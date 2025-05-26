@@ -5,6 +5,9 @@ A web application for tracking meal-related expenses, built with Flask and Docke
 ## Features
 
 - Track meal expenses with categories (Breakfast, Lunch, Dinner, etc.)
+- Date-based expense filtering and reporting
+- Edit existing expenses
+- Expense summaries with totals
 - User authentication
 - Responsive design
 - Docker containerization
@@ -12,20 +15,21 @@ A web application for tracking meal-related expenses, built with Flask and Docke
 ## Prerequisites
 
 - Docker
-- Docker Compose (optional)
 
-## Setup and Running
+## Quick Start
 
 1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd meal-expense-tracker
 ```
 
-2. Build and run with Docker:
+1. Build and run with Docker:
+
 ```bash
 docker build -t meal-expense-tracker .
-docker run -p 5000:5000 meal-expense-tracker
+docker run -d -p 5000:5000 meal-expense-tracker
 ```
 
 The application will be available at http://localhost:5000
@@ -33,17 +37,20 @@ The application will be available at http://localhost:5000
 ## Development Setup
 
 1. Create a virtual environment:
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 2. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 3. Run the application:
+
 ```bash
 flask run
 ```
@@ -55,4 +62,4 @@ flask run
 
 ## License
 
-MIT 
+MIT
