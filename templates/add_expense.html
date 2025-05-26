@@ -1,108 +1,79 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title mb-0">Add New Expense</h3>
-            </div>
-            <div class="card-body">
-                <form method="POST" onsubmit="return validateForm()">
-                    <div class="mb-3">
-                        <label for="date" class="form-label">Date</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-calendar"></i></span>
-                            <input type="date" class="form-control" id="date" name="date" required 
-                                   max="{{ today }}" min="{{ min_date }}" value="{{ today }}">
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">Add Expense</h2>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="restaurant_id" class="form-label">Restaurant</label>
+                                <select class="form-select" id="restaurant_id" name="restaurant_id" required>
+                                    <option value="">Select a restaurant</option>
+                                    {% for restaurant in restaurants %}
+                                    <option value="{{ restaurant.id }}">{{ restaurant.full_name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">
+                                    <a href="{{ url_for('add_restaurant') }}" target="_blank">Add a new restaurant</a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="date" class="form-label">Date</label>
+                                <input type="date" class="form-control" id="date" name="date" 
+                                       value="{{ today }}" min="{{ min_date }}" max="{{ today }}" required>
+                            </div>
                         </div>
-                        <div class="form-text">Select the date of the expense (between {{ min_date }} and today)</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="amount" class="form-label">Amount ($)</label>
-                        <div class="input-group">
-                            <span class="input-group-text">$</span>
-                            <input type="number" step="0.01" min="0.01" class="form-control" id="amount" name="amount" required>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="amount" class="form-label">Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" id="amount" name="amount" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="meal" class="form-label">Meal (Optional)</label>
+                                <select class="form-select" id="meal" name="meal">
+                                    <option value="">Select a meal type (optional)</option>
+                                    <option value="Breakfast">Breakfast</option>
+                                    <option value="Lunch">Lunch</option>
+                                    <option value="Dinner">Dinner</option>
+                                    <option value="Snacks">Snacks</option>
+                                    <option value="Groceries">Groceries</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="form-text">Enter the expense amount</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
-                        <input type="text" class="form-control" id="description" name="description" required 
-                               placeholder="e.g., Lunch at Italian Restaurant">
-                        <div class="form-text">Briefly describe the expense</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="meal" class="form-label">Meal (Optional)</label>
-                        <select class="form-select" id="meal" name="meal">
-                            <option value="">Select a meal type (optional)</option>
-                            <option value="Breakfast">Breakfast</option>
-                            <option value="Lunch">Lunch</option>
-                            <option value="Dinner">Dinner</option>
-                            <option value="Snacks">Snacks</option>
-                            <option value="Groceries">Groceries</option>
-                            <option value="Other">Other</option>
-                        </select>
-                        <div class="form-text">Choose the meal type (optional)</div>
-                    </div>
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save"></i> Save Expense
-                        </button>
-                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
-                            <i class="bi bi-x-circle"></i> Cancel
-                        </a>
-                    </div>
-                </form>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description (Optional)</label>
+                            <input type="text" class="form-control" id="description" name="description" 
+                                   placeholder="Brief description of the expense">
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Add Expense</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 </div>
-
-<script>
-function validateForm() {
-    const dateInput = document.getElementById('date');
-    const amountInput = document.getElementById('amount');
-    const descriptionInput = document.getElementById('description');
-    
-    // Date validation
-    if (!dateInput.value) {
-        alert('Please select a date');
-        return false;
-    }
-    
-    const selectedDate = new Date(dateInput.value);
-    const today = new Date();
-    const minDate = new Date('{{ min_date }}');
-    
-    if (selectedDate > today) {
-        alert('Date cannot be in the future');
-        return false;
-    }
-    
-    if (selectedDate < minDate) {
-        alert('Date cannot be before {{ min_date }}');
-        return false;
-    }
-    
-    // Amount validation
-    if (!amountInput.value || amountInput.value <= 0) {
-        alert('Please enter a valid amount greater than 0');
-        return false;
-    }
-    
-    // Description validation
-    if (!descriptionInput.value.trim()) {
-        alert('Please enter a description');
-        return false;
-    }
-    
-    if (descriptionInput.value.trim().length < 3) {
-        alert('Description must be at least 3 characters long');
-        return false;
-    }
-    
-    return true;
-}
-</script>
 {% endblock %} 
