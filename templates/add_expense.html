@@ -33,9 +33,9 @@
                         <div class="form-text">Briefly describe the expense</div>
                     </div>
                     <div class="mb-3">
-                        <label for="category" class="form-label">Category</label>
-                        <select class="form-select" id="category" name="category" required>
-                            <option value="">Select a category</option>
+                        <label for="meal" class="form-label">Meal (Optional)</label>
+                        <select class="form-select" id="meal" name="meal">
+                            <option value="">Select a meal type (optional)</option>
                             <option value="Breakfast">Breakfast</option>
                             <option value="Lunch">Lunch</option>
                             <option value="Dinner">Dinner</option>
@@ -43,7 +43,7 @@
                             <option value="Groceries">Groceries</option>
                             <option value="Other">Other</option>
                         </select>
-                        <div class="form-text">Choose the expense category</div>
+                        <div class="form-text">Choose the meal type (optional)</div>
                     </div>
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary">
@@ -64,7 +64,6 @@ function validateForm() {
     const dateInput = document.getElementById('date');
     const amountInput = document.getElementById('amount');
     const descriptionInput = document.getElementById('description');
-    const categoryInput = document.getElementById('category');
     
     // Date validation
     if (!dateInput.value) {
@@ -100,12 +99,6 @@ function validateForm() {
     
     if (descriptionInput.value.trim().length < 3) {
         alert('Description must be at least 3 characters long');
-        return false;
-    }
-    
-    // Category validation
-    if (!categoryInput.value) {
-        alert('Please select a category');
         return false;
     }
     

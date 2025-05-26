@@ -42,7 +42,7 @@ class Expense(db.Model):
     date = db.Column(db.DateTime, nullable=False)
     amount = db.Column(db.Float, nullable=False)
     description = db.Column(db.String(200), nullable=False)
-    category = db.Column(db.String(50), nullable=False)
+    meal = db.Column(db.String(50), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 @login_manager.user_loader
@@ -135,10 +135,7 @@ def add_expense():
                 flash('Description must be at least 3 characters long', 'danger')
                 return redirect(url_for('add_expense'))
                 
-            category = request.form['category']
-            if not category:
-                flash('Please select a category', 'danger')
-                return redirect(url_for('add_expense'))
+            meal = request.form.get('meal', '')
                 
             date_str = request.form['date']
             date = datetime.strptime(date_str, '%Y-%m-%d')
@@ -156,7 +153,7 @@ def add_expense():
             expense = Expense(
                 amount=amount,
                 description=description,
-                category=category,
+                meal=meal,
                 date=date,
                 user_id=current_user.id
             )
@@ -196,10 +193,7 @@ def edit_expense(expense_id):
                 flash('Description must be at least 3 characters long', 'danger')
                 return redirect(url_for('edit_expense', expense_id=expense_id))
                 
-            category = request.form['category']
-            if not category:
-                flash('Please select a category', 'danger')
-                return redirect(url_for('edit_expense', expense_id=expense_id))
+            meal = request.form.get('meal', '')
                 
             date_str = request.form['date']
             date = datetime.strptime(date_str, '%Y-%m-%d')
@@ -216,7 +210,7 @@ def edit_expense(expense_id):
             
             expense.amount = amount
             expense.description = description
-            expense.category = category
+            expense.meal = meal
             expense.date = date
             
             db.session.commit()
