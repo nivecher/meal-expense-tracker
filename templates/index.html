@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>Your Meal Expenses</h2>
+    </div>
+    <div class="col text-end">
+        <a href="{{ url_for('add_expense') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add New Expense
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    {% for expense in expenses %}
+    <div class="col-md-4 mb-4">
+        <div class="card expense-card h-100">
+            <div class="card-body">
+                <h5 class="card-title">{{ expense.description }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">{{ expense.category }}</h6>
+                <p class="card-text">
+                    <strong>Amount:</strong> ${{ "%.2f"|format(expense.amount) }}<br>
+                    <strong>Date:</strong> {{ expense.date.strftime('%Y-%m-%d %H:%M') }}
+                </p>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col">
+        <div class="alert alert-info">
+            No expenses recorded yet. Click "Add New Expense" to get started!
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %} 
