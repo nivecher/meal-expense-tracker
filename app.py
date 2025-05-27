@@ -1,15 +1,20 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import click
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///meals.db'
-app.config['GOOGLE_MAPS_API_KEY'] = os.environ.get('GOOGLE_MAPS_API_KEY', '')
+app.config['SECRET_KEY'] = os.urandom(24)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///meal_expenses.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['GOOGLE_MAPS_API_KEY'] = os.getenv('GOOGLE_MAPS_API_KEY')
 db = SQLAlchemy(app)
 
 class Restaurant(db.Model):
@@ -372,6 +377,38 @@ def register():
         return redirect(url_for('login'))
     
     return render_template('register.html')
+
+@app.route('/restaurant/<int:restaurant_id>')
+@login_required
+def restaurant_details(restaurant_id):
+    restaurant = Restaurant.query.get_or_404(restaurant_id)
+    
+    # Get all expenses for this restaurant
+    expenses = Expense.query.filter_by(
+        restaurant_id=restaurant_id,
+        user_id=current_user.id
+    ).order_by(Expense.date.desc()).all()
+    
+    # Calculate summary statistics
+    total_expenses = len(expenses)
+    total_amount = sum(expense.amount for expense in expenses)
+    avg_amount = total_amount / total_expenses if total_expenses > 0 else 0
+    
+    # Group expenses by meal type
+    meal_stats = {}
+    for expense in expenses:
+        if expense.meal not in meal_stats:
+            meal_stats[expense.meal] = {'count': 0, 'amount': 0}
+        meal_stats[expense.meal]['count'] += 1
+        meal_stats[expense.meal]['amount'] += expense.amount
+    
+    return render_template('restaurant_details.html',
+                         restaurant=restaurant,
+                         expenses=expenses,
+                         total_expenses=total_expenses,
+                         total_amount=total_amount,
+                         avg_amount=avg_amount,
+                         meal_stats=meal_stats)
 
 if __name__ == '__main__':
     app.run(debug=True) 
