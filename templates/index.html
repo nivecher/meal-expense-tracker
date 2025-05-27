@@ -41,16 +41,26 @@
                 </div>
 
                 <!-- Filters Section -->
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label for="meal" class="form-label">Meal Type</label>
                     <select class="form-select" id="meal" name="meal">
                         <option value="">All Meals</option>
-                        <option value="Breakfast" {% if request.args.get('meal') == 'Breakfast' %}selected{% endif %}>Breakfast</option>
-                        <option value="Lunch" {% if request.args.get('meal') == 'Lunch' %}selected{% endif %}>Lunch</option>
-                        <option value="Dinner" {% if request.args.get('meal') == 'Dinner' %}selected{% endif %}>Dinner</option>
-                        <option value="Snacks" {% if request.args.get('meal') == 'Snacks' %}selected{% endif %}>Snacks</option>
-                        <option value="Groceries" {% if request.args.get('meal') == 'Groceries' %}selected{% endif %}>Groceries</option>
-                        <option value="Other" {% if request.args.get('meal') == 'Other' %}selected{% endif %}>Other</option>
+                        {% for meal_type in meal_types %}
+                        <option value="{{ meal_type }}" {% if meal == meal_type %}selected{% endif %}>
+                            {{ meal_type }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-select" id="category" name="category">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>
+                            {{ cat }}
+                        </option>
+                        {% endfor %}
                     </select>
                 </div>
 
@@ -125,10 +135,10 @@
                                 </a>
                             </th>
                             <th>
-                                <a href="{{ url_for('index', sort='description', order='asc' if sort_by != 'description' or sort_order == 'desc' else 'desc', search=request.args.get('search', ''), meal=request.args.get('meal', ''), start_date=request.args.get('start_date', ''), end_date=request.args.get('end_date', '')) }}"
+                                <a href="{{ url_for('index', sort='category', order='asc' if sort_by != 'category' or sort_order == 'desc' else 'desc', search=request.args.get('search', ''), meal=request.args.get('meal', ''), start_date=request.args.get('start_date', ''), end_date=request.args.get('end_date', '')) }}"
                                    class="text-decoration-none text-dark d-flex align-items-center">
-                                    Description
-                                    {% if sort_by == 'description' %}
+                                    Category
+                                    {% if sort_by == 'category' %}
                                         <span class="sort-indicator">
                                             {% if sort_order == 'asc' %}↑{% else %}↓{% endif %}
                                         </span>
@@ -156,8 +166,8 @@
                             <td>
                                 {% if expense.restaurant %}
                                     <span class="d-flex align-items-center">
-                                        <i class="fas fa-store text-muted me-2"></i>
-                                        {{ expense.restaurant.name }}
+                                        <i class="fas fa-utensils me-2"></i>
+                                        {{ expense.restaurant.full_name }}
                                     </span>
                                 {% else %}
                                     -
@@ -172,7 +182,7 @@
                                     -
                                 {% endif %}
                             </td>
-                            <td>{{ expense.description or '-' }}</td>
+                            <td>{{ expense.category or '-' }}</td>
                             <td class="fw-bold">${{ "%.2f"|format(expense.amount) }}</td>
                             <td>
                                 <div class="btn-group">

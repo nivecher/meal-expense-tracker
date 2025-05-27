@@ -26,8 +26,40 @@
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Location</th>
+                            <th>
+                                <a href="{{ url_for('restaurants', sort='name', order='asc' if sort_by != 'name' or sort_order == 'desc' else 'desc') }}"
+                                   class="text-decoration-none text-dark d-flex align-items-center">
+                                    Name
+                                    {% if sort_by == 'name' %}
+                                        <span class="sort-indicator">
+                                            {% if sort_order == 'asc' %}↑{% else %}↓{% endif %}
+                                        </span>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>
+                                <a href="{{ url_for('restaurants', sort='location', order='asc' if sort_by != 'location' or sort_order == 'desc' else 'desc') }}"
+                                   class="text-decoration-none text-dark d-flex align-items-center">
+                                    Location
+                                    {% if sort_by == 'location' %}
+                                        <span class="sort-indicator">
+                                            {% if sort_order == 'asc' %}↑{% else %}↓{% endif %}
+                                        </span>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th>Address</th>
+                            <th>
+                                <a href="{{ url_for('restaurants', sort='category', order='asc' if sort_by != 'category' or sort_order == 'desc' else 'desc') }}"
+                                   class="text-decoration-none text-dark d-flex align-items-center">
+                                    Category
+                                    {% if sort_by == 'category' %}
+                                        <span class="sort-indicator">
+                                            {% if sort_order == 'asc' %}↑{% else %}↓{% endif %}
+                                        </span>
+                                    {% endif %}
+                                </a>
+                            </th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -35,7 +67,17 @@
                         {% for restaurant in restaurants %}
                         <tr>
                             <td>{{ restaurant.name }}</td>
-                            <td>{{ restaurant.location }}</td>
+                            <td>{{ restaurant.location or '-' }}</td>
+                            <td>{{ restaurant.address or '-' }}</td>
+                            <td>
+                                {% if restaurant.category %}
+                                    <span class="badge bg-light text-dark">
+                                        {{ restaurant.category }}
+                                    </span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
                             <td>
                                 <div class="btn-group">
                                     <a href="{{ url_for('edit_restaurant', restaurant_id=restaurant.id) }}" class="btn btn-sm btn-outline-primary">

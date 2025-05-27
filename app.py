@@ -9,6 +9,7 @@ import click
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///meals.db'
+app.config['GOOGLE_MAPS_API_KEY'] = os.environ.get('GOOGLE_MAPS_API_KEY', '')
 db = SQLAlchemy(app)
 
 class Restaurant(db.Model):
@@ -177,7 +178,7 @@ def add_restaurant():
         flash('Restaurant added successfully!', 'success')
         return redirect(url_for('restaurants'))
 
-    return render_template('add_restaurant.html')
+    return render_template('add_restaurant.html', config=app.config)
 
 @app.route('/edit_restaurant/<int:restaurant_id>', methods=['GET', 'POST'])
 @login_required
@@ -210,7 +211,7 @@ def edit_restaurant(restaurant_id):
         flash('Restaurant updated successfully!', 'success')
         return redirect(url_for('restaurants'))
 
-    return render_template('edit_restaurant.html', restaurant=restaurant)
+    return render_template('edit_restaurant.html', restaurant=restaurant, config=app.config)
 
 @app.route('/add_expense', methods=['GET', 'POST'])
 @login_required

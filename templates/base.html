@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Meal Expense Tracker{% endblock %}</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+    <!-- Styles -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -190,5 +196,59 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Google Places API -->
+    <script>
+        // Queue for initialization callbacks
+        window.googleMapsInitQueue = [];
+        
+        // Initialize Google Maps when the API is loaded
+        function initGoogleMaps() {
+            console.log('Google Maps API loaded successfully');
+            // Execute all queued callbacks
+            while (window.googleMapsInitQueue.length > 0) {
+                const callback = window.googleMapsInitQueue.shift();
+                if (typeof callback === 'function') {
+                    try {
+                        callback();
+                    } catch (error) {
+                        console.error('Error in Google Maps initialization callback:', error);
+                        if (error.name === 'ApiNotActivatedMapError') {
+                            alert('Google Maps API is not activated. Please enable the Maps JavaScript API in the Google Cloud Console.');
+                        }
+                    }
+                }
+            }
+        }
+
+        // Function to queue initialization callbacks
+        window.initGoogleMaps = function(callback) {
+            if (typeof callback === 'function') {
+                if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+                    callback();
+                } else {
+                    window.googleMapsInitQueue.push(callback);
+                }
+            }
+        };
+
+        // Handle API loading errors
+        function handleApiError(error) {
+            console.error('Failed to load Google Maps API:', error);
+            if (error.name === 'ApiNotActivatedMapError') {
+                alert('Google Maps API is not activated. Please enable the Maps JavaScript API in the Google Cloud Console.');
+            }
+        }
+
+        // Load Google Maps API
+        (function loadGoogleMapsAPI() {
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_MAPS_API_KEY }}&libraries=places&callback=initGoogleMaps`;
+            script.async = true;
+            script.defer = true;
+            script.onerror = handleApiError;
+            document.head.appendChild(script);
+        })();
+    </script>
+    {% block scripts %}{% endblock %}
 </body>
 </html> 
