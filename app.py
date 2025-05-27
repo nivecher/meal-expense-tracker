@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime, timedelta
@@ -248,58 +248,49 @@ def add_expense():
 @login_required
 def edit_expense(expense_id):
     expense = Expense.query.get_or_404(expense_id)
-    
-    # Ensure the expense belongs to the current user
     if expense.user_id != current_user.id:
-        flash('You do not have permission to edit this expense', 'danger')
-        return redirect(url_for('index'))
+        abort(403)
     
     if request.method == 'POST':
-        try:
-            amount = float(request.form['amount'])
-            if amount <= 0:
-                flash('Amount must be greater than 0', 'danger')
-                return redirect(url_for('edit_expense', expense_id=expense_id))
-                
-            description = request.form.get('description', '').strip()
-            meal = request.form.get('meal', '')
-            restaurant_id = request.form.get('restaurant_id', type=int)
-            
-            if not restaurant_id:
-                flash('Restaurant is required', 'danger')
-                return redirect(url_for('edit_expense', expense_id=expense_id))
-                
-            date_str = request.form['date']
-            date = datetime.strptime(date_str, '%Y-%m-%d')
-            today = datetime.now().date()
-            min_date = today - timedelta(days=365)
-            
-            if date.date() > today:
-                flash('Date cannot be in the future', 'danger')
-                return redirect(url_for('edit_expense', expense_id=expense_id))
-                
-            if date.date() < min_date:
-                flash('Date cannot be more than 1 year ago', 'danger')
-                return redirect(url_for('edit_expense', expense_id=expense_id))
-            
-            expense.amount = amount
-            expense.description = description
-            expense.meal = meal
-            expense.restaurant_id = restaurant_id
-            expense.date = date
-            
-            db.session.commit()
-            flash('Expense updated successfully!', 'success')
-            return redirect(url_for('index'))
-            
-        except ValueError:
-            flash('Invalid input data', 'danger')
-            return redirect(url_for('edit_expense', expense_id=expense_id))
+        expense.date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
+        expense.amount = float(request.form['amount'])
+        expense.meal = request.form['meal']
+        expense.restaurant_id = int(request.form['restaurant_id'])
+        expense.description = request.form['description']
+        
+        db.session.commit()
+        flash('Expense updated successfully!', 'success')
+        return redirect(url_for('index'))
     
     restaurants = Restaurant.query.order_by(Restaurant.name, Restaurant.location).all()
-    today = datetime.now().strftime('%Y-%m-%d')
-    min_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-    return render_template('edit_expense.html', expense=expense, today=today, min_date=min_date, restaurants=restaurants)
+    return render_template('edit_expense.html', expense=expense, restaurants=restaurants)
+
+@app.route('/delete_expense/<int:expense_id>', methods=['POST'])
+@login_required
+def delete_expense(expense_id):
+    expense = Expense.query.get_or_404(expense_id)
+    if expense.user_id != current_user.id:
+        abort(403)
+    
+    db.session.delete(expense)
+    db.session.commit()
+    flash('Expense deleted successfully!', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/delete_restaurant/<int:restaurant_id>', methods=['POST'])
+@login_required
+def delete_restaurant(restaurant_id):
+    restaurant = Restaurant.query.get_or_404(restaurant_id)
+    
+    # Check if restaurant has any expenses
+    if Expense.query.filter_by(restaurant_id=restaurant.id).first():
+        flash('Cannot delete restaurant with existing expenses!', 'danger')
+        return redirect(url_for('restaurants'))
+    
+    db.session.delete(restaurant)
+    db.session.commit()
+    flash('Restaurant deleted successfully!', 'success')
+    return redirect(url_for('restaurants'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
