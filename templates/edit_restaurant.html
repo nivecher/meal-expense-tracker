@@ -105,7 +105,7 @@
                     try {
                         const place = autocomplete.getPlace();
                         console.log('Place selected:', place);
-                        
+
                         if (!place || !place.address_components) {
                             console.log('No place details available');
                             return;
@@ -142,14 +142,14 @@
                     const name = nameInput.value.trim();
                     const location = locationInput.value.trim();
                     let searchQuery = '';
-
+                    
                     if (name) {
                         searchQuery += name;
                     }
                     if (location) {
                         searchQuery += searchQuery ? ` in ${location}` : location;
                     }
-
+                    
                     if (searchQuery) {
                         console.log('Updating search with:', searchQuery);
                         addressInput.value = searchQuery;
