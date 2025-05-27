@@ -15,6 +15,8 @@ class Restaurant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     location = db.Column(db.String(100), nullable=True)
+    address = db.Column(db.String(200), nullable=True)
+    category = db.Column(db.String(50), nullable=True)
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     expenses = db.relationship('Expense', backref='restaurant', lazy=True)
@@ -44,6 +46,7 @@ class Expense(db.Model):
     amount = db.Column(db.Float, nullable=False)
     description = db.Column(db.String(200), nullable=True)
     meal = db.Column(db.String(50), nullable=True)
+    category = db.Column(db.String(50), nullable=True)
     restaurant_id = db.Column(db.Integer, db.ForeignKey('restaurant.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
@@ -69,61 +72,72 @@ def load_user(user_id):
 @login_required
 def index():
     # Get filter parameters
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    search = request.args.get('search', '').strip()
+    search = request.args.get('search', '')
     meal = request.args.get('meal', '')
-    
-    # Get sorting parameters
+    category = request.args.get('category', '')
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
     sort_by = request.args.get('sort', 'date')
     sort_order = request.args.get('order', 'desc')
     
-    # Build the query
+    # Base query
     query = Expense.query.filter_by(user_id=current_user.id)
     
-    # Apply date filters
-    if start_date:
-        query = query.filter(Expense.date >= datetime.strptime(start_date, '%Y-%m-%d').date())
-    if end_date:
-        query = query.filter(Expense.date <= datetime.strptime(end_date, '%Y-%m-%d').date())
-    
-    # Apply meal filter
-    if meal:
-        query = query.filter(Expense.meal == meal)
-    
-    # Apply search filter
+    # Apply filters
     if search:
-        search_term = f"%{search}%"
         query = query.join(Restaurant).filter(
             db.or_(
-                Restaurant.name.ilike(search_term),
-                Restaurant.location.ilike(search_term),
-                Expense.description.ilike(search_term)
+                Restaurant.name.ilike(f'%{search}%'),
+                Restaurant.location.ilike(f'%{search}%'),
+                Expense.description.ilike(f'%{search}%')
             )
         )
+    if meal:
+        query = query.filter(Expense.meal == meal)
+    if category:
+        query = query.filter(Expense.category == category)
+    if start_date:
+        query = query.filter(Expense.date >= datetime.strptime(start_date, '%Y-%m-%d'))
+    if end_date:
+        query = query.filter(Expense.date <= datetime.strptime(end_date, '%Y-%m-%d'))
     
     # Apply sorting
     if sort_by == 'date':
         query = query.order_by(Expense.date.desc() if sort_order == 'desc' else Expense.date.asc())
     elif sort_by == 'amount':
         query = query.order_by(Expense.amount.desc() if sort_order == 'desc' else Expense.amount.asc())
+    elif sort_by == 'meal':
+        query = query.order_by(Expense.meal.desc() if sort_order == 'desc' else Expense.meal.asc())
+    elif sort_by == 'category':
+        query = query.order_by(Expense.category.desc() if sort_order == 'desc' else Expense.category.asc())
     elif sort_by == 'restaurant':
         query = query.join(Restaurant).order_by(
             Restaurant.name.desc() if sort_order == 'desc' else Restaurant.name.asc()
         )
-    elif sort_by == 'meal':
-        query = query.order_by(Expense.meal.desc() if sort_order == 'desc' else Expense.meal.asc())
-    elif sort_by == 'description':
-        query = query.order_by(Expense.description.desc() if sort_order == 'desc' else Expense.description.asc())
     
     expenses = query.all()
-    total_amount = sum(expense.amount for expense in expenses)
+    
+    # Calculate total amount
+    total_amount = sum(expense.amount for expense in expenses) if expenses else 0.0
+    
+    # Get unique meal types and categories for filter dropdowns
+    meal_types = db.session.query(Expense.meal).distinct().filter(Expense.meal != '').all()
+    meal_types = [meal[0] for meal in meal_types]
+    categories = db.session.query(Expense.category).distinct().filter(Expense.category != '').all()
+    categories = [category[0] for category in categories]
     
     return render_template('index.html', 
-                         expenses=expenses, 
-                         total_amount=total_amount,
+                         expenses=expenses,
+                         search=search,
+                         meal=meal,
+                         category=category,
+                         start_date=start_date,
+                         end_date=end_date,
                          sort_by=sort_by,
-                         sort_order=sort_order)
+                         sort_order=sort_order,
+                         meal_types=meal_types,
+                         categories=categories,
+                         total_amount=total_amount)
 
 @app.route('/restaurants')
 @login_required
@@ -137,6 +151,8 @@ def add_restaurant():
     if request.method == 'POST':
         name = request.form['name'].strip()
         location = request.form.get('location', '').strip()
+        address = request.form.get('address', '').strip()
+        category = request.form.get('category', '').strip()
         description = request.form.get('description', '').strip()
 
         if not name:
@@ -152,6 +168,8 @@ def add_restaurant():
         restaurant = Restaurant(
             name=name,
             location=location if location else None,
+            address=address if address else None,
+            category=category if category else None,
             description=description if description else None
         )
         db.session.add(restaurant)
@@ -169,6 +187,8 @@ def edit_restaurant(restaurant_id):
     if request.method == 'POST':
         name = request.form['name'].strip()
         location = request.form.get('location', '').strip()
+        address = request.form.get('address', '').strip()
+        category = request.form.get('category', '').strip()
         description = request.form.get('description', '').strip()
 
         if not name:
@@ -183,6 +203,8 @@ def edit_restaurant(restaurant_id):
 
         restaurant.name = name
         restaurant.location = location if location else None
+        restaurant.address = address if address else None
+        restaurant.category = category if category else None
         restaurant.description = description if description else None
         db.session.commit()
         flash('Restaurant updated successfully!', 'success')
@@ -202,11 +224,18 @@ def add_expense():
                 
             description = request.form.get('description', '').strip()
             meal = request.form.get('meal', '')
+            category = request.form.get('category', '')
             restaurant_id = request.form.get('restaurant_id', type=int)
             
             if not restaurant_id:
                 flash('Restaurant is required', 'danger')
                 return redirect(url_for('add_expense'))
+            
+            # Get restaurant's category if no category is specified
+            if not category:
+                restaurant = Restaurant.query.get(restaurant_id)
+                if restaurant and restaurant.category:
+                    category = restaurant.category
                 
             date_str = request.form['date']
             date = datetime.strptime(date_str, '%Y-%m-%d')
@@ -225,6 +254,7 @@ def add_expense():
                 amount=amount,
                 description=description,
                 meal=meal,
+                category=category,
                 restaurant_id=restaurant_id,
                 date=date,
                 user_id=current_user.id
@@ -255,6 +285,7 @@ def edit_expense(expense_id):
         expense.date = datetime.strptime(request.form['date'], '%Y-%m-%d').date()
         expense.amount = float(request.form['amount'])
         expense.meal = request.form['meal']
+        expense.category = request.form['category']
         expense.restaurant_id = int(request.form['restaurant_id'])
         expense.description = request.form['description']
         
