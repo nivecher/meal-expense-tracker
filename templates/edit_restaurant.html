@@ -1,64 +1,55 @@
 {% extends "base.html" %}
 
-{% block content %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-white py-3">
-                    <h2 class="h4 mb-0">Edit Restaurant</h2>
-                </div>
-                <div class="card-body">
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category }} alert-dismissible fade show">
-                                    {{ message }}
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
+{% block title %}Edit Restaurant{% endblock %}
 
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label for="name" class="form-label">Restaurant Name *</label>
-                            <input type="text" class="form-control" id="name" name="name" 
-                                   value="{{ restaurant.name }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="location" class="form-label">Location</label>
-                            <input type="text" class="form-control" id="location" name="location" 
-                                   value="{{ restaurant.location or '' }}">
-                        </div>
-                        <div class="mb-3">
-                            <label for="address" class="form-label">Address</label>
-                            <input type="text" class="form-control" id="address" name="address" 
-                                   value="{{ restaurant.address or '' }}">
-                        </div>
-                        <div class="mb-3">
-                            <label for="category" class="form-label">Category</label>
-                            <select class="form-select" id="category" name="category">
-                                <option value="">Select a category (optional)</option>
-                                <option value="Dining Out" {% if restaurant.category == 'Dining Out' %}selected{% endif %}>Dining Out</option>
-                                <option value="Takeout" {% if restaurant.category == 'Takeout' %}selected{% endif %}>Takeout</option>
-                                <option value="Groceries" {% if restaurant.category == 'Groceries' %}selected{% endif %}>Groceries</option>
-                                <option value="Coffee" {% if restaurant.category == 'Coffee' %}selected{% endif %}>Coffee</option>
-                                <option value="Snacks" {% if restaurant.category == 'Snacks' %}selected{% endif %}>Snacks</option>
-                                <option value="Other" {% if restaurant.category == 'Other' %}selected{% endif %}>Other</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="description" class="form-label">Description</label>
-                            <textarea class="form-control" id="description" name="description" 
-                                      rows="3">{{ restaurant.description or '' }}</textarea>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">Update Restaurant</button>
-                            <a href="{{ url_for('restaurants') }}" class="btn btn-outline-secondary">Cancel</a>
-                        </div>
-                    </form>
-                </div>
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="mb-0">{% if restaurant %}Edit{% else %}Add{% endif %} Restaurant</h2>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Restaurant Name</label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ restaurant.name if restaurant else '' }}" required>
+                        <div class="invalid-feedback">Please enter a restaurant name.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Address</label>
+                        <input type="text" class="form-control" id="address" name="address" value="{{ restaurant.address if restaurant else '' }}" required>
+                        <div class="invalid-feedback">Please enter an address.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="chain" class="form-label">Restaurant Chain (Optional)</label>
+                        <input type="text" class="form-control" id="chain" name="chain" value="{{ restaurant.chain if restaurant else '' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category (Optional)</label>
+                        <select class="form-select" id="category" name="category">
+                            <option value="">Select a category</option>
+                            <option value="restaurant" {% if restaurant and restaurant.category == 'restaurant' %}selected{% endif %}>Restaurant</option>
+                            <option value="cafe" {% if restaurant and restaurant.category == 'cafe' %}selected{% endif %}>Cafe</option>
+                            <option value="bar" {% if restaurant and restaurant.category == 'bar' %}selected{% endif %}>Bar</option>
+                            <option value="bakery" {% if restaurant and restaurant.category == 'bakery' %}selected{% endif %}>Bakery</option>
+                            <option value="food" {% if restaurant and restaurant.category == 'food' %}selected{% endif %}>Food</option>
+                            <option value="meal_delivery" {% if restaurant and restaurant.category == 'meal_delivery' %}selected{% endif %}>Meal Delivery</option>
+                            <option value="meal_takeaway" {% if restaurant and restaurant.category == 'meal_takeaway' %}selected{% endif %}>Meal Takeaway</option>
+                            <option value="supermarket" {% if restaurant and restaurant.category == 'supermarket' %}selected{% endif %}>Supermarket</option>
+                            <option value="grocery_or_supermarket" {% if restaurant and restaurant.category == 'grocery_or_supermarket' %}selected{% endif %}>Grocery Store</option>
+                            <option value="convenience_store" {% if restaurant and restaurant.category == 'convenience_store' %}selected{% endif %}>Convenience Store</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ restaurant.description if restaurant else '' }}</textarea>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Save Restaurant</button>
+                        <a href="{{ url_for('restaurants') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -67,107 +58,80 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const nameInput = document.getElementById('name');
-        const addressInput = document.getElementById('address');
-        const locationInput = document.getElementById('location');
+async function initializePlacesAutocomplete() {
+    try {
+        const { Autocomplete } = await google.maps.importLibrary("places");
         
-        if (!nameInput || !addressInput || !locationInput) {
-            console.error('Required input elements not found:', {
-                name: !!nameInput,
-                address: !!addressInput,
-                location: !!locationInput
-            });
-            return;
-        }
-
-        // Prevent form submission on Enter key when address input is focused
-        addressInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-            }
+        const addressInput = document.getElementById('address');
+        const nameInput = document.getElementById('name');
+        const categorySelect = document.getElementById('category');
+        const chainInput = document.getElementById('chain');
+        
+        const autocomplete = new Autocomplete(addressInput, {
+            types: ['establishment'],
+            fields: ['name', 'formatted_address', 'geometry', 'place_id', 'types']
         });
 
-        // Initialize Google Places Autocomplete
-        window.initGoogleMaps(function() {
-            try {
-                console.log('Initializing Google Places Autocomplete...');
-                
-                // Create the autocomplete object with restaurant search
-                const autocomplete = new google.maps.places.Autocomplete(addressInput, {
-                    types: ['establishment'],
-                    componentRestrictions: { country: 'US' },
-                    fields: ['name', 'address_components', 'formatted_address', 'place_id']
-                });
+        // Handle place selection
+        autocomplete.addListener('place_changed', function() {
+            const place = autocomplete.getPlace();
+            if (!place.geometry) {
+                return;
+            }
 
-                // Handle place selection
-                autocomplete.addListener('place_changed', function() {
-                    try {
-                        const place = autocomplete.getPlace();
-                        console.log('Place selected:', place);
+            // Update the address field with the formatted address
+            addressInput.value = place.formatted_address;
+            
+            // Update the name field if it's empty
+            if (!nameInput.value && place.name) {
+                nameInput.value = place.name;
+            }
 
-                        if (!place || !place.address_components) {
-                            console.log('No place details available');
-                            return;
-                        }
+            // Update category based on place types
+            if (place.types) {
+                const restaurantTypes = {
+                    'restaurant': 'restaurant',
+                    'cafe': 'cafe',
+                    'bar': 'bar',
+                    'bakery': 'bakery',
+                    'food': 'food',
+                    'meal_delivery': 'meal_delivery',
+                    'meal_takeaway': 'meal_takeaway',
+                    'supermarket': 'supermarket',
+                    'grocery_or_supermarket': 'grocery_or_supermarket',
+                    'convenience_store': 'convenience_store'
+                };
 
-                        // Update restaurant name if it's empty
-                        if (!nameInput.value && place.name) {
-                            nameInput.value = place.name;
-                        }
-
-                        // Find the city component
-                        const cityComponent = place.address_components.find(
-                            component => component.types.includes('locality')
-                        );
-                        
-                        if (cityComponent) {
-                            console.log('Setting city to:', cityComponent.long_name);
-                            locationInput.value = cityComponent.long_name;
-                        } else {
-                            console.log('No city component found in place details');
-                        }
-
-                        // Update address with formatted address
-                        if (place.formatted_address) {
-                            addressInput.value = place.formatted_address;
-                        }
-                    } catch (error) {
-                        console.error('Error handling place selection:', error);
-                    }
-                });
-
-                // Update search based on name and location
-                function updateSearch() {
-                    const name = nameInput.value.trim();
-                    const location = locationInput.value.trim();
-                    let searchQuery = '';
-                    
-                    if (name) {
-                        searchQuery += name;
-                    }
-                    if (location) {
-                        searchQuery += searchQuery ? ` in ${location}` : location;
-                    }
-                    
-                    if (searchQuery) {
-                        console.log('Updating search with:', searchQuery);
-                        addressInput.value = searchQuery;
-                        // Trigger the autocomplete
-                        const event = new Event('input', { bubbles: true });
-                        addressInput.dispatchEvent(event);
+                // Find the first matching type
+                for (const type of place.types) {
+                    if (restaurantTypes[type]) {
+                        categorySelect.value = restaurantTypes[type];
+                        break;
                     }
                 }
-
-                // Add event listeners for name and location changes
-                nameInput.addEventListener('change', updateSearch);
-                locationInput.addEventListener('change', updateSearch);
-
-                console.log('Google Places Autocomplete initialized successfully');
-            } catch (error) {
-                console.error('Error initializing Google Places Autocomplete:', error);
             }
         });
+    } catch (error) {
+        console.error('Error initializing Places Autocomplete:', error);
+    }
+}
+
+// Initialize form validation
+(function() {
+    'use strict';
+    const forms = document.querySelectorAll('.needs-validation');
+    Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
     });
+})();
+
+// Initialize Places Autocomplete
+initializePlacesAutocomplete();
 </script>
 {% endblock %} 

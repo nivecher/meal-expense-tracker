@@ -20,16 +20,16 @@ db = SQLAlchemy(app)
 class Restaurant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    location = db.Column(db.String(100), nullable=True)
     address = db.Column(db.String(200), nullable=True)
-    category = db.Column(db.String(50), nullable=True)
+    category = db.Column(db.String(50), nullable=True)  # Now using Google Places categories
+    chain = db.Column(db.String(100), nullable=True)  # New field for restaurant chain
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     expenses = db.relationship('Expense', backref='restaurant', lazy=True)
 
     @property
     def full_name(self):
-        return f"{self.name}{' - ' + self.location if self.location else ''}"
+        return f"{self.name}{' - ' + self.address if self.address else ''}"
 
     def __repr__(self):
         return self.full_name
@@ -94,7 +94,7 @@ def index():
         query = query.join(Restaurant).filter(
             db.or_(
                 Restaurant.name.ilike(f'%{search}%'),
-                Restaurant.location.ilike(f'%{search}%'),
+                Restaurant.address.ilike(f'%{search}%'),
                 Expense.description.ilike(f'%{search}%')
             )
         )
@@ -148,7 +148,7 @@ def index():
 @app.route('/restaurants')
 @login_required
 def restaurants():
-    restaurants = Restaurant.query.order_by(Restaurant.name, Restaurant.location).all()
+    restaurants = Restaurant.query.order_by(Restaurant.name, Restaurant.address).all()
     return render_template('restaurants.html', restaurants=restaurants)
 
 @app.route('/add_restaurant', methods=['GET', 'POST'])
@@ -156,9 +156,9 @@ def restaurants():
 def add_restaurant():
     if request.method == 'POST':
         name = request.form['name'].strip()
-        location = request.form.get('location', '').strip()
         address = request.form.get('address', '').strip()
         category = request.form.get('category', '').strip()
+        chain = request.form.get('chain', '').strip()
         description = request.form.get('description', '').strip()
 
         if not name:
@@ -166,16 +166,16 @@ def add_restaurant():
             return redirect(url_for('add_restaurant'))
 
         # Check if restaurant already exists
-        existing = Restaurant.query.filter_by(name=name, location=location).first()
+        existing = Restaurant.query.filter_by(name=name, address=address).first()
         if existing:
-            flash('This restaurant location already exists', 'danger')
+            flash('This restaurant already exists', 'danger')
             return redirect(url_for('add_restaurant'))
 
         restaurant = Restaurant(
             name=name,
-            location=location if location else None,
             address=address if address else None,
             category=category if category else None,
+            chain=chain if chain else None,
             description=description if description else None
         )
         db.session.add(restaurant)
@@ -192,26 +192,32 @@ def edit_restaurant(restaurant_id):
     
     if request.method == 'POST':
         name = request.form['name'].strip()
-        location = request.form.get('location', '').strip()
         address = request.form.get('address', '').strip()
         category = request.form.get('category', '').strip()
+        chain = request.form.get('chain', '').strip()
         description = request.form.get('description', '').strip()
 
         if not name:
             flash('Restaurant name is required', 'danger')
             return redirect(url_for('edit_restaurant', restaurant_id=restaurant_id))
 
-        # Check if the new name/location combination already exists
-        existing = Restaurant.query.filter_by(name=name, location=location).first()
-        if existing and existing.id != restaurant_id:
-            flash('This restaurant location already exists', 'danger')
+        # Check if restaurant already exists (excluding current restaurant)
+        existing = Restaurant.query.filter(
+            Restaurant.name == name,
+            Restaurant.address == address,
+            Restaurant.id != restaurant_id
+        ).first()
+        
+        if existing:
+            flash('This restaurant already exists', 'danger')
             return redirect(url_for('edit_restaurant', restaurant_id=restaurant_id))
 
         restaurant.name = name
-        restaurant.location = location if location else None
         restaurant.address = address if address else None
         restaurant.category = category if category else None
+        restaurant.chain = chain if chain else None
         restaurant.description = description if description else None
+        
         db.session.commit()
         flash('Restaurant updated successfully!', 'success')
         return redirect(url_for('restaurants'))
@@ -275,7 +281,7 @@ def add_expense():
             flash('Invalid input data', 'danger')
             return redirect(url_for('add_expense'))
     
-    restaurants = Restaurant.query.order_by(Restaurant.name, Restaurant.location).all()
+    restaurants = Restaurant.query.order_by(Restaurant.name, Restaurant.address).all()
     today = datetime.now().strftime('%Y-%m-%d')
     min_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')  # 1 year ago
     return render_template('add_expense.html', today=today, min_date=min_date, restaurants=restaurants)
@@ -299,7 +305,7 @@ def edit_expense(expense_id):
         flash('Expense updated successfully!', 'success')
         return redirect(url_for('index'))
     
-    restaurants = Restaurant.query.order_by(Restaurant.name, Restaurant.location).all()
+    restaurants = Restaurant.query.order_by(Restaurant.name, Restaurant.address).all()
     return render_template('edit_expense.html', expense=expense, restaurants=restaurants)
 
 @app.route('/delete_expense/<int:expense_id>', methods=['POST'])
