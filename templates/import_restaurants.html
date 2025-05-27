@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Import Restaurants{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="mb-0">Import Restaurants</h2>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h4 class="alert-heading">Instructions</h4>
+                    <p>Upload a CSV file with the following columns:</p>
+                    <ul>
+                        <li><strong>Name</strong> (required): Restaurant name</li>
+                        <li><strong>Address</strong> (optional): Restaurant address</li>
+                        <li><strong>Category</strong> (optional): Restaurant category</li>
+                        <li><strong>Chain</strong> (optional): Restaurant chain name</li>
+                        <li><strong>Description</strong> (optional): Restaurant description</li>
+                    </ul>
+                    <p class="mb-0">You can download a sample CSV file by clicking the "Export Restaurants" button on the restaurants page.</p>
+                </div>
+
+                <form method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="file" class="form-label">CSV File</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".csv" required>
+                        <div class="invalid-feedback">Please select a CSV file.</div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Import Restaurants</button>
+                        <a href="{{ url_for('restaurants') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Initialize form validation
+(function() {
+    'use strict';
+    const forms = document.querySelectorAll('.needs-validation');
+    Array.from(forms).forEach(form => {
+        form.addEventListener('submit', event => {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
+})();
+</script>
+{% endblock %} 

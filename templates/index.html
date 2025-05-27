@@ -167,7 +167,9 @@
                                 {% if expense.restaurant %}
                                     <span class="d-flex align-items-center">
                                         <i class="fas fa-utensils me-2"></i>
-                                        {{ expense.restaurant.full_name }}
+                                        <a href="{{ url_for('restaurant_details', restaurant_id=expense.restaurant.id) }}" class="text-decoration-none">
+                                            {{ expense.restaurant.full_name }}
+                                        </a>
                                     </span>
                                 {% else %}
                                     -

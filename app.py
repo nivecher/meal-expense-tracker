@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from datetime import datetime, timedelta
@@ -6,6 +6,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import click
 from dotenv import load_dotenv
+import csv
+import io
+import tempfile
 
 # Load environment variables from .env file
 load_dotenv()
@@ -415,6 +418,96 @@ def restaurant_details(restaurant_id):
                          total_amount=total_amount,
                          avg_amount=avg_amount,
                          meal_stats=meal_stats)
+
+@app.route('/export_restaurants')
+@login_required
+def export_restaurants():
+    # Create a StringIO object to write CSV data
+    si = io.StringIO()
+    cw = csv.writer(si)
+    
+    # Write header row
+    cw.writerow(['Name', 'Address', 'Category', 'Chain', 'Description', 'Created At'])
+    
+    # Write restaurant data
+    restaurants = Restaurant.query.order_by(Restaurant.name).all()
+    for restaurant in restaurants:
+        cw.writerow([
+            restaurant.name,
+            restaurant.address or '',
+            restaurant.category or '',
+            restaurant.chain or '',
+            restaurant.description or '',
+            restaurant.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        ])
+    
+    # Create the response
+    output = si.getvalue()
+    si.close()
+    
+    # Create a temporary file
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv') as temp:
+        temp.write(output)
+        temp_path = temp.name
+    
+    return send_file(
+        temp_path,
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name='restaurants.csv'
+    )
+
+@app.route('/import_restaurants', methods=['GET', 'POST'])
+@login_required
+def import_restaurants():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            flash('No file uploaded', 'danger')
+            return redirect(request.url)
+        
+        file = request.files['file']
+        if file.filename == '':
+            flash('No file selected', 'danger')
+            return redirect(request.url)
+        
+        if not file.filename.endswith('.csv'):
+            flash('Please upload a CSV file', 'danger')
+            return redirect(request.url)
+        
+        try:
+            # Read CSV file
+            stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+            csv_reader = csv.DictReader(stream)
+            
+            # Process each row
+            for row in csv_reader:
+                # Check if restaurant already exists
+                existing = Restaurant.query.filter_by(
+                    name=row['Name'],
+                    address=row['Address'] if row['Address'] else None
+                ).first()
+                
+                if not existing:
+                    # Create new restaurant
+                    restaurant = Restaurant(
+                        name=row['Name'],
+                        address=row['Address'] if row['Address'] else None,
+                        category=row['Category'] if row['Category'] else None,
+                        chain=row['Chain'] if row['Chain'] else None,
+                        description=row['Description'] if row['Description'] else None
+                    )
+                    db.session.add(restaurant)
+            
+            db.session.commit()
+            flash('Restaurants imported successfully!', 'success')
+            return redirect(url_for('restaurants'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error importing restaurants: {str(e)}', 'danger')
+            return redirect(request.url)
+    
+    return render_template('import_restaurants.html')
 
 if __name__ == '__main__':
     app.run(debug=True) 

@@ -1,12 +1,16 @@
 {% extends "base.html" %}
 
+{% block title %}Restaurants{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
+<div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Restaurants</h2>
-        <a href="{{ url_for('add_restaurant') }}" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Add Restaurant
-        </a>
+        <h1>Restaurants</h1>
+        <div class="btn-group">
+            <a href="{{ url_for('add_restaurant') }}" class="btn btn-primary">Add Restaurant</a>
+            <a href="{{ url_for('export_restaurants') }}" class="btn btn-success">Export to CSV</a>
+            <a href="{{ url_for('import_restaurants') }}" class="btn btn-info">Import from CSV</a>
+        </div>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -66,7 +70,11 @@
                     <tbody>
                         {% for restaurant in restaurants %}
                         <tr>
-                            <td>{{ restaurant.name }}</td>
+                            <td>
+                                <a href="{{ url_for('restaurant_details', restaurant_id=restaurant.id) }}" class="text-decoration-none">
+                                    {{ restaurant.name }}
+                                </a>
+                            </td>
                             <td>{{ restaurant.location or '-' }}</td>
                             <td>{{ restaurant.address or '-' }}</td>
                             <td>

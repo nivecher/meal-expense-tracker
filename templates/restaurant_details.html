@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- Restaurant Information -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h4 mb-0">Restaurant Details</h2>
+                </div>
+                <div class="card-body">
+                    <h3 class="h5 mb-3">{{ restaurant.name }}</h3>
+                    {% if restaurant.location %}
+                        <p class="mb-2">
+                            <i class="fas fa-map-marker-alt text-muted me-2"></i>
+                            {{ restaurant.location }}
+                        </p>
+                    {% endif %}
+                    {% if restaurant.address %}
+                        <p class="mb-2">
+                            <i class="fas fa-map text-muted me-2"></i>
+                            {{ restaurant.address }}
+                        </p>
+                    {% endif %}
+                    {% if restaurant.category %}
+                        <p class="mb-2">
+                            <i class="fas fa-tag text-muted me-2"></i>
+                            <span class="badge bg-light text-dark">{{ restaurant.category }}</span>
+                        </p>
+                    {% endif %}
+                    {% if restaurant.description %}
+                        <p class="mb-0">
+                            <i class="fas fa-info-circle text-muted me-2"></i>
+                            {{ restaurant.description }}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Expense Summary -->
+            <div class="card mb-4">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h4 mb-0">Expense Summary</h2>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h3 class="h6 text-muted mb-2">Total Expenses</h3>
+                        <p class="h4 mb-0">{{ total_expenses }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <h3 class="h6 text-muted mb-2">Total Amount</h3>
+                        <p class="h4 mb-0">${{ "%.2f"|format(total_amount) }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <h3 class="h6 text-muted mb-2">Average Amount</h3>
+                        <p class="h4 mb-0">${{ "%.2f"|format(avg_amount) }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meal Type Breakdown -->
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h4 mb-0">Meal Type Breakdown</h2>
+                </div>
+                <div class="card-body">
+                    {% for meal, stats in meal_stats.items() %}
+                        <div class="mb-3">
+                            <h3 class="h6 text-muted mb-2">{{ meal }}</h3>
+                            <p class="mb-1">{{ stats.count }} visits</p>
+                            <p class="mb-0">${{ "%.2f"|format(stats.amount) }} total</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Expense History -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h4 mb-0">Expense History</h2>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Meal</th>
+                                    <th>Category</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for expense in expenses %}
+                                <tr>
+                                    <td>{{ expense.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <span class="badge bg-light text-dark">
+                                            {{ expense.meal }}
+                                        </span>
+                                    </td>
+                                    <td>{{ expense.category or '-' }}</td>
+                                    <td>{{ expense.description or '-' }}</td>
+                                    <td class="fw-bold">${{ "%.2f"|format(expense.amount) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
