@@ -17,9 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
-# Run the application
-CMD ["python", "app/main.py"]
-
+# Set environment variables
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 
@@ -28,5 +26,5 @@ VOLUME /app/instance
 
 EXPOSE 5000
 
-# Use environment variables from .env file
+# Run the application
 CMD ["sh", "-c", "flask init-db && flask run --host=0.0.0.0"] 

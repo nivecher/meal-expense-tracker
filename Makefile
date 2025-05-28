@@ -1,4 +1,7 @@
-.PHONY: build run stop logs clean
+.PHONY: build run test lint clean
+
+# Enable BuildKit for better build performance and features
+export DOCKER_BUILDKIT=1
 
 # Variables
 CONTAINER_NAME = meal-expense-app
@@ -37,4 +40,11 @@ rebuild-logs: rebuild logs
 restart: stop run
 
 # Quick restart with logs
-restart-logs: restart logs 
+restart-logs: restart logs
+
+test:
+	PYTHONPATH=. pytest tests/
+
+lint:
+	black .
+	mypy . 
