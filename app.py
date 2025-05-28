@@ -22,32 +22,35 @@ db = SQLAlchemy(app)
 
 class Restaurant(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    address = db.Column(db.String(200), nullable=True)
-    category = db.Column(db.String(50), nullable=True)  # Now using Google Places categories
-    chain = db.Column(db.String(100), nullable=True)  # New field for restaurant chain
-    description = db.Column(db.Text, nullable=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    address = db.Column(db.String(200))
+    category = db.Column(db.String(50))
+    chain = db.Column(db.String(100))
+    description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    expenses = db.relationship('Expense', backref='restaurant', lazy=True)
+    expenses = db.relationship('Expense', backref='restaurant', lazy='dynamic')
 
     @property
     def full_name(self):
         return f"{self.name}{' - ' + self.address if self.address else ''}"
 
     def __repr__(self):
-        return self.full_name
+        return f'<Restaurant {self.name}>'
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(120), nullable=False)
-    expenses = db.relationship('Expense', backref='user', lazy=True)
+    username = db.Column(db.String(64), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128))
+    expenses = db.relationship('Expense', backref='user', lazy='dynamic')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+    def __repr__(self):
+        return f'<User {self.username}>'
 
 class Expense(db.Model):
     id = db.Column(db.Integer, primary_key=True)
