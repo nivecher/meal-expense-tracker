@@ -23,7 +23,21 @@
                     {% endwith %}
 
                     <form method="POST" class="needs-validation" novalidate>
-                        <!-- Basic Information Section -->
+                        <!-- Google Address Search -->
+                        <div class="mb-4">
+                            <h3 class="h5 mb-3">Find Restaurant</h3>
+                            <div class="mb-3">
+                                <label for="address" class="form-label">Google Address Search *</label>
+                                <input type="text" class="form-control" id="address" name="address" required
+                                       value="{{ restaurant.address or '' }}"
+                                       placeholder="Search for a restaurant or enter an address"
+                                       data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="Search for a restaurant or enter an address to auto-fill other fields">
+                                <div class="invalid-feedback">Please enter an address.</div>
+                            </div>
+                        </div>
+
+                        <!-- Basic Information -->
                         <div class="mb-4">
                             <h3 class="h5 mb-3">Basic Information</h3>
                             <div class="mb-3">
@@ -55,44 +69,40 @@
                                     <option value="other" {% if restaurant.type == 'other' %}selected{% endif %}>Other</option>
                                 </select>
                             </div>
-                            <div class="mb-3">
-                                <label for="description" class="form-label">Description</label>
-                                <textarea class="form-control" id="description" name="description" rows="2"
-                                          placeholder="Brief description of the restaurant"
-                                          data-bs-toggle="tooltip" data-bs-placement="top"
-                                          title="Add a brief description of the restaurant">{{ restaurant.description or '' }}</textarea>
-                            </div>
                         </div>
 
-                        <!-- Location Information Section -->
+                        <!-- Address Details -->
                         <div class="mb-4">
-                            <h3 class="h5 mb-3">Location Information</h3>
-                            <div class="mb-3">
-                                <label for="location" class="form-label">City/Location</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control" id="location" name="location"
-                                           value="{{ restaurant.location or '' }}"
-                                           placeholder="Enter city or location"
+                            <h3 class="h5 mb-3">Address Details</h3>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="city" class="form-label">City</label>
+                                    <input type="text" class="form-control" id="city" name="city"
+                                           value="{{ restaurant.city or '' }}"
+                                           placeholder="Enter city"
                                            data-bs-toggle="tooltip" data-bs-placement="top"
-                                           title="Enter the city or location of the restaurant">
-                                    <button type="button" class="btn btn-outline-primary" id="useCurrentLocation"
-                                            data-bs-toggle="tooltip" data-bs-placement="top"
-                                            title="Use your current location">
-                                        <i class="bi bi-geo-alt"></i> Use My Location
-                                    </button>
+                                           title="Enter the city">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="state" class="form-label">State</label>
+                                    <input type="text" class="form-control" id="state" name="state"
+                                           value="{{ restaurant.state or '' }}"
+                                           placeholder="Enter state"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Enter the state">
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label for="address" class="form-label">Full Address</label>
-                                <input type="text" class="form-control" id="address" name="address"
-                                       value="{{ restaurant.address or '' }}"
-                                       placeholder="Enter full address"
+                                <label for="zip_code" class="form-label">Zip Code</label>
+                                <input type="text" class="form-control" id="zip_code" name="zip_code"
+                                       value="{{ restaurant.zip_code or '' }}"
+                                       placeholder="Enter zip code"
                                        data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="Enter the complete address of the restaurant">
+                                       title="Enter the zip code">
                             </div>
                         </div>
 
-                        <!-- Additional Information Section -->
+                        <!-- Additional Information -->
                         <div class="mb-4">
                             <h3 class="h5 mb-3">Additional Information</h3>
                             <div class="row">
@@ -110,11 +120,47 @@
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="cuisine" class="form-label">Cuisine Type</label>
-                                    <input type="text" class="form-control" id="cuisine" name="cuisine"
-                                           value="{{ restaurant.cuisine or '' }}"
-                                           placeholder="e.g., Italian, Japanese, etc."
+                                    <select class="form-select" id="cuisine" name="cuisine"
                                            data-bs-toggle="tooltip" data-bs-placement="top"
-                                           title="Enter the type of cuisine served">
+                                           title="Select the type of cuisine served">
+                                        <option value="">Select cuisine type</option>
+                                        <option value="american" {% if restaurant.cuisine == 'american' %}selected{% endif %}>American</option>
+                                        <option value="italian" {% if restaurant.cuisine == 'italian' %}selected{% endif %}>Italian</option>
+                                        <option value="mexican" {% if restaurant.cuisine == 'mexican' %}selected{% endif %}>Mexican</option>
+                                        <option value="chinese" {% if restaurant.cuisine == 'chinese' %}selected{% endif %}>Chinese</option>
+                                        <option value="japanese" {% if restaurant.cuisine == 'japanese' %}selected{% endif %}>Japanese</option>
+                                        <option value="thai" {% if restaurant.cuisine == 'thai' %}selected{% endif %}>Thai</option>
+                                        <option value="indian" {% if restaurant.cuisine == 'indian' %}selected{% endif %}>Indian</option>
+                                        <option value="vietnamese" {% if restaurant.cuisine == 'vietnamese' %}selected{% endif %}>Vietnamese</option>
+                                        <option value="korean" {% if restaurant.cuisine == 'korean' %}selected{% endif %}>Korean</option>
+                                        <option value="mediterranean" {% if restaurant.cuisine == 'mediterranean' %}selected{% endif %}>Mediterranean</option>
+                                        <option value="greek" {% if restaurant.cuisine == 'greek' %}selected{% endif %}>Greek</option>
+                                        <option value="french" {% if restaurant.cuisine == 'french' %}selected{% endif %}>French</option>
+                                        <option value="german" {% if restaurant.cuisine == 'german' %}selected{% endif %}>German</option>
+                                        <option value="spanish" {% if restaurant.cuisine == 'spanish' %}selected{% endif %}>Spanish</option>
+                                        <option value="brazilian" {% if restaurant.cuisine == 'brazilian' %}selected{% endif %}>Brazilian</option>
+                                        <option value="caribbean" {% if restaurant.cuisine == 'caribbean' %}selected{% endif %}>Caribbean</option>
+                                        <option value="sushi" {% if restaurant.cuisine == 'sushi' %}selected{% endif %}>Sushi</option>
+                                        <option value="steakhouse" {% if restaurant.cuisine == 'steakhouse' %}selected{% endif %}>Steakhouse</option>
+                                        <option value="seafood" {% if restaurant.cuisine == 'seafood' %}selected{% endif %}>Seafood</option>
+                                        <option value="bbq" {% if restaurant.cuisine == 'bbq' %}selected{% endif %}>BBQ</option>
+                                        <option value="pizza" {% if restaurant.cuisine == 'pizza' %}selected{% endif %}>Pizza</option>
+                                        <option value="burgers" {% if restaurant.cuisine == 'burgers' %}selected{% endif %}>Burgers</option>
+                                        <option value="sandwiches" {% if restaurant.cuisine == 'sandwiches' %}selected{% endif %}>Sandwiches</option>
+                                        <option value="cafe" {% if restaurant.cuisine == 'cafe' %}selected{% endif %}>Cafe</option>
+                                        <option value="bakery" {% if restaurant.cuisine == 'bakery' %}selected{% endif %}>Bakery</option>
+                                        <option value="dessert" {% if restaurant.cuisine == 'dessert' %}selected{% endif %}>Dessert</option>
+                                        <option value="ice_cream" {% if restaurant.cuisine == 'ice_cream' %}selected{% endif %}>Ice Cream</option>
+                                        <option value="coffee_shop" {% if restaurant.cuisine == 'coffee_shop' %}selected{% endif %}>Coffee Shop</option>
+                                        <option value="juice_bar" {% if restaurant.cuisine == 'juice_bar' %}selected{% endif %}>Juice Bar</option>
+                                        <option value="smoothie" {% if restaurant.cuisine == 'smoothie' %}selected{% endif %}>Smoothie</option>
+                                        <option value="vegan" {% if restaurant.cuisine == 'vegan' %}selected{% endif %}>Vegan</option>
+                                        <option value="vegetarian" {% if restaurant.cuisine == 'vegetarian' %}selected{% endif %}>Vegetarian</option>
+                                        <option value="gluten_free" {% if restaurant.cuisine == 'gluten_free' %}selected{% endif %}>Gluten Free</option>
+                                        <option value="halal" {% if restaurant.cuisine == 'halal' %}selected{% endif %}>Halal</option>
+                                        <option value="kosher" {% if restaurant.cuisine == 'kosher' %}selected{% endif %}>Kosher</option>
+                                        <option value="other" {% if restaurant.cuisine == 'other' %}selected{% endif %}>Other</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="mb-3">
@@ -132,6 +178,13 @@
                                        placeholder="Enter phone number"
                                        data-bs-toggle="tooltip" data-bs-placement="top"
                                        title="Enter the restaurant's phone number">
+                            </div>
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="2"
+                                          placeholder="Brief description of the restaurant"
+                                          data-bs-toggle="tooltip" data-bs-placement="top"
+                                          title="Add a brief description of the restaurant">{{ restaurant.description or '' }}</textarea>
                             </div>
                             <div class="mb-3">
                                 <label for="notes" class="form-label">Additional Notes</label>
@@ -159,26 +212,87 @@
 <script>
 async function initializePlacesAutocomplete() {
     try {
-        const { Autocomplete } = await google.maps.importLibrary("places");
+        const { Autocomplete, PlacesService } = await google.maps.importLibrary("places");
         
         const addressInput = document.getElementById('address');
-        const locationInput = document.getElementById('location');
         
         const autocomplete = new Autocomplete(addressInput, {
-            fields: ['address_components', 'formatted_address', 'geometry', 'name', 'website', 'formatted_phone_number', 'types']
+            fields: ['address_components', 'formatted_address', 'geometry', 'name', 'website', 'formatted_phone_number', 'types', 'place_id']
         });
+
+        // Create a PlacesService instance
+        const placesService = new PlacesService(document.createElement('div'));
+
+        // Google Places to our cuisine mapping
+        const cuisineMapping = {
+            'american_restaurant': 'american',
+            'italian_restaurant': 'italian',
+            'mexican_restaurant': 'mexican',
+            'chinese_restaurant': 'chinese',
+            'japanese_restaurant': 'japanese',
+            'thai_restaurant': 'thai',
+            'indian_restaurant': 'indian',
+            'vietnamese_restaurant': 'vietnamese',
+            'korean_restaurant': 'korean',
+            'mediterranean_restaurant': 'mediterranean',
+            'greek_restaurant': 'greek',
+            'french_restaurant': 'french',
+            'german_restaurant': 'german',
+            'spanish_restaurant': 'spanish',
+            'brazilian_restaurant': 'brazilian',
+            'caribbean_restaurant': 'caribbean',
+            'sushi_restaurant': 'sushi',
+            'steak_house': 'steakhouse',
+            'seafood_restaurant': 'seafood',
+            'barbecue_restaurant': 'bbq',
+            'pizza_restaurant': 'pizza',
+            'hamburger_restaurant': 'burgers',
+            'sandwich_shop': 'sandwiches',
+            'cafe': 'cafe',
+            'bakery': 'bakery',
+            'dessert_shop': 'dessert',
+            'ice_cream_shop': 'ice_cream',
+            'coffee_shop': 'coffee_shop',
+            'juice_bar': 'juice_bar',
+            'smoothie_shop': 'smoothie',
+            'vegan_restaurant': 'vegan',
+            'vegetarian_restaurant': 'vegetarian',
+            'gluten_free_restaurant': 'gluten_free',
+            'halal_restaurant': 'halal',
+            'kosher_restaurant': 'kosher'
+        };
 
         autocomplete.addListener('place_changed', function() {
             const place = autocomplete.getPlace();
             
-            // Update location (city)
+            // Update address components
             if (place.address_components) {
-                const cityComponent = place.address_components.find(
-                    component => component.types.includes('locality')
-                );
-                if (cityComponent) {
-                    locationInput.value = cityComponent.long_name;
+                let streetNumber = '';
+                let route = '';
+                let city = '';
+                let state = '';
+                let zipCode = '';
+
+                for (const component of place.address_components) {
+                    const types = component.types;
+                    if (types.includes('street_number')) {
+                        streetNumber = component.long_name;
+                    } else if (types.includes('route')) {
+                        route = component.long_name;
+                    } else if (types.includes('locality')) {
+                        city = component.long_name;
+                    } else if (types.includes('administrative_area_level_1')) {
+                        state = component.short_name;
+                    } else if (types.includes('postal_code')) {
+                        zipCode = component.long_name;
+                    }
                 }
+
+                // Update address fields
+                document.getElementById('address').value = streetNumber + ' ' + route;
+                document.getElementById('city').value = city;
+                document.getElementById('state').value = state;
+                document.getElementById('zip_code').value = zipCode;
             }
 
             // Update website if available
@@ -222,6 +336,42 @@ async function initializePlacesAutocomplete() {
                     }
                 }
             }
+
+            // Get additional place details
+            if (place.place_id) {
+                placesService.getDetails({
+                    placeId: place.place_id,
+                    fields: ['price_level', 'types']
+                }, (placeDetails, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        // Update price range
+                        if (placeDetails.price_level !== undefined) {
+                            const priceRangeSelect = document.getElementById('price_range');
+                            const priceMapping = {
+                                1: '$',
+                                2: '$$',
+                                3: '$$$',
+                                4: '$$$$'
+                            };
+                            if (priceMapping[placeDetails.price_level]) {
+                                priceRangeSelect.value = priceMapping[placeDetails.price_level];
+                            }
+                        }
+
+                        // Update cuisine type based on place types
+                        if (placeDetails.types) {
+                            const cuisineSelect = document.getElementById('cuisine');
+                            // Find the first matching cuisine type
+                            for (const type of placeDetails.types) {
+                                if (cuisineMapping[type]) {
+                                    cuisineSelect.value = cuisineMapping[type];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                });
+            }
         });
     } catch (error) {
         console.error('Error initializing Places Autocomplete:', error);
@@ -243,35 +393,6 @@ async function initializePlacesAutocomplete() {
     });
 })();
 
-initializePlacesAutocomplete();
-
-document.getElementById('useCurrentLocation').addEventListener('click', function() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(position) {
-            const geocoder = new google.maps.Geocoder();
-            const latlng = { lat: position.coords.latitude, lng: position.coords.longitude };
-            geocoder.geocode({ 'location': latlng }, function(results, status) {
-                if (status === 'OK') {
-                    if (results[0]) {
-                        const cityComponent = results[0].address_components.find(
-                            component => component.types.includes('locality')
-                        );
-                        if (cityComponent) {
-                            document.getElementById('location').value = cityComponent.long_name;
-                        }
-                    }
-                } else {
-                    console.error('Geocode was not successful for the following reason: ' + status);
-                }
-            });
-        }, function(error) {
-            console.error('Error getting location:', error);
-        });
-    } else {
-        console.error('Geolocation is not supported by this browser.');
-    }
-});
-
 // Initialize tooltips
 document.addEventListener('DOMContentLoaded', function() {
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -279,5 +400,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 });
+
+initializePlacesAutocomplete();
 </script>
 {% endblock %} 

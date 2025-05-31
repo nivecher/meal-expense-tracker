@@ -6,7 +6,7 @@ from flask import (
     url_for,
     flash,
     abort,
-    send_file,
+    Response,
 )
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -25,7 +25,6 @@ import click
 from dotenv import load_dotenv
 import csv
 import io
-import tempfile
 
 # Load environment variables from .env file
 load_dotenv()
@@ -35,34 +34,53 @@ app.config["SECRET_KEY"] = os.urandom(24)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///meal_expenses.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["GOOGLE_MAPS_API_KEY"] = os.getenv("GOOGLE_MAPS_API_KEY")
+
+# Initialize extensions
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 
-class Restaurant(db.Model):  # type: ignore
+class Restaurant(db.Model):
+    __tablename__ = "restaurant"
+    __table_args__ = (db.UniqueConstraint('name', 'city', name='uix_restaurant_name_city'),)
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    location = db.Column(db.String(100))
-    address = db.Column(db.String(200))
+    name = db.Column(db.String(100), nullable=False)
     type = db.Column(db.String(50))
+    description = db.Column(db.Text)
+    address = db.Column(db.String(200))
+    city = db.Column(db.String(100))
+    state = db.Column(db.String(50))
+    zip_code = db.Column(db.String(20))
     price_range = db.Column(db.String(10))
     cuisine = db.Column(db.String(100))
     website = db.Column(db.String(200))
     phone = db.Column(db.String(20))
     notes = db.Column(db.Text)
-    description = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    expenses = db.relationship("Expense", backref="restaurant", lazy="dynamic")
+    expenses = db.relationship("Expense", backref="restaurant", lazy=True)
 
     @property
     def full_name(self):
-        return f"{self.name}{' - ' + self.location if self.location else ''}"
+        return f"{self.name} - {self.city}" if self.city else self.name
+
+    @property
+    def full_address(self):
+        parts = []
+        if self.address:
+            parts.append(self.address)
+        if self.city:
+            parts.append(self.city)
+        if self.state:
+            parts.append(self.state)
+        if self.zip_code:
+            parts.append(self.zip_code)
+        return ", ".join(parts) if parts else None
 
     def __repr__(self):
         return f"<Restaurant {self.name}>"
 
 
 class User(UserMixin, db.Model):  # type: ignore
+    __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
@@ -79,6 +97,7 @@ class User(UserMixin, db.Model):  # type: ignore
 
 
 class Expense(db.Model):  # type: ignore
+    __tablename__ = "expense"
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.DateTime, nullable=False)
     amount = db.Column(db.Float, nullable=False)
@@ -228,97 +247,94 @@ def restaurants():
 @login_required
 def add_restaurant():
     if request.method == "POST":
-        name = request.form["name"].strip()
-        location = request.form.get("location", "").strip()
-        address = request.form.get("address", "").strip()
-        type = request.form.get("type", "").strip()
-        price_range = request.form.get("price_range", "").strip()
-        cuisine = request.form.get("cuisine", "").strip()
-        website = request.form.get("website", "").strip()
-        phone = request.form.get("phone", "").strip()
-        notes = request.form.get("notes", "").strip()
-        description = request.form.get("description", "").strip()
+        name = request.form.get("name")
+        type = request.form.get("type")
+        description = request.form.get("description")
+        address = request.form.get("address")
+        city = request.form.get("city")
+        state = request.form.get("state")
+        zip_code = request.form.get("zip_code")
+        price_range = request.form.get("price_range")
+        cuisine = request.form.get("cuisine")
+        website = request.form.get("website")
+        phone = request.form.get("phone")
+        notes = request.form.get("notes")
 
-        if not name:
-            flash("Restaurant name is required", "danger")
-            return redirect(url_for("add_restaurant"))
-
-        # Check if restaurant already exists
-        existing = Restaurant.query.filter_by(name=name, location=location).first()
-        if existing:
-            flash("This restaurant already exists", "danger")
+        # Check if restaurant with same name and city already exists
+        existing_restaurant = Restaurant.query.filter_by(name=name, city=city).first()
+        if existing_restaurant:
+            flash("A restaurant with this name already exists in this city.", "danger")
             return redirect(url_for("add_restaurant"))
 
         restaurant = Restaurant(
             name=name,
-            location=location if location else None,
-            address=address if address else None,
-            type=type if type else None,
-            price_range=price_range if price_range else None,
-            cuisine=cuisine if cuisine else None,
-            website=website if website else None,
-            phone=phone if phone else None,
-            notes=notes if notes else None,
-            description=description if description else None,
+            type=type,
+            description=description,
+            address=address,
+            city=city,
+            state=state,
+            zip_code=zip_code,
+            price_range=price_range,
+            cuisine=cuisine,
+            website=website,
+            phone=phone,
+            notes=notes,
         )
         db.session.add(restaurant)
         db.session.commit()
         flash("Restaurant added successfully!", "success")
         return redirect(url_for("restaurants"))
-
-    return render_template("add_restaurant.html", config=app.config)
+    return render_template("add_restaurant.html")
 
 
 @app.route("/edit_restaurant/<int:restaurant_id>", methods=["GET", "POST"])
 @login_required
 def edit_restaurant(restaurant_id):
     restaurant = Restaurant.query.get_or_404(restaurant_id)
-
     if request.method == "POST":
-        name = request.form["name"].strip()
-        location = request.form.get("location", "").strip()
-        address = request.form.get("address", "").strip()
-        type = request.form.get("type", "").strip()
-        price_range = request.form.get("price_range", "").strip()
-        cuisine = request.form.get("cuisine", "").strip()
-        website = request.form.get("website", "").strip()
-        phone = request.form.get("phone", "").strip()
-        notes = request.form.get("notes", "").strip()
-        description = request.form.get("description", "").strip()
+        name = request.form.get("name")
+        type = request.form.get("type")
+        description = request.form.get("description")
+        address = request.form.get("address")
+        city = request.form.get("city")
+        state = request.form.get("state")
+        zip_code = request.form.get("zip_code")
+        price_range = request.form.get("price_range")
+        cuisine = request.form.get("cuisine")
+        website = request.form.get("website")
+        phone = request.form.get("phone")
+        notes = request.form.get("notes")
 
-        if not name:
-            flash("Restaurant name is required", "danger")
-            return redirect(url_for("edit_restaurant", restaurant_id=restaurant_id))
-
-        # Check if restaurant already exists (excluding current restaurant)
-        existing = Restaurant.query.filter(
+        # Check if another restaurant with same name and city exists
+        existing_restaurant = Restaurant.query.filter(
             Restaurant.name == name,
-            Restaurant.location == location,
+            Restaurant.city == city,
             Restaurant.id != restaurant_id,
         ).first()
-
-        if existing:
-            flash("This restaurant already exists", "danger")
+        if existing_restaurant:
+            flash(
+                "Another restaurant with this name already exists in this city.",
+                "danger",
+            )
             return redirect(url_for("edit_restaurant", restaurant_id=restaurant_id))
 
         restaurant.name = name
-        restaurant.location = location if location else None
-        restaurant.address = address if address else None
-        restaurant.type = type if type else None
-        restaurant.price_range = price_range if price_range else None
-        restaurant.cuisine = cuisine if cuisine else None
-        restaurant.website = website if website else None
-        restaurant.phone = phone if phone else None
-        restaurant.notes = notes if notes else None
-        restaurant.description = description if description else None
+        restaurant.type = type
+        restaurant.description = description
+        restaurant.address = address
+        restaurant.city = city
+        restaurant.state = state
+        restaurant.zip_code = zip_code
+        restaurant.price_range = price_range
+        restaurant.cuisine = cuisine
+        restaurant.website = website
+        restaurant.phone = phone
+        restaurant.notes = notes
 
         db.session.commit()
         flash("Restaurant updated successfully!", "success")
-        return redirect(url_for("restaurants"))
-
-    return render_template(
-        "edit_restaurant.html", restaurant=restaurant, config=app.config
-    )
+        return redirect(url_for("restaurant_details", restaurant_id=restaurant.id))
+    return render_template("edit_restaurant.html", restaurant=restaurant)
 
 
 @app.route("/add_expense", methods=["GET", "POST"])
@@ -528,55 +544,59 @@ def restaurant_details(restaurant_id):
     )
 
 
-@app.route("/export_restaurants")
-@login_required
+@app.route("/restaurants/export")
 def export_restaurants():
-    # Create a StringIO object to write CSV data
-    si = io.StringIO()
-    cw = csv.writer(si)
+    restaurants = Restaurant.query.all()
 
-    # Write header row
-    cw.writerow([
-        "Name", "Location", "Address", "Type", "Price Range",
-        "Cuisine", "Website", "Phone", "Notes", "Description", "Created At"
-    ])
+    output = io.StringIO()
+    writer = csv.writer(output)
 
-    # Write restaurant data
-    restaurants = Restaurant.query.order_by(Restaurant.name).all()
+    # Write header
+    writer.writerow(
+        [
+            "Name",
+            "Address",
+            "City",
+            "State",
+            "Zip Code",
+            "Type",
+            "Price Range",
+            "Cuisine",
+            "Website",
+            "Phone",
+            "Description",
+            "Notes",
+        ]
+    )
+
+    # Write data
     for restaurant in restaurants:
-        cw.writerow([
-            restaurant.name,
-            restaurant.location or "",
-            restaurant.address or "",
-            restaurant.type or "",
-            restaurant.price_range or "",
-            restaurant.cuisine or "",
-            restaurant.website or "",
-            restaurant.phone or "",
-            restaurant.notes or "",
-            restaurant.description or "",
-            restaurant.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-        ])
+        writer.writerow(
+            [
+                restaurant.name,
+                restaurant.address,
+                restaurant.city,
+                restaurant.state,
+                restaurant.zip_code,
+                restaurant.type,
+                restaurant.price_range,
+                restaurant.cuisine,
+                restaurant.website,
+                restaurant.phone,
+                restaurant.description,
+                restaurant.notes,
+            ]
+        )
 
-    # Create the response
-    output = si.getvalue()
-    si.close()
-
-    # Create a temporary file
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv") as temp:
-        temp.write(output)
-        temp_path = temp.name
-
-    return send_file(
-        temp_path,
+    output.seek(0)
+    return Response(
+        output,
         mimetype="text/csv",
-        as_attachment=True,
-        download_name="restaurants.csv",
+        headers={"Content-Disposition": "attachment; filename=restaurants.csv"},
     )
 
 
-@app.route("/import_restaurants", methods=["GET", "POST"])
-@login_required
+@app.route("/restaurants/import", methods=["GET", "POST"])
 def import_restaurants():
     if request.method == "POST":
         if "file" not in request.files:
@@ -593,44 +613,78 @@ def import_restaurants():
             return redirect(request.url)
 
         try:
-            # Read CSV file
-            stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
-            csv_reader = csv.DictReader(stream)
-
-            # Process each row
-            for row in csv_reader:
-                # Check if restaurant already exists
-                existing = Restaurant.query.filter_by(
-                    name=row["Name"],
-                    location=row["Location"] if row["Location"] else None
-                ).first()
-
-                if not existing:
-                    # Create new restaurant
-                    restaurant = Restaurant(
-                        name=row["Name"],
-                        location=row["Location"] if row["Location"] else None,
-                        address=row["Address"] if row["Address"] else None,
-                        type=row["Type"] if row["Type"] else None,
-                        price_range=row["Price Range"] if row["Price Range"] else None,
-                        cuisine=row["Cuisine"] if row["Cuisine"] else None,
-                        website=row["Website"] if row["Website"] else None,
-                        phone=row["Phone"] if row["Phone"] else None,
-                        notes=row["Notes"] if row["Notes"] else None,
-                        description=row["Description"] if row["Description"] else None,
-                    )
-                    db.session.add(restaurant)
-
-            db.session.commit()
-            flash("Restaurants imported successfully!", "success")
-            return redirect(url_for("restaurants"))
-
+            return process_csv_import(file)
         except Exception as e:
-            db.session.rollback()
             flash(f"Error importing restaurants: {str(e)}", "danger")
             return redirect(request.url)
 
     return render_template("import_restaurants.html")
+
+
+def process_csv_import(file):
+    """Process the CSV file and import restaurants."""
+    stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+    reader = csv.DictReader(stream)
+
+    required_fields = ["Name", "Address", "City", "State", "Zip Code"]
+    optional_fields = [
+        "Type",
+        "Price Range",
+        "Cuisine",
+        "Website",
+        "Phone",
+        "Description",
+        "Notes",
+    ]
+
+    # Validate required fields
+    for field in required_fields:
+        if field not in reader.fieldnames:
+            flash(f"Missing required field: {field}", "danger")
+            return redirect(url_for("import_restaurants"))
+
+    restaurants_added = 0
+    for row in reader:
+        if not is_restaurant_exists(row):
+            add_restaurant_from_row(row)
+            restaurants_added += 1
+
+    db.session.commit()
+    flash(f"Successfully imported {restaurants_added} restaurants", "success")
+    return redirect(url_for("restaurants"))
+
+
+def is_restaurant_exists(row):
+    """Check if a restaurant with the same details already exists."""
+    return (
+        Restaurant.query.filter_by(
+            name=row["Name"],
+            address=row["Address"],
+            city=row["City"],
+            state=row["State"],
+            zip_code=row["Zip Code"],
+        ).first()
+        is not None
+    )
+
+
+def add_restaurant_from_row(row):
+    """Create and add a new restaurant from a CSV row."""
+    restaurant = Restaurant(
+        name=row["Name"],
+        address=row["Address"],
+        city=row["City"],
+        state=row["State"],
+        zip_code=row["Zip Code"],
+        type=row.get("Type"),
+        price_range=row.get("Price Range"),
+        cuisine=row.get("Cuisine"),
+        website=row.get("Website"),
+        phone=row.get("Phone"),
+        description=row.get("Description"),
+        notes=row.get("Notes"),
+    )
+    db.session.add(restaurant)
 
 
 if __name__ == "__main__":

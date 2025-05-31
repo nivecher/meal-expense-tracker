@@ -1,0 +1,8 @@
+                            <div class="mb-3">
+                                <label class="form-label">Restaurant</label>
+                                <div class="form-control-plaintext">
+                                    <a href="{{ url_for('restaurant_detail', restaurant_id=expense.restaurant.id) }}" class="text-decoration-none">
+                                        {{ expense.restaurant.name }}
+                                    </a>
+                                </div>
+                            </div> 
