@@ -9,6 +9,7 @@ from flask import (
     send_file,
 )
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_login import (  # type: ignore
     LoginManager,
     UserMixin,
@@ -35,21 +36,27 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///meal_expenses.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["GOOGLE_MAPS_API_KEY"] = os.getenv("GOOGLE_MAPS_API_KEY")
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 
 class Restaurant(db.Model):  # type: ignore
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+    location = db.Column(db.String(100))
     address = db.Column(db.String(200))
-    category = db.Column(db.String(50))
-    chain = db.Column(db.String(100))
+    type = db.Column(db.String(50))
+    price_range = db.Column(db.String(10))
+    cuisine = db.Column(db.String(100))
+    website = db.Column(db.String(200))
+    phone = db.Column(db.String(20))
+    notes = db.Column(db.Text)
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     expenses = db.relationship("Expense", backref="restaurant", lazy="dynamic")
 
     @property
     def full_name(self):
-        return f"{self.name}{' - ' + self.address if self.address else ''}"
+        return f"{self.name}{' - ' + self.location if self.location else ''}"
 
     def __repr__(self):
         return f"<Restaurant {self.name}>"
@@ -222,9 +229,14 @@ def restaurants():
 def add_restaurant():
     if request.method == "POST":
         name = request.form["name"].strip()
+        location = request.form.get("location", "").strip()
         address = request.form.get("address", "").strip()
-        category = request.form.get("category", "").strip()
-        chain = request.form.get("chain", "").strip()
+        type = request.form.get("type", "").strip()
+        price_range = request.form.get("price_range", "").strip()
+        cuisine = request.form.get("cuisine", "").strip()
+        website = request.form.get("website", "").strip()
+        phone = request.form.get("phone", "").strip()
+        notes = request.form.get("notes", "").strip()
         description = request.form.get("description", "").strip()
 
         if not name:
@@ -232,16 +244,21 @@ def add_restaurant():
             return redirect(url_for("add_restaurant"))
 
         # Check if restaurant already exists
-        existing = Restaurant.query.filter_by(name=name, address=address).first()
+        existing = Restaurant.query.filter_by(name=name, location=location).first()
         if existing:
             flash("This restaurant already exists", "danger")
             return redirect(url_for("add_restaurant"))
 
         restaurant = Restaurant(
             name=name,
+            location=location if location else None,
             address=address if address else None,
-            category=category if category else None,
-            chain=chain if chain else None,
+            type=type if type else None,
+            price_range=price_range if price_range else None,
+            cuisine=cuisine if cuisine else None,
+            website=website if website else None,
+            phone=phone if phone else None,
+            notes=notes if notes else None,
             description=description if description else None,
         )
         db.session.add(restaurant)
@@ -259,9 +276,14 @@ def edit_restaurant(restaurant_id):
 
     if request.method == "POST":
         name = request.form["name"].strip()
+        location = request.form.get("location", "").strip()
         address = request.form.get("address", "").strip()
-        category = request.form.get("category", "").strip()
-        chain = request.form.get("chain", "").strip()
+        type = request.form.get("type", "").strip()
+        price_range = request.form.get("price_range", "").strip()
+        cuisine = request.form.get("cuisine", "").strip()
+        website = request.form.get("website", "").strip()
+        phone = request.form.get("phone", "").strip()
+        notes = request.form.get("notes", "").strip()
         description = request.form.get("description", "").strip()
 
         if not name:
@@ -271,7 +293,7 @@ def edit_restaurant(restaurant_id):
         # Check if restaurant already exists (excluding current restaurant)
         existing = Restaurant.query.filter(
             Restaurant.name == name,
-            Restaurant.address == address,
+            Restaurant.location == location,
             Restaurant.id != restaurant_id,
         ).first()
 
@@ -280,9 +302,14 @@ def edit_restaurant(restaurant_id):
             return redirect(url_for("edit_restaurant", restaurant_id=restaurant_id))
 
         restaurant.name = name
+        restaurant.location = location if location else None
         restaurant.address = address if address else None
-        restaurant.category = category if category else None
-        restaurant.chain = chain if chain else None
+        restaurant.type = type if type else None
+        restaurant.price_range = price_range if price_range else None
+        restaurant.cuisine = cuisine if cuisine else None
+        restaurant.website = website if website else None
+        restaurant.phone = phone if phone else None
+        restaurant.notes = notes if notes else None
         restaurant.description = description if description else None
 
         db.session.commit()
@@ -509,21 +536,27 @@ def export_restaurants():
     cw = csv.writer(si)
 
     # Write header row
-    cw.writerow(["Name", "Address", "Category", "Chain", "Description", "Created At"])
+    cw.writerow([
+        "Name", "Location", "Address", "Type", "Price Range",
+        "Cuisine", "Website", "Phone", "Notes", "Description", "Created At"
+    ])
 
     # Write restaurant data
     restaurants = Restaurant.query.order_by(Restaurant.name).all()
     for restaurant in restaurants:
-        cw.writerow(
-            [
-                restaurant.name,
-                restaurant.address or "",
-                restaurant.category or "",
-                restaurant.chain or "",
-                restaurant.description or "",
-                restaurant.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-            ]
-        )
+        cw.writerow([
+            restaurant.name,
+            restaurant.location or "",
+            restaurant.address or "",
+            restaurant.type or "",
+            restaurant.price_range or "",
+            restaurant.cuisine or "",
+            restaurant.website or "",
+            restaurant.phone or "",
+            restaurant.notes or "",
+            restaurant.description or "",
+            restaurant.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        ])
 
     # Create the response
     output = si.getvalue()
@@ -568,16 +601,22 @@ def import_restaurants():
             for row in csv_reader:
                 # Check if restaurant already exists
                 existing = Restaurant.query.filter_by(
-                    name=row["Name"], address=row["Address"] if row["Address"] else None
+                    name=row["Name"],
+                    location=row["Location"] if row["Location"] else None
                 ).first()
 
                 if not existing:
                     # Create new restaurant
                     restaurant = Restaurant(
                         name=row["Name"],
+                        location=row["Location"] if row["Location"] else None,
                         address=row["Address"] if row["Address"] else None,
-                        category=row["Category"] if row["Category"] else None,
-                        chain=row["Chain"] if row["Chain"] else None,
+                        type=row["Type"] if row["Type"] else None,
+                        price_range=row["Price Range"] if row["Price Range"] else None,
+                        cuisine=row["Cuisine"] if row["Cuisine"] else None,
+                        website=row["Website"] if row["Website"] else None,
+                        phone=row["Phone"] if row["Phone"] else None,
+                        notes=row["Notes"] if row["Notes"] else None,
                         description=row["Description"] if row["Description"] else None,
                     )
                     db.session.add(restaurant)

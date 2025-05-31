@@ -48,4 +48,4 @@ ENV/
 Thumbs.db
 
 # Coverage
-.coverage
+.coverage*
