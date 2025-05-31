@@ -4,3 +4,5 @@ pytest-flask
 locust
 black
 flake8
+mypy
+types-Pillow

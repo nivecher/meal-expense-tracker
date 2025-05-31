@@ -1,0 +1,19 @@
+[flake8]
+max-line-length = 88  # Standard black line length
+extend-ignore = E203  # Ignore whitespace before ':' (black compatibility)
+exclude = 
+    .git,
+    __pycache__,
+    build,
+    dist,
+    *.egg-info,
+    .venv,
+    venv,
+    .env,
+    .tox,
+    .pytest_cache,
+    .mypy_cache
+per-file-ignores =
+    __init__.py: F401
+    tests/*: S101  # Allow assert statements in tests
+max-complexity = 10 

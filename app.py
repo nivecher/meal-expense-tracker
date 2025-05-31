@@ -10,7 +10,7 @@ from flask import (
     send_file,
 )
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import (
+from flask_login import (  # type: ignore
     LoginManager,
     UserMixin,
     login_user,
@@ -38,7 +38,7 @@ app.config["GOOGLE_MAPS_API_KEY"] = os.getenv("GOOGLE_MAPS_API_KEY")
 db = SQLAlchemy(app)
 
 
-class Restaurant(db.Model):
+class Restaurant(db.Model):  # type: ignore
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     address = db.Column(db.String(200))
@@ -56,7 +56,7 @@ class Restaurant(db.Model):
         return f"<Restaurant {self.name}>"
 
 
-class User(UserMixin, db.Model):
+class User(UserMixin, db.Model):  # type: ignore
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
@@ -72,7 +72,7 @@ class User(UserMixin, db.Model):
         return f"<User {self.username}>"
 
 
-class Expense(db.Model):
+class Expense(db.Model):  # type: ignore
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.DateTime, nullable=False)
     amount = db.Column(db.Float, nullable=False)
