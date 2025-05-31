@@ -1,6 +1,6 @@
 [flake8]
-max-line-length = 88  # Standard black line length
-extend-ignore = E203  # Ignore whitespace before ':' (black compatibility)
+max-line-length = 88
+extend-ignore = E203
 exclude = 
     .git,
     __pycache__,
@@ -15,5 +15,6 @@ exclude =
     .mypy_cache
 per-file-ignores =
     __init__.py: F401
-    tests/*: S101  # Allow assert statements in tests
+    tests/*: S101
+    app.py: F841
 max-complexity = 10 

@@ -1,5 +1,5 @@
 import pytest
-from app import app as flask_app, db
+from app import app as flask_app
 
 
 @pytest.fixture(scope="session")

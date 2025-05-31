@@ -44,7 +44,6 @@ def create_favicon(size):
 
     # Draw knife blade
     blade_width = knife_width
-    blade_height = knife_height // 2
     draw.rectangle(
         [
             knife_x,

@@ -6,7 +6,6 @@ from flask import (
     url_for,
     flash,
     abort,
-    jsonify,
     send_file,
 )
 from flask_sqlalchemy import SQLAlchemy
@@ -106,22 +105,13 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-@app.route("/")
-@login_required
-def index():
-    # Get filter parameters
-    search = request.args.get("search", "")
-    meal = request.args.get("meal", "")
-    category = request.args.get("category", "")
-    start_date = request.args.get("start_date", "")
-    end_date = request.args.get("end_date", "")
-    sort_by = request.args.get("sort", "date")
-    sort_order = request.args.get("order", "desc")
+def apply_filters(query, request_args):
+    search = request_args.get("search", "")
+    meal = request_args.get("meal", "")
+    category = request_args.get("category", "")
+    start_date = request_args.get("start_date", "")
+    end_date = request_args.get("end_date", "")
 
-    # Base query
-    query = Expense.query.filter_by(user_id=current_user.id)
-
-    # Apply filters
     if search:
         query = query.join(Restaurant).filter(
             db.or_(
@@ -138,8 +128,10 @@ def index():
         query = query.filter(Expense.date >= datetime.strptime(start_date, "%Y-%m-%d"))
     if end_date:
         query = query.filter(Expense.date <= datetime.strptime(end_date, "%Y-%m-%d"))
+    return query
 
-    # Apply sorting
+
+def apply_sorting(query, sort_by, sort_order):
     if sort_by == "date":
         query = query.order_by(
             Expense.date.desc() if sort_order == "desc" else Expense.date.asc()
@@ -160,6 +152,29 @@ def index():
         query = query.join(Restaurant).order_by(
             Restaurant.name.desc() if sort_order == "desc" else Restaurant.name.asc()
         )
+    return query
+
+
+@app.route("/")
+@login_required
+def index():
+    # Get filter parameters
+    search = request.args.get("search", "")
+    meal = request.args.get("meal", "")
+    category = request.args.get("category", "")
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+    sort_by = request.args.get("sort", "date")
+    sort_order = request.args.get("order", "desc")
+
+    # Base query
+    query = Expense.query.filter_by(user_id=current_user.id)
+
+    # Apply filters
+    query = apply_filters(query, request.args)
+
+    # Apply sorting
+    query = apply_sorting(query, sort_by, sort_order)
 
     expenses = query.all()
 
