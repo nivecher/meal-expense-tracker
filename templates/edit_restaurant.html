@@ -3,53 +3,151 @@
 {% block title %}Edit Restaurant{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h2 class="mb-0">{% if restaurant %}Edit{% else %}Add{% endif %} Restaurant</h2>
-            </div>
-            <div class="card-body">
-                <form method="POST" class="needs-validation" novalidate>
-                    <div class="mb-3">
-                        <label for="name" class="form-label">Restaurant Name</label>
-                        <input type="text" class="form-control" id="name" name="name" value="{{ restaurant.name if restaurant else '' }}" required>
-                        <div class="invalid-feedback">Please enter a restaurant name.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="address" class="form-label">Address</label>
-                        <input type="text" class="form-control" id="address" name="address" value="{{ restaurant.address if restaurant else '' }}" required>
-                        <div class="invalid-feedback">Please enter an address.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="chain" class="form-label">Restaurant Chain (Optional)</label>
-                        <input type="text" class="form-control" id="chain" name="chain" value="{{ restaurant.chain if restaurant else '' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="category" class="form-label">Category (Optional)</label>
-                        <select class="form-select" id="category" name="category">
-                            <option value="">Select a category</option>
-                            <option value="restaurant" {% if restaurant and restaurant.category == 'restaurant' %}selected{% endif %}>Restaurant</option>
-                            <option value="cafe" {% if restaurant and restaurant.category == 'cafe' %}selected{% endif %}>Cafe</option>
-                            <option value="bar" {% if restaurant and restaurant.category == 'bar' %}selected{% endif %}>Bar</option>
-                            <option value="bakery" {% if restaurant and restaurant.category == 'bakery' %}selected{% endif %}>Bakery</option>
-                            <option value="food" {% if restaurant and restaurant.category == 'food' %}selected{% endif %}>Food</option>
-                            <option value="meal_delivery" {% if restaurant and restaurant.category == 'meal_delivery' %}selected{% endif %}>Meal Delivery</option>
-                            <option value="meal_takeaway" {% if restaurant and restaurant.category == 'meal_takeaway' %}selected{% endif %}>Meal Takeaway</option>
-                            <option value="supermarket" {% if restaurant and restaurant.category == 'supermarket' %}selected{% endif %}>Supermarket</option>
-                            <option value="grocery_or_supermarket" {% if restaurant and restaurant.category == 'grocery_or_supermarket' %}selected{% endif %}>Grocery Store</option>
-                            <option value="convenience_store" {% if restaurant and restaurant.category == 'convenience_store' %}selected{% endif %}>Convenience Store</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea class="form-control" id="description" name="description" rows="3">{{ restaurant.description if restaurant else '' }}</textarea>
-                    </div>
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">Save Restaurant</button>
-                        <a href="{{ url_for('restaurants') }}" class="btn btn-secondary">Cancel</a>
-                    </div>
-                </form>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h4 mb-0">Edit Restaurant</h2>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST" class="needs-validation" novalidate>
+                        <!-- Basic Information Section -->
+                        <div class="mb-4">
+                            <h3 class="h5 mb-3">Basic Information</h3>
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Restaurant Name *</label>
+                                <input type="text" class="form-control" id="name" name="name" 
+                                       value="{{ restaurant.name }}" required
+                                       placeholder="Enter restaurant name"
+                                       data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="Enter the full name of the restaurant">
+                                <div class="invalid-feedback">Please enter a restaurant name.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="type" class="form-label">Type</label>
+                                <select class="form-select" id="type" name="type"
+                                        data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="Select the type of establishment">
+                                    <option value="">Select a type</option>
+                                    <option value="restaurant" {% if restaurant.type == 'restaurant' %}selected{% endif %}>Restaurant</option>
+                                    <option value="cafe" {% if restaurant.type == 'cafe' %}selected{% endif %}>Cafe</option>
+                                    <option value="bakery" {% if restaurant.type == 'bakery' %}selected{% endif %}>Bakery</option>
+                                    <option value="bar" {% if restaurant.type == 'bar' %}selected{% endif %}>Bar</option>
+                                    <option value="meal_delivery" {% if restaurant.type == 'meal_delivery' %}selected{% endif %}>Meal Delivery</option>
+                                    <option value="meal_takeaway" {% if restaurant.type == 'meal_takeaway' %}selected{% endif %}>Meal Takeaway</option>
+                                    <option value="supermarket" {% if restaurant.type == 'supermarket' %}selected{% endif %}>Supermarket</option>
+                                    <option value="grocery_or_supermarket" {% if restaurant.type == 'grocery_or_supermarket' %}selected{% endif %}>Grocery Store</option>
+                                    <option value="convenience_store" {% if restaurant.type == 'convenience_store' %}selected{% endif %}>Convenience Store</option>
+                                    <option value="food" {% if restaurant.type == 'food' %}selected{% endif %}>Food</option>
+                                    <option value="liquor_store" {% if restaurant.type == 'liquor_store' %}selected{% endif %}>Liquor Store</option>
+                                    <option value="other" {% if restaurant.type == 'other' %}selected{% endif %}>Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="description" class="form-label">Description</label>
+                                <textarea class="form-control" id="description" name="description" rows="2"
+                                          placeholder="Brief description of the restaurant"
+                                          data-bs-toggle="tooltip" data-bs-placement="top"
+                                          title="Add a brief description of the restaurant">{{ restaurant.description or '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Location Information Section -->
+                        <div class="mb-4">
+                            <h3 class="h5 mb-3">Location Information</h3>
+                            <div class="mb-3">
+                                <label for="location" class="form-label">City/Location</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="location" name="location"
+                                           value="{{ restaurant.location or '' }}"
+                                           placeholder="Enter city or location"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Enter the city or location of the restaurant">
+                                    <button type="button" class="btn btn-outline-primary" id="useCurrentLocation"
+                                            data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Use your current location">
+                                        <i class="bi bi-geo-alt"></i> Use My Location
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="address" class="form-label">Full Address</label>
+                                <input type="text" class="form-control" id="address" name="address"
+                                       value="{{ restaurant.address or '' }}"
+                                       placeholder="Enter full address"
+                                       data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="Enter the complete address of the restaurant">
+                            </div>
+                        </div>
+
+                        <!-- Additional Information Section -->
+                        <div class="mb-4">
+                            <h3 class="h5 mb-3">Additional Information</h3>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="price_range" class="form-label">Price Range</label>
+                                    <select class="form-select" id="price_range" name="price_range"
+                                            data-bs-toggle="tooltip" data-bs-placement="top"
+                                            title="Select the price range of the restaurant">
+                                        <option value="">Select price range</option>
+                                        <option value="$" {% if restaurant.price_range == '$' %}selected{% endif %}>$ (Budget)</option>
+                                        <option value="$$" {% if restaurant.price_range == '$$' %}selected{% endif %}>$$ (Moderate)</option>
+                                        <option value="$$$" {% if restaurant.price_range == '$$$' %}selected{% endif %}>$$$ (Expensive)</option>
+                                        <option value="$$$$" {% if restaurant.price_range == '$$$$' %}selected{% endif %}>$$$$ (Luxury)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="cuisine" class="form-label">Cuisine Type</label>
+                                    <input type="text" class="form-control" id="cuisine" name="cuisine"
+                                           value="{{ restaurant.cuisine or '' }}"
+                                           placeholder="e.g., Italian, Japanese, etc."
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Enter the type of cuisine served">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="website" class="form-label">Website</label>
+                                <input type="url" class="form-control" id="website" name="website"
+                                       value="{{ restaurant.website or '' }}"
+                                       placeholder="https://www.example.com"
+                                       data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="Enter the restaurant's website URL">
+                            </div>
+                            <div class="mb-3">
+                                <label for="phone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phone" name="phone"
+                                       value="{{ restaurant.phone or '' }}"
+                                       placeholder="Enter phone number"
+                                       data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="Enter the restaurant's phone number">
+                            </div>
+                            <div class="mb-3">
+                                <label for="notes" class="form-label">Additional Notes</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="2"
+                                          placeholder="Any additional information about the restaurant"
+                                          data-bs-toggle="tooltip" data-bs-placement="top"
+                                          title="Add any additional notes or information">{{ restaurant.notes or '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Restaurant</button>
+                            <a href="{{ url_for('restaurants') }}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -57,55 +155,69 @@
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script>
 async function initializePlacesAutocomplete() {
     try {
         const { Autocomplete } = await google.maps.importLibrary("places");
         
         const addressInput = document.getElementById('address');
-        const nameInput = document.getElementById('name');
-        const categorySelect = document.getElementById('category');
-        const chainInput = document.getElementById('chain');
+        const locationInput = document.getElementById('location');
         
         const autocomplete = new Autocomplete(addressInput, {
-            types: ['establishment'],
-            fields: ['name', 'formatted_address', 'geometry', 'place_id', 'types']
+            fields: ['address_components', 'formatted_address', 'geometry', 'name', 'website', 'formatted_phone_number', 'types']
         });
 
-        // Handle place selection
         autocomplete.addListener('place_changed', function() {
             const place = autocomplete.getPlace();
-            if (!place.geometry) {
-                return;
+            
+            // Update location (city)
+            if (place.address_components) {
+                const cityComponent = place.address_components.find(
+                    component => component.types.includes('locality')
+                );
+                if (cityComponent) {
+                    locationInput.value = cityComponent.long_name;
+                }
             }
 
-            // Update the address field with the formatted address
-            addressInput.value = place.formatted_address;
-            
-            // Update the name field if it's empty
+            // Update website if available
+            if (place.website) {
+                document.getElementById('website').value = place.website;
+            }
+
+            // Update phone number if available
+            if (place.formatted_phone_number) {
+                document.getElementById('phone').value = place.formatted_phone_number;
+            }
+
+            // Update restaurant name if empty
+            const nameInput = document.getElementById('name');
             if (!nameInput.value && place.name) {
                 nameInput.value = place.name;
             }
 
-            // Update category based on place types
+            // Update type based on place types
             if (place.types) {
-                const restaurantTypes = {
+                const typeSelect = document.getElementById('type');
+                const typeMapping = {
                     'restaurant': 'restaurant',
                     'cafe': 'cafe',
-                    'bar': 'bar',
                     'bakery': 'bakery',
-                    'food': 'food',
+                    'bar': 'bar',
                     'meal_delivery': 'meal_delivery',
                     'meal_takeaway': 'meal_takeaway',
                     'supermarket': 'supermarket',
                     'grocery_or_supermarket': 'grocery_or_supermarket',
-                    'convenience_store': 'convenience_store'
+                    'convenience_store': 'convenience_store',
+                    'food': 'food',
+                    'liquor_store': 'liquor_store'
                 };
 
                 // Find the first matching type
                 for (const type of place.types) {
-                    if (restaurantTypes[type]) {
-                        categorySelect.value = restaurantTypes[type];
+                    if (typeMapping[type]) {
+                        typeSelect.value = typeMapping[type];
                         break;
                     }
                 }
@@ -131,7 +243,41 @@ async function initializePlacesAutocomplete() {
     });
 })();
 
-// Initialize Places Autocomplete
 initializePlacesAutocomplete();
+
+document.getElementById('useCurrentLocation').addEventListener('click', function() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            const geocoder = new google.maps.Geocoder();
+            const latlng = { lat: position.coords.latitude, lng: position.coords.longitude };
+            geocoder.geocode({ 'location': latlng }, function(results, status) {
+                if (status === 'OK') {
+                    if (results[0]) {
+                        const cityComponent = results[0].address_components.find(
+                            component => component.types.includes('locality')
+                        );
+                        if (cityComponent) {
+                            document.getElementById('location').value = cityComponent.long_name;
+                        }
+                    }
+                } else {
+                    console.error('Geocode was not successful for the following reason: ' + status);
+                }
+            });
+        }, function(error) {
+            console.error('Error getting location:', error);
+        });
+    } else {
+        console.error('Geolocation is not supported by this browser.');
+    }
+});
+
+// Initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
 </script>
 {% endblock %} 
