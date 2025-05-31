@@ -1,1 +1,1 @@
-"""Integration tests for the Meal Expense Tracker application.""" 
+"""Integration tests for the Meal Expense Tracker application."""
