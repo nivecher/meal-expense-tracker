@@ -42,7 +42,9 @@ migrate = Migrate(app, db)
 
 class Restaurant(db.Model):
     __tablename__ = "restaurant"
-    __table_args__ = (db.UniqueConstraint('name', 'city', name='uix_restaurant_name_city'),)
+    __table_args__ = (
+        db.UniqueConstraint("name", "city", name="uix_restaurant_name_city"),
+    )
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     type = db.Column(db.String(50))
@@ -356,11 +358,27 @@ def add_expense():
                 flash("Restaurant is required", "danger")
                 return redirect(url_for("add_expense"))
 
-            # Get restaurant's category if no category is specified
+            # Get restaurant's type if no category is specified
             if not category:
                 restaurant = Restaurant.query.get(restaurant_id)
-                if restaurant and restaurant.category:
-                    category = restaurant.category
+                if restaurant and restaurant.type:
+                    # Map restaurant type to expense category
+                    type_to_category = {
+                        "restaurant": "Dining Out",
+                        "cafe": "Coffee",
+                        "bar": "Dining Out",
+                        "meal_delivery": "Takeout",
+                        "meal_takeaway": "Takeout",
+                        "supermarket": "Groceries",
+                        "grocery_or_supermarket": "Groceries",
+                        "convenience_store": "Groceries",
+                        "coffee_shop": "Coffee",
+                        "bakery": "Snacks",
+                        "dessert_shop": "Snacks",
+                        "ice_cream_shop": "Snacks",
+                        "other": "Other",
+                    }
+                    category = type_to_category.get(restaurant.type, "")
 
             date_str = request.form["date"]
             date = datetime.strptime(date_str, "%Y-%m-%d")
@@ -397,8 +415,13 @@ def add_expense():
     restaurants = Restaurant.query.order_by(Restaurant.name, Restaurant.address).all()
     today = datetime.now().strftime("%Y-%m-%d")
     min_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")  # 1 year ago
+    default_restaurant_id = request.args.get("restaurant_id", type=int)
     return render_template(
-        "add_expense.html", today=today, min_date=min_date, restaurants=restaurants
+        "add_expense.html",
+        today=today,
+        min_date=min_date,
+        restaurants=restaurants,
+        default_restaurant_id=default_restaurant_id,
     )
 
 

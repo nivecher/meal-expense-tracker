@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block title %}Add Restaurant{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
@@ -201,197 +203,137 @@
 {% block scripts %}
 {{ super() }}
 <script>
-async function initializePlacesAutocomplete() {
-    try {
-        const { Autocomplete, PlacesService } = await google.maps.importLibrary("places");
-        
+    // Function to initialize Google Places Autocomplete
+    function initAutocomplete() {
+        if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
+            console.error('Google Maps API not loaded properly');
+            return;
+        }
+
         const addressInput = document.getElementById('address');
-        
-        const autocomplete = new Autocomplete(addressInput, {
-            fields: ['address_components', 'formatted_address', 'geometry', 'name', 'website', 'formatted_phone_number', 'types', 'place_id']
+        if (!addressInput) {
+            console.error('Address input element not found');
+            return;
+        }
+
+        const autocomplete = new google.maps.places.Autocomplete(addressInput, {
+            fields: ['name', 'formatted_address', 'types', 'price_level'],
+            types: ['establishment']
         });
-
-        // Create a PlacesService instance
-        const placesService = new PlacesService(document.createElement('div'));
-
-        // Google Places to our cuisine mapping
-        const cuisineMapping = {
-            'american_restaurant': 'american',
-            'italian_restaurant': 'italian',
-            'mexican_restaurant': 'mexican',
-            'chinese_restaurant': 'chinese',
-            'japanese_restaurant': 'japanese',
-            'thai_restaurant': 'thai',
-            'indian_restaurant': 'indian',
-            'vietnamese_restaurant': 'vietnamese',
-            'korean_restaurant': 'korean',
-            'mediterranean_restaurant': 'mediterranean',
-            'greek_restaurant': 'greek',
-            'french_restaurant': 'french',
-            'german_restaurant': 'german',
-            'spanish_restaurant': 'spanish',
-            'brazilian_restaurant': 'brazilian',
-            'caribbean_restaurant': 'caribbean',
-            'sushi_restaurant': 'sushi',
-            'steak_house': 'steakhouse',
-            'seafood_restaurant': 'seafood',
-            'barbecue_restaurant': 'bbq',
-            'pizza_restaurant': 'pizza',
-            'hamburger_restaurant': 'burgers',
-            'sandwich_shop': 'sandwiches',
-            'cafe': 'cafe',
-            'bakery': 'bakery',
-            'dessert_shop': 'dessert',
-            'ice_cream_shop': 'ice_cream',
-            'coffee_shop': 'coffee_shop',
-            'juice_bar': 'juice_bar',
-            'smoothie_shop': 'smoothie',
-            'vegan_restaurant': 'vegan',
-            'vegetarian_restaurant': 'vegetarian',
-            'gluten_free_restaurant': 'gluten_free',
-            'halal_restaurant': 'halal',
-            'kosher_restaurant': 'kosher'
-        };
 
         autocomplete.addListener('place_changed', function() {
             const place = autocomplete.getPlace();
-            
-            // Update address components
-            if (place.address_components) {
-                let streetNumber = '';
-                let route = '';
-                let city = '';
-                let state = '';
-                let zipCode = '';
+            if (!place) return;
 
-                for (const component of place.address_components) {
-                    const types = component.types;
-                    if (types.includes('street_number')) {
-                        streetNumber = component.long_name;
-                    } else if (types.includes('route')) {
-                        route = component.long_name;
-                    } else if (types.includes('locality')) {
-                        city = component.long_name;
-                    } else if (types.includes('administrative_area_level_1')) {
-                        state = component.short_name;
-                    } else if (types.includes('postal_code')) {
-                        zipCode = component.long_name;
-                    }
-                }
-
-                // Update address fields
-                document.getElementById('address').value = streetNumber + ' ' + route;
-                document.getElementById('city').value = city;
-                document.getElementById('state').value = state;
-                document.getElementById('zip_code').value = zipCode;
-            }
-
-            // Update website if available
-            if (place.website) {
-                document.getElementById('website').value = place.website;
-            }
-
-            // Update phone number if available
-            if (place.formatted_phone_number) {
-                document.getElementById('phone').value = place.formatted_phone_number;
-            }
-
-            // Update restaurant name if empty
+            // Set restaurant name
             const nameInput = document.getElementById('name');
-            if (!nameInput.value && place.name) {
+            if (nameInput && place.name) {
                 nameInput.value = place.name;
             }
 
-            // Update type based on place types
-            if (place.types) {
-                const typeSelect = document.getElementById('type');
+            // Parse address components
+            if (place.formatted_address) {
+                const addressParts = place.formatted_address.split(',');
+                const cityStateZip = addressParts[1] ? addressParts[1].trim().split(' ') : [];
+                
+                // Set address
+                if (addressInput) {
+                    addressInput.value = addressParts[0] || '';
+                }
+
+                // Set city
+                const cityInput = document.getElementById('city');
+                if (cityInput && cityStateZip.length > 0) {
+                    cityInput.value = cityStateZip[0] || '';
+                }
+
+                // Set state
+                const stateInput = document.getElementById('state');
+                if (stateInput && cityStateZip.length > 1) {
+                    stateInput.value = cityStateZip[1] || '';
+                }
+
+                // Set zip code
+                const zipInput = document.getElementById('zip_code');
+                if (zipInput && cityStateZip.length > 2) {
+                    zipInput.value = cityStateZip[2] || '';
+                }
+            }
+
+            // Set price range
+            const priceRangeInput = document.getElementById('price_range');
+            if (priceRangeInput && place.price_level !== undefined) {
+                const priceLevel = place.price_level;
+                const priceRanges = ['$', '$$', '$$$', '$$$$'];
+                priceRangeInput.value = priceRanges[priceLevel - 1] || '';
+            }
+
+            // Set restaurant type
+            const typeInput = document.getElementById('type');
+            if (typeInput && place.types && place.types.length > 0) {
                 const typeMapping = {
                     'restaurant': 'restaurant',
                     'cafe': 'cafe',
-                    'bakery': 'bakery',
                     'bar': 'bar',
                     'meal_delivery': 'meal_delivery',
                     'meal_takeaway': 'meal_takeaway',
                     'supermarket': 'supermarket',
                     'grocery_or_supermarket': 'grocery_or_supermarket',
                     'convenience_store': 'convenience_store',
-                    'food': 'food',
-                    'liquor_store': 'liquor_store'
+                    'coffee_shop': 'coffee_shop',
+                    'bakery': 'bakery',
+                    'dessert_shop': 'dessert_shop',
+                    'ice_cream_shop': 'ice_cream_shop'
                 };
 
-                // Find the first matching type
                 for (const type of place.types) {
                     if (typeMapping[type]) {
-                        typeSelect.value = typeMapping[type];
+                        typeInput.value = typeMapping[type];
                         break;
                     }
                 }
             }
-
-            // Get additional place details
-            if (place.place_id) {
-                placesService.getDetails({
-                    placeId: place.place_id,
-                    fields: ['price_level', 'types']
-                }, (placeDetails, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK) {
-                        // Update price range
-                        if (placeDetails.price_level !== undefined) {
-                            const priceRangeSelect = document.getElementById('price_range');
-                            const priceMapping = {
-                                1: '$',
-                                2: '$$',
-                                3: '$$$',
-                                4: '$$$$'
-                            };
-                            if (priceMapping[placeDetails.price_level]) {
-                                priceRangeSelect.value = priceMapping[placeDetails.price_level];
-                            }
-                        }
-
-                        // Update cuisine type based on place types
-                        if (placeDetails.types) {
-                            const cuisineSelect = document.getElementById('cuisine');
-                            // Find the first matching cuisine type
-                            for (const type of placeDetails.types) {
-                                if (cuisineMapping[type]) {
-                                    cuisineSelect.value = cuisineMapping[type];
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                });
-            }
         });
-    } catch (error) {
-        console.error('Error initializing Places Autocomplete:', error);
     }
-}
 
-// Initialize form validation
-(function() {
-    'use strict';
-    const forms = document.querySelectorAll('.needs-validation');
-    Array.from(forms).forEach(form => {
-        form.addEventListener('submit', event => {
-            if (!form.checkValidity()) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            form.classList.add('was-validated');
-        }, false);
+    // Load Google Maps API script
+    function loadGoogleMapsScript() {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_MAPS_API_KEY }}&libraries=places&callback=initAutocomplete`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = function() {
+            console.error('Failed to load Google Maps API');
+        };
+        document.head.appendChild(script);
+    }
+
+    // Initialize when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadGoogleMapsScript();
     });
-})();
 
-// Initialize tooltips
-document.addEventListener('DOMContentLoaded', function() {
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function(tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
+    // Initialize form validation
+    (function() {
+        'use strict';
+        const forms = document.querySelectorAll('.needs-validation');
+        Array.from(forms).forEach(form => {
+            form.addEventListener('submit', event => {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    })();
+
+    // Initialize tooltips
+    document.addEventListener('DOMContentLoaded', function() {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function(tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
     });
-});
-
-initializePlacesAutocomplete();
 </script>
 {% endblock %} 

@@ -94,4 +94,67 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const restaurantSelect = document.getElementById('restaurant_id');
+    const categorySelect = document.getElementById('category');
+    
+    // Map of restaurant types to expense categories
+    const typeToCategoryMap = {
+        'restaurant': 'Dining Out',
+        'cafe': 'Coffee',
+        'bar': 'Dining Out',
+        'meal_delivery': 'Takeout',
+        'meal_takeaway': 'Takeout',
+        'supermarket': 'Groceries',
+        'grocery_or_supermarket': 'Groceries',
+        'convenience_store': 'Groceries',
+        'coffee_shop': 'Coffee',
+        'bakery': 'Snacks',
+        'dessert_shop': 'Snacks',
+        'ice_cream_shop': 'Snacks',
+        'other': 'Other'
+    };
+
+    // Function to update category based on restaurant type
+    function updateCategory(restaurantId) {
+        if (!restaurantId) {
+            categorySelect.value = '';
+            return;
+        }
+
+        // Get the selected restaurant's type from the data attribute
+        const selectedOption = restaurantSelect.options[restaurantSelect.selectedIndex];
+        const restaurantType = selectedOption.getAttribute('data-type');
+        
+        if (restaurantType && typeToCategoryMap[restaurantType]) {
+            categorySelect.value = typeToCategoryMap[restaurantType];
+        } else {
+            categorySelect.value = '';
+        }
+    }
+
+    // Add data-type attribute to restaurant options
+    {% for restaurant in restaurants %}
+    const option = restaurantSelect.querySelector('option[value="{{ restaurant.id }}"]');
+    if (option) {
+        option.setAttribute('data-type', '{{ restaurant.type }}');
+    }
+    {% endfor %}
+
+    // Update category when restaurant selection changes
+    restaurantSelect.addEventListener('change', function() {
+        updateCategory(this.value);
+    });
+
+    // Initialize category if a restaurant is pre-selected
+    if (restaurantSelect.value) {
+        updateCategory(restaurantSelect.value);
+    }
+});
+</script>
 {% endblock %} 
