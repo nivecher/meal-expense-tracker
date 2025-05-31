@@ -40,6 +40,9 @@ ENV/
 # Logs
 *.log
 
+# mypy
+.mypy_cache/
+
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
