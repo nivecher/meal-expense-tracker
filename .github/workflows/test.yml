@@ -107,6 +107,13 @@ jobs:
             git push origin v0.1.0
           fi
 
+      - name: Get commit message
+        id: commit_message
+        run: |
+          MSG=$(git log -1 --pretty=format:%s)
+          echo "message=$MSG" >> $GITHUB_OUTPUT
+          echo "Last commit message: $MSG"
+
       - name: Get next version
         id: semver
         uses: ietf-tools/semver-action@v1
@@ -114,24 +121,33 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: main
           fallbackTag: 'v0.1.0'
+          minorList: 'feat,feature,minor'
+          patchList: 'fix,bugfix,perf,refactor,test,tests,chore,docs'
           noNewCommitBehavior: 'patch'
           noVersionBumpBehavior: 'patch'
+          skipInvalidTags: true
 
-      - name: Get current version
-        id: current_version
+      - name: Determine version
+        id: version
         run: |
-          CURRENT_VERSION="${{ steps.semver.outputs.next }}"
-          if [ -z "$CURRENT_VERSION" ]; then
-            CURRENT_VERSION="0.1.0"
+          # If we got a next version from semver action, use it
+          if [[ -n "${{ steps.semver.outputs.next }}" ]]; then
+            VERSION="${{ steps.semver.outputs.next }}"
+          else
+            # Get the latest tag and increment patch version
+            LATEST_TAG=$(git describe --tags --abbrev=0)
+            LATEST_VERSION=${LATEST_TAG#v}
+            IFS='.' read -r major minor patch <<< "$LATEST_VERSION"
+            VERSION="$major.$minor.$((patch + 1))"
           fi
-          echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Using version: $CURRENT_VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
 
       - name: Tag and push Docker image
         id: docker_tag
         if: success()
         run: |
-          VERSION=${{ steps.current_version.outputs.version }}
+          VERSION=${{ steps.version.outputs.version }}
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Tagging version: $VERSION"
           
@@ -147,15 +163,18 @@ jobs:
           fi
 
       - name: Create Release
-        if: success() && !contains(github.ref, 'v${{ steps.docker_tag.outputs.version }}')
+        if: success() && !contains(github.ref, 'v${{ steps.version.outputs.version }}')
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.docker_tag.outputs.version }}
-          release_name: Release v${{ steps.docker_tag.outputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Release v${{ steps.version.outputs.version }}
           body: |
-            Release version ${{ steps.docker_tag.outputs.version }}
+            Release version ${{ steps.version.outputs.version }}
+            
+            Changes:
+            - ${{ steps.commit_message.outputs.message }}
             
             This release has passed all tests and security scans.
           draft: false
