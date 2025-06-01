@@ -32,12 +32,6 @@ def _db(app):
 def client(app, _db):
     """A test client for the app."""
     with app.test_client() as client:
-        with app.app_context():
-            # Create test user
-            user = User(username="testuser")
-            user.set_password("testpass")
-            db.session.add(user)
-            db.session.commit()
         yield client
 
 
@@ -64,6 +58,14 @@ class AuthActions:
         """Log out the test user."""
         return self._client.get("/auth/logout", follow_redirects=True)
 
+    def create_user(self, username="testuser", password="testpass"):
+        """Create a test user."""
+        return self._client.post(
+            "/auth/register",
+            data={"username": username, "password": password},
+            follow_redirects=True,
+        )
+
 
 @pytest.fixture(scope="function")
 def auth(client):
@@ -72,14 +74,12 @@ def auth(client):
 
 
 @pytest.fixture(scope="function")
-def test_user(app, _db):
+def test_user(app, _db, auth):
     """Create a test user."""
     with app.app_context():
         try:
-            user = User(username="testuser")
-            user.set_password("testpass")
-            db.session.add(user)
-            db.session.commit()
+            auth.create_user()
+            user = User.query.filter_by(username="testuser").first()
             return user
         except SQLAlchemyError:
             db.session.rollback()

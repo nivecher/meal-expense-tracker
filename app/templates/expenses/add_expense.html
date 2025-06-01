@@ -6,7 +6,7 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h2 class="mb-0">Add Expense</h2>
+                    <h2 class="mb-0">Add Expense{% if restaurant %} for {{ restaurant.name }}{% endif %}</h2>
                 </div>
                 <div class="card-body">
                     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -23,8 +23,10 @@
                                 <label for="restaurant_id" class="form-label">Restaurant</label>
                                 <select name="restaurant_id" id="restaurant_id" class="form-select" required>
                                     <option value="">Select Restaurant</option>
-                                    {% for restaurant in restaurants %}
-                                    <option value="{{ restaurant.id }}" {% if restaurant.id == default_restaurant_id %}selected{% endif %}>{{ restaurant.name }}</option>
+                                    {% for r in restaurants %}
+                                    <option value="{{ r.id }}" 
+                                            {% if restaurant and r.id == restaurant.id %}selected{% endif %}
+                                            data-type="{{ r.type }}">{{ r.name }}</option>
                                     {% endfor %}
                                 </select>
                                 <div class="form-text">
@@ -43,7 +45,7 @@
                                 <label for="amount" class="form-label">Amount</label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" step="0.01" class="form-control" id="amount" name="amount" required>
+                                    <input type="number" step="0.01" min="0.01" class="form-control" id="amount" name="amount" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -81,7 +83,11 @@
                         </div>
 
                         <div class="d-flex justify-content-between">
+                            {% if restaurant %}
+                            <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}" class="btn btn-secondary">Cancel</a>
+                            {% else %}
                             <a href="{{ url_for('main.index') }}" class="btn btn-secondary">Cancel</a>
+                            {% endif %}
                             <button type="submit" class="btn btn-primary">Add Expense</button>
                         </div>
                     </form>
@@ -133,14 +139,6 @@ document.addEventListener('DOMContentLoaded', function() {
             categorySelect.value = '';
         }
     }
-
-    // Add data-type attribute to restaurant options
-    {% for restaurant in restaurants %}
-    const option = restaurantSelect.querySelector('option[value="{{ restaurant.id }}"]');
-    if (option) {
-        option.setAttribute('data-type', '{{ restaurant.type }}');
-    }
-    {% endfor %}
 
     // Update category when restaurant selection changes
     restaurantSelect.addEventListener('change', function() {

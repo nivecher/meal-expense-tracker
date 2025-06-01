@@ -1,4 +1,4 @@
-.PHONY: build run test lint clean
+.PHONY: build run test lint clean run-local
 
 # Enable BuildKit for better build performance and features
 export DOCKER_BUILDKIT=1
@@ -16,6 +16,10 @@ build:
 # Run the container with .env file
 run:
 	docker run -d -p $(PORT):$(PORT) -v $(VOLUME_NAME):/app/instance --env-file .env --name $(CONTAINER_NAME) $(IMAGE_NAME)
+
+# Run the application locally using Python
+run-local:
+	PYTHONPATH=. FLASK_APP=app.py FLASK_ENV=development flask run --port $(PORT)
 
 # Stop and remove the container
 stop:

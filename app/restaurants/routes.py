@@ -3,6 +3,7 @@ from flask_login import login_required
 from app import db
 from app.restaurants import bp
 from app.restaurants.models import Restaurant
+from app.expenses.models import Expense
 from sqlalchemy.exc import SQLAlchemyError
 import csv
 from io import StringIO
@@ -22,18 +23,27 @@ def list_restaurants():
         return redirect(url_for("main.index"))
 
 
-@bp.route("/<int:id>/details")
+@bp.route("/<int:restaurant_id>/details")
 @login_required
-def restaurant_details(id):
+def restaurant_details(restaurant_id):
     try:
-        restaurant = Restaurant.query.get_or_404(id)
+        restaurant = Restaurant.query.get_or_404(restaurant_id)
+        expenses = (
+            Expense.query.filter_by(restaurant_id=restaurant.id)
+            .order_by(Expense.date.desc())
+            .all()
+        )
         return render_template(
-            "restaurants/restaurant_details.html", restaurant=restaurant
+            "restaurants/restaurant_details.html",
+            restaurant=restaurant,
+            expenses=expenses,
         )
     except SQLAlchemyError:
         db.session.rollback()
         flash("Error loading restaurant details. Please try again.", "error")
-        return redirect(url_for("restaurants.list_restaurants"))
+        return render_template(
+            "restaurants/restaurant_details.html", restaurant=None, expenses=[]
+        )
 
 
 @bp.route("/add", methods=["GET", "POST"])
@@ -47,6 +57,16 @@ def add_restaurant():
                 if not request.form.get(field):
                     flash(f"{field.title()} is required", "error")
                     return render_template("restaurants/add_restaurant.html")
+
+            # Check for duplicate restaurant
+            existing_restaurant = Restaurant.query.filter_by(
+                name=request.form["name"], city=request.form["city"]
+            ).first()
+            if existing_restaurant:
+                flash(
+                    "A restaurant with this name already exists in this city.", "error"
+                )
+                return render_template("restaurants/add_restaurant.html")
 
             restaurant = Restaurant(
                 name=request.form["name"],
@@ -81,11 +101,11 @@ def add_restaurant():
     return render_template("restaurants/add_restaurant.html")
 
 
-@bp.route("/<int:id>/edit", methods=["GET", "POST"])
+@bp.route("/<int:restaurant_id>/edit", methods=["GET", "POST"])
 @login_required
-def edit_restaurant(id):
+def edit_restaurant(restaurant_id):
     try:
-        restaurant = Restaurant.query.get_or_404(id)
+        restaurant = Restaurant.query.get_or_404(restaurant_id)
         if request.method == "POST":
             try:
                 restaurant.name = request.form["name"]
@@ -115,11 +135,11 @@ def edit_restaurant(id):
         return redirect(url_for("restaurants.list_restaurants"))
 
 
-@bp.route("/<int:id>/delete", methods=["POST"])
+@bp.route("/<int:restaurant_id>/delete", methods=["POST"])
 @login_required
-def delete_restaurant(id):
+def delete_restaurant(restaurant_id):
     try:
-        restaurant = Restaurant.query.get_or_404(id)
+        restaurant = Restaurant.query.get_or_404(restaurant_id)
         if restaurant.expenses:
             flash("Cannot delete restaurant with associated expenses.", "error")
             return redirect(url_for("restaurants.list_restaurants"))

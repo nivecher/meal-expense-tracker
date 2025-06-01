@@ -14,6 +14,7 @@ def test_index_redirects_to_login(client):
 
 def test_index_with_expenses(client, auth):
     """Test index page with expenses."""
+    auth.create_user()
     auth.login()
     # Add a restaurant and expense
     client.post(
@@ -48,6 +49,7 @@ def test_index_with_expenses(client, auth):
 
 def test_index_sorting(client, auth):
     """Test index page sorting."""
+    auth.create_user()
     auth.login()
     # Add a restaurant and multiple expenses
     client.post(
@@ -95,6 +97,7 @@ def test_index_sorting(client, auth):
 
 def test_index_search(client, auth):
     """Test index page search functionality."""
+    auth.create_user()
     auth.login()
     # Add a restaurant and expense
     client.post(

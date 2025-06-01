@@ -40,12 +40,16 @@ def register():
         return redirect(url_for("main.index"))
 
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        if not username or not password:
+            flash("Please fill out all fields.", "danger")
+            return render_template("auth/register.html", username=username)
 
         if User.query.filter_by(username=username).first():
             flash("Username already exists", "danger")
-            return redirect(url_for("auth.register"))
+            return render_template("auth/register.html", username=username)
 
         try:
             user = User(username=username)

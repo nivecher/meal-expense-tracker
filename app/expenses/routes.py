@@ -115,6 +115,14 @@ def get_main_index_context():
 @bp.route("/add", methods=["GET", "POST"])
 @login_required
 def add_expense():
+    restaurant_id = request.args.get("restaurant_id")
+    restaurant = None
+    if restaurant_id:
+        restaurant = Restaurant.query.get(restaurant_id)
+        if not restaurant:
+            flash("Restaurant not found.", "error")
+            return redirect(url_for("main.index"))
+
     if request.method == "POST":
         date = datetime.strptime(request.form["date"], "%Y-%m-%d").date()
         restaurant_id = request.form.get("restaurant_id")
@@ -147,43 +155,98 @@ def add_expense():
         db.session.add(expense)
         db.session.commit()
         flash("Expense added successfully!", "success")
+        if restaurant_id:
+            return redirect(
+                url_for("restaurants.restaurant_details", restaurant_id=restaurant_id)
+            )
         return redirect(url_for("main.index"))
-    return render_template("expenses/add.html")
+
+    # Get all restaurants for the dropdown
+    restaurants = Restaurant.query.order_by(Restaurant.name).all()
+    today = datetime.now().date()
+    min_date = today - timedelta(days=365)  # Allow expenses up to 1 year in the past
+
+    return render_template(
+        "expenses/add_expense.html",
+        restaurant=restaurant,
+        restaurants=restaurants,
+        today=today.strftime("%Y-%m-%d"),
+        min_date=min_date.strftime("%Y-%m-%d"),
+    )
 
 
-@bp.route("/<int:id>/edit", methods=["GET", "POST"])
+@bp.route("/<int:expense_id>/edit", methods=["GET", "POST"])
 @login_required
-def edit_expense(id):
-    expense = Expense.query.get_or_404(id)
+def edit_expense(expense_id):
+    expense = Expense.query.get_or_404(expense_id)
     if expense.user_id != current_user.id:
         flash("You do not have permission to edit this expense.", "error")
         return redirect(url_for("main.index"))
+
+    # Get all restaurants for the dropdown
+    restaurants = Restaurant.query.order_by(Restaurant.name).all()
+    today = datetime.now().date()
+    min_date = today - timedelta(days=365)  # Allow expenses up to 1 year in the past
+
     if request.method == "POST":
-        expense.date = datetime.strptime(request.form["date"], "%Y-%m-%d").date()
-        expense.amount = float(request.form["amount"])
-        expense.category = request.form["category"]
+        try:
+            expense.date = datetime.strptime(request.form["date"], "%Y-%m-%d").date()
+        except ValueError:
+            flash("Invalid date format.", "error")
+            return (
+                render_template(
+                    "expenses/edit_expense.html",
+                    expense=expense,
+                    restaurants=restaurants,
+                    today=today.strftime("%Y-%m-%d"),
+                    min_date=min_date.strftime("%Y-%m-%d"),
+                ),
+                400,
+            )
+
+        try:
+            expense.amount = float(request.form["amount"])
+        except ValueError:
+            flash("Invalid amount format.", "error")
+            return (
+                render_template(
+                    "expenses/edit_expense.html",
+                    expense=expense,
+                    restaurants=restaurants,
+                    today=today.strftime("%Y-%m-%d"),
+                    min_date=min_date.strftime("%Y-%m-%d"),
+                ),
+                400,
+            )
+
+        expense.category = request.form.get("category", "")
         expense.meal_type = request.form["meal_type"]
-        expense.notes = request.form["notes"]
+        expense.notes = request.form.get("notes", "")
         expense.restaurant_id = request.form.get("restaurant_id")
         db.session.commit()
         flash("Expense updated successfully!", "success")
-        context = get_main_index_context()
-        return render_template("main/index.html", **context), 200
-    return render_template("expenses/edit.html", expense=expense)
+        return redirect(url_for("main.index"))
+
+    return render_template(
+        "expenses/edit_expense.html",
+        expense=expense,
+        restaurants=restaurants,
+        today=today.strftime("%Y-%m-%d"),
+        min_date=min_date.strftime("%Y-%m-%d"),
+    )
 
 
-@bp.route("/<int:id>/delete", methods=["POST"])
+@bp.route("/<int:expense_id>/delete", methods=["POST"])
 @login_required
-def delete_expense(id):
-    expense = Expense.query.get_or_404(id)
+def delete_expense(expense_id):
+    expense = Expense.query.get_or_404(expense_id)
     if expense.user_id != current_user.id:
         flash("You do not have permission to delete this expense.", "error")
         return redirect(url_for("main.index"))
     db.session.delete(expense)
     db.session.commit()
     flash("Expense deleted successfully!", "success")
-    context = get_main_index_context()
-    return render_template("main/index.html", **context), 200
+    return redirect(url_for("main.index"))
 
 
 @bp.route("/stats")
@@ -215,3 +278,13 @@ def expense_stats():
         start_date=start_date,
         end_date=end_date,
     )
+
+
+@bp.route("/<int:expense_id>")
+@login_required
+def expense_details(expense_id):
+    expense = Expense.query.get_or_404(expense_id)
+    if expense.user_id != current_user.id:
+        flash("You do not have permission to view this expense.", "error")
+        return redirect(url_for("main.index"))
+    return render_template("expenses/expense_detail.html", expense=expense)
