@@ -27,12 +27,17 @@
                         <div class="mb-4">
                             <h3 class="h5 mb-3">Find Restaurant</h3>
                             <div class="mb-3">
-                                <label for="address" class="form-label">Google Address Search *</label>
-                                <input type="text" class="form-control" id="address" name="address" required
-                                       value="{{ restaurant.address or '' }}"
-                                       placeholder="Search for a restaurant or enter an address"
-                                       data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="Search for a restaurant or enter an address to auto-fill other fields">
+                                <label for="google_address" class="form-label">Google Address Search *</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="google_address" name="google_address" required
+                                           value="{{ restaurant.google_address or '' }}"
+                                           placeholder="Search for a restaurant or enter an address"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Search for a restaurant or enter an address to auto-fill other fields">
+                                    <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                                        <i class="fas fa-search"></i> Search
+                                    </button>
+                                </div>
                                 <div class="invalid-feedback">Please enter an address.</div>
                             </div>
                         </div>
@@ -71,11 +76,19 @@
                             </div>
                         </div>
 
-                        <!-- Address Details -->
+                        <!-- Contact Information -->
                         <div class="mb-4">
-                            <h3 class="h5 mb-3">Address Details</h3>
+                            <h3 class="h5 mb-3">Contact Information</h3>
+                            <div class="mb-3">
+                                <label for="address" class="form-label">Address</label>
+                                <input type="text" class="form-control" id="address" name="address"
+                                       value="{{ restaurant.address or '' }}"
+                                       placeholder="Enter street address"
+                                       data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="Enter the street address">
+                            </div>
                             <div class="row">
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-4 mb-3">
                                     <label for="city" class="form-label">City</label>
                                     <input type="text" class="form-control" id="city" name="city"
                                            value="{{ restaurant.city or '' }}"
@@ -83,22 +96,90 @@
                                            data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Enter the city">
                                 </div>
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-4 mb-3">
                                     <label for="state" class="form-label">State</label>
-                                    <input type="text" class="form-control" id="state" name="state"
-                                           value="{{ restaurant.state or '' }}"
-                                           placeholder="Enter state"
+                                    <select class="form-select" id="state" name="state"
                                            data-bs-toggle="tooltip" data-bs-placement="top"
-                                           title="Enter the state">
+                                           title="Select the state">
+                                        <option value="">Select state</option>
+                                        <option value="AL" {% if restaurant.state == 'AL' %}selected{% endif %}>Alabama - AL</option>
+                                        <option value="AK" {% if restaurant.state == 'AK' %}selected{% endif %}>Alaska - AK</option>
+                                        <option value="AZ" {% if restaurant.state == 'AZ' %}selected{% endif %}>Arizona - AZ</option>
+                                        <option value="AR" {% if restaurant.state == 'AR' %}selected{% endif %}>Arkansas - AR</option>
+                                        <option value="CA" {% if restaurant.state == 'CA' %}selected{% endif %}>California - CA</option>
+                                        <option value="CO" {% if restaurant.state == 'CO' %}selected{% endif %}>Colorado - CO</option>
+                                        <option value="CT" {% if restaurant.state == 'CT' %}selected{% endif %}>Connecticut - CT</option>
+                                        <option value="DE" {% if restaurant.state == 'DE' %}selected{% endif %}>Delaware - DE</option>
+                                        <option value="FL" {% if restaurant.state == 'FL' %}selected{% endif %}>Florida - FL</option>
+                                        <option value="GA" {% if restaurant.state == 'GA' %}selected{% endif %}>Georgia - GA</option>
+                                        <option value="HI" {% if restaurant.state == 'HI' %}selected{% endif %}>Hawaii - HI</option>
+                                        <option value="ID" {% if restaurant.state == 'ID' %}selected{% endif %}>Idaho - ID</option>
+                                        <option value="IL" {% if restaurant.state == 'IL' %}selected{% endif %}>Illinois - IL</option>
+                                        <option value="IN" {% if restaurant.state == 'IN' %}selected{% endif %}>Indiana - IN</option>
+                                        <option value="IA" {% if restaurant.state == 'IA' %}selected{% endif %}>Iowa - IA</option>
+                                        <option value="KS" {% if restaurant.state == 'KS' %}selected{% endif %}>Kansas - KS</option>
+                                        <option value="KY" {% if restaurant.state == 'KY' %}selected{% endif %}>Kentucky - KY</option>
+                                        <option value="LA" {% if restaurant.state == 'LA' %}selected{% endif %}>Louisiana - LA</option>
+                                        <option value="ME" {% if restaurant.state == 'ME' %}selected{% endif %}>Maine - ME</option>
+                                        <option value="MD" {% if restaurant.state == 'MD' %}selected{% endif %}>Maryland - MD</option>
+                                        <option value="MA" {% if restaurant.state == 'MA' %}selected{% endif %}>Massachusetts - MA</option>
+                                        <option value="MI" {% if restaurant.state == 'MI' %}selected{% endif %}>Michigan - MI</option>
+                                        <option value="MN" {% if restaurant.state == 'MN' %}selected{% endif %}>Minnesota - MN</option>
+                                        <option value="MS" {% if restaurant.state == 'MS' %}selected{% endif %}>Mississippi - MS</option>
+                                        <option value="MO" {% if restaurant.state == 'MO' %}selected{% endif %}>Missouri - MO</option>
+                                        <option value="MT" {% if restaurant.state == 'MT' %}selected{% endif %}>Montana - MT</option>
+                                        <option value="NE" {% if restaurant.state == 'NE' %}selected{% endif %}>Nebraska - NE</option>
+                                        <option value="NV" {% if restaurant.state == 'NV' %}selected{% endif %}>Nevada - NV</option>
+                                        <option value="NH" {% if restaurant.state == 'NH' %}selected{% endif %}>New Hampshire - NH</option>
+                                        <option value="NJ" {% if restaurant.state == 'NJ' %}selected{% endif %}>New Jersey - NJ</option>
+                                        <option value="NM" {% if restaurant.state == 'NM' %}selected{% endif %}>New Mexico - NM</option>
+                                        <option value="NY" {% if restaurant.state == 'NY' %}selected{% endif %}>New York - NY</option>
+                                        <option value="NC" {% if restaurant.state == 'NC' %}selected{% endif %}>North Carolina - NC</option>
+                                        <option value="ND" {% if restaurant.state == 'ND' %}selected{% endif %}>North Dakota - ND</option>
+                                        <option value="OH" {% if restaurant.state == 'OH' %}selected{% endif %}>Ohio - OH</option>
+                                        <option value="OK" {% if restaurant.state == 'OK' %}selected{% endif %}>Oklahoma - OK</option>
+                                        <option value="OR" {% if restaurant.state == 'OR' %}selected{% endif %}>Oregon - OR</option>
+                                        <option value="PA" {% if restaurant.state == 'PA' %}selected{% endif %}>Pennsylvania - PA</option>
+                                        <option value="RI" {% if restaurant.state == 'RI' %}selected{% endif %}>Rhode Island - RI</option>
+                                        <option value="SC" {% if restaurant.state == 'SC' %}selected{% endif %}>South Carolina - SC</option>
+                                        <option value="SD" {% if restaurant.state == 'SD' %}selected{% endif %}>South Dakota - SD</option>
+                                        <option value="TN" {% if restaurant.state == 'TN' %}selected{% endif %}>Tennessee - TN</option>
+                                        <option value="TX" {% if restaurant.state == 'TX' %}selected{% endif %}>Texas - TX</option>
+                                        <option value="UT" {% if restaurant.state == 'UT' %}selected{% endif %}>Utah - UT</option>
+                                        <option value="VT" {% if restaurant.state == 'VT' %}selected{% endif %}>Vermont - VT</option>
+                                        <option value="VA" {% if restaurant.state == 'VA' %}selected{% endif %}>Virginia - VA</option>
+                                        <option value="WA" {% if restaurant.state == 'WA' %}selected{% endif %}>Washington - WA</option>
+                                        <option value="WV" {% if restaurant.state == 'WV' %}selected{% endif %}>West Virginia - WV</option>
+                                        <option value="WI" {% if restaurant.state == 'WI' %}selected{% endif %}>Wisconsin - WI</option>
+                                        <option value="WY" {% if restaurant.state == 'WY' %}selected{% endif %}>Wyoming - WY</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="zip_code" class="form-label">Zip Code</label>
+                                    <input type="text" class="form-control" id="zip_code" name="zip_code"
+                                           value="{{ restaurant.zip_code or '' }}"
+                                           placeholder="Enter zip code"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Enter the zip code">
                                 </div>
                             </div>
-                            <div class="mb-3">
-                                <label for="zip_code" class="form-label">Zip Code</label>
-                                <input type="text" class="form-control" id="zip_code" name="zip_code"
-                                       value="{{ restaurant.zip_code or '' }}"
-                                       placeholder="Enter zip code"
-                                       data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="Enter the zip code">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <input type="tel" class="form-control" id="phone" name="phone"
+                                           value="{{ restaurant.phone or '' }}"
+                                           placeholder="Enter phone number"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Enter the restaurant's phone number">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="website" class="form-label">Website</label>
+                                    <input type="url" class="form-control" id="website" name="website"
+                                           value="{{ restaurant.website or '' }}"
+                                           placeholder="https://www.example.com"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Enter the restaurant's website URL">
+                                </div>
                             </div>
                         </div>
 
@@ -124,60 +205,40 @@
                                            data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Select the type of cuisine served">
                                         <option value="">Select cuisine type</option>
-                                        <option value="american" {% if restaurant.cuisine == 'american' %}selected{% endif %}>American</option>
-                                        <option value="italian" {% if restaurant.cuisine == 'italian' %}selected{% endif %}>Italian</option>
-                                        <option value="mexican" {% if restaurant.cuisine == 'mexican' %}selected{% endif %}>Mexican</option>
-                                        <option value="chinese" {% if restaurant.cuisine == 'chinese' %}selected{% endif %}>Chinese</option>
-                                        <option value="japanese" {% if restaurant.cuisine == 'japanese' %}selected{% endif %}>Japanese</option>
-                                        <option value="thai" {% if restaurant.cuisine == 'thai' %}selected{% endif %}>Thai</option>
-                                        <option value="indian" {% if restaurant.cuisine == 'indian' %}selected{% endif %}>Indian</option>
-                                        <option value="vietnamese" {% if restaurant.cuisine == 'vietnamese' %}selected{% endif %}>Vietnamese</option>
-                                        <option value="korean" {% if restaurant.cuisine == 'korean' %}selected{% endif %}>Korean</option>
-                                        <option value="mediterranean" {% if restaurant.cuisine == 'mediterranean' %}selected{% endif %}>Mediterranean</option>
-                                        <option value="greek" {% if restaurant.cuisine == 'greek' %}selected{% endif %}>Greek</option>
-                                        <option value="french" {% if restaurant.cuisine == 'french' %}selected{% endif %}>French</option>
-                                        <option value="german" {% if restaurant.cuisine == 'german' %}selected{% endif %}>German</option>
-                                        <option value="spanish" {% if restaurant.cuisine == 'spanish' %}selected{% endif %}>Spanish</option>
-                                        <option value="brazilian" {% if restaurant.cuisine == 'brazilian' %}selected{% endif %}>Brazilian</option>
-                                        <option value="caribbean" {% if restaurant.cuisine == 'caribbean' %}selected{% endif %}>Caribbean</option>
-                                        <option value="sushi" {% if restaurant.cuisine == 'sushi' %}selected{% endif %}>Sushi</option>
-                                        <option value="steakhouse" {% if restaurant.cuisine == 'steakhouse' %}selected{% endif %}>Steakhouse</option>
-                                        <option value="seafood" {% if restaurant.cuisine == 'seafood' %}selected{% endif %}>Seafood</option>
-                                        <option value="bbq" {% if restaurant.cuisine == 'bbq' %}selected{% endif %}>BBQ</option>
-                                        <option value="pizza" {% if restaurant.cuisine == 'pizza' %}selected{% endif %}>Pizza</option>
-                                        <option value="burgers" {% if restaurant.cuisine == 'burgers' %}selected{% endif %}>Burgers</option>
-                                        <option value="sandwiches" {% if restaurant.cuisine == 'sandwiches' %}selected{% endif %}>Sandwiches</option>
-                                        <option value="cafe" {% if restaurant.cuisine == 'cafe' %}selected{% endif %}>Cafe</option>
-                                        <option value="bakery" {% if restaurant.cuisine == 'bakery' %}selected{% endif %}>Bakery</option>
-                                        <option value="dessert" {% if restaurant.cuisine == 'dessert' %}selected{% endif %}>Dessert</option>
-                                        <option value="ice_cream" {% if restaurant.cuisine == 'ice_cream' %}selected{% endif %}>Ice Cream</option>
-                                        <option value="coffee_shop" {% if restaurant.cuisine == 'coffee_shop' %}selected{% endif %}>Coffee Shop</option>
-                                        <option value="juice_bar" {% if restaurant.cuisine == 'juice_bar' %}selected{% endif %}>Juice Bar</option>
-                                        <option value="smoothie" {% if restaurant.cuisine == 'smoothie' %}selected{% endif %}>Smoothie</option>
-                                        <option value="vegan" {% if restaurant.cuisine == 'vegan' %}selected{% endif %}>Vegan</option>
-                                        <option value="vegetarian" {% if restaurant.cuisine == 'vegetarian' %}selected{% endif %}>Vegetarian</option>
-                                        <option value="gluten_free" {% if restaurant.cuisine == 'gluten_free' %}selected{% endif %}>Gluten Free</option>
-                                        <option value="halal" {% if restaurant.cuisine == 'halal' %}selected{% endif %}>Halal</option>
-                                        <option value="kosher" {% if restaurant.cuisine == 'kosher' %}selected{% endif %}>Kosher</option>
-                                        <option value="other" {% if restaurant.cuisine == 'other' %}selected{% endif %}>Other</option>
+                                        <option value="american">American</option>
+                                        <option value="asian">Asian</option>
+                                        <option value="barbecue">Barbecue</option>
+                                        <option value="brazilian">Brazilian</option>
+                                        <option value="breakfast">Breakfast</option>
+                                        <option value="burgers">Burgers</option>
+                                        <option value="cafe">Cafe</option>
+                                        <option value="caribbean">Caribbean</option>
+                                        <option value="chinese">Chinese</option>
+                                        <option value="coffee_shop">Coffee Shop</option>
+                                        <option value="dessert">Dessert</option>
+                                        <option value="fast_food">Fast Food</option>
+                                        <option value="french">French</option>
+                                        <option value="german">German</option>
+                                        <option value="greek">Greek</option>
+                                        <option value="ice_cream">Ice Cream</option>
+                                        <option value="indian">Indian</option>
+                                        <option value="italian">Italian</option>
+                                        <option value="japanese">Japanese</option>
+                                        <option value="korean">Korean</option>
+                                        <option value="mediterranean">Mediterranean</option>
+                                        <option value="mexican">Mexican</option>
+                                        <option value="middle_eastern">Middle Eastern</option>
+                                        <option value="pizza">Pizza</option>
+                                        <option value="sandwiches">Sandwiches</option>
+                                        <option value="seafood">Seafood</option>
+                                        <option value="spanish">Spanish</option>
+                                        <option value="steakhouse">Steakhouse</option>
+                                        <option value="sushi">Sushi</option>
+                                        <option value="thai">Thai</option>
+                                        <option value="vietnamese">Vietnamese</option>
+                                        <option value="other">Other</option>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="website" class="form-label">Website</label>
-                                <input type="url" class="form-control" id="website" name="website"
-                                       value="{{ restaurant.website or '' }}"
-                                       placeholder="https://www.example.com"
-                                       data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="Enter the restaurant's website URL">
-                            </div>
-                            <div class="mb-3">
-                                <label for="phone" class="form-label">Phone Number</label>
-                                <input type="tel" class="form-control" id="phone" name="phone"
-                                       value="{{ restaurant.phone or '' }}"
-                                       placeholder="Enter phone number"
-                                       data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="Enter the restaurant's phone number">
                             </div>
                             <div class="mb-3">
                                 <label for="description" class="form-label">Description</label>
@@ -217,130 +278,186 @@
             return;
         }
 
-        const addressInput = document.getElementById('address');
-        if (!addressInput) {
-            console.error('Address input element not found');
+        const googleAddressInput = document.getElementById('google_address');
+        if (!googleAddressInput) {
+            console.error('Google address input element not found');
             return;
         }
 
-        const autocomplete = new google.maps.places.Autocomplete(addressInput, {
-            fields: ['name', 'formatted_address', 'types', 'price_level'],
+        const autocomplete = new google.maps.places.Autocomplete(googleAddressInput, {
+            fields: ['name', 'formatted_address', 'types', 'price_level', 'address_components'],
             types: ['establishment']
         });
 
-        autocomplete.addListener('place_changed', function() {
-            const place = autocomplete.getPlace();
-            if (!place) return;
-
-            // Set restaurant name
-            const nameInput = document.getElementById('name');
-            if (nameInput && place.name) {
-                nameInput.value = place.name;
-            }
-
-            // Parse address components
-            if (place.formatted_address) {
-                const addressParts = place.formatted_address.split(',');
-                const cityStateZip = addressParts[1] ? addressParts[1].trim().split(' ') : [];
-                
-                // Set address
-                if (addressInput) {
-                    addressInput.value = addressParts[0] || '';
-                }
-
-                // Set city
+        // Add search button functionality
+        const searchButton = document.getElementById('searchButton');
+        if (searchButton) {
+            searchButton.addEventListener('click', function() {
+                const nameInput = document.getElementById('name');
                 const cityInput = document.getElementById('city');
-                if (cityInput && cityStateZip.length > 0) {
-                    cityInput.value = cityStateZip[0] || '';
-                }
+                
+                if (nameInput && nameInput.value) {
+                    const searchQuery = cityInput && cityInput.value 
+                        ? `${nameInput.value}, ${cityInput.value}`
+                        : nameInput.value;
+                    
+                    googleAddressInput.value = searchQuery;
+                    
+                    // Trigger the place_changed event
+                    const event = new Event('place_changed');
+                    autocomplete.addListener('place_changed', function() {
+                        const place = autocomplete.getPlace();
+                        if (!place) return;
 
-                // Set state
-                const stateInput = document.getElementById('state');
-                if (stateInput && cityStateZip.length > 1) {
-                    stateInput.value = cityStateZip[1] || '';
-                }
-
-                // Set zip code
-                const zipInput = document.getElementById('zip_code');
-                if (zipInput && cityStateZip.length > 2) {
-                    zipInput.value = cityStateZip[2] || '';
-                }
-            }
-
-            // Set price range
-            const priceRangeInput = document.getElementById('price_range');
-            if (priceRangeInput && place.price_level !== undefined) {
-                const priceLevel = place.price_level;
-                const priceRanges = ['$', '$$', '$$$', '$$$$'];
-                priceRangeInput.value = priceRanges[priceLevel - 1] || '';
-            }
-
-            // Set restaurant type and cuisine
-            const typeInput = document.getElementById('type');
-            const cuisineInput = document.getElementById('cuisine');
-            if (place.types && place.types.length > 0) {
-                const typeMapping = {
-                    'restaurant': 'restaurant',
-                    'cafe': 'cafe',
-                    'bar': 'bar',
-                    'meal_delivery': 'meal_delivery',
-                    'meal_takeaway': 'meal_takeaway',
-                    'supermarket': 'supermarket',
-                    'grocery_or_supermarket': 'grocery_or_supermarket',
-                    'convenience_store': 'convenience_store',
-                    'coffee_shop': 'coffee_shop',
-                    'bakery': 'bakery',
-                    'dessert_shop': 'dessert_shop',
-                    'ice_cream_shop': 'ice_cream_shop'
-                };
-
-                const cuisineMapping = {
-                    'american': ['american', 'steakhouse', 'bbq', 'burgers'],
-                    'italian': ['italian', 'pizza'],
-                    'mexican': ['mexican'],
-                    'chinese': ['chinese'],
-                    'japanese': ['japanese', 'sushi'],
-                    'thai': ['thai'],
-                    'indian': ['indian'],
-                    'vietnamese': ['vietnamese'],
-                    'korean': ['korean'],
-                    'mediterranean': ['mediterranean', 'greek'],
-                    'french': ['french'],
-                    'german': ['german'],
-                    'spanish': ['spanish'],
-                    'brazilian': ['brazilian'],
-                    'caribbean': ['caribbean'],
-                    'seafood': ['seafood'],
-                    'sandwiches': ['sandwiches'],
-                    'cafe': ['cafe', 'coffee_shop'],
-                    'bakery': ['bakery', 'dessert_shop'],
-                    'dessert': ['dessert_shop', 'ice_cream_shop'],
-                    'vegan': ['vegan'],
-                    'vegetarian': ['vegetarian'],
-                    'gluten_free': ['gluten_free'],
-                    'halal': ['halal'],
-                    'kosher': ['kosher']
-                };
-
-                // Set type
-                for (const type of place.types) {
-                    if (typeMapping[type]) {
-                        typeInput.value = typeMapping[type];
-                        break;
-                    }
-                }
-
-                // Set cuisine based on types
-                for (const type of place.types) {
-                    for (const [cuisine, typeList] of Object.entries(cuisineMapping)) {
-                        if (typeList.includes(type)) {
-                            cuisineInput.value = cuisine;
-                            break;
+                        // Set restaurant name
+                        if (nameInput && place.name) {
+                            nameInput.value = place.name;
                         }
-                    }
+
+                        // Parse address components
+                        if (place.address_components) {
+                            let streetNumber = '';
+                            let route = '';
+                            let city = '';
+                            let state = '';
+                            let zipCode = '';
+
+                            for (const component of place.address_components) {
+                                const types = component.types;
+                                if (types.includes('street_number')) {
+                                    streetNumber = component.long_name;
+                                } else if (types.includes('route')) {
+                                    route = component.long_name;
+                                } else if (types.includes('locality')) {
+                                    city = component.long_name;
+                                } else if (types.includes('administrative_area_level_1')) {
+                                    state = component.short_name;
+                                } else if (types.includes('postal_code')) {
+                                    zipCode = component.long_name;
+                                }
+                            }
+
+                            // Set street address
+                            const addressInput = document.getElementById('address');
+                            if (addressInput) {
+                                addressInput.value = `${streetNumber} ${route}`.trim();
+                            }
+
+                            // Set city
+                            if (cityInput) {
+                                cityInput.value = city;
+                            }
+
+                            // Set state
+                            const stateInput = document.getElementById('state');
+                            if (stateInput) {
+                                stateInput.value = state;
+                            }
+
+                            // Set zip code
+                            const zipInput = document.getElementById('zip_code');
+                            if (zipInput) {
+                                zipInput.value = zipCode;
+                            }
+
+                            // Update Google Address Search with formatted address
+                            if (googleAddressInput && nameInput) {
+                                googleAddressInput.value = `${nameInput.value}, ${city}${state ? ', ' + state : ''}${zipCode ? ' ' + zipCode : ''}`.trim();
+                            }
+                        }
+
+                        // Set price range
+                        const priceRangeInput = document.getElementById('price_range');
+                        if (priceRangeInput && place.price_level !== undefined) {
+                            const priceLevel = place.price_level;
+                            const priceRanges = ['$', '$$', '$$$', '$$$$'];
+                            priceRangeInput.value = priceRanges[priceLevel - 1] || '';
+                        }
+
+                        // Set restaurant type and cuisine
+                        const typeInput = document.getElementById('type');
+                        const cuisineInput = document.getElementById('cuisine');
+                        if (place.types && place.types.length > 0) {
+                            const typeMapping = {
+                                'restaurant': 'restaurant',
+                                'cafe': 'cafe',
+                                'bar': 'bar',
+                                'meal_delivery': 'meal_delivery',
+                                'meal_takeaway': 'meal_takeaway',
+                                'supermarket': 'supermarket',
+                                'grocery_or_supermarket': 'grocery_or_supermarket',
+                                'convenience_store': 'convenience_store',
+                                'coffee_shop': 'coffee_shop',
+                                'bakery': 'bakery',
+                                'dessert_shop': 'dessert_shop',
+                                'ice_cream_shop': 'ice_cream_shop'
+                            };
+
+                            const cuisineMapping = {
+                                'american': ['american', 'steakhouse', 'bbq', 'burgers', 'breakfast', 'american_restaurant'],
+                                'asian': ['asian', 'asian_restaurant'],
+                                'barbecue': ['barbecue', 'bbq', 'barbecue_restaurant'],
+                                'brazilian': ['brazilian', 'brazilian_restaurant'],
+                                'breakfast': ['breakfast', 'breakfast_restaurant'],
+                                'burgers': ['burgers', 'hamburger', 'burger_restaurant'],
+                                'cafe': ['cafe', 'coffee_shop'],
+                                'caribbean': ['caribbean', 'caribbean_restaurant'],
+                                'chinese': ['chinese', 'chinese_restaurant'],
+                                'coffee_shop': ['coffee_shop', 'cafe'],
+                                'dessert': ['dessert', 'dessert_shop', 'ice_cream_shop'],
+                                'fast_food': ['fast_food', 'fast_food_restaurant'],
+                                'french': ['french', 'french_restaurant'],
+                                'german': ['german', 'german_restaurant'],
+                                'greek': ['greek', 'greek_restaurant'],
+                                'ice_cream': ['ice_cream', 'ice_cream_shop'],
+                                'indian': ['indian', 'indian_restaurant'],
+                                'italian': ['italian', 'pizza', 'italian_restaurant'],
+                                'japanese': ['japanese', 'sushi', 'japanese_restaurant'],
+                                'korean': ['korean', 'korean_restaurant'],
+                                'mediterranean': ['mediterranean', 'greek', 'middle_eastern', 'mediterranean_restaurant'],
+                                'mexican': ['mexican', 'mexican_restaurant'],
+                                'middle_eastern': ['middle_eastern', 'middle_eastern_restaurant'],
+                                'pizza': ['pizza', 'pizza_restaurant'],
+                                'sandwiches': ['sandwiches', 'deli', 'sandwich_restaurant'],
+                                'seafood': ['seafood', 'seafood_restaurant'],
+                                'spanish': ['spanish', 'spanish_restaurant'],
+                                'steakhouse': ['steakhouse', 'steak_restaurant'],
+                                'sushi': ['sushi', 'sushi_restaurant'],
+                                'thai': ['thai', 'thai_restaurant'],
+                                'vietnamese': ['vietnamese', 'vietnamese_restaurant']
+                            };
+
+                            // Set type
+                            for (const type of place.types) {
+                                if (typeMapping[type]) {
+                                    typeInput.value = typeMapping[type];
+                                    break;
+                                }
+                            }
+
+                            // Set cuisine based on types
+                            let cuisineSet = false;
+                            for (const type of place.types) {
+                                for (const [cuisine, typeList] of Object.entries(cuisineMapping)) {
+                                    if (typeList.includes(type)) {
+                                        cuisineInput.value = cuisine;
+                                        cuisineSet = true;
+                                        break;
+                                    }
+                                }
+                                if (cuisineSet) break;
+                            }
+
+                            // If no cuisine was set but it's a restaurant, default to 'american'
+                            if (!cuisineSet && place.types.includes('restaurant')) {
+                                cuisineInput.value = 'american';
+                            }
+                        }
+                    });
+                    autocomplete.trigger('place_changed');
                 }
-            }
-        });
+            });
+        }
     }
 
     // Load Google Maps API script

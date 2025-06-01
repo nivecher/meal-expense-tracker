@@ -17,17 +17,6 @@
         </div>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-
     <div class="card">
         <div class="card-body">
             {% if restaurants %}
@@ -36,10 +25,10 @@
                         <thead>
                             <tr>
                                 <th>Name</th>
-                                <th>City</th>
+                                <th>Location</th>
+                                <th>Cuisine</th>
                                 <th>Type</th>
                                 <th>Price Range</th>
-                                <th>Cuisine</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -47,14 +36,20 @@
                             {% for restaurant in restaurants %}
                                 <tr>
                                     <td>
-                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">
+                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}" class="text-decoration-none">
                                             {{ restaurant.name }}
                                         </a>
                                     </td>
-                                    <td>{{ restaurant.city }}</td>
-                                    <td>{{ restaurant.type }}</td>
+                                    <td>
+                                        {% if restaurant.city %}
+                                            {{ restaurant.city }}{% if restaurant.state %}, {{ restaurant.state }}{% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ restaurant.cuisine|title if restaurant.cuisine else '-' }}</td>
+                                    <td>{{ restaurant.type|title if restaurant.type else '-' }}</td>
                                     <td>{{ restaurant.price_range }}</td>
-                                    <td>{{ restaurant.cuisine }}</td>
                                     <td>
                                         <div class="btn-group">
                                             <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}" 
@@ -93,7 +88,13 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                Are you sure you want to delete {{ restaurant.name }}?
+                <p>Are you sure you want to delete {{ restaurant.name }}?</p>
+                {% if restaurant.expenses %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    This restaurant has {{ restaurant.expenses|length }} associated expense(s). Deleting the restaurant will also delete all associated expenses.
+                </div>
+                {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -105,6 +106,17 @@
     </div>
 </div>
 {% endfor %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
 {% endblock %}
 
 {% block scripts %}

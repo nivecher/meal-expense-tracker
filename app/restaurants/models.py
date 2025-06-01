@@ -38,5 +38,14 @@ class Restaurant(db.Model):
             parts.append(self.zip_code)
         return ", ".join(parts) if parts else None
 
+    @property
+    def google_search(self):
+        parts = []
+        if self.name:
+            parts.append(self.name)
+        if self.full_address:
+            parts.append(self.full_address)
+        return ", ".join(parts) if parts else None
+
     def __repr__(self):
         return f"<Restaurant {self.name}>"

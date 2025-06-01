@@ -27,15 +27,17 @@
                     </div>
 
                     <div class="mb-3">
-                        <strong>Address:</strong>
-                        <p class="mb-1">{{ restaurant.address or 'Not specified' }}</p>
-                        {% if restaurant.city or restaurant.state or restaurant.zip_code %}
+                        <h5 class="text-muted mb-2">Address</h5>
                         <p class="mb-1">
-                            {% if restaurant.city %}{{ restaurant.city }}{% endif %}
-                            {% if restaurant.state %}, {{ restaurant.state }}{% endif %}
-                            {% if restaurant.zip_code %} {{ restaurant.zip_code }}{% endif %}
+                            {% if restaurant.address %}
+                                {{ restaurant.address }}<br>
+                            {% endif %}
+                            {% if restaurant.city or restaurant.state or restaurant.zip_code %}
+                                {% if restaurant.city %}{{ restaurant.city }}{% endif %}{% if restaurant.state %}, {{ restaurant.state }}{% endif %}{% if restaurant.zip_code %} {{ restaurant.zip_code }}{% endif %}
+                            {% else %}
+                                No address information available
+                            {% endif %}
                         </p>
-                        {% endif %}
                     </div>
 
                     <div class="mb-3">

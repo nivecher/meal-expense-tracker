@@ -1,12 +1,20 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify, send_file
+from flask import (
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    request,
+    send_file,
+    jsonify,
+)
 from flask_login import login_required
-from app import db
-from app.restaurants import bp
 from app.restaurants.models import Restaurant
 from app.expenses.models import Expense
+from app import db
 from sqlalchemy.exc import SQLAlchemyError
 import csv
 from io import StringIO, BytesIO
+from app.restaurants import bp
 
 
 @bp.route("/")
@@ -138,19 +146,20 @@ def edit_restaurant(restaurant_id):
 @bp.route("/<int:restaurant_id>/delete", methods=["POST"])
 @login_required
 def delete_restaurant(restaurant_id):
+    restaurant = Restaurant.query.get_or_404(restaurant_id)
+
     try:
-        restaurant = Restaurant.query.get_or_404(restaurant_id)
-        if restaurant.expenses:
-            flash("Cannot delete restaurant with associated expenses.", "error")
-            return redirect(url_for("restaurants.list_restaurants"))
+        # Delete all associated expenses first
+        Expense.query.filter_by(restaurant_id=restaurant.id).delete()
+        # Then delete the restaurant
         db.session.delete(restaurant)
         db.session.commit()
-        flash("Restaurant deleted successfully!", "success")
-        return redirect(url_for("restaurants.list_restaurants"))
-    except SQLAlchemyError:
+        flash("Restaurant and associated expenses deleted successfully.", "success")
+    except Exception:
         db.session.rollback()
-        flash("Error deleting restaurant. Please try again.", "error")
-        return redirect(url_for("restaurants.list_restaurants"))
+        flash("An error occurred while deleting the restaurant.", "danger")
+
+    return redirect(url_for("restaurants.list_restaurants"))
 
 
 @bp.route("/search")

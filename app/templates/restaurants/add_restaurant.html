@@ -27,11 +27,16 @@
                         <div class="mb-4">
                             <h3 class="h5 mb-3">Find Restaurant</h3>
                             <div class="mb-3">
-                                <label for="address" class="form-label">Google Address Search *</label>
-                                <input type="text" class="form-control" id="address" name="address" required
-                                       placeholder="Search for a restaurant or enter an address"
-                                       data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="Search for a restaurant or enter an address to auto-fill other fields">
+                                <label for="google_address" class="form-label">Google Address Search *</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="google_address" name="google_address" required
+                                           placeholder="Search for a restaurant or enter an address"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Search for a restaurant or enter an address to auto-fill other fields">
+                                    <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                                        <i class="fas fa-search"></i> Search
+                                    </button>
+                                </div>
                                 <div class="invalid-feedback">Please enter an address.</div>
                             </div>
                         </div>
@@ -69,31 +74,105 @@
                             </div>
                         </div>
 
-                        <!-- Address Details -->
+                        <!-- Contact Information -->
                         <div class="mb-4">
-                            <h3 class="h5 mb-3">Address Details</h3>
+                            <h3 class="h5 mb-3">Contact Information</h3>
+                            <div class="mb-3">
+                                <label for="address" class="form-label">Address</label>
+                                <input type="text" class="form-control" id="address" name="address"
+                                       placeholder="Enter street address"
+                                       data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="Enter the street address">
+                            </div>
                             <div class="row">
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-4 mb-3">
                                     <label for="city" class="form-label">City</label>
                                     <input type="text" class="form-control" id="city" name="city"
                                            placeholder="Enter city"
                                            data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Enter the city">
                                 </div>
-                                <div class="col-md-6 mb-3">
+                                <div class="col-md-4 mb-3">
                                     <label for="state" class="form-label">State</label>
-                                    <input type="text" class="form-control" id="state" name="state"
-                                           placeholder="Enter state"
+                                    <select class="form-select" id="state" name="state"
                                            data-bs-toggle="tooltip" data-bs-placement="top"
-                                           title="Enter the state">
+                                           title="Select the state">
+                                        <option value="">Select state</option>
+                                        <option value="AL">Alabama - AL</option>
+                                        <option value="AK">Alaska - AK</option>
+                                        <option value="AZ">Arizona - AZ</option>
+                                        <option value="AR">Arkansas - AR</option>
+                                        <option value="CA">California - CA</option>
+                                        <option value="CO">Colorado - CO</option>
+                                        <option value="CT">Connecticut - CT</option>
+                                        <option value="DE">Delaware - DE</option>
+                                        <option value="FL">Florida - FL</option>
+                                        <option value="GA">Georgia - GA</option>
+                                        <option value="HI">Hawaii - HI</option>
+                                        <option value="ID">Idaho - ID</option>
+                                        <option value="IL">Illinois - IL</option>
+                                        <option value="IN">Indiana - IN</option>
+                                        <option value="IA">Iowa - IA</option>
+                                        <option value="KS">Kansas - KS</option>
+                                        <option value="KY">Kentucky - KY</option>
+                                        <option value="LA">Louisiana - LA</option>
+                                        <option value="ME">Maine - ME</option>
+                                        <option value="MD">Maryland - MD</option>
+                                        <option value="MA">Massachusetts - MA</option>
+                                        <option value="MI">Michigan - MI</option>
+                                        <option value="MN">Minnesota - MN</option>
+                                        <option value="MS">Mississippi - MS</option>
+                                        <option value="MO">Missouri - MO</option>
+                                        <option value="MT">Montana - MT</option>
+                                        <option value="NE">Nebraska - NE</option>
+                                        <option value="NV">Nevada - NV</option>
+                                        <option value="NH">New Hampshire - NH</option>
+                                        <option value="NJ">New Jersey - NJ</option>
+                                        <option value="NM">New Mexico - NM</option>
+                                        <option value="NY">New York - NY</option>
+                                        <option value="NC">North Carolina - NC</option>
+                                        <option value="ND">North Dakota - ND</option>
+                                        <option value="OH">Ohio - OH</option>
+                                        <option value="OK">Oklahoma - OK</option>
+                                        <option value="OR">Oregon - OR</option>
+                                        <option value="PA">Pennsylvania - PA</option>
+                                        <option value="RI">Rhode Island - RI</option>
+                                        <option value="SC">South Carolina - SC</option>
+                                        <option value="SD">South Dakota - SD</option>
+                                        <option value="TN">Tennessee - TN</option>
+                                        <option value="TX">Texas - TX</option>
+                                        <option value="UT">Utah - UT</option>
+                                        <option value="VT">Vermont - VT</option>
+                                        <option value="VA">Virginia - VA</option>
+                                        <option value="WA">Washington - WA</option>
+                                        <option value="WV">West Virginia - WV</option>
+                                        <option value="WI">Wisconsin - WI</option>
+                                        <option value="WY">Wyoming - WY</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="zip_code" class="form-label">Zip Code</label>
+                                    <input type="text" class="form-control" id="zip_code" name="zip_code"
+                                           placeholder="Enter zip code"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Enter the zip code">
                                 </div>
                             </div>
-                            <div class="mb-3">
-                                <label for="zip_code" class="form-label">Zip Code</label>
-                                <input type="text" class="form-control" id="zip_code" name="zip_code"
-                                       placeholder="Enter zip code"
-                                       data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="Enter the zip code">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <input type="tel" class="form-control" id="phone" name="phone"
+                                           placeholder="Enter phone number"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Enter the restaurant's phone number">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="website" class="form-label">Website</label>
+                                    <input type="url" class="form-control" id="website" name="website"
+                                           placeholder="https://www.example.com"
+                                           data-bs-toggle="tooltip" data-bs-placement="top"
+                                           title="Enter the restaurant's website URL">
+                                </div>
                             </div>
                         </div>
 
@@ -120,57 +199,39 @@
                                            title="Select the type of cuisine served">
                                         <option value="">Select cuisine type</option>
                                         <option value="american">American</option>
-                                        <option value="italian">Italian</option>
-                                        <option value="mexican">Mexican</option>
+                                        <option value="asian">Asian</option>
+                                        <option value="barbecue">Barbecue</option>
+                                        <option value="brazilian">Brazilian</option>
+                                        <option value="breakfast">Breakfast</option>
+                                        <option value="burgers">Burgers</option>
+                                        <option value="cafe">Cafe</option>
+                                        <option value="caribbean">Caribbean</option>
                                         <option value="chinese">Chinese</option>
-                                        <option value="japanese">Japanese</option>
-                                        <option value="thai">Thai</option>
-                                        <option value="indian">Indian</option>
-                                        <option value="vietnamese">Vietnamese</option>
-                                        <option value="korean">Korean</option>
-                                        <option value="mediterranean">Mediterranean</option>
-                                        <option value="greek">Greek</option>
+                                        <option value="coffee_shop">Coffee Shop</option>
+                                        <option value="dessert">Dessert</option>
+                                        <option value="fast_food">Fast Food</option>
                                         <option value="french">French</option>
                                         <option value="german">German</option>
-                                        <option value="spanish">Spanish</option>
-                                        <option value="brazilian">Brazilian</option>
-                                        <option value="caribbean">Caribbean</option>
-                                        <option value="sushi">Sushi</option>
-                                        <option value="steakhouse">Steakhouse</option>
-                                        <option value="seafood">Seafood</option>
-                                        <option value="bbq">BBQ</option>
-                                        <option value="pizza">Pizza</option>
-                                        <option value="burgers">Burgers</option>
-                                        <option value="sandwiches">Sandwiches</option>
-                                        <option value="cafe">Cafe</option>
-                                        <option value="bakery">Bakery</option>
-                                        <option value="dessert">Dessert</option>
+                                        <option value="greek">Greek</option>
                                         <option value="ice_cream">Ice Cream</option>
-                                        <option value="coffee_shop">Coffee Shop</option>
-                                        <option value="juice_bar">Juice Bar</option>
-                                        <option value="smoothie">Smoothie</option>
-                                        <option value="vegan">Vegan</option>
-                                        <option value="vegetarian">Vegetarian</option>
-                                        <option value="gluten_free">Gluten Free</option>
-                                        <option value="halal">Halal</option>
-                                        <option value="kosher">Kosher</option>
+                                        <option value="indian">Indian</option>
+                                        <option value="italian">Italian</option>
+                                        <option value="japanese">Japanese</option>
+                                        <option value="korean">Korean</option>
+                                        <option value="mediterranean">Mediterranean</option>
+                                        <option value="mexican">Mexican</option>
+                                        <option value="middle_eastern">Middle Eastern</option>
+                                        <option value="pizza">Pizza</option>
+                                        <option value="sandwiches">Sandwiches</option>
+                                        <option value="seafood">Seafood</option>
+                                        <option value="spanish">Spanish</option>
+                                        <option value="steakhouse">Steakhouse</option>
+                                        <option value="sushi">Sushi</option>
+                                        <option value="thai">Thai</option>
+                                        <option value="vietnamese">Vietnamese</option>
                                         <option value="other">Other</option>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="website" class="form-label">Website</label>
-                                <input type="url" class="form-control" id="website" name="website"
-                                       placeholder="https://www.example.com"
-                                       data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="Enter the restaurant's website URL">
-                            </div>
-                            <div class="mb-3">
-                                <label for="phone" class="form-label">Phone Number</label>
-                                <input type="tel" class="form-control" id="phone" name="phone"
-                                       placeholder="Enter phone number"
-                                       data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="Enter the restaurant's phone number">
                             </div>
                             <div class="mb-3">
                                 <label for="description" class="form-label">Description</label>
@@ -210,90 +271,186 @@
             return;
         }
 
-        const addressInput = document.getElementById('address');
-        if (!addressInput) {
-            console.error('Address input element not found');
+        const googleAddressInput = document.getElementById('google_address');
+        if (!googleAddressInput) {
+            console.error('Google address input element not found');
             return;
         }
 
-        const autocomplete = new google.maps.places.Autocomplete(addressInput, {
-            fields: ['name', 'formatted_address', 'types', 'price_level'],
+        const autocomplete = new google.maps.places.Autocomplete(googleAddressInput, {
+            fields: ['name', 'formatted_address', 'types', 'price_level', 'address_components'],
             types: ['establishment']
         });
 
-        autocomplete.addListener('place_changed', function() {
-            const place = autocomplete.getPlace();
-            if (!place) return;
-
-            // Set restaurant name
-            const nameInput = document.getElementById('name');
-            if (nameInput && place.name) {
-                nameInput.value = place.name;
-            }
-
-            // Parse address components
-            if (place.formatted_address) {
-                const addressParts = place.formatted_address.split(',');
-                const cityStateZip = addressParts[1] ? addressParts[1].trim().split(' ') : [];
-                
-                // Set address
-                if (addressInput) {
-                    addressInput.value = addressParts[0] || '';
-                }
-
-                // Set city
+        // Add search button functionality
+        const searchButton = document.getElementById('searchButton');
+        if (searchButton) {
+            searchButton.addEventListener('click', function() {
+                const nameInput = document.getElementById('name');
                 const cityInput = document.getElementById('city');
-                if (cityInput && cityStateZip.length > 0) {
-                    cityInput.value = cityStateZip[0] || '';
+                
+                if (nameInput && nameInput.value) {
+                    const searchQuery = cityInput && cityInput.value 
+                        ? `${nameInput.value}, ${cityInput.value}`
+                        : nameInput.value;
+                    
+                    googleAddressInput.value = searchQuery;
+                    
+                    // Trigger the place_changed event
+                    const event = new Event('place_changed');
+                    autocomplete.addListener('place_changed', function() {
+                        const place = autocomplete.getPlace();
+                        if (!place) return;
+
+                        // Set restaurant name
+                        if (nameInput && place.name) {
+                            nameInput.value = place.name;
+                        }
+
+                        // Parse address components
+                        if (place.address_components) {
+                            let streetNumber = '';
+                            let route = '';
+                            let city = '';
+                            let state = '';
+                            let zipCode = '';
+
+                            for (const component of place.address_components) {
+                                const types = component.types;
+                                if (types.includes('street_number')) {
+                                    streetNumber = component.long_name;
+                                } else if (types.includes('route')) {
+                                    route = component.long_name;
+                                } else if (types.includes('locality')) {
+                                    city = component.long_name;
+                                } else if (types.includes('administrative_area_level_1')) {
+                                    state = component.short_name;
+                                } else if (types.includes('postal_code')) {
+                                    zipCode = component.long_name;
+                                }
+                            }
+
+                            // Set street address
+                            const addressInput = document.getElementById('address');
+                            if (addressInput) {
+                                addressInput.value = `${streetNumber} ${route}`.trim();
+                            }
+
+                            // Set city
+                            if (cityInput) {
+                                cityInput.value = city;
+                            }
+
+                            // Set state
+                            const stateInput = document.getElementById('state');
+                            if (stateInput) {
+                                stateInput.value = state;
+                            }
+
+                            // Set zip code
+                            const zipInput = document.getElementById('zip_code');
+                            if (zipInput) {
+                                zipInput.value = zipCode;
+                            }
+
+                            // Update Google Address Search with formatted address
+                            if (googleAddressInput && nameInput) {
+                                googleAddressInput.value = `${nameInput.value}, ${city}${state ? ', ' + state : ''}${zipCode ? ' ' + zipCode : ''}`.trim();
+                            }
+                        }
+
+                        // Set price range
+                        const priceRangeInput = document.getElementById('price_range');
+                        if (priceRangeInput && place.price_level !== undefined) {
+                            const priceLevel = place.price_level;
+                            const priceRanges = ['$', '$$', '$$$', '$$$$'];
+                            priceRangeInput.value = priceRanges[priceLevel - 1] || '';
+                        }
+
+                        // Set restaurant type and cuisine
+                        const typeInput = document.getElementById('type');
+                        const cuisineInput = document.getElementById('cuisine');
+                        if (place.types && place.types.length > 0) {
+                            const typeMapping = {
+                                'restaurant': 'restaurant',
+                                'cafe': 'cafe',
+                                'bar': 'bar',
+                                'meal_delivery': 'meal_delivery',
+                                'meal_takeaway': 'meal_takeaway',
+                                'supermarket': 'supermarket',
+                                'grocery_or_supermarket': 'grocery_or_supermarket',
+                                'convenience_store': 'convenience_store',
+                                'coffee_shop': 'coffee_shop',
+                                'bakery': 'bakery',
+                                'dessert_shop': 'dessert_shop',
+                                'ice_cream_shop': 'ice_cream_shop'
+                            };
+
+                            const cuisineMapping = {
+                                'american': ['american', 'steakhouse', 'bbq', 'burgers', 'breakfast', 'american_restaurant'],
+                                'asian': ['asian', 'asian_restaurant'],
+                                'barbecue': ['barbecue', 'bbq', 'barbecue_restaurant'],
+                                'brazilian': ['brazilian', 'brazilian_restaurant'],
+                                'breakfast': ['breakfast', 'breakfast_restaurant'],
+                                'burgers': ['burgers', 'hamburger', 'burger_restaurant'],
+                                'cafe': ['cafe', 'coffee_shop'],
+                                'caribbean': ['caribbean', 'caribbean_restaurant'],
+                                'chinese': ['chinese', 'chinese_restaurant'],
+                                'coffee_shop': ['coffee_shop', 'cafe'],
+                                'dessert': ['dessert', 'dessert_shop', 'ice_cream_shop'],
+                                'fast_food': ['fast_food', 'fast_food_restaurant'],
+                                'french': ['french', 'french_restaurant'],
+                                'german': ['german', 'german_restaurant'],
+                                'greek': ['greek', 'greek_restaurant'],
+                                'ice_cream': ['ice_cream', 'ice_cream_shop'],
+                                'indian': ['indian', 'indian_restaurant'],
+                                'italian': ['italian', 'pizza', 'italian_restaurant'],
+                                'japanese': ['japanese', 'sushi', 'japanese_restaurant'],
+                                'korean': ['korean', 'korean_restaurant'],
+                                'mediterranean': ['mediterranean', 'greek', 'middle_eastern', 'mediterranean_restaurant'],
+                                'mexican': ['mexican', 'mexican_restaurant'],
+                                'middle_eastern': ['middle_eastern', 'middle_eastern_restaurant'],
+                                'pizza': ['pizza', 'pizza_restaurant'],
+                                'sandwiches': ['sandwiches', 'deli', 'sandwich_restaurant'],
+                                'seafood': ['seafood', 'seafood_restaurant'],
+                                'spanish': ['spanish', 'spanish_restaurant'],
+                                'steakhouse': ['steakhouse', 'steak_restaurant'],
+                                'sushi': ['sushi', 'sushi_restaurant'],
+                                'thai': ['thai', 'thai_restaurant'],
+                                'vietnamese': ['vietnamese', 'vietnamese_restaurant']
+                            };
+
+                            // Set type
+                            for (const type of place.types) {
+                                if (typeMapping[type]) {
+                                    typeInput.value = typeMapping[type];
+                                    break;
+                                }
+                            }
+
+                            // Set cuisine based on types
+                            let cuisineSet = false;
+                            for (const type of place.types) {
+                                for (const [cuisine, typeList] of Object.entries(cuisineMapping)) {
+                                    if (typeList.includes(type)) {
+                                        cuisineInput.value = cuisine;
+                                        cuisineSet = true;
+                                        break;
+                                    }
+                                }
+                                if (cuisineSet) break;
+                            }
+
+                            // If no cuisine was set but it's a restaurant, default to 'american'
+                            if (!cuisineSet && place.types.includes('restaurant')) {
+                                cuisineInput.value = 'american';
+                            }
+                        }
+                    });
+                    autocomplete.trigger('place_changed');
                 }
-
-                // Set state
-                const stateInput = document.getElementById('state');
-                if (stateInput && cityStateZip.length > 1) {
-                    stateInput.value = cityStateZip[1] || '';
-                }
-
-                // Set zip code
-                const zipInput = document.getElementById('zip_code');
-                if (zipInput && cityStateZip.length > 2) {
-                    zipInput.value = cityStateZip[2] || '';
-                }
-            }
-
-            // Set price range
-            const priceRangeInput = document.getElementById('price_range');
-            if (priceRangeInput && place.price_level !== undefined) {
-                const priceLevel = place.price_level;
-                const priceRanges = ['$', '$$', '$$$', '$$$$'];
-                priceRangeInput.value = priceRanges[priceLevel - 1] || '';
-            }
-
-            // Set restaurant type
-            const typeInput = document.getElementById('type');
-            if (typeInput && place.types && place.types.length > 0) {
-                const typeMapping = {
-                    'restaurant': 'restaurant',
-                    'cafe': 'cafe',
-                    'bar': 'bar',
-                    'meal_delivery': 'meal_delivery',
-                    'meal_takeaway': 'meal_takeaway',
-                    'supermarket': 'supermarket',
-                    'grocery_or_supermarket': 'grocery_or_supermarket',
-                    'convenience_store': 'convenience_store',
-                    'coffee_shop': 'coffee_shop',
-                    'bakery': 'bakery',
-                    'dessert_shop': 'dessert_shop',
-                    'ice_cream_shop': 'ice_cream_shop'
-                };
-
-                for (const type of place.types) {
-                    if (typeMapping[type]) {
-                        typeInput.value = typeMapping[type];
-                        break;
-                    }
-                }
-            }
-        });
+            });
+        }
     }
 
     // Load Google Maps API script

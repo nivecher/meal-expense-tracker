@@ -1,6 +1,10 @@
 from app.restaurants.models import Restaurant
+from app import db
 from sqlalchemy.exc import SQLAlchemyError
 from unittest.mock import Mock
+from app.expenses.models import Expense
+from datetime import datetime
+from app.auth.models import User
 
 
 def test_restaurants_list(client, auth):
@@ -24,6 +28,7 @@ def test_add_restaurant(client, auth):
             "address": "123 Test St",
             "phone": "123-456-7890",
             "website": "http://test.com",
+            "cuisine": "American",
         },
         follow_redirects=True,
     )
@@ -44,6 +49,7 @@ def test_edit_restaurant(client, auth):
             "address": "123 Test St",
             "phone": "123-456-7890",
             "website": "http://test.com",
+            "cuisine": "American",
         },
     )
 
@@ -60,6 +66,7 @@ def test_edit_restaurant(client, auth):
             "address": "456 Updated St",
             "phone": "098-765-4321",
             "website": "http://updated.com",
+            "cuisine": "Italian",
         },
         follow_redirects=True,
     )
@@ -220,34 +227,109 @@ def test_restaurant_details_with_multiple_expenses(client, auth):
     assert b"Dinner" in response.data
 
 
-def test_delete_restaurant(client, auth):
-    """Test deleting a restaurant."""
-    auth.create_user()
+def test_delete_restaurant_without_expenses(client, auth, app):
+    """Test deleting a restaurant that has no expenses."""
+    # Create and login user
+    with app.app_context():
+        user = User(username="testuser")
+        user.set_password("testpass")
+        db.session.add(user)
+        db.session.commit()
     auth.login()
-    # First add a restaurant
-    client.post(
-        "/restaurants/add",
-        data={
-            "name": "Test Restaurant",
-            "city": "Test City",
-            "address": "123 Test St",
-            "phone": "123-456-7890",
-            "website": "http://test.com",
-        },
+
+    # Create a restaurant first
+    restaurant = Restaurant(
+        name="Test Restaurant",
+        type="restaurant",
+        address="123 Test St",
+        city="Test City",
+        cuisine="American",
     )
+    with app.app_context():
+        db.session.add(restaurant)
+        db.session.commit()
+        restaurant_id = restaurant.id
 
-    # Get the restaurant ID after creation
-    restaurant = Restaurant.query.filter_by(name="Test Restaurant").first()
-    assert restaurant is not None
+        # Verify no expenses exist
+        assert len(Expense.query.filter_by(restaurant_id=restaurant_id).all()) == 0
 
-    # Delete the restaurant
+    # Try to delete the restaurant
     response = client.post(
-        f"/restaurants/{restaurant.id}/delete", follow_redirects=True
+        f"/restaurants/{restaurant_id}/delete", follow_redirects=True
     )
-    assert response.status_code == 200
-    assert b"Restaurant deleted successfully" in response.data
+    assert response.status_code == 200  # After following redirect
+    assert b"Restaurant and associated expenses deleted successfully." in response.data
 
-    # Verify restaurant is deleted
-    response = client.get("/restaurants/", follow_redirects=True)
-    assert response.status_code == 200
-    assert b"Test Restaurant" not in response.data
+    # Verify the restaurant is deleted
+    with app.app_context():
+        assert Restaurant.query.get(restaurant_id) is None
+        # Verify no expenses exist
+        assert len(Expense.query.filter_by(restaurant_id=restaurant_id).all()) == 0
+
+
+def test_delete_restaurant_with_expenses(client, auth, app):
+    """Test deleting a restaurant that has associated expenses."""
+    # Create and login user
+    with app.app_context():
+        user = User(username="testuser")
+        user.set_password("testpass")
+        db.session.add(user)
+        db.session.commit()
+    auth.login()
+
+    # Create a restaurant first
+    restaurant = Restaurant(
+        name="Test Restaurant",
+        type="restaurant",
+        address="123 Test St",
+        city="Test City",
+        cuisine="American",
+    )
+    with app.app_context():
+        db.session.add(restaurant)
+        db.session.commit()
+        restaurant_id = restaurant.id
+
+        # Get the current user
+        user = User.query.filter_by(username="testuser").first()
+        assert user is not None
+
+        # Add some expenses
+        expenses = [
+            Expense(
+                date=datetime.strptime("2024-02-20", "%Y-%m-%d").date(),
+                amount=25.50,
+                category="Dining",
+                meal_type="Lunch",
+                notes="Test expense 1",
+                restaurant_id=restaurant_id,
+                user_id=user.id,
+            ),
+            Expense(
+                date=datetime.strptime("2024-02-21", "%Y-%m-%d").date(),
+                amount=35.75,
+                category="Dining",
+                meal_type="Dinner",
+                notes="Test expense 2",
+                restaurant_id=restaurant_id,
+                user_id=user.id,
+            ),
+        ]
+        for expense in expenses:
+            db.session.add(expense)
+        db.session.commit()
+
+        # Verify expenses were created
+        assert len(Expense.query.filter_by(restaurant_id=restaurant_id).all()) == 2
+
+    # Try to delete the restaurant
+    response = client.post(
+        f"/restaurants/{restaurant_id}/delete", follow_redirects=True
+    )
+    assert response.status_code == 200  # After following redirect
+    assert b"Restaurant and associated expenses deleted successfully." in response.data
+
+    # Verify both restaurant and its expenses are deleted
+    with app.app_context():
+        assert Restaurant.query.get(restaurant_id) is None
+        assert len(Expense.query.filter_by(restaurant_id=restaurant_id).all()) == 0
