@@ -47,4 +47,4 @@ test:
 
 lint:
 	black .
-	mypy . 
+	flake8 . 

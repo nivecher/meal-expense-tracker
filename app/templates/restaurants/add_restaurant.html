@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+{% extends "main/base.html" %}
 
-{% block title %}Edit Restaurant{% endblock %}
+{% block title %}Add Restaurant{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
@@ -8,7 +8,7 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header bg-white py-3">
-                    <h2 class="h4 mb-0">Edit Restaurant</h2>
+                    <h2 class="h4 mb-0">Add Restaurant</h2>
                 </div>
                 <div class="card-body">
                     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -29,7 +29,6 @@
                             <div class="mb-3">
                                 <label for="address" class="form-label">Google Address Search *</label>
                                 <input type="text" class="form-control" id="address" name="address" required
-                                       value="{{ restaurant.address or '' }}"
                                        placeholder="Search for a restaurant or enter an address"
                                        data-bs-toggle="tooltip" data-bs-placement="top"
                                        title="Search for a restaurant or enter an address to auto-fill other fields">
@@ -42,8 +41,7 @@
                             <h3 class="h5 mb-3">Basic Information</h3>
                             <div class="mb-3">
                                 <label for="name" class="form-label">Restaurant Name *</label>
-                                <input type="text" class="form-control" id="name" name="name" 
-                                       value="{{ restaurant.name }}" required
+                                <input type="text" class="form-control" id="name" name="name" required
                                        placeholder="Enter restaurant name"
                                        data-bs-toggle="tooltip" data-bs-placement="top"
                                        title="Enter the full name of the restaurant">
@@ -55,18 +53,18 @@
                                         data-bs-toggle="tooltip" data-bs-placement="top"
                                         title="Select the type of establishment">
                                     <option value="">Select a type</option>
-                                    <option value="restaurant" {% if restaurant.type == 'restaurant' %}selected{% endif %}>Restaurant</option>
-                                    <option value="cafe" {% if restaurant.type == 'cafe' %}selected{% endif %}>Cafe</option>
-                                    <option value="bakery" {% if restaurant.type == 'bakery' %}selected{% endif %}>Bakery</option>
-                                    <option value="bar" {% if restaurant.type == 'bar' %}selected{% endif %}>Bar</option>
-                                    <option value="meal_delivery" {% if restaurant.type == 'meal_delivery' %}selected{% endif %}>Meal Delivery</option>
-                                    <option value="meal_takeaway" {% if restaurant.type == 'meal_takeaway' %}selected{% endif %}>Meal Takeaway</option>
-                                    <option value="supermarket" {% if restaurant.type == 'supermarket' %}selected{% endif %}>Supermarket</option>
-                                    <option value="grocery_or_supermarket" {% if restaurant.type == 'grocery_or_supermarket' %}selected{% endif %}>Grocery Store</option>
-                                    <option value="convenience_store" {% if restaurant.type == 'convenience_store' %}selected{% endif %}>Convenience Store</option>
-                                    <option value="food" {% if restaurant.type == 'food' %}selected{% endif %}>Food</option>
-                                    <option value="liquor_store" {% if restaurant.type == 'liquor_store' %}selected{% endif %}>Liquor Store</option>
-                                    <option value="other" {% if restaurant.type == 'other' %}selected{% endif %}>Other</option>
+                                    <option value="restaurant">Restaurant</option>
+                                    <option value="cafe">Cafe</option>
+                                    <option value="bakery">Bakery</option>
+                                    <option value="bar">Bar</option>
+                                    <option value="meal_delivery">Meal Delivery</option>
+                                    <option value="meal_takeaway">Meal Takeaway</option>
+                                    <option value="supermarket">Supermarket</option>
+                                    <option value="grocery_or_supermarket">Grocery Store</option>
+                                    <option value="convenience_store">Convenience Store</option>
+                                    <option value="food">Food</option>
+                                    <option value="liquor_store">Liquor Store</option>
+                                    <option value="other">Other</option>
                                 </select>
                             </div>
                         </div>
@@ -78,7 +76,6 @@
                                 <div class="col-md-6 mb-3">
                                     <label for="city" class="form-label">City</label>
                                     <input type="text" class="form-control" id="city" name="city"
-                                           value="{{ restaurant.city or '' }}"
                                            placeholder="Enter city"
                                            data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Enter the city">
@@ -86,7 +83,6 @@
                                 <div class="col-md-6 mb-3">
                                     <label for="state" class="form-label">State</label>
                                     <input type="text" class="form-control" id="state" name="state"
-                                           value="{{ restaurant.state or '' }}"
                                            placeholder="Enter state"
                                            data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Enter the state">
@@ -95,7 +91,6 @@
                             <div class="mb-3">
                                 <label for="zip_code" class="form-label">Zip Code</label>
                                 <input type="text" class="form-control" id="zip_code" name="zip_code"
-                                       value="{{ restaurant.zip_code or '' }}"
                                        placeholder="Enter zip code"
                                        data-bs-toggle="tooltip" data-bs-placement="top"
                                        title="Enter the zip code">
@@ -112,10 +107,10 @@
                                             data-bs-toggle="tooltip" data-bs-placement="top"
                                             title="Select the price range of the restaurant">
                                         <option value="">Select price range</option>
-                                        <option value="$" {% if restaurant.price_range == '$' %}selected{% endif %}>$ (Budget)</option>
-                                        <option value="$$" {% if restaurant.price_range == '$$' %}selected{% endif %}>$$ (Moderate)</option>
-                                        <option value="$$$" {% if restaurant.price_range == '$$$' %}selected{% endif %}>$$$ (Expensive)</option>
-                                        <option value="$$$$" {% if restaurant.price_range == '$$$$' %}selected{% endif %}>$$$$ (Luxury)</option>
+                                        <option value="$">$ (Budget)</option>
+                                        <option value="$$">$$ (Moderate)</option>
+                                        <option value="$$$">$$$ (Expensive)</option>
+                                        <option value="$$$$">$$$$ (Luxury)</option>
                                     </select>
                                 </div>
                                 <div class="col-md-6 mb-3">
@@ -124,49 +119,48 @@
                                            data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Select the type of cuisine served">
                                         <option value="">Select cuisine type</option>
-                                        <option value="american" {% if restaurant.cuisine == 'american' %}selected{% endif %}>American</option>
-                                        <option value="italian" {% if restaurant.cuisine == 'italian' %}selected{% endif %}>Italian</option>
-                                        <option value="mexican" {% if restaurant.cuisine == 'mexican' %}selected{% endif %}>Mexican</option>
-                                        <option value="chinese" {% if restaurant.cuisine == 'chinese' %}selected{% endif %}>Chinese</option>
-                                        <option value="japanese" {% if restaurant.cuisine == 'japanese' %}selected{% endif %}>Japanese</option>
-                                        <option value="thai" {% if restaurant.cuisine == 'thai' %}selected{% endif %}>Thai</option>
-                                        <option value="indian" {% if restaurant.cuisine == 'indian' %}selected{% endif %}>Indian</option>
-                                        <option value="vietnamese" {% if restaurant.cuisine == 'vietnamese' %}selected{% endif %}>Vietnamese</option>
-                                        <option value="korean" {% if restaurant.cuisine == 'korean' %}selected{% endif %}>Korean</option>
-                                        <option value="mediterranean" {% if restaurant.cuisine == 'mediterranean' %}selected{% endif %}>Mediterranean</option>
-                                        <option value="greek" {% if restaurant.cuisine == 'greek' %}selected{% endif %}>Greek</option>
-                                        <option value="french" {% if restaurant.cuisine == 'french' %}selected{% endif %}>French</option>
-                                        <option value="german" {% if restaurant.cuisine == 'german' %}selected{% endif %}>German</option>
-                                        <option value="spanish" {% if restaurant.cuisine == 'spanish' %}selected{% endif %}>Spanish</option>
-                                        <option value="brazilian" {% if restaurant.cuisine == 'brazilian' %}selected{% endif %}>Brazilian</option>
-                                        <option value="caribbean" {% if restaurant.cuisine == 'caribbean' %}selected{% endif %}>Caribbean</option>
-                                        <option value="sushi" {% if restaurant.cuisine == 'sushi' %}selected{% endif %}>Sushi</option>
-                                        <option value="steakhouse" {% if restaurant.cuisine == 'steakhouse' %}selected{% endif %}>Steakhouse</option>
-                                        <option value="seafood" {% if restaurant.cuisine == 'seafood' %}selected{% endif %}>Seafood</option>
-                                        <option value="bbq" {% if restaurant.cuisine == 'bbq' %}selected{% endif %}>BBQ</option>
-                                        <option value="pizza" {% if restaurant.cuisine == 'pizza' %}selected{% endif %}>Pizza</option>
-                                        <option value="burgers" {% if restaurant.cuisine == 'burgers' %}selected{% endif %}>Burgers</option>
-                                        <option value="sandwiches" {% if restaurant.cuisine == 'sandwiches' %}selected{% endif %}>Sandwiches</option>
-                                        <option value="cafe" {% if restaurant.cuisine == 'cafe' %}selected{% endif %}>Cafe</option>
-                                        <option value="bakery" {% if restaurant.cuisine == 'bakery' %}selected{% endif %}>Bakery</option>
-                                        <option value="dessert" {% if restaurant.cuisine == 'dessert' %}selected{% endif %}>Dessert</option>
-                                        <option value="ice_cream" {% if restaurant.cuisine == 'ice_cream' %}selected{% endif %}>Ice Cream</option>
-                                        <option value="coffee_shop" {% if restaurant.cuisine == 'coffee_shop' %}selected{% endif %}>Coffee Shop</option>
-                                        <option value="juice_bar" {% if restaurant.cuisine == 'juice_bar' %}selected{% endif %}>Juice Bar</option>
-                                        <option value="smoothie" {% if restaurant.cuisine == 'smoothie' %}selected{% endif %}>Smoothie</option>
-                                        <option value="vegan" {% if restaurant.cuisine == 'vegan' %}selected{% endif %}>Vegan</option>
-                                        <option value="vegetarian" {% if restaurant.cuisine == 'vegetarian' %}selected{% endif %}>Vegetarian</option>
-                                        <option value="gluten_free" {% if restaurant.cuisine == 'gluten_free' %}selected{% endif %}>Gluten Free</option>
-                                        <option value="halal" {% if restaurant.cuisine == 'halal' %}selected{% endif %}>Halal</option>
-                                        <option value="kosher" {% if restaurant.cuisine == 'kosher' %}selected{% endif %}>Kosher</option>
-                                        <option value="other" {% if restaurant.cuisine == 'other' %}selected{% endif %}>Other</option>
+                                        <option value="american">American</option>
+                                        <option value="italian">Italian</option>
+                                        <option value="mexican">Mexican</option>
+                                        <option value="chinese">Chinese</option>
+                                        <option value="japanese">Japanese</option>
+                                        <option value="thai">Thai</option>
+                                        <option value="indian">Indian</option>
+                                        <option value="vietnamese">Vietnamese</option>
+                                        <option value="korean">Korean</option>
+                                        <option value="mediterranean">Mediterranean</option>
+                                        <option value="greek">Greek</option>
+                                        <option value="french">French</option>
+                                        <option value="german">German</option>
+                                        <option value="spanish">Spanish</option>
+                                        <option value="brazilian">Brazilian</option>
+                                        <option value="caribbean">Caribbean</option>
+                                        <option value="sushi">Sushi</option>
+                                        <option value="steakhouse">Steakhouse</option>
+                                        <option value="seafood">Seafood</option>
+                                        <option value="bbq">BBQ</option>
+                                        <option value="pizza">Pizza</option>
+                                        <option value="burgers">Burgers</option>
+                                        <option value="sandwiches">Sandwiches</option>
+                                        <option value="cafe">Cafe</option>
+                                        <option value="bakery">Bakery</option>
+                                        <option value="dessert">Dessert</option>
+                                        <option value="ice_cream">Ice Cream</option>
+                                        <option value="coffee_shop">Coffee Shop</option>
+                                        <option value="juice_bar">Juice Bar</option>
+                                        <option value="smoothie">Smoothie</option>
+                                        <option value="vegan">Vegan</option>
+                                        <option value="vegetarian">Vegetarian</option>
+                                        <option value="gluten_free">Gluten Free</option>
+                                        <option value="halal">Halal</option>
+                                        <option value="kosher">Kosher</option>
+                                        <option value="other">Other</option>
                                     </select>
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <label for="website" class="form-label">Website</label>
                                 <input type="url" class="form-control" id="website" name="website"
-                                       value="{{ restaurant.website or '' }}"
                                        placeholder="https://www.example.com"
                                        data-bs-toggle="tooltip" data-bs-placement="top"
                                        title="Enter the restaurant's website URL">
@@ -174,7 +168,6 @@
                             <div class="mb-3">
                                 <label for="phone" class="form-label">Phone Number</label>
                                 <input type="tel" class="form-control" id="phone" name="phone"
-                                       value="{{ restaurant.phone or '' }}"
                                        placeholder="Enter phone number"
                                        data-bs-toggle="tooltip" data-bs-placement="top"
                                        title="Enter the restaurant's phone number">
@@ -184,20 +177,20 @@
                                 <textarea class="form-control" id="description" name="description" rows="2"
                                           placeholder="Brief description of the restaurant"
                                           data-bs-toggle="tooltip" data-bs-placement="top"
-                                          title="Add a brief description of the restaurant">{{ restaurant.description or '' }}</textarea>
+                                          title="Add a brief description of the restaurant"></textarea>
                             </div>
                             <div class="mb-3">
                                 <label for="notes" class="form-label">Additional Notes</label>
                                 <textarea class="form-control" id="notes" name="notes" rows="2"
                                           placeholder="Any additional information about the restaurant"
                                           data-bs-toggle="tooltip" data-bs-placement="top"
-                                          title="Add any additional notes or information">{{ restaurant.notes or '' }}</textarea>
+                                          title="Add any additional notes or information"></textarea>
                             </div>
                         </div>
 
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">Save Restaurant</button>
-                            <a href="{{ url_for('restaurants') }}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Add Restaurant</button>
+                            <a href="{{ url_for('restaurants.restaurants') }}" class="btn btn-outline-secondary">Cancel</a>
                         </div>
                     </form>
                 </div>

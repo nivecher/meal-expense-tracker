@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "main/base.html" %}
 
 {% block title %}Import Restaurants{% endblock %}
 
@@ -63,7 +63,7 @@
 
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Import Restaurants</button>
-                            <a href="{{ url_for('restaurants') }}" class="btn btn-outline-secondary">Cancel</a>
+                            <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary">Cancel</a>
                         </div>
                     </form>
                 </div>

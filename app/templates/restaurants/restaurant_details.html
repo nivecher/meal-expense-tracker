@@ -1,0 +1,138 @@
+{% extends "main/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ restaurant.name }}</h2>
+        <div class="btn-group">
+            <a href="{{ url_for('restaurants.edit_restaurant', id=restaurant.id) }}" 
+               class="btn btn-outline-primary">
+                <i class="fas fa-edit me-2"></i>Edit
+            </a>
+            <button type="button" 
+                    class="btn btn-outline-danger"
+                    data-bs-toggle="modal"
+                    data-bs-target="#deleteModal">
+                <i class="fas fa-trash me-2"></i>Delete
+            </button>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="card-title">Restaurant Information</h5>
+                    <dl class="row">
+                        <dt class="col-sm-4">Type</dt>
+                        <dd class="col-sm-8">{{ restaurant.type }}</dd>
+
+                        <dt class="col-sm-4">Cuisine</dt>
+                        <dd class="col-sm-8">{{ restaurant.cuisine }}</dd>
+
+                        <dt class="col-sm-4">Price Range</dt>
+                        <dd class="col-sm-8">{{ restaurant.price_range }}</dd>
+
+                        <dt class="col-sm-4">Address</dt>
+                        <dd class="col-sm-8">
+                            {{ restaurant.address }}<br>
+                            {{ restaurant.city }}{% if restaurant.state %}, {{ restaurant.state }}{% endif %}
+                            {% if restaurant.zip_code %}{{ restaurant.zip_code }}{% endif %}
+                        </dd>
+
+                        {% if restaurant.phone %}
+                        <dt class="col-sm-4">Phone</dt>
+                        <dd class="col-sm-8">{{ restaurant.phone }}</dd>
+                        {% endif %}
+
+                        {% if restaurant.website %}
+                        <dt class="col-sm-4">Website</dt>
+                        <dd class="col-sm-8">
+                            <a href="{{ restaurant.website }}" target="_blank" rel="noopener noreferrer">
+                                {{ restaurant.website }}
+                            </a>
+                        </dd>
+                        {% endif %}
+                    </dl>
+                </div>
+
+                {% if restaurant.description or restaurant.notes %}
+                <div class="col-md-6">
+                    {% if restaurant.description %}
+                    <h5 class="card-title">Description</h5>
+                    <p class="card-text">{{ restaurant.description }}</p>
+                    {% endif %}
+
+                    {% if restaurant.notes %}
+                    <h5 class="card-title">Notes</h5>
+                    <p class="card-text">{{ restaurant.notes }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            {% if restaurant.expenses %}
+            <div class="mt-4">
+                <h5 class="card-title">Recent Expenses</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Meal Type</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for expense in restaurant.expenses %}
+                            <tr>
+                                <td>{{ expense.date.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ expense.meal_type }}</td>
+                                <td>{{ expense.category }}</td>
+                                <td>${{ "%.2f"|format(expense.amount) }}</td>
+                                <td>{{ expense.notes }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete {{ restaurant.name }}?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('restaurants.delete_restaurant', id=restaurant.id) }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
