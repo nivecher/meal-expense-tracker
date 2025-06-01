@@ -113,26 +113,41 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: main
-          fallback-tag: 'v0.1.0'
+          fallbackTag: 'v0.1.0'
+          noNewCommitBehavior: 'patch'
+          noVersionBumpBehavior: 'patch'
+
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT_VERSION="${{ steps.semver.outputs.next }}"
+          if [ -z "$CURRENT_VERSION" ]; then
+            CURRENT_VERSION="0.1.0"
+          fi
+          echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Using version: $CURRENT_VERSION"
 
       - name: Tag and push Docker image
         id: docker_tag
         if: success()
         run: |
-          VERSION=${{ steps.semver.outputs.next }}
+          VERSION=${{ steps.current_version.outputs.version }}
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Tagging version: $VERSION"
           
           # Tag the image that passed tests with semantic version
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v$VERSION
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v$VERSION
           
-          # Create and push Git tag
-          git tag -a "v$VERSION" -m "Release version $VERSION"
-          git push origin "v$VERSION"
+          # Check if tag already exists
+          if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            # Create and push Git tag if it doesn't exist
+            git tag -a "v$VERSION" -m "Release version $VERSION"
+            git push origin "v$VERSION"
+          fi
 
       - name: Create Release
-        if: success()
+        if: success() && !contains(github.ref, 'v${{ steps.docker_tag.outputs.version }}')
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
