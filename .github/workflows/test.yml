@@ -40,9 +40,27 @@ jobs:
         run: |
           make test
 
+      - name: Pull image from GitHub Container Registry
+        run: |
+          echo $CR_PAT | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}
+
+      - name: Run Docker container from pulled image
+        run: |
+          docker run -d -p 5000:5000 --env-file .env --name meal-expense-app ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}
+
+      - name: Wait for app to be ready
+        run: |
+          for i in {1..30}; do curl -fs http://localhost:5000/ && break || sleep 1; done
+
       - name: Run load tests
         run: |
           make load-test
+
+      - name: Stop and remove Docker container
+        if: always()
+        run: |
+          docker rm -f meal-expense-app
 
       - name: Run security scans
         uses: aquasecurity/trivy-action@master
