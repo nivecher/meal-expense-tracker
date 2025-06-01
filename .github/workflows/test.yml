@@ -86,7 +86,7 @@ jobs:
       - name: Run security scans
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
