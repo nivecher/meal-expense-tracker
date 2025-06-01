@@ -11,7 +11,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+  SHORT_SHA: ${{ github.event.workflow_run.head_sha }}
   PYTHONPATH: ${{ github.workspace }}
 
 jobs:
@@ -50,12 +50,13 @@ jobs:
 
       - name: Pull image from GitHub Container Registry
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ env.IMAGE_TAG }}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
+          # Also pull by SHA for traceability in security scans
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-$(echo ${{ env.SHORT_SHA }} | cut -c1-7)
 
       - name: Run Docker container from pulled image
         run: |
-          docker run -d -p 5000:5000 --env-file .env --name meal-expense-app ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ env.IMAGE_TAG }}
+          docker run -d -p 5000:5000 --env-file .env --name meal-expense-app ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
 
       - name: Wait for app to be ready
         run: |
@@ -73,7 +74,7 @@ jobs:
       - name: Run security scans
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-$(echo ${{ env.SHORT_SHA }} | cut -c1-7)
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
