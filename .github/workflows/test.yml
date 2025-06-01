@@ -11,8 +11,13 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  SHORT_SHA: ${{ github.event.workflow_run.head_sha }}
+  IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
   PYTHONPATH: ${{ github.workspace }}
+  # Add required environment variables for the application
+  FLASK_APP: app.py
+  FLASK_ENV: testing
+  DATABASE_URL: sqlite:///instance/meal_expenses.db
+  SECRET_KEY: testing-key-123
 
 jobs:
   test:
@@ -25,6 +30,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -50,13 +57,18 @@ jobs:
 
       - name: Pull image from GitHub Container Registry
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
-          # Also pull by SHA for traceability in security scans
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-$(echo ${{ env.SHORT_SHA }} | cut -c1-7)
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main || echo "Failed to pull main tag"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ env.IMAGE_TAG }} || echo "Failed to pull SHA tag"
 
       - name: Run Docker container from pulled image
         run: |
-          docker run -d -p 5000:5000 --env-file .env --name meal-expense-app ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
+          docker run -d -p 5000:5000 \
+            -e FLASK_APP=${{ env.FLASK_APP }} \
+            -e FLASK_ENV=${{ env.FLASK_ENV }} \
+            -e DATABASE_URL=${{ env.DATABASE_URL }} \
+            -e SECRET_KEY=${{ env.SECRET_KEY }} \
+            --name meal-expense-app \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
 
       - name: Wait for app to be ready
         run: |
@@ -74,7 +86,7 @@ jobs:
       - name: Run security scans
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-$(echo ${{ env.SHORT_SHA }} | cut -c1-7)
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.event.workflow_run.head_sha }}
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
