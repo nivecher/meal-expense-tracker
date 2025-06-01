@@ -55,38 +55,43 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Tag and push image to Amazon ECR
+      - name: Pull and Push to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           VERSION: ${{ steps.get_version.outputs.version }}
         run: |
           # Pull the tested image from GHCR
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v$VERSION
           
           # Tag for ECR
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:latest
           
           # Push to ECR
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          
-          echo "version=$VERSION" >> $GITHUB_ENV
 
-      - name: Update ECS service
-        env:
-          VERSION: ${{ steps.get_version.outputs.version }}
+      - name: Download task definition
         run: |
-          # Update task definition with new image version
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --task-definition $ECS_TASK_DEFINITION:$VERSION \
-            --force-new-deployment
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+            --query taskDefinition > task-definition.json
 
-      - name: Wait for service stability
-        run: |
-          aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE
+      - name: Update ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.ECR_REPOSITORY }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.get_version.outputs.version }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
 
       - name: Run smoke tests
         run: |
@@ -101,5 +106,5 @@ jobs:
           SLACK_CHANNEL: deployments
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: Production Deployment
-          SLACK_MESSAGE: 'Deployment to production ${{ job.status }}'
+          SLACK_MESSAGE: 'Deployment to production ${{ job.status }} for version ${{ steps.get_version.outputs.version }}'
           SLACK_FOOTER: 'GitHub Actions'
