@@ -93,12 +93,22 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
+      - name: Check for existing tags
+        id: check_tags
+        run: |
+          if ! git tag | grep -q "^v"; then
+            echo "Creating initial tag v0.1.0"
+            git tag -a "v0.1.0" -m "Initial release"
+            git push origin v0.1.0
+          fi
+
       - name: Get next version
         id: semver
         uses: ietf-tools/semver-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: main
+          fallback-tag: 'v0.1.0'
 
       - name: Tag and push Docker image
         id: docker_tag
