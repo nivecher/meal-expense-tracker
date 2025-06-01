@@ -47,8 +47,11 @@ restart: stop run
 restart-logs: restart logs
 
 test:
-	PYTHONPATH=. pytest tests/
+	PYTHONPATH=. pytest --cov=app tests/
 
 lint:
 	black .
-	flake8 . 
+	flake8 .
+
+load-test:
+	python3 -m locust -f tests/load/locustfile.py --headless -u 10 -r 2 -t 30s --host=http://localhost:5000

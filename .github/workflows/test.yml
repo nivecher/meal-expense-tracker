@@ -38,11 +38,11 @@ jobs:
 
       - name: Run integration tests
         run: |
-          pytest --cov=app tests/integration
+          make test
 
       - name: Run load tests
         run: |
-          locust -f tests/load/locustfile.py --headless -u 10 -r 1 --run-time 1m
+          make load-test
 
       - name: Run security scans
         uses: aquasecurity/trivy-action@master

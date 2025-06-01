@@ -22,15 +22,80 @@ A Flask-based web application for tracking meal expenses, with features for mana
 - Persistent database storage
 
 ## Setup
+This application can be run locally or in a Docker container. Below are the setup instructions for both environments.
 
-1. Install Docker if you haven't already
-2. Clone the repository
-3. Build and run the application:
+## Initial Python Setup (Local Development)
+
+1. Clone the repository:
    ```bash
-   docker build -t meal-expense-tracker .
-   docker run -d -p 5000:5000 -v meal-expense-db:/app/instance --name meal-expense-app meal-expense-tracker
+   git clone <repo-url>
+   cd meal-expense-tracker
    ```
-4. Access the application at http://localhost:5000
+
+2. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements-dev.txt
+   ```
+
+4. Create your environment file:
+   ```bash
+   cp .env.sample .env
+   # Edit .env and fill in your secrets and configuration values
+   ```
+
+5. Initialize the database (optional, for local dev):
+   ```bash
+   python init_db.py
+   ```
+
+6. Run the application locally:
+   ```bash
+   make run-local
+   ```
+   The app will be available at http://localhost:5000
+
+## Using Make Commands
+
+- **Run locally (Python):**
+  ```bash
+  make run-local
+  ```
+- **Build Docker image:**
+  ```bash
+  make build
+  ```
+- **Run in Docker:**
+  ```bash
+  make run
+  ```
+- **Stop Docker container:**
+  ```bash
+  make stop
+  ```
+- **View logs:**
+  ```bash
+  make logs
+  ```
+- **Run tests:**
+  ```bash
+  make test
+  ```
+- **Lint code:**
+  ```bash
+  make lint
+  ```
+- **Clean up containers and volumes:**
+  ```bash
+  make clean
+  ```
+
+For more, see the `Makefile`.
 
 ## Database Management
 
@@ -66,6 +131,20 @@ The application is built with:
 - SQLAlchemy (ORM)
 - Bootstrap (Frontend)
 - SQLite (Database)
+
+## Environment Variables
+
+Before running the application, create a `.env` file for your configuration:
+
+1. Copy the sample environment file:
+   ```bash
+   cp .env.sample .env
+   ```
+2. Edit `.env` and fill in your secrets and configuration values as needed.
+
+- `SECRET_KEY`: Flask secret key (use a random value in production)
+- `SQLALCHEMY_DATABASE_URI`: Database URI (default is SQLite for local dev)
+- `GOOGLE_MAPS_API_KEY`: (Optional) Google Maps API key for map features
 
 ## License
 

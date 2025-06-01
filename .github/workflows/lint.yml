@@ -24,10 +24,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Run Black (code formatter)
+      - name: Run lint and format checks
         run: |
-          black --check .
-
-      - name: Run Flake8 (linter)
-        run: |
-          flake8 .
+          make lint
