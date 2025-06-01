@@ -6,7 +6,7 @@ from app.restaurants.models import Restaurant
 from app.expenses.models import Expense
 from sqlalchemy.exc import SQLAlchemyError
 import csv
-from io import StringIO
+from io import StringIO, BytesIO
 
 
 @bp.route("/")
@@ -226,9 +226,13 @@ def export_restaurants():
                     restaurant.notes,
                 ]
             )
-        output.seek(0)
+        # Convert StringIO to BytesIO for send_file
+        mem = BytesIO()
+        mem.write(output.getvalue().encode("utf-8"))
+        mem.seek(0)
+        output.close()
         return send_file(
-            StringIO(output.getvalue()),
+            mem,
             mimetype="text/csv",
             as_attachment=True,
             download_name="restaurants.csv",

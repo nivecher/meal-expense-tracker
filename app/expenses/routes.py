@@ -1,10 +1,12 @@
-from flask import render_template, redirect, url_for, flash, request
+from flask import render_template, redirect, url_for, flash, request, Response
 from flask_login import login_required, current_user
 from app import db
 from app.expenses import bp
 from app.expenses.models import Expense
 from app.restaurants.models import Restaurant
 from datetime import datetime, timedelta
+import csv
+from io import StringIO
 
 
 def apply_filters(query, search, meal_type, category, start_date, end_date):
@@ -219,10 +221,28 @@ def edit_expense(expense_id):
                 400,
             )
 
-        expense.category = request.form.get("category", "")
+        # Set category based on restaurant type
+        restaurant_id = request.form.get("restaurant_id")
+        restaurant_type = None
+        if restaurant_id:
+            restaurant = Restaurant.query.get(restaurant_id)
+            if restaurant:
+                restaurant_type = restaurant.type
+        type_to_category = {
+            "restaurant": "Dining",
+            "cafe": "Coffee",
+            "bar": "Drinks",
+            "fast_food": "Fast Food",
+            "food_truck": "Street Food",
+            "bakery": "Bakery",
+            "grocery": "Groceries",
+        }
+        expense.category = type_to_category.get(
+            restaurant_type, request.form.get("category", "")
+        )
         expense.meal_type = request.form["meal_type"]
         expense.notes = request.form.get("notes", "")
-        expense.restaurant_id = request.form.get("restaurant_id")
+        expense.restaurant_id = restaurant_id
         db.session.commit()
         flash("Expense updated successfully!", "success")
         return redirect(url_for("main.index"))
@@ -288,3 +308,61 @@ def expense_details(expense_id):
         flash("You do not have permission to view this expense.", "error")
         return redirect(url_for("main.index"))
     return render_template("expenses/expense_detail.html", expense=expense)
+
+
+@bp.route("/export")
+@login_required
+def export_expenses():
+    """Export expenses to CSV."""
+    try:
+        expenses = (
+            Expense.query.filter_by(user_id=current_user.id)
+            .order_by(Expense.date.desc())
+            .all()
+        )
+
+        output = StringIO()
+        writer = csv.writer(output)
+
+        # Write header with restaurant information
+        writer.writerow(
+            [
+                "Date",
+                "Restaurant",
+                "Meal Type",
+                "Amount",
+                "Notes",
+                "Restaurant Type",
+                "Cuisine",
+                "Price Range",
+                "Location",
+            ]
+        )
+
+        # Write expense data with restaurant information
+        for expense in expenses:
+            restaurant = expense.restaurant
+            location = f"{restaurant.city}, {restaurant.state}" if restaurant else ""
+            writer.writerow(
+                [
+                    expense.date.strftime("%Y-%m-%d"),
+                    restaurant.name if restaurant else "Unknown",
+                    expense.meal_type or "",
+                    f"${expense.amount:.2f}",
+                    expense.notes or "",
+                    restaurant.type if restaurant else "",
+                    restaurant.cuisine if restaurant else "",
+                    restaurant.price_range if restaurant else "",
+                    location,
+                ]
+            )
+
+        output.seek(0)
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename=expenses.csv"},
+        )
+    except Exception as e:
+        flash(f"Error exporting expenses: {str(e)}", "error")
+        return redirect(url_for("main.index"))
