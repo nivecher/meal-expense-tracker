@@ -285,7 +285,7 @@
         }
 
         const autocomplete = new google.maps.places.Autocomplete(googleAddressInput, {
-            fields: ['name', 'formatted_address', 'types', 'price_level', 'address_components'],
+            fields: ['name', 'formatted_address', 'types', 'price_level', 'address_components', 'website', 'formatted_phone_number'],
             types: ['establishment']
         });
 
@@ -453,6 +453,16 @@
                                 cuisineInput.value = 'american';
                             }
                         }
+
+                        // Set website and phone if available from Google Place
+                        const websiteInput = document.getElementById('website');
+                        if (websiteInput && place.website) {
+                            websiteInput.value = place.website;
+                        }
+                        const phoneInput = document.getElementById('phone');
+                        if (phoneInput && place.formatted_phone_number) {
+                            phoneInput.value = place.formatted_phone_number;
+                        }
                     });
                     autocomplete.trigger('place_changed');
                 }
@@ -500,4 +510,4 @@
         });
     });
 </script>
-{% endblock %} 
+{% endblock %}
