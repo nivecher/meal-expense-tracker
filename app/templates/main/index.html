@@ -9,78 +9,97 @@
         </a>
     </div>
 
+    {% set filter_count = 0 %}
+    {% if search %}{% set filter_count = filter_count + 1 %}{% endif %}
+    {% if meal_type %}{% set filter_count = filter_count + 1 %}{% endif %}
+    {% if category %}{% set filter_count = filter_count + 1 %}{% endif %}
+    {% if start_date %}{% set filter_count = filter_count + 1 %}{% endif %}
+    {% if end_date %}{% set filter_count = filter_count + 1 %}{% endif %}
+    {% set show_filters = filter_count or request.args.get('filter_expanded') == '1' %}
     <div class="card mb-4">
-        <div class="card-header bg-white py-3">
-            <h5 class="card-title mb-0">
-                <i class="fas fa-filter me-2"></i>Filter Expenses
+        <div class="card-header bg-white py-3 {% if filter_count %}border-primary bg-opacity-25 border-2{% endif %}"
+             data-bs-toggle="collapse" data-bs-target="#filterCollapse" style="cursor:pointer;">
+            <h5 class="card-title mb-0 d-flex align-items-center justify-content-between">
+                <span>
+                    <i class="fas fa-filter me-2"></i>Filter Expenses
+                    {% if filter_count %}
+                        <span class="badge bg-primary ms-2">{{ filter_count }} filter{{ 's' if filter_count > 1 else '' }} applied</span>
+                        <span class="badge bg-secondary ms-2">{{ expenses|length }} result{{ 's' if expenses|length != 1 else '' }}</span>
+                    {% endif %}
+                </span>
+                <span>
+                    <i class="fas {% if show_filters %}fa-chevron-up{% else %}fa-chevron-down{% endif %}"></i>
+                </span>
             </h5>
         </div>
-        <div class="card-body">
-            <form method="GET" class="row g-3">
-                <!-- Search Section -->
-                <div class="col-12 mb-3">
-                    <div class="input-group">
-                        <span class="input-group-text bg-white">
-                            <i class="fas fa-search text-muted"></i>
-                        </span>
-                        <input type="text" class="form-control" id="search" name="search" 
-                               placeholder="Search restaurants, locations, or descriptions"
-                               value="{{ request.args.get('search', '') }}">
-                    </div>
-                </div>
-
-                <!-- Filters Section -->
-                <div class="col-md-3">
-                    <label for="meal_type" class="form-label">Meal Type</label>
-                    <select class="form-select" id="meal_type" name="meal_type">
-                        <option value="">All Meals</option>
-                        {% for mt in meal_types %}
-                        <option value="{{ mt }}" {% if meal_type == mt %}selected{% endif %}>
-                            {{ mt }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label for="category" class="form-label">Category</label>
-                    <select class="form-select" id="category" name="category">
-                        <option value="">All Categories</option>
-                        {% for cat in categories %}
-                        <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>
-                            {{ cat }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <!-- Date Range Section -->
-                <div class="col-md-8">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label for="start_date" class="form-label">Start Date</label>
-                            <input type="date" class="form-control" id="start_date" name="start_date" 
-                                   value="{{ request.args.get('start_date', '') }}">
-                        </div>
-                        <div class="col-md-6">
-                            <label for="end_date" class="form-label">End Date</label>
-                            <input type="date" class="form-control" id="end_date" name="end_date" 
-                                   value="{{ request.args.get('end_date', '') }}">
+        <div class="collapse{% if show_filters %} show{% endif %}" id="filterCollapse">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <!-- Search Section -->
+                    <div class="col-12 mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white">
+                                <i class="fas fa-search text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control" id="search" name="search" 
+                                   placeholder="Search restaurant, city, notes, or description"
+                                   value="{{ request.args.get('search', '') }}">
                         </div>
                     </div>
-                </div>
 
-                <!-- Action Buttons -->
-                <div class="col-12 mt-3">
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-filter me-2"></i>Apply Filters
-                        </button>
-                        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-times me-2"></i>Clear Filters
-                        </a>
+                    <!-- Filters Section -->
+                    <div class="col-md-3">
+                        <label for="meal_type" class="form-label">Meal Type</label>
+                        <select class="form-select" id="meal_type" name="meal_type">
+                            <option value="">All Meals</option>
+                            {% for mt in meal_types %}
+                            <option value="{{ mt }}" {% if meal_type == mt %}selected{% endif %}>
+                                {{ mt }}
+                            </option>
+                            {% endfor %}
+                        </select>
                     </div>
-                </div>
-            </form>
+                    <div class="col-md-3">
+                        <label for="category" class="form-label">Category</label>
+                        <select class="form-select" id="category" name="category">
+                            <option value="">All Categories</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>
+                                {{ cat }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Date Range Section -->
+                    <div class="col-md-8">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="start_date" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="start_date" name="start_date" 
+                                       value="{{ request.args.get('start_date', '') }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="end_date" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="end_date" name="end_date" 
+                                       value="{{ request.args.get('end_date', '') }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="col-12 mt-3">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-filter me-2"></i>Apply Filters
+                            </button>
+                            <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-2"></i>Clear Filters
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -165,6 +184,9 @@
                                            class="text-decoration-none">
                                             {{ expense.restaurant.full_name }}
                                         </a>
+                                        {% if restaurant_expense_counts and expense.restaurant.id in restaurant_expense_counts %}
+                                            <span class="badge bg-info ms-2">{{ restaurant_expense_counts[expense.restaurant.id] }} visit{{ 's' if restaurant_expense_counts[expense.restaurant.id] != 1 else '' }}</span>
+                                        {% endif %}
                                     </span>
                                 {% else %}
                                     -
@@ -238,11 +260,16 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize all modals
-    var modals = document.querySelectorAll('.modal');
-    modals.forEach(function(modal) {
-        new bootstrap.Modal(modal);
-    });
+    var filterHeader = document.querySelector('.card-header[data-bs-toggle="collapse"]');
+    if (filterHeader) {
+        filterHeader.addEventListener('click', function() {
+            var icon = this.querySelector('i.fas.fa-chevron-down, i.fas.fa-chevron-up');
+            if (icon) {
+                icon.classList.toggle('fa-chevron-down');
+                icon.classList.toggle('fa-chevron-up');
+            }
+        });
+    }
 });
 </script>
-{% endblock %} 
+{% endblock %}

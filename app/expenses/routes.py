@@ -15,8 +15,12 @@ def apply_filters(query, search, meal_type, category, start_date, end_date):
         query = query.join(Restaurant).filter(
             db.or_(
                 Restaurant.name.ilike(f"%{search}%"),
-                Restaurant.address.ilike(f"%{search}%"),
+                Restaurant.city.ilike(f"%{search}%"),
+                Restaurant.cuisine.ilike(f"%{search}%"),
+                Restaurant.type.ilike(f"%{search}%"),
                 Expense.notes.ilike(f"%{search}%"),
+                Expense.category.ilike(f"%{search}%"),
+                Expense.meal_type.ilike(f"%{search}%"),
             )
         )
     if meal_type:
@@ -90,14 +94,29 @@ def get_main_index_context():
         .filter(Expense.meal_type != "")
         .all()
     )
-    meal_types = [meal[0] for meal in meal_types]
+    meal_types = sorted([meal[0] for meal in meal_types])
     categories = (
         db.session.query(Expense.category)
         .distinct()
         .filter(Expense.category != "")
         .all()
     )
-    categories = [category[0] for category in categories]
+    categories = sorted([category[0] for category in categories])
+
+    # Add restaurant_expense_counts for use in the template
+    restaurant_ids = [e.restaurant_id for e in expenses if e.restaurant_id]
+    restaurant_expense_counts = {}
+    if restaurant_ids:
+        counts = (
+            db.session.query(Expense.restaurant_id, db.func.count(Expense.id))
+            .filter(
+                Expense.user_id == current_user.id,
+                Expense.restaurant_id.in_(restaurant_ids),
+            )
+            .group_by(Expense.restaurant_id)
+            .all()
+        )
+        restaurant_expense_counts = {rid: count for rid, count in counts}
 
     return dict(
         expenses=expenses,
@@ -111,6 +130,7 @@ def get_main_index_context():
         meal_types=meal_types,
         categories=categories,
         total_amount=total_amount,
+        restaurant_expense_counts=restaurant_expense_counts,
     )
 
 

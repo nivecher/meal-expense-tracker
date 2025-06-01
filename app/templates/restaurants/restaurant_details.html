@@ -47,7 +47,7 @@
 
                     <div class="mb-3">
                         <strong>Cuisine:</strong>
-                        <span>{{ restaurant.cuisine or 'Not specified' }}</span>
+                        <span>{{ restaurant.cuisine|replace('_', ' ')|title if restaurant.cuisine else 'Not specified' }}</span>
                     </div>
 
                     {% if restaurant.website %}
@@ -194,4 +194,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{% endblock %} 
+{% endblock %}

@@ -20,15 +20,83 @@ from app.restaurants import bp
 @bp.route("/")
 @login_required
 def list_restaurants():
-    try:
-        restaurants = Restaurant.query.order_by(Restaurant.name).all()
-        return render_template(
-            "restaurants/list_restaurants.html", restaurants=restaurants
-        )
-    except SQLAlchemyError:
-        db.session.rollback()
-        flash("Error loading restaurants. Please try again.", "error")
-        return redirect(url_for("main.index"))
+    # Get filter and sort parameters from query string
+    search = request.args.get("search", "")
+    cuisine = request.args.get("cuisine", "")
+    city = request.args.get("city", "")
+    type_ = request.args.get("type", "")
+    price_range = request.args.get("price_range", "")
+    sort_by = request.args.get("sort_by", "name")
+    sort_order = request.args.get("sort_order", "asc")
+
+    # Start query
+    query = Restaurant.query
+    if search:
+        query = query.filter(Restaurant.name.ilike(f"%{search}%"))
+    if cuisine:
+        query = query.filter(Restaurant.cuisine == cuisine)
+    if city:
+        query = query.filter(Restaurant.city == city)
+    if type_:
+        query = query.filter(Restaurant.type == type_)
+    if price_range:
+        query = query.filter(Restaurant.price_range == price_range)
+
+    # Sorting
+    sort_column = getattr(Restaurant, sort_by, Restaurant.name)
+    if sort_order == "desc":
+        sort_column = sort_column.desc()
+    else:
+        sort_column = sort_column.asc()
+    query = query.order_by(sort_column)
+
+    restaurants = query.all()
+
+    # For filter dropdowns
+    cuisines = [
+        c[0]
+        for c in db.session.query(Restaurant.cuisine)
+        .distinct()
+        .filter(Restaurant.cuisine is not None)
+        .all()
+    ]
+    cities = [
+        c[0]
+        for c in db.session.query(Restaurant.city)
+        .distinct()
+        .filter(Restaurant.city is not None)
+        .all()
+    ]
+    types = [
+        t[0]
+        for t in db.session.query(Restaurant.type)
+        .distinct()
+        .filter(Restaurant.type is not None)
+        .all()
+    ]
+    price_ranges = [
+        p[0]
+        for p in db.session.query(Restaurant.price_range)
+        .distinct()
+        .filter(Restaurant.price_range is not None)
+        .all()
+    ]
+
+    return render_template(
+        "restaurants/list_restaurants.html",
+        restaurants=restaurants,
+        search=search,
+        cuisine=cuisine,
+        city=city,
+        type_=type_,
+        price_range=price_range,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        cuisines=cuisines,
+        cities=cities,
+        types=types,
+        price_ranges=price_ranges,
+    )
 
 
 @bp.route("/<int:restaurant_id>/details")
