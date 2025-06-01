@@ -35,8 +35,11 @@ jobs:
       - name: Get latest version tag
         id: get_version
         run: |
+          # Get latest tag and ensure we strip any 'v' prefix
           VERSION=$(git describe --tags --abbrev=0)
-          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+          VERSION=${VERSION#v}  # Remove v prefix
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -55,17 +58,23 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Create ECR repository if not exists
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} || \
+          aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }}
+
       - name: Pull and Push to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           VERSION: ${{ steps.get_version.outputs.version }}
         run: |
-          # Pull the tested image from GHCR
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v$VERSION
+          # Pull the tested image from GHCR (using version without v prefix)
+          echo "Pulling version $VERSION from GHCR"
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
           
           # Tag for ECR
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:latest
           
           # Push to ECR
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
