@@ -16,12 +16,6 @@ variable "app_name" {
   default     = "meal-expense-tracker"
 }
 
-variable "database_url" {
-  description = "Database URL for the application"
-  type        = string
-  sensitive   = true
-}
-
 variable "image_tag" {
   description = "Docker image tag for the Lambda function"
   type        = string
@@ -30,4 +24,16 @@ variable "image_tag" {
 variable "domain_name" {
   description = "The domain name for the ACM certificate"
   type        = string
+}
+
+variable "db_name" {
+  description = "The name of the database."
+  type        = string
+  default     = "meal_expenses"
+}
+
+variable "db_username" {
+  description = "The username for the database."
+  type        = string
+  default     = "admin"
 }

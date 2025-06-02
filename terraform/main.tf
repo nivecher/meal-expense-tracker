@@ -19,6 +19,49 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
 }
 
+# VPC for the application
+resource "aws_vpc" "app_vpc" {
+  cidr_block = "10.0.0.0/16"
+
+  tags = {
+    Name        = "${var.app_name}-vpc"
+    Environment = var.environment
+  }
+}
+
+resource "aws_subnet" "app_private_subnet" {
+  count = 2
+
+  vpc_id                  = aws_vpc.app_vpc.id
+  cidr_block              = cidrsubnet(aws_vpc.app_vpc.cidr_block, 8, count.index)
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name        = "${var.app_name}-private-subnet-${count.index}"
+    Environment = var.environment
+  }
+}
+
+resource "aws_route_table" "app_private_route_table" {
+  vpc_id = aws_vpc.app_vpc.id
+
+  route {
+    cidr_block         = "0.0.0.0/0"
+    transit_gateway_id = aws_vpc_endpoint.api_gateway.id
+  }
+
+  tags = {
+    Name        = "${var.app_name}-private-route-table"
+    Environment = var.environment
+  }
+}
+
+resource "aws_route_table_association" "app_private_route_table_association" {
+  count          = 2
+  subnet_id      = aws_subnet.app_private_subnet[count.index].id
+  route_table_id = aws_route_table.app_private_route_table.id
+}
+
 # Lambda function using Docker image from ECR
 resource "aws_lambda_function" "app" {
   function_name = "${var.app_name}-${var.environment}"
@@ -30,8 +73,15 @@ resource "aws_lambda_function" "app" {
 
   environment {
     variables = {
-      DATABASE_URL = var.database_url
+      DATABASE_URL           = "postgresql://${jsondecode(aws_secretsmanager_secret_version.db_password_version.secret_string).username}:${jsondecode(aws_secretsmanager_secret_version.db_password_version.secret_string).password}@${aws_db_instance.postgres.endpoint}/${var.db_name}"
+      DB_SECRET_ARN          = aws_secretsmanager_secret.db_password.arn
+      API_GATEWAY_HTTPS_ONLY = "true"
     }
+  }
+
+  vpc_config {
+    subnet_ids         = aws_subnet.app_private_subnet[*].id
+    security_group_ids = [aws_security_group.lambda_sg.id]
   }
 }
 
@@ -117,5 +167,135 @@ resource "aws_acm_certificate" "app" {
   tags = {
     Environment = var.environment
     Application = var.app_name
+  }
+}
+
+resource "aws_db_instance" "postgres" {
+  allocated_storage      = 20
+  engine                 = "postgres"
+  engine_version         = "14.5"
+  instance_class         = "db.t3.micro"
+  username               = var.db_username
+  password               = random_password.db_password.result
+  vpc_security_group_ids = [aws_security_group.db_sg.id]
+  db_subnet_group_name   = aws_db_subnet_group.default.name
+  publicly_accessible    = false
+  skip_final_snapshot    = true
+  storage_encrypted      = true
+  kms_key_id             = aws_kms_key.db_encryption_key.arn
+
+  tags = {
+    Environment = var.environment
+    Application = var.app_name
+  }
+}
+
+resource "aws_kms_key" "db_encryption_key" {
+  description = "KMS key for encrypting RDS database."
+
+  tags = {
+    Name        = "${var.app_name}-db-encryption-key"
+    Environment = var.environment
+  }
+}
+
+resource "aws_kms_alias" "db_encryption_alias" {
+  name          = "alias/${var.app_name}-db-encryption-key"
+  target_key_id = aws_kms_key.db_encryption_key.id
+}
+
+resource "aws_security_group" "db_sg" {
+  vpc_id = aws_vpc.app_vpc.id
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.app_name}-db-sg"
+    Environment = var.environment
+  }
+}
+
+resource "aws_db_subnet_group" "default" {
+  name       = "${var.app_name}-db-subnet-group"
+  subnet_ids = aws_subnet.app_private_subnet[*].id
+
+  tags = {
+    Name        = "${var.app_name}-db-subnet-group"
+    Environment = var.environment
+  }
+}
+
+resource "aws_secretsmanager_secret" "db_password" {
+  name = "${var.app_name}-${var.environment}-db-password"
+
+  tags = {
+    Environment = var.environment
+    Application = var.app_name
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "db_password_version" {
+  secret_id = aws_secretsmanager_secret.db_password.id
+  secret_string = jsonencode({
+    username = var.db_username,
+    password = random_password.db_password.result
+  })
+}
+
+resource "random_password" "db_password" {
+  length           = 16
+  special          = true
+  override_special = "!@#$%^&*()_+-=[]{}|"
+  upper            = true
+  lower            = true
+  numeric          = true
+}
+
+resource "aws_vpc_endpoint" "api_gateway" {
+  vpc_id       = aws_vpc.app_vpc.id
+  service_name = "com.amazonaws.${var.aws_region}.execute-api"
+
+  private_dns_enabled = true
+
+  subnet_ids = aws_subnet.app_private_subnet[*].id
+
+  tags = {
+    Name        = "${var.app_name}-api-gateway-endpoint"
+    Environment = var.environment
+  }
+}
+
+resource "aws_security_group" "lambda_sg" {
+  vpc_id = aws_vpc.app_vpc.id
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.app_name}-lambda-sg"
+    Environment = var.environment
   }
 }

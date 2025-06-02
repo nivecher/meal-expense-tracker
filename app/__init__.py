@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import os
 import click
 from flask.cli import with_appcontext
+import boto3
+import json
 
 # Load environment variables
 load_dotenv()
@@ -73,3 +75,29 @@ def create_app(config_class=None):
     app.cli.add_command(init_db_command)
 
     return app
+
+
+def get_db_credentials():
+    if os.getenv("FLASK_ENV") in ["development", "testing"]:
+        return {
+            "username": "sqlite_user",
+            "password": "sqlite_password",
+            "database_url": "sqlite:///instance/meal_expenses.db",
+        }
+
+    secrets_manager = boto3.client(
+        "secretsmanager", region_name=os.getenv("AWS_REGION", "us-east-1")
+    )
+    secret_arn = os.getenv("DB_SECRET_ARN")
+
+    response = secrets_manager.get_secret_value(SecretId=secret_arn)
+    secret = json.loads(response["SecretString"])
+
+    return {
+        "username": secret["username"],
+        "password": secret["password"],
+        "database_url": (
+            f"postgresql://{secret['username']}:{secret['password']}@"
+            f"{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}"
+        ),
+    }

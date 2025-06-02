@@ -217,3 +217,9 @@ jobs:
 
           # Override the terraform.tfvars file
           echo "secret_key = \"$SECRET_KEY\"" >> terraform/terraform.tfvars
+
+      - name: Update GitHub Actions Role Permissions
+        run: |
+          aws iam attach-role-policy \
+            --role-name ${{ secrets.AWS_ROLE_NAME }} \
+            --policy-arn arn:aws:iam::aws:policy/AmazonRDSFullAccess

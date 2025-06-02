@@ -14,4 +14,5 @@ locust==2.37.4
 factory-boy==3.3.3 
 faker==22.6.0 
 pytest-mock==3.14.0 
-pytest-xdist==3.6.1 
+pytest-xdist==3.6.1
+boto3
