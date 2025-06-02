@@ -60,8 +60,6 @@ jobs:
           terraform plan \
             -var="environment=prod" \
             -var="database_url=${{ secrets.DATABASE_URL }}" \
-            -var="secret_key=${{ secrets.FLASK_SECRET_KEY }}" \
-            -var="certificate_arn=${{ secrets.SSL_CERTIFICATE_ARN }}" \
             -out=tfplan
         
       - name: Terraform Apply
