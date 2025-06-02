@@ -1,0 +1,221 @@
+name: Infrastructure Deployment
+
+on:
+  workflow_run:
+    workflows: ["Testing Build"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  TF_VERSION: 1.5.0
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: meal-expense-tracker-prod
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  terraform:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Generate Backend Config
+        working-directory: ./terraform
+        run: |
+          chmod +x generate-backend-config.sh
+          ./generate-backend-config.sh
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform Format Check
+        working-directory: ./terraform
+        run: terraform fmt -check
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        run: |
+          terraform plan \
+            -var="environment=prod" \
+            -var="database_url=${{ secrets.DATABASE_URL }}" \
+            -var="secret_key=${{ secrets.FLASK_SECRET_KEY }}" \
+            -var="certificate_arn=${{ secrets.SSL_CERTIFICATE_ARN }}" \
+            -out=tfplan
+        
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: terraform apply -auto-approve tfplan
+
+      - name: Export Infrastructure Values
+        working-directory: ./terraform
+        run: |
+          # Export values as GitHub Actions environment variables
+          echo "ECS_EXECUTION_ROLE_ARN=$(terraform output -raw ecs_execution_role_arn)" >> $GITHUB_ENV
+          echo "ECS_TASK_ROLE_ARN=$(terraform output -raw ecs_task_role_arn)" >> $GITHUB_ENV
+          echo "DATABASE_URL_ARN=$(terraform output -raw database_url_secret_arn)" >> $GITHUB_ENV
+          echo "SECRET_KEY_ARN=$(terraform output -raw secret_key_secret_arn)" >> $GITHUB_ENV
+          echo "SUBNET_IDS=$(terraform output -raw private_subnet_ids)" >> $GITHUB_ENV
+          echo "SECURITY_GROUP_IDS=$(terraform output -raw ecs_security_group_id)" >> $GITHUB_ENV
+
+      - name: Update GitHub Secrets
+        uses: gliech/create-github-secret-action@v1
+        with:
+          name: ECS_EXECUTION_ROLE_ARN
+          value: ${{ env.ECS_EXECUTION_ROLE_ARN }}
+          pa_token: ${{ secrets.GH_PA_TOKEN }}
+        
+      - name: Update ECS Task Role ARN
+        uses: gliech/create-github-secret-action@v1
+        with:
+          name: ECS_TASK_ROLE_ARN
+          value: ${{ env.ECS_TASK_ROLE_ARN }}
+          pa_token: ${{ secrets.GH_PA_TOKEN }}
+
+      - name: Update Database URL ARN
+        uses: gliech/create-github-secret-action@v1
+        with:
+          name: DATABASE_URL_ARN
+          value: ${{ env.DATABASE_URL_ARN }}
+          pa_token: ${{ secrets.GH_PA_TOKEN }}
+
+      - name: Update Secret Key ARN
+        uses: gliech/create-github-secret-action@v1
+        with:
+          name: SECRET_KEY_ARN
+          value: ${{ env.SECRET_KEY_ARN }}
+          pa_token: ${{ secrets.GH_PA_TOKEN }}
+
+      - name: Update Subnet IDs
+        uses: gliech/create-github-secret-action@v1
+        with:
+          name: SUBNET_IDS
+          value: ${{ env.SUBNET_IDS }}
+          pa_token: ${{ secrets.GH_PA_TOKEN }}
+
+      - name: Update Security Group IDs
+        uses: gliech/create-github-secret-action@v1
+        with:
+          name: SECURITY_GROUP_IDS
+          value: ${{ env.SECURITY_GROUP_IDS }}
+          pa_token: ${{ secrets.GH_PA_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Validate Terraform Variables
+        run: |
+          if [ -z "${{ secrets.DATABASE_URL }}" ] || [ -z "${{ secrets.FLASK_SECRET_KEY }}" ] || [ -z "${{ secrets.SSL_CERTIFICATE_ARN }}" ]; then
+            echo "Error: Required secrets are not set"
+            echo "Please ensure DATABASE_URL, FLASK_SECRET_KEY, and SSL_CERTIFICATE_ARN are configured in repository secrets"
+            exit 1
+          fi
+
+      - name: Validate Docker Build Context
+        run: |
+          if [ ! -f "Dockerfile" ]; then
+            echo "Error: Dockerfile not found"
+            exit 1
+          fi
+
+      - name: Verify AWS Credentials
+        run: |
+          aws sts get-caller-identity || {
+            echo "Error: Unable to validate AWS credentials"
+            exit 1
+          }
+
+      - name: Tag Resources
+        if: success()
+        working-directory: ./terraform
+        run: |
+          aws ecs tag-resource \
+            --resource-arn $(terraform output -raw ecs_service_arn) \
+            --tags Key=DeploymentID,Value=${{ github.run_id }} \
+                  Key=GitCommit,Value=${{ github.sha }}
+
+      - name: Wait for ECS Service Stability
+        if: success()
+        run: |
+          aws ecs wait services-stable \
+            --cluster $(terraform output -raw ecs_cluster_name) \
+            --services $(terraform output -raw ecs_service_name)
+
+      - name: Verify Application Health
+        if: success()
+        run: |
+          ALB_DNS=$(terraform output -raw alb_dns_name)
+          max_retries=30
+          count=0
+          echo "Waiting for application to become healthy at https://$ALB_DNS/health"
+          while [ $count -lt $max_retries ]; do
+            if curl -sk "https://$ALB_DNS/health" | grep -q "ok"; then
+              echo "Application is healthy!"
+              exit 0
+            fi
+            count=$((count + 1))
+            sleep 10
+          done
+          echo "Application health check failed after $max_retries attempts"
+          exit 1
+
+      - name: Output Deployment Information
+        if: success()
+        working-directory: ./terraform
+        run: |
+          echo "Application URL: https://$(terraform output -raw alb_dns_name)"
+          echo "Deployment ID: ${{ github.run_id }}"
+          echo "Commit: ${{ github.sha }}"
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "::error::Infrastructure deployment failed. Check the logs for details."
+
+      - name: Generate and Store Secret Key
+        run: |
+          # Generate a random secret key
+          SECRET_KEY=$(openssl rand -base64 32)
+
+          # Store the secret key in AWS Secrets Manager
+          aws secretsmanager create-secret --name flask-secret-key --secret-string "$SECRET_KEY" || \
+          aws secretsmanager update-secret --secret-id flask-secret-key --secret-string "$SECRET_KEY"
+
+          # Override the terraform.tfvars file
+          echo "secret_key = \"$SECRET_KEY\"" >> terraform/terraform.tfvars

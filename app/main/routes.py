@@ -117,3 +117,9 @@ def apply_sorting(query, sort_by, sort_order):
             Restaurant.name.desc() if sort_order == "desc" else Restaurant.name.asc()
         )
     return query
+
+
+@bp.route("/health")
+def health_check():
+    """Health check endpoint for AWS ALB."""
+    return "ok", 200
