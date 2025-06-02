@@ -31,7 +31,6 @@ resource "aws_lambda_function" "app" {
   environment {
     variables = {
       DATABASE_URL = var.database_url
-      SECRET_KEY   = var.secret_key
     }
   }
 }
@@ -90,16 +89,19 @@ resource "aws_ecr_repository" "app" {
 }
 
 resource "aws_acmpca_certificate_authority" "private_ca" {
-  type              = "ROOT"
-  key_algorithm     = "RSA_2048"
-  signing_algorithm = "SHA256WITHRSA"
-  subject {
-    common_name         = "${var.app_name}-${var.environment} Private CA"
-    organization        = "Morgan Davis"
-    organizational_unit = "IT"
-    country             = "US"
-    state               = "Texas"
-    locality            = "Dallas"
+  type = "SUBORDINATE"
+
+  certificate_authority_configuration {
+    key_algorithm     = "RSA_2048"
+    signing_algorithm = "SHA256WITHRSA"
+    subject {
+      common_name         = "${var.app_name}-${var.environment} Private CA"
+      organization        = "Morgan Davis"
+      organizational_unit = "IT"
+      country             = "US"
+      state               = "Texas"
+      locality            = "Dallas"
+    }
   }
 
   tags = {
@@ -110,7 +112,6 @@ resource "aws_acmpca_certificate_authority" "private_ca" {
 
 resource "aws_acm_certificate" "app" {
   domain_name               = var.domain_name
-  validation_method         = "NONE"
   certificate_authority_arn = aws_acmpca_certificate_authority.private_ca.arn
 
   tags = {

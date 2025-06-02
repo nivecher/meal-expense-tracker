@@ -22,19 +22,8 @@ variable "database_url" {
   sensitive   = true
 }
 
-variable "secret_key" {
-  description = "Secret key for Flask application"
-  type        = string
-  sensitive   = true
-}
-
 variable "image_tag" {
   description = "Docker image tag for the Lambda function"
-  type        = string
-}
-
-variable "certificate_arn" {
-  description = "ARN of the ACM certificate for HTTPS"
   type        = string
 }
 
