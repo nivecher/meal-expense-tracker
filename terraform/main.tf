@@ -88,3 +88,33 @@ resource "aws_iam_role_policy_attachment" "lambda_exec_policy" {
 resource "aws_ecr_repository" "app" {
   name = var.app_name
 }
+
+resource "aws_acmpca_certificate_authority" "private_ca" {
+  type              = "ROOT"
+  key_algorithm     = "RSA_2048"
+  signing_algorithm = "SHA256WITHRSA"
+  subject {
+    common_name         = "${var.app_name}-${var.environment} Private CA"
+    organization        = "Morgan Davis"
+    organizational_unit = "IT"
+    country             = "US"
+    state               = "Texas"
+    locality            = "Dallas"
+  }
+
+  tags = {
+    Environment = var.environment
+    Application = var.app_name
+  }
+}
+
+resource "aws_acm_certificate" "app" {
+  domain_name               = var.domain_name
+  validation_method         = "NONE"
+  certificate_authority_arn = aws_acmpca_certificate_authority.private_ca.arn
+
+  tags = {
+    Environment = var.environment
+    Application = var.app_name
+  }
+}

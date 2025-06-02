@@ -7,3 +7,5 @@ database_url = "sqlite:////app/instance/meal_expenses.db"
 #secret_key   = "dev-secret-key-replace-in-production"
 
 image_tag = "latest"
+
+domain_name = "nivecher.com"
