@@ -2,7 +2,7 @@ name: Production Deployment
 
 on:
   workflow_run:
-    workflows: ["Testing Build"]
+    workflows: ["Infrastructure Deployment"]
     types:
       - completed
     branches:
