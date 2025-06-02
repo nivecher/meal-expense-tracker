@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'IAM Role for GitHub Actions to interact with ECR, ECS, and other AWS services'
+Description: 'IAM Role for GitHub Actions to interact with ECR and other AWS services'
 
 Parameters:
   GitHubOrg:
@@ -28,9 +28,8 @@ Resources:
                 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com'
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
-        - arn:aws:iam::aws:policy/AmazonECS_FullAccess
       Policies:
-        - PolicyName: GitHubActionsECSDeployment
+        - PolicyName: GitHubActionsDeployment
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -45,23 +44,29 @@ Resources:
                   - ecr:UploadLayerPart
                   - ecr:CompleteLayerUpload
                   - ecr:PutImage
-                  # ECS permissions
-                  - ecs:DescribeServices
-                  - ecs:UpdateService
-                  - ecs:RegisterTaskDefinition
-                  - ecs:ListTaskDefinitions
-                  - ecs:DescribeTaskDefinition
-                  - ecs:DeregisterTaskDefinition
-                  - ecs:ListClusters
-                  - ecs:DescribeClusters
-                  - ecs:ListServices
-                  - ecs:DescribeServices
-                  - ecs:ListTasks
-                  - ecs:DescribeTasks
-                  - ecs:StopTask
-                  - ecs:RunTask
                   # IAM permissions for task execution role
                   - iam:PassRole
+                  # DynamoDB permissions for Terraform state locking
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:DescribeTable
+                  # Lambda permissions
+                  - lambda:CreateFunction
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                  - lambda:DeleteFunction
+                  - lambda:InvokeFunction
+                  - lambda:GetFunction
+                  - lambda:ListFunctions
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                  # S3 permissions for Terraform backend
+                  - s3:ListBucket
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:GetBucketLocation
                 Resource: '*'
 
 Outputs:
