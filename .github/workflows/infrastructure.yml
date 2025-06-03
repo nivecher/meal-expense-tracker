@@ -59,7 +59,6 @@ jobs:
         run: |
           terraform plan \
             -var="environment=prod" \
-            -var="database_url=${{ secrets.DATABASE_URL }}" \
             -out=tfplan
         
       - name: Terraform Apply
