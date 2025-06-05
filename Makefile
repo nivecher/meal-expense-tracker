@@ -53,5 +53,20 @@ lint:
 	black .
 	flake8 .
 
+lint-infra:
+	checkov -d terraform --quiet
+
+check-infra:
+	terraform fmt -check
+	terraform validate
+	# TODO checkov -d terraform --quiet
+
 load-test:
 	python3 -m locust -f tests/load/locustfile.py --headless -u 10 -r 2 -t 30s --host=http://localhost:5000
+
+setup-github-actions:
+	aws cloudformation deploy \
+	  --template-file cloudformation/github-actions-role.yml \
+	  --stack-name github-actions-role \
+	  --capabilities CAPABILITY_NAMED_IAM \
+	  --parameter-overrides GitHubOrg=$(GITHUB_ORG) RepositoryName=$(REPO_NAME)

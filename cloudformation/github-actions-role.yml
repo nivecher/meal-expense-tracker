@@ -67,6 +67,60 @@ Resources:
                   - s3:PutObject
                   - s3:DeleteObject
                   - s3:GetBucketLocation
+                  # EC2 permissions for VPC setup
+                  - ec2:CreateVpc
+                  - ec2:CreateSubnet
+                  - ec2:CreateRouteTable
+                  - ec2:AssociateRouteTable
+                  - ec2:CreateSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:CreateVpcEndpoint
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeSubnets
+                  - ec2:DescribeRouteTables
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeVpcEndpoints
+                  # RDS permissions
+                  - rds:CreateDBInstance
+                  - rds:ModifyDBInstance
+                  - rds:DeleteDBInstance
+                  - rds:DescribeDBInstances
+                  - rds:CreateDBSubnetGroup
+                  - rds:DescribeDBSubnetGroups
+                  # Secrets Manager permissions
+                  - secretsmanager:CreateSecret
+                  - secretsmanager:PutSecretValue
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:DeleteSecret
+                  # KMS permissions
+                  - kms:CreateKey
+                  - kms:DescribeKey
+                  - kms:EnableKeyRotation
+                  - kms:ListAliases
+                  - kms:CreateAlias
+                  - kms:DeleteAlias
+                  # API Gateway permissions
+                  - apigateway:CreateApi
+                  - apigateway:UpdateApi
+                  - apigateway:DeleteApi
+                  - apigateway:CreateIntegration
+                  - apigateway:UpdateIntegration
+                  - apigateway:DeleteIntegration
+                  - apigateway:CreateRoute
+                  - apigateway:UpdateRoute
+                  - apigateway:DeleteRoute
+                  - apigateway:CreateStage
+                  - apigateway:UpdateStage
+                  - apigateway:DeleteStage
+                  # ACM permissions
+                  - acm:RequestCertificate
+                  - acm:DescribeCertificate
+                  - acm:DeleteCertificate
+                  - acm-pca:CreateCertificateAuthority
+                  - acm-pca:DescribeCertificateAuthority
+                  - acm-pca:DeleteCertificateAuthority
                 Resource: '*'
 
 Outputs:

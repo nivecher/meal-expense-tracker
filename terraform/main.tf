@@ -6,7 +6,9 @@ terraform {
     }
   }
 
-  backend "s3" {}
+  backend "s3" {
+    use_locking = true
+  }
 }
 
 provider "aws" {
@@ -19,9 +21,14 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
 }
 
+data "aws_availability_zones" "available" {}
+
 # VPC for the application
 resource "aws_vpc" "app_vpc" {
   cidr_block = "10.0.0.0/16"
+
+  enable_dns_support   = true
+  enable_dns_hostnames = true
 
   tags = {
     Name        = "${var.app_name}-vpc"
@@ -30,7 +37,8 @@ resource "aws_vpc" "app_vpc" {
 }
 
 resource "aws_subnet" "app_private_subnet" {
-  count = 2
+  count             = 2
+  availability_zone = element(data.aws_availability_zones.available.names, count.index)
 
   vpc_id                  = aws_vpc.app_vpc.id
   cidr_block              = cidrsubnet(aws_vpc.app_vpc.cidr_block, 8, count.index)
@@ -45,10 +53,8 @@ resource "aws_subnet" "app_private_subnet" {
 resource "aws_route_table" "app_private_route_table" {
   vpc_id = aws_vpc.app_vpc.id
 
-  route {
-    cidr_block         = "0.0.0.0/0"
-    transit_gateway_id = aws_vpc_endpoint.api_gateway.id
-  }
+  # No default route to 0.0.0.0/0 via VPC endpoint, as this is not supported.
+  # Add a NAT Gateway or Internet Gateway route here if outbound internet access is required.
 
   tags = {
     Name        = "${var.app_name}-private-route-table"
@@ -133,9 +139,18 @@ resource "aws_iam_role_policy_attachment" "lambda_exec_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_vpc_access_policy" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
 # ECR Repository
 resource "aws_ecr_repository" "app" {
   name = var.app_name
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_acmpca_certificate_authority" "private_ca" {
@@ -173,7 +188,7 @@ resource "aws_acm_certificate" "app" {
 resource "aws_db_instance" "postgres" {
   allocated_storage      = 20
   engine                 = "postgres"
-  engine_version         = "14.5"
+  engine_version         = "17.5"
   instance_class         = "db.t3.micro"
   username               = var.db_username
   password               = random_password.db_password.result
@@ -264,12 +279,10 @@ resource "random_password" "db_password" {
 }
 
 resource "aws_vpc_endpoint" "api_gateway" {
-  vpc_id       = aws_vpc.app_vpc.id
-  service_name = "com.amazonaws.${var.aws_region}.execute-api"
-
+  vpc_id              = aws_vpc.app_vpc.id
+  service_name        = "com.amazonaws.${var.aws_region}.execute-api"
+  vpc_endpoint_type   = "Interface"
   private_dns_enabled = true
-
-  subnet_ids = aws_subnet.app_private_subnet[*].id
 
   tags = {
     Name        = "${var.app_name}-api-gateway-endpoint"
