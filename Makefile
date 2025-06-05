@@ -8,6 +8,8 @@ CONTAINER_NAME = meal-expense-app
 IMAGE_NAME = meal-expense-tracker
 PORT = 5000
 VOLUME_NAME = meal-expense-db
+GITHUB_ORG = nivecher
+REPO_NAME = meal-expense-tracker
 
 # Build the Docker image
 build:
