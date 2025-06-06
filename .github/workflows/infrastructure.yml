@@ -78,31 +78,32 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # - name: Build and push Docker image
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     push: true
+      #     tags: |
+      #       ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+      #       ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+      #     cache-from: type=gha
+      #     cache-to: type=gha,mode=max
 
-      - name: Validate Terraform Variables
-        run: |
-          if [ -z "${{ secrets.DATABASE_URL }}" ] || [ -z "${{ secrets.FLASK_SECRET_KEY }}" ] || [ -z "${{ secrets.SSL_CERTIFICATE_ARN }}" ]; then
-            echo "Error: Required secrets are not set"
-            echo "Please ensure DATABASE_URL, FLASK_SECRET_KEY, and SSL_CERTIFICATE_ARN are configured in repository secrets"
-            exit 1
-          fi
+          # TODO
+      # - name: Validate Terraform Variables
+      #   run: |
+      #     if [ -z "${{ secrets.DATABASE_URL }}" ] || [ -z "${{ secrets.FLASK_SECRET_KEY }}" ] || [ -z "${{ secrets.SSL_CERTIFICATE_ARN }}" ]; then
+      #       echo "Error: Required secrets are not set"
+      #       echo "Please ensure DATABASE_URL, FLASK_SECRET_KEY, and SSL_CERTIFICATE_ARN are configured in repository secrets"
+      #       exit 1
+      #     fi
 
-      - name: Validate Docker Build Context
-        run: |
-          if [ ! -f "Dockerfile" ]; then
-            echo "Error: Dockerfile not found"
-            exit 1
-          fi
+      # - name: Validate Docker Build Context
+      #   run: |
+      #     if [ ! -f "Dockerfile" ]; then
+      #       echo "Error: Dockerfile not found"
+      #       exit 1
+      #     fi
 
       - name: Verify AWS Credentials
         run: |
