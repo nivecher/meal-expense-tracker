@@ -88,13 +88,13 @@ jobs:
           # Add your smoke test commands here
           echo "Running smoke tests..."
 
-      - name: Notify deployment status
-        if: always()
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: deployments
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: Production Deployment
-          SLACK_MESSAGE: 'Deployment to production ${{ job.status }} for version ${{ steps.get_version.outputs.version }}'
-          SLACK_FOOTER: 'GitHub Actions'
+      # - name: Notify deployment status
+      #   if: always()
+      #   uses: rtCamp/action-slack-notify@v2
+      #   env:
+      #     SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+      #     SLACK_CHANNEL: deployments
+      #     SLACK_COLOR: ${{ job.status }}
+      #     SLACK_TITLE: Production Deployment
+      #     SLACK_MESSAGE: 'Deployment to production ${{ job.status }} for version ${{ steps.get_version.outputs.version }}'
+      #     SLACK_FOOTER: 'GitHub Actions'
