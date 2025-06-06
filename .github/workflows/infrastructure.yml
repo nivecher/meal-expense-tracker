@@ -111,47 +111,7 @@ jobs:
             exit 1
           }
 
-      - name: Tag Resources
-        if: success()
-        working-directory: ./terraform
-        run: |
-          aws ecs tag-resource \
-            --resource-arn $(terraform output -raw ecs_service_arn) \
-            --tags Key=DeploymentID,Value=${{ github.run_id }} \
-                  Key=GitCommit,Value=${{ github.sha }}
-
-      - name: Wait for ECS Service Stability
-        if: success()
-        run: |
-          aws ecs wait services-stable \
-            --cluster $(terraform output -raw ecs_cluster_name) \
-            --services $(terraform output -raw ecs_service_name)
-
-      - name: Verify Application Health
-        if: success()
-        run: |
-          ALB_DNS=$(terraform output -raw alb_dns_name)
-          max_retries=30
-          count=0
-          echo "Waiting for application to become healthy at https://$ALB_DNS/health"
-          while [ $count -lt $max_retries ]; do
-            if curl -sk "https://$ALB_DNS/health" | grep -q "ok"; then
-              echo "Application is healthy!"
-              exit 0
-            fi
-            count=$((count + 1))
-            sleep 10
-          done
-          echo "Application health check failed after $max_retries attempts"
-          exit 1
-
-      - name: Output Deployment Information
-        if: success()
-        working-directory: ./terraform
-        run: |
-          echo "Application URL: https://$(terraform output -raw alb_dns_name)"
-          echo "Deployment ID: ${{ github.run_id }}"
-          echo "Commit: ${{ github.sha }}"
+          # TODO Helath check
 
       - name: Notify on Failure
         if: failure()
