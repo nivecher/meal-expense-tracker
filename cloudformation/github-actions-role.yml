@@ -28,11 +28,10 @@ Resources:
                 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com'
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
-        - arn:aws:iam::aws:policy/AmazonECRFullAccess
-        - arn:aws:iam::aws:policy/AmazonLambdaFullAccess
-        - arn:aws:iam::aws:policy/AmazonAPIGatewayFullAccess
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+        - arn:aws:iam::aws:policy/AmazonAPIGatewayAdministrator
         - arn:aws:iam::aws:policy/AmazonRDSFullAccess
-        - arn:aws:iam::aws:policy/AmazonSecretsManagerFullAccess
+        - arn:aws:iam::aws:policy/SecretsManagerReadWrite
       Policies:
         - PolicyName: GitHubActionsDeployment
           PolicyDocument:
@@ -72,22 +71,23 @@ Resources:
                   - ec2:Get*
                   # KMS permissions
                   - kms:CreateKey
-                  - kms:DescribeKey
-                  - kms:EnableKeyRotation
-                  - kms:ListAliases
                   - kms:CreateAlias
                   - kms:DeleteAlias
+                  - kms:Describe*
+                  - kms:EnableKeyRotation
+                  - kms:Get*
+                  - kms:List*
                   # ACM permissions
                   - acm:RequestCertificate
-                  - acm:DescribeCertificate
                   - acm:DeleteCertificate
-                  - acm:ListCertificates
-                  - acm:GetCertificate
-                  - acm:ImportCertificate
                   - acm:DeleteCertificateAuthority
+                  - acm:Describe*
+                  - acm:Get*
+                  - acm:ImportCertificate
+                  - acm:List*
                 Resource: '*'
 
-Outputs:sour
+Outputs:
   RoleARN:
     Description: ARN of the GitHub Actions IAM Role
     Value: !GetAtt GitHubActionsRole.Arn

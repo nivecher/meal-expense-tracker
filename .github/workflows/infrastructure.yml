@@ -71,17 +71,6 @@ jobs:
         working-directory: ./terraform
         run: terraform apply -auto-approve tfplan
 
-      - name: Export Infrastructure Values
-        working-directory: ./terraform
-        run: |
-          # Export values as GitHub Actions environment variables
-          echo "ECS_EXECUTION_ROLE_ARN=$(terraform output -raw ecs_execution_role_arn)" >> $GITHUB_ENV
-          echo "ECS_TASK_ROLE_ARN=$(terraform output -raw ecs_task_role_arn)" >> $GITHUB_ENV
-          echo "DATABASE_URL_ARN=$(terraform output -raw database_url_secret_arn)" >> $GITHUB_ENV
-          echo "SECRET_KEY_ARN=$(terraform output -raw secret_key_secret_arn)" >> $GITHUB_ENV
-          echo "SUBNET_IDS=$(terraform output -raw private_subnet_ids)" >> $GITHUB_ENV
-          echo "SECURITY_GROUP_IDS=$(terraform output -raw ecs_security_group_id)" >> $GITHUB_ENV
-
       - name: Update GitHub Secrets
         uses: gliech/create-github-secret-action@v1
         with:
