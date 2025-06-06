@@ -3,4 +3,4 @@ environment = "prod"
 app_name    = "meal-expense-tracker"
 
 image_tag   = "latest"
-domain_name = "nivecher.com"
+domain_name = "*.nivecher.com"

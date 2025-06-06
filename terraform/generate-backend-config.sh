@@ -8,7 +8,7 @@ cat > backend.hcl << EOF
 bucket         = "meal-expense-tracker-tfstate-${AWS_ACCOUNT_ID}"
 key            = "prod/terraform.tfstate"
 region         = "us-east-1"
-use_locking    = true
+dynamodb_table = "meal-expense-tracker-tflock"
 encrypt        = true
 EOF
 

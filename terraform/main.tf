@@ -153,31 +153,9 @@ resource "aws_ecr_repository" "app" {
   }
 }
 
-resource "aws_acmpca_certificate_authority" "private_ca" {
-  type = "SUBORDINATE"
-
-  certificate_authority_configuration {
-    key_algorithm     = "RSA_2048"
-    signing_algorithm = "SHA256WITHRSA"
-    subject {
-      common_name         = "${var.app_name}-${var.environment} Private CA"
-      organization        = "Morgan Davis"
-      organizational_unit = "IT"
-      country             = "US"
-      state               = "Texas"
-      locality            = "Dallas"
-    }
-  }
-
-  tags = {
-    Environment = var.environment
-    Application = var.app_name
-  }
-}
-
 resource "aws_acm_certificate" "app" {
   domain_name               = var.domain_name
-  certificate_authority_arn = aws_acmpca_certificate_authority.private_ca.arn
+  validation_method         = "DNS"
 
   tags = {
     Environment = var.environment
