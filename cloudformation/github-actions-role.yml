@@ -28,6 +28,11 @@ Resources:
                 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com'
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
+        - arn:aws:iam::aws:policy/AmazonECRFullAccess
+        - arn:aws:iam::aws:policy/AmazonLambdaFullAccess
+        - arn:aws:iam::aws:policy/AmazonAPIGatewayFullAccess
+        - arn:aws:iam::aws:policy/AmazonRDSFullAccess
+        - arn:aws:iam::aws:policy/AmazonSecretsManagerFullAccess
       Policies:
         - PolicyName: GitHubActionsDeployment
           PolicyDocument:
@@ -35,15 +40,6 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  # ECR permissions
-                  - ecr:GetAuthorizationToken
-                  - ecr:BatchCheckLayerAvailability
-                  - ecr:GetDownloadUrlForLayer
-                  - ecr:BatchGetImage
-                  - ecr:InitiateLayerUpload
-                  - ecr:UploadLayerPart
-                  - ecr:CompleteLayerUpload
-                  - ecr:PutImage
                   # IAM permissions for task execution role
                   - iam:PassRole
                   # DynamoDB permissions for Terraform state locking
@@ -51,22 +47,15 @@ Resources:
                   - dynamodb:GetItem
                   - dynamodb:DeleteItem
                   - dynamodb:DescribeTable
-                  # Lambda permissions
-                  - lambda:CreateFunction
-                  - lambda:UpdateFunctionCode
-                  - lambda:UpdateFunctionConfiguration
-                  - lambda:DeleteFunction
-                  - lambda:InvokeFunction
-                  - lambda:GetFunction
-                  - lambda:ListFunctions
-                  - lambda:TagResource
-                  - lambda:UntagResource
                   # S3 permissions for Terraform backend
                   - s3:ListBucket
                   - s3:GetObject
                   - s3:PutObject
                   - s3:DeleteObject
                   - s3:GetBucketLocation
+                  - s3:Describe*
+                  - s3:Get*
+                  - s3:Tag*
                   # EC2 permissions for VPC setup
                   - ec2:CreateVpc
                   - ec2:CreateSubnet
@@ -76,24 +65,11 @@ Resources:
                   - ec2:AuthorizeSecurityGroupIngress
                   - ec2:AuthorizeSecurityGroupEgress
                   - ec2:CreateVpcEndpoint
-                  - ec2:DescribeVpcs
-                  - ec2:DescribeSubnets
-                  - ec2:DescribeRouteTables
-                  - ec2:DescribeSecurityGroups
-                  - ec2:DescribeVpcEndpoints
-                  # RDS permissions
-                  - rds:CreateDBInstance
-                  - rds:ModifyDBInstance
-                  - rds:DeleteDBInstance
-                  - rds:DescribeDBInstances
-                  - rds:CreateDBSubnetGroup
-                  - rds:DescribeDBSubnetGroups
-                  # Secrets Manager permissions
-                  - secretsmanager:CreateSecret
-                  - secretsmanager:PutSecretValue
-                  - secretsmanager:GetSecretValue
-                  - secretsmanager:DescribeSecret
-                  - secretsmanager:DeleteSecret
+                  - ec2:ModifyVpcAttribute
+                  - ec2:CreateTags
+                  - ec2:DeleteTags
+                  - ec2:Describe*
+                  - ec2:Get*
                   # KMS permissions
                   - kms:CreateKey
                   - kms:DescribeKey
@@ -101,29 +77,17 @@ Resources:
                   - kms:ListAliases
                   - kms:CreateAlias
                   - kms:DeleteAlias
-                  # API Gateway permissions
-                  - apigateway:CreateApi
-                  - apigateway:UpdateApi
-                  - apigateway:DeleteApi
-                  - apigateway:CreateIntegration
-                  - apigateway:UpdateIntegration
-                  - apigateway:DeleteIntegration
-                  - apigateway:CreateRoute
-                  - apigateway:UpdateRoute
-                  - apigateway:DeleteRoute
-                  - apigateway:CreateStage
-                  - apigateway:UpdateStage
-                  - apigateway:DeleteStage
                   # ACM permissions
                   - acm:RequestCertificate
                   - acm:DescribeCertificate
                   - acm:DeleteCertificate
-                  - acm-pca:CreateCertificateAuthority
-                  - acm-pca:DescribeCertificateAuthority
-                  - acm-pca:DeleteCertificateAuthority
+                  - acm:ListCertificates
+                  - acm:GetCertificate
+                  - acm:ImportCertificate
+                  - acm:DeleteCertificateAuthority
                 Resource: '*'
 
-Outputs:
+Outputs:sour
   RoleARN:
     Description: ARN of the GitHub Actions IAM Role
     Value: !GetAtt GitHubActionsRole.Arn
