@@ -86,6 +86,10 @@ jobs:
         run: |
           PYTHONPATH=. pytest --cov=app tests/
 
+      - name: Install load testing dependencies
+        run: |
+          pip install locust
+
       - name: Run load tests
         run: |
           make load-test
