@@ -1,24 +1,15 @@
-name: Testing Build
+name: Test
 
 on:
   workflow_run:
-    workflows: ["Development Build"]
+    workflows: ["Build"]
     types:
       - completed
     branches:
       - main
   workflow_dispatch:
 
-  push:
-    paths:
-      - 'tests/**'
-      - '.github/workflows/test.yml'
-      - 'Makefile'
-      - 'pytest.ini'
-      - 'requirements-dev.txt'
-      - 'requirements-dev.in'
-      - 'requirements.txt'
-      - 'requirements.in'
+
 
   pull_request:
     paths:
@@ -59,7 +50,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.13'
           cache: 'pip'
 
       - name: Install dependencies
@@ -93,9 +84,9 @@ jobs:
             --name meal-expense-app \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
 
-      - name: Wait for app to be ready
+      - name: Run tests
         run: |
-          for i in {1..30}; do curl -fs http://localhost:5000/ && break || sleep 1; done
+          PYTHONPATH=. pytest --cov=app tests/
 
       - name: Run load tests
         run: |
@@ -105,50 +96,6 @@ jobs:
         if: always()
         run: |
           docker rm -f meal-expense-app
-
-      - name: Run security scans
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-
-      - name: Configure Git
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "github-actions@github.com"
-
-      - name: Check for existing tags
-        id: check_tags
-        run: |
-          if ! git tag | grep -q "^v"; then
-            echo "Creating initial tag v0.1.0"
-            git tag -a "v0.1.0" -m "Initial release"
-            git push origin v0.1.0
-          fi
-
-      - name: Get commit message
-        id: commit_message
-        run: |
-          MSG=$(git log -1 --pretty=format:%s)
-          echo "message=$MSG" >> $GITHUB_OUTPUT
-          echo "Last commit message: $MSG"
-
-      - name: Get next version
-        id: semver
-        uses: ietf-tools/semver-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: main
-          fallbackTag: 'v0.1.0'
-          minorList: 'feat,feature,minor'
-          patchList: 'fix,bugfix,perf,refactor,test,tests,chore,docs'
-          noNewCommitBehavior: 'patch'
-          noVersionBumpBehavior: 'patch'
-          skipInvalidTags: true
 
       - name: Determine version
         id: version

@@ -2,12 +2,11 @@ name: Infrastructure Deployment
 
 on:
   workflow_run:
-    workflows: ["Testing Build"]
+    workflows: ["Release"]
     types:
       - completed
     branches:
       - main
-  workflow_dispatch:
 
   push:
     paths:

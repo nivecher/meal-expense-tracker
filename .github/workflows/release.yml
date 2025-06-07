@@ -1,13 +1,12 @@
-name: Version Management
+name: Release
 
 on:
   workflow_run:
-    workflows: ["Testing Build"]
+    workflows: ["Test"]
     types:
       - completed
     branches:
       - main
-
   workflow_dispatch:
     inputs:
       version:
@@ -24,7 +23,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  version:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -37,29 +36,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
+      - name: Get version from pyproject.toml
+        id: get_version
         run: |
-          python -m pip install --upgrade pip
-          pip install toml
-
-      - name: Update version in pyproject.toml
-        run: |
-          python scripts/update-version.py
-
-      - name: Create version tag
-        run: |
-          # Get current version from pyproject.toml
+          # Get version from pyproject.toml
           VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
 
           # Add 'v' prefix if not present
           if [[ $VERSION != v* ]]; then
             VERSION="v$VERSION"
           fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+      - name: Create version tag
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
 
           # Create tag
           git tag -a "$VERSION" -m "Release $VERSION"
@@ -72,12 +65,3 @@ jobs:
           workflow: "Production Deployment"
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: main
-
-      - name: Update Docker image tags
-        run: |
-          # Get current version from pyproject.toml
-          VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-
-          # Tag and push Docker image
-          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
