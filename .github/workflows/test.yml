@@ -144,7 +144,7 @@ jobs:
           curl -s http://localhost:5000/health || exit 1
 
       - name: Run security scanning
-        uses: docker://owasp/zap2docker-stable:latest
+        uses: docker://owasp/zap2docker-stable:2.12.0
         with:
           args: -t http://localhost:5000 -r zap_report.html
 
