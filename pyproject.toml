@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meal-expense-tracker"
+version = "0.4.11"
+description = "A Flask-based web application for tracking meal expenses"
+authors = [
+    { name = "nivecher", email = "mtd37@hotmail.com" }
+]
+requires-python = ">=3.13.3"
+
+[tool.setuptools]
+packages = ['app']
+include-package-data = true
+zip-safe = false
+
+[project.urls]
+homepage = "https://github.com/nivecher/meal-expense-tracker"
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.13.3"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test"]
+python_functions = ["test_"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

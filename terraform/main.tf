@@ -26,14 +26,31 @@ data "aws_availability_zones" "available" {}
 # VPC for the application
 resource "aws_vpc" "app_vpc" {
   cidr_block = "10.0.0.0/16"
-
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-
   tags = {
     Name        = "${var.app_name}-vpc"
     Environment = var.environment
   }
+}
+
+# Restrict default security group to deny all traffic
+resource "aws_security_group_rule" "default_sg_egress" {
+  security_group_id = aws_vpc.app_vpc.default_security_group_id
+  type              = "egress"
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  from_port         = 0
+  to_port           = 0
+  description       = "Deny all outbound traffic by default"
+}
+
+resource "aws_security_group_rule" "default_sg_ingress" {
+  security_group_id = aws_vpc.app_vpc.default_security_group_id
+  type              = "ingress"
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  from_port         = 0
+  to_port           = 0
+  description       = "Deny all inbound traffic by default"
 }
 
 resource "aws_subnet" "app_private_subnet" {
@@ -69,6 +86,76 @@ resource "aws_route_table_association" "app_private_route_table_association" {
 }
 
 # Lambda function using Docker image from ECR
+resource "aws_lambda_function" "secret_rotation" {
+  function_name = "${var.app_name}-${var.environment}-secret-rotation"
+  role          = aws_iam_role.secret_rotation_exec.arn
+  package_type  = "Zip"
+  filename      = "secret_rotation.py"
+  handler       = "secret_rotation.lambda_handler"
+  runtime       = "python3.11"
+  timeout       = 30
+  memory_size   = 128
+
+  environment {
+    variables = {
+      AWS_REGION = var.aws_region
+    }
+  }
+
+  vpc_config {
+    security_group_ids = [aws_security_group.lambda_sg.id]
+    subnet_ids         = aws_subnet.app_private_subnet[*].id
+  }
+}
+
+resource "aws_iam_role" "secret_rotation_exec" {
+  name = "${var.app_name}-${var.environment}-secret-rotation-exec"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "secret_rotation_exec_policy" {
+  role       = aws_iam_role.secret_rotation_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy_attachment" "secret_rotation_vpc_access_policy" {
+  role       = aws_iam_role.secret_rotation_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+resource "aws_iam_role_policy" "secret_rotation_policy" {
+  name = "${var.app_name}-${var.environment}-secret-rotation-policy"
+  role = aws_iam_role.secret_rotation_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecretVersionStage",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = aws_secretsmanager_secret.db_password.arn
+      }
+    ]
+  })
+}
+
 resource "aws_lambda_function" "app" {
   function_name = "${var.app_name}-${var.environment}"
   role          = aws_iam_role.lambda_exec.arn
@@ -205,13 +292,15 @@ resource "aws_security_group" "db_sg" {
     to_port     = 5432
     protocol    = "tcp"
     cidr_blocks = ["10.0.0.0/16"]
+    description = "Allow PostgreSQL traffic from private subnets"
   }
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+    description = "Allow PostgreSQL traffic to private subnets"
   }
 
   tags = {
@@ -236,6 +325,14 @@ resource "aws_secretsmanager_secret" "db_password" {
   tags = {
     Environment = var.environment
     Application = var.app_name
+  }
+}
+
+resource "aws_secretsmanager_secret_rotation" "db_password" {
+  secret_id           = aws_secretsmanager_secret.db_password.id
+  rotation_lambda_arn = aws_lambda_function.secret_rotation.arn
+  rotation_rules {
+    automatically_after_days = 90
   }
 }
 
@@ -276,13 +373,15 @@ resource "aws_security_group" "lambda_sg" {
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["10.0.0.0/16"]
+    description = "Allow HTTPS traffic from private subnets"
   }
 
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
+    description = "Allow HTTPS traffic to private subnets"
   }
 
   tags = {

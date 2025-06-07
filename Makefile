@@ -21,7 +21,7 @@ run:
 
 # Run the application locally using Python
 run-local:
-	PYTHONPATH=. FLASK_APP=app.py FLASK_ENV=development flask run --port $(PORT)
+	PYTHONPATH=. FLASK_APP=wsgi.py FLASK_ENV=development flask run --port $(PORT)
 
 # Stop and remove the container
 stop:
@@ -49,19 +49,21 @@ restart: stop run
 restart-logs: restart logs
 
 test:
-	PYTHONPATH=. pytest --cov=app tests/
+	PYTHONPATH=. pytest tests/
 
 lint:
 	black .
 	flake8 .
 
 lint-infra:
-	checkov -d terraform --quiet
+	cd terraform && terraform fmt
 
 check-infra:
-	terraform fmt -check
-	terraform validate
-	# TODO checkov -d terraform --quiet
+	cd terraform && terraform fmt -check
+	cd terraform && terraform init -backend=false
+	cd terraform && terraform validate
+	checkov -d terraform --quiet
+	# checkov -d cloudformation --quiet
 
 load-test:
 	python3 -m locust -f tests/load/locustfile.py --headless -u 10 -r 2 -t 30s --host=http://localhost:5000

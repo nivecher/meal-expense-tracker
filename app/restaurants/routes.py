@@ -16,6 +16,57 @@ import csv
 from io import StringIO, BytesIO
 from app.restaurants import bp
 
+# Display names for restaurant types and cuisines
+RESTAURANT_TYPE_DISPLAY_NAMES = {
+    "sit_down": "Sit-down Restaurant",
+    "fast_food": "Fast Food",
+    "cafe": "Café",
+    "diner": "Diner",
+    "food_truck": "Food Truck",
+    "buffet": "Buffet",
+    "bar": "Bar/Pub",
+    "pub": "Bar/Pub",
+    "food_stand": "Food Stand",
+    "other": "Other",
+}
+
+CUISINE_DISPLAY_NAMES = {
+    "american": "American",
+    "mexican": "Mexican",
+    "italian": "Italian",
+    "chinese": "Chinese",
+    "japanese": "Japanese",
+    "indian": "Indian",
+    "mediterranean": "Mediterranean",
+    "thai": "Thai",
+    "vietnamese": "Vietnamese",
+    "greek": "Greek",
+    "korean": "Korean",
+    "french": "French",
+    "spanish": "Spanish",
+    "middle_eastern": "Middle Eastern",
+    "caribbean": "Caribbean",
+    "african": "African",
+    "latin_american": "Latin American",
+    "asian": "Asian",
+    "other": "Other",
+}
+
+
+def get_type_display_name(type_code):
+    """Get the display name for a restaurant type code."""
+    # Convert underscores to spaces and capitalize
+    formatted_code = type_code.replace("_", " ").title()
+    # Handle special cases
+    if type_code.lower() == "cafe":
+        return "Café"
+    return RESTAURANT_TYPE_DISPLAY_NAMES.get(type_code.lower(), formatted_code)
+
+
+def get_cuisine_display_name(cuisine_code):
+    """Get the display name for a cuisine code."""
+    return CUISINE_DISPLAY_NAMES.get(cuisine_code.lower(), cuisine_code.title())
+
 
 @bp.route("/")
 @login_required
@@ -96,6 +147,8 @@ def list_restaurants():
         cities=cities,
         types=types,
         price_ranges=price_ranges,
+        get_cuisine_display_name=get_cuisine_display_name,
+        get_type_display_name=get_type_display_name,
     )
 
 

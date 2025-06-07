@@ -41,7 +41,7 @@
                             <span class="input-group-text bg-white">
                                 <i class="fas fa-search text-muted"></i>
                             </span>
-                            <input type="text" class="form-control" id="search" name="search" 
+                            <input type="text" class="form-control" id="search" name="search"
                                    placeholder="Search restaurant, city, notes, or description"
                                    value="{{ request.args.get('search', '') }}">
                         </div>
@@ -76,12 +76,12 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <label for="start_date" class="form-label">Start Date</label>
-                                <input type="date" class="form-control" id="start_date" name="start_date" 
+                                <input type="date" class="form-control" id="start_date" name="start_date"
                                        value="{{ request.args.get('start_date', '') }}">
                             </div>
                             <div class="col-md-6">
                                 <label for="end_date" class="form-label">End Date</label>
-                                <input type="date" class="form-control" id="end_date" name="end_date" 
+                                <input type="date" class="form-control" id="end_date" name="end_date"
                                        value="{{ request.args.get('end_date', '') }}">
                             </div>
                         </div>
@@ -171,7 +171,7 @@
                         {% for expense in expenses %}
                         <tr>
                             <td>
-                                <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}" 
+                                <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
                                    class="text-decoration-none">
                                     {{ expense.date.strftime('%Y-%m-%d') }}
                                 </a>
@@ -180,7 +180,7 @@
                                 {% if expense.restaurant %}
                                     <span class="d-flex align-items-center">
                                         <i class="fas fa-utensils me-2"></i>
-                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}" 
+                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
                                            class="text-decoration-none">
                                             {{ expense.restaurant.full_name }}
                                         </a>
@@ -205,11 +205,11 @@
                             <td class="fw-bold">${{ "%.2f"|format(expense.amount) }}</td>
                             <td>
                                 <div class="btn-group">
-                                    <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}" 
+                                    <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
                                        class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    <button type="button" 
+                                    <button type="button"
                                             class="btn btn-sm btn-outline-danger"
                                             data-bs-toggle="modal"
                                             data-bs-target="#deleteModal{{ expense.id }}">

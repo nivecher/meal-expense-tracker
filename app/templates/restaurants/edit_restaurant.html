@@ -47,7 +47,7 @@
                             <h3 class="h5 mb-3">Basic Information</h3>
                             <div class="mb-3">
                                 <label for="name" class="form-label">Restaurant Name *</label>
-                                <input type="text" class="form-control" id="name" name="name" 
+                                <input type="text" class="form-control" id="name" name="name"
                                        value="{{ restaurant.name }}" required
                                        placeholder="Enter restaurant name"
                                        data-bs-toggle="tooltip" data-bs-placement="top"
@@ -295,14 +295,14 @@
             searchButton.addEventListener('click', function() {
                 const nameInput = document.getElementById('name');
                 const cityInput = document.getElementById('city');
-                
+
                 if (nameInput && nameInput.value) {
-                    const searchQuery = cityInput && cityInput.value 
+                    const searchQuery = cityInput && cityInput.value
                         ? `${nameInput.value}, ${cityInput.value}`
                         : nameInput.value;
-                    
+
                     googleAddressInput.value = searchQuery;
-                    
+
                     // Trigger the place_changed event
                     const event = new Event('place_changed');
                     autocomplete.addListener('place_changed', function() {

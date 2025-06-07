@@ -32,12 +32,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get latest version tag
+      - name: Get version from pyproject.toml
         id: get_version
         run: |
-          # Get latest tag and ensure we strip any 'v' prefix
-          VERSION=$(git describe --tags --abbrev=0)
-          VERSION=${VERSION#v}  # Remove v prefix
+          # Get version from pyproject.toml
+          VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Using version: $VERSION"
 
@@ -71,11 +70,11 @@ jobs:
           # Pull the tested image from GHCR (using version without v prefix)
           echo "Pulling version $VERSION from GHCR"
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
-          
+
           # Tag for ECR
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          
+
           # Push to ECR
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest

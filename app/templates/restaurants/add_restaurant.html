@@ -288,14 +288,14 @@
             searchButton.addEventListener('click', function() {
                 const nameInput = document.getElementById('name');
                 const cityInput = document.getElementById('city');
-                
+
                 if (nameInput && nameInput.value) {
-                    const searchQuery = cityInput && cityInput.value 
+                    const searchQuery = cityInput && cityInput.value
                         ? `${nameInput.value}, ${cityInput.value}`
                         : nameInput.value;
-                    
+
                     googleAddressInput.value = searchQuery;
-                    
+
                     // Trigger the place_changed event
                     const event = new Event('place_changed');
                     autocomplete.addListener('place_changed', function() {

@@ -1,0 +1,42 @@
+{% extends "main/base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">About Meal Expense Tracker</h2>
+    </div>
+    <div class="card-body">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12">
+                    <h4 class="mb-4">Application Information</h4>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title">Version</h5>
+                                    <p class="card-text">{{ app_version }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Features</h5>
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item">Track meal expenses</li>
+                                        <li class="list-group-item">Categorize expenses</li>
+                                        <li class="list-group-item">Restaurant management</li>
+                                        <li class="list-group-item">Expense filtering and sorting</li>
+                                        <li class="list-group-item">User authentication</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

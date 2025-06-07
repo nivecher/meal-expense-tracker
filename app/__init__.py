@@ -1,16 +1,37 @@
+import os
+import json
+import logging
+import boto3
+import flask
+import sqlalchemy
+import importlib.metadata
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from dotenv import load_dotenv
-import os
-import click
 from flask.cli import with_appcontext
-import boto3
-import json
+import click
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Version information
+try:
+    __version__ = importlib.metadata.version("meal-expense-tracker")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "development"
+
+version = {"app": __version__}
 
 # Load environment variables
-load_dotenv()
+try:
+    load_dotenv()
+    logger.info("Environment variables loaded successfully")
+except Exception as e:
+    logger.error(f"Failed to load environment variables: {str(e)}")
+    raise
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -20,18 +41,28 @@ login_manager.login_view = "auth.login"
 
 
 def create_app(config_class=None):
+    logger.info("Creating Flask application...")
     app = Flask(__name__)
 
     # Configure the app
     if config_class:
+        logger.info(f"Using config class: {config_class.__name__}")
         app.config.from_object(config_class)
     else:
+        logger.info("Using default configuration")
         app.config["SECRET_KEY"] = os.urandom(24)
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///meal_expenses.db"
         app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
         app.config["GOOGLE_MAPS_API_KEY"] = os.getenv("GOOGLE_MAPS_API_KEY")
+        app.config["SERVER_NAME"] = "localhost:5001"
+        logger.info(
+            f"Google Maps API Key: "
+            f"{'set' if app.config['GOOGLE_MAPS_API_KEY'] else 'not set'}"
+        )
+        logger.info("Server name: localhost:5001")
 
     # Initialize extensions with app
+    logger.info("Initializing extensions...")
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)

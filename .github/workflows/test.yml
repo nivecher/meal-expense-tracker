@@ -7,6 +7,29 @@ on:
       - completed
     branches:
       - main
+  workflow_dispatch:
+
+  push:
+    paths:
+      - 'tests/**'
+      - '.github/workflows/test.yml'
+      - 'Makefile'
+      - 'pytest.ini'
+      - 'requirements-dev.txt'
+      - 'requirements-dev.in'
+      - 'requirements.txt'
+      - 'requirements.in'
+
+  pull_request:
+    paths:
+      - 'tests/**'
+      - '.github/workflows/test.yml'
+      - 'Makefile'
+      - 'pytest.ini'
+      - 'requirements-dev.txt'
+      - 'requirements-dev.in'
+      - 'requirements.txt'
+      - 'requirements.in'
 
 env:
   REGISTRY: ghcr.io
@@ -152,11 +175,11 @@ jobs:
           VERSION=${{ steps.version.outputs.version }}
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Tagging version: $VERSION"
-          
+
           # Tag the image that passed tests with semantic version (without v prefix)
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
-          
+
           # Check if Git tag exists (with v prefix for Git tags only)
           if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
             git tag -a "v$VERSION" -m "Release version $VERSION"
@@ -185,10 +208,10 @@ jobs:
           release_name: Release v${{ steps.version.outputs.version }}
           body: |
             Release version ${{ steps.version.outputs.version }}
-            
+
             Changes:
             - ${{ steps.commit_message.outputs.message }}
-            
+
             This release has passed all tests and security scans.
           draft: false
           prerelease: false

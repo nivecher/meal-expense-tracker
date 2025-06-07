@@ -9,6 +9,18 @@ on:
       - main
   workflow_dispatch:
 
+  push:
+    paths:
+      - 'terraform/**'
+      - 'cloudformation/**'
+      - '.github/workflows/infrastructure.yml'
+
+  pull_request:
+    paths:
+      - 'terraform/**'
+      - 'cloudformation/**'
+      - '.github/workflows/infrastructure.yml'
+
 env:
   TF_VERSION: 1.5.0
   AWS_REGION: us-east-1
@@ -19,7 +31,7 @@ jobs:
   terraform:
     name: Deploy Infrastructure
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.ref != 'main') }}
     permissions:
       contents: read
       id-token: write
@@ -59,6 +71,10 @@ jobs:
       - name: Terraform Init
         working-directory: ./terraform
         run: terraform init -backend-config=backend.hcl
+
+      - name: Run Terraform Validate
+        working-directory: ./terraform
+        run: terraform validate -no-color
 
       - name: Terraform Plan
         working-directory: ./terraform

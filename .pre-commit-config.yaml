@@ -1,0 +1,43 @@
+repos:
+-   repo: https://github.com/psf/black
+    rev: 24.1.1
+    hooks:
+    -   id: black
+        language_version: python3
+        args: ['--check']
+
+-   repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+    -   id: flake8
+        exclude: cloudformation/
+
+-   repo: https://github.com/PyCQA/bandit
+    rev: 1.8.0
+    hooks:
+    -   id: bandit
+        exclude: tests/
+        files: app/
+
+-   repo: local
+    hooks:
+    -   id: validate-cloudformation
+        name: validate-cloudformation
+        entry: python scripts/validate_cloudformation.py
+        language: python
+        language_version: python3
+        additional_dependencies: [ruamel.yaml>=0.18.0]
+        types: [yaml]
+        files: cloudformation/.*\.yml$
+
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+    -   id: check-yaml
+        exclude: cloudformation/
+    -   id: check-added-large-files
+    -   id: check-merge-conflict
+    -   id: check-case-conflict
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-json

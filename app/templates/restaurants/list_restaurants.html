@@ -57,7 +57,9 @@
                         <select class="form-select" id="cuisine" name="cuisine">
                             <option value="">All Cuisines</option>
                             {% for c in cuisines|sort %}
-                            <option value="{{ c }}" {% if cuisine == c %}selected{% endif %}>{{ c }}</option>
+                            <option value="{{ c }}" {% if cuisine == c %}selected{% endif %}>
+                                {{ get_cuisine_display_name(c) }}
+                            </option>
                             {% endfor %}
                         </select>
                     </div>
@@ -75,7 +77,9 @@
                         <select class="form-select" id="type" name="type">
                             <option value="">All Types</option>
                             {% for t in types %}
-                            <option value="{{ t }}" {% if type_ == t %}selected{% endif %}>{{ t }}</option>
+                            <option value="{{ t }}" {% if type_ == t %}selected{% endif %}>
+                                {{ get_type_display_name(t) }}
+                            </option>
                             {% endfor %}
                         </select>
                     </div>
@@ -190,11 +194,11 @@
                                 <td>{{ restaurant.price_range }}</td>
                                 <td>
                                     <div class="btn-group">
-                                        <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}" 
+                                        <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
                                            class="btn btn-sm btn-outline-primary">
                                             <i class="fas fa-edit"></i>
                                         </a>
-                                        <button type="button" 
+                                        <button type="button"
                                                 class="btn btn-sm btn-outline-danger"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#deleteModal{{ restaurant.id }}">

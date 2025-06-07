@@ -5,10 +5,10 @@ set -e
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 cat > backend.hcl << EOF
-bucket         = "meal-expense-tracker-tfstate-${AWS_ACCOUNT_ID}"
-key            = "prod/terraform.tfstate"
+bucket         = "meal-expense-tracker-terraform-state"
+key            = "terraform.tfstate"
 region         = "us-east-1"
-dynamodb_table = "meal-expense-tracker-tflock"
+dynamodb_table = "terraform-state-lock"
 encrypt        = true
 EOF
 

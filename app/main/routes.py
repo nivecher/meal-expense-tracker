@@ -1,10 +1,16 @@
 from flask import render_template, request
 from flask_login import login_required, current_user
-from app import db
+from app import db, version
 from app.main import bp
 from app.expenses.models import Expense
 from app.restaurants.models import Restaurant
 from datetime import datetime
+
+
+@bp.route("/about")
+@login_required
+def about():
+    return render_template("main/about.html", app_version=version["app"])
 
 
 @bp.route("/")
