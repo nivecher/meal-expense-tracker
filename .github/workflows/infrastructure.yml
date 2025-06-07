@@ -8,18 +8,6 @@ on:
     branches:
       - main
 
-  push:
-    paths:
-      - 'terraform/**'
-      - 'cloudformation/**'
-      - '.github/workflows/infrastructure.yml'
-
-  pull_request:
-    paths:
-      - 'terraform/**'
-      - 'cloudformation/**'
-      - '.github/workflows/infrastructure.yml'
-
 env:
   TF_VERSION: 1.5.0
   AWS_REGION: us-east-1
@@ -57,18 +45,26 @@ jobs:
           chmod +x setup-backend.sh
           ./setup-backend.sh
 
-      - name: Wait for Backend Resources
-        working-directory: ./terraform
+      - name: Wait for AWS resources to be available
         run: |
-          # Extract bucket name from backend config
-          BUCKET_NAME=$(grep bucket backend.hcl | cut -d'=' -f2 | tr -d ' '"'")
-          TABLE_NAME=$(grep dynamodb_table backend.hcl | cut -d'=' -f2 | tr -d ' '"'")
+          # Extract bucket name from backend config and trim whitespace
+          BUCKET_NAME=$(grep bucket backend.hcl | cut -d'=' -f2 | tr -d ' '"'"' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          TABLE_NAME=$(grep dynamodb_table backend.hcl | cut -d'=' -f2 | tr -d ' '"'"' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+          echo "Bucket name: $BUCKET_NAME"
+          echo "Table name: $TABLE_NAME"
+
+          # Validate bucket name format
+          if ! [[ $BUCKET_NAME =~ ^[a-zA-Z0-9.-]{1,255}$ ]]; then
+            echo "Error: Invalid bucket name format"
+            exit 1
+          fi
 
           # Wait for S3 bucket to be available
-          aws s3api wait bucket-exists --bucket $BUCKET_NAME
+          aws s3api wait bucket-exists --bucket "$BUCKET_NAME"
 
           # Wait for DynamoDB table to be active
-          aws dynamodb wait table-exists --table-name $TABLE_NAME
+          aws dynamodb wait table-exists --table-name "$TABLE_NAME"
 
       - name: Generate Backend Config
         working-directory: ./terraform
