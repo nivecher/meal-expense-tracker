@@ -12,7 +12,10 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: meal-expense-tracker
+  ECR_REPOSITORY: meal-expense-tracker-prod
+  APP_NAME: meal-expense-tracker
+  ENVIRONMENT: prod
+  LAMBDA_FUNCTION_NAME: ${APP_NAME}-${ENVIRONMENT}
 
 jobs:
   deploy:
@@ -80,7 +83,7 @@ jobs:
       - name: Deploy Lambda Function
         run: |
           aws lambda update-function-code \
-            --function-name ${{ env.ECR_REPOSITORY }} \
+            --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
             --image-uri ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.get_version.outputs.version }}
 
       - name: Run smoke tests
