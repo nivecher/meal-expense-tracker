@@ -23,15 +23,13 @@ repos:
     hooks:
     -   id: validate-commit-message
         name: validate-commit-message
-        entry: python scripts/validate_commit.py
+        entry: gitlint --msg="$(cat $1)"
         language: python
         language_version: python3
         types: [text]
         stages: [commit-msg]
         pass_filenames: false
-        environment:
-          LC_ALL: C.UTF-8
-          LANG: C.UTF-8
+        additional_dependencies: [gitlint]
 
 -   repo: local
     hooks:
