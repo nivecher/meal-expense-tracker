@@ -104,19 +104,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Run unit tests with coverage
-        run: |
-          coverage run -m pytest --cov=app tests/unit/
-          coverage report -m
-          coverage xml
-
-      - name: Upload unit test coverage
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          name: build-unit-coverage
-          fail_ci_if_error: true
-
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -171,18 +158,24 @@ jobs:
       - name: Run integration tests
         run: |
           # Run integration tests
-          docker exec meal-expense-app pytest --cov=app tests/integration/
-          docker exec meal-expense-app coverage report -m
-          docker exec meal-expense-app coverage xml
-          docker cp meal-expense-app:/app/coverage.xml /tmp/coverage.xml
+          docker exec meal-expense-app pytest tests/integration/
+          docker cp meal-expense-app:/app/.coverage /tmp/.coverage
 
       - name: Stop container
         run: docker stop meal-expense-app
 
+      - name: Generate and upload coverage report
+        run: |
+          coverage combine
+          coverage report -m
+          coverage xml
+        env:
+          COVERAGE_FILE: /tmp/.coverage
+
       - name: Upload integration test coverage
         uses: codecov/codecov-action@v3
         with:
-          file: /tmp/coverage.xml
+          file: ./coverage.xml
           name: integration-coverage
           fail_ci_if_error: true
 
@@ -222,27 +215,19 @@ jobs:
         run: |
           # Run load tests
           wrk -t12 -c400 -d30s http://localhost:5000/api/health
-          docker exec meal-expense-app coverage report -m
-          docker exec meal-expense-app coverage xml
-          docker cp meal-expense-app:/app/coverage.xml /tmp/coverage.xml
 
       - name: Stop container
         run: docker stop meal-expense-app
 
-      - name: Upload load test coverage
-        uses: codecov/codecov-action@v3
-        with:
-          file: /tmp/coverage.xml
-          name: load-test-coverage
-          fail_ci_if_error: true
-
-  deploy:
+  publish:
     needs: load-test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
       packages: write
+      id-token: write
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout repository
