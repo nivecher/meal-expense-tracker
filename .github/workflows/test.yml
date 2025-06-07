@@ -85,31 +85,29 @@ jobs:
           pip install bandit
           bandit -r app/ -f json > bandit_report.json
 
-      - name: Get latest tag
-        id: get_latest_tag
-        run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0)
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-
-      - name: Get next version
+      - name: Get version info
         id: version
         run: |
-          # Get latest tag
-          LATEST_TAG=${{ steps.get_latest_tag.outputs.latest_tag }}
+          # Install dependencies with setuptools-scm
+          pip install setuptools_scm
 
-          # If no tags exist, start with 0.1.0
-          if [ -z "$LATEST_TAG" ]; then
-            VERSION="0.1.0"
+          # Get current version using setuptools-scm
+          CURRENT_VERSION=$(python -c "from setuptools_scm import get_version; print(get_version())")
+
+          # Get next version based on commit message
+          if [[ "$COMMIT_MESSAGE" =~ "BREAKING CHANGE" ]]; then
+            NEXT_VERSION=$(python -c "from setuptools_scm import get_version; print(get_version().split('.')[0] + '.0.0')")
+          elif [[ "$COMMIT_MESSAGE" =~ "feat" ]]; then
+            MAJOR=$(python -c "from setuptools_scm import get_version; print(get_version().split('.')[0])")
+            MINOR=$(python -c "from setuptools_scm import get_version; print(get_version().split('.')[1])")
+            NEXT_VERSION="$MAJOR.$((MINOR + 1)).0"
           else
-            # Extract version number (remove v prefix if present)
-            LATEST_VERSION=${LATEST_TAG#v}
-            IFS='.' read -r major minor patch <<< "$LATEST_VERSION"
-            # Increment patch version
-            VERSION="$major.$minor.$((patch + 1))"
+            NEXT_VERSION=$(python -c "from setuptools_scm import get_version; print(get_version().split('.')[0] + '.' + get_version().split('.')[1] + '.' + str(int(get_version().split('.')[2]) + 1))")
           fi
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Using version: $VERSION" >> $GITHUB_OUTPUT
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "next_version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+          echo "Using current version: $CURRENT_VERSION, next version: $NEXT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -170,7 +168,7 @@ jobs:
 
       - name: Upload ZAP Report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: zap-report
           path: zap_report.html
