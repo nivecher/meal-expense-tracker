@@ -67,8 +67,8 @@ jobs:
             VERSION="v$VERSION"
           fi
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Using version: $VERSION" >> $GITHUB_OUTPUT
+          echo "::set-output name=version::$VERSION"
+          echo "Using version: $VERSION"
 
       - name: Create Git tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
