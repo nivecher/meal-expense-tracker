@@ -14,10 +14,6 @@ on:
         required: true
         type: string
 
-  push:
-    tags:
-      - 'v*'
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
