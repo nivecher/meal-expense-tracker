@@ -9,17 +9,6 @@ on:
       - main
   workflow_dispatch:
 
-  pull_request:
-    paths:
-      - 'tests/**'
-      - '.github/workflows/test.yml'
-      - 'Makefile'
-      - 'pytest.ini'
-      - 'requirements-dev.txt'
-      - 'requirements-dev.in'
-      - 'requirements.txt'
-      - 'requirements.in'
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
