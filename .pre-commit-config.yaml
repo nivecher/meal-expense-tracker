@@ -21,18 +21,6 @@ repos:
 
 -   repo: local
     hooks:
-    -   id: validate-commit-message
-        name: validate-commit-message
-        entry: gitlint --msg="$(cat $1)"
-        language: python
-        language_version: python3
-        types: [text]
-        stages: [commit-msg]
-        pass_filenames: false
-        additional_dependencies: [gitlint]
-
--   repo: local
-    hooks:
     -   id: validate-cloudformation
         name: validate-cloudformation
         entry: python scripts/validate_cloudformation.py
