@@ -52,6 +52,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-docker-layers-
 
+      - name: Install toml package
+        run: pip install toml
+
       - name: Get version
         id: get_version
         run: |
