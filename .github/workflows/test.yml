@@ -1,4 +1,4 @@
-name: Test
+name: Test and Release
 
 on:
   workflow_run:
@@ -8,6 +8,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to tag (e.g., 0.5.0)'
+        required: false
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -15,7 +20,7 @@ env:
   IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
   PYTHONPATH: ${{ github.workspace }}
   # Add required environment variables for the application
-  FLASK_APP: app.py
+  FLASK_APP: wsgi.py
   FLASK_ENV: testing
   DATABASE_URL: sqlite:///instance/meal_expenses.db
   SECRET_KEY: testing-key-123
@@ -46,14 +51,65 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
 
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.local
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Run integration tests
+      - name: Run tests with coverage
         run: |
-          make test
+          coverage run -m pytest --cov=app tests/
+          coverage report -m
+          coverage xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: app-coverage
+          fail_ci_if_error: true
+
+      - name: Run Bandit security scanning
+        run: |
+          pip install bandit
+          bandit -r app/ -f json > bandit_report.json
+
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0)
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+      - name: Get next version
+        id: version
+        run: |
+          # Get latest tag
+          LATEST_TAG=${{ steps.get_latest_tag.outputs.latest_tag }}
+
+          # If no tags exist, start with 0.1.0
+          if [ -z "$LATEST_TAG" ]; then
+            VERSION="0.1.0"
+          else
+            # Extract version number (remove v prefix if present)
+            LATEST_VERSION=${LATEST_TAG#v}
+            IFS='.' read -r major minor patch <<< "$LATEST_VERSION"
+            # Increment patch version
+            VERSION="$major.$minor.$((patch + 1))"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -77,13 +133,20 @@ jobs:
             --name meal-expense-app \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main
 
-      - name: Run tests
+      - name: Wait for container to be ready
         run: |
-          PYTHONPATH=. pytest --cov=app tests/
+          echo "Waiting for container to be ready..."
+          for i in {1..30}; do
+            curl -s http://localhost:5000/health && break
+            echo "Container not ready yet, waiting..."
+            sleep 5
+          done
+          curl -s http://localhost:5000/health || exit 1
 
-      - name: Install load testing dependencies
-        run: |
-          pip install locust
+      - name: Run security scanning
+        uses: docker://owasp/zap2docker-stable:latest
+        with:
+          args: -t http://localhost:5000 -r zap_report.html
 
       - name: Run load tests
         run: |
@@ -94,26 +157,14 @@ jobs:
         run: |
           docker rm -f meal-expense-app
 
-      - name: Determine version
-        id: version
+      - name: Get commit message
+        id: commit_message
         run: |
-          # If we got a next version from semver action, use it
-          if [[ -n "${{ steps.semver.outputs.next }}" ]]; then
-            # Remove any 'v' prefix from semver output
-            VERSION="${{ steps.semver.outputs.next }}"
-            VERSION="${VERSION#v}"
-          else
-            # Get the latest tag and increment patch version
-            LATEST_TAG=$(git describe --tags --abbrev=0)
-            LATEST_VERSION=${LATEST_TAG#v}  # Remove v prefix
-            IFS='.' read -r major minor patch <<< "$LATEST_VERSION"
-            VERSION="$major.$minor.$((patch + 1))"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Using version: $VERSION"
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B ${{ github.event.workflow_run.head_sha }})
+          echo "message=$COMMIT_MESSAGE" >> $GITHUB_OUTPUT
 
       - name: Tag and push Docker image
-        id: docker_tag
+        id: tag_image
         if: success()
         run: |
           VERSION=${{ steps.version.outputs.version }}
@@ -124,37 +175,26 @@ jobs:
           docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
 
-          # Check if Git tag exists (with v prefix for Git tags only)
-          if ! git rev-parse "v$VERSION" >/dev/null 2>&1; then
-            git tag -a "v$VERSION" -m "Release version $VERSION"
-            git push origin "v$VERSION"
-          fi
-
-      - name: Check if release exists
-        id: check_release
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          if curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/v$VERSION" \
-            | grep -q "\"tag_name\": \"v$VERSION\""; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
+          # Push the version tag
+          git tag -a "v$VERSION" -m "Release version $VERSION"
+          git push origin "v$VERSION"
 
       - name: Create Release
-        if: success() && steps.check_release.outputs.exists == 'false'
+        if: success()
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ steps.version.outputs.version }}
           release_name: Release v${{ steps.version.outputs.version }}
-          body: |
+          body: >
             Release version ${{ steps.version.outputs.version }}
 
             Changes:
-            - ${{ steps.commit_message.outputs.message }}
+            - Automated release from GitHub Actions
+            - Version: ${{ steps.version.outputs.version }}
+            - Commit: ${{ github.event.workflow_run.head_sha }}
+            - Commit message: ${{ steps.commit_message.outputs.message }}
 
             This release has passed all tests and security scans.
           draft: false

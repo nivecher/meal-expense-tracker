@@ -82,7 +82,7 @@ jobs:
           directory: ./terraform
           soft_fail: true
 
-      - name: Terraform Format Check
+      - name: Run Terraform Format
         working-directory: ./terraform
         run: terraform fmt -check
 
