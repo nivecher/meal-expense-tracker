@@ -1,15 +1,18 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=42", "wheel", "setuptools_scm>=7.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "meal-expense-tracker"
-version = "0.5.0"
 description = "A Flask-based web application for tracking meal expenses"
 authors = [
     { name = "nivecher", email = "mtd37@hotmail.com" }
 ]
 requires-python = ">=3.13.3"
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = {attr = "setuptools_scm.version"}
 
 [tool.setuptools]
 packages = ['app']

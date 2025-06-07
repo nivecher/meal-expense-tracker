@@ -21,6 +21,17 @@ repos:
 
 -   repo: local
     hooks:
+    -   id: validate-commit-message
+        name: validate-commit-message
+        entry: python scripts/validate_commit.py
+        language: python
+        language_version: python3
+        types: [text]
+        stages: [commit-msg]
+        pass_filenames: false
+
+-   repo: local
+    hooks:
     -   id: validate-cloudformation
         name: validate-cloudformation
         entry: python scripts/validate_cloudformation.py
