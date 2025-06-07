@@ -29,6 +29,9 @@ repos:
         types: [text]
         stages: [commit-msg]
         pass_filenames: false
+        environment:
+          LC_ALL: C.UTF-8
+          LANG: C.UTF-8
 
 -   repo: local
     hooks:
