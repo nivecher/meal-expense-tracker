@@ -1,11 +1,11 @@
 [general]
 ignore=body-first-line-empty, body-max-line-length, title-max-line-length
 
-[rule "T1"]
+[rule "title-match-regex"]
 regex = ^([a-z]+)\([a-z0-9_\-]+\): .+
 message = Title must match format: <type>(<scope>): <description>
 
-[rule "T2"]
+[rule "title-types"]
 regex = ^([a-z]+)\([a-z0-9_\-]+\): .+
 message = Title must start with a valid type
 valid_types = feat, fix, docs, style, refactor, perf, test, chore, ci, build
