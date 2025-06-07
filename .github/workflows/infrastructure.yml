@@ -35,7 +35,6 @@ jobs:
       contents: read
       id-token: write
       packages: write
-      aws: write
 
     steps:
       - name: Checkout repository
