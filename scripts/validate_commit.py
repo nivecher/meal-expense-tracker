@@ -64,10 +64,8 @@ def validate_commit_message(message: str) -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python validate_commit.py <commit-message-file>")
+        print("Usage: python validate_commit.py <commit-message>")
         sys.exit(1)
 
-    message_file = sys.argv[1]
-    with open(message_file, "r") as f:
-        message = f.read()
-        validate_commit_message(message)
+    message = sys.argv[1]
+    validate_commit_message(message)
