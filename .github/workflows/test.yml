@@ -9,8 +9,6 @@ on:
       - main
   workflow_dispatch:
 
-
-
   pull_request:
     paths:
       - 'tests/**'

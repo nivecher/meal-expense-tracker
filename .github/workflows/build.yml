@@ -52,7 +52,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-docker-layers-
 
+      - name: Get version
+        id: get_version
+        run: |
+          # Get version from pyproject.toml
+          VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
 
+          # Add 'v' prefix if not present
+          if [[ $VERSION != v* ]]; then
+            VERSION="v$VERSION"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

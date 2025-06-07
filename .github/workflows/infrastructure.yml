@@ -51,6 +51,12 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Setup Backend Resources
+        working-directory: ./terraform
+        run: |
+          chmod +x setup-backend.sh
+          ./setup-backend.sh
+
       - name: Generate Backend Config
         working-directory: ./terraform
         run: |
