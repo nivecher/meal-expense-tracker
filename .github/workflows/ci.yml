@@ -174,6 +174,7 @@ jobs:
           docker exec meal-expense-app pytest --cov=app tests/integration/
           docker exec meal-expense-app coverage report -m
           docker exec meal-expense-app coverage xml
+          docker cp meal-expense-app:/app/coverage.xml /tmp/coverage.xml
 
       - name: Stop container
         run: docker stop meal-expense-app
@@ -181,7 +182,7 @@ jobs:
       - name: Upload integration test coverage
         uses: codecov/codecov-action@v3
         with:
-          file: ./coverage.xml
+          file: /tmp/coverage.xml
           name: integration-coverage
           fail_ci_if_error: true
 
@@ -221,9 +222,19 @@ jobs:
         run: |
           # Run load tests
           wrk -t12 -c400 -d30s http://localhost:5000/api/health
+          docker exec meal-expense-app coverage report -m
+          docker exec meal-expense-app coverage xml
+          docker cp meal-expense-app:/app/coverage.xml /tmp/coverage.xml
 
       - name: Stop container
         run: docker stop meal-expense-app
+
+      - name: Upload load test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: /tmp/coverage.xml
+          name: load-test-coverage
+          fail_ci_if_error: true
 
   deploy:
     needs: load-test
