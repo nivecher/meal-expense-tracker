@@ -57,6 +57,19 @@ jobs:
           chmod +x setup-backend.sh
           ./setup-backend.sh
 
+      - name: Wait for Backend Resources
+        working-directory: ./terraform
+        run: |
+          # Extract bucket name from backend config
+          BUCKET_NAME=$(grep bucket backend.hcl | cut -d'=' -f2 | tr -d ' '"'")
+          TABLE_NAME=$(grep dynamodb_table backend.hcl | cut -d'=' -f2 | tr -d ' '"'")
+
+          # Wait for S3 bucket to be available
+          aws s3api wait bucket-exists --bucket $BUCKET_NAME
+
+          # Wait for DynamoDB table to be active
+          aws dynamodb wait table-exists --table-name $TABLE_NAME
+
       - name: Generate Backend Config
         working-directory: ./terraform
         run: |
