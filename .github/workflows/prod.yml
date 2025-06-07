@@ -2,7 +2,7 @@ name: Production Deployment
 
 on:
   workflow_run:
-    workflows: ["Infrastructure Deployment"]
+    workflows: ["Version Management"]
     types:
       - completed
     branches:
