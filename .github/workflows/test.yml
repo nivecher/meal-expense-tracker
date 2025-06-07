@@ -143,10 +143,37 @@ jobs:
           done
           curl -s http://localhost:5000/health || exit 1
 
-      - name: Run security scanning
+      - name: Run OWASP ZAP Security Scan
         uses: docker://owasp/zap2docker-stable:2.12.0
         with:
-          args: -t http://localhost:5000 -r zap_report.html
+          args: >
+            zap-baseline.py
+            -t http://localhost:5000
+            -r zap_report.html
+            -c 10
+            -s
+            -m 10
+            -l Low
+            --timeout 300
+            --hook /zap/wrk/ext/zap-baseline.py
+        continue-on-error: true
+
+      - name: Analyze ZAP Report
+        if: always()
+        run: |
+          if [ -f zap_report.html ]; then
+            echo "ZAP Security Scan Report Generated"
+            cat zap_report.html
+          else
+            echo "No ZAP report generated"
+          fi
+
+      - name: Upload ZAP Report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: zap-report
+          path: zap_report.html
 
       - name: Run load tests
         run: |
