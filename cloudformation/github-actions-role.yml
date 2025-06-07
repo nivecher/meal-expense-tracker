@@ -32,6 +32,8 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonAPIGatewayAdministrator
         - arn:aws:iam::aws:policy/AmazonRDSFullAccess
         - arn:aws:iam::aws:policy/SecretsManagerReadWrite
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
       Policies:
         - PolicyName: GitHubActionsDeployment
           PolicyDocument:
@@ -41,20 +43,6 @@ Resources:
                 Action:
                   # IAM permissions for task execution role
                   - iam:PassRole
-                  # DynamoDB permissions for Terraform state locking
-                  - dynamodb:PutItem
-                  - dynamodb:GetItem
-                  - dynamodb:DeleteItem
-                  - dynamodb:DescribeTable
-                  # S3 permissions for Terraform backend
-                  - s3:ListBucket
-                  - s3:GetObject
-                  - s3:PutObject
-                  - s3:DeleteObject
-                  - s3:GetBucketLocation
-                  - s3:Describe*
-                  - s3:Get*
-                  - s3:Tag*
                   # EC2 permissions for VPC setup
                   - ec2:CreateVpc
                   - ec2:CreateSubnet
