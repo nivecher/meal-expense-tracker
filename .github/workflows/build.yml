@@ -62,13 +62,16 @@ jobs:
           # Get version using setuptools-scm
           VERSION=$(python -c "from setuptools_scm import get_version; print(get_version())")
 
+          # Replace '+' with '-' for Docker tags
+          DOCKER_TAG=$(echo $VERSION | sed 's/+/-/')
+
           # Add 'v' prefix
-          if [[ $VERSION != v* ]]; then
-            VERSION="v$VERSION"
+          if [[ $DOCKER_TAG != v* ]]; then
+            DOCKER_TAG="v$DOCKER_TAG"
           fi
 
-          echo "::set-output name=version::$VERSION"
-          echo "Using version: $VERSION"
+          echo "::set-output name=version::$DOCKER_TAG"
+          echo "Using version: $DOCKER_TAG"
 
       - name: Create Git tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
