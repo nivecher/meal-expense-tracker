@@ -20,6 +20,9 @@ var/
 .installed.cfg
 *.egg
 
+# Node.js dependencies
+node_modules/
+
 # Virtual Environment
 venv/
 ENV/
@@ -105,3 +108,8 @@ terraform.rc
 .terragrunt-cache
 
 testing/
+cache/
+.serverless/
+.serverless*
+
+package-lock.json

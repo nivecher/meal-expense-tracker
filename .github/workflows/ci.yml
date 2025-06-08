@@ -5,11 +5,19 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+    types: [opened, synchronize, reopened]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   PYTHONPATH: ${{ github.workspace }}
+  FLASK_APP: app
+  FLASK_ENV: test
+  DATABASE_URL: sqlite:///test.db
+  SECRET_KEY: test-secret-key
+  IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+  PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
+  PR_BRANCH: ${{ github.event.pull_request.head.ref || 'main' }}
 
 jobs:
   setup:
@@ -127,11 +135,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    env:
-      FLASK_APP: app
-      FLASK_ENV: test
-      DATABASE_URL: sqlite:///test.db
-      SECRET_KEY: test-secret-key
 
     steps:
       - name: Checkout repository
@@ -220,7 +223,7 @@ jobs:
         run: docker stop meal-expense-app
 
   publish:
-    needs: load-test
+    needs: [load-test, setup]
     runs-on: ubuntu-latest
     permissions:
       contents: write

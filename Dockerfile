@@ -33,7 +33,7 @@ COPY . .
 
 # Set environment variables
 ENV FLASK_APP=wsgi.py
-ENV FLASK_ENV=production
+ENV FLASK_ENV=development
 
 # Create a volume for the database
 VOLUME /app/instance

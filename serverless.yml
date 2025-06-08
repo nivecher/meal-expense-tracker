@@ -1,0 +1,151 @@
+service: meal-expense-tracker
+frameworkVersion: '3.40.0'
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  endpointType: regional
+
+  # Environment variables
+  environment:
+    FLASK_ENV: ${self:provider.stage}
+    NODE_ENV: ${self:provider.stage}
+    PYTHONPATH: ./
+  lambdaHashingVersion: 20201221
+  memorySize: 256  # MB
+  timeout: 30  # seconds
+  tracing:
+    lambda: true  # Enable X-Ray tracing
+    # apiGateway: true
+
+  # Deployment bucket configuration
+  deploymentBucket:
+    name: ${self:service}-deploy-${self:provider.region}
+    serverSideEncryption: AES256
+
+  # Tags for all resources
+  stackTags:
+    Service: ${self:service}
+    Environment: ${self:provider.stage}
+    ManagedBy: serverless
+    Owner: ${env:USER, 'serverless'}
+
+# Custom variables
+custom:
+  wsgi:
+    app: wsgi.app
+    packRequirements: false
+  pythonRequirements:
+    dockerizePip: true
+    slim: true
+    useStaticCache: true
+    useDownloadCache: true
+    cacheLocation: "./cache"
+    slimPatterns:
+      - '**/*.py[c|o]'
+      - '**/__pycache__*/**'
+      - '**/tests/**'
+      - '**/test/**'
+      - '**/docs/**'
+      - '**/*.dist-info/**'
+      - '**/*.egg-info/**'
+      - '**/examples/**'
+      - '**/example/**'
+      - '**/samples/**'
+      - '**/sample/**'
+      - '**/babel/locale-data/**'
+      - '**/setuptools/**'
+      - '**/pkg_resources/**'
+      - '**/pip/**'
+      - '**/pip-*'
+      - '**/wheel/**'
+      - '**/wheel-*'
+      - '**/setuptools-*'
+      - '**/easy_install*'
+      - '**/pkg_resources/**'
+      - '**/__pycache__/**'
+      - '**/*.py[co]'
+
+  # Custom domain (uncomment and configure if needed)
+  # customDomain:
+  #   domainName: api.${self:provider.stage}.yourdomain.com
+  #   basePath: ""
+  #   stage: ${self:provider.stage}
+  #   createRoute53Record: true
+  #   endpointType: regional
+  #   securityPolicy: tls_1_2
+
+functions:
+  app:
+    handler: wsgi.handler
+    description: 'Meal Expense Tracker API'
+    memorySize: 512  # Can be overridden per function
+    timeout: 29  # Max is 29 seconds for API Gateway
+    environment:
+      STAGE: ${self:provider.stage}
+      # Add function-specific environment variables here
+    events:
+      - http:
+          path: /
+          method: ANY
+          cors:
+            origin: '*'  # Restrict this in production
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
+            maxAge: 86400  # 24 hours
+          private: false
+      - http:
+          path: '/{proxy+}'
+          method: ANY
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
+            maxAge: 86400
+          private: false
+    package:
+      patterns:
+        - '!./**'
+        - 'wsgi.py'
+        - 'wsgi_handler.py'
+        - 'app/**'
+        - '!node_modules/**'
+        - '!venv/**'
+        - '!__pycache__/**'
+        - '!*.pyc'
+        - '!*.pyo'
+        - '!*.pyd'
+        - '!*.so'
+        - '!*.egg-info/**'
+        - '!.git/**'
+        - '!.github/**'
+        - '!.gitignore'
+        - '!.env'
+        - '!.venv/**'
+        - '!.pytest_cache/**'
+        - '!.mypy_cache/**'
+        - '!.vscode/**'
+        - '!.idea/**'
+        - '!package*.json'
+        - '!package-lock.json'
+        - '!yarn.lock'
+        - '!.serverless/**'
+        - '!.serverless_plugins/'
+
+plugins:
+  - serverless-wsgi
+  - serverless-python-requirements

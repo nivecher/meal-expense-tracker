@@ -12,7 +12,11 @@ exclude =
     .env,
     .tox,
     .pytest_cache,
-    .mypy_cache
+    .mypy_cache,
+    .serverless,
+    .serverless*
+    cache,
+    node_modules
 per-file-ignores =
     __init__.py: F401
     tests/*: S101

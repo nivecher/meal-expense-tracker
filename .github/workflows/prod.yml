@@ -15,11 +15,12 @@ env:
   APP_NAME: meal-expense-tracker
   ENVIRONMENT: prod
   LAMBDA_FUNCTION_NAME: ${APP_NAME}-${ENVIRONMENT}
+  TF_VERSION: 1.6.0
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'release' }}
     permissions:
       contents: read
       packages: read
@@ -28,6 +29,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -126,29 +130,30 @@ jobs:
             exit 1
           }
 
-      - name: Notify Success
-        if: success()
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
-          message: |
-            🚀 Production deployment successful!
-            Version: ${{ github.event.release.tag_name }}
-            Time: ${{ github.event.created_at }}
-            Environment: Production
+      # TODO: Add Telegram notifications
+      # - name: Notify Success
+      #   if: success()
+      #   uses: appleboy/telegram-action@master
+      #   with:
+      #     to: ${{ secrets.TELEGRAM_CHAT_ID }}
+      #     token: ${{ secrets.TELEGRAM_TOKEN }}
+      #     message: |
+      #       🚀 Production deployment successful!
+      #       Version: ${{ github.event.release.tag_name }}
+      #       Time: ${{ github.event.created_at }}
+      #       Environment: Production
 
-      - name: Notify Failure
-        if: failure()
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
-          message: |
-            ❌ Production deployment failed!
-            Version: ${{ github.event.release.tag_name }}
-            Time: ${{ github.event.created_at }}
-            Environment: Production
+      # - name: Notify Failure
+      #   if: failure()
+      #   uses: appleboy/telegram-action@master
+      #   with:
+      #     to: ${{ secrets.TELEGRAM_CHAT_ID }}
+      #     token: ${{ secrets.TELEGRAM_TOKEN }}
+      #     message: |
+      #       ❌ Production deployment failed!
+      #       Version: ${{ github.event.release.tag_name }}
+      #       Time: ${{ github.event.created_at }}
+      #       Environment: Production
 
       - name: Cleanup
         if: always()

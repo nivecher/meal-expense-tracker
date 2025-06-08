@@ -1,6 +1,7 @@
-from app import create_app
+import os
 import logging
 import sys
+from app import create_app
 
 # Set up logging
 logging.basicConfig(
@@ -10,15 +11,30 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-try:
-    app = create_app()
-    if __name__ == "__main__":
-        logger.info("Starting application...")
-        try:
-            app.run(debug=True, port=5001)
-        except Exception as e:
-            logger.error(f"Failed to run application: {str(e)}", exc_info=True)
-            raise
-except Exception as e:
-    logger.error(f"Failed to create application: {str(e)}", exc_info=True)
-    sys.exit(1)
+# Initialize the Flask application
+app = create_app()
+
+# AWS Lambda support
+if os.environ.get("AWS_EXECUTION_ENV"):
+    try:
+        import awsgi
+
+        def handler(event, context):
+            """
+            AWS Lambda handler function.
+            This is the entry point for AWS Lambda.
+            """
+            return awsgi.response(app, event, context)
+
+    except ImportError:
+        logger.warning("awsgi package not found. AWS Lambda support disabled.")
+
+if __name__ == "__main__":
+    # Run the application locally if not running on AWS Lambda
+    logger.info("Starting application locally...")
+    try:
+        port = int(os.environ.get("PORT", 5000))
+        app.run(debug=True, host="0.0.0.0", port=port)
+    except Exception as e:
+        logger.error(f"Failed to run application: {str(e)}", exc_info=True)
+        raise
