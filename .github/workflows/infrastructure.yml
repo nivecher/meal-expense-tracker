@@ -8,37 +8,101 @@ on:
     branches:
       - main
 
+# Environment variables
 env:
-  TF_VERSION: 1.5.0
+  # Terraform settings
+  TF_VERSION: '1.6.0'  # Match version with CI workflow
+
+  # AWS settings
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: meal-expense-tracker-prod
-  IMAGE_TAG: ${{ github.sha }}
+  ECR_REPOSITORY: meal-expense-tracker
   ENVIRONMENT: prod
+
+  # Application settings
+  APP_NAME: meal-expense-tracker
+
+  # Security settings
+  TF_IN_AUTOMATION: 'true'  # Indicates that Terraform is running in automation
+  TF_INPUT: '0'  # Don't ask for input during plan/apply
+
+  # Output settings
+  TF_CLI_ARGS_plan: '-lock-timeout=300s'
+  TF_CLI_ARGS_apply: '-auto-approve -lock-timeout=300s'
+
+permissions:
+  contents: read
+  id-token: write  # Required for OIDC with AWS
+  security-events: write  # For security scanning
+
+  # Required for GitHub OIDC provider
+  actions: read
+
+  # Required for Terraform state management
+  pull-requests: write
+  statuses: write
+  checks: write
+  deployments: write
+  pages: write
+  repository-projects: write
+
+  # Required for GitHub Container Registry
+  packages: write
 
 jobs:
   terraform:
     name: Deploy Infrastructure
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    permissions:
-      contents: read
-      id-token: write
-      packages: write
+    environment:
+      name: prod
+      url: ${{ steps.deploy.outputs.web-url }}
+
+    # Environment variables are now defined at the job level
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for setuptools_scm versioning
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure AWS credentials
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          role-duration-seconds: 3600  # 1 hour
+          role-skip-session-tagging: true
+
+      - name: Configure AWS CLI
+        run: |
+          # Enable AWS CLI output in JSON format
+          aws configure set cli_follow_urlparam false
+          aws configure set cli_pager ""
+
+          # Verify AWS credentials
+          aws sts get-caller-identity
+
+          # Configure AWS CLI to use JSON output by default
+          aws configure set output json
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false  # Disable wrapper for better error messages
+
+      - name: Setup Terraform Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+            ~/.terraform.d/credentials.tfrc.json
+          key: ${{ runner.os }}-terraform-${{ env.TF_VERSION }}-${{ hashFiles('**/*.tf') }}
+          restore-keys: |
+            ${{ runner.os }}-terraform-${{ env.TF_VERSION }}-
+            ${{ runner.os }}-terraform-
 
       - name: Setup Backend Resources
         working-directory: ./terraform

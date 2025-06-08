@@ -7,45 +7,67 @@ on:
     branches: [ main ]
     types: [opened, synchronize, reopened]
 
+# Environment variables
 env:
+  # Application settings
+  PYTHON_VERSION: '3.11'  # Using a stable Python LTS version
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   PYTHONPATH: ${{ github.workspace }}
   FLASK_APP: app
   FLASK_ENV: test
-  DATABASE_URL: sqlite:///test.db
-  SECRET_KEY: test-secret-key
+  # Use in-memory SQLite for tests to avoid file system issues
+  DATABASE_URL: 'sqlite:///:memory:'
+
+  # CI/CD settings
   IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
   PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
   PR_BRANCH: ${{ github.event.pull_request.head.ref || 'main' }}
+
+  # Cache settings
+  PIP_CACHE_DIR: ~/.cache/pip
+  POETRY_CACHE_DIR: ~/.cache/pypoetry
+
+  # Security settings
+  DOCKER_CONTENT_TRUST: 1  # Enable Docker Content Trust
 
 jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+      cache-key: ${{ steps.get-cache-key.outputs.key }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # Fetch all history for setuptools_scm versioning
           fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
+          cache-dependency-path: '**/requirements*.txt'
+
+      - name: Generate cache key
+        id: get-cache-key
+        run: |
+          # Generate a cache key based on the lock file
+          echo "key=$(sha256sum requirements*.txt | base64 | tr -d '\n')" >> $GITHUB_OUTPUT
 
       - name: Install versioning dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install setuptools_scm
 
       - name: Get version
         id: get_version
         run: |
           VERSION=$(python -c "from setuptools_scm import get_version; print(get_version())")
-          echo "::set-output name=version::$VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Using version: $VERSION"
 
   check:
@@ -53,7 +75,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      security-events: write  # For security scanning
+
+    env:
+      # Use a unique database name for parallel test runs
+      TEST_DB: test_${{ github.run_id }}.db
 
     steps:
       - name: Checkout repository
@@ -64,13 +90,34 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
+          cache-dependency-path: '**/requirements*.txt'
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ${{ env.PIP_CACHE_DIR }}
+            ${{ env.POETRY_CACHE_DIR }}
+            __pypackages__/
+          key: ${{ runner.os }}-pip-${{ needs.setup.outputs.cache-key }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
+          pip install safety bandit
+
+      - name: Run security audit
+        run: |
+          # Check for known security vulnerabilities
+          safety check --full-report
+          # Run bandit for security issues
+          bandit -r app -c pyproject.toml
 
       - name: Run lint and format checks
         run: make lint
@@ -87,6 +134,13 @@ jobs:
           file: ./coverage.xml
           name: unit-coverage
           fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: results.sarif
 
   build:
     needs: check

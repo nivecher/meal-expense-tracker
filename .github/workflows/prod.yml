@@ -2,44 +2,122 @@ name: Production Deployment
 
 on:
   release:
-    types:
-      - created
-
+    types: [created]
   workflow_dispatch:
+    # Optional: Add input parameters for manual triggering
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - staging
+          - prod
+          # Add other environments as needed
 
+# Environment variables
 env:
+  # Application settings
+  PYTHON_VERSION: '3.11'  # Match version with CI workflow
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+
+  # AWS settings
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: meal-expense-tracker-prod
-  APP_NAME: meal-expense-tracker
+  ECR_REPOSITORY: meal-expense-tracker
   ENVIRONMENT: prod
-  LAMBDA_FUNCTION_NAME: ${APP_NAME}-${ENVIRONMENT}
-  TF_VERSION: 1.6.0
+
+  # Terraform settings
+  TF_VERSION: '1.6.0'  # Match version with other workflows
+
+  # Security settings
+  DOCKER_CONTENT_TRUST: 1
+
+  # Output settings
+  TF_CLI_ARGS_plan: '-lock-timeout=300s'
+  TF_CLI_ARGS_apply: '-auto-approve -lock-timeout=300s'
+
+  # Application configuration
+  APP_NAME: meal-expense-tracker
+  LAMBDA_FUNCTION_NAME: meal-expense-tracker-prod  # Direct reference instead of using env vars
+
+permissions:
+  contents: read
+  id-token: write  # Required for OIDC with AWS
+  security-events: write  # For security scanning
+
+  # Required for GitHub OIDC provider
+  actions: read
+
+  # Required for GitHub Container Registry
+  packages: write
+
+  # Required for deployments
+  deployments: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'release' }}
-    permissions:
-      contents: read
-      packages: read
-      id-token: write
+    environment: prod
+      # Note: Environment name must match your GitHub environment settings
+      # url will be set by the deployment step
+
+    # Only run on release events or workflow_dispatch
+    if: |
+      github.event_name == 'release' ||
+      github.event_name == 'workflow_dispatch'
+
+    env:
+      TF_WORKSPACE: prod-${{ github.run_id }}
+      # These secrets need to be configured in your repository
+      # TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      # TF_STATE_LOCK_TABLE: ${{ secrets.TF_STATE_LOCK_TABLE }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for versioning
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure AWS credentials
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-Deploy-${{ github.run_id }}
+          role-duration-seconds: 3600  # 1 hour
+          role-skip-session-tagging: true
+
+      - name: Configure AWS CLI
+        run: |
+          # Enable AWS CLI output in JSON format
+          aws configure set cli_follow_urlparam false
+          aws configure set cli_pager ""
+
+          # Verify AWS credentials
+          aws sts get-caller-identity
+
+          # Configure AWS CLI to use JSON output by default
+          aws configure set output json
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false  # Disable wrapper for better error messages
+
+      - name: Setup Terraform Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+            ~/.terraform.d/credentials.tfrc.json
+          key: ${{ runner.os }}-terraform-${{ env.TF_VERSION }}-${{ hashFiles('**/*.tf') }}
+          restore-keys: |
+            ${{ runner.os }}-terraform-${{ env.TF_VERSION }}-
+            ${{ runner.os }}-terraform-
 
       - name: Setup Backend Resources
         working-directory: ./terraform
