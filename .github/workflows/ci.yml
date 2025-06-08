@@ -77,7 +77,7 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          coverage run -m pytest --cov=app tests/unit/
+          coverage run -m pytest --cov=app tests/
           coverage report -m
           coverage xml
 
