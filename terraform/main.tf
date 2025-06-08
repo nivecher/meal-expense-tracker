@@ -286,7 +286,7 @@ data "aws_route_tables" "private_route_tables" {
 }
 
 data "aws_route_table" "private_route_tables" {
-  for_each = toset(data.aws_route_tables.private_route_tables.ids)
+  for_each       = toset(data.aws_route_tables.private_route_tables.ids)
   route_table_id = each.key
 }
 
@@ -483,7 +483,7 @@ resource "aws_apigatewayv2_api" "http_api" {
 
   # CORS configuration - when allow_credentials is true, allow_origins cannot be ["*"]
   cors_configuration {
-    allow_credentials = false  # Set to false since we're using "*" for origins
+    allow_credentials = false # Set to false since we're using "*" for origins
     allow_headers     = ["Content-Type", "X-Amz-Date", "Authorization", "X-Api-Key"]
     allow_methods     = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     allow_origins     = ["*"]
@@ -651,9 +651,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Action = [
           "kms:Decrypt"
         ]
-        Resource = [
-          aws_kms_key.primary_encryption_key.arn
-        ]
+        Resource = [aws_kms_key.primary_encryption_key.arn]
         Condition = {
           StringEquals = {
             "kms:ViaService" = [
@@ -732,72 +730,7 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
 
-# Primary KMS Key for all encryption needs
-resource "aws_kms_key" "primary_encryption_key" {
-  description             = "Primary KMS key for encrypting all resources"
-  deletion_window_in_days = 30
-  enable_key_rotation     = true
-
-  # Use a simplified policy that allows the root account full access
-  # and let AWS services use the key through grants and key policies
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "Enable IAM User Permissions"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action   = "kms:*"
-        Resource = "*"
-      },
-      {
-        Sid    = "Allow use of the key"
-        Effect = "Allow"
-        Principal = {
-          Service = [
-            "logs.${var.aws_region}.amazonaws.com",
-            "lambda.amazonaws.com",
-            "rds.amazonaws.com",
-            "secretsmanager.${var.aws_region}.amazonaws.com"
-          ]
-        }
-        Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:CreateGrant",
-          "kms:ListGrants",
-          "kms:DescribeKey"
-        ]
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = [
-              "logs.${var.aws_region}.amazonaws.com",
-              "lambda.${var.aws_region}.amazonaws.com",
-              "rds.${var.aws_region}.amazonaws.com",
-              "secretsmanager.${var.aws_region}.amazonaws.com"
-            ]
-          }
-        }
-      }
-    ]
-  })
-
-  tags = merge(
-    {
-      Name        = "${var.app_name}-primary-encryption-key"
-      Environment = var.environment
-      Application = var.app_name
-      ManagedBy   = "Terraform"
-    },
-    var.tags
-  )
-}
-
+# CloudWatch Log Group for Lambda function
 resource "aws_cloudwatch_log_group" "lambda" {
   name              = "/aws/lambda/${aws_lambda_function.app.function_name}"
   retention_in_days = 7 # Reduced from 365 days to save costs
@@ -812,11 +745,6 @@ resource "aws_cloudwatch_log_group" "lambda" {
     },
     var.tags
   )
-}
-
-resource "aws_kms_alias" "primary_encryption_alias" {
-  name          = "alias/${var.app_name}-primary-encryption-key"
-  target_key_id = aws_kms_key.primary_encryption_key.key_id
 }
 
 # ECR Repository with enhanced security
@@ -889,7 +817,7 @@ resource "aws_db_instance" "postgres" {
 
   # Performance Insights (enabled for all environments with 7-day retention)
   performance_insights_enabled          = true
-  performance_insights_retention_period = 7  # 7 days for all environments (valid values: 7 or 731)
+  performance_insights_retention_period = 7 # 7 days for all environments (valid values: 7 or 731)
 
   # Engine configuration
   engine         = "postgres"
