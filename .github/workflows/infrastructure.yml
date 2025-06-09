@@ -137,11 +137,11 @@ jobs:
           chmod +x generate-backend-config.sh
           ./generate-backend-config.sh
 
-      - name: Run Checkov for Terraform Security Scans
-        uses: bridgecrewio/checkov-action@v12
+      - name: Install TFSec
+        uses: aquasecurity/tfsec-action@v1.0.0
         with:
-          directory: ./terraform
           soft_fail: true
+          working_directory: ./terraform
 
       - name: Run Terraform Format
         working-directory: ./terraform

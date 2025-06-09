@@ -1,4 +1,12 @@
 repos:
+-   repo: https://github.com/aquasecurity/tfsec-pre-commit
+    rev: v1.28.4
+    hooks:
+    -   id: tfsec
+        args: [--soft-fail]
+        files: '.*\.tf$'
+        exclude: 'modules/.*'
+
 -   repo: https://github.com/psf/black
     rev: 24.1.1
     hooks:

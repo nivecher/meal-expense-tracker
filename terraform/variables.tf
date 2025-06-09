@@ -1,11 +1,16 @@
-variable "aws_region" {
-  description = "AWS region"
+variable "app_name" {
+  description = "Name of the application"
   type        = string
-  default     = "us-east-1"
+  default     = "meal-expense-tracker"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9-]*$", var.app_name))
+    error_message = "App name must start with a letter and contain only alphanumeric characters and hyphens."
+  }
 }
 
 variable "environment" {
-  description = "Deployment environment (e.g., dev, staging, prod)"
+  description = "Deployment environment (dev, staging, prod)"
   type        = string
   default     = "dev"
 
@@ -15,51 +20,90 @@ variable "environment" {
   }
 }
 
-variable "app_name" {
-  description = "Application name"
+variable "aws_region" {
+  description = "AWS region to deploy to"
   type        = string
-  default     = "meal-expense-tracker"
+  default     = "us-east-1"
 }
 
-variable "image_tag" {
-  description = "Docker image tag for the Lambda function (e.g., 'latest', 'v1.0.0', or git commit SHA)"
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC"
   type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "db_instance_class" {
+  description = "The instance class of the RDS instance"
+  type        = string
+  default     = "db.t3.micro"
+}
+
+variable "db_allocated_storage" {
+  description = "The allocated storage in GB"
+  type        = number
+  default     = 20
+}
+
+variable "db_engine" {
+  description = "The database engine to use"
+  type        = string
+  default     = "postgres"
+}
+
+variable "db_engine_version" {
+  description = "The engine version to use"
+  type        = string
+  default     = "14.5"
+}
+
+variable "db_parameter_group_name" {
+  description = "Name of the DB parameter group"
+  type        = string
+  default     = "default.postgres14"
+}
+
+variable "db_skip_final_snapshot" {
+  description = "Determines whether a final DB snapshot is created before the DB instance is deleted"
+  type        = bool
+  default     = true
+}
+
+variable "db_backup_retention_period" {
+  description = "The days to retain backups for"
+  type        = number
+  default     = 7
+}
+
+variable "lambda_memory_size" {
+  description = "Memory size for Lambda function in MB"
+  type        = number
+  default     = 256
 
   validation {
-    condition     = length(var.image_tag) > 0
-    error_message = "Image tag cannot be empty"
+    condition     = var.lambda_memory_size >= 128 && var.lambda_memory_size <= 10240 && floor(var.lambda_memory_size) == var.lambda_memory_size
+    error_message = "Lambda memory size must be between 128MB and 10240MB in 1MB increments."
   }
 }
 
-variable "domain_name" {
-  description = "Base domain name for the application (e.g., example.com). This will be used for ACM certificate and API Gateway domain configuration."
-  type        = string
+variable "lambda_timeout" {
+  description = "Timeout for Lambda function in seconds"
+  type        = number
+  default     = 30
 
   validation {
-    condition     = can(regex("^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\\.)+[a-zA-Z]{2,}$", var.domain_name))
-    error_message = "Invalid domain name format. Must be a valid domain (e.g., example.com)."
+    condition     = var.lambda_timeout >= 1 && var.lambda_timeout <= 900
+    error_message = "Lambda timeout must be between 1 and 900 seconds."
   }
 }
 
-variable "db_name" {
-  description = "The name of the database."
+variable "base_domain_name" {
+  description = "Base domain name for the application (e.g., example.com)"
   type        = string
-  default     = "meal_expenses"
-}
-
-variable "db_username" {
-  description = "The username for the database."
-  type        = string
-  default     = "dbadmin"
+  default     = null
 }
 
 variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)
-  default = {
-    "Project"    = "Meal Expense Tracker"
-    "Owner"      = "Nivecher"
-    "CostCenter" = "MealExpenseTracker"
-    "ManagedBy"  = "Terraform"
-  }
+  default     = {}
 }

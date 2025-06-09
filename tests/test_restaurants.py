@@ -251,7 +251,8 @@ def test_delete_restaurant_without_expenses(client, auth, app):
         restaurant_id = restaurant.id
 
         # Verify no expenses exist
-        assert len(Expense.query.filter_by(restaurant_id=restaurant_id).all()) == 0
+        query = db.session.query(Expense).filter_by(restaurant_id=restaurant_id)
+        assert len(query.all()) == 0
 
     # Try to delete the restaurant
     response = client.post(
@@ -262,9 +263,10 @@ def test_delete_restaurant_without_expenses(client, auth, app):
 
     # Verify the restaurant is deleted
     with app.app_context():
-        assert Restaurant.query.get(restaurant_id) is None
+        assert db.session.get(Restaurant, restaurant_id) is None
         # Verify no expenses exist
-        assert len(Expense.query.filter_by(restaurant_id=restaurant_id).all()) == 0
+        query = db.session.query(Expense).filter_by(restaurant_id=restaurant_id)
+        assert len(query.all()) == 0
 
 
 def test_delete_restaurant_with_expenses(client, auth, app):
@@ -320,7 +322,8 @@ def test_delete_restaurant_with_expenses(client, auth, app):
         db.session.commit()
 
         # Verify expenses were created
-        assert len(Expense.query.filter_by(restaurant_id=restaurant_id).all()) == 2
+        query = db.session.query(Expense).filter_by(restaurant_id=restaurant_id)
+        assert len(query.all()) == 2
 
     # Try to delete the restaurant
     response = client.post(
@@ -331,5 +334,6 @@ def test_delete_restaurant_with_expenses(client, auth, app):
 
     # Verify both restaurant and its expenses are deleted
     with app.app_context():
-        assert Restaurant.query.get(restaurant_id) is None
-        assert len(Expense.query.filter_by(restaurant_id=restaurant_id).all()) == 0
+        assert db.session.get(Restaurant, restaurant_id) is None
+        query = db.session.query(Expense).filter_by(restaurant_id=restaurant_id)
+        assert len(query.all()) == 0

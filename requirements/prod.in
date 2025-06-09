@@ -1,0 +1,5 @@
+-r base.in
+
+# Production-specific dependencies
+gunicorn==21.2.0
+gevent==24.2.1

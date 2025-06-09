@@ -1,0 +1,64 @@
+# TFSec Configuration
+# This file configures tfsec to ignore specific checks that are not applicable to this project
+
+# Ignore specific checks that are not applicable or have been reviewed
+# Format: 
+# - "CHECK_ID"  # Reason for ignoring
+
+# Example ignores (uncomment and modify as needed):
+# exclude:
+#   - AWS017  # The S3 bucket should have access logging enabled
+#   - AWS045  # The S3 bucket does not have public access restricted
+#   - AWS093  # Resource 'aws_iam_policy_document' includes an overly permissive Action
+
+# Only show issues of high or critical severity
+# severity: WARNING  # CRITICAL, HIGH, MEDIUM, LOW, NONE
+
+# Include additional checks that are not enabled by default
+include:
+  - general
+  - aws
+  - terraform
+
+# Custom severity overrides for specific checks
+# severity_overrides:
+#   AWS017: LOW  # Consider S3 access logging as low severity
+
+# Ignore directories
+# excluded_dirs:
+#   - modules/third-party/  # Ignore third-party modules
+
+# Ignore specific directories or files
+# excluded_files:
+#   - main_override.tf
+
+# Customize output format for CI/CD
+# output:
+#   format: json
+#   file: tfsec-results.json
+
+# Enable/disable specific modules
+# modules:
+#   aws: true
+#   azure: false
+#   gcp: false
+#   digitalocean: false
+#   github: false
+#   google: false
+#   nifcloud: false
+#   openstack: false
+#   oracle: false
+#   scaleway: false
+
+# Custom check definitions
+# custom_checks:
+#   - code: CUSTOM001
+#     description: "Custom check for specific requirement"
+#     required_types:
+#       - resource
+#     required_labels:
+#       - aws_s3_bucket
+#     severity: HIGH
+#     match:
+#       name: "example"
+#     error_message: "This is not allowed"

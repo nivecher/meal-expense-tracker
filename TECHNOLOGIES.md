@@ -4,7 +4,7 @@ This document provides an overview of the key technologies, frameworks, and serv
 
 ## Core Technologies
 
-### Python 3.13
+### Python 3.11
 - **Description**: The primary programming language used for the backend application.
 - **Website**: [https://www.python.org/](https://www.python.org/)
 
@@ -46,6 +46,11 @@ This document provides an overview of the key technologies, frameworks, and serv
 - **Website**: [https://www.terraform.io/](https://www.terraform.io/)
 
 ## Development Tools
+
+### tfsec
+- **Description**: Security scanner for Terraform code
+- **Purpose**: Static analysis of Terraform templates to spot potential security issues
+- **Website**: [https://aquasecurity.github.io/tfsec/](https://aquasecurity.github.io/tfsec/)
 
 ### Git
 - **Description**: Distributed version control system.

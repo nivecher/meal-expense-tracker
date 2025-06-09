@@ -1,0 +1,21 @@
+-r base.in
+
+# Testing
+pytest==8.2.2
+pytest-cov==4.1.0
+factory-boy==3.3.0
+Faker==25.3.0
+
+# Linting & Formatting
+black==25.1.0
+flake8==7.1.1
+isort==5.13.2
+mypy==1.10.0
+
+# Security
+bandit==1.8.3
+safety==2.3.5
+
+# Documentation
+sphinx==7.3.7
+sphinx-rtd-theme==2.0.0

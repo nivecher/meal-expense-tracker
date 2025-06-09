@@ -1,3 +1,4 @@
+from app import db
 from app.expenses.models import Expense
 
 
@@ -104,7 +105,7 @@ def test_edit_expense(client, auth, app):
     assert b"35.50" in response.data
     # Check the database for updated notes and amount
     with app.app_context():
-        expense = Expense.query.get(1)
+        expense = db.session.get(Expense, 1)
         assert expense.notes == "Updated expense"
         assert expense.amount == 35.50
 
@@ -158,7 +159,7 @@ def test_edit_expense_unauthorized(client, auth, app):
     assert b"You do not have permission to edit this expense." in response.data
     assert b"Meal Expenses" in response.data
     with app.app_context():
-        expense = Expense.query.get(1)
+        expense = db.session.get(Expense, 1)
         assert expense.notes == "Test expense"
         assert expense.amount == 25.50
 

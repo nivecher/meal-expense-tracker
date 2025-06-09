@@ -3,8 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyc
+*.pyo
+*.pyd
 .Python
-env/
+Python-3.11.0.tgz
+Python-3.11.0/
 build/
 develop-eggs/
 dist/
@@ -16,96 +20,93 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
-# Node.js dependencies
-node_modules/
-
 # Virtual Environment
 venv/
 ENV/
+env/
 
-# IDE
+# Node.js
+node_modules/
+.npm
+.yarn-integrity
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# IDEs and Editors
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-workspace
+*.sublime-project
 
-# Environment variables
+# TFSec
+tfsec-results.*
+.tfsec/
+.tfsec.log
+
+# Terraform (managed in terraform/.gitignore)
+/terraform/.gitignore
+
+# Environment files
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
 
 # Database
 *.db
 *.sqlite3
+*.sqlite
+*.sql
 
-# Logs
-*.log
-
-# mypy
-.mypy_cache/
-
-# OS
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Coverage
-.coverage*
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
 
-# pytest
-.pytest_cache/
+# Local development
+local_settings.py
 
-# Terraform
-.terraform/
-.terraform.lock.hcl
-*.tfstate
-*.tfstate.*
-terraform.tfvars
-*.tfvars.json
-*.tfvars
-*.tfvars.backup
-*.tfplan
-*.tfplan.*
-.terraformrc
-terraform.rc
-
-# Crash log files
-crash.log
-
-# Exclude all .tfvars files, which are likely to contain sentitive data, such as
-# password, private keys, and other secrets. These should not be part of version
-# control as they are data points which are potentially sensitive and subject
-# to change depending on the environment.
-#
-#*.tfvars
-
-# Ignore override files as they are usually used to override resources locally and so
-# are not checked in
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-
-# Include override files you do wish to add to version control using negated pattern
-#
-# !example_override.tf
-
-# Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
-# example: *tfplan*
-
-# Ignore Terraform plan files
-tfplan
-
-# Ignore CLI configuration files
-.terraformrc
-terraform.rc
-
-# Ignore terraform locks
-.terraform.lock.hcl
-
-# Ignore terragrunt cache
-.terragrunt-cache
 
 testing/
 cache/

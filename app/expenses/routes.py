@@ -140,7 +140,7 @@ def add_expense():
     restaurant_id = request.args.get("restaurant_id")
     restaurant = None
     if restaurant_id:
-        restaurant = Restaurant.query.get(restaurant_id)
+        restaurant = db.session.get(Restaurant, restaurant_id)
         if not restaurant:
             flash("Restaurant not found.", "error")
             return redirect(url_for("main.index"))
@@ -150,7 +150,7 @@ def add_expense():
         restaurant_id = request.form.get("restaurant_id")
         restaurant_type = None
         if restaurant_id:
-            restaurant = Restaurant.query.get(restaurant_id)
+            restaurant = db.session.get(Restaurant, restaurant_id)
             if restaurant:
                 restaurant_type = restaurant.type
         type_to_category = {
@@ -245,7 +245,7 @@ def edit_expense(expense_id):
         restaurant_id = request.form.get("restaurant_id")
         restaurant_type = None
         if restaurant_id:
-            restaurant = Restaurant.query.get(restaurant_id)
+            restaurant = db.session.get(Restaurant, restaurant_id)
             if restaurant:
                 restaurant_type = restaurant.type
         type_to_category = {

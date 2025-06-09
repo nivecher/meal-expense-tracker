@@ -5,6 +5,20 @@ set -e
 
 echo "Setting up local development environment..."
 
+# Install system dependencies
+echo "Installing system dependencies..."
+if command -v apt-get >/dev/null 2>&1; then
+    # Debian/Ubuntu
+    sudo apt-get update
+    sudo apt-get install -y libsqlite3-dev
+elif command -v yum >/dev/null 2>&1; then
+    # RHEL/CentOS
+    sudo yum install -y sqlite-devel
+elif command -v brew >/dev/null 2>&1; then
+    # macOS
+    brew install sqlite
+fi
+
 echo "Installing Python dependencies..."
 pip install --upgrade pip
 pip install pip-tools
@@ -31,9 +45,9 @@ if [ ! -f requirements-dev.in ]; then
     echo "black>=23.11.0" >> requirements-dev.in
     echo "flake8>=6.1.0" >> requirements-dev.in
     echo "mypy>=1.6.1" >> requirements-dev.in
-    echo "mypy-extensions>=1.1.0" >> requirements-dev.in
+    # Add security tools
     echo "bandit>=1.7.5" >> requirements-dev.in
-    echo "checkov>=3.2.437" >> requirements-dev.in
+    echo "safety>=2.3.0" >> requirements-dev.in
     echo "typing-extensions>=4.4.0" >> requirements-dev.in
     echo "sphinx>=7.1.2" >> requirements-dev.in
     echo "sphinx-rtd-theme>=1.3.0" >> requirements-dev.in
@@ -54,9 +68,8 @@ echo "Installing pre-commit hooks..."
 pip install pre-commit
 pre-commit install --install-hooks
 
-# Install security scanning tools
-echo "Installing security scanning tools..."
-pip install bandit checkov
+# Install development tools
+pip install bandit
 
 # Install Docker and Docker Compose
 echo "Installing Docker..."

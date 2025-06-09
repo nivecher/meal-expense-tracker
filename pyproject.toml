@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel", "setuptools_scm>=7.0.0"]
+requires = ["setuptools>=45", "wheel", "setuptools_scm>=7.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,11 +8,16 @@ description = "A Flask-based web application for tracking meal expenses"
 authors = [
     { name = "nivecher", email = "mtd37@hotmail.com" }
 ]
-requires-python = ">=3.13.3"
+requires-python = ">=3.8"
 dynamic = ["version"]
 
 [tool.setuptools.dynamic]
-version = {attr = "setuptools_scm.version"}
+version = {attr = "app.__version__"}
+
+[tool.setuptools_scm]
+write_to = "app/_version.py"
+write_to_template = "__version__ = '{version}'"
+
 
 [tool.setuptools]
 packages = ['app']
@@ -32,7 +37,7 @@ profile = "black"
 multi_line_output = 3
 
 [tool.mypy]
-python_version = "3.13.3"
+python_version = "3.11.0"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

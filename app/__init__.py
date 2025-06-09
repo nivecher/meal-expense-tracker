@@ -2,9 +2,6 @@ import os
 import json
 import logging
 import boto3
-import flask
-import sqlalchemy
-import importlib.metadata
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -17,10 +14,12 @@ import click
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Version information
+# Version information - will be set by setuptools-scm
 try:
-    __version__ = importlib.metadata.version("meal-expense-tracker")
-except importlib.metadata.PackageNotFoundError:
+    from ._version import __version__
+except ImportError:
+    # Fallback if _version.py doesn't exist yet
+    __version__ = "0.0.0"
     __version__ = "development"
 
 version = {"app": __version__}
@@ -68,9 +67,6 @@ def create_app(config_class=None):
     login_manager.init_app(app)
 
     # Import models after extensions are initialized
-    from app.auth import models as auth_models
-    from app.restaurants import models as restaurant_models
-    from app.expenses import models as expense_models
 
     # Register blueprints
     from app.auth import bp as auth_bp
