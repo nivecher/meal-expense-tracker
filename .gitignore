@@ -9,6 +9,10 @@ __pycache__/
 .Python
 Python-3.13.0.tgz
 Python-3.13.0/
+
+# Temporary requirements files
+.requirements.in
+.requirements-*.in
 build/
 develop-eggs/
 dist/
