@@ -1,3 +1,4 @@
+# Default AWS provider
 provider "aws" {
   region = var.aws_region
 
@@ -13,9 +14,19 @@ provider "aws" {
   }
 }
 
-provider "random" {}
+# Provider for ACM certificates in us-east-1 (required for API Gateway custom domains)
+provider "aws" {
+  alias  = "us-east-1"
+  region = "us-east-1"
 
-# Get current AWS account and region
-data "aws_caller_identity" "current" {}
-data "aws_region" "current" {}
-data "aws_availability_zones" "available" {}
+  default_tags {
+    tags = merge(
+      {
+        Environment = var.environment
+        Application = var.app_name
+        ManagedBy   = "Terraform"
+      },
+      var.tags
+    )
+  }
+}

@@ -7,8 +7,8 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-Python-3.11.0.tgz
-Python-3.11.0/
+Python-3.13.0.tgz
+Python-3.13.0/
 build/
 develop-eggs/
 dist/
@@ -24,11 +24,55 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.python-version
 
 # Virtual Environment
 venv/
 ENV/
 env/
+.venv/
+
+# Local development
+.env
+.env.local
+.env.*.local
+!.env.example
+.flaskenv
+
+# Docker
+docker-compose.override.yml
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Logs
+*.log
+
+# Local development
+instance/
+.webassets-cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
 
 # Node.js
 node_modules/
@@ -57,15 +101,52 @@ tfsec-results.*
 .tfsec/
 .tfsec.log
 
-# Terraform (managed in terraform/.gitignore)
-/terraform/.gitignore
+# Terraform
+**/.terraform/*
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/terraform.tfstate.lock.info
+terraform/.terraform.tfstate.lock.info
+**/*.tfstate
+**/*.tfstate.*
+**/terraform.tfstate.backup
+**/terraform*.tfstate.backup*
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+**/.terraformrc
+**/terraform.rc
+**/crash.log
+**/*.tfvars
+**/*.tfplan
+**/plan.out
+**/*.tfplan.json
+**/*.tfvars.json
+**/plan.out
+**/*.plan
+**/.terraform-docs*
+
+# Backend configuration
+**/backend.hcl
+!terraform/backend.hcl
+**/backend.hcl.*
+**/backend.tf
+!terraform/backend.tf
+**/backend.tf.*
+**/backend-*.tf
+**/backend-*.hcl
+**/config/backend.hcl
+**/config/backend-*.hcl
+**/environments/*/backend.hcl
+**/environments/*/backend-*.hcl
 
 # Environment files
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!.env.sample
+!.env.template
 
 # Logs
 logs/
@@ -81,6 +162,14 @@ yarn-error.log*
 htmlcov/
 .tox/
 .nox/
+.coveragerc
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.pytest_cache/*
+!.pytest_cache/.gitkeep
 
 # Type checking
 .mypy_cache/
@@ -99,6 +188,16 @@ htmlcov/
 .Trashes
 ehthumbs.db
 Thumbs.db
+*~
+*#
+*#*
+.#*
+*.bak
+*.swp
+*.swo
+*~
+.~*~
+Thumbs.db
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -113,4 +212,10 @@ cache/
 .serverless/
 .serverless*
 
+*.zip
+
 package-lock.json
+package
+package/*
+tmp
+tmp/*

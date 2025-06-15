@@ -126,6 +126,23 @@ def apply_sorting(query, sort_by, sort_order):
 
 
 @bp.route("/health")
+@bp.route("/api/health")  # Support both paths for backward compatibility
 def health_check():
-    """Health check endpoint for AWS ALB."""
-    return "ok", 200
+    """Health check endpoint for AWS ALB and API Gateway.
+
+    Returns:
+        JSON: Status and version information
+    """
+    from flask import jsonify
+    from app import version
+
+    return (
+        jsonify(
+            {
+                "status": "healthy",
+                "version": version.get("app", "unknown"),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        ),
+        200,
+    )

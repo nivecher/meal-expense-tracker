@@ -3,115 +3,196 @@
 # Exit on error
 set -e
 
-echo "Setting up local development environment..."
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# Install system dependencies
-echo "Installing system dependencies..."
-if command -v apt-get >/dev/null 2>&1; then
+# Function to print section headers
+section() {
+  echo -e "\n${GREEN}=== $1 ===${NC}"
+}
+
+# Function to install system packages
+install_packages() {
+  local packages=("$@")
+  if command -v apt-get >/dev/null 2>&1; then
     # Debian/Ubuntu
     sudo apt-get update
-    sudo apt-get install -y libsqlite3-dev
-elif command -v yum >/dev/null 2>&1; then
+    sudo apt-get install -y "${packages[@]}" || true
+  elif command -v yum >/dev/null 2>&1; then
     # RHEL/CentOS
-    sudo yum install -y sqlite-devel
-elif command -v brew >/dev/null 2>&1; then
+    sudo yum install -y "${packages[@]}" || true
+  elif command -v dnf >/dev/null 2>&1; then
+    # Fedora
+    sudo dnf install -y "${packages[@]}" || true
+  elif command -v brew >/dev/null 2>&1; then
     # macOS
-    brew install sqlite
+    brew install "${packages[@]}" || true
+  else
+    echo -e "${YELLOW}Warning: Could not determine package manager. Please install dependencies manually.${NC}"
+    return 1
+  fi
+}
+
+# Function to install Terraform
+install_terraform() {
+  section "Installing Terraform"
+
+  # Check if Terraform is already installed
+  if command -v terraform >/dev/null 2>&1; then
+    echo -e "${YELLOW}Terraform is already installed.${NC}"
+    terraform version
+    return 0
+  fi
+
+  # Create temp directory
+  local tmp_dir
+  tmp_dir=$(mktemp -d)
+
+  # Download and install Terraform
+  if command -v apt-get >/dev/null 2>&1; then
+    # For Debian/Ubuntu
+    wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+    sudo apt-get update
+    sudo apt-get install -y terraform
+  elif command -v yum >/dev/null 2>&1; then
+    # For RHEL/CentOS
+    sudo yum install -y yum-utils
+    sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+    sudo yum -y install terraform
+  elif command -v dnf >/dev/null 2>&1; then
+    # For Fedora
+    sudo dnf install -y dnf-plugins-core
+    sudo dnf config-manager --add-repo https://rpm.releases.hashicorp.com/fedora/hashicorp.repo
+    sudo dnf -y install terraform
+  elif command -v brew >/dev/null 2>&1; then
+    # For macOS
+    brew tap hashicorp/tap
+    brew install hashicorp/tap/terraform
+  else
+    # Fallback to manual installation
+    echo -e "${YELLOW}Unsupported system. Attempting manual installation...${NC}"
+    local tf_ver="1.5.7" # You can update this to the latest version
+    local os_arch
+    os_arch=$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/')
+    local tf_url="https://releases.hashicorp.com/terraform/${tf_ver}/terraform_${tf_ver}_${os_arch}.zip"
+
+    wget -q "$tf_url" -O "${tmp_dir}/terraform.zip"
+    unzip -o "${tmp_dir}/terraform.zip" -d "${tmp_dir}"
+    sudo install -o root -g root -m 0755 "${tmp_dir}/terraform" /usr/local/bin/terraform
+  fi
+
+  # Clean up
+  rm -rf "$tmp_dir"
+
+  # Verify installation
+  if command -v terraform >/dev/null 2>&1; then
+    echo -e "${GREEN}Terraform installed successfully!${NC}"
+    terraform version
+  else
+    echo -e "${YELLOW}Failed to install Terraform. Please install it manually.${NC}"
+    return 1
+  fi
+}
+
+# Function to install Python requirements
+install_python_requirements() {
+  section "Setting up Python virtual environment"
+
+  # Create virtual environment if it doesn't exist
+  if [ ! -d "venv" ]; then
+    python3 -m venv venv
+  fi
+
+  # Activate virtual environment
+  source venv/bin/activate
+
+  # Upgrade pip and install pip-tools
+  python3 -m pip install --upgrade pip
+  pip install pip-tools
+
+  # Install base requirements
+  section "Installing base requirements"
+  pip install -r requirements/base.in
+
+  # Install pre-commit, toml, and development requirements
+  pip install pre-commit toml
+
+  # Install development requirements
+  section "Installing development requirements"
+  pip install -r requirements/dev.in
+
+  # Install security requirements
+  section "Installing security requirements"
+  pip install -r requirements/security.in
+
+  # Install pre-commit hooks
+  section "Setting up pre-commit hooks"
+  pre-commit install
+}
+
+echo -e "\n${GREEN}🚀 Setting up local development environment...${NC}"
+
+# Store the current directory
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+# Install system dependencies
+section "Installing system dependencies"
+if command -v apt-get >/dev/null 2>&1; then
+  # Debian/Ubuntu
+  install_packages libsqlite3-dev sqlite3 python3-pip python3-venv git curl jq unzip shfmt
+elif command -v yum >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then
+  # RHEL/CentOS/Fedora
+  install_packages python3-devel sqlite-devel gcc git curl jq unzip shfmt
+else
+  echo -e "${YELLOW}Unsupported system. Please install dependencies manually.${NC}"
+  exit 1
 fi
 
-echo "Installing Python dependencies..."
-pip install --upgrade pip
-pip install pip-tools
+# Install Python requirements
+install_python_requirements
 
-# Create requirements files if they don't exist
-if [ ! -f requirements.in ]; then
-    echo "Creating requirements.in..."
-    echo "Flask>=3.1.1" > requirements.in
-    echo "Flask-SQLAlchemy>=3.1.1" >> requirements.in
-    echo "Flask-Login>=0.6.3" >> requirements.in
-    echo "Flask-Migrate>=4.0.5" >> requirements.in
-    echo "Flask-WTF>=1.2.1" >> requirements.in
-    echo "psycopg2-binary>=2.9.9" >> requirements.in
-    echo "python-dotenv>=1.0.0" >> requirements.in
-    echo "boto3>=1.38.32" >> requirements.in
-    echo "botocore>=1.38.32" >> requirements.in
-fi
+# Install Terraform
+install_terraform
 
-if [ ! -f requirements-dev.in ]; then
-    echo "Creating requirements-dev.in..."
-    echo "-r requirements.in" > requirements-dev.in
-    echo "pytest>=7.4.3" >> requirements-dev.in
-    echo "pytest-cov>=4.1.0" >> requirements-dev.in
-    echo "black>=23.11.0" >> requirements-dev.in
-    echo "flake8>=6.1.0" >> requirements-dev.in
-    echo "mypy>=1.6.1" >> requirements-dev.in
-    # Add security tools
-    echo "bandit>=1.7.5" >> requirements-dev.in
-    echo "safety>=2.3.0" >> requirements-dev.in
-    echo "typing-extensions>=4.4.0" >> requirements-dev.in
-    echo "sphinx>=7.1.2" >> requirements-dev.in
-    echo "sphinx-rtd-theme>=1.3.0" >> requirements-dev.in
-    echo "pre-commit>=3.3.3" >> requirements-dev.in
-    echo "ipython>=8.12.0" >> requirements-dev.in
-fi
-
-# Generate requirements files
-pip-compile requirements.in
-pip-compile requirements-dev.in
-
-# Install dependencies
-pip install -r requirements-dev.txt
-echo "Skipping package installation due to setuptools-scm versioning issues"
-
-# Install pre-commit hooks
-echo "Installing pre-commit hooks..."
-pip install pre-commit
-pre-commit install --install-hooks
-
-# Install development tools
-pip install bandit
+# Print completion message
+section "Setup Complete!"
+echo -e "\n${GREEN}✅ Development environment setup is complete!${NC}"
+echo -e "\nTo activate the virtual environment, run:"
+echo -e "  source venv/bin/activate\n"
 
 # Install Docker and Docker Compose
 echo "Installing Docker..."
 sudo apt-get update
 sudo apt-get install -y docker.io docker-compose
-sudo usermod -aG docker $USER
+sudo usermod -aG docker "$USER"
 
 # Update version from git tags
-python scripts/update-version.py
-
-# Exit if version update failed
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to update version from git tags"
-    exit 1
+if ! python scripts/update-version.py; then
+  echo "Error: Failed to update version from git tags"
+  exit 1
 fi
 
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
-    echo "Creating .env file..."
-    echo "FLASK_APP=app.py" > .env
-    echo "FLASK_ENV=development" >> .env
-    echo "DATABASE_URL=postgresql://localhost:5432/meal_expenses" >> .env
-    echo "SECRET_KEY=your-secret-key-here" >> .env
+  echo "Creating .env file..."
+  {
+    echo "FLASK_APP=app.py"
+    echo "FLASK_ENV=development"
+    echo "DATABASE_URL=postgresql://localhost:5432/meal_expenses"
+    echo "SECRET_KEY=your-secret-key-here"
+  } >.env
 fi
 
 # Initialize database
 echo "Initializing database..."
 python init_db.py
 
-# Build and start containers
-echo "Building and starting containers..."
-docker-compose up -d --build
-
-# Run security scans
-echo "Running security scans..."
-bandit -r app/
-
-# Run code quality checks
-echo "Running code quality checks..."
-black . --check
-flake8 app/
-mypy app/
+# Run locally
+make run
 
 echo "Local development environment setup complete!"
-echo "Access the application at http://localhost:5000"
+exit 0

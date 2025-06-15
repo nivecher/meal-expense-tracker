@@ -1,28 +1,45 @@
-version: '3.8'
-
 services:
   web:
-    build: .
+    build:
+      context: .
+      target: development
     ports:
-      - "5000:5000"
+      - "5001:5001"
     volumes:
       - .:/app
+      - app_instance:/app/instance
     environment:
       - FLASK_APP=wsgi.py
       - FLASK_ENV=development
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/meal_expense_tracker
+      - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5432/meal_expenses
+      - PYTHONUNBUFFERED=1
+      - FLASK_DEBUG=1
     depends_on:
-      - db
-    command: sh -c "flask db upgrade && flask run --host=0.0.0.0"
+      db:
+        condition: service_healthy
+    command: flask run --host=0.0.0.0 --port=5001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   db:
-    image: postgres:13
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
+    image: postgres:16
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=meal_expense_tracker
+      - POSTGRES_USER=mealuser
+      - POSTGRES_PASSWORD=mealpassword
+      - POSTGRES_DB=meal_expenses
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mealuser -d meal_expenses"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
+  app_instance:

@@ -17,6 +17,7 @@ exclude =
     .serverless*
     cache,
     node_modules
+    Python-3.13.0
 per-file-ignores =
     __init__.py: F401
     tests/*: S101

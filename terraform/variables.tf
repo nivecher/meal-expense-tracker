@@ -32,48 +32,7 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
-variable "db_instance_class" {
-  description = "The instance class of the RDS instance"
-  type        = string
-  default     = "db.t3.micro"
-}
-
-variable "db_allocated_storage" {
-  description = "The allocated storage in GB"
-  type        = number
-  default     = 20
-}
-
-variable "db_engine" {
-  description = "The database engine to use"
-  type        = string
-  default     = "postgres"
-}
-
-variable "db_engine_version" {
-  description = "The engine version to use"
-  type        = string
-  default     = "14.5"
-}
-
-variable "db_parameter_group_name" {
-  description = "Name of the DB parameter group"
-  type        = string
-  default     = "default.postgres14"
-}
-
-variable "db_skip_final_snapshot" {
-  description = "Determines whether a final DB snapshot is created before the DB instance is deleted"
-  type        = bool
-  default     = true
-}
-
-variable "db_backup_retention_period" {
-  description = "The days to retain backups for"
-  type        = number
-  default     = 7
-}
-
+# Database configuration is handled in the RDS module
 variable "lambda_memory_size" {
   description = "Memory size for Lambda function in MB"
   type        = number
@@ -83,6 +42,24 @@ variable "lambda_memory_size" {
     condition     = var.lambda_memory_size >= 128 && var.lambda_memory_size <= 10240 && floor(var.lambda_memory_size) == var.lambda_memory_size
     error_message = "Lambda memory size must be between 128MB and 10240MB in 1MB increments."
   }
+}
+
+variable "cert_domain" {
+  description = "Domain name for the SSL certificate (e.g., '*.example.com'). Set to null to disable custom domain."
+  type        = string
+  default     = null
+}
+
+variable "api_domain_name" {
+  description = "Custom domain name for the API (e.g., 'api.example.com'). Set to null to disable custom domain."
+  type        = string
+  default     = null
+}
+
+variable "create_route53_records" {
+  description = "Whether to create Route53 records for the API domain"
+  type        = bool
+  default     = true
 }
 
 variable "lambda_timeout" {

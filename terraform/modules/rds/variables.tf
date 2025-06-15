@@ -23,3 +23,8 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "db_kms_key_arn" {
+  description = "The ARN of the KMS key to use for encrypting the database"
+  type        = string
+}

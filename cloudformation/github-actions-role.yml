@@ -5,9 +5,11 @@ Parameters:
   GitHubOrg:
     Type: String
     Description: GitHub organization/user name
+    Default: nivecher
   RepositoryName:
     Type: String
     Description: GitHub repository name
+    Default: meal-expense-tracker
 
 Resources:
   GitHubActionsRole:

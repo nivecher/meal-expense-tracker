@@ -2,45 +2,57 @@ name: Production Deployment
 
 on:
   release:
-    types: [created]
+    types: [published]
   workflow_dispatch:
-    # Optional: Add input parameters for manual triggering
     inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        default: 'prod'
-        type: choice
-        options:
-          - staging
-          - prod
-          # Add other environments as needed
+      version:
+        description: 'Version to deploy (defaults to latest release)'
+        required: false
+        type: string
+      force:
+        description: 'Force deployment even if checks are failing'
+        required: false
+        type: boolean
+        default: false
 
 # Environment variables
 env:
   # Application settings
-  PYTHON_VERSION: '3.11'  # Match version with CI workflow
+  PYTHON_VERSION: '3.13'
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ${{ github.repository_owner }}/meal-expense-tracker
+  VERSION: ${{ github.event.release.tag_name || github.event.inputs.version || 'latest' }}
 
   # AWS settings
   AWS_REGION: us-east-1
   ECR_REPOSITORY: meal-expense-tracker
   ENVIRONMENT: prod
+  LAMBDA_FUNCTION_NAME: meal-expense-tracker-prod
 
-  # Terraform settings
-  TF_VERSION: '1.6.0'  # Match version with other workflows
+  # Container settings
+  CONTAINER_PORT: 5000
+  HOST_PORT: 5000
 
   # Security settings
   DOCKER_CONTENT_TRUST: 1
 
-  # Output settings
+  # Terraform settings
+  TF_VERSION: '1.6.0'
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: '0'
   TF_CLI_ARGS_plan: '-lock-timeout=300s'
   TF_CLI_ARGS_apply: '-auto-approve -lock-timeout=300s'
 
   # Application configuration
   APP_NAME: meal-expense-tracker
-  LAMBDA_FUNCTION_NAME: meal-expense-tracker-prod  # Direct reference instead of using env vars
+  NAMESPACE: 'meal-tracker'
+
+  # Monitoring
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Feature flags
+  ENABLE_FEATURE_X: 'true'
+  ENABLE_FEATURE_Y: 'false'
 
 permissions:
   contents: read

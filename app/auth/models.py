@@ -7,7 +7,7 @@ class User(UserMixin, db.Model):
     __tablename__ = "user"
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    password_hash = db.Column(db.String(256))
     expenses = db.relationship("Expense", backref="user", lazy="dynamic")
 
     def set_password(self, password):

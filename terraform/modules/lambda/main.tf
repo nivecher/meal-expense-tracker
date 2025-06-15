@@ -4,16 +4,24 @@ resource "aws_lambda_function" "main" {
   role          = var.lambda_role_arn
 
   # Use the packaged Lambda deployment
-  filename         = "${path.module}/../../app.zip"
-  source_code_hash = filebase64sha256("${path.module}/../../app.zip")
+  filename         = "${path.module}/../../../dist/app.zip"
+  source_code_hash = filebase64sha256("${path.module}/../../../dist/app.zip")
 
-  # Runtime settings
-  runtime     = "python3.11"
-  handler     = "app.main.lambda_handler"
+  # Runtime settings - optimized for cost
+  runtime     = "python3.13"
+  handler     = "wsgi.handler" # Points to the handler function in wsgi.py
   memory_size = var.memory_size
   timeout     = var.timeout
 
-  # Environment variables
+  # Cost optimization: Use ARM architecture (cheaper and often faster for Lambda)
+  architectures = ["arm64"]
+
+  # Cost optimization: Enable ephemeral storage for performance without cost
+  ephemeral_storage {
+    size = 512 # MB - minimum size to avoid performance issues
+  }
+
+  # Environment variables with KMS encryption
   environment {
     variables = {
       ENVIRONMENT           = var.environment
@@ -26,15 +34,21 @@ resource "aws_lambda_function" "main" {
     }
   }
 
+  # Enable KMS encryption for environment variables
+  kms_key_arn = var.lambda_kms_key_arn
+
   # VPC configuration
   vpc_config {
     security_group_ids = var.lambda_security_group_ids
     subnet_ids         = var.subnet_ids
   }
 
-  # Dead Letter Queue
-  dead_letter_config {
-    target_arn = aws_sns_topic.lambda_dlq.arn
+  # Dead Letter Queue (if configured)
+  dynamic "dead_letter_config" {
+    for_each = var.dead_letter_queue_arn != null ? [1] : []
+    content {
+      target_arn = var.dead_letter_queue_arn
+    }
   }
 
   # Monitoring and logging
@@ -47,48 +61,21 @@ resource "aws_lambda_function" "main" {
   }, var.tags)
 
   # Ensure the deployment package exists
-  depends_on = [
-    aws_sns_topic.lambda_dlq,
-    aws_sns_topic_policy.lambda_dlq_policy
-  ]
+  depends_on = []
 }
 
-# SNS Topic for Dead Letter Queue
-resource "aws_sns_topic" "lambda_dlq" {
-  name = "${var.app_name}-${var.environment}-lambda-dlq"
+# SNS Topic for Dead Letter Queue is now created in the root module
 
-  tags = merge({
-    Name = "${var.app_name}-${var.environment}-lambda-dlq"
-  }, var.tags)
-}
-
-# Allow Lambda service to publish to the DLQ
-resource "aws_sns_topic_policy" "lambda_dlq_policy" {
-  arn    = aws_sns_topic.lambda_dlq.arn
-  policy = data.aws_iam_policy_document.lambda_dlq_policy.json
-}
-
-data "aws_iam_policy_document" "lambda_dlq_policy" {
-  statement {
-    effect  = "Allow"
-    actions = ["SNS:Publish"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-
-    resources = [aws_sns_topic.lambda_dlq.arn]
-  }
-}
-
-# CloudWatch Log Group for Lambda
+# CloudWatch Log Group for Lambda with KMS encryption
 resource "aws_cloudwatch_log_group" "lambda" {
   name              = "/aws/lambda/${aws_lambda_function.main.function_name}"
   retention_in_days = var.environment == "prod" ? 90 : 30
+  kms_key_id        = var.logs_kms_key_arn
 
   tags = merge({
-    Name = "${var.app_name}-${var.environment}-lambda-logs"
+    Name        = "${var.app_name}-${var.environment}-lambda-logs"
+    Environment = var.environment
+    ManagedBy   = "terraform"
   }, var.tags)
 }
 

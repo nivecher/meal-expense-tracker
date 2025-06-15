@@ -1,0 +1,201 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for Terraform backend resources (S3 bucket, DynamoDB table, and KMS keys)'
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+    Description: Environment name (e.g., dev, staging, prod)
+    AllowedPattern: '[a-zA-Z0-9-]+'
+    ConstraintDescription: Must contain only alphanumeric characters and hyphens
+
+Conditions:
+  IsProd: !Equals [!Ref EnvironmentName, 'prod']
+
+Resources:
+  # KMS Key for S3 bucket encryption
+  S3KmsKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: KMS key for encrypting Terraform state bucket
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+
+  S3KmsKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/meal-expense-tracker-tfstate-key-${EnvironmentName}'
+      TargetKeyId: !Ref S3KmsKey
+
+  # KMS Key for DynamoDB table encryption
+  DynamoDBKmsKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: KMS key for encrypting Terraform state lock table
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+
+  DynamoDBKmsKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/meal-expense-tracker-tflock-key-${EnvironmentName}'
+      TargetKeyId: !Ref DynamoDBKmsKey
+
+  # Main S3 Bucket for Terraform State
+  TerraformStateBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "meal-expense-tracker-tfstate-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !GetAtt S3KmsKey.Arn
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: KeepAllVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  # Access Logs Bucket for S3
+  AccessLogsKMSKey:
+    Type: AWS::KMS::Key
+    Condition: IsProd
+    Properties:
+      Description: CMK for encrypting S3 access logs bucket
+      EnableKeyRotation: true
+
+  AccessLogsBucket:
+    Type: AWS::S3::Bucket
+    Condition: IsProd
+    Properties:
+      BucketName: !Sub '${AWS::AccountId}-${AWS::Region}-meal-expense-tracker-tfstate-logs'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref AccessLogsKMSKey
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: KeepAllVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  TerraformStateBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: TerraformStateBucket
+    Properties:
+      Bucket: !Ref TerraformStateBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow account root user full access (simplified for testing)
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${TerraformStateBucket}'
+              - !Sub 'arn:aws:s3:::${TerraformStateBucket}/*'
+
+  TerraformStateLockTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "meal-expense-tracker-tflock-${EnvironmentName}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: LockID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: LockID
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !GetAtt DynamoDBKmsKey.Arn
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+Outputs:
+  StateBucketName:
+    Description: Name of the S3 bucket for Terraform state
+    Value: !Ref TerraformStateBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-StateBucketName"
+
+  StateLockTableName:
+    Description: Name of the DynamoDB table for state locking
+    Value: !Ref TerraformStateLockTable
+    Export:
+      Name: !Sub "${AWS::StackName}-StateLockTableName"
+
+  StateBucketArn:
+    Description: ARN of the S3 bucket for Terraform state
+    Value: !GetAtt TerraformStateBucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-StateBucketArn"
+
+  S3KmsKeyArn:
+    Description: ARN of the KMS key used for S3 bucket encryption
+    Value: !GetAtt S3KmsKey.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-S3KmsKeyArn"
+
+  DynamoDBKmsKeyArn:
+    Description: ARN of the KMS key used for DynamoDB table encryption
+    Value: !GetAtt DynamoDBKmsKey.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-DynamoDBKmsKeyArn"
+
+  AccessLogsBucketName:
+    Description: Name of the S3 bucket for access logs (if created)
+    Condition: IsProd
+    Value: !If [IsProd, !Ref AccessLogsBucket, !Ref 'AWS::NoValue']
+    Export:
+      Name: !Sub "${AWS::StackName}-AccessLogsBucketName"

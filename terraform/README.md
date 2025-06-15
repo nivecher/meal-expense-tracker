@@ -30,7 +30,7 @@ terraform/
 
 - Terraform >= 1.2.0
 - AWS CLI configured with appropriate credentials
-- Python 3.11 (for Lambda runtime)
+- Python 3.13 (for Lambda runtime)
 
 ## Getting Started
 

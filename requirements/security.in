@@ -1,3 +1,3 @@
 # Security tools
-bandit==1.7.4
-safety==1.10.3
+bandit>=1.7.0,<2.0.0
+safety>=2.3.0,<2.4.0  # Version with compatible packaging requirements

@@ -25,6 +25,7 @@ output "db_password" {
   sensitive   = true
 }
 
+
 output "db_secret_arn" {
   description = "The ARN of the database secret in Secrets Manager"
   value       = aws_secretsmanager_secret.db_credentials.arn

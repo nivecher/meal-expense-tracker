@@ -50,3 +50,19 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "logs_kms_key_arn" {
+  description = "The ARN of the KMS key to use for encrypting CloudWatch Logs"
+  type        = string
+}
+
+variable "lambda_kms_key_arn" {
+  description = "The ARN of the KMS key used to encrypt Lambda environment variables"
+  type        = string
+}
+
+variable "dead_letter_queue_arn" {
+  description = "ARN of the SNS topic to use as a dead-letter queue for the Lambda function. If not provided, no DLQ will be configured."
+  type        = string
+  default     = null
+}

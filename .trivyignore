@@ -1,0 +1,3 @@
+# Ignore S3 bucket logging requirements for the Terraform backend buckets
+# These are intentionally configured this way to avoid circular dependencies
+AVD-AWS-0089 # S3 Bucket should have access logging enabled

@@ -3,21 +3,27 @@ name: CI/CD
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   pull_request:
     branches: [ main ]
     types: [opened, synchronize, reopened]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
 
 # Environment variables
 env:
   # Application settings
-  PYTHON_VERSION: '3.11'  # Using a stable Python LTS version
+  PYTHON_VERSION: '3.13'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   PYTHONPATH: ${{ github.workspace }}
   FLASK_APP: app
   FLASK_ENV: test
-  # Use in-memory SQLite for tests to avoid file system issues
-  DATABASE_URL: 'sqlite:///:memory:'
+  DATABASE_URL: 'postgresql+psycopg2://postgres:postgres@localhost:5432/test_meal_expenses'
+  TESTING: 'true'
 
   # CI/CD settings
   IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
@@ -29,7 +35,15 @@ env:
   POETRY_CACHE_DIR: ~/.cache/pypoetry
 
   # Security settings
-  DOCKER_CONTENT_TRUST: 1  # Enable Docker Content Trust
+  DOCKER_CONTENT_TRUST: 1
+  PYTHONUNBUFFERED: 1
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  checks: write
+  statuses: write
 
 jobs:
   setup:
@@ -128,20 +142,6 @@ jobs:
           coverage report -m
           coverage xml
 
-      - name: Upload unit test coverage
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          name: unit-coverage
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Upload SARIF results
-        if: always()
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: results.sarif
-
   build:
     needs: check
     runs-on: ubuntu-latest
@@ -183,8 +183,38 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  security-scan:
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '.'  # Scan the repository root
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          # Scan for vulnerabilities, misconfigurations, and secrets
+          scan-type: 'fs'
+          ignore-unfixed: true
+          # Skip files that don't need to be scanned
+          skip-files: '**/node_modules/**,**/vendor/**,**/dist/**'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
   integration:
-    needs: build
+    needs: [build, security-scan]
     runs-on: ubuntu-latest
     permissions:
       contents: read

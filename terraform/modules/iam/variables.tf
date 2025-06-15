@@ -1,3 +1,8 @@
+variable "region" {
+  description = "AWS region where resources will be created"
+  type        = string
+}
+
 variable "app_name" {
   description = "Name of the application"
   type        = string
@@ -5,11 +10,6 @@ variable "app_name" {
 
 variable "environment" {
   description = "Deployment environment (dev, staging, prod)"
-  type        = string
-}
-
-variable "region" {
-  description = "AWS region"
   type        = string
 }
 

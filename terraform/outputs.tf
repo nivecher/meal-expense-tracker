@@ -8,10 +8,6 @@ output "api_domain_name" {
   value       = module.api_gateway.domain_name
 }
 
-data "aws_caller_identity" "current" {}
-
-data "aws_region" "current" {}
-
 output "lambda_function_name" {
   description = "The name of the Lambda function"
   value       = module.lambda.function_name
@@ -46,6 +42,16 @@ output "private_subnet_ids" {
 output "public_subnet_ids" {
   description = "List of public subnet IDs"
   value       = module.network.public_subnet_ids
+}
+
+output "kms_key_arn" {
+  description = "The ARN of the KMS key used for encryption"
+  value       = aws_kms_key.main.arn
+}
+
+output "kms_key_id" {
+  description = "The ID of the KMS key used for encryption"
+  value       = aws_kms_key.main.key_id
 }
 
 output "cloudwatch_log_group_names" {

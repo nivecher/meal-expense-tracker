@@ -52,15 +52,18 @@ def register():
             return render_template("auth/register.html", username=username)
 
         try:
+            print(f"Attempting to create user: {username}")  # Debug log
             user = User(username=username)
             user.set_password(password)
             db.session.add(user)
             db.session.commit()
+            print(f"Successfully created user: {username}")  # Debug log
             flash("Registration successful! Please login.", "success")
             return redirect(url_for("auth.login"))
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.session.rollback()
-            flash("Error creating user. Please try again.", "error")
+            print(f"Error creating user: {str(e)}")  # Debug log
+            flash(f"Error creating user: {str(e)}", "error")
             return redirect(url_for("auth.register"))
 
     return render_template("auth/register.html")

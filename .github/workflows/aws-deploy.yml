@@ -1,0 +1,116 @@
+name: AWS Deployment
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+      - 'infra/**'
+      - 'requirements*.txt'
+      - 'Dockerfile*'
+      - '.github/workflows/aws-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      skip_approval:
+        description: 'Skip manual approval (only for non-prod environments)'
+        required: false
+        type: boolean
+        default: false
+
+# Environment variables
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: meal-expense-tracker
+  CONTAINER_NAME: meal-expense-tracker
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  DOCKER_CONTENT_TRUST: 1
+
+# Required permissions for the workflow
+permissions:
+  contents: read
+  id-token: write  # Required for OIDC
+  packages: write  # For GitHub Packages
+  security-events: write  # For code scanning
+  actions: read  # For reusing workflows
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          role-duration-seconds: 3600
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install awscli boto3
+
+      - name: Package Lambda function
+        run: |
+          chmod +x ./terraform/scripts/package_lambda.sh
+          ./terraform/scripts/package_lambda.sh
+        env:
+          DIST_DIR: ./dist
+          ZIP_PATH: ./dist/lambda-deployment-package.zip
+
+      - name: Configure AWS CLI
+        run: |
+          aws configure set default.region us-east-1
+          aws configure set default.output json
+
+      - name: Deploy with Terraform
+        run: |
+          cd terraform/environments/${{ github.event.inputs.environment || 'dev' }}
+          terraform init -input=false
+          terraform validate
+          terraform plan -input=false -out=tfplan
+          terraform apply -auto-approve tfplan
+
+      - name: Update Lambda function
+        run: |
+          LAMBDA_FUNCTION=$(cd terraform/environments/${{ github.event.inputs.environment || 'dev' }} && terraform output -raw lambda_function_name)
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION" \
+            --zip-file fileb://dist/lambda-deployment-package.zip \
+            --publish
+
+      - name: Invoke Lambda function
+        run: |
+          LAMBDA_FUNCTION=$(cd terraform/environments/${{ github.event.inputs.environment || 'dev' }} && terraform output -raw lambda_function_name)
+          aws lambda invoke \
+            --function-name "$LAMBDA_FUNCTION" \
+            --payload '{"version":"2.0","routeKey":"GET /api/health","rawPath":"/api/health","requestContext":{"http":{"method":"GET","path":"/api/health"},"requestId":"test-invoke-request"},"isBase64Encoded":false}' \
+            --cli-binary-format raw-in-base64-out \
+            --log-type Tail \
+            --output json \
+            /tmp/lambda-response.json
+          echo "Lambda response:"
+          cat /tmp/lambda-response.json

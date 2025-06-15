@@ -20,15 +20,15 @@ output "api_stage_arn" {
 
 output "domain_name" {
   description = "The domain name of the API Gateway"
-  value       = try(aws_apigatewayv2_domain_name.main[0].domain_name, null)
+  value       = var.domain_name != null ? one(aws_apigatewayv2_domain_name.main[*].domain_name) : null
 }
 
 output "domain_zone_id" {
   description = "The hosted zone ID of the API Gateway domain name"
-  value       = try(aws_apigatewayv2_domain_name.main[0].domain_name_configuration[0].hosted_zone_id, null)
+  value       = var.domain_name != null ? one(aws_apigatewayv2_domain_name.main[*].domain_name_configuration[0].hosted_zone_id) : null
 }
 
 output "domain_target_domain_name" {
   description = "The target domain name of the API Gateway domain name"
-  value       = try(aws_apigatewayv2_domain_name.main[0].domain_name_configuration[0].target_domain_name, null)
+  value       = var.domain_name != null ? one(aws_apigatewayv2_domain_name.main[*].domain_name_configuration[0].target_domain_name) : null
 }

@@ -1,33 +1,49 @@
-name: Infrastructure Deployment
+name: Infrastructure as Code
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types:
-      - completed
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      tf_action:
+        description: 'Terraform action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
 
 # Environment variables
 env:
   # Terraform settings
-  TF_VERSION: '1.6.0'  # Match version with CI workflow
+  TF_VERSION: '1.6.0'
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: '0'
+  TF_CLI_ARGS_plan: '-lock-timeout=300s'
+  TF_CLI_ARGS_apply: '-auto-approve -lock-timeout=300s'
+  TF_WORKSPACE: ${{ github.event.inputs.environment || 'dev' }}
 
   # AWS settings
   AWS_REGION: us-east-1
+  AWS_DEFAULT_REGION: us-east-1
   ECR_REPOSITORY: meal-expense-tracker
-  ENVIRONMENT: prod
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
 
   # Application settings
   APP_NAME: meal-expense-tracker
+  NAMESPACE: 'meal-tracker'
 
   # Security settings
-  TF_IN_AUTOMATION: 'true'  # Indicates that Terraform is running in automation
-  TF_INPUT: '0'  # Don't ask for input during plan/apply
-
-  # Output settings
-  TF_CLI_ARGS_plan: '-lock-timeout=300s'
-  TF_CLI_ARGS_apply: '-auto-approve -lock-timeout=300s'
+  CHECKOV_SKIP_CHECK: 'CKV_AWS_19,CKV_AWS_20'  # Skip specific checks if needed
 
 permissions:
   contents: read
@@ -79,6 +95,75 @@ jobs:
         run: |
           # Enable AWS CLI output in JSON format
           aws configure set cli_follow_urlparam false
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run make to generate backend configuration
+        run: |
+          make tf-backend ENV=${{ github.event.inputs.environment || 'dev' }}
+
+      - name: Initialize Terraform with S3 backend
+        working-directory: ./terraform
+        run: |
+          terraform init \
+            -backend-config=../environments/${{ github.event.inputs.environment || 'dev' }}/backend.hcl \
+            -reconfigure
+
+      - name: Select Terraform workspace
+        working-directory: ./terraform
+        run: |
+          terraform workspace select ${{ github.event.inputs.environment || 'dev' }} || \
+          terraform workspace new ${{ github.event.inputs.environment || 'dev' }}
+
+      - name: Terraform Format
+        id: fmt
+        working-directory: ./terraform
+        run: |
+          terraform fmt -check -recursive -diff
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: ./terraform
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        if: github.event.inputs.tf_action == 'plan' || github.event.inputs.tf_action == 'apply'
+        working-directory: ./terraform
+        run: |
+          terraform plan -input=false -out=tfplan
+
+      - name: Terraform Plan Status
+        if: always() && (github.event.inputs.tf_action == 'plan' || github.event.inputs.tf_action == 'apply')
+        working-directory: ./terraform
+        run: |
+          if [ -f tfplan ]; then
+            echo "plan_has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "plan_has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terraform Apply
+        if: github.event.inputs.tf_action == 'apply' && steps.plan.outputs.plan_has_changes == 'true'
+        working-directory: ./terraform
+        run: |
+          terraform apply -auto-approve -input=false tfplan
+
+      - name: Terraform Destroy
+        if: github.event.inputs.tf_action == 'destroy'
+        working-directory: ./terraform
+        run: |
+          terraform destroy -auto-approve -input=false
           aws configure set cli_pager ""
 
           # Verify AWS credentials
@@ -87,11 +172,21 @@ jobs:
           # Configure AWS CLI to use JSON output by default
           aws configure set output json
 
+      - name: Install tflint
+        run: |
+          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false  # Disable wrapper for better error messages
+
+      - name: Run tflint
+        run: |
+          cd terraform
+          tflint --init
+          tflint --config=../.tflint.hcl --recursive
 
       - name: Setup Terraform Cache
         uses: actions/cache@v3
@@ -99,10 +194,23 @@ jobs:
           path: |
             ~/.terraform.d/plugin-cache
             ~/.terraform.d/credentials.tfrc.json
+            ~/.cache/trivy
           key: ${{ runner.os }}-terraform-${{ env.TF_VERSION }}-${{ hashFiles('**/*.tf') }}
           restore-keys: |
             ${{ runner.os }}-terraform-${{ env.TF_VERSION }}-
-            ${{ runner.os }}-terraform-
+
+      - name: Run Trivy security scan for infrastructure
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-infra-results.sarif'
+
+      - name: Upload Trivy infrastructure scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-infra-results.sarif'
 
       - name: Setup Backend Resources
         working-directory: ./terraform

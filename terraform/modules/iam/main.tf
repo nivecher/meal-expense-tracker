@@ -50,7 +50,18 @@ resource "aws_iam_policy" "lambda_combined" {
         ]
         Resource = [
           "arn:aws:rds:${var.region}:${var.account_id}:db:${var.db_identifier}",
-          "arn:aws:rds:${var.region}:${var.account_id}:cluster:${var.db_identifier}"
+          "arn:aws:rds:${var.region}:${var.account_id}:cluster:${var.db_identifier}",
+          "arn:aws:rds-db:${var.region}:${var.account_id}:dbuser:*/${var.app_name}"
+        ]
+      },
+      # RDS IAM Authentication
+      {
+        Effect = "Allow"
+        Action = [
+          "rds-db:connect"
+        ]
+        Resource = [
+          "arn:aws:rds-db:${var.region}:${var.account_id}:dbuser:*/${var.app_name}"
         ]
       },
       # CloudWatch Logs
@@ -76,6 +87,16 @@ resource "aws_iam_policy" "lambda_combined" {
           "ec2:UnassignPrivateIpAddresses"
         ]
         Resource = ["*"]
+      },
+      # SNS Publish for Dead Letter Queue
+      {
+        Effect = "Allow"
+        Action = [
+          "sns:Publish"
+        ]
+        Resource = [
+          "*" # Temporarily using wildcard to test, will scope down after verification
+        ]
       }
     ]
   })
@@ -85,4 +106,10 @@ resource "aws_iam_policy" "lambda_combined" {
 resource "aws_iam_role_policy_attachment" "lambda_combined" {
   role       = aws_iam_role.lambda_exec.name
   policy_arn = aws_iam_policy.lambda_combined.arn
+}
+
+# Attach AWS X-Ray managed policy for tracing
+resource "aws_iam_role_policy_attachment" "lambda_xray" {
+  role       = aws_iam_role.lambda_exec.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
 }

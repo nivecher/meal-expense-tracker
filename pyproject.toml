@@ -1,55 +1,54 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm>=7.0.0"]
+requires = [ "setuptools>=45", "wheel", "setuptools_scm>=7.0.0",]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "meal-expense-tracker"
 description = "A Flask-based web application for tracking meal expenses"
-authors = [
-    { name = "nivecher", email = "mtd37@hotmail.com" }
-]
 requires-python = ">=3.8"
-dynamic = ["version"]
+dynamic = [ "version",]
+[[project.authors]]
+name = "nivecher"
+email = "mtd37@hotmail.com"
 
-[tool.setuptools.dynamic]
-version = {attr = "app.__version__"}
+[project.urls]
+homepage = "https://github.com/nivecher/meal-expense-tracker"
+
+[tool.setuptools]
+packages = [ "app",]
+include-package-data = true
+zip-safe = false
 
 [tool.setuptools_scm]
 write_to = "app/_version.py"
 write_to_template = "__version__ = '{version}'"
 
-
-[tool.setuptools]
-packages = ['app']
-include-package-data = true
-zip-safe = false
-
-[project.urls]
-homepage = "https://github.com/nivecher/meal-expense-tracker"
-
 [tool.black]
 line-length = 88
-target-version = ['py312']
-include = '\.pyi?$'
+target-version = [ "py312",]
+include = "\\.pyi?$"
 
 [tool.isort]
 profile = "black"
 multi_line_output = 3
 
 [tool.mypy]
-python_version = "3.11.0"
+python_version = "0.5"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test"]
-python_functions = ["test_"]
+testpaths = [ "tests",]
+python_files = [ "test_*.py",]
+python_classes = [ "Test",]
+python_functions = [ "test_",]
 
 [tool.coverage.run]
-source = ["app"]
-omit = ["tests/*"]
+source = [ "app",]
+omit = [ "tests/*",]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+[tool.setuptools.dynamic.version]
+attr = "app.__version__"

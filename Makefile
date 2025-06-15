@@ -1,8 +1,8 @@
 # Meal Expense Tracker - Makefile
 # =============================
-# 
+#
 # Available commands (run 'make help' for details):
-#   Development:   setup, run, test, lint, format, db-* 
+#   Development:   setup, run, test, lint, format, db-*
 #   Docker:       docker-{build,run,stop,logs,clean}
 #   Terraform:    tf-{init,plan,apply,destroy,validate,fmt,backend}
 #   Deployment:   deploy-{dev,staging,prod}
@@ -25,10 +25,16 @@ CONTAINER_NAME = $(APP_NAME)-app
 IMAGE_NAME = $(APP_NAME)
 VOLUME_NAME = $(APP_NAME)-db
 
-# Environment settings
+# Terraform settings
 ENV ?= dev
 TF_ENV ?= $(ENV)
 TF_CMD = cd terraform && make ENV=$(TF_ENV)
+TF_PARALLELISM ?= 30
+TF_ARGS ?= -parallelism=$(TF_PARALLELISM) -refresh=true
+
+# GitHub settings
+GITHUB_ORG ?= nivecher
+REPO_NAME ?= meal-expense-tracker
 
 # Python settings
 PYTHONPATH = $(shell pwd)
@@ -47,7 +53,7 @@ export PYTHONPATH
 .PHONY: help
 help:
 	@echo "\n\033[1mMeal Expense Tracker - Available Commands:\033[0m"
-	
+
 	@echo "\n\033[1;34mDevelopment:\033[0m"
 	@echo "  \033[1mmake setup\033[0m           Install development dependencies"
 	@echo "  \033[1mmake run\033[0m             Run the application locally"
@@ -77,12 +83,16 @@ help:
 	@echo "  \033[1mmake tf-destroy\033[0m     Destroy infrastructure"
 	@echo "  \033[1mmake tf-validate\033[0m    Validate Terraform configuration"
 	@echo "  \033[1mmake tf-fmt\033[0m         Format Terraform files"
-	@echo "  \033[1mmake tf-backend\033[0m     Configure Terraform backend"
+	@echo "  \033[1mmake setup-tf-backend\033[0m  Provision remote backend & generate configs"
+	@echo "  \033[1mmake destroy-tf-backend [STACK=terraform-backend REGION=us-east-1]\033[0m  Delete backend resources"
 
 	@echo "\n\033[1;34mDeployment:\033[0m"
 	@echo "  \033[1mmake deploy-dev\033[0m      Deploy to development environment"
 	@echo "  \033[1mmake deploy-staging\033[0m  Deploy to staging environment"
 	@echo "  \033[1mmake deploy-prod\033[0m     Deploy to production environment"
+	@echo "  \033[1mmake package-lambda\033[0m  Create Lambda deployment package using package_lambda.sh"
+	@echo "  \033[1mmake update-lambda\033[0m   Update Lambda function code with latest package"
+	@echo "  \033[1mmake invoke-lambda\033[0m   Invoke Lambda function with test event"
 
 	@echo "\n\033[1;34mDependencies:\033[0m"
 	@echo "  \033[1mmake requirements\033[0m    Update requirements files"
@@ -114,8 +124,8 @@ help:
 ## Install development dependencies
 .PHONY: setup
 setup:
-	$(PIP) install -r requirements-dev.txt
-	$(PIP) install -e .
+	@echo "\n\033[1m=== Setting up development environment ===\033[0m"
+	@./scripts/setup-local-dev.sh
 
 ## Run the application locally
 .PHONY: run
@@ -125,14 +135,45 @@ run:
 ## Run linters
 .PHONY: lint
 lint:
-	flake8 app/ tests/
-	black --check app/ tests/
+	@echo "\n\033[1m=== Running Python Linters ===\033[0m"
+	@flake8 app/ tests/
+	@black --check app/ tests/ migrations/ */*.py *.py
+	@echo "\n\033[1m=== Running Shell Script Linter ===\033[0m"
+	@find . -type f -name '*.sh' \
+		-not -path '*/.*' \
+		-not -path '*/venv/*' \
+		-not -path '*/Python-*/*' \
+		-print0 | xargs -0 -I{} sh -c 'echo "Checking {}" && shellcheck -x {}' || true
 
 ## Format code
 .PHONY: format
-format:
-	black app/ tests/
-	autoflake --in-place --remove-all-unused-imports --recursive app/ tests/
+format: format-python format-shell
+
+## Format Python code
+.PHONY: format-python
+format-python:
+	@echo "\n\033[1m=== Formatting Python code ===\033[0m"
+	@black app/ tests/ migrations/ */*.py *.py
+	@autoflake --in-place --remove-all-unused-imports --recursive app/ tests/
+
+## Format Shell scripts
+.PHONY: format-shell
+format-shell:
+	@if command -v shfmt >/dev/null 2>&1; then \
+		echo "\n\033[1m=== Formatting Shell scripts ===\033[0m"; \
+		find . -type f -name '*.sh' \
+			-not -path '*/.*' \
+			-not -path '*/venv/*' \
+			-not -path '*/Python-*/*' \
+			-print0 | xargs -0 -I{} sh -c 'echo "Formatting {}" && shfmt -i 2 -w "{}"'; \
+	else \
+		echo "\n\033[1;33m⚠️ shfmt is not installed. Shell scripts will not be formatted.\033[0m"; \
+		echo "To enable shell script formatting, please install shfmt:"; \
+		echo "  - Using Go: go install mvdan.cc/sh/v3/cmd/shfmt@latest"; \
+		echo "  - Or download from: https://github.com/mvdan/sh/releases"; \
+		echo "  - Or via package manager: brew install shfmt / apt-get install shfmt / etc."; \
+		echo "\nContinuing with Python formatting only...\n"; \
+	fi
 
 ## Run tests
 .PHONY: test
@@ -211,76 +252,136 @@ docker-rebuild: docker-clean docker-build docker-run
 # Terraform
 # =======================
 
-## Initialize Terraform commands
-.PHONY: tf-init tf-plan tf-apply tf-destroy tf-validate tf-fmt tf-backend
+# ---------------------------
+# Terraform backend helper
+# ---------------------------
+# Ensures backend.hcl exists for the specified environment.
+# If missing, instructs user to run setup-tf-backend.
+# ---------------------------
+tffile = terraform/environments/$(TF_ENV)/backend.hcl
 
+## Initialize Terraform for a specific environment
+.PHONY: tf-init
 tf-init:
-	@echo "Initializing Terraform environment: $(TF_ENV)"
-	@cd terraform && terraform init \
-		-backend-config=backend-$(TF_ENV).hcl
+	@if [ -z "$(TF_ENV)" ]; then \
+		echo "Error: TF_ENV is not set. Usage: make tf-init TF_ENV=<env>"; \
+		exit 1; \
+	fi
+	@if [ ! -f "terraform/environments/$(TF_ENV)/backend.tf" ]; then \
+		echo "Error: backend.tf not found for environment $(TF_ENV)."; \
+		echo "Run 'make setup-tf-backend' first to generate backend configurations."; \
+		exit 1; \
+	fi
+	@echo "🚀 Initializing Terraform with parallelism=$(TF_PARALLELISM) in $(TF_ENV) environment..."
+	@cd terraform/environments/$(TF_ENV) && \
+	TF_PLUGIN_CACHE_DIR="$(HOME)/.terraform.d/plugin-cache" \
+	TF_IN_AUTOMATION=1 \
+	terraform init -input=false -backend=true -get=true -upgrade $(TF_ARGS) && terraform init -backend-config=backend.hcl
 
 ## Generate a plan without applying
-tf-plan:
+.PHONY: tf-plan
+tf-plan: tf-init
 	@echo "Creating Terraform plan for environment: $(TF_ENV)"
-	@cd terraform && terraform plan \
-		-var-file=$(TF_ENV).tfvars \
-		-out=tfplan-$(TF_ENV)
+	@if [ ! -f "terraform/environments/$(TF_ENV)/terraform.tfvars" ]; then \
+		echo "Error: terraform/environments/$(TF_ENV)/terraform.tfvars not found."; \
+		echo "Please create the file with the required variables for the $(TF_ENV) environment."; \
+		exit 1; \
+	fi
+	@cd terraform/environments/$(TF_ENV) && terraform plan \
+		-var-file=terraform.tfvars \
+		-out=tfplan-$(TF_ENV) \
+		-var="environment=$(TF_ENV)"
 
 ## Apply the most recent plan
+.PHONY: tf-apply
 tf-apply:
 	@echo "Applying Terraform changes to environment: $(TF_ENV)"
-	@cd terraform && terraform apply \
-		-var-file=$(TF_ENV).tfvars \
-		tfplan-$(TF_ENV)
+	@cd terraform/environments/$(TF_ENV) && terraform apply tfplan-$(TF_ENV)
 
 ## Destroy all resources in the environment
+.PHONY: tf-destroy
 tf-destroy:
-	@echo "Destroying Terraform environment: $(TF_ENV)"
 	@echo "WARNING: This will destroy all resources in the $(TF_ENV) environment!"
-	@read -p "Are you sure? (y/N) " -n 1 -r; \
-	echo; \
-	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-		cd terraform && terraform destroy -var-file=$(TF_ENV).tfvars; \
-	fi
+	@read -p "Are you sure you want to continue? [y/N] " confirm && \
+		[ $$confirm = y ] || [ $$confirm = Y ] || (echo "Aborting..."; exit 1)
+	@cd terraform/environments/$(TF_ENV) && terraform destroy \
+		-var-file=terraform.tfvars \
+		-var="environment=$(TF_ENV)"
 
 ## Validate Terraform configuration
+.PHONY: tf-validate
 tf-validate:
 	@echo "Validating Terraform configuration..."
-	@cd terraform && terraform init -backend=false
-	@cd terraform && terraform validate
+	@cd terraform/environments/$(TF_ENV) && terraform init -backend=false
+	@cd terraform/environments/$(TF_ENV) && terraform validate
 
 ## Format Terraform files
 .PHONY: tf-fmt
 tf-fmt:
-	@cd terraform && terraform fmt -recursive
+	@cd terraform/environments/$(TF_ENV) && terraform fmt -recursive
 
-## Configure Terraform backend
-tf-backend:
-	@echo "Configuring Terraform backend for environment: $(TF_ENV)"
-	@if [ ! -f "terraform/backend-$(TF_ENV).hcl" ]; then \
-		echo "Backend configuration for $(TF_ENV) not found."; \
-		echo "Create terraform/backend-$(TF_ENV).hcl with your backend configuration."; \
-		exit 1; \
-	fi
-	@echo "Backend configuration for $(TF_ENV) is ready."
+## Clean Terraform lock files and cache
+.PHONY: tf-clean
+tf-clean:
+	@echo "Cleaning Terraform lock files and cache..."
+	@rm -rf terraform/environments/$(TF_ENV)/.terraform terraform/environments/$(TF_ENV)/.terraform.lock.hcl
+	@echo "Terraform cache and lock files have been removed"
 
 ## Check infrastructure
 .PHONY: check-infra
-check-infra: tf-validate tf-fmt tfsec
-	@echo "✅ Infrastructure configuration validated, formatted, and secured"
+check-infra: tf-validate tf-fmt
+	@if [ "$(SKIP_TRIVY)" != "true" ]; then \
+		$(MAKE) trivy; \
+	else \
+		echo "🔍 Skipping Trivy scan (SKIP_TRIVY=true)"; \
+	fi
+	@echo "✅ Infrastructure configuration validated, formatted$(if $(SKIP_TRIVY),, and secured)"
 
-## Run TFSec security scan
-.PHONY: tfsec
-tfsec:
-	@echo "🔍 Running TFSec security scan..."
-	@if ! command -v tfsec >/dev/null 2>&1; then \
-		echo "❌ TFSec is not installed. Please install it first:"; \
-		echo "   # macOS: brew install tfsec"; \
-		echo "   # Linux: curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash"; \
+## Run Trivy security scan
+.PHONY: trivy
+trivy:
+	@echo "🔍 Running Trivy security scan..."
+	@if ! command -v trivy >/dev/null 2>&1; then \
+		echo "❌ Trivy is not installed. Please install it first:"; \
+		echo "   # macOS: brew install aquasecurity/trivy/trivy"; \
+		echo "   # Linux: brew install aquasecurity/trivy/trivy or use the installation script"; \
+		echo "   #   curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin"; \
 		exit 1; \
 	fi
-	@cd terraform && tfsec --no-colour --soft-fail
-	@echo "✅ TFSec scan completed"
+	@echo "📋 Scanning Terraform files..."
+	@cd terraform/environments/$(TF_ENV) && trivy config --tf-vars terraform.tfvars .
+	@echo "\n📋 Scanning CloudFormation files..."
+	@find . -path "*/cloudformation/*.y*ml" -type f -exec echo "Scanning {}" \; -exec trivy config "{}" \;
+	@echo "✅ Trivy scan completed"
+
+# -------------------------------------------------------
+# Provision or update the remote backend (S3 & DynamoDB)
+# Usage: make setup-tf-backend [ARGS=...]
+# Any flags in ARGS will be forwarded to the shell script.
+# -------------------------------------------------------
+setup-tf-backend:
+	@echo "Setting up Terraform backend via CloudFormation..."
+	@./scripts/setup-terraform-backend.sh $(ARGS)
+
+DESTROY_STACK ?= terraform-backend
+DESTROY_REGION ?= us-east-1
+
+# -------------------------------------------------------
+# Set default values for stack name and region
+DEFAULT_STACK_NAME ?= terraform-backend
+DEFAULT_REGION ?= us-east-1
+
+# Delete the CloudFormation stack that hosts the Terraform backend
+# Usage: make destroy-tf-backend [DESTROY_STACK=name] [DESTROY_REGION=region]
+# Default: DESTROY_STACK=terraform-backend, DESTROY_REGION=us-east-1
+# -------------------------------------------------------
+destroy-tf-backend:
+	@STACK_NAME="$(or $(DESTROY_STACK),$(DEFAULT_STACK_NAME))"; \
+	REGION="$(or $(DESTROY_REGION),$(DEFAULT_REGION))"; \
+	echo "Deleting Terraform backend stack '$$STACK_NAME' in region '$$REGION'..."; \
+	aws cloudformation delete-stack --stack-name "$$STACK_NAME" --region "$$REGION"; \
+	aws cloudformation wait stack-delete-complete --stack-name "$$STACK_NAME" --region "$$REGION" || true; \
+	echo "✅ Terraform backend stack '$$STACK_NAME' deletion completed in region '$$REGION'."
 
 # =======================
 # Deployment
@@ -290,19 +391,110 @@ tfsec:
 .PHONY: deploy-dev
 deploy-dev:
 	@echo "Deploying to development environment..."
+	@$(MAKE) TF_ENV=dev tf-init
+	@$(MAKE) TF_ENV=dev tf-plan
 	@$(MAKE) TF_ENV=dev tf-apply
 
 ## Deploy to staging environment
 .PHONY: deploy-staging
 deploy-staging:
 	@echo "Deploying to staging environment..."
+	@echo "Are you sure you want to deploy to staging? This will apply all pending changes."
+	@read -p "Type 'yes' to continue: " confirm && [ $$confirm = yes ]
+	@$(MAKE) TF_ENV=staging tf-init
+	@$(MAKE) TF_ENV=staging tf-plan
 	@$(MAKE) TF_ENV=staging tf-apply
 
 ## Deploy to production environment
 .PHONY: deploy-prod
 deploy-prod:
-	@echo "Deploying to production environment..."
+	@echo "WARNING: You are about to deploy to PRODUCTION!"
+	@echo "This will apply all pending changes to your production environment."
+	@read -p "Type 'production' to continue: " confirm && [ "$$confirm" = "production" ]
+	@$(MAKE) TF_ENV=prod tf-init
+	@$(MAKE) TF_ENV=prod tf-plan
 	@$(MAKE) TF_ENV=prod tf-apply
+
+# =======================
+# Lambda Deployment
+# =======================
+
+## Package the application for Lambda deployment
+.PHONY: package-lambda
+package-lambda:
+	@echo "\033[1m📦 Creating Lambda deployment package...\033[0m"
+	@if [ ! -x "$(shell which zip)" ]; then \
+		echo "Error: 'zip' command is required but not installed."; \
+		exit 1; \
+	fi
+	@if [ ! -x "$(shell which pip)" ]; then \
+		echo "Error: 'pip' command is required but not installed."; \
+		exit 1; \
+	fi
+	@chmod +x scripts/package-lambda.sh
+	@# Ignore the exit code from the script as zip might return non-zero on success
+	@if ! scripts/package-lambda.sh; then \
+		echo "\033[1;33m⚠️  Package script completed with warnings, but continuing...\033[0m"; \
+	fi
+
+## Update the Lambda function with the latest package
+.PHONY: update-lambda
+update-lambda: package-lambda
+	@echo "\033[1m🔄 Updating Lambda function...\033[0m"
+	@if [ -z "$(LAMBDA_FUNCTION_NAME)" ]; then \
+		echo "Error: LAMBDA_FUNCTION_NAME is not set."; \
+		echo "Please set LAMBDA_FUNCTION_NAME environment variable or run:"; \
+		echo "  make update-lambda LAMBDA_FUNCTION_NAME=your-function-name"; \
+		echo "Or use Terraform output:"; \
+		echo "  make update-lambda LAMBDA_FUNCTION_NAME=\`cd terraform && terraform output -raw lambda_function_name\`"; \
+		exit 1; \
+	fi
+	@aws lambda update-function-code \
+		--function-name "$(LAMBDA_FUNCTION_NAME)" \
+		--zip-file "fileb://dist/app.zip" \
+		--publish \
+		--output json
+
+## Invoke the Lambda function with a test event
+.PHONY: invoke-lambda
+	@echo "\033[1m🚀 Invoking Lambda function...\033[0m"
+	@if [ -z "$(LAMBDA_FUNCTION_NAME)" ]; then \
+		echo "Error: LAMBDA_FUNCTION_NAME is not set."; \
+		echo "Please set LAMBDA_FUNCTION_NAME environment variable or run:"; \
+		echo "  make invoke-lambda LAMBDA_FUNCTION_NAME=your-function-name"; \
+		echo "Or use Terraform output:"; \
+		echo "  make invoke-lambda LAMBDA_FUNCTION_NAME=\`cd terraform && terraform output -raw lambda_function_name\`"; \
+		exit 1; \
+	fi
+	@mkdir -p tmp
+	@echo '{"version":"2.0","routeKey":"GET /api/health","rawPath":"/api/health","requestContext":{"http":{"method":"GET","path":"/api/health"},"requestId":"test-invoke-request"},"isBase64Encoded":false}' > tmp/test-event.json
+	@aws lambda invoke \
+		--function-name "$(LAMBDA_FUNCTION_NAME)" \
+		--payload file://tmp/test-event.json \
+		--cli-binary-format raw-in-base64-out \
+		--log-type Tail \
+		--output json \
+		--query 'LogResult' \
+		tmp/response.json | base64 --decode
+	@echo "\n\033[1m📄 Response:\033[0m"
+	@cat tmp/response.json | jq .
+
+# =======================
+# GitHub Actions
+# =======================
+
+# Setup GitHub Actions workflows
+setup-github-actions:
+	@if [ -z "$(GITHUB_ORG)" ]; then \
+		echo "Error: GITHUB_ORG is required. Example: make setup-github-actions GITHUB_ORG=your-org"; \
+		exit 1; \
+	fi
+	@echo "🚀 Setting up GitHub Actions for $(GITHUB_ORG)/$(or $(REPO_NAME),meal-expense-tracker)..."
+	@if [ ! -x "scripts/setup-github-actions.sh" ]; then \
+		echo "Error: setup-github-actions.sh script not found or not executable"; \
+		exit 1; \
+	fi
+	@./scripts/setup-github-actions.sh --github-org "$(GITHUB_ORG)" $(if $(REPO_NAME),--repo-name "$(REPO_NAME)")
 
 # =======================
 # Utilities
@@ -430,14 +622,3 @@ show-deps:
 check-reqs:
 	pip check
 	snyk monitor
-
-# ======================
-# GitHub Actions Setup
-# ======================
-.PHONY: setup-github-actions
-setup-github-actions:
-	aws cloudformation deploy \
-	  --template-file cloudformation/github-actions-role.yml \
-	  --stack-name github-actions-role \
-	  --capabilities CAPABILITY_NAMED_IAM \
-	  --parameter-overrides GitHubOrg=$(GITHUB_ORG) RepositoryName=$(REPO_NAME)

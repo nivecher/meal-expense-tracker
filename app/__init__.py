@@ -41,7 +41,17 @@ login_manager.login_view = "auth.login"
 
 def create_app(config_class=None):
     logger.info("Creating Flask application...")
-    app = Flask(__name__)
+
+    # Configure instance path for AWS Lambda
+    instance_path = None
+    if os.environ.get("AWS_EXECUTION_ENV"):
+        import tempfile
+
+        instance_path = os.path.join(tempfile.gettempdir(), "meal_expense_instance")
+        os.makedirs(instance_path, exist_ok=True)
+        logger.info(f"Created temporary instance directory at {instance_path}")
+
+    app = Flask(__name__, instance_path=instance_path)
 
     # Configure the app
     if config_class:
@@ -49,8 +59,23 @@ def create_app(config_class=None):
         app.config.from_object(config_class)
     else:
         logger.info("Using default configuration")
-        app.config["SECRET_KEY"] = os.urandom(24)
-        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///meal_expenses.db"
+        app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", os.urandom(24).hex())
+
+        # Use DATABASE_URL if set, otherwise fall back to SQLite
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
+            # Ensure proper PostgreSQL URL format
+            if db_url.startswith("postgresql://"):
+                db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+            logger.info(f"Using PostgreSQL database: {db_url.split('@')[-1]}")
+        else:
+            # Use SQLite for local development
+            os.makedirs(app.instance_path, exist_ok=True)
+            db_path = os.path.join(app.instance_path, "meal_expenses.db")
+            app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+            logger.info(f"Using SQLite database at {db_path}")
+
         app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
         app.config["GOOGLE_MAPS_API_KEY"] = os.getenv("GOOGLE_MAPS_API_KEY")
         app.config["SERVER_NAME"] = "localhost:5001"
@@ -70,15 +95,13 @@ def create_app(config_class=None):
 
     # Register blueprints
     from app.auth import bp as auth_bp
-
-    app.register_blueprint(auth_bp, url_prefix="/auth")
-
+    from app.health import bp as health_bp
     from app.restaurants import bp as restaurants_bp
-
-    app.register_blueprint(restaurants_bp, url_prefix="/restaurants")
-
     from app.expenses import bp as expenses_bp
 
+    app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(health_bp)
+    app.register_blueprint(restaurants_bp, url_prefix="/restaurants")
     app.register_blueprint(expenses_bp, url_prefix="/expenses")
 
     # Register main routes

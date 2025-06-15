@@ -23,7 +23,4 @@ output "cloudwatch_log_group_arn" {
   value       = aws_cloudwatch_log_group.lambda.arn
 }
 
-output "dlq_arn" {
-  description = "The ARN of the Dead Letter Queue"
-  value       = aws_sns_topic.lambda_dlq.arn
-}
+# The Dead Letter Queue ARN is now managed in the root module

@@ -2,7 +2,7 @@
 # This file configures tfsec to ignore specific checks that are not applicable to this project
 
 # Ignore specific checks that are not applicable or have been reviewed
-# Format: 
+# Format:
 # - "CHECK_ID"  # Reason for ignoring
 
 # Example ignores (uncomment and modify as needed):
