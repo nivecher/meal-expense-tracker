@@ -258,7 +258,9 @@ docker-rebuild: docker-clean docker-build docker-run
 # Ensures backend.hcl exists for the specified environment.
 # If missing, instructs user to run setup-tf-backend.
 # ---------------------------
-tffile = terraform/environments/$(TF_ENV)/backend.hcl
+TF_ROOT := $(shell pwd)/terraform
+TF_ENV_DIR = $(TF_ROOT)/environments/$(TF_ENV)
+TF_BACKEND_CONFIG = $(TF_ENV_DIR)/backend.hcl
 
 ## Initialize Terraform for a specific environment
 .PHONY: tf-init
@@ -267,36 +269,53 @@ tf-init:
 		echo "Error: TF_ENV is not set. Usage: make tf-init TF_ENV=<env>"; \
 		exit 1; \
 	fi
-	@if [ ! -f "terraform/environments/$(TF_ENV)/backend.tf" ]; then \
+	@if [ ! -f "$(TF_ENV_DIR)/backend.tf" ]; then \
 		echo "Error: backend.tf not found for environment $(TF_ENV)."; \
 		echo "Run 'make setup-tf-backend' first to generate backend configurations."; \
 		exit 1; \
 	fi
+	@if [ ! -f "$(TF_BACKEND_CONFIG)" ]; then \
+		echo "Error: backend.hcl not found at $(TF_BACKEND_CONFIG)"; \
+		echo "Run 'make setup-tf-backend' first to generate backend configurations."; \
+		exit 1; \
+	fi
 	@echo "🚀 Initializing Terraform with parallelism=$(TF_PARALLELISM) in $(TF_ENV) environment..."
-	@cd terraform/environments/$(TF_ENV) && \
+	@cd "$(TF_ENV_DIR)" && \
 	TF_PLUGIN_CACHE_DIR="$(HOME)/.terraform.d/plugin-cache" \
 	TF_IN_AUTOMATION=1 \
-	terraform init -input=false -backend=true -get=true -upgrade $(TF_ARGS) && terraform init -backend-config=backend.hcl
+	terraform init -input=false -backend=true -get=true -upgrade $(TF_ARGS) && \
+	terraform init -backend-config="$(TF_BACKEND_CONFIG)"
 
 ## Generate a plan without applying
 .PHONY: tf-plan
 tf-plan: tf-init
 	@echo "Creating Terraform plan for environment: $(TF_ENV)"
-	@if [ ! -f "terraform/environments/$(TF_ENV)/terraform.tfvars" ]; then \
-		echo "Error: terraform/environments/$(TF_ENV)/terraform.tfvars not found."; \
+	@if [ ! -f "$(TF_ENV_DIR)/terraform.tfvars" ]; then \
+		echo "Error: terraform.tfvars not found in $(TF_ENV_DIR)"; \
 		echo "Please create the file with the required variables for the $(TF_ENV) environment."; \
 		exit 1; \
 	fi
-	@cd terraform/environments/$(TF_ENV) && terraform plan \
+	@cd "$(TF_ENV_DIR)" && terraform plan \
 		-var-file=terraform.tfvars \
 		-out=tfplan-$(TF_ENV) \
-		-var="environment=$(TF_ENV)"
+		-var="environment=$(TF_ENV)" \
+		-input=false \
+		-lock=true \
+		-parallelism=$(TF_PARALLELISM)
 
 ## Apply the most recent plan
 .PHONY: tf-apply
 tf-apply:
+	@if [ ! -f "$(TF_ENV_DIR)/tfplan-$(TF_ENV)" ]; then \
+		echo "Error: No Terraform plan found. Run 'make tf-plan' first."; \
+		exit 1; \
+	fi
 	@echo "Applying Terraform changes to environment: $(TF_ENV)"
-	@cd terraform/environments/$(TF_ENV) && terraform apply tfplan-$(TF_ENV)
+	@cd "$(TF_ENV_DIR)" && terraform apply \
+		-input=false \
+		-lock=true \
+		-parallelism=$(TF_PARALLELISM) \
+		tfplan-$(TF_ENV)
 
 ## Destroy all resources in the environment
 .PHONY: tf-destroy
@@ -304,28 +323,45 @@ tf-destroy:
 	@echo "WARNING: This will destroy all resources in the $(TF_ENV) environment!"
 	@read -p "Are you sure you want to continue? [y/N] " confirm && \
 		[ $$confirm = y ] || [ $$confirm = Y ] || (echo "Aborting..."; exit 1)
-	@cd terraform/environments/$(TF_ENV) && terraform destroy \
+	@cd "$(TF_ENV_DIR)" && terraform destroy \
 		-var-file=terraform.tfvars \
-		-var="environment=$(TF_ENV)"
+		-var="environment=$(TF_ENV)" \
+		-input=false \
+		-lock=true \
+		-parallelism=$(TF_PARALLELISM) \
+		-auto-approve
 
 ## Validate Terraform configuration
 .PHONY: tf-validate
 tf-validate:
-	@echo "Validating Terraform configuration..."
-	@cd terraform/environments/$(TF_ENV) && terraform init -backend=false
-	@cd terraform/environments/$(TF_ENV) && terraform validate
+	@if [ -z "$(TF_ENV)" ]; then \
+		echo "Error: TF_ENV is not set. Usage: make tf-validate TF_ENV=<env>"; \
+		exit 1; \
+	fi
+	@echo "Validating Terraform configuration for $(TF_ENV)..."
+	@cd "$(TF_ENV_DIR)" && terraform init -backend=false
+	@cd "$(TF_ENV_DIR)" && terraform validate
 
 ## Format Terraform files
 .PHONY: tf-fmt
 tf-fmt:
-	@cd terraform/environments/$(TF_ENV) && terraform fmt -recursive
+	@if [ -z "$(TF_ENV)" ]; then \
+		echo "Error: TF_ENV is not set. Usage: make tf-fmt TF_ENV=<env>"; \
+		exit 1; \
+	fi
+	@echo "Formatting Terraform files in $(TF_ENV_DIR)..."
+	@cd "$(TF_ENV_DIR)" && terraform fmt -recursive
 
 ## Clean Terraform lock files and cache
 .PHONY: tf-clean
 tf-clean:
-	@echo "Cleaning Terraform lock files and cache..."
-	@rm -rf terraform/environments/$(TF_ENV)/.terraform terraform/environments/$(TF_ENV)/.terraform.lock.hcl
-	@echo "Terraform cache and lock files have been removed"
+	@if [ -z "$(TF_ENV)" ]; then \
+		echo "Error: TF_ENV is not set. Usage: make tf-clean TF_ENV=<env>"; \
+		exit 1; \
+	fi
+	@echo "Cleaning Terraform lock files and cache for $(TF_ENV)..."
+	@rm -rf "$(TF_ENV_DIR)/.terraform" "$(TF_ENV_DIR)/.terraform.lock.hcl" "$(TF_ENV_DIR)/tfplan-$(TF_ENV)"
+	@echo "Terraform cache, lock files, and plan files have been removed"
 
 ## Check infrastructure
 .PHONY: check-infra

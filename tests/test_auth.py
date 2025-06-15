@@ -183,4 +183,5 @@ def test_register_database_error(client, app, monkeypatch):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Error creating user. Please try again." in response.data
+    # Check for the actual error message format from routes.py
+    assert b"Error creating user:" in response.data

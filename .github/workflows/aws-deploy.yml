@@ -74,12 +74,10 @@ jobs:
           pip install awscli boto3
 
       - name: Package Lambda function
-        run: |
-          chmod +x ./terraform/scripts/package_lambda.sh
-          ./terraform/scripts/package_lambda.sh
+        run: make package-lambda
         env:
           DIST_DIR: ./dist
-          ZIP_PATH: ./dist/lambda-deployment-package.zip
+          ZIP_PATH: ./dist/app.zip
 
       - name: Configure AWS CLI
         run: |
@@ -99,7 +97,7 @@ jobs:
           LAMBDA_FUNCTION=$(cd terraform/environments/${{ github.event.inputs.environment || 'dev' }} && terraform output -raw lambda_function_name)
           aws lambda update-function-code \
             --function-name "$LAMBDA_FUNCTION" \
-            --zip-file fileb://dist/lambda-deployment-package.zip \
+            --zip-file fileb://dist/app.zip \
             --publish
 
       - name: Invoke Lambda function
