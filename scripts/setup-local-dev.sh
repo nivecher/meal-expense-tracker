@@ -103,34 +103,96 @@ install_python_requirements() {
 
   # Create virtual environment if it doesn't exist
   if [ ! -d "venv" ]; then
+    echo "Creating Python virtual environment..."
     python3 -m venv venv
+  else
+    echo -e "${YELLOW}Virtual environment already exists.${NC}"
   fi
 
   # Activate virtual environment
+  echo "Activating virtual environment..."
+  # shellcheck source=/dev/null
   source venv/bin/activate
 
-  # Upgrade pip and install pip-tools
-  python3 -m pip install --upgrade pip
-  pip install pip-tools
+  # Upgrade pip
+  echo "Upgrading pip..."
+  pip install --upgrade pip
 
-  # Install base requirements
-  section "Installing base requirements"
-  pip install -r requirements/base.in
+  # Install requirements
+  echo "Installing Python requirements..."
+  if [ -f "requirements.txt" ]; then
+    pip install -r requirements.txt
+  else
+    echo -e "${YELLOW}requirements.txt not found. Skipping Python package installation.${NC}\n"
+    echo -e "To install requirements later, run:"
+    echo -e "  source venv/bin/activate"
+    echo -e "  pip install -r requirements.txt"
+    return 1
+  fi
 
-  # Install pre-commit, toml, and development requirements
-  pip install pre-commit toml
+  # Install development requirements if they exist
+  if [ -f "requirements-dev.txt" ]; then
+    echo "Installing development requirements..."
+    pip install -r requirements-dev.txt
+  fi
 
-  # Install development requirements
-  section "Installing development requirements"
-  pip install -r requirements/dev.in
+  # Install package in development mode
+  if [ -f "setup.py" ]; then
+    echo "Installing package in development mode..."
+    pip install -e .
+  fi
+}
 
-  # Install security requirements
-  section "Installing security requirements"
-  pip install -r requirements/security.in
+# Function to install and configure AWS CLI
+install_aws_cli() {
+  section "Setting up AWS CLI"
 
-  # Install pre-commit hooks
-  section "Setting up pre-commit hooks"
-  pre-commit install
+  # Check if AWS CLI is already installed
+  if command -v aws &>/dev/null; then
+    echo -e "${YELLOW}AWS CLI is already installed.${NC}"
+    aws --version
+    return 0
+  fi
+
+  echo "Installing AWS CLI..."
+
+  # Install AWS CLI based on the system
+  if command -v apt-get >/dev/null 2>&1; then
+    # Debian/Ubuntu
+    echo "Detected Debian/Ubuntu system"
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    unzip awscliv2.zip
+    sudo ./aws/install
+    rm -rf aws awscliv2.zip
+  elif command -v yum >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then
+    # RHEL/CentOS/Fedora
+    echo "Detected RHEL/CentOS/Fedora system"
+    sudo yum install -y awscli || sudo dnf install -y awscli
+  elif command -v brew >/dev/null 2>&1; then
+    # macOS
+    echo "Detected macOS system"
+    brew install awscli
+  else
+    echo -e "${YELLOW}Unsupported system. Please install AWS CLI manually.${NC}"
+    return 1
+  fi
+
+  # Verify installation
+  if aws --version; then
+    echo -e "${GREEN}AWS CLI installed successfully!${NC}"
+
+    # Configure AWS if not already configured
+    if [ ! -f "$HOME/.aws/credentials" ] && [ ! -f "$HOME/.aws/config" ]; then
+      echo -e "\n${YELLOW}AWS CLI is not configured. Please configure it with your credentials:${NC}"
+      echo -e "Run: aws configure"
+      echo -e "You'll need your AWS Access Key ID and Secret Access Key.${NC}"
+    else
+      echo -e "${GREEN}AWS CLI is already configured.${NC}"
+    fi
+  else
+    echo -e "${YELLOW}Failed to verify AWS CLI installation.${NC}"
+    return 1
+  fi
 }
 
 echo -e "\n${GREEN}🚀 Setting up local development environment...${NC}"
@@ -158,6 +220,9 @@ install_python_requirements
 # Install Terraform
 install_terraform
 
+# Install AWS CLI
+install_aws_cli
+
 # Print completion message
 section "Setup Complete!"
 echo -e "\n${GREEN}✅ Development environment setup is complete!${NC}"
@@ -165,10 +230,32 @@ echo -e "\nTo activate the virtual environment, run:"
 echo -e "  source venv/bin/activate\n"
 
 # Install Docker and Docker Compose
-echo "Installing Docker..."
-sudo apt-get update
-sudo apt-get install -y docker.io docker-compose
-sudo usermod -aG docker "$USER"
+section "Installing Docker"
+if ! command -v docker &>/dev/null; then
+  echo "Installing Docker..."
+  if command -v apt-get >/dev/null 2>&1; then
+    # Debian/Ubuntu
+    sudo apt-get update
+    sudo apt-get install -y docker.io docker-compose
+  elif command -v yum >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then
+    # RHEL/CentOS/Fedora
+    sudo yum install -y docker docker-compose || sudo dnf install -y docker docker-compose
+    sudo systemctl enable --now docker
+  elif command -v brew >/dev/null 2>&1; then
+    # macOS
+    brew install --cask docker
+  else
+    echo -e "${YELLOW}Unsupported system. Please install Docker manually.${NC}"
+  fi
+
+  # Add user to docker group if not already
+  if ! groups "$USER" | grep -q '\bdocker\b'; then
+    sudo usermod -aG docker "$USER"
+    echo -e "${YELLOW}You've been added to the docker group. Please log out and log back in for the changes to take effect.${NC}"
+  fi
+else
+  echo -e "${YELLOW}Docker is already installed.${NC}"
+fi
 
 # Update version from git tags
 if ! python scripts/update-version.py; then
