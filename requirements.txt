@@ -16,7 +16,7 @@ flask-sqlalchemy==3.1.1
 flask-wtf==1.2.2
 gevent==24.11.1
 greenlet==3.2.3
-gunicorn==21.2.0
+gunicorn==23.0.0
 itsdangerous==2.2.0
 jinja2==3.1.6
 jmespath==1.0.1
@@ -39,3 +39,4 @@ zope-interface==7.2
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
