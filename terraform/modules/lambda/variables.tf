@@ -48,7 +48,7 @@ variable "timeout" {
   default     = 30
 }
 
-variable "architecture" {
+variable "architectures" {
   description = "Instruction set architecture for your Lambda function"
   type        = list(string)
   default     = ["x86_64"]
@@ -80,13 +80,19 @@ variable "dlq_topic_name" {
 
 # Lambda Layer Variables
 variable "layer_s3_bucket" {
-  description = "S3 bucket containing the Lambda layer package"
+  description = "S3 bucket where the Lambda layer package will be stored. Leave empty to skip layer creation."
   type        = string
   default     = ""
 }
 
 variable "layer_s3_key" {
-  description = "S3 key of the Lambda layer package"
+  description = "S3 key where the Lambda layer package will be stored in the bucket"
+  type        = string
+  default     = ""
+}
+
+variable "layer_local_path" {
+  description = "Local filesystem path to the Lambda layer zip file. Required if layer_s3_bucket is set."
   type        = string
   default     = ""
 }

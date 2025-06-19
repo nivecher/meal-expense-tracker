@@ -40,11 +40,6 @@ output "lambda_function_arn" {
   value       = module.lambda.lambda_function_arn
 }
 
-output "lambda_layer_arn" {
-  description = "The ARN of the Lambda layer"
-  value       = module.lambda.lambda_layer_arn
-}
-
 output "lambda_layer_version_arn" {
   description = "The ARN of the Lambda layer version"
   value       = module.lambda.lambda_layer_version_arn
@@ -97,9 +92,9 @@ output "public_subnet_ids" {
   value       = module.network.public_subnet_ids
 }
 
-output "lambda_deployment_bucket_name" {
+output "lambda_deployment_bucket" {
   description = "The name of the S3 bucket used for Lambda deployment packages"
-  value       = data.aws_s3_bucket.lambda_deployment.bucket
+  value       = aws_s3_bucket.lambda_deployment.bucket
 }
 
 output "kms_key_arn" {

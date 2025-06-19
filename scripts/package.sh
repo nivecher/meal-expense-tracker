@@ -70,19 +70,30 @@ package_layer() {
   pip install --upgrade pip
   pip install pip-tools
 
-  # Install requirements using pip-sync to ensure exact versions
+  # First install pip-tools to ensure we can compile requirements
+  pip install --upgrade pip
+  pip install pip-tools
+
+  # Install all requirements from requirements.txt
+  echo -e "${GREEN}[*] Installing dependencies from requirements.txt...${NC}"
   pip install -r requirements.txt --target "${package_dir}" --no-cache-dir --upgrade
 
   # Explicitly install aws-wsgi to ensure it's included
+  echo -e "${GREEN}[*] Installing aws-wsgi...${NC}"
   pip install aws-wsgi==0.2.7 --target "${package_dir}" --no-cache-dir
 
   # Ensure psycopg2-binary is installed with the correct platform-specific wheel
+  echo -e "${GREEN}[*] Installing psycopg2-binary with platform-specific wheel...${NC}"
   pip install --platform manylinux2014_x86_64 \
     --implementation cp \
     --python-version 3.13 \
     --only-binary=:all: \
     --target "${package_dir}" \
     psycopg2-binary==2.9.10
+
+  # Ensure flask-cors is installed
+  echo -e "${GREEN}[*] Installing flask-cors...${NC}"
+  pip install flask-cors==4.0.2 --target "${package_dir}" --no-cache-dir
 
   # Remove unnecessary files
   echo -e "${GREEN}[*] Cleaning up...${NC}"

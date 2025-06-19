@@ -369,24 +369,6 @@ module "api_gateway" {
   ]
 }
 
-# Default S3 bucket name if not provided
-locals {
-  lambda_deployment_bucket = coalesce(var.lambda_deployment_bucket, "${var.app_name}-deployment-${data.aws_caller_identity.current.account_id}")
-}
-
-# Data source for the S3 bucket (managed by deployment scripts)
-data "aws_s3_bucket" "lambda_deployment" {
-  bucket = local.lambda_deployment_bucket
-
-  # This will cause Terraform to fail with a clear error if the bucket doesn't exist
-  lifecycle {
-    postcondition {
-      condition     = self.arn != ""
-      error_message = "S3 bucket ${self.bucket} does not exist. Please create it before applying Terraform."
-    }
-  }
-}
-
 # Lambda function configuration
 module "lambda" {
   source = "./modules/lambda"
@@ -404,12 +386,14 @@ module "lambda" {
   kms_key_arn = aws_kms_key.main.arn
 
   # Lambda package
-  s3_bucket = data.aws_s3_bucket.lambda_deployment.bucket
+  s3_bucket = aws_s3_bucket.lambda_deployment.bucket
   s3_key    = "${var.environment}/app/latest/app.zip"
 
   # Layer configuration
-  layer_s3_bucket     = data.aws_s3_bucket.lambda_deployment.bucket
+  layer_s3_bucket     = aws_s3_bucket.lambda_deployment.bucket
   layer_s3_key        = "${var.environment}/layers/latest/python-dependencies.zip"
+  layer_local_path    = "${path.module}/../dist/layers/python-dependencies.zip"
+  architectures       = [var.lambda_architecture]
   compatible_runtimes = ["python3.13"]
 
   # Database configuration

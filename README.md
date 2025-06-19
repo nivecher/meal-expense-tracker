@@ -165,7 +165,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
    FLASK_APP=wsgi.py
    FLASK_ENV=development
    SECRET_KEY=your-secret-key
-   SQLALCHEMY_DATABASE_URI=sqlite:///instance/meals.db
+   SQLALCHEMY_DATABASE_URI=sqlite:///instance/meals_expenses.db
    GOOGLE_MAPS_API_KEY=your-google-api-key
    ```
 

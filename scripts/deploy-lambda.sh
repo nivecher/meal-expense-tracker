@@ -9,7 +9,7 @@ set -e
 APP_NAME="meal-expense-tracker"
 ENVIRONMENT="${ENVIRONMENT:-dev}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
-S3_BUCKET="${S3_BUCKET:-${APP_NAME}-deployment-$(aws sts get-caller-identity --query Account --output text)}"
+S3_BUCKET="${S3_BUCKET:-${APP_NAME}-${ENVIRONMENT}-deployment-$(aws sts get-caller-identity --query Account --output text)}"
 DEPLOY_TIMESTAMP=$(date +%Y%m%d%H%M%S)
 
 # Colors for output

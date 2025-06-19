@@ -2,19 +2,45 @@
 
 data "aws_caller_identity" "current" {}
 
+# S3 Object for Lambda Layer Package
+resource "aws_s3_object" "lambda_layer_package" {
+  count = var.layer_s3_bucket != "" && var.layer_s3_key != "" ? 1 : 0
+
+  bucket = var.layer_s3_bucket
+  key    = var.layer_s3_key
+  source = var.layer_local_path
+  etag   = filemd5(var.layer_local_path)
+
+  # Ensure the object is recreated when the source file changes
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 # Lambda Layer for Python Dependencies
 resource "aws_lambda_layer_version" "python_dependencies" {
   layer_name               = "${var.app_name}-${var.environment}-dependencies"
   description              = "Python dependencies for ${var.app_name} in ${var.environment}"
   s3_bucket                = var.layer_s3_bucket
   s3_key                   = var.layer_s3_key
+  s3_object_version        = try(aws_s3_object.lambda_layer_package[0].version_id, null)
   compatible_runtimes      = var.compatible_runtimes
   compatible_architectures = var.compatible_architectures
 
   # Ensure the layer is recreated when the S3 object changes
   lifecycle {
     create_before_destroy = true
+
+    # Ignore changes to the source code hash as we're using S3 object versioning
+    ignore_changes = [
+      source_code_hash
+    ]
   }
+
+  # Depend on the S3 object to ensure it's created first
+  depends_on = [
+    aws_s3_object.lambda_layer_package
+  ]
 }
 
 # CloudWatch Log Group for Lambda
@@ -165,6 +191,7 @@ resource "aws_lambda_function" "main" {
   role          = aws_iam_role.lambda_role.arn
   handler       = var.handler
   runtime       = var.runtime
+  architectures = var.architectures
   memory_size   = var.memory_size
   timeout       = var.timeout
 
@@ -177,8 +204,8 @@ resource "aws_lambda_function" "main" {
   s3_bucket = var.s3_bucket
   s3_key    = var.s3_key
 
-  # Attach the required layer
-  layers = [aws_lambda_layer_version.python_dependencies.arn]
+  # Attach the required layer if it exists
+  layers = var.layer_s3_bucket != "" && var.layer_s3_key != "" ? [aws_lambda_layer_version.python_dependencies.arn] : []
 
   # Environment variables including enhanced monitoring
   environment {

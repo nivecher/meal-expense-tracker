@@ -37,15 +37,18 @@ graph TD
   - Authentication/Authorization
 
 ### 2. Database
+
 - AWS RDS PostgreSQL for production
 - SQLite for local development
 - Managed backups and point-in-time recovery
 
 ### 3. Authentication
+
 - JWT-based authentication
 - Role-based access control
 
 ### 4. Infrastructure
+
 - Infrastructure as Code with Terraform
 - Multi-environment support (dev, staging, prod)
 - Automated provisioning and deployment

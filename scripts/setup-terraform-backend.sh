@@ -94,7 +94,7 @@ if aws cloudformation deploy \
   --stack-name "$STACK_NAME" \
   --region "$REGION" \
   --template-file "$(pwd)/cloudformation/terraform-backend.yml" \
-  --parameter-overrides "EnvironmentName=prod" \
+  --parameter-overrides "EnvironmentName=dev" \
   --capabilities CAPABILITY_NAMED_IAM; then
   echo -e "${GREEN}CloudFormation stack deployed successfully!${NC}"
 else

@@ -77,11 +77,6 @@ variable "api_subdomain" {
 # ======================
 # Lambda Configuration
 # ======================
-variable "lambda_deployment_bucket" {
-  type        = string
-  default     = "" # Will be generated if empty
-  description = "Name of the S3 bucket for Lambda deployment packages"
-}
 
 variable "lambda_architecture" {
   type        = string

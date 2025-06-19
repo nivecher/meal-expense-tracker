@@ -4,14 +4,14 @@ output "lambda_function_arn" {
   value       = aws_lambda_function.main.arn
 }
 
-output "lambda_layer_arn" {
-  description = "The ARN of the Lambda layer"
-  value       = aws_lambda_layer_version.python_dependencies.arn
-}
-
 output "lambda_layer_version_arn" {
   description = "The ARN of the Lambda layer version"
   value       = aws_lambda_layer_version.python_dependencies.arn
+}
+
+output "lambda_layer_s3_object" {
+  description = "The S3 object information for the Lambda layer package"
+  value       = aws_s3_object.lambda_layer_package[0]
 }
 
 output "invoke_arn" {

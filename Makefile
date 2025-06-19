@@ -432,17 +432,17 @@ destroy-tf-backend:
 # Deployment
 # =======================
 
-## Deploy to development environment
+## Deploy to dev environment
 .PHONY: deploy-dev
-deploy-dev:
-	@echo "Deploying to development environment..."
+deploy-dev: package-lambda
+	@echo "Deploying to dev environment..."
 	@$(MAKE) TF_ENV=dev tf-init
 	@$(MAKE) TF_ENV=dev tf-plan
 	@$(MAKE) TF_ENV=dev tf-apply
 
 ## Deploy to staging environment
 .PHONY: deploy-staging
-deploy-staging:
+deploy-staging: package-lambda
 	@echo "Deploying to staging environment..."
 	@echo "Are you sure you want to deploy to staging? This will apply all pending changes."
 	@read -p "Type 'yes' to continue: " confirm && [ $$confirm = yes ]
@@ -452,7 +452,7 @@ deploy-staging:
 
 ## Deploy to production environment
 .PHONY: deploy-prod
-deploy-prod:
+deploy-prod: package-lambda
 	@echo "WARNING: You are about to deploy to PRODUCTION!"
 	@echo "This will apply all pending changes to your production environment."
 	@read -p "Type 'production' to continue: " confirm && [ "$$confirm" = "production" ]
@@ -464,9 +464,9 @@ deploy-prod:
 # Lambda Deployment
 # =======================
 
-## Package the application for Lambda deployment
+## Package the application and dependencies for Lambda deployment
 .PHONY: package-lambda
-package-lambda:
+package-lambda: package-layer
 	@echo "\033[1m📦 Creating Lambda deployment package...\033[0m"
 	@if [ ! -x "$(shell which zip)" ]; then \
 		echo "Error: 'zip' command is required but not installed."; \
@@ -476,12 +476,31 @@ package-lambda:
 		echo "Error: 'pip' command is required but not installed."; \
 		exit 1; \
 	fi
-	@chmod +x scripts/package-lambda.sh
-	@if ! scripts/package-lambda.sh; then \
+	@chmod +x scripts/package.sh
+	@if ! ./scripts/package.sh -a; then \
 		echo "\033[1;31m❌ Failed to create Lambda package\033[0m"; \
 		exit 1; \
 	fi
 	@echo "\033[1;32m✅ Lambda package created at dist/app.zip\033[0m"
+
+## Package only the Lambda layer
+.PHONY: package-layer
+package-layer:
+	@echo "\033[1m📦 Creating Lambda layer package...\033[0m"
+	@if [ ! -x "$(shell which zip)" ]; then \
+		echo "Error: 'zip' command is required but not installed."; \
+		exit 1; \
+	fi
+	@if [ ! -x "$(shell which pip)" ]; then \
+		echo "Error: 'pip' command is required but not installed."; \
+		exit 1; \
+	fi
+	@chmod +x scripts/package.sh
+	@if ! ./scripts/package.sh -l; then \
+		echo "\033[1;31m❌ Failed to create Lambda layer package\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ Lambda layer package created at dist/layers/python-dependencies.zip\033[0m"
 
 ## Check if Lambda package exists
 .PHONY: check-lambda-package
