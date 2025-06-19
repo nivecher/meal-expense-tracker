@@ -1,28 +1,7 @@
-# IAM Role for Lambda
-resource "aws_iam_role" "lambda_exec" {
-  name = "${var.app_name}-${var.environment}-lambda-role"
+# Note: Lambda IAM role has been moved to the Lambda module for better encapsulation
+# and to follow the principle of single responsibility.
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = ["lambda.amazonaws.com"]
-      }
-    }]
-  })
-
-  tags = var.tags
-}
-
-# Basic Lambda execution policy attachment
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-# Combined IAM Policy for Lambda
+# Combined IAM Policy that can be attached to the Lambda role
 resource "aws_iam_policy" "lambda_combined" {
   name        = "${var.app_name}-${var.environment}-lambda-combined-policy"
   description = "Combined IAM policy for Lambda function"
@@ -41,7 +20,7 @@ resource "aws_iam_policy" "lambda_combined" {
           var.db_secret_arn
         ]
       },
-      # RDS access
+      # RDS access - Using wildcards to avoid circular dependency
       {
         Effect = "Allow"
         Action = [
@@ -49,18 +28,8 @@ resource "aws_iam_policy" "lambda_combined" {
           "rds-db:connect"
         ]
         Resource = [
-          "arn:aws:rds:${var.region}:${var.account_id}:db:${var.db_identifier}",
-          "arn:aws:rds:${var.region}:${var.account_id}:cluster:${var.db_identifier}",
-          "arn:aws:rds-db:${var.region}:${var.account_id}:dbuser:*/${var.app_name}"
-        ]
-      },
-      # RDS IAM Authentication
-      {
-        Effect = "Allow"
-        Action = [
-          "rds-db:connect"
-        ]
-        Resource = [
+          "arn:aws:rds:${var.region}:${var.account_id}:db:*",
+          "arn:aws:rds:${var.region}:${var.account_id}:cluster:*",
           "arn:aws:rds-db:${var.region}:${var.account_id}:dbuser:*/${var.app_name}"
         ]
       },
@@ -97,19 +66,31 @@ resource "aws_iam_policy" "lambda_combined" {
         Resource = [
           "*" # Temporarily using wildcard to test, will scope down after verification
         ]
+      },
+      # KMS Decrypt for Secrets Manager
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey"
+        ]
+        Resource = [
+          "*" # This should be scoped to the specific KMS key ARN when known
+        ]
       }
     ]
   })
 }
 
-# Attach the combined policy to the Lambda role
-resource "aws_iam_role_policy_attachment" "lambda_combined" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = aws_iam_policy.lambda_combined.arn
+# Note: Policy attachments have been moved to the Lambda module
+# where the IAM role is now managed. The policy is still created here
+# and can be attached by the calling module as needed.
+
+# Output the policy ARN so it can be attached by the Lambda module
+output "lambda_combined_policy_arn" {
+  description = "The ARN of the combined IAM policy for Lambda functions"
+  value       = aws_iam_policy.lambda_combined.arn
 }
 
-# Attach AWS X-Ray managed policy for tracing
-resource "aws_iam_role_policy_attachment" "lambda_xray" {
-  role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
-}
+# Note: AWS X-Ray policy attachment has been moved to the Lambda module
+# where the IAM role is managed.

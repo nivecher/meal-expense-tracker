@@ -10,6 +10,9 @@ __pycache__/
 Python-3.13.0.tgz
 Python-3.13.0/
 
+# Version file (temporarily unignored for static versioning)
+# app/_version.py
+
 # Temporary requirements files
 .requirements.in
 .requirements-*.in
@@ -130,7 +133,7 @@ terraform/.terraform.tfstate.lock.info
 **/plan.out
 **/*.plan
 **/.terraform-docs*
-
+**/tfplan*
 # Backend configuration
 **/backend.hcl
 !terraform/backend.hcl
@@ -213,8 +216,6 @@ local_settings.py
 
 testing/
 cache/
-.serverless/
-.serverless*
 
 *.zip
 
@@ -223,3 +224,5 @@ package
 package/*
 tmp
 tmp/*
+
+.VSCodeCounter/

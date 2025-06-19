@@ -4,50 +4,52 @@ This document outlines the high-level architecture of the Meal Expense Tracker a
 
 ## 🏗 High-Level Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                                                                     │
-│                    Meal Expense Tracker                             │
-│                                                                     │
-│  ┌─────────────┐    ┌────────────────┐    ┌──────────────────┐   │
-│  │             │    │                │    │                  │   │
-│  │  Frontend   │◄───┤    Backend     │◄───┤   Database       │   │
-│  │  (React)    │    │   (Flask)      │    │   (PostgreSQL)   │   │
-│  │             ├───►│                ├───►│                  │   │
-│  └─────────────┘    └────────────────┘    └──────────────────┘   │
-│           │                   │                       │           │
-│           ▼                   ▼                       ▼           │
-│  ┌────────────────┬───────────────────┬───────────────────────┐   │
-│  │                │                   │                       │   │
-│  │  AWS S3       │   AWS ECS        │    AWS RDS            │   │
-│  │  (Static      │   (Application    │    (Database)         │   │
-│  │   Assets)     │    Hosting)       │                       │   │
-│  └────────────────┴───────────────────┴───────────────────────┘   │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A[User] -->|HTTPS| B[API Gateway]
+    B --> C[Lambda Function]
+    C --> D[Flask Application]
+    D --> E[RDS PostgreSQL]
+    D --> F[Secrets Manager]
+    G[GitHub Actions] -->|Deploy| H[S3 Bucket]
+    H -->|Deployment Package| C
+    G -->|Provision| E
 ```
 
 ## 🧩 Core Components
 
-### 1. Frontend
-- Single-page application built with React
-- Responsive design for all device sizes
-- Client-side routing and state management
+### 1. Backend
 
-### 2. Backend
-- RESTful API built with Flask
-- Authentication and authorization
-- Business logic and data processing
+- **Flask Application**
+  - WSGI-based web framework
+  - RESTful API endpoints
+  - Request/response handling
 
-### 3. Data Layer
-- PostgreSQL for production data
+- **AWS Lambda Integration**
+  - Serverless execution environment
+  - WSGI adapter for Flask
+  - Environment-based configuration
+  - Deployment package in S3
+
+- **API Gateway**
+  - HTTP API configuration
+  - Request routing
+  - Authentication/Authorization
+
+### 2. Database
+- AWS RDS PostgreSQL for production
 - SQLite for local development
-- Object-relational mapping with SQLAlchemy
+- Managed backups and point-in-time recovery
+
+### 3. Authentication
+- JWT-based authentication
+- Role-based access control
 
 ### 4. Infrastructure
-- Containerized deployment with Docker
-- Orchestrated using AWS ECS (Fargate)
 - Infrastructure as Code with Terraform
+- Multi-environment support (dev, staging, prod)
+- Automated provisioning and deployment
+- VPC networking with security groups and NACLs
 
 ## 🔄 Data Flow
 

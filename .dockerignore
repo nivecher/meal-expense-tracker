@@ -1,17 +1,141 @@
 # Node.js dependencies
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Python
-venv/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
 env/
+ENV/
+
+# Environment variables
 .env
+.env.*
+!.env.example
+
+# Database
 *.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Version control
 .git/
 .gitignore
+.gitattributes
+.github/
+
+# Documentation
 README.md
-.vscode/
+CHANGELOG.md
+CONTRIBUTING.md
+
+# Local development
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# AWS
+.aws/
+
+# Logs
+logs/
+*.log
+
+# Local development server
+instance/
+
+# Ignore the local Docker Compose override file
+docker-compose.override.yml
+
+# Ignore development configuration files
+*.local
+
+# Ignore OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Ignore development and testing files
+tests/
+test/
+*.test
+
+# Ignore coverage reports
+.coverage
+coverage.xml
+*.cover
+
+# Ignore development tools
+.tox/
+.nox/
+
+# Ignore development configuration
+.python-version
+.python-version.*
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore local development environment files
+.env.local
+.env.*.local
+
+# Ignore production environment files
+!.env.production
+
+# Ignore development environment files
+!.env.development
+
+# Ignore test environment files
+!.env.test
+
+# Ignore CI/CD configuration files
+.circleci/
+.travis.yml
+.gitlab-ci.yml
+.github/workflows/
+
+# Ignore development tools configuration
+.pylintrc
+.flake8
+.mypy.ini

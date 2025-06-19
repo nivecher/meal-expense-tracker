@@ -206,44 +206,9 @@ resource "aws_vpc_endpoint" "s3" {
   }, var.tags)
 }
 
-resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.region}.ecr.api"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-  subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-
-  tags = merge({
-    Name = "${var.app_name}-${var.environment}-ecr-api-endpoint"
-  }, var.tags)
-}
-
-resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.region}.ecr.dkr"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-  subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-
-  tags = merge({
-    Name = "${var.app_name}-${var.environment}-ecr-dkr-endpoint"
-  }, var.tags)
-}
-
-resource "aws_vpc_endpoint" "logs" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.region}.logs"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-  subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-
-  tags = merge({
-    Name = "${var.app_name}-${var.environment}-logs-endpoint"
-  }, var.tags)
-}
+# Keep only essential VPC endpoints to reduce costs
+# Removed ECR, Logs, and SSM endpoints as they can use NAT Gateway
+# Kept Secrets Manager and KMS as they are critical for application security
 
 resource "aws_vpc_endpoint" "secretsmanager" {
   vpc_id              = aws_vpc.main.id
@@ -255,32 +220,6 @@ resource "aws_vpc_endpoint" "secretsmanager" {
 
   tags = merge({
     Name = "${var.app_name}-${var.environment}-secretsmanager-endpoint"
-  }, var.tags)
-}
-
-resource "aws_vpc_endpoint" "ssm" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.region}.ssm"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-  subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-
-  tags = merge({
-    Name = "${var.app_name}-${var.environment}-ssm-endpoint"
-  }, var.tags)
-}
-
-resource "aws_vpc_endpoint" "ssmmessages" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.region}.ssmmessages"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-  subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.vpc_endpoints.id]
-
-  tags = merge({
-    Name = "${var.app_name}-${var.environment}-ssmmessages-endpoint"
   }, var.tags)
 }
 
@@ -303,7 +242,7 @@ resource "aws_security_group" "vpc_endpoints" {
   description = "Security group for VPC endpoints"
   vpc_id      = aws_vpc.main.id
 
-  # Allow HTTPS from VPC CIDR
+  # Allow HTTPS from VPC
   ingress {
     description = "Allow HTTPS from VPC"
     from_port   = 443
@@ -312,125 +251,42 @@ resource "aws_security_group" "vpc_endpoints" {
     cidr_blocks = [var.vpc_cidr]
   }
 
+  # Allow HTTPS outbound to AWS services within VPC
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+    description = "Allow HTTPS outbound to AWS services within VPC"
+  }
+
+  # Allow DNS (UDP) for service discovery within VPC
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
+    description = "Allow DNS (UDP) outbound within VPC"
+  }
+
+  # Allow DNS (TCP) for larger DNS responses within VPC
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+    description = "Allow DNS (TCP) outbound within VPC"
+  }
 
   tags = merge({
     Name = "${var.app_name}-${var.environment}-vpc-endpoints-sg"
   }, var.tags)
 }
 
-# Security Groups
-resource "aws_security_group" "lambda" {
-  name        = "${var.app_name}-${var.environment}-lambda-sg"
-  description = "Security group for Lambda functions"
-  vpc_id      = aws_vpc.main.id
-
-  # No ingress rules needed for Lambda functions
-  # as they are invoked via AWS services, not direct inbound traffic
-
-  # Restrict egress to only necessary AWS services via VPC endpoints
-  # Allow outbound to all VPC endpoints
-  egress {
-    description = "Allow outbound to all VPC endpoints"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
-  }
-
-  # Allow outbound to S3 VPC endpoint
-  egress {
-    description     = "Allow outbound to S3 VPC endpoint"
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    prefix_list_ids = [aws_vpc_endpoint.s3.prefix_list_id]
-  }
-
-  # Allow outbound DNS (UDP 53) for DNS resolution
-  egress {
-    description = "Allow outbound DNS"
-    from_port   = 53
-    to_port     = 53
-    protocol    = "udp"
-    cidr_blocks = [var.vpc_cidr] # Use the VPC's CIDR block for DNS resolution
-  }
-
-  # Allow outbound NTP (UDP 123) for time synchronization
-  egress {
-    description = "Allow outbound NTP"
-    from_port   = 123
-    to_port     = 123
-    protocol    = "udp"
-    cidr_blocks = ["169.254.169.123/32"] # Amazon Time Sync Service
-  }
-
-  tags = merge({
-    Name = "${var.app_name}-${var.environment}-lambda-sg"
-  }, var.tags)
-}
-
-resource "aws_security_group" "rds" {
-  name        = "${var.app_name}-${var.environment}-rds-sg"
-  description = "Security group for RDS PostgreSQL database"
-  vpc_id      = aws_vpc.main.id
-
-  # Ingress rule for PostgreSQL access from Lambda
-  ingress {
-    description     = "Allow PostgreSQL access from Lambda security group"
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.lambda.id]
-  }
-
-  # Restrict egress traffic to only what's necessary
-  # Allow outbound to all VPC endpoints
-  egress {
-    description = "Allow outbound to all VPC endpoints"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [aws_vpc.main.cidr_block]
-  }
-
-  # Allow outbound to S3 VPC endpoint
-  egress {
-    description     = "Allow outbound to S3 VPC endpoint"
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    prefix_list_ids = [aws_vpc_endpoint.s3.prefix_list_id]
-  }
-
-  # Allow outbound DNS (UDP 53) for DNS resolution
-  egress {
-    description = "Allow outbound DNS"
-    from_port   = 53
-    to_port     = 53
-    protocol    = "udp"
-    cidr_blocks = [var.vpc_cidr] # Use the VPC's CIDR block for DNS resolution
-  }
-
-  # Allow outbound NTP (UDP 123) for time synchronization
-  egress {
-    description = "Allow outbound NTP"
-    from_port   = 123
-    to_port     = 123
-    protocol    = "udp"
-    cidr_blocks = ["169.254.169.123/32"] # Amazon Time Sync Service
-  }
-
-  # Note: In AWS Security Groups, all traffic is denied by default.
-  # Only explicitly allowed egress rules are permitted.
-  # No need to explicitly deny traffic in AWS Security Groups.
-
-  # Add tags for better resource management
-  tags = merge({
-    Name        = "${var.app_name}-${var.environment}-rds-sg"
-    Environment = var.environment
-    ManagedBy   = "terraform"
-    CostCenter  = var.app_name
-  }, var.tags)
+# Output the security group ID for use by other modules
+output "vpc_endpoints_sg_id" {
+  description = "The ID of the security group for VPC endpoints"
+  value       = aws_security_group.vpc_endpoints.id
 }
 
 # Data Sources
@@ -438,35 +294,4 @@ data "aws_caller_identity" "current" {}
 
 data "aws_availability_zones" "available" {
   state = "available"
-}
-
-# Outputs
-output "vpc_id" {
-  description = "The ID of the VPC"
-  value       = aws_vpc.main.id
-}
-
-output "public_subnet_ids" {
-  description = "List of public subnet IDs"
-  value       = aws_subnet.public[*].id
-}
-
-output "private_subnet_ids" {
-  description = "List of private subnet IDs"
-  value       = aws_subnet.private[*].id
-}
-
-output "db_subnet_group_name" {
-  description = "Name of the DB subnet group"
-  value       = aws_db_subnet_group.main.name
-}
-
-output "db_security_group_id" {
-  description = "ID of the RDS security group"
-  value       = aws_security_group.rds.id
-}
-
-output "lambda_security_group_id" {
-  description = "ID of the Lambda security group"
-  value       = aws_security_group.lambda.id
 }

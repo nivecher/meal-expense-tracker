@@ -7,9 +7,11 @@ mkdir -p requirements
 pip install --upgrade pip-tools
 
 # Compile requirements
-pip-compile requirements/base.in -o requirements/requirements.txt
-pip-compile requirements/dev.in -o requirements/dev-requirements.txt
-pip-compile requirements/prod.in -o requirements/prod-requirements.txt
-pip-compile requirements/security.in -o requirements/security-requirements.txt
+pip-compile requirements/base.in -o requirements.txt
+pip-compile requirements/dev.in -o requirements-dev.txt
+pip-compile requirements/prod.in -o requirements-prod.txt
 
-echo "Requirements files have been updated in the requirements/ directory."
+# Create a combined requirements file for development
+cat requirements.txt requirements-dev.txt requirements-security.txt | grep -v '^#' | sort -u >requirements-dev.txt
+
+echo "Requirements files have been updated in the root directory."

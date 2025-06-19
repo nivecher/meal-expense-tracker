@@ -143,6 +143,56 @@ install_python_requirements() {
   fi
 }
 
+# Function to install Trivy
+install_trivy() {
+  section "Installing Trivy"
+
+  # Check if Trivy is already installed
+  if command -v trivy >/dev/null 2>&1; then
+    echo -e "${YELLOW}Trivy is already installed.${NC}"
+    trivy --version
+    return 0
+  fi
+
+  # Install Trivy based on the OS
+  if command -v apt-get >/dev/null 2>&1; then
+    # Debian/Ubuntu
+    sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg >/dev/null
+    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+    sudo apt-get update
+    sudo apt-get install -y trivy
+  elif command -v yum >/dev/null 2>&1; then
+    # RHEL/CentOS
+    sudo yum install -y yum-utils
+    rhel_version="$(rpm -E %rhel)"
+    sudo yum-config-manager --add-repo "https://aquasecurity.github.io/trivy-repo/rhel/releases/download/${rhel_version}/trivy.repo"
+    sudo yum install -y trivy
+  elif command -v dnf >/dev/null 2>&1; then
+    # Fedora
+    sudo dnf install -y dnf-plugins-core
+    fedora_version="$(rpm -E %fedora)"
+    sudo dnf config-manager --add-repo "https://aquasecurity.github.io/trivy-repo/rhel/releases/download/${fedora_version}/trivy.repo"
+    sudo dnf install -y trivy
+  elif command -v brew >/dev/null 2>&1; then
+    # macOS
+    brew install trivy
+  else
+    # Fallback to manual installation
+    echo -e "${YELLOW}Unsupported system. Attempting manual installation...${NC}"
+    curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+  fi
+
+  # Verify installation
+  if command -v trivy >/dev/null 2>&1; then
+    echo -e "${GREEN}Trivy installed successfully!${NC}"
+    trivy --version
+  else
+    echo -e "${YELLOW}Failed to install Trivy. Please install it manually.${NC}"
+    return 1
+  fi
+}
+
 # Function to install and configure AWS CLI
 install_aws_cli() {
   section "Setting up AWS CLI"
@@ -200,6 +250,13 @@ echo -e "\n${GREEN}🚀 Setting up local development environment...${NC}"
 # Store the current directory
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
+
+# Install core dependencies
+section "Installing core dependencies"
+install_packages "git" "curl" "wget" "unzip" "jq" "python3-pip" "python3-venv"
+
+# Install Trivy
+install_trivy
 
 # Install system dependencies
 section "Installing system dependencies"

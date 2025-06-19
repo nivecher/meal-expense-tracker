@@ -1,92 +1,231 @@
-# Lambda function
-resource "aws_lambda_function" "main" {
-  function_name = "${var.app_name}-${var.environment}"
-  role          = var.lambda_role_arn
+# Lambda module main configuration
 
-  # Use the packaged Lambda deployment
-  filename         = "${path.module}/../../../dist/app.zip"
-  source_code_hash = filebase64sha256("${path.module}/../../../dist/app.zip")
+data "aws_caller_identity" "current" {}
 
-  # Runtime settings - optimized for cost
-  runtime     = "python3.13"
-  handler     = "wsgi.handler" # Points to the handler function in wsgi.py
-  memory_size = var.memory_size
-  timeout     = var.timeout
+# Lambda Layer for Python Dependencies
+resource "aws_lambda_layer_version" "python_dependencies" {
+  layer_name               = "${var.app_name}-${var.environment}-dependencies"
+  description              = "Python dependencies for ${var.app_name} in ${var.environment}"
+  s3_bucket                = var.layer_s3_bucket
+  s3_key                   = var.layer_s3_key
+  compatible_runtimes      = var.compatible_runtimes
+  compatible_architectures = var.compatible_architectures
 
-  # Cost optimization: Use ARM architecture (cheaper and often faster for Lambda)
-  architectures = ["arm64"]
-
-  # Cost optimization: Enable ephemeral storage for performance without cost
-  ephemeral_storage {
-    size = 512 # MB - minimum size to avoid performance issues
+  # Ensure the layer is recreated when the S3 object changes
+  lifecycle {
+    create_before_destroy = true
   }
-
-  # Environment variables with KMS encryption
-  environment {
-    variables = {
-      ENVIRONMENT           = var.environment
-      LOG_LEVEL             = var.environment == "prod" ? "INFO" : "DEBUG"
-      SECRET_ARN            = var.db_secret_arn
-      FLASK_APP             = "app.main"
-      FLASK_ENV             = var.environment
-      PYTHONPATH            = "/var/task"
-      API_GATEWAY_BASE_PATH = "/${var.environment}"
-    }
-  }
-
-  # Enable KMS encryption for environment variables
-  kms_key_arn = var.lambda_kms_key_arn
-
-  # VPC configuration
-  vpc_config {
-    security_group_ids = var.lambda_security_group_ids
-    subnet_ids         = var.subnet_ids
-  }
-
-  # Dead Letter Queue (if configured)
-  dynamic "dead_letter_config" {
-    for_each = var.dead_letter_queue_arn != null ? [1] : []
-    content {
-      target_arn = var.dead_letter_queue_arn
-    }
-  }
-
-  # Monitoring and logging
-  tracing_config {
-    mode = "Active"
-  }
-
-  tags = merge({
-    Name = "${var.app_name}-${var.environment}-lambda"
-  }, var.tags)
-
-  # Ensure the deployment package exists
-  depends_on = []
 }
 
-# SNS Topic for Dead Letter Queue is now created in the root module
-
-# CloudWatch Log Group for Lambda with KMS encryption
+# CloudWatch Log Group for Lambda
 resource "aws_cloudwatch_log_group" "lambda" {
-  name              = "/aws/lambda/${aws_lambda_function.main.function_name}"
-  retention_in_days = var.environment == "prod" ? 90 : 30
-  kms_key_id        = var.logs_kms_key_arn
+  name              = "/aws/lambda/${var.app_name}-${var.environment}"
+  retention_in_days = var.log_retention_in_days
+  kms_key_id        = var.kms_key_arn
 
   tags = merge({
-    Name        = "${var.app_name}-${var.environment}-lambda-logs"
+    Name        = "${var.app_name}-${var.environment}-logs"
     Environment = var.environment
     ManagedBy   = "terraform"
   }, var.tags)
 }
 
-# Lambda Permission for API Gateway
-resource "aws_lambda_permission" "apigw" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.main.function_name
-  principal     = "apigateway.amazonaws.com"
+# SNS Topic for Dead Letter Queue
+resource "aws_sns_topic" "lambda_dlq" {
+  count = var.create_dlq ? 1 : 0
 
-  # The /*/*/* part allows invocation from any stage, method and resource path
-  # within API Gateway REST API.
-  source_arn = "${var.api_gateway_execution_arn}/*/*"
+  name = var.dlq_topic_name != "" ? var.dlq_topic_name : "${var.app_name}-${var.environment}-dlq"
+
+  # Enable server-side encryption using KMS key from root module
+  kms_master_key_id = var.kms_key_arn
+
+  tags = merge({
+    Name        = var.dlq_topic_name != "" ? var.dlq_topic_name : "${var.app_name}-${var.environment}-dlq"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }, var.tags)
+}
+
+# SNS Topic Policy for DLQ
+resource "aws_sns_topic_policy" "lambda_dlq_policy" {
+  count  = var.create_dlq ? 1 : 0
+  arn    = aws_sns_topic.lambda_dlq[0].arn
+  policy = data.aws_iam_policy_document.sns_topic_policy.json
+}
+
+data "aws_iam_policy_document" "sns_topic_policy" {
+  statement {
+    effect  = "Allow"
+    actions = ["SNS:Publish"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+
+    resources = [aws_sns_topic.lambda_dlq[0].arn]
+  }
+}
+
+# IAM Role for Lambda
+resource "aws_iam_role" "lambda_role" {
+  name = "${var.app_name}-${var.environment}-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = merge({
+    Name        = "${var.app_name}-${var.environment}-lambda-role"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }, var.tags)
+}
+
+# IAM Policy for Lambda function
+resource "aws_iam_role_policy" "lambda_policy" {
+  name = "${var.app_name}-${var.environment}-lambda-policy"
+  role = aws_iam_role.lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # Basic Lambda execution permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:log-group:/aws/lambda/${var.app_name}-${var.environment}:*"
+      },
+      # VPC networking permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateNetworkInterface",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DeleteNetworkInterface"
+        ]
+        Resource = "*"
+      },
+      # Secrets Manager access
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [
+          var.db_secret_arn
+        ]
+      }
+    ]
+  })
+}
+
+# Attach AWS managed policy for basic Lambda execution
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Attach AWS managed policy for VPC access if VPC is configured
+resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
+  count      = var.vpc_id != "" ? 1 : 0
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
+# Attach the combined IAM policy from the IAM module
+resource "aws_iam_role_policy_attachment" "lambda_combined" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = var.lambda_combined_policy_arn
+}
+
+# Attach AWS X-Ray managed policy for tracing if enabled
+resource "aws_iam_role_policy_attachment" "lambda_xray" {
+  count      = var.enable_xray_tracing ? 1 : 0
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+}
+
+# Lambda Function
+resource "aws_lambda_function" "main" {
+  function_name = "${var.app_name}-${var.environment}"
+  role          = aws_iam_role.lambda_role.arn
+  handler       = var.handler
+  runtime       = var.runtime
+  memory_size   = var.memory_size
+  timeout       = var.timeout
+
+  # Enable X-Ray tracing
+  tracing_config {
+    mode = "Active"
+  }
+
+  # Use S3 for deployment package
+  s3_bucket = var.s3_bucket
+  s3_key    = var.s3_key
+
+  # Attach the required layer
+  layers = [aws_lambda_layer_version.python_dependencies.arn]
+
+  # Environment variables including enhanced monitoring
+  environment {
+    variables = {
+      DB_SECRET_ARN           = var.db_secret_arn
+      DB_HOST                 = var.db_host
+      DB_NAME                 = var.db_name
+      DB_USERNAME             = var.db_username
+      ENVIRONMENT             = var.environment
+      AWS_LAMBDA_EXEC_WRAPPER = "/opt/otel-instrument"
+    }
+  }
+
+  # VPC configuration if VPC ID is provided
+  vpc_config {
+    subnet_ids         = var.subnet_ids
+    security_group_ids = [aws_security_group.lambda.id]
+  }
+
+  # Dead Letter Queue configuration if enabled
+  dynamic "dead_letter_config" {
+    for_each = var.create_dlq ? [1] : []
+    content {
+      target_arn = aws_sns_topic.lambda_dlq[0].arn
+    }
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_basic_execution,
+    aws_iam_role_policy_attachment.lambda_vpc_access
+  ]
+
+  # Tags
+  tags = merge(
+    {
+      Name        = "${var.app_name}-${var.environment}-lambda"
+      Environment = var.environment
+      ManagedBy   = "Terraform"
+    },
+    var.tags
+  )
+
+  # Lifecycle configuration to ignore changes to environment variables
+  lifecycle {
+    ignore_changes = [
+      environment[0].variables,
+      source_code_hash
+    ]
+  }
 }

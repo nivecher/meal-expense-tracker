@@ -13,6 +13,16 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY")
 
+    @classmethod
+    def init_app(cls, app):
+        """Initialize configuration for the Flask app.
+
+        Args:
+            app: The Flask application instance
+        """
+        # This method can be overridden in child classes for additional configuration
+        pass
+
 
 class DevelopmentConfig(Config):
     DEBUG = True

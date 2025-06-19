@@ -1,163 +1,242 @@
-"""WSGI entry point for the Meal Expense Tracker application."""
+"""WSGI entry point for the Meal Expense Tracker application.
+
+This module serves as the entry point for both local development
+and AWS Lambda deployment.
+"""
 
 import os
 import sys
 import logging
-import json
-import base64
-from typing import Dict, Any, Tuple, Optional
-from flask.testing import FlaskClient
-from werkzeug.test import TestResponse
-from app import create_app
-
-# Set up logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger(__name__)
-
-# Initialize the Flask application
-app = create_app()
+from flask import jsonify
+from app import create_app, db
 
 
-def parse_http_v2_event(event: Dict[str, Any]) -> Tuple[str, str, Dict, Dict, str]:
-    """Parse API Gateway HTTP API v2 event format."""
-    method = event["requestContext"]["http"]["method"]
-    path = event["rawPath"]
-    query_params = event.get("queryStringParameters", {}) or {}
-    headers = {k.lower(): v for k, v in event.get("headers", {}).items()}
-    body = event.get("body", "")
+def setup_logger():
+    """Set up the root logger with basic configuration."""
+    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
-    if event.get("isBase64Encoded", False) and body:
-        body = base64.b64decode(body).decode("utf-8")
+    # Clear existing handlers
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
 
-    return method, path, query_params, headers, body
-
-
-def parse_rest_api_event(event: Dict[str, Any]) -> Tuple[str, str, Dict, Dict, str]:
-    """Parse API Gateway REST API event format."""
-    method = event["httpMethod"]
-    path = event["path"]
-    query_params = event.get("queryStringParameters", {}) or {}
-    headers = {k.lower(): v for k, v in event.get("headers", {}).items()}
-    body = event.get("body", "")
-
-    if event.get("isBase64Encoded", False) and body:
-        body = base64.b64decode(body).decode("utf-8")
-
-    return method, path, query_params, headers, body
-
-
-def process_request(
-    client: FlaskClient,
-    method: str,
-    path: str,
-    query_params: Dict,
-    headers: Dict,
-    body: str,
-) -> TestResponse:
-    """Process the HTTP request using Flask test client."""
-    headers_list = [(k, v) for k, v in headers.items()]
-    return client.open(
-        method=method,
-        path=path,
-        query_string=query_params,
-        data=body,
-        headers=headers_list,
-        content_type=headers.get("content-type"),
+    # Configure basic logging
+    logging.basicConfig(
+        level=log_level, format=log_format, handlers=[logging.StreamHandler(sys.stdout)]
     )
 
+    return logging.Formatter(log_format)
 
-def format_response(response: TestResponse) -> Dict[str, Any]:
-    """Format the Flask response for API Gateway."""
-    response_body = response.get_data(as_text=True)
-    content_type = response.content_type or ""
 
-    # Try to parse as JSON if content type is JSON
-    if "application/json" in content_type and response_body:
+def configure_application_logging(app):
+    """Configure application-specific logging settings."""
+    formatter = setup_logger()
+    logger = logging.getLogger()
+
+    # Add console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    # Add stderr handler in AWS environment
+    if os.environ.get("AWS_EXECUTION_ENV"):
+        stderr_handler = logging.StreamHandler(sys.stderr)
+        stderr_handler.setFormatter(formatter)
+        logger.addHandler(stderr_handler)
+
+    # Configure third-party loggers
+    for logger_name in ["botocore", "urllib3", "sqlalchemy"]:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+    app.logger.info("Logging configured")
+
+
+def register_error_handlers(app):
+    """Register error handlers for the Flask application."""
+
+    @app.errorhandler(404)
+    def not_found_error(error):
+        """Handle 404 errors."""
+        return jsonify({"error": "Not found"}), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Handle 500 errors."""
+        db.session.rollback()
+        return jsonify({"error": "Internal server error"}), 500
+
+
+def register_routes(app):
+    """Register application routes."""
+
+    @app.route("/")
+    def root():
+        """Root endpoint that returns a welcome message."""
+        return (
+            jsonify(
+                {
+                    "status": "healthy",
+                    "message": "Meal Expense Tracker API",
+                    "version": app.config.get("VERSION", "0.0.0"),
+                }
+            ),
+            200,
+        )
+
+
+def check_database_migrations(app):
+    """Check and apply database migrations if needed."""
+    if not app.config.get("SQLALCHEMY_DATABASE_URI", "").startswith("postgresql"):
+        return
+
+    from sqlalchemy import inspect
+
+    inspector = inspect(db.engine)
+    tables = inspector.get_table_names()
+    table_list = ", ".join(tables) if tables else "None"
+    app.logger.info(f"Database contains tables: {table_list}")
+
+    migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
+    if os.path.exists(migration_dir):
         try:
-            response_body = json.loads(response_body)
-        except json.JSONDecodeError:
-            pass
+            from flask_migrate import upgrade as migration_upgrade
 
-    # Format response body
-    body_content = (
-        json.dumps(response_body, default=str)
-        if isinstance(response_body, (dict, list))
-        else response_body or ""
-    )
+            migration_upgrade()
+            app.logger.info("Database migrations applied successfully")
+        except Exception as e:
+            app.logger.error(f"Error applying database migrations: {str(e)}")
+            # Re-raise the exception to fail fast in production
+            if os.environ.get("FLASK_ENV") == "production":
+                raise
+            app.logger.error(f"Error applying database migrations: {str(e)}")
+            # Re-raise the exception to fail fast if migrations are required
+            raise
+            app.logger.warning(f"Could not apply migrations: {str(e)}")
 
-    # Prepare response headers
-    response_headers = dict(response.headers)
-    if "content-length" in response_headers:
-        response_headers["Content-Length"] = str(len(body_content))
+
+def create_application():
+    """Create and configure the Flask application."""
+    app = create_app()
+
+    # Configure application components
+    configure_application_logging(app)
+    register_error_handlers(app)
+    register_routes(app)
+
+    # Initialize database
+    with app.app_context():
+        try:
+            db.create_all()  # Create tables if they don't exist
+            app.logger.info("Database tables verified/created")
+            check_database_migrations(app)
+        except Exception as e:
+            app.logger.error(f"Error initializing database: {str(e)}")
+            raise
+
+    return app
+
+
+# Create the application
+app = create_application()
+application = app  # For WSGI servers
+
+
+def _transform_http_api_event(event):
+    """Transform HTTP API (v2.0) event to REST API format."""
+    if "version" not in event or event.get("version") != "2.0" or "httpMethod" in event:
+        return event
+
+    request_context = event.get("requestContext", {})
+    http_context = request_context.get("http", {})
 
     return {
-        "statusCode": response.status_code,
-        "headers": response_headers,
-        "body": body_content,
+        **event,
+        "httpMethod": http_context.get("method", "GET"),
+        "path": event.get("rawPath", "/"),
+        "queryStringParameters": event.get("queryStringParameters", {}),
+        "headers": event.get("headers", {}),
+        "body": event.get("body", ""),
+        "isBase64Encoded": event.get("isBase64Encoded", False),
     }
 
 
-def handle_unknown_event(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Handle unknown event format by trying aws-wsgi as fallback."""
+def _get_awsgi_response():
+    """Get the AWSGI response handler, trying multiple import methods."""
     try:
-        import aws_wsgi
+        import awsgi
 
-        return aws_wsgi.response(app, event, context)
+        return awsgi.response
     except ImportError:
-        logger.error("aws-wsgi not available for fallback")
-        raise
-    except Exception as e:
-        logger.error("Error in aws-wsgi fallback: %s", str(e), exc_info=True)
-        raise
+        try:
+            from awsgi import response as awsgi_response
+
+            return awsgi_response
+        except ImportError as e:
+            app.logger.error(f"Failed to import awsgi: {str(e)}")
+            return None
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+def lambda_handler(event, context):
+    """AWS Lambda handler function.
+
+    Handles both API Gateway events (REST and HTTP APIs) and direct Lambda invocations.
     """
-    AWS Lambda handler function.
-    Handles both API Gateway HTTP API v2 and REST API events.
-    """
-    try:
-        logger.info("Received event: %s", json.dumps(event, indent=2))
+    app.logger.debug("Received Lambda event")
 
-        # Parse the event based on its format
-        if event.get("version") == "2.0" and "requestContext" in event:
-            method, path, query_params, headers, body = parse_http_v2_event(event)
-        elif "httpMethod" in event:
-            method, path, query_params, headers, body = parse_rest_api_event(event)
-        else:
-            return handle_unknown_event(event, context)
+    # Handle direct Lambda invocation (test event)
+    if not event.get("httpMethod") and not event.get("requestContext"):
+        app.logger.info("Direct Lambda invocation detected")
+        return {
+            "statusCode": 200,
+            "body": (
+                "Lambda function is working! Use API Gateway to access the application."
+            ),
+            "headers": {"Content-Type": "application/json"},
+        }
 
-        # Process the request
-        with app.test_client() as client:
-            response = process_request(
-                client, method, path, query_params, headers, body
-            )
-            return format_response(response)
+    # Transform HTTP API v2.0 events to REST API format
+    event = _transform_http_api_event(event)
 
-    except Exception as e:
-        logger.error("Error processing request: %s", str(e), exc_info=True)
+    # Get AWSGI response handler
+    awsgi_handler = _get_awsgi_response()
+    if not awsgi_handler:
         return {
             "statusCode": 500,
+            "body": "Internal Server Error: awsgi package not found",
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": "Internal Server Error"}),
         }
+
+    try:
+        return awsgi_handler(app, event, context, base64_content_types={"image/png"})
+    except Exception as e:
+        app.logger.error(f"Error processing request: {str(e)}", exc_info=True)
+        return {
+            "statusCode": 500,
+            "body": "Internal Server Error",
+            "headers": {"Content-Type": "application/json"},
+        }
+
+
+def main():
+    """Run the application locally."""
+    try:
+        port = int(os.environ.get("PORT", 5000))
+        host = os.environ.get("HOST", "0.0.0.0")
+
+        app.logger.info(f"Starting Meal Expense Tracker on {host}:{port}")
+        app.logger.info(f'Environment: {app.config["ENV"]}')
+        app.logger.info(f"Debug mode: {app.debug}")
+
+        app.run(host=host, port=port, debug=app.debug)
+    except Exception as e:
+        app.logger.error(f"Failed to start application: {str(e)}")
+        sys.exit(1)
 
 
 # For AWS Lambda
 if os.environ.get("AWS_EXECUTION_ENV"):
     handler = lambda_handler
 
-
 # For local development
 if __name__ == "__main__":
-    logger.info("Starting application locally...")
-    try:
-        port = int(os.environ.get("PORT", 5000))
-        app.run(debug=True, host="0.0.0.0", port=port)
-    except Exception as e:
-        logger.error("Failed to run application: %s", str(e), exc_info=True)
-        raise
+    main()

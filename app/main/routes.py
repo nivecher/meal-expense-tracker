@@ -1,148 +1,66 @@
+"""
+Main blueprint routes.
+
+This module contains the route handlers for the main blueprint.
+"""
+
 from flask import render_template, request
-from flask_login import login_required, current_user
-from app import db, version
-from app.main import bp
-from app.expenses.models import Expense
-from app.restaurants.models import Restaurant
-from datetime import datetime
+from flask_login import current_user, login_required
+
+from app import version
+from . import bp
+from .services import (
+    get_expense_filters,
+    get_user_expenses,
+    get_filter_options,
+)
 
 
 @bp.route("/about")
 @login_required
 def about():
+    """Render the about page.
+
+    Returns:
+        Rendered about page template
+    """
     return render_template("main/about.html", app_version=version["app"])
 
 
 @bp.route("/")
 @login_required
 def index():
-    # Get filter parameters
-    search = request.args.get("search", "")
-    meal_type = request.args.get("meal_type", "")
-    category = request.args.get("category", "")
-    start_date = request.args.get("start_date", "")
-    end_date = request.args.get("end_date", "")
-    sort_by = request.args.get("sort", "date")
-    sort_order = request.args.get("order", "desc")
-
-    # Base query
-    query = Expense.query.filter_by(user_id=current_user.id)
-
-    # Apply filters
-    query = apply_filters(query, request.args)
-
-    # Apply sorting
-    query = apply_sorting(query, sort_by, sort_order)
-
-    expenses = query.all()
-
-    # Calculate total amount
-    total_amount = sum(expense.amount for expense in expenses) if expenses else 0.0
-
-    # Get unique meal types and categories for filter dropdowns
-    meal_types = (
-        db.session.query(Expense.meal_type)
-        .distinct()
-        .filter(Expense.meal_type != "")
-        .all()
-    )
-    meal_types = [meal[0] for meal in meal_types]
-    categories = (
-        db.session.query(Expense.category)
-        .distinct()
-        .filter(Expense.category != "")
-        .all()
-    )
-    categories = [category[0] for category in categories]
-
-    return render_template(
-        "main/index.html",
-        expenses=expenses,
-        search=search,
-        meal_type=meal_type,
-        category=category,
-        start_date=start_date,
-        end_date=end_date,
-        sort_by=sort_by,
-        sort_order=sort_order,
-        meal_types=meal_types,
-        categories=categories,
-        total_amount=total_amount,
-    )
-
-
-def apply_filters(query, request_args):
-    search = request_args.get("search", "")
-    meal_type = request_args.get("meal_type", "")
-    category = request_args.get("category", "")
-    start_date = request_args.get("start_date", "")
-    end_date = request_args.get("end_date", "")
-
-    if search:
-        query = query.join(Restaurant).filter(
-            db.or_(
-                Restaurant.name.ilike(f"%{search}%"),
-                Restaurant.address.ilike(f"%{search}%"),
-                Expense.notes.ilike(f"%{search}%"),
-            )
-        )
-    if meal_type:
-        query = query.filter(Expense.meal_type == meal_type)
-    if category:
-        query = query.filter(Expense.category == category)
-    if start_date:
-        start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
-        query = query.filter(Expense.date >= start_date_obj)
-    if end_date:
-        end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
-        query = query.filter(Expense.date <= end_date_obj)
-    return query
-
-
-def apply_sorting(query, sort_by, sort_order):
-    if sort_by == "date":
-        query = query.order_by(
-            Expense.date.desc() if sort_order == "desc" else Expense.date.asc()
-        )
-    elif sort_by == "amount":
-        query = query.order_by(
-            Expense.amount.desc() if sort_order == "desc" else Expense.amount.asc()
-        )
-    elif sort_by == "meal_type":
-        query = query.order_by(
-            Expense.meal_type.desc()
-            if sort_order == "desc"
-            else Expense.meal_type.asc()
-        )
-    elif sort_by == "category":
-        query = query.order_by(
-            Expense.category.desc() if sort_order == "desc" else Expense.category.asc()
-        )
-    elif sort_by == "restaurant":
-        query = query.join(Restaurant).order_by(
-            Restaurant.name.desc() if sort_order == "desc" else Restaurant.name.asc()
-        )
-    return query
-
-
-@bp.route("/health")
-@bp.route("/api/health")  # Support both paths for backward compatibility
-def health_check():
-    """Health check endpoint for AWS ALB and API Gateway.
+    """Render the main index page with expense list and filters.
 
     Returns:
-        JSON: Status and version information
+        Rendered index page template with expenses and filter options
     """
-    from flask import jsonify
-    from app import version
+    # Get filter parameters from request
+    filters = get_expense_filters(request)
 
-    return (
-        jsonify(
-            {
-                "status": "healthy",
-                "version": version.get("app", "unknown"),
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        ),
-        200,
-    )
+    try:
+        # Get expenses and total amount
+        expenses, total_amount = get_user_expenses(current_user.id, filters)
+
+        # Get filter options
+        filter_options = get_filter_options(current_user.id)
+
+        return render_template(
+            "main/index.html",
+            expenses=expenses,
+            total_amount=total_amount,
+            **filters,  # Pass all filter values to template
+            **filter_options,  # Pass filter options
+        )
+    except Exception as e:
+        # Log the error and show a user-friendly message
+        from flask import current_app
+
+        current_app.logger.error(f"Error loading expenses: {str(e)}")
+        return (
+            render_template(
+                "errors/500.html",
+                error="An error occurred while loading expenses. Please try again later.",
+            ),
+            500,
+        )

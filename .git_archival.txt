@@ -1,0 +1,4 @@
+# This file helps setuptools_scm determine the version when .git is not available
+# Format: https://github.com/benoitc/git-archive-all/issues/53
+ref-names: $Format:%D$
+ref: $Format:%H$  # $Format:%H$

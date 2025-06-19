@@ -13,8 +13,6 @@ exclude =
     .tox,
     .pytest_cache,
     .mypy_cache,
-    .serverless,
-    .serverless*
     cache,
     node_modules
     Python-3.13.0

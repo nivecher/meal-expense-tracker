@@ -34,7 +34,7 @@ def test_create_app_with_default_config():
             "FLASK_APP": "app",
             "FLASK_ENV": "development",
             "GOOGLE_MAPS_API_KEY": "test-key",
-            "SERVER_NAME": "localhost:5001",
+            "SERVER_NAME": "localhost:5000",
             "DB_USERNAME": "test",
             "DB_PASSWORD": "test",
             "DB_HOST": "localhost",
@@ -48,7 +48,7 @@ def test_create_app_with_default_config():
         app = create_app()
         assert not app.testing
         assert app.config["GOOGLE_MAPS_API_KEY"] == "test-key"
-        assert app.config["SERVER_NAME"] == "localhost:5001"
+        assert app.config["SERVER_NAME"] == "localhost:5000"
         # SECRET_KEY should be set (either from env or auto-generated)
         assert "SECRET_KEY" in app.config
         # SECRET_KEY can be either bytes or string

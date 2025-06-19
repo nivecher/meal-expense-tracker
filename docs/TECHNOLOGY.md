@@ -6,11 +6,9 @@ This document outlines the technology choices and architecture decisions for the
 - [Core Technologies](#core-technologies)
 - [Infrastructure](#infrastructure)
 - [Development Tools](#development-tools)
-- [Third-party Services](#third-party-services)
-- [Development Environment](#development-environment)
-- [Deployment](#deployment)
-- [Monitoring and Operations](#monitoring-and-operations)
+- [CI/CD Pipeline](#cicd-pipeline)
 - [Security](#security)
+- [Monitoring and Operations](#monitoring-and-operations)
 - [Future Considerations](#future-considerations)
 
 ## Core Technologies
@@ -20,167 +18,120 @@ This document outlines the technology choices and architecture decisions for the
   - Type hints and modern Python features
   - Async/await support for I/O-bound operations
 
-- **Framework**: [Flask](https://flask.palletsprojects.com/)
-  - Lightweight WSGI web application framework
-  - Extensible with Flask extensions
-  - RESTful API support
-
-- **API**: RESTful JSON API
-  - Standardized endpoints
-  - Versioned API routes
-  - OpenAPI/Swagger documentation
-
-- **Authentication**: JWT (JSON Web Tokens)
-  - Stateless authentication
-  - Token refresh mechanism
-  - Role-based access control
-
-- **Validation**:
-  - Flask-WTF for form validation
-  - Marshmallow for data serialization/deserialization
-  - Request/response schema validation
+- **Serverless Framework**: AWS Lambda
 
 - **Database ORM**: [SQLAlchemy](https://www.sqlalchemy.org/)
-  - Powerful ORM and SQL toolkit
-  - Connection pooling
-  - Transaction management
+  - Async SQLAlchemy for non-blocking database access
+- **Data Validation**: Pydantic
+- **Authentication**: Flask-JWT-Extended
+- **Testing**: Pytest with Flask-Testing
+- **Code Quality**: Black, isort, Flake8, Mypy
 
-### Frontend
-- **Base**: HTML5, CSS3, JavaScript (ES6+)
-- **Framework**: React
-  - Component-based architecture
-  - Virtual DOM for performance
-  - Rich ecosystem of libraries
-
-- **State Management**: React Context API
-  - Built-in state management
-  - Redux (planned for complex state needs)
-
-- **Build Tool**: Webpack
-
-### Database
-- **Production**: PostgreSQL (AWS RDS)
-- **Development**: SQLite
-- **ORM**: SQLAlchemy
-- **Migrations**: Flask-Migrate (Alembic)
+### AWS Lambda Integration
+- **Runtime**: Python 3.13
+- **WSGI Adapter**: aws-wsgi
+- **Handler**: Lambda-compatible entry point
+- **Layers**: Custom runtime dependencies
+- **Environment**: Configuration via Lambda environment variables
+- **Logging**: Structured JSON logging with CloudWatch
 
 ## Infrastructure
 
-### Containerization
-- **Runtime**: [Docker](https://www.docker.com/)
-  - Containerization platform
-  - Reproducible environments
-  - Multi-stage builds
-
-- **Orchestration**: AWS ECS (Fargate)
-  - Serverless container orchestration
-  - Automatic scaling
-  - Integration with other AWS services
-
-- **Local Development**: Docker Compose
-  - Multi-container applications
-  - Service dependencies
-  - Volume mounts for development
-
-### Infrastructure as Code
-- **Tool**: [Terraform](https://www.terraform.io/)
-  - Declarative configuration
-  - Resource graph visualization
-  - Plan/apply workflow
-
-- **State Management**:
-  - S3 Backend
-  - DynamoDB Locking
-  - State versioning and rollback
-
-- **Modules**:
-  - Reusable infrastructure components
-  - Environment-specific configurations
-  - Versioned modules
-
 ### AWS Services
-- **Compute**:
-  - ECS Fargate (container orchestration)
-  - Lambda (serverless functions)
-  - EC2 (if needed for specific workloads)
-
+- **Compute**: AWS Lambda
+- **API**: API Gateway HTTP API
 - **Storage**:
-  - S3 (object storage)
-  - EFS (shared file system)
-  - RDS (PostgreSQL)
-
+  - S3 for Lambda deployment packages
+  - RDS PostgreSQL for data storage
 - **Networking**:
   - VPC with public/private subnets
-  - Application Load Balancer (ALB)
-  - Route 53 (DNS management)
-  - API Gateway (API management)
-
-- **Security**:
-  - KMS (encryption keys)
-  - IAM (access control)
-  - Secrets Manager (secrets management)
-  - WAF (web application firewall)
-
+  - Security Groups for access control
+  - NAT Gateway for outbound internet access
+- **Secrets**: AWS Secrets Manager for credentials
 - **Monitoring**:
-  - CloudWatch (logs, metrics, alarms)
-  - X-Ray (distributed tracing)
-  - CloudTrail (API activity logging)
+  - CloudWatch Logs
+  - CloudWatch Metrics
+  - CloudWatch Alarms
 
-### Infrastructure as Code
-- **Tool**: Terraform
-- **State Management**: S3 Backend with DynamoDB Locking
-- **Modules**: Reusable modules for common patterns
+### Local Development
+- LocalStack for AWS service emulation
+- Docker Compose for local services
+- SQLite for local development database
 
-### CI/CD
-- **Provider**: GitHub Actions
-- **Workflows**:
-  - PR Validation (lint, test, security scan)
-  - Deployment to Staging/Production
-  - Infrastructure Testing
+## CI/CD Pipeline
+
+### GitHub Actions Workflows
+1. **PR Validation**
+   - Code linting (Python, Terraform)
+   - Unit and integration tests
+   - Security scanning (Trivy, Bandit)
+   - Terraform plan validation
+   - Test coverage reporting
+
+2. **Deployment**
+   - Build and package Flask application
+   - Upload deployment package to S3
+   - Update Lambda function
+   - Run database migrations
+   - Update API Gateway configuration
+   - Run integration tests
+   - Notify on success/failure
+
+3. **Environment Promotion**
+   - Manual approval gates
+   - Environment-specific configuration
+   - Zero-downtime deployments
+   - Automated rollback on failure
+
+4. **Infrastructure**
+   - Terraform plan/apply
+   - Drift detection
+   - Cost estimation
+   - Security scanning
 
 ## Development Tools
+
+### Local Development
+- **Local Stack**: Docker Compose for local AWS services
+- **Database**: Local PostgreSQL container
+- **Testing**:
+  - Pytest with fixtures
+  - Factory Boy for test data
+  - HTTPretty for HTTP mocking
 
 ### Code Quality
 - **Linting**:
   - Flake8 (Python)
   - ShellCheck (Shell scripts)
-  - ESLint (JavaScript/TypeScript)
   - TFLint (Terraform)
 
 - **Formatting**:
   - Black (Python)
   - shfmt (Shell)
-  - Prettier (JavaScript/CSS)
   - Terraform fmt
 
 - **Type Checking**:
-  - mypy (Python)
-  - TypeScript (frontend)
+  - Mypy (Python)
 
 - **Security**:
-  - [Trivy](https://aquasecurity.github.io/trivy/)
-    - Container image scanning
-    - Infrastructure as Code scanning
-    - Dependency vulnerability scanning
-  - Bandit (Python security)
-  - npm audit (JavaScript dependencies)
-  - Git secrets scanning
+  - Trivy for dependency scanning
+  - Bandit for Python security
+  - GitLeaks for secret detection
+
+### AWS Development
+- **AWS SAM CLI** for local Lambda testing
+- **AWS CLI** for service interaction
+- **AWS Vault** for credential management
+- **LocalStack** for offline development
 
 ### Testing
 - **Unit/Integration**:
   - pytest (Python)
-  - React Testing Library (frontend)
-  - Mock AWS services
 
 - **Coverage**:
   - pytest-cov
   - Codecov integration
   - Minimum coverage requirements
-
-- **E2E**:
-  - Cypress (planned)
-  - API contract testing
-  - Performance testing
 
 ### Documentation
 - **API**:
@@ -215,133 +166,6 @@ This document outlines the technology choices and architecture decisions for the
   - Automated testing
   - Code coverage requirements
 
-### CI/CD
-- **Provider**: GitHub Actions
-  - Workflow automation
-  - Self-hosted runners (if needed)
-  - Matrix testing
-
-- **Workflows**:
-  - PR Validation (lint, test, security scan)
-  - Release management
-  - Deployment to environments
-  - Infrastructure testing
-
-- **Environments**:
-  - Development
-  - Staging
-  - Production
-  - Feature environments (on-demand)
-
-### Testing
-- **Unit/Integration**: pytest
-- **Coverage**: pytest-cov
-- **E2E**: Cypress (planned)
-
-### Documentation
-- **API**: Swagger/OpenAPI
-- **Architecture**: C4 Model
-- **Decisions**: ADRs
-
-## Third-party Services
-
-### Monitoring & Observability
-- **Error Tracking**:
-  - Sentry (application errors)
-  - CloudWatch Alarms
-  - Custom metrics
-
-- **Analytics**:
-  - AWS Pinpoint (user analytics, planned)
-  - Custom event tracking
-  - Business metrics
-
-### Communication
-- **Email**:
-  - Amazon SES
-  - Transactional emails
-  - Notifications
-
-- **Notifications**:
-  - Amazon SNS
-  - Webhook integrations
-  - Push notifications (future)
-
-### Integration
-- **Payment Processing**:
-  - Stripe (planned)
-  - Subscription management
-  - Invoicing
-
-- **Maps & Location**:
-  - Google Maps API
-  - Geocoding services
-  - Distance calculations
-
-## Version Control
-- **Hosting**: GitHub
-- **Branching**: GitHub Flow
-- **PR Process**: Required reviews, status checks
-
-## Development Environment
-
-### Prerequisites
-- **Python 3.13+**
-  - Virtual environment (venv/poetry)
-  - Package management (pip/poetry)
-  - Development headers
-
-- **Docker & Docker Compose**
-  - Container runtime
-  - Multi-container applications
-  - Volume mounts for development
-
-- **Terraform**
-  - Infrastructure as Code
-  - Provider plugins
-  - Workspace management
-
-- **AWS CLI**
-  - AWS credentials
-  - SSO configuration
-  - Profile management
-
-- **Node.js** (for frontend development)
-  - LTS version
-  - npm/yarn package manager
-  - Build tools
-
-### Local Development
-- **Database**:
-  - SQLite for local development
-  - PostgreSQL for integration testing
-  - Database migrations
-
-- **API**:
-  - Flask development server
-  - Auto-reload on changes
-  - Debug mode
-
-- **Frontend**:
-  - Webpack dev server
-  - Hot module replacement
-  - Development proxy
-
-- **Testing**:
-  - pytest with test database
-  - Fixtures and factories
-  - Test isolation
-
-### Development Workflow
-1. Clone the repository
-2. Set up environment variables
-3. Install dependencies
-4. Start development services
-5. Run tests
-6. Make changes
-7. Run linters/formatters
-8. Create pull request
-
 ## Deployment
 
 ### Environments
@@ -369,7 +193,6 @@ This document outlines the technology choices and architecture decisions for the
 2. **Testing**
    - Unit tests
    - Integration tests
-   - E2E tests
    - Security scans
 
 3. **Staging Deployment**
@@ -398,16 +221,10 @@ This document outlines the technology choices and architecture decisions for the
 ## Monitoring and Operations
 
 ### Logging
-- **Application Logs**
-  - Structured JSON format
-  - Correlation IDs
-  - Log levels (DEBUG, INFO, WARNING, ERROR)
-
-- **Infrastructure Logs**
-  - CloudWatch Logs
-  - Container logs
-  - System metrics
-
+- AWS CloudWatch Logs
+  - Centralized log collection
+  - Log groups and streams
+  - Retention policies
 - **Log Retention**
   - Development: 7 days
   - Staging: 30 days

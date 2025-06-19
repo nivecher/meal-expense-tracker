@@ -1,17 +1,17 @@
-# Variable declarations required by this environment module
+# Core Configuration
+variable "app_name" {
+  description = "Application name"
+  type        = string
+}
 
 variable "environment" {
   description = "The environment name (e.g., dev, staging, prod)"
   type        = string
 }
 
+# AWS Configuration
 variable "aws_region" {
   description = "AWS region to deploy resources"
-  type        = string
-}
-
-variable "app_name" {
-  description = "Application name"
   type        = string
 }
 
@@ -21,30 +21,30 @@ variable "common_tags" {
   default     = {}
 }
 
-variable "enable_cloudwatch_logs" {
-  type = bool
-}
-
-variable "enable_xray_tracing" {
-  type = bool
-}
-
-variable "enable_cost_alert" {
-  type = bool
-}
-
-variable "monthly_budget_amount" {
-  type = number
-}
-
-variable "allowed_ip_ranges" {
-  type = list(string)
-}
-
+# Database Configuration
 variable "db_instance_class" {
-  type = string
+  description = "The instance class of the RDS database"
+  type        = string
 }
 
 variable "db_allocated_storage" {
-  type = number
+  description = "The allocated storage in GB for the RDS database"
+  type        = number
+}
+
+# Security & Access
+variable "allowed_ip_ranges" {
+  description = "List of allowed IP ranges for accessing the application"
+  type        = list(string)
+}
+
+# Monitoring & Budgeting
+variable "enable_cloudwatch_logs" {
+  description = "Whether to enable CloudWatch logging for the application"
+  type        = bool
+}
+
+variable "monthly_budget_amount" {
+  description = "The monthly budget amount in USD for the environment"
+  type        = number
 }

@@ -2,35 +2,40 @@
 
 This document provides detailed instructions for setting up and working with the Meal Expense Tracker project.
 
-## 🛠 Development Environment Setup
+## Development Environment Setup
 
 ### Prerequisites
 
-- **Python 3.9+**: For running the application and development tools
-- **pip**: Python package manager
-- **Git**: Version control system
-- **Docker & Docker Compose**: For containerized development
-- **Go (optional)**: For installing `shfmt` shell formatter
+- Python 3.13+
+- Docker and Docker Compose
+- AWS CLI (for deployment)
+- AWS SAM CLI (for local Lambda testing)
+- Terraform 1.5+ (for infrastructure management)
+- **AWS CLI**: For AWS service interaction
 
-### Automated Setup (Recommended)
+### Local Development Setup
+
+### Automated Setup
 
 Run the setup script to configure your development environment:
 
 ```bash
 # Make the script executable
-chmod +x scripts/setup-local-dev.sh
+chmod +x scripts/setup-dev.sh
 
 # Run the setup script
-./scripts/setup-local-dev.sh
+./scripts/setup-dev.sh
 ```
 
 This script will:
+
 1. Install system dependencies
 2. Set up a Python virtual environment
 3. Install Python dependencies
 4. Configure pre-commit hooks
-5. Set up Docker containers
+5. Set up local PostgreSQL container
 6. Initialize the database
+7. Configure AWS credentials (if not already set up)
 
 ### Manual Setup
 
@@ -42,87 +47,168 @@ If you prefer to set up manually:
    cd meal-expense-tracker
    ```
 
-2. **Set up Python environment**
+2. **Python Environment**
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install --upgrade pip
+   # Create and activate virtual environment
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+   # Install dependencies
    pip install -r requirements-dev.txt
    ```
 
-3. **Install development tools**
+2. **Database Setup**
    ```bash
-   # Install pre-commit hooks
-   pre-commit install
+   # Start PostgreSQL container
+   docker-compose -f docker-compose.dev.yml up -d postgres
 
-   # Install shellcheck (Linux)
-   sudo apt-get install shellcheck
-
-   # Install shfmt (recommended)
-   go install mvdan.cc/sh/v3/cmd/shfmt@latest
+   # Run migrations
+   alembic upgrade head
    ```
 
-## 🚀 Running the Application
+3. **AWS SAM CLI Setup**
+   ```bash
+   # Install AWS SAM CLI (Linux)
+   pip install --user aws-sam-cli
 
-### Development Server
+   # Verify installation
+   sam --version
+   ```
+
+4. **LocalStack (Optional, for AWS service emulation)**
+   ```bash
+   # Install LocalStack
+   pip install localstack
+
+   # Start LocalStack
+   localstack start -d
+   ```
+
+5. **Configure AWS credentials**
+   ```bash
+   aws configure
+   # Follow prompts to enter AWS credentials
+   ```
+
+## Running the Application
+
+### Local Development with Flask
 
 ```bash
 # Activate virtual environment
 source venv/bin/activate
 
+# Set environment variables
+export FLASK_APP=app.py
+export FLASK_ENV=development
+
 # Start Flask development server
 flask run
 ```
 
-Access the application at: http://localhost:5000
-
-### Using Docker
+### Local Testing with SAM CLI
 
 ```bash
-# Build and start containers
-docker-compose up -d --build
+# Start API Gateway and Lambda locally
+sam local start-api --template template.yaml
+
+# Invoke a specific Lambda function
+sam local invoke "FunctionName" -e events/event.json
+```
+
+### Using Docker Compose
+
+```bash
+# Start all services
+docker-compose -f docker-compose.dev.yml up -d
 
 # View logs
-docker-compose logs -f
+docker-compose -f docker-compose.dev.yml logs -f
 ```
 
-## 🔧 Development Tools
+## Deployment
 
-### Pre-commit Hooks
-
-This project uses pre-commit to run checks before each commit. The following hooks are configured:
-
-- **Black**: Python code formatting
-- **Flake8**: Python linting
-- **ShellCheck**: Shell script linting
-- **shfmt**: Shell script formatting
-- **Terraform fmt**: Terraform code formatting
-
-To run all hooks manually:
-```bash
-pre-commit run --all-files
-```
-
-### Makefile Commands
-
-Common development tasks are automated using the Makefile:
+### Build and Package
 
 ```bash
-# Format code
-make format
+# Build deployment package
+sam build
 
-# Run tests
-make test
-
-# Run tests with coverage
-make test-cov
-
-# Lint code
-make lint
-
-# Run security checks
-make security
+# Package for deployment
+sam package \
+  --output-template-file packaged.yaml \
+  --s3-bucket your-deployment-bucket
 ```
+
+### Deploy to AWS
+
+```bash
+# Deploy to development environment
+sam deploy \
+  --template-file packaged.yaml \
+  --stack-name meal-expense-tracker-dev \
+  --capabilities CAPABILITY_IAM \
+  --region us-east-1
+
+# Deploy to production
+sam deploy \
+  --template-file packaged.yaml \
+  --stack-name meal-expense-tracker-prod \
+  --capabilities CAPABILITY_IAM \
+  --region us-east-1
+```
+
+### Infrastructure Deployment
+
+```bash
+# Initialize Terraform
+cd terraform
+terraform init
+
+# Plan changes
+terraform plan
+
+# Apply changes
+terraform apply
+```
+
+## Infrastructure Management
+
+### Terraform Commands
+
+```bash
+# Initialize Terraform
+make tf-init
+
+# Plan infrastructure changes
+make tf-plan
+
+# Apply infrastructure changes
+make tf-apply
+
+# Destroy infrastructure
+make tf-destroy
+```
+
+## API Documentation
+
+### Local Development
+
+When running the Flask development server, access the API documentation at:
+- Swagger UI: http://localhost:5000/api/docs
+- ReDoc: http://localhost:5000/api/redoc
+
+### Production
+
+In production, the API documentation is automatically generated and available at:
+- Swagger UI: https://api.yourdomain.com/docs
+- ReDoc: https://api.yourdomain.com/redoc
+
+### API Versioning
+
+- The API follows semantic versioning (e.g., v1, v2)
+- Version is included in the URL path: `/api/v1/...`
+- Current API version: v1
 
 ## 🧪 Testing
 

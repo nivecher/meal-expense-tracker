@@ -1,0 +1,62 @@
+---
+# YAML Lint Configuration
+# See: https://yamllint.readthedocs.io/en/stable/rules.html
+
+extends: default
+
+rules:
+  # Line length
+  line-length:
+    max: 120
+    level: warning
+    allow-non-breakable-inline-mappings: true
+    allow-non-breakable-words: true
+
+  # Indentation
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+    check-multi-line-strings: false
+
+  # Trailing spaces
+  trailing-spaces:
+    level: error
+    ignore-line-end: true
+
+  # Empty lines
+  empty-lines:
+    max: 1
+    max-start: 1
+    max-end: 1
+
+  # Key duplication
+  key-duplicates: enable
+
+  # Comments
+  comments:
+    require-starting-space: true
+    min-spaces-from-content: 2
+
+  # Document end
+  document-end: disable
+
+  # Truthy values
+  truthy:
+    level: warning
+    allowed-values: ['true', 'false', 'True', 'False', 'YES', 'NO', 'Yes', 'No', 'On', 'Off', 'ON', 'OFF']
+    check-keys: false
+
+  # Quoted strings
+  quoted-strings:
+    quote-type: single
+    required: only-when-needed
+    extra-required: ['.*\*{2}.*']
+
+  # Braces
+  braces: {}
+  brackets: {}
+  colons: {}
+  commas: {}
+
+  # YAML version
+  document-start: {present: true}

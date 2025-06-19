@@ -1,108 +1,192 @@
 # Main Terraform configuration
 # This file serves as the entry point for Terraform
 
-# Get AWS account and region information
+# Get the current AWS account ID
 data "aws_caller_identity" "current" {}
+
+# Get the current AWS region
 data "aws_region" "current" {}
+
+# Data sources for VPC endpoints
+# We'll use specific endpoint IDs or names to avoid conflicts
+
+
+
+# Generate a random password for Flask secret key
+resource "random_password" "flask_secret_key" {
+  length           = 50
+  special          = true
+  override_special = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+  min_lower        = 5
+  min_numeric      = 5
+  min_special      = 5
+  min_upper        = 5
+}
+
+data "aws_vpc" "selected" {
+  id = module.network.vpc_id
+}
 
 # Current region is set via the aws_region variable in variables.tf
 locals {
   current_region = var.aws_region
   account_id     = data.aws_caller_identity.current.account_id
+
+
+  # Set budget amount based on environment
+  budget_amount = var.environment == "prod" ? "20.0" : "5.0"
+
+  # Use provided monthly_budget_amount or default to environment-based amount
+  monthly_budget = coalesce(var.monthly_budget_amount, local.budget_amount)
 }
 
-# KMS Key for all encryption needs
-resource "aws_kms_key" "main" {
-  description             = "KMS key for ${var.app_name}-${var.environment} encryption"
-  deletion_window_in_days = var.environment == "prod" ? 30 : 7
-  enable_key_rotation     = true
-  policy                  = data.aws_iam_policy_document.kms_key_policy.json
+# S3 Bucket for Lambda deployment
+resource "aws_s3_bucket" "lambda_deployment" {
+  bucket = "${var.app_name}-${var.environment}-deployment-${data.aws_caller_identity.current.account_id}"
 
   tags = merge({
-    Name        = "${var.app_name}-${var.environment}-key"
+    Name        = "${var.app_name}-${var.environment}-deployment"
     Environment = var.environment
     ManagedBy   = "terraform"
   }, var.tags)
 }
 
-# KMS Alias for the key
-resource "aws_kms_alias" "main" {
-  name          = "alias/${var.app_name}-${var.environment}-key"
-  target_key_id = aws_kms_key.main.key_id
+# Enable versioning on the S3 bucket
+resource "aws_s3_bucket_versioning" "lambda_deployment" {
+  bucket = aws_s3_bucket.lambda_deployment.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
 }
 
-# IAM policy document for the KMS key
-data "aws_iam_policy_document" "kms_key_policy" {
-  statement {
-    effect = "Allow"
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::${local.account_id}:root"]
-    }
-    actions   = ["kms:*"]
-    resources = ["*"]
-  }
+# Create a separate S3 bucket for access logs
+resource "aws_s3_bucket" "access_logs" {
+  bucket = "${var.app_name}-${var.environment}-access-logs-${data.aws_caller_identity.current.account_id}"
 
-  statement {
-    effect = "Allow"
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::${local.account_id}:root"]
-    }
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:DescribeKey"
-    ]
-    resources = ["*"]
-  }
+  tags = merge({
+    Name        = "${var.app_name}-${var.environment}-access-logs"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }, var.tags)
+}
 
-  # Allow AWS services to use the key
-  statement {
-    effect = "Allow"
-    principals {
-      type        = "Service"
-      identifiers = ["logs.${local.current_region}.amazonaws.com"]
-    }
-    actions = [
-      "kms:Encrypt*",
-      "kms:Decrypt*",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:Describe*"
-    ]
-    resources = ["*"]
-  }
+# Enable server-side encryption for the access logs bucket
+resource "aws_s3_bucket_server_side_encryption_configuration" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
 
-  statement {
-    effect = "Allow"
-    principals {
-      type        = "Service"
-      identifiers = ["secretsmanager.amazonaws.com"]
-    }
-    actions = [
-      "kms:CreateGrant",
-      "kms:DescribeKey"
-    ]
-    resources = ["*"]
-    condition {
-      test     = "StringEquals"
-      variable = "kms:CallerAccount"
-      values   = [local.account_id]
-    }
-    condition {
-      test     = "StringEquals"
-      variable = "kms:ViaService"
-      values   = ["secretsmanager.${local.current_region}.amazonaws.com"]
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.main.arn
+      sse_algorithm     = "aws:kms"
     }
   }
 }
 
+# Enable access logging for the access logs bucket (self-logging)
+resource "aws_s3_bucket_logging" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+
+  target_bucket = aws_s3_bucket.access_logs.id
+  target_prefix = "self-logs/"
+}
+
+# For the access logs bucket, we don't enable logging on itself as it would create a loop
+# We'll use a lifecycle rule to manage the logs instead
+resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+
+  rule {
+    id     = "log"
+    status = "Enabled"
+
+    # Apply to all objects in the bucket
+    filter {
+      prefix = ""
+    }
+
+    expiration {
+      days = 90 # Keep logs for 90 days
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.access_logs]
+}
+
+# Enable bucket owner preferred for access control
+resource "aws_s3_bucket_ownership_controls" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+# Enable versioning for the logs bucket
+resource "aws_s3_bucket_versioning" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+
+  depends_on = [aws_s3_bucket_ownership_controls.access_logs]
+}
+
+
+
+# Block public access to the logs bucket
+resource "aws_s3_bucket_public_access_block" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Enable server access logging for the deployment bucket
+resource "aws_s3_bucket_logging" "lambda_deployment" {
+  bucket        = aws_s3_bucket.lambda_deployment.id
+  target_bucket = aws_s3_bucket.access_logs.id
+  target_prefix = "s3/${var.app_name}-${var.environment}-deployment/"
+}
+
+
+
+# Block public access to the bucket
+resource "aws_s3_bucket_public_access_block" "lambda_deployment" {
+  bucket = aws_s3_bucket.lambda_deployment.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Enable server-side encryption for the S3 bucket
+resource "aws_s3_bucket_server_side_encryption_configuration" "lambda_deployment" {
+  bucket = aws_s3_bucket.lambda_deployment.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.main.arn
+      sse_algorithm     = "aws:kms"
+    }
+  }
+}
+
+
+
+# Network Module
 # Network Module
 module "network" {
   source = "./modules/network"
+
 
   region      = local.current_region
   app_name    = var.app_name
@@ -112,9 +196,8 @@ module "network" {
   # VPC Flow Logs configuration
   enable_flow_logs            = true
   flow_logs_retention_in_days = var.environment == "prod" ? 30 : 7
-  logs_kms_key_arn            = aws_kms_key.main.arn
 
-  tags = local.common_tags
+  tags = local.tags
 }
 
 # IAM Module
@@ -126,79 +209,236 @@ module "iam" {
   environment   = var.environment
   account_id    = data.aws_caller_identity.current.account_id
   db_secret_arn = module.rds.db_secret_arn
-  db_identifier = module.rds.db_identifier
-  tags          = local.common_tags
+  tags          = local.tags
 
-  # Ensure KMS key is created before IAM policies that reference it
-  depends_on = [aws_kms_key.main]
+}
+
+# Main KMS Key for all encryption
+resource "aws_kms_key" "main" {
+  description             = "Main KMS key for ${var.app_name} ${var.environment} environment"
+  deletion_window_in_days = var.environment == "prod" ? 30 : 7
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.kms_main_policy.json
+
+  tags = merge({
+    Name        = "${var.app_name}-${var.environment}-main-kms-key"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }, var.tags)
+}
+
+# KMS Key Policy for the main key
+data "aws_iam_policy_document" "kms_main_policy" {
+  # Allow root account full access
+  statement {
+    sid    = "Enable IAM User Permissions"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  # Allow AWS services to use the key
+  statement {
+    sid    = "Allow AWS Services to use the key"
+    effect = "Allow"
+    principals {
+      type = "Service"
+      identifiers = [
+        "rds.amazonaws.com",
+        "logs.${data.aws_region.current.name}.amazonaws.com",
+        "lambda.amazonaws.com",
+        "apigateway.amazonaws.com",
+        "sns.amazonaws.com"
+      ]
+    }
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:CreateGrant",
+      "kms:ListGrants",
+      "kms:DescribeKey"
+    ]
+    resources = ["*"]
+  }
+
+  # Allow CloudWatch Logs to use the key with specific conditions
+  statement {
+    sid    = "Allow CloudWatch Logs to use the key"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["logs.${data.aws_region.current.name}.amazonaws.com"]
+    }
+    actions = [
+      "kms:Encrypt*",
+      "kms:Decrypt*",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:Describe*"
+    ]
+    resources = ["*"]
+    condition {
+      test     = "ArnLike"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values = [
+        "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*"
+      ]
+    }
+  }
+
+  # Allow SNS to use the key
+  statement {
+    sid    = "Allow SNS to use the key"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["sns.amazonaws.com"]
+    }
+    actions = [
+      "kms:GenerateDataKey",
+      "kms:Decrypt"
+    ]
+    resources = ["*"]
+  }
+}
+
+# KMS Alias for easier reference
+resource "aws_kms_alias" "main" {
+  name          = "alias/${var.app_name}-${var.environment}-main"
+  target_key_id = aws_kms_key.main.key_id
 }
 
 # RDS Module
 module "rds" {
   source = "./modules/rds"
 
-  app_name             = var.app_name
-  environment          = var.environment
-  db_subnet_group_name = module.network.db_subnet_group_name
-  db_security_group_id = module.network.db_security_group_id
-  db_kms_key_arn       = aws_kms_key.main.arn
-  tags                 = local.common_tags
+  # Core configuration
+  app_name    = var.app_name
+  environment = var.environment
 
-  # Explicitly depend on KMS key creation
-  depends_on = [aws_kms_key.main, aws_kms_alias.main]
-}
+  # Network configuration
+  vpc_id               = module.network.vpc_id
+  vpc_cidr             = var.vpc_cidr
+  db_subnet_group_name = module.network.database_subnet_group_name
 
-# Lambda Module
-module "lambda" {
-  source = "./modules/lambda"
+  # Use the main KMS key for encryption
+  db_kms_key_arn = aws_kms_key.main.arn
 
-  app_name                  = var.app_name
-  environment               = var.environment
-  lambda_role_arn           = module.iam.lambda_role_arn
-  lambda_security_group_ids = [module.network.lambda_security_group_id]
-  subnet_ids                = module.network.private_subnet_ids
-  memory_size               = var.lambda_memory_size
-  timeout                   = var.lambda_timeout
-  db_secret_arn             = module.rds.db_secret_arn
-  api_gateway_execution_arn = module.api_gateway.api_execution_arn
-  logs_kms_key_arn          = aws_kms_key.main.arn
-  lambda_kms_key_arn        = aws_kms_key.main.arn
-  tags                      = local.common_tags
+  # Tags
+  tags = local.tags
 
-  # Dead-letter queue configuration
-  dead_letter_queue_arn = aws_sns_topic.lambda_dlq.arn
-
-  # Ensure KMS key is created before Lambda function
-  depends_on = [
-    aws_kms_key.main,
-    aws_kms_alias.main,
-    aws_sns_topic.lambda_dlq,
-    aws_sns_topic_policy.lambda_dlq_policy
-  ]
 }
 
 # API Gateway Module
 module "api_gateway" {
   source = "./modules/api_gateway"
 
-  # Explicitly pass the providers
+  # Required parameters
+  app_name    = var.app_name
+  environment = var.environment
+
+  # Lambda integration
+  lambda_invoke_arn    = module.lambda.invoke_arn
+  lambda_function_name = module.lambda.name # Pass the Lambda function name directly
+  logs_kms_key_arn     = aws_kms_key.main.arn
+
+  # Domain configuration
+  domain_name     = local.domain_name
+  cert_domain     = local.cert_domain     # Wildcard certificate for subdomains
+  api_domain_name = local.api_domain_name # Full domain name (e.g., api.dev.example.com)
+
+  tags = merge(local.tags, {
+    Name = "${var.app_name}-${var.environment}-api"
+  })
+
+  # Provider configuration for multi-region support
   providers = {
-    aws           = aws           # Default AWS provider
-    aws.us-east-1 = aws.us-east-1 # us-east-1 provider for ACM certificates
+    aws           = aws
+    aws.us-east-1 = aws.us-east-1 # Required for ACM certificate in us-east-1
   }
 
-  region                 = local.current_region
-  app_name               = var.app_name
-  environment            = var.environment
-  lambda_invoke_arn      = module.lambda.invoke_arn
-  lambda_function_name   = module.lambda.function_name
-  domain_name            = var.cert_domain
-  logs_kms_key_arn       = aws_kms_key.main.arn
-  tags                   = local.common_tags
-  cert_domain            = var.cert_domain
-  api_domain_name        = var.api_domain_name
-  create_route53_records = var.cert_domain != null && var.api_domain_name != null
+  depends_on = [
+    aws_kms_key.main,
+    module.network # Ensure network resources are created first
+  ]
+}
 
-  # Ensure KMS key is created before API Gateway
-  depends_on = [aws_kms_key.main, aws_kms_alias.main]
+# Default S3 bucket name if not provided
+locals {
+  lambda_deployment_bucket = coalesce(var.lambda_deployment_bucket, "${var.app_name}-deployment-${data.aws_caller_identity.current.account_id}")
+}
+
+# Data source for the S3 bucket (managed by deployment scripts)
+data "aws_s3_bucket" "lambda_deployment" {
+  bucket = local.lambda_deployment_bucket
+
+  # This will cause Terraform to fail with a clear error if the bucket doesn't exist
+  lifecycle {
+    postcondition {
+      condition     = self.arn != ""
+      error_message = "S3 bucket ${self.bucket} does not exist. Please create it before applying Terraform."
+    }
+  }
+}
+
+# Lambda function configuration
+module "lambda" {
+  source = "./modules/lambda"
+
+  # Basic configuration
+  app_name    = var.app_name
+  environment = var.environment
+
+  # VPC configuration
+  vpc_id     = module.network.vpc_id
+  vpc_cidr   = module.network.vpc_cidr_block
+  subnet_ids = module.network.private_subnet_ids
+
+  # Encryption
+  kms_key_arn = aws_kms_key.main.arn
+
+  # Lambda package
+  s3_bucket = data.aws_s3_bucket.lambda_deployment.bucket
+  s3_key    = "${var.environment}/app/latest/app.zip"
+
+  # Layer configuration
+  layer_s3_bucket     = data.aws_s3_bucket.lambda_deployment.bucket
+  layer_s3_key        = "${var.environment}/layers/latest/python-dependencies.zip"
+  compatible_runtimes = ["python3.13"]
+
+  # Database configuration
+  db_secret_arn        = module.rds.db_secret_arn
+  db_security_group_id = module.rds.db_security_group_id
+  db_host              = module.rds.db_host
+  db_name              = module.rds.db_name
+  db_username          = "postgres" # Default username for PostgreSQL
+
+  # API Gateway integration
+  api_gateway_execution_arn = module.api_gateway.api_execution_arn
+
+  # Runtime configuration
+  handler     = var.lambda_handler
+  runtime     = var.lambda_runtime
+  memory_size = var.lambda_memory_size
+  timeout     = var.lambda_timeout
+
+  # IAM Policy
+  lambda_combined_policy_arn = module.iam.lambda_combined_policy_arn
+
+  # Optional features
+  enable_xray_tracing = true
+  create_dlq          = true
+
+  # Tags
+  tags = merge(local.tags, {
+    Name        = "${var.app_name}-${var.environment}-lambda"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  })
 }

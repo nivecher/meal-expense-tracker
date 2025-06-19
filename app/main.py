@@ -1,33 +1,18 @@
-import sys
+"""
+Main application module for Meal Expense Tracker.
+
+This module initializes the Flask application and sets up logging.
+"""
+
 import logging
-from wsgi import app
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger(__name__)
 
-def lambda_handler(event, context):
-    """
-    AWS Lambda handler function.
-    This is the entry point for AWS Lambda.
-    """
-    # Set up logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-    logger = logging.getLogger(__name__)
-
-    try:
-        # Import awsgi here to avoid import errors in non-Lambda environments
-        import awsgi
-
-        logger.info("Starting AWS Lambda handler")
-        return awsgi.response(app, event, context)
-    except ImportError:
-        logger.error(
-            "awsgi package not found. Make sure to include it in your deployment\n"
-            "package."
-        )
-        raise
-    except Exception as e:
-        logger.error(f"Error in Lambda handler: {str(e)}", exc_info=True)
-        raise
+# Initialize routes and other application components
+# This file is kept as an entry point for the application package

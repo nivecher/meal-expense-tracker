@@ -134,7 +134,7 @@ for ENV in dev staging prod; do
 bucket         = "$STATE_BUCKET"
 key            = "$ENV/terraform.tfstate"
 region         = "$REGION"
-dynamodb_table = "$LOCK_TABLE"
+use_lockfile   = true
 encrypt        = true
 EOM
 

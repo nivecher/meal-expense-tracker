@@ -1,4 +1,5 @@
 services:
+  # Development web server
   web:
     build:
       context: .
@@ -24,6 +25,59 @@ services:
       timeout: 10s
       retries: 3
 
+  # AWS Lambda emulation for local testing
+  lambda:
+    build:
+      context: .
+      target: production
+    ports:
+      - "9000:8080"  # AWS Lambda Runtime Interface Emulator listens on 8080
+    environment:
+      - AWS_LAMBDA_FUNCTION_MEMORY_SIZE=1024
+      - AWS_LAMBDA_FUNCTION_TIMEOUT=30
+      - AWS_LAMBDA_FUNCTION_HANDLER=lambda.handler
+      - AWS_LAMBDA_EVENT_BODY={}
+      - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5432/meal_expenses
+      - PYTHONUNBUFFERED=1
+      - FLASK_APP=wsgi.py
+      - FLASK_ENV=production
+    volumes:
+      - .:/var/task
+      - ./instance:/tmp/instance
+    depends_on:
+      db:
+        condition: service_healthy
+    # Use the AWS Lambda Runtime Interface Emulator (RIE) for local testing
+    command: ["/entry.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/2015-03-31/functions/function/invocations", "-d", "{}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # LocalStack for AWS services emulation
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"  # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      - SERVICES=apigateway,lambda,s3,secretsmanager,ssm,kms,dynamodb
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - LAMBDA_EXECUTOR=docker
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - HOST_TMP_FOLDER=${TMPDIR:-/tmp/}localstack
+    volumes:
+      - "${TMPDIR:-/tmp/}/localstack:/tmp/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL database
   db:
     image: postgres:16
     environment:
@@ -39,6 +93,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Adminer for database management (optional)
+  adminer:
+    image: adminer:latest
+    restart: always
+    ports:
+      - "8081:8080"
+    depends_on:
+      - db
 
 volumes:
   postgres_data:

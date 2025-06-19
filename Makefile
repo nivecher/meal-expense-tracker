@@ -46,6 +46,21 @@ export DOCKER_BUILDKIT=1
 export PYTHONPATH
 
 # =======================
+# Virtual Environment
+# =======================
+
+## Create and activate Python virtual environment
+.PHONY: venv
+venv:
+	@if [ ! -d "venv" ]; then \
+		echo "Creating virtual environment..."; \
+		$(PYTHON) -m venv venv; \
+		echo "Virtual environment created. Run 'source venv/bin/activate' to activate."; \
+	else \
+		echo "Virtual environment already exists. Run 'source venv/bin/activate' to activate."; \
+	fi
+
+# =======================
 # Help
 # =======================
 
@@ -91,6 +106,11 @@ help:
 	@echo "  \033[1mmake deploy-staging\033[0m  Deploy to staging environment"
 	@echo "  \033[1mmake deploy-prod\033[0m     Deploy to production environment"
 	@echo "  \033[1mmake package-lambda\033[0m  Create Lambda deployment package using package_lambda.sh"
+
+	@echo "\n\033[1;34mVirtual Environment:\033[0m"
+	@echo "  \033[1mmake venv\033[0m           Create Python virtual environment (if not exists)"
+
+	@echo "\n\033[1;34mDocker (Container Runtime):\033[0m"
 	@echo "  \033[1mmake update-lambda\033[0m   Update Lambda function code with latest package"
 	@echo "  \033[1mmake invoke-lambda\033[0m   Invoke Lambda function with test event"
 
@@ -269,35 +289,24 @@ tf-init:
 		echo "Error: TF_ENV is not set. Usage: make tf-init TF_ENV=<env>"; \
 		exit 1; \
 	fi
-	@if [ ! -f "$(TF_ENV_DIR)/backend.tf" ]; then \
-		echo "Error: backend.tf not found for environment $(TF_ENV)."; \
-		echo "Run 'make setup-tf-backend' first to generate backend configurations."; \
-		exit 1; \
-	fi
-	@if [ ! -f "$(TF_BACKEND_CONFIG)" ]; then \
-		echo "Error: backend.hcl not found at $(TF_BACKEND_CONFIG)"; \
-		echo "Run 'make setup-tf-backend' first to generate backend configurations."; \
-		exit 1; \
-	fi
-	@echo "🚀 Initializing Terraform with parallelism=$(TF_PARALLELISM) in $(TF_ENV) environment..."
-	@cd "$(TF_ENV_DIR)" && \
+	@echo "🚀 Initializing Terraform in $(TF_ENV) environment..."
+	@cd terraform && \
 	TF_PLUGIN_CACHE_DIR="$(HOME)/.terraform.d/plugin-cache" \
 	TF_IN_AUTOMATION=1 \
-	terraform init -input=false -backend=true -get=true -upgrade $(TF_ARGS) && \
-	terraform init -backend-config="$(TF_BACKEND_CONFIG)"
+	terraform init -reconfigure -backend-config=environments/$(TF_ENV)/backend.hcl
 
 ## Generate a plan without applying
 .PHONY: tf-plan
 tf-plan: tf-init
 	@echo "Creating Terraform plan for environment: $(TF_ENV)"
-	@if [ ! -f "$(TF_ENV_DIR)/terraform.tfvars" ]; then \
-		echo "Error: terraform.tfvars not found in $(TF_ENV_DIR)"; \
+	@if [ ! -f "terraform/environments/$(TF_ENV)/terraform.tfvars" ]; then \
+		echo "Error: terraform.tfvars not found in terraform/environments/$(TF_ENV)/"; \
 		echo "Please create the file with the required variables for the $(TF_ENV) environment."; \
 		exit 1; \
 	fi
-	@cd "$(TF_ENV_DIR)" && terraform plan \
-		-var-file=terraform.tfvars \
-		-out=tfplan-$(TF_ENV) \
+	@cd terraform && terraform plan \
+		-var-file=environments/$(TF_ENV)/terraform.tfvars \
+		-out=environments/$(TF_ENV)/tfplan-$(TF_ENV) \
 		-var="environment=$(TF_ENV)" \
 		-input=false \
 		-lock=true \
@@ -306,16 +315,16 @@ tf-plan: tf-init
 ## Apply the most recent plan
 .PHONY: tf-apply
 tf-apply:
-	@if [ ! -f "$(TF_ENV_DIR)/tfplan-$(TF_ENV)" ]; then \
+	@if [ ! -f "terraform/environments/$(TF_ENV)/tfplan-$(TF_ENV)" ]; then \
 		echo "Error: No Terraform plan found. Run 'make tf-plan' first."; \
 		exit 1; \
 	fi
 	@echo "Applying Terraform changes to environment: $(TF_ENV)"
-	@cd "$(TF_ENV_DIR)" && terraform apply \
+	@cd terraform && terraform apply \
 		-input=false \
 		-lock=true \
 		-parallelism=$(TF_PARALLELISM) \
-		tfplan-$(TF_ENV)
+		environments/$(TF_ENV)/tfplan-$(TF_ENV)
 
 ## Destroy all resources in the environment
 .PHONY: tf-destroy
@@ -323,8 +332,8 @@ tf-destroy:
 	@echo "WARNING: This will destroy all resources in the $(TF_ENV) environment!"
 	@read -p "Are you sure you want to continue? [y/N] " confirm && \
 		[ $$confirm = y ] || [ $$confirm = Y ] || (echo "Aborting..."; exit 1)
-	@cd "$(TF_ENV_DIR)" && terraform destroy \
-		-var-file=terraform.tfvars \
+	@cd terraform && terraform destroy \
+		-var-file=environments/$(TF_ENV)/terraform.tfvars \
 		-var="environment=$(TF_ENV)" \
 		-input=false \
 		-lock=true \
@@ -468,61 +477,72 @@ package-lambda:
 		exit 1; \
 	fi
 	@chmod +x scripts/package-lambda.sh
-	@# Ignore the exit code from the script as zip might return non-zero on success
 	@if ! scripts/package-lambda.sh; then \
-		echo "\033[1;33m⚠️  Package script completed with warnings, but continuing...\033[0m"; \
+		echo "\033[1;31m❌ Failed to create Lambda package\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ Lambda package created at dist/app.zip\033[0m"
+
+## Check if Lambda package exists
+.PHONY: check-lambda-package
+check-lambda-package:
+	@if [ ! -f "dist/app.zip" ]; then \
+		echo "\033[1;33m⚠️  Lambda package (dist/app.zip) not found.\033[0m"; \
+		echo -n "Run 'make package-lambda' to create it now? [y/N] "; \
+		read -r -n 1; \
+		if [[ "$$REPLY" =~ ^[Yy]$$ ]]; then \
+			echo ""; \
+			$(MAKE) package-lambda; \
+			if [ ! -f "dist/app.zip" ]; then \
+				echo "\033[1;31m❌ Package creation failed. Please fix the issues and try again.\033[0m"; \
+				exit 1; \
+			fi; \
+		else \
+			echo "\n\033[1;31m❌ Aborting: Lambda package is required for deployment.\033[0m"; \
+			exit 1; \
+		fi; \
 	fi
 
-## Update the Lambda function with the latest package
-.PHONY: update-lambda
-update-lambda: package-lambda
-	@echo "\033[1m🔄 Updating Lambda function...\033[0m"
-	@if [ -z "$(LAMBDA_FUNCTION_NAME)" ]; then \
-		echo "LAMBDA_FUNCTION_NAME not provided, attempting to get from Terraform..."; \
-		if ! command -v terraform >/dev/null 2>&1; then \
-			echo "Error: terraform command not found. Please install Terraform or provide LAMBDA_FUNCTION_NAME"; \
-			exit 1; \
-		fi; \
-		cd terraform && \
-		export LAMBDA_FUNCTION_NAME=$$(terraform output -raw lambda_function_name 2>/dev/null || echo ""); \
-		if [ -z "$$LAMBDA_FUNCTION_NAME" ]; then \
-			echo "Error: Could not determine LAMBDA_FUNCTION_NAME from Terraform."; \
-			echo "Please set it explicitly:"; \
-			echo "  make update-lambda LAMBDA_FUNCTION_NAME=your-function-name"; \
-			exit 1; \
-		else \
-			echo "Using Lambda function: $$LAMBDA_FUNCTION_NAME"; \
-		fi; \
-	fi
+## Deploy the Lambda function with the latest package
+# Default Lambda function name
+LAMBDA_FUNCTION_NAME ?= meal-expense-tracker-$(TF_ENV)
+
+.PHONY: deploy-lambda
+deploy-lambda: check-lambda-package
+	@echo "\033[1m🔄 Deploying Lambda function...\033[0m"
+	@echo "Using Lambda function: $(LAMBDA_FUNCTION_NAME)"
+	@echo "\033[1m📦 Updating Lambda function code...\033[0m"
 	@aws lambda update-function-code \
 		--function-name "$(LAMBDA_FUNCTION_NAME)" \
-		--zip-file "fileb://dist/app.zip" \
+		--zip-file fileb://dist/app.zip \
 		--publish \
 		--output json
+	@echo "\n\033[1m✅ Successfully updated Lambda function: $(LAMBDA_FUNCTION_NAME)\033[0m"
+	@echo "\033[1m📊 Function details:\033[0m"
+	@aws lambda get-function --function-name "$(LAMBDA_FUNCTION_NAME)" --query 'Configuration.{FunctionName:FunctionName,Version:Version,LastModified:LastModified,State:State}' --output table
 
 ## Invoke the Lambda function with a test event
 .PHONY: invoke-lambda
+invoke-lambda:
 	@echo "\033[1m🚀 Invoking Lambda function...\033[0m"
-	@if [ -z "$(LAMBDA_FUNCTION_NAME)" ]; then \
-		echo "Error: LAMBDA_FUNCTION_NAME is not set."; \
-		echo "Please set LAMBDA_FUNCTION_NAME environment variable or run:"; \
-		echo "  make invoke-lambda LAMBDA_FUNCTION_NAME=your-function-name"; \
-		echo "Or use Terraform output:"; \
-		echo "  make invoke-lambda LAMBDA_FUNCTION_NAME=\`cd terraform && terraform output -raw lambda_function_name\`"; \
-		exit 1; \
-	fi
+	@echo "Using Lambda function: $(LAMBDA_FUNCTION_NAME)"
 	@mkdir -p tmp
 	@echo '{"version":"2.0","routeKey":"GET /api/health","rawPath":"/api/health","requestContext":{"http":{"method":"GET","path":"/api/health"},"requestId":"test-invoke-request"},"isBase64Encoded":false}' > tmp/test-event.json
+	@echo "\n\033[1m📤 Sending test request to Lambda function...\033[0m"
+	@echo "\n\033[1m📝 Logs and Response:\033[0m"
 	@aws lambda invoke \
 		--function-name "$(LAMBDA_FUNCTION_NAME)" \
 		--payload file://tmp/test-event.json \
 		--cli-binary-format raw-in-base64-out \
 		--log-type Tail \
 		--output json \
+		tmp/response.json \
 		--query 'LogResult' \
-		tmp/response.json | base64 --decode
-	@echo "\n\033[1m📄 Response:\033[0m"
+		--output text \
+		2>/dev/null | base64 --decode
+	@echo "\n\033[1m📄 Response Body:\033[0m"
 	@cat tmp/response.json | jq .
+	@echo "\n\033[1m✅ Lambda function test completed\033[0m"
 
 # =======================
 # GitHub Actions
@@ -592,7 +612,7 @@ monitor:
 PIP_TOOLS := $(shell pip show pip-tools >/dev/null 2>&1 || echo "pip-tools not installed")
 
 # Default requirements files
-REQUIREMENTS_FILES = requirements.txt requirements-dev.txt
+REQUIREMENTS_FILES = requirements.txt requirements-dev.txt requirements-prod.txt
 
 # Generate requirements files if they don't exist
 .PHONY: check-requirements
@@ -606,20 +626,21 @@ check-requirements:
 
 # Update all requirements files
 .PHONY: requirements
-requirements: check-pip-tools requirements.txt requirements-dev.txt
-	@echo "All requirements files are up to date"
+requirements: check-pip-tools
+	@echo "Updating requirements files..."
+	@scripts/update_requirements.sh
 
 # Install development environment
 .PHONY: dev-setup
-dev-setup: check-pip-tools requirements-dev.txt
+dev-setup: check-pip-tools requirements
 	@echo "Setting up development environment..."
 	pip install -r requirements.txt -r requirements-dev.txt
 
 # Install production dependencies
 .PHONY: prod-setup
-prod-setup: check-pip-tools requirements.txt
+prod-setup: check-pip-tools requirements
 	@echo "Setting up production environment..."
-	pip install -r requirements.txt
+	pip install -r requirements-prod.txt
 
 # Check for security vulnerabilities
 .PHONY: security-check
@@ -632,38 +653,10 @@ security-check: check-pip-tools
 # Get absolute path to the project directory
 PROJECT_DIR := $(shell pwd)
 
-# Generate requirements.txt from requirements/*.in files
-requirements.txt: requirements/base.in requirements/prod.in
-	@echo "Generating $@..."
-	@echo "# This file is autogenerated. Do not edit directly." > $@
-	@echo "# Update requirements/*.in files and run 'make requirements' instead." >> $@
-	@echo "" >> $@
-	@# Use pip-compile with --no-annotate to avoid absolute paths in the output
-	@cd requirements && \
-	  pip-compile \
-	    --no-annotate \
-	    --output-file="${PROJECT_DIR}/requirements.txt" \
-	    --resolver=backtracking \
-	    base.in prod.in
-
-# Generate requirements-dev.txt from requirements/*.in files
-requirements-dev.txt: requirements/base.in requirements/dev.in requirements/security.in
-	@echo "Generating $@..."
-	@echo "# This file is autogenerated. Do not edit directly." > $@
-	@echo "# Update requirements/*.in files and run 'make requirements' instead." >> $@
-	@echo "" >> $@
-	@# Use pip-compile with --no-annotate to avoid absolute paths in the output
-	@cd requirements && \
-	  pip-compile \
-	    --no-annotate \
-	    --output-file="${PROJECT_DIR}/requirements-dev.txt" \
-	    --resolver=backtracking \
-	    base.in dev.in security.in
-
 # Clean up generated requirements files
 .PHONY: clean-requirements
 clean-requirements:
-	rm -f requirements.txt requirements-dev.txt .requirements.in .requirements-dev.in
+	rm -f requirements.txt requirements-dev.txt requirements-prod.txt
 
 # Update a single requirements file
 %.txt: %.in

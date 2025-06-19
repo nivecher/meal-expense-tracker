@@ -46,7 +46,7 @@ resource "aws_db_instance" "main" {
 
   # Network configuration
   db_subnet_group_name   = var.db_subnet_group_name
-  vpc_security_group_ids = [var.db_security_group_id]
+  vpc_security_group_ids = [aws_security_group.rds.id]
   publicly_accessible    = false  # Keep database private
   network_type           = "IPV4" # Explicitly disable public access
 
