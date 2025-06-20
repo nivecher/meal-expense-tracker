@@ -376,6 +376,7 @@ module "lambda" {
   # Basic configuration
   app_name    = var.app_name
   environment = var.environment
+  aws_region  = var.aws_region
 
   # VPC configuration
   vpc_id     = module.network.vpc_id
@@ -386,8 +387,9 @@ module "lambda" {
   kms_key_arn = aws_kms_key.main.arn
 
   # Lambda package
-  s3_bucket = aws_s3_bucket.lambda_deployment.bucket
-  s3_key    = "${var.environment}/app/latest/app.zip"
+  s3_bucket      = aws_s3_bucket.lambda_deployment.bucket
+  s3_key         = "${var.environment}/app/latest/app.zip"
+  app_local_path = "${path.module}/../dist/app.zip"
 
   # Layer configuration
   layer_s3_bucket     = aws_s3_bucket.lambda_deployment.bucket
@@ -400,6 +402,7 @@ module "lambda" {
   db_secret_arn        = module.rds.db_secret_arn
   db_security_group_id = module.rds.db_security_group_id
   db_host              = module.rds.db_host
+  db_port              = module.rds.db_port
   db_name              = module.rds.db_name
   db_username          = "postgres" # Default username for PostgreSQL
 
@@ -417,6 +420,7 @@ module "lambda" {
 
   # Optional features
   enable_xray_tracing = true
+  enable_otel_tracing = false # Set to true to enable OpenTelemetry tracing
   create_dlq          = true
 
   # Tags

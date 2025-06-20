@@ -23,6 +23,12 @@ variable "environment" {
   type        = string
 }
 
+variable "aws_region" {
+  description = "The AWS region where resources will be created"
+  type        = string
+  default     = "us-west-2"
+}
+
 # Lambda Function Configuration
 variable "handler" {
   description = "The function entrypoint in your code"
@@ -97,6 +103,12 @@ variable "layer_local_path" {
   default     = ""
 }
 
+variable "app_local_path" {
+  description = "Local filesystem path to the Lambda application zip file. Required if app_s3_bucket is set."
+  type        = string
+  default     = ""
+}
+
 variable "compatible_runtimes" {
   description = "List of compatible runtimes for the Lambda layer"
   type        = list(string)
@@ -146,6 +158,12 @@ variable "db_host" {
   default     = ""
 }
 
+variable "db_port" {
+  description = "The database port"
+  type        = number
+  default     = 5432
+}
+
 variable "db_name" {
   description = "The name of the database"
   type        = string
@@ -172,6 +190,11 @@ variable "enable_xray_tracing" {
   default     = false
 }
 
+variable "enable_otel_tracing" {
+  description = "Enable OpenTelemetry tracing for the Lambda function"
+  type        = bool
+  default     = false
+}
 
 # KMS
 variable "kms_key_arn" {

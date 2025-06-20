@@ -19,6 +19,3 @@ gunicorn>=23.0.0,<24.0.0
 
 # AWS Lambda WSGI Adapter
 aws-wsgi>=0.2.7,<1.0.0
-
-# Postgres dependencies
-psycopg2-binary>=2.9.9,<3.0.0

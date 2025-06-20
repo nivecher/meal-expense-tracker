@@ -41,14 +41,24 @@ package_app() {
   local app_temp_dir="${TEMP_DIR}/app"
   mkdir -p "${app_temp_dir}"
 
-  # Copy application code and required scripts
+  # Copy application code and required files
   cp -r app/ "${app_temp_dir}/app"
   cp wsgi.py "${app_temp_dir}/"
   cp requirements.txt "${app_temp_dir}/"
 
+  # Copy configuration files
+  cp config.py "${app_temp_dir}/"
+  cp .env.example "${app_temp_dir}/.env" 2>/dev/null || echo "No .env.example file found, continuing..."
+
   # Copy database check script
   mkdir -p "${app_temp_dir}/scripts"
   cp scripts/check_rds.py "${app_temp_dir}/scripts/"
+
+  # Ensure all Python files are readable
+  find "${app_temp_dir}" -type f -name "*.py" -exec chmod 644 {} \;
+
+  # Create __init__.py in the root if it doesn't exist
+  touch "${app_temp_dir}/__init__.py"
 
   # Create the deployment package
   (cd "${app_temp_dir}" && zip -r9 "${OUTPUT_DIR}/app.zip" .)
@@ -72,26 +82,27 @@ package_layer() {
   pip install --upgrade pip
   pip install --upgrade pip-tools
 
-  # Install all requirements from requirements.txt
+  # Install all requirements from requirements.txt with platform-specific wheels
   echo -e "${GREEN}[*] Installing dependencies from requirements.txt...${NC}"
-  pip install -r requirements.txt --target "${package_dir}" --no-cache-dir --upgrade
 
-  # Explicitly install aws-wsgi to ensure it's included
-  echo -e "${GREEN}[*] Installing aws-wsgi...${NC}"
-  pip install aws-wsgi==0.2.7 --target "${package_dir}" --no-cache-dir
-
-  # Ensure psycopg2-binary is installed with the correct platform-specific wheel
-  echo -e "${GREEN}[*] Installing psycopg2-binary with platform-specific wheel...${NC}"
-  pip install --platform manylinux2014_x86_64 \
-    --implementation cp \
-    --python-version "${PYTHON_VERSION}" \
-    --only-binary=:all: \
+  # First install platform-agnostic packages
+  pip install -r <(grep -v '^#' requirements.txt | grep -v 'psycopg2-binary') \
     --target "${package_dir}" \
-    psycopg2-binary==2.9.10
+    --no-cache-dir \
+    --upgrade
 
-  # Ensure flask-cors is installed
-  echo -e "${GREEN}[*] Installing flask-cors...${NC}"
-  pip install flask-cors==4.0.2 --target "${package_dir}" --no-cache-dir
+  # Install psycopg2-binary with platform-specific wheel
+  if grep -q "psycopg2-binary" requirements.txt; then
+    echo -e "${GREEN}[*] Installing psycopg2-binary with platform-specific wheel...${NC}"
+    pip install --platform manylinux2014_x86_64 \
+      --implementation cp \
+      --python-version "${PYTHON_VERSION}" \
+      --only-binary=:all: \
+      --target "${package_dir}" \
+      --no-cache-dir \
+      --upgrade \
+      "psycopg2-binary==$(grep 'psycopg2-binary' requirements.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+  fi
 
   # Remove unnecessary files
   echo -e "${GREEN}[*] Cleaning up...${NC}"

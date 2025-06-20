@@ -17,6 +17,19 @@ resource "aws_s3_object" "lambda_layer_package" {
   }
 }
 
+# S3 Object for Lambda Application Package
+resource "aws_s3_object" "lambda_app_package" {
+  bucket = var.s3_bucket
+  key    = var.s3_key
+  source = var.app_local_path
+  etag   = filemd5(var.app_local_path)
+
+  # Ensure the object is recreated when the source file changes
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 # Lambda Layer for Python Dependencies
 resource "aws_lambda_layer_version" "python_dependencies" {
   layer_name               = "${var.app_name}-${var.environment}-dependencies"
@@ -185,6 +198,19 @@ resource "aws_iam_role_policy_attachment" "lambda_xray" {
   policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
 }
 
+# Get the latest OpenTelemetry Lambda Layer
+# ARN format: arn:aws:lambda:${var.aws_region}:901920570463:layer:aws-otel-collector-${var.aws_region}:1
+
+locals {
+  otel_layer_arn = "arn:aws:lambda:${var.aws_region}:901920570463:layer:aws-otel-collector-${var.aws_region}:1"
+
+  # Base layers (Python dependencies if configured)
+  base_layers = var.layer_s3_bucket != "" && var.layer_s3_key != "" ? [aws_lambda_layer_version.python_dependencies.arn] : []
+
+  # Add OpenTelemetry layer if enabled
+  all_layers = var.enable_otel_tracing ? concat(local.base_layers, [local.otel_layer_arn]) : local.base_layers
+}
+
 # Lambda Function
 resource "aws_lambda_function" "main" {
   function_name = "${var.app_name}-${var.environment}"
@@ -198,25 +224,37 @@ resource "aws_lambda_function" "main" {
 
   # Enable X-Ray tracing
   tracing_config {
-    mode = "Active"
+    mode = var.enable_xray_tracing ? "Active" : "PassThrough"
   }
 
   # Use S3 for deployment package
-  s3_bucket = var.s3_bucket
-  s3_key    = var.s3_key
+  s3_bucket        = var.s3_bucket
+  s3_key           = var.s3_key
+  source_code_hash = fileexists(var.app_local_path) ? filebase64sha256(var.app_local_path) : null
 
-  # Attach the required layer if it exists
-  layers = var.layer_s3_bucket != "" && var.layer_s3_key != "" ? [aws_lambda_layer_version.python_dependencies.arn] : []
+  # Attach the required layers
+  layers = local.all_layers
 
   # Environment variables including enhanced monitoring
   environment {
     variables = {
-      DB_SECRET_ARN           = var.db_secret_arn
-      DB_HOST                 = var.db_host
-      DB_NAME                 = var.db_name
-      DB_USERNAME             = var.db_username
+      # Database configuration
+      DB_SECRET_ARN = var.db_secret_arn
+      DB_HOST       = var.db_host
+      DB_PORT       = tostring(var.db_port)
+      DB_NAME       = var.db_name
+      DB_USERNAME   = var.db_username
+
+      # Application configuration
       ENVIRONMENT             = var.environment
-      AWS_LAMBDA_EXEC_WRAPPER = "/opt/otel-instrument"
+      FLASK_ENV               = var.environment == "prod" ? "production" : "development"
+      AWS_LAMBDA_EXEC_WRAPPER = var.enable_otel_tracing ? "/opt/otel-instrument" : ""
+
+      # SQLAlchemy connection URL
+      # Format: postgresql://username:password@host:port/dbname
+      # Note: Password will be retrieved from Secrets Manager at runtime
+      # The application code should handle building the full URL with the password
+      DATABASE_URL = "postgresql://${var.db_username}@${var.db_host}:${var.db_port}/${var.db_name}"
     }
   }
 
@@ -248,12 +286,4 @@ resource "aws_lambda_function" "main" {
     },
     var.tags
   )
-
-  # Lifecycle configuration to ignore changes to environment variables
-  lifecycle {
-    ignore_changes = [
-      environment[0].variables,
-      source_code_hash
-    ]
-  }
 }

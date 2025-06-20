@@ -1,6 +1,3 @@
-# Get current region
-data "aws_region" "current" {}
-
 # Security group for Lambda functions
 resource "aws_security_group" "lambda" {
   name        = "${var.app_name}-${var.environment}-lambda-sg"

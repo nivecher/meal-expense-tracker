@@ -4,7 +4,7 @@
 variable "owner" {
   type        = string
   description = "The owner of the infrastructure (team or individual)"
-  default     = ""
+  default     = "Morgan Davis"
 }
 
 variable "assume_role_arn" {
@@ -195,6 +195,12 @@ variable "enable_xray_tracing" {
   type        = bool
   default     = false
   description = "Enable AWS X-Ray distributed tracing for Lambda functions and API Gateway"
+}
+
+variable "enable_otel_tracing" {
+  type        = bool
+  default     = false
+  description = "Enable OpenTelemetry tracing for Lambda functions (requires OpenTelemetry Collector layer)"
 }
 
 variable "enable_api_gateway_logging" {
