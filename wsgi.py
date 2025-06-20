@@ -366,15 +366,16 @@ def main():
 # AWS Lambda Configuration
 # This ensures the handler is available for Lambda invocations
 if os.environ.get("AWS_EXECUTION_ENV"):
-    # Import handler here to avoid circular imports
-    from app import handler  # noqa: F401
-
     # Configure Lambda-specific settings
     logger.info("Running in AWS Lambda environment")
 
     # Ensure all log messages are flushed
     for log_handler in logging.root.handlers:
         log_handler.flush()
+
+    # Export handler for AWS Lambda compatibility
+    # This allows the Lambda function to use `wsgi.handler` as the entry point
+    handler = lambda_handler  # noqa: F401
 
 # For local development
 if __name__ == "__main__":
