@@ -240,21 +240,13 @@ resource "aws_lambda_function" "main" {
     variables = {
       # Database configuration
       DB_SECRET_ARN = var.db_secret_arn
-      DB_HOST       = var.db_host
-      DB_PORT       = tostring(var.db_port)
-      DB_NAME       = var.db_name
-      DB_USERNAME   = var.db_username
 
       # Application configuration
       ENVIRONMENT             = var.environment
       FLASK_ENV               = var.environment == "prod" ? "production" : "development"
       AWS_LAMBDA_EXEC_WRAPPER = var.enable_otel_tracing ? "/opt/otel-instrument" : ""
 
-      # SQLAlchemy connection URL
-      # Format: postgresql://username:password@host:port/dbname
-      # Note: Password will be retrieved from Secrets Manager at runtime
-      # The application code should handle building the full URL with the password
-      DATABASE_URL = "postgresql://${var.db_username}@${var.db_host}:${var.db_port}/${var.db_name}"
+      # Note: DATABASE_URL will be constructed at runtime using the password from Secrets Manager
     }
   }
 

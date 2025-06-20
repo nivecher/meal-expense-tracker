@@ -132,16 +132,6 @@ variable "lambda_runtime" {
 # ======================
 # Database Configuration
 # ======================
-variable "db_name" {
-  type        = string
-  default     = "mealexpensetracker"
-  description = "Name of the PostgreSQL database"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z_][a-zA-Z0-9_]*$", var.db_name))
-    error_message = "Database name must start with a letter or underscore and contain only alphanumeric characters and underscores"
-  }
-}
 
 variable "db_allocated_storage" {
   type        = number

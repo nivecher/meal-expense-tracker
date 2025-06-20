@@ -152,30 +152,6 @@ variable "db_security_group_id" {
   default     = ""
 }
 
-variable "db_host" {
-  description = "The database host"
-  type        = string
-  default     = ""
-}
-
-variable "db_port" {
-  description = "The database port"
-  type        = number
-  default     = 5432
-}
-
-variable "db_name" {
-  description = "The name of the database"
-  type        = string
-  default     = ""
-}
-
-variable "db_username" {
-  description = "The database username"
-  type        = string
-  default     = "postgres"
-}
-
 # API Gateway Integration
 variable "api_gateway_execution_arn" {
   description = "The ARN of the API Gateway that will invoke this Lambda"

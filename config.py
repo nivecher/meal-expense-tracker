@@ -81,20 +81,10 @@ class Config:
             ValueError: If required configuration is missing or invalid
         """
         # Get required environment variables
-        db_host = os.environ.get("DB_HOST")
-        db_port = os.environ.get("DB_PORT", "5432")
-        db_name = os.environ.get("DB_NAME")
-        db_user = os.environ.get("DB_USERNAME")
         db_secret_arn = os.environ.get("DB_SECRET_ARN")
 
         # Validate required variables
         missing_vars = []
-        if not db_host:
-            missing_vars.append("DB_HOST")
-        if not db_name:
-            missing_vars.append("DB_NAME")
-        if not db_user:
-            missing_vars.append("DB_USERNAME")
         if not db_secret_arn:
             missing_vars.append("DB_SECRET_ARN")
 
@@ -116,6 +106,10 @@ class Config:
                 return None
 
             db_password = secret["db_password"]
+            db_user = secret["db_user"]
+            db_host = secret["db_host"]
+            db_port = secret["db_port"]
+            db_name = secret["db_name"]
             if not db_password:
                 logging.error("Database password is empty in secret")
                 return None
