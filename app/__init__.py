@@ -92,9 +92,47 @@ def _register_blueprints(app):
 
 def _configure_logging(app):
     """Configure application logging."""
-    if app.config.get("ENV") == "production":
-        logging.basicConfig(level=logging.INFO)
-        app.logger.setLevel(logging.INFO)
-    else:
-        logging.basicConfig(level=logging.DEBUG)
-        app.logger.setLevel(logging.DEBUG)
+    # Configure the root logger
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+    # Set the logging level for the app logger
+    app.logger.setLevel(logging.INFO)
+
+
+def setup_logger(app=None):
+    """Configure and return a formatter for the application logs.
+
+    Args:
+        app: Optional Flask application instance. If provided, configures logging
+             based on the app's configuration.
+
+    Returns:
+        logging.Formatter: Configured formatter for log messages
+    """
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+
+    if app is not None:
+        # Configure root logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(app.config.get("LOG_LEVEL", logging.INFO))
+
+        # Clear any existing handlers
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+
+        # Add console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)
+
+        # In production, also log to a file
+        if app.config.get("ENV") == "production":
+            file_handler = logging.FileHandler("app.log")
+            file_handler.setFormatter(formatter)
+            root_logger.addHandler(file_handler)
+
+    return formatter

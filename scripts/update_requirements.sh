@@ -12,6 +12,7 @@ pip-compile requirements/dev.in -o requirements-dev.txt
 pip-compile requirements/prod.in -o requirements-prod.txt
 
 # Create a combined requirements file for development
-cat requirements.txt requirements-dev.txt requirements-security.txt | grep -v '^#' | sort -u >requirements-dev.txt
+cat requirements.txt requirements-dev.txt requirements-security.txt | grep -v '^#' | sort -u >requirements-dev.txt.tmp
+mv requirements-dev.txt.tmp requirements-dev.txt
 
 echo "Requirements files have been updated in the root directory."

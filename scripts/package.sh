@@ -41,18 +41,40 @@ package_app() {
   local app_temp_dir="${TEMP_DIR}/app"
   mkdir -p "${app_temp_dir}"
 
-  # Copy application code and required files
-  cp -r app/ "${app_temp_dir}/app"
-  cp wsgi.py "${app_temp_dir}/"
-  cp requirements.txt "${app_temp_dir}/"
-
-  # Copy configuration files
-  cp config.py "${app_temp_dir}/"
-  cp .env.example "${app_temp_dir}/.env" 2>/dev/null || echo "No .env.example file found, continuing..."
-
-  # Copy database check script
+  # Create necessary directories in the temp directory
+  mkdir -p "${app_temp_dir}/app"
+  mkdir -p "${app_temp_dir}/migrations"
   mkdir -p "${app_temp_dir}/scripts"
-  cp scripts/check_rds.py "${app_temp_dir}/scripts/"
+  mkdir -p "${app_temp_dir}/instance"
+
+  # Copy application code
+  cp -r app/ "${app_temp_dir}/"
+
+  # Copy root Python files
+  cp *.py "${app_temp_dir}/" 2>/dev/null || true
+
+  # Copy requirements and config
+  cp requirements.txt "${app_temp_dir}/"
+  cp config.py "${app_temp_dir}/"
+
+  # Copy migrations if they exist
+  if [ -d "migrations" ]; then
+    cp -r migrations/ "${app_temp_dir}/"
+  fi
+
+  # Copy any .env file if it exists
+  [ -f ".env" ] && cp .env "${app_temp_dir}/.env"
+  [ -f ".env.example" ] && cp .env.example "${app_temp_dir}/.env.example"
+
+  # Ensure __init__.py files exist in all packages
+  touch "${app_temp_dir}/__init__.py"
+  touch "${app_temp_dir}/app/__init__.py"
+  touch "${app_temp_dir}/app/auth/__init__.py"
+  touch "${app_temp_dir}/app/expenses/__init__.py"
+  touch "${app_temp_dir}/app/restaurants/__init__.py"
+
+  # Copy any additional required files
+  [ -f "scripts/check_rds.py" ] && cp scripts/check_rds.py "${app_temp_dir}/scripts/"
 
   # Ensure all Python files are readable
   find "${app_temp_dir}" -type f -name "*.py" -exec chmod 644 {} \;

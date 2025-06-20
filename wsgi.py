@@ -1,31 +1,110 @@
 """WSGI entry point for the Meal Expense Tracker application.
 
-This module serves as the entry point for both local development
-and AWS Lambda deployment.
+This module serves as the entry point for both local development and
+AWS Lambda deployment.
+For AWS Lambda, this module provides the handler function that AWS Lambda invokes.
+For local development, it can be run directly with `python wsgi.py`.
 """
 
+import logging
 import os
 import sys
-import logging
-from flask import jsonify
-from app import create_app, db
+
+# Add the current directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Import app components after path configuration
+from app import create_app, db, setup_logger  # noqa: E402
+from flask import jsonify  # noqa: E402
+
+# Configure logging after imports to ensure all loggers are properly configured
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO"),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    force=True,  # Override any existing handlers
+)
+logger = logging.getLogger(__name__)
 
 
-def setup_logger():
-    """Set up the root logger with basic configuration."""
-    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+def _create_app_with_env(env):
+    """Helper to create app with given environment."""
+    return create_app(env)
 
-    # Clear existing handlers
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
 
-    # Configure basic logging
-    logging.basicConfig(
-        level=log_level, format=log_format, handlers=[logging.StreamHandler(sys.stdout)]
-    )
+def _setup_app_context(app):
+    """Set up application context including logging and database."""
+    with app.app_context():
+        setup_logger(app)
+        try:
+            # Initialize database and verify connection
+            _initialize_database(app)
 
-    return logging.Formatter(log_format)
+            # Verify database connection using SQLAlchemy text() for raw SQL
+            from sqlalchemy import text
+
+            db.session.execute(text("SELECT 1"))
+            logger.info("Successfully connected to the database")
+
+        except Exception as e:
+            logger.critical("Database error: %s", str(e), exc_info=True)
+            # Re-raise to fail fast in production
+            if os.environ.get("FLASK_ENV") == "production":
+                raise
+
+        # Register routes and handlers
+        register_routes(app)
+        register_error_handlers(app)
+        check_database_migrations(app)
+
+
+def configure_application():
+    """Create and configure the Flask application.
+
+    This function is separated to ensure all configurations are properly set
+    before the application starts handling requests.
+
+    Returns:
+        Flask: The configured Flask application instance
+    """
+    try:
+        # Import os here to ensure it's in scope
+        import os  # noqa: F811
+
+        # Determine the environment
+        env = os.environ.get("FLASK_ENV", "development")
+        logger.info("Starting application in %s environment", env)
+        app = _create_app_with_env(env)
+        _setup_app_context(app)
+        try:
+            db.session.execute("SELECT 1")
+            logger.info("Successfully connected to the database")
+        except Exception as e:
+            logger.critical(f"Database error: {str(e)}", exc_info=True)
+            # Re-raise to fail fast in production
+            if os.environ.get("FLASK_ENV") == "production":
+                raise
+        except ImportError as e:
+            logger.critical(f"Failed to import models: {str(e)}", exc_info=True)
+            # List contents of app directory for debugging
+            try:
+                import os
+
+                app_dir = os.path.join(os.path.dirname(__file__), "app")
+                if os.path.exists(app_dir):
+                    logger.info(f"Contents of app directory: {os.listdir(app_dir)}")
+                else:
+                    logger.error(f"App directory not found at: {app_dir}")
+            except Exception as debug_e:
+                logger.error(f"Error listing app directory: {str(debug_e)}")
+                raise
+
+        return app
+
+    except Exception as e:
+        logger.critical(f"Failed to initialize application: {str(e)}", exc_info=True)
+        raise
 
 
 def configure_application_logging(app):
@@ -114,31 +193,79 @@ def check_database_migrations(app):
             app.logger.warning(f"Could not apply migrations: {str(e)}")
 
 
-def create_application():
-    """Create and configure the Flask application."""
-    app = create_app()
+def _initialize_database(app):
+    """Initialize the database and verify connection.
 
-    # Configure application components
-    configure_application_logging(app)
-    register_error_handlers(app)
-    register_routes(app)
+    Args:
+        app: Flask application instance
 
-    # Initialize database
+    Raises:
+        RuntimeError: If database initialization fails
+    """
     with app.app_context():
         try:
-            db.create_all()  # Create tables if they don't exist
-            app.logger.info("Database tables verified/created")
+            # Verify database connection
+            app.logger.info("Verifying database connection...")
+            db.session.execute(db.text("SELECT 1"))
+
+            # Create tables if they don't exist
+            app.logger.info("Creating database tables if they don't exist...")
+            db.create_all()
+
+            # Check for pending migrations
             check_database_migrations(app)
+
+            app.logger.info("Database initialization completed successfully")
+            return True
+
         except Exception as e:
-            app.logger.error(f"Error initializing database: {str(e)}")
-            raise
+            app.logger.error(
+                "Database initialization failed: %s", str(e), exc_info=True
+            )
+            raise RuntimeError(f"Failed to initialize database: {str(e)}") from e
 
-    return app
+
+def create_application(env=None):
+    """Create and configure the Flask application.
+
+    Args:
+        env (str, optional): The environment to use (development, production, etc.)
+                          If not provided, will use FLASK_ENV or default to development.
+
+    Returns:
+        Flask: The configured Flask application
+
+    Raises:
+        RuntimeError: If application initialization fails
+    """
+    try:
+        # Create the Flask application with the specified environment
+        app = create_app(env)
+
+        # Register error handlers
+        register_error_handlers(app)
+
+        # Register routes
+        register_routes(app)
+
+        # Check and apply database migrations if needed
+        check_database_migrations(app)
+
+        # Initialize the database
+        _initialize_database(app)
+
+        logger.info("Application initialized successfully")
+        return app
+
+    except Exception as e:
+        logger.critical("Failed to create application", exc_info=True)
+        raise RuntimeError("Failed to initialize the application") from e
 
 
-# Create the application
-app = create_application()
-application = app  # For WSGI servers
+# Create the application instance
+# This is used by WSGI servers and local development
+app = configure_application()
+application = app  # Standard WSGI interface
 
 
 def _transform_http_api_event(event):
@@ -218,25 +345,43 @@ def lambda_handler(event, context):
 
 
 def main():
-    """Run the application locally."""
+    """Run the application locally.
+
+    This is the entry point for local development using `python wsgi.py`
+    """
     try:
         port = int(os.environ.get("PORT", 5000))
         host = os.environ.get("HOST", "0.0.0.0")
+        debug = os.environ.get("FLASK_ENV") == "development"
 
-        app.logger.info(f"Starting Meal Expense Tracker on {host}:{port}")
-        app.logger.info(f'Environment: {app.config["ENV"]}')
-        app.logger.info(f"Debug mode: {app.debug}")
+        logger.info(f"Starting development server on http://{host}:{port}")
+        logger.info(f"Debug mode: {'on' if debug else 'off'}")
 
-        app.run(host=host, port=port, debug=app.debug)
+        app.run(host=host, port=port, debug=debug, use_reloader=debug)
     except Exception as e:
         app.logger.error(f"Failed to start application: {str(e)}")
         sys.exit(1)
 
 
-# For AWS Lambda
+# AWS Lambda Configuration
+# This ensures the handler is available for Lambda invocations
 if os.environ.get("AWS_EXECUTION_ENV"):
-    handler = lambda_handler
+    # Import handler here to avoid circular imports
+    from app import handler  # noqa: F401
+
+    # Configure Lambda-specific settings
+    logger.info("Running in AWS Lambda environment")
+
+    # Ensure all log messages are flushed
+    for log_handler in logging.root.handlers:
+        log_handler.flush()
 
 # For local development
 if __name__ == "__main__":
+    # Only run the development server if this file is executed directly
+    # and not imported as a module
     main()
+
+# This file serves as both a module and an executable script:
+# - As a module: Provides the 'app' and 'application' objects for WSGI servers
+# - As a script: Runs the development server for local testing
