@@ -1,13 +1,11 @@
 # Look up the existing Route53 zone if domain_name is provided
 data "aws_route53_zone" "main" {
-  count        = var.domain_name != null ? 1 : 0
   name         = var.domain_name
   private_zone = false
 }
 
 # Look up the existing ACM certificate in us-east-1 if cert_domain is provided
 data "aws_acm_certificate" "main" {
-  count    = var.cert_domain != null ? 1 : 0
   domain   = var.cert_domain
   statuses = ["ISSUED"]
 
@@ -25,11 +23,10 @@ data "aws_acm_certificate" "main" {
 
 # API Gateway Custom Domain (only if domain_name and certificate are provided)
 resource "aws_apigatewayv2_domain_name" "main" {
-  count       = var.domain_name != null && length(data.aws_acm_certificate.main) > 0 ? 1 : 0
   domain_name = var.api_domain_name
 
   domain_name_configuration {
-    certificate_arn = data.aws_acm_certificate.main[0].arn
+    certificate_arn = data.aws_acm_certificate.main.arn
     endpoint_type   = "REGIONAL"
     security_policy = "TLS_1_2"
   }
@@ -64,22 +61,20 @@ resource "aws_apigatewayv2_domain_name" "main" {
 
 # API Mapping to connect the domain to the API (only if domain and certificate are configured)
 resource "aws_apigatewayv2_api_mapping" "main" {
-  count       = var.domain_name != null ? 1 : 0
   api_id      = aws_apigatewayv2_api.main.id
-  domain_name = aws_apigatewayv2_domain_name.main[0].id
+  domain_name = aws_apigatewayv2_domain_name.main.id
   stage       = aws_apigatewayv2_stage.main.id # Point to the main stage
 }
 
 # Create Route53 record for the API Gateway custom domain (only if domain and certificate are configured)
 resource "aws_route53_record" "api" {
-  count   = var.domain_name != null ? 1 : 0
-  zone_id = data.aws_route53_zone.main[0].zone_id
+  zone_id = data.aws_route53_zone.main.zone_id
   name    = trimsuffix(var.api_domain_name, ".${var.domain_name}")
   type    = "A"
 
   alias {
-    name                   = aws_apigatewayv2_domain_name.main[0].domain_name_configuration[0].target_domain_name
-    zone_id                = aws_apigatewayv2_domain_name.main[0].domain_name_configuration[0].hosted_zone_id
+    name                   = aws_apigatewayv2_domain_name.main.domain_name_configuration[0].target_domain_name
+    zone_id                = aws_apigatewayv2_domain_name.main.domain_name_configuration[0].hosted_zone_id
     evaluate_target_health = false
   }
 
@@ -96,8 +91,8 @@ resource "aws_route53_record" "api" {
 
     # Ensure we have a valid target domain name
     precondition {
-      condition     = aws_apigatewayv2_domain_name.main[0].domain_name_configuration[0].target_domain_name != ""
-      error_message = "The target domain name for the API Gateway custom domain is empty."
+      condition     = length(aws_apigatewayv2_domain_name.main.domain_name_configuration) > 0 && aws_apigatewayv2_domain_name.main.domain_name_configuration[0].target_domain_name != ""
+      error_message = "The target domain name for the API Gateway custom domain is empty or invalid."
     }
   }
 }
@@ -172,20 +167,34 @@ resource "aws_cloudwatch_log_group" "api_gw" {
   }, var.tags)
 }
 
-# API Gateway Lambda Integration (only if lambda_invoke_arn is provided)
+# API Gateway Lambda Integration
 resource "aws_apigatewayv2_integration" "lambda" {
-  count = var.lambda_invoke_arn != null ? 1 : 0
-
+  # Always create the integration, but only configure it if lambda_invoke_arn is provided
   api_id             = aws_apigatewayv2_api.main.id
-  integration_type   = "AWS_PROXY"
-  integration_method = "POST"
-  integration_uri    = var.lambda_invoke_arn
+  integration_type   = var.lambda_invoke_arn != null ? "AWS_PROXY" : "HTTP_PROXY"
+  integration_method = var.lambda_invoke_arn != null ? "POST" : "ANY"
+  integration_uri    = var.lambda_invoke_arn != null ? var.lambda_invoke_arn : "http://example.com"
+
+  # Only set the payload format version for Lambda integrations
+  payload_format_version = var.lambda_invoke_arn != null ? "2.0" : null
+
+  # Only set connection type for Lambda integrations
+  connection_type = var.lambda_invoke_arn != null ? "INTERNET" : null
+
+  lifecycle {
+    # Ignore changes to integration_uri as it may be updated later by the Lambda module
+    ignore_changes = [integration_uri]
+
+    # Ensure the integration is created before any routes that depend on it
+    create_before_destroy = true
+  }
+
+  # Explicitly depend on the API to ensure it exists
+  depends_on = [aws_apigatewayv2_api.main]
 }
 
 # Allow API Gateway to invoke the Lambda function
 resource "aws_lambda_permission" "api_gateway" {
-  count = var.lambda_invoke_arn != null && var.lambda_function_name != null ? 1 : 0
-
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = var.lambda_function_name
@@ -194,24 +203,45 @@ resource "aws_lambda_permission" "api_gateway" {
   # The /*/* part allows invocation from any stage and method
   # within the API Gateway HTTP API
   source_arn = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+
+  # Ensure the API Gateway exists before creating the permission
+  depends_on = [aws_apigatewayv2_api.main]
 }
 
 # Add a catch-all {proxy+} route
 resource "aws_apigatewayv2_route" "proxy" {
-  count = var.lambda_invoke_arn != null ? 1 : 0
-
+  # Always create the route, but only set the target if lambda_invoke_arn is provided
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "ANY /{proxy+}"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda[0].id}"
+
+  # Set target to integration ID if lambda_invoke_arn is provided, otherwise null
+  target = var.lambda_invoke_arn != null ? "integrations/${aws_apigatewayv2_integration.lambda.id}" : null
+
+  # Depend on the integration being created first
+  depends_on = [aws_apigatewayv2_integration.lambda]
+
+  lifecycle {
+    # Ensure the route is destroyed before the integration is recreated
+    create_before_destroy = false
+  }
 }
 
 # Add a root route
 resource "aws_apigatewayv2_route" "root" {
-  count = var.lambda_invoke_arn != null ? 1 : 0
-
+  # Always create the route, but only set the target if lambda_invoke_arn is provided
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "ANY /"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda[0].id}"
+
+  # Set target to integration ID if lambda_invoke_arn is provided, otherwise null
+  target = var.lambda_invoke_arn != null ? "integrations/${aws_apigatewayv2_integration.lambda.id}" : null
+
+  # Depend on the integration being created first
+  depends_on = [aws_apigatewayv2_integration.lambda]
+
+  lifecycle {
+    # Ensure the route is destroyed before the integration is recreated
+    create_before_destroy = false
+  }
 }
 
 # Note: Route responses are not supported for HTTP API with proxy integration

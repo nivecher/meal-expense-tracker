@@ -60,7 +60,10 @@ def index():
         return (
             render_template(
                 "errors/500.html",
-                error="An error occurred while loading expenses. Please try again later.",
+                error=(
+                    "An error occurred while loading expenses. "
+                    "Please try again later."
+                ),
             ),
             500,
         )

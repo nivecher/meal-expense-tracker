@@ -2,9 +2,11 @@
 set -e
 
 # Configuration
-PYTHON_VERSION="3.13" # Match your Lambda runtime version
+: "${PYTHON_VERSION:=3.13}" # Default to 3.13 if not set in environment
 OUTPUT_DIR="${PWD}/dist"
 TEMP_DIR=$(mktemp -d)
+
+echo "Using Python version: $PYTHON_VERSION"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -66,13 +68,9 @@ package_layer() {
   # Install dependencies into the package directory
   echo -e "${GREEN}[*] Installing dependencies...${NC}"
 
-  # First install pip-tools to ensure we can compile requirements
+  # Ensure we have the latest pip and pip-tools
   pip install --upgrade pip
-  pip install pip-tools
-
-  # First install pip-tools to ensure we can compile requirements
-  pip install --upgrade pip
-  pip install pip-tools
+  pip install --upgrade pip-tools
 
   # Install all requirements from requirements.txt
   echo -e "${GREEN}[*] Installing dependencies from requirements.txt...${NC}"
@@ -86,7 +84,7 @@ package_layer() {
   echo -e "${GREEN}[*] Installing psycopg2-binary with platform-specific wheel...${NC}"
   pip install --platform manylinux2014_x86_64 \
     --implementation cp \
-    --python-version 3.13 \
+    --python-version "${PYTHON_VERSION}" \
     --only-binary=:all: \
     --target "${package_dir}" \
     psycopg2-binary==2.9.10

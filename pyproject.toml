@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "meal-expense-tracker"
 version = "0.5.2.dev0"
 description = "A Flask-based web application for tracking meal expenses"
-requires-python = ">=3.8"
+requires-python = ">=3.13,<3.14"  # Match Lambda runtime version
 [[project.authors]]
 name = "nivecher"
 email = "mtd37@hotmail.com"
@@ -21,7 +21,7 @@ zip-safe = false
 
 [tool.black]
 line-length = 88
-target-version = [ "py312",]
+target-version = [ "py312",]  # Using the latest supported version by Black as of now
 include = "\\.pyi?$"
 
 [tool.isort]
@@ -29,7 +29,7 @@ profile = "black"
 multi_line_output = 3
 
 [tool.mypy]
-python_version = "0.5"
+python_version = "3.13"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

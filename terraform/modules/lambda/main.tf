@@ -194,6 +194,7 @@ resource "aws_lambda_function" "main" {
   architectures = var.architectures
   memory_size   = var.memory_size
   timeout       = var.timeout
+  publish       = true
 
   # Enable X-Ray tracing
   tracing_config {

@@ -10,8 +10,12 @@ __pycache__/
 Python-3.13.0.tgz
 Python-3.13.0/
 
-# Version file (temporarily unignored for static versioning)
-# app/_version.py
+# Build artifacts
+dist/
+
+# Version files
+!.python-version  # Explicitly track Python version for development tools
+app/_version.py
 
 # Temporary requirements files
 .requirements.in
@@ -35,7 +39,6 @@ wheels/
 .mypy_cache/
 .coverage
 htmlcov/
-.python-version
 
 # Virtual Environment
 venv/
