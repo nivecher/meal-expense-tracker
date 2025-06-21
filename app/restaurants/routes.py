@@ -6,12 +6,15 @@ from flask import (
     request,
     send_file,
     jsonify,
+    abort,
+    current_app,
 )
 from flask_login import login_required
 from app.restaurants.models import Restaurant
 from app.expenses.models import Expense
 from app import db
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 import csv
 from io import StringIO, BytesIO
 from app.restaurants import bp
@@ -81,57 +84,38 @@ def list_restaurants():
     sort_order = request.args.get("sort_order", "asc")
 
     # Start query
-    query = Restaurant.query
+    stmt = db.select(Restaurant)
+
+    # Apply filters
     if search:
-        query = query.filter(Restaurant.name.ilike(f"%{search}%"))
+        stmt = stmt.where(Restaurant.name.ilike(f"%{search}%"))
     if cuisine:
-        query = query.filter(Restaurant.cuisine == cuisine)
+        stmt = stmt.where(Restaurant.cuisine == cuisine)
     if city:
-        query = query.filter(Restaurant.city == city)
+        stmt = stmt.where(Restaurant.city == city)
     if type_:
-        query = query.filter(Restaurant.type == type_)
+        stmt = stmt.where(Restaurant.type == type_)
     if price_range:
-        query = query.filter(Restaurant.price_range == price_range)
+        stmt = stmt.where(Restaurant.price_range == price_range)
 
-    # Sorting
+    # Apply sorting
     sort_column = getattr(Restaurant, sort_by, Restaurant.name)
-    if sort_order == "desc":
-        sort_column = sort_column.desc()
-    else:
-        sort_column = sort_column.asc()
-    query = query.order_by(sort_column)
+    stmt = stmt.order_by(
+        sort_column.desc() if sort_order == "desc" else sort_column.asc()
+    )
 
-    restaurants = query.all()
+    # Execute query
+    restaurants = db.session.scalars(stmt).all()
 
     # For filter dropdowns
-    cuisines = [
-        c[0]
-        for c in db.session.query(Restaurant.cuisine)
-        .distinct()
-        .filter(Restaurant.cuisine is not None)
-        .all()
-    ]
-    cities = [
-        c[0]
-        for c in db.session.query(Restaurant.city)
-        .distinct()
-        .filter(Restaurant.city is not None)
-        .all()
-    ]
-    types = [
-        t[0]
-        for t in db.session.query(Restaurant.type)
-        .distinct()
-        .filter(Restaurant.type is not None)
-        .all()
-    ]
-    price_ranges = [
-        p[0]
-        for p in db.session.query(Restaurant.price_range)
-        .distinct()
-        .filter(Restaurant.price_range is not None)
-        .all()
-    ]
+    def get_distinct_values(column):
+        stmt = db.select(column).distinct().where(column.isnot(None))
+        return [r[0] for r in db.session.execute(stmt).all()]
+
+    cuisines = get_distinct_values(Restaurant.cuisine)
+    cities = get_distinct_values(Restaurant.city)
+    types = get_distinct_values(Restaurant.type)
+    price_ranges = get_distinct_values(Restaurant.price_range)
 
     return render_template(
         "restaurants/list_restaurants.html",
@@ -156,23 +140,28 @@ def list_restaurants():
 @login_required
 def restaurant_details(restaurant_id):
     try:
-        restaurant = Restaurant.query.get_or_404(restaurant_id)
-        expenses = (
-            Expense.query.filter_by(restaurant_id=restaurant.id)
+        # Use SQLAlchemy 2.0 style query
+        restaurant = db.session.get(Restaurant, restaurant_id)
+        if restaurant is None:
+            abort(404)
+
+        # Force a database operation to ensure we catch any connection issues
+        db.session.execute(text("SELECT 1"))
+        expenses = db.session.scalars(
+            db.select(Expense)
+            .where(Expense.restaurant_id == restaurant.id)
             .order_by(Expense.date.desc())
-            .all()
-        )
+        ).all()
         return render_template(
             "restaurants/restaurant_details.html",
             restaurant=restaurant,
             expenses=expenses,
         )
-    except SQLAlchemyError:
+    except SQLAlchemyError as e:
         db.session.rollback()
+        current_app.logger.error(f"Database error in restaurant_details: {str(e)}")
         flash("Error loading restaurant details. Please try again.", "error")
-        return render_template(
-            "restaurants/restaurant_details.html", restaurant=None, expenses=[]
-        )
+        abort(500)
 
 
 @bp.route("/add", methods=["GET", "POST"])
@@ -234,7 +223,7 @@ def add_restaurant():
 @login_required
 def edit_restaurant(restaurant_id):
     try:
-        restaurant = Restaurant.query.get_or_404(restaurant_id)
+        restaurant = db.get_or_404(Restaurant, restaurant_id)
         if request.method == "POST":
             try:
                 restaurant.name = request.form["name"]
@@ -267,11 +256,13 @@ def edit_restaurant(restaurant_id):
 @bp.route("/<int:restaurant_id>/delete", methods=["POST"])
 @login_required
 def delete_restaurant(restaurant_id):
-    restaurant = Restaurant.query.get_or_404(restaurant_id)
+    restaurant = db.get_or_404(Restaurant, restaurant_id)
 
     try:
         # Delete all associated expenses first
-        Expense.query.filter_by(restaurant_id=restaurant.id).delete()
+        db.session.execute(
+            db.delete(Expense).where(Expense.restaurant_id == restaurant.id)
+        )
         # Then delete the restaurant
         db.session.delete(restaurant)
         db.session.commit()
@@ -291,14 +282,15 @@ def search_restaurants():
         return jsonify([])
 
     try:
-        restaurants = (
-            Restaurant.query.filter(
+        stmt = (
+            db.select(Restaurant)
+            .where(
                 (Restaurant.name.ilike(f"%{query}%"))
                 | (Restaurant.city.ilike(f"%{query}%"))
             )
             .limit(10)
-            .all()
         )
+        restaurants = db.session.scalars(stmt).all()
 
         return jsonify(
             [

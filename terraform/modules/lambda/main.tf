@@ -2,6 +2,8 @@
 
 data "aws_caller_identity" "current" {}
 
+data "aws_region" "current" {}
+
 # Note: DB_URL will be constructed at runtime in the Lambda function using the secret
 
 # S3 Object for Lambda Layer Package
@@ -169,6 +171,32 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Resource = [
           var.db_secret_arn
         ]
+      },
+      # DynamoDB access for session management
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Scan",
+          "dynamodb:Query"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/flask_sessions"
+        ]
+      },
+      # Allow creating the DynamoDB table if it doesn't exist
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:CreateTable",
+          "dynamodb:DescribeTable"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/flask_sessions"
+        ]
       }
     ]
   })
@@ -244,11 +272,16 @@ resource "aws_lambda_function" "main" {
       DB_SECRET_ARN  = var.db_secret_arn
       RUN_MIGRATIONS = var.run_migrations ? "true" : "false"
 
+
       # Application configuration
       ENVIRONMENT             = var.environment
       FLASK_ENV               = var.environment == "prod" ? "production" : "development"
       AWS_LAMBDA_EXEC_WRAPPER = var.enable_otel_tracing ? "/opt/otel-instrument" : ""
       LOG_LEVEL               = var.log_level
+
+      # Session configuration
+      SESSION_DYNAMODB_TABLE = "flask_sessions"
+      AWS_DEFAULT_REGION     = data.aws_region.current.name
 
       # Note: DB_URL will be constructed at runtime in the Lambda function
     }, var.extra_environment_variables)

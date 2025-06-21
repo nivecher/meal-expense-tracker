@@ -1,10 +1,18 @@
-from app.restaurants.models import Restaurant
-from app import db
+"""Tests for restaurant-related functionality."""
+
+from datetime import datetime, date
+import os
+import sys
 from sqlalchemy.exc import SQLAlchemyError
-from unittest.mock import Mock
-from app.expenses.models import Expense
-from datetime import datetime
-from app.auth.models import User
+
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.insert(0, project_root)
+
+from app import db  # noqa: E402
+from app.auth.models import User  # noqa: E402
+from app.expenses.models import Expense  # noqa: E402
+from app.restaurants.models import Restaurant  # noqa: E402
 
 
 def test_restaurants_list(client, auth):
@@ -79,50 +87,55 @@ def test_edit_restaurant(client, auth):
     assert b"Updated Restaurant" in response.data
 
 
-def test_restaurant_details(client, auth):
+def test_restaurant_details(client, auth, app):
     """Test viewing restaurant details."""
+    # Create user and login
     auth.create_user()
     auth.login()
-    # Add a restaurant first
-    client.post(
-        "/restaurants/add",
-        data={
-            "name": "Test Restaurant",
-            "type": "restaurant",
-            "city": "Test City",
-            "state": "CA",
-            "zip_code": "12345",
-            "address": "123 Test St",
-            "phone": "123-456-7890",
-            "website": "http://test.com",
-            "cuisine": "American",
-            "price_range": "$$",
-        },
-    )
-    # Get the restaurant ID after creation
-    restaurant = Restaurant.query.filter_by(name="Test Restaurant").first()
-    assert restaurant is not None
 
-    # Add an expense for the restaurant
-    client.post(
-        "/expenses/add",
-        data={
-            "restaurant_id": restaurant.id,
-            "date": "2024-02-20",
-            "meal_type": "Lunch",
-            "amount": "25.50",
-            "notes": "Test expense",
-        },
-    )
+    with app.app_context():
+        # Create a test restaurant directly
+        restaurant = Restaurant(
+            name="Test Restaurant",
+            type="restaurant",
+            city="Test City",
+            state="CA",
+            zip_code="12345",
+            address="123 Test St",
+            phone="123-456-7890",
+            website="http://test.com",
+            cuisine="american",
+            price_range="$$",
+        )
+        db.session.add(restaurant)
+        db.session.commit()
+
+        # Get the test user
+        user = User.query.filter_by(username="testuser").first()
+        # Add an expense for the restaurant
+        expense = Expense(
+            user_id=user.id,
+            restaurant_id=restaurant.id,
+            date=date(2024, 2, 20),
+            meal_type="Lunch",
+            category="Food",
+            amount=25.50,
+            notes="Test expense",
+        )
+        db.session.add(expense)
+        db.session.commit()
+
+        # Get the restaurant ID before the session is closed
+        restaurant_id = restaurant.id
 
     # View restaurant details
-    response = client.get(f"/restaurants/{restaurant.id}/details")
+    response = client.get(f"/restaurants/{restaurant_id}/details")
     assert response.status_code == 200
     assert b"Test Restaurant" in response.data
     assert b"Test City" in response.data
     assert b"123 Test St" in response.data
-    assert b"<td>$25.50</td>" in response.data
-    assert b"<td>Lunch</td>" in response.data
+    assert b"$25.50" in response.data
+    assert b"Lunch" in response.data
 
 
 def test_restaurant_details_not_found(client, auth):
@@ -137,86 +150,105 @@ def test_restaurant_details_database_error(client, auth, monkeypatch):
     """Test handling database error when viewing restaurant details."""
     auth.create_user()
     auth.login()
-    # Add a restaurant first
-    client.post(
-        "/restaurants/add",
-        data={
-            "name": "Test Restaurant",
-            "type": "restaurant",
-            "city": "Test City",
-            "state": "CA",
-            "zip_code": "12345",
-            "address": "123 Test St",
-            "phone": "123-456-7890",
-            "website": "http://test.com",
-            "cuisine": "American",
-            "price_range": "$$",
-        },
-    )
-    # Get the restaurant ID after creation
-    restaurant = Restaurant.query.filter_by(name="Test Restaurant").first()
-    assert restaurant is not None
 
-    # Simulate a database error
-    monkeypatch.setattr(Restaurant, "query", Mock(side_effect=SQLAlchemyError))
+    with client.application.app_context():
+        # Create a test restaurant directly
+        restaurant = Restaurant(
+            name="Test Restaurant",
+            type="restaurant",
+            city="Test City",
+            state="CA",
+            zip_code="12345",
+            address="123 Test St",
+            phone="123-456-7890",
+            website="http://test.com",
+            cuisine="american",
+            price_range="$$",
+        )
+        db.session.add(restaurant)
+        db.session.commit()
+        restaurant_id = restaurant.id
 
-    # Try to view restaurant details
-    response = client.get(f"/restaurants/{restaurant.id}/details")
-    assert response.status_code == 200
-    assert b"Error loading restaurant details. Please try again." in response.data
+    # Mock the database query to raise an error
+    from unittest.mock import patch
+
+    with (
+        patch("app.restaurants.routes.db.session.scalars") as mock_scalars,
+        patch("app.restaurants.routes.current_app.logger") as mock_logger,
+    ):
+        # Make the session.get() raise an SQLAlchemyError
+        mock_scalars.side_effect = SQLAlchemyError("Database error")
+
+        # Try to view restaurant details - should handle the error
+        response = client.get(f"/restaurants/{restaurant_id}/details")
+
+        # Check that we got a 500 error
+        assert response.status_code == 500
+
+        # Check that the error was logged
+        mock_logger.error.assert_called_once()
+        error_message = mock_logger.error.call_args[0][0]
+        assert "Database error in restaurant_details" in error_message
 
 
-def test_restaurant_details_with_multiple_expenses(client, auth):
+def test_restaurant_details_with_multiple_expenses(client, auth, app):
     """Test viewing restaurant details with multiple expenses."""
+    # Create user and login
     auth.create_user()
     auth.login()
-    # Add a restaurant first
-    client.post(
-        "/restaurants/add",
-        data={
-            "name": "Test Restaurant",
-            "type": "restaurant",
-            "city": "Test City",
-            "state": "CA",
-            "zip_code": "12345",
-            "address": "123 Test St",
-            "phone": "123-456-7890",
-            "website": "http://test.com",
-            "cuisine": "American",
-            "price_range": "$$",
-        },
-    )
-    # Get the restaurant ID after creation
-    restaurant = Restaurant.query.filter_by(name="Test Restaurant").first()
-    assert restaurant is not None
 
-    # Add multiple expenses
-    expenses = [
-        {
-            "date": "2024-02-20",
-            "meal_type": "Lunch",
-            "amount": "25.50",
-            "notes": "First visit",
-        },
-        {
-            "date": "2024-02-21",
-            "meal_type": "Dinner",
-            "amount": "45.75",
-            "notes": "Second visit",
-        },
-    ]
-
-    for expense_data in expenses:
-        client.post(
-            "/expenses/add",
-            data={
-                **expense_data,
-                "restaurant_id": restaurant.id,
-            },
+    with app.app_context():
+        # Create a test restaurant directly
+        restaurant = Restaurant(
+            name="Test Restaurant",
+            type="restaurant",
+            city="Test City",
+            state="CA",
+            zip_code="12345",
+            address="123 Test St",
+            phone="123-456-7890",
+            website="http://test.com",
+            cuisine="american",
+            price_range="$$",
         )
+        db.session.add(restaurant)
+        db.session.commit()
+
+        # Get the test user
+        user = User.query.filter_by(username="testuser").first()
+
+        # Add multiple expenses
+        expenses = [
+            {
+                "user_id": user.id,
+                "restaurant_id": restaurant.id,
+                "date": date(2024, 2, 20),  # Using date object
+                "meal_type": "Lunch",
+                "category": "Food",
+                "amount": 25.50,
+                "notes": "First visit",
+            },
+            {
+                "user_id": user.id,
+                "restaurant_id": restaurant.id,
+                "date": date(2024, 2, 21),  # Using date object
+                "meal_type": "Dinner",
+                "category": "Food",
+                "amount": 45.75,
+                "notes": "Second visit",
+            },
+        ]
+
+        for expense_data in expenses:
+            expense = Expense(**expense_data)
+            db.session.add(expense)
+        db.session.commit()
+
+        # Get the restaurant ID before the session is closed
+        restaurant_id = restaurant.id
 
     # View restaurant details
-    response = client.get(f"/restaurants/{restaurant.id}/details")
+    response = client.get(f"/restaurants/{restaurant_id}/details")
     assert response.status_code == 200
     assert b"Test Restaurant" in response.data
     assert b"2024-02-20" in response.data

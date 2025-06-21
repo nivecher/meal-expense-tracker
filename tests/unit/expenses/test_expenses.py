@@ -1,5 +1,14 @@
-from app import db
-from app.expenses.models import Expense
+"""Tests for expense-related functionality."""
+
+import os
+import sys
+
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.insert(0, project_root)
+
+from app import db  # noqa: E402
+from app.expenses.models import Expense  # noqa: E402
 
 
 def test_expenses_list(client, auth):

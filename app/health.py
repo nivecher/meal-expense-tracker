@@ -1,6 +1,6 @@
 """Health check endpoints for the application."""
 
-from datetime import datetime
+from datetime import datetime, UTC
 from flask import Blueprint, jsonify
 from sqlalchemy import text
 
@@ -11,7 +11,6 @@ bp = Blueprint("health", __name__)
 
 
 @bp.route("/health")
-@bp.route("/api/health")  # Support both paths for backward compatibility
 def health_check():
     """Health check endpoint to verify the application and database are running.
 
@@ -34,7 +33,7 @@ def health_check():
             {
                 "status": status,
                 "version": version.get("app", "unknown"),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "database": db_status,
             }
         ),
