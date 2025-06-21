@@ -491,9 +491,31 @@ module "lambda" {
   enable_otel_tracing = false # Set to true to enable OpenTelemetry tracing
   create_dlq          = true
 
+  # Extra environment variables
+  extra_environment_variables = {
+    SESSION_DYNAMODB_TABLE = module.dynamodb.table_name
+  }
+
   # Tags
   tags = merge(local.tags, {
     Name        = "${var.app_name}-${var.environment}-lambda"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  })
+}
+
+# DynamoDB Table for Session Storage
+module "dynamodb" {
+  source = "./modules/dynamodb"
+
+  # Basic configuration
+  table_name                 = "${var.app_name}-${var.environment}-sessions"
+  environment                = var.environment
+  kms_key_arn                = aws_kms_key.main.arn
+  lambda_execution_role_name = module.lambda.lambda_role_name
+
+  tags = merge(local.tags, {
+    Name        = "${var.app_name}-${var.environment}-sessions"
     Environment = var.environment
     ManagedBy   = "terraform"
   })

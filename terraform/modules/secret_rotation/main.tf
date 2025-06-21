@@ -49,10 +49,10 @@ resource "aws_iam_policy" "secrets_manager_access" {
   })
 }
 
-# IAM policy for CloudWatch Logs
+# IAM policy for CloudWatch Logs and X-Ray
 resource "aws_iam_policy" "cloudwatch_logs" {
-  name        = "${var.app_name}-cloudwatch-logs"
-  description = "Policy for CloudWatch Logs access"
+  name        = "${var.app_name}-monitoring"
+  description = "Policy for CloudWatch Logs and X-Ray access"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -64,7 +64,30 @@ resource "aws_iam_policy" "cloudwatch_logs" {
           "logs:CreateLogStream",
           "logs:PutLogEvents"
         ]
-        Resource = "arn:aws:logs:*:*:*"
+        Resource = [
+          "arn:aws:logs:*:*:log-group:/aws/lambda/${var.app_name}-*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords",
+          "xray:GetSamplingRules",
+          "xray:GetSamplingTargets",
+          "xray:GetSamplingStatisticSummaries"
+        ]
+        Resource = ["*"]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = [
+          "arn:aws:kms:*:*:key/*"
+        ]
       }
     ]
   })
@@ -96,6 +119,11 @@ resource "aws_lambda_function" "secret_rotation" {
   runtime       = var.lambda_runtime
   timeout       = 300 # 5 minutes
   memory_size   = 128
+
+  # Enable X-Ray tracing
+  tracing_config {
+    mode = "Active"
+  }
 
   vpc_config {
     subnet_ids         = var.subnet_ids

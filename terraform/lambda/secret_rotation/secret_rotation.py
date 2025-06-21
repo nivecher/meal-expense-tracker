@@ -12,18 +12,17 @@ stored in AWS Secrets Manager. It implements the four-step rotation process:
 import boto3
 import json
 import logging
-import os
 import string
 import random
 import psycopg2
 import botocore
-from botocore.exceptions import ClientError
 
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# PostgreSQL allowed special characters (excluding those that might cause issues in connection strings)
+# PostgreSQL allowed special characters (excluding those that might cause issues in
+# connection strings)
 PG_SPECIAL_CHARS = "~!@#$%^&*_-+=|(){}[]:;\"',<>?/."
 
 # Retry configuration

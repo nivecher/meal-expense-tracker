@@ -6,6 +6,9 @@ set -e
 OUTPUT_DIR="${PWD}/dist"
 TEMP_DIR=$(mktemp -d)
 
+# Paths
+SECRET_ROTATION_DIR="${PWD}/terraform/lambda/secret_rotation"
+
 echo "Using Python version: $PYTHON_VERSION"
 
 # Colors for output
@@ -38,12 +41,15 @@ show_help() {
   echo "  -a, --app          Package the application code (default)"
   echo "  -l, --layer        Package the dependencies as a Lambda layer"
   echo "  -b, --both         Package both the application and layer"
+  echo "  -s, --secrets      Package the secret rotation lambda"
   echo "  -h, --help         Show this help message"
   echo ""
   echo "Examples:"
   echo "  $0 -a              # Package only the application"
   echo "  $0 -l              # Package only the dependencies layer"
   echo "  $0 -b              # Package both application and dependencies"
+  echo "  $0 -s              # Package only the secret rotation lambda"
+  echo "  $0 -b -s           # Package all components (app, layer, and secret rotation)"
 }
 
 # Function to package the application
@@ -205,9 +211,48 @@ package_layer() {
   echo -e "${GREEN}[✓] Lambda layer created: ${OUTPUT_DIR}/layers/python-dependencies.zip${NC}"
 }
 
+# Function to package the secret rotation lambda
+package_secret_rotation() {
+  local temp_dir="${TEMP_DIR}/secret_rotation"
+  echo -e "${YELLOW}[*] Packaging secret rotation lambda...${NC}"
+
+  # Create directory structure
+  mkdir -p "${temp_dir}"
+
+  # Copy Lambda function code
+  if [ -f "${SECRET_ROTATION_DIR}/secret_rotation.py" ]; then
+    cp "${SECRET_ROTATION_DIR}/secret_rotation.py" "${temp_dir}/"
+  else
+    echo -e "${RED}[!] Error: Secret rotation lambda code not found at ${SECRET_ROTATION_DIR}/secret_rotation.py${NC}"
+    exit 1
+  fi
+
+  # Install dependencies
+  if [ -f "${SECRET_ROTATION_DIR}/requirements.txt" ]; then
+    echo -e "${YELLOW}[*] Installing secret rotation dependencies...${NC}"
+    pip install -r "${SECRET_ROTATION_DIR}/requirements.txt" -t "${temp_dir}" --no-cache-dir
+  else
+    echo -e "${YELLOW}[*] No requirements.txt found for secret rotation, skipping dependency installation${NC}"
+  fi
+
+  # Create ZIP package
+  echo -e "${YELLOW}[*] Creating secret rotation package...${NC}"
+  (cd "${temp_dir}" && zip -r9 "${OUTPUT_DIR}/secret_rotation.zip" .)
+
+  echo -e "${GREEN}[✓] Secret rotation package created: ${OUTPUT_DIR}/secret_rotation.zip${NC}"
+}
+
 # Parse command line arguments
 PACKAGE_APP=false
 PACKAGE_LAYER=false
+PACKAGE_SECRETS=false
+
+# Default to packaging app if no arguments provided
+if [ $# -eq 0 ]; then
+  PACKAGE_APP=true
+  PACKAGE_LAYER=true
+  PACKAGE_SECRETS=true
+fi
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -224,25 +269,23 @@ while [[ $# -gt 0 ]]; do
     PACKAGE_LAYER=true
     shift
     ;;
+  -s | --secrets)
+    PACKAGE_SECRETS=true
+    shift
+    ;;
   -h | --help)
     show_help
     exit 0
     ;;
   *)
-    echo -e "${YELLOW}Unknown option: $1${NC}"
+    echo "Unknown option: $1"
     show_help
     exit 1
     ;;
   esac
 done
 
-# Default to packaging both if no options are provided
-if [ "$PACKAGE_APP" = false ] && [ "$PACKAGE_LAYER" = false ]; then
-  PACKAGE_APP=true
-  PACKAGE_LAYER=true
-fi
-
-# Execute packaging
+# Package the requested components
 if [ "$PACKAGE_APP" = true ]; then
   package_app
 fi
@@ -251,10 +294,14 @@ if [ "$PACKAGE_LAYER" = true ]; then
   package_layer
 fi
 
-# Clean up
+if [ "$PACKAGE_SECRETS" = true ]; then
+  package_secret_rotation
+fi
+
+# Clean up the temporary directory
 rm -rf "${TEMP_DIR}"
 
-echo -e "${GREEN}[✓] Packaging completed successfully!${NC}"
+echo -e "${GREEN}[✓] Packaging complete!${NC}"
 
 # Show deployment instructions
 if [ "$PACKAGE_LAYER" = true ]; then

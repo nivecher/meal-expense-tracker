@@ -237,6 +237,29 @@ def create_app(config_obj=None):
     login_manager.login_view = "auth.login"
     login_manager.login_message_category = "info"
 
+    # Configure session management based on environment
+    if app.config.get("SESSION_TYPE") == "dynamodb":
+        try:
+            from flask_session import Session
+
+            Session(app)
+            app.logger.info("Configured DynamoDB for session storage")
+        except ImportError:
+            app.logger.warning(
+                "Flask-Session not installed. Using default session backend."
+            )
+    else:
+        # Default session configuration for development
+        app.config.update(
+            SESSION_COOKIE_SECURE=app.config.get("SESSION_COOKIE_SECURE", False),
+            SESSION_COOKIE_HTTPONLY=app.config.get("SESSION_COOKIE_HTTPONLY", True),
+            SESSION_COOKIE_SAMESITE=app.config.get("SESSION_COOKIE_SAMESITE", "Lax"),
+            PERMANENT_SESSION_LIFETIME=app.config.get(
+                "PERMANENT_SESSION_LIFETIME", 86400
+            ),  # 24 hours
+        )
+        app.logger.info("Using default session configuration")
+
     # Initialize the user loader
     from app.auth.models import init_login_manager
 

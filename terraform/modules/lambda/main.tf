@@ -172,32 +172,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
           var.db_secret_arn
         ]
       },
-      # DynamoDB access for session management
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:PutItem",
-          "dynamodb:UpdateItem",
-          "dynamodb:DeleteItem",
-          "dynamodb:Scan",
-          "dynamodb:Query"
-        ]
-        Resource = [
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/flask_sessions"
-        ]
-      },
-      # Allow creating the DynamoDB table if it doesn't exist
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:CreateTable",
-          "dynamodb:DescribeTable"
-        ]
-        Resource = [
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/flask_sessions"
-        ]
-      }
+
     ]
   })
 }
@@ -278,10 +253,6 @@ resource "aws_lambda_function" "main" {
       FLASK_ENV               = var.environment == "prod" ? "production" : "development"
       AWS_LAMBDA_EXEC_WRAPPER = var.enable_otel_tracing ? "/opt/otel-instrument" : ""
       LOG_LEVEL               = var.log_level
-
-      # Session configuration
-      SESSION_DYNAMODB_TABLE = "flask_sessions"
-      AWS_DEFAULT_REGION     = data.aws_region.current.name
 
       # Note: DB_URL will be constructed at runtime in the Lambda function
     }, var.extra_environment_variables)

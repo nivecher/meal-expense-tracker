@@ -2,6 +2,7 @@
 #
 # Deploy the application and/or Lambda layer to AWS S3
 # and update the Lambda layer and function with the new version
+# Also sets up required AWS resources like DynamoDB tables
 #
 set -e
 

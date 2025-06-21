@@ -343,7 +343,32 @@ class TestingConfig(Config):
 
 
 class ProductionConfig(Config):
-    pass
+    # Use secure session settings for production
+    SESSION_TYPE = "dynamodb"  # Requires Flask-Session with DynamoDB
+    SESSION_DYNAMODB_TABLE = "flask_sessions"
+    SESSION_DYNAMODB_REGION = None  # Will use AWS_DEFAULT_REGION
+    SESSION_USE_SIGNER = True
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours in seconds
+
+    @classmethod
+    def init_app(cls, app):
+        super().init_app(app)
+        try:
+            # Only import if using DynamoDB sessions
+            from flask_session import Session
+
+            session = Session()
+            session.init_app(app)
+        except ImportError:
+            app.logger.warning(
+                "Flask-Session not installed. Using default session backend."
+            )
+        except Exception as e:
+            app.logger.error("Failed to initialize session: %s", str(e))
+            raise
 
 
 config = {
