@@ -1,3 +1,4 @@
+import logging
 from flask import render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, current_user
 from app import db
@@ -36,34 +37,64 @@ def logout():
 
 @bp.route("/register", methods=["GET", "POST"])
 def register():
+    logger = logging.getLogger(__name__)
+    logger.info("Register endpoint called")
+
     if current_user.is_authenticated:
+        logger.info("User already authenticated, redirecting to index")
         return redirect(url_for("main.index"))
 
     if request.method == "POST":
+        logger.info("Processing registration form")
         username = request.form.get("username")
         password = request.form.get("password")
 
+        masked_username = "*" * len(username) if username else "None"
+        masked_password = "*" * len(password) if password else "None"
+        logger.debug(
+            f"Form data - Username: {masked_username}, " f"Password: {masked_password}"
+        )
+
         if not username or not password:
+            logger.warning("Registration failed: Missing required fields")
             flash("Please fill out all fields.", "danger")
             return render_template("auth/register.html", username=username)
 
-        if User.query.filter_by(username=username).first():
-            flash("Username already exists", "danger")
-            return render_template("auth/register.html", username=username)
-
         try:
-            print(f"Attempting to create user: {username}")  # Debug log
+            logger.debug("Checking for existing user")
+            if User.query.filter_by(username=username).first():
+                logger.warning(
+                    f"Registration failed: Username '{username}' already exists"
+                )
+                flash("Username already exists", "danger")
+                return render_template("auth/register.html", username=username)
+
+            logger.debug("Creating new user")
             user = User(username=username)
             user.set_password(password)
+
+            logger.debug("Adding user to session")
             db.session.add(user)
+
+            logger.debug("Committing transaction")
             db.session.commit()
-            print(f"Successfully created user: {username}")  # Debug log
+
+            logger.info(f"Successfully created user: {username}")
             flash("Registration successful! Please login.", "success")
             return redirect(url_for("auth.login"))
+
         except SQLAlchemyError as e:
             db.session.rollback()
-            print(f"Error creating user: {str(e)}")  # Debug log
-            flash(f"Error creating user: {str(e)}", "error")
+            logger.error(f"Database error during registration: {str(e)}", exc_info=True)
+            flash("An error occurred during registration. Please try again.", "error")
+            return redirect(url_for("auth.register"))
+        except Exception as e:
+            db.session.rollback()
+            logger.critical(
+                f"Unexpected error during registration: {str(e)}", exc_info=True
+            )
+            flash("An unexpected error occurred. Please try again later.", "error")
             return redirect(url_for("auth.register"))
 
+    logger.debug("Rendering registration form")
     return render_template("auth/register.html")
