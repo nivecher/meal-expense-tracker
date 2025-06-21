@@ -37,7 +37,8 @@ def get_secret(secret_arn, region_name=None):
 
     Args:
         secret_arn (str): The ARN of the secret to retrieve
-        region_name (str, optional): AWS region name. If not provided, will use AWS_REGION or us-east-1
+        region_name (str, optional): AWS region name. If not provided, will use
+        AWS_REGION or us-east-1
 
     Returns:
         dict: The secret value as a dictionary
@@ -107,22 +108,42 @@ class Config:
         )
         logger.info(f"Running in {env_type} environment")
 
+        # Log relevant environment variables (masking sensitive data)
+        env_vars = {
+            "FLASK_ENV": os.environ.get("FLASK_ENV"),
+            "DB_SECRET_ARN": "***" if os.environ.get("DB_SECRET_ARN") else None,
+            "DB_HOST": "***" if os.environ.get("DB_HOST") else None,
+            "DB_NAME": os.environ.get("DB_NAME"),
+            "AWS_REGION": os.environ.get("AWS_REGION"),
+            "AWS_LAMBDA_FUNCTION_NAME": os.environ.get("AWS_LAMBDA_FUNCTION_NAME"),
+        }
+        logger.debug("Database configuration environment: %s", env_vars)
+
         # 1. Check for explicit DATABASE_URL (highest priority)
         if db_url := os.environ.get("DATABASE_URL"):
             logger.info("Using DATABASE_URL from environment")
             return db_url
 
-        # 2. In Lambda, use RDS connection via Secrets Manager
-        if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
-            logger.info("Running in AWS Lambda environment, attempting RDS connection")
+        # 2. Use RDS connection via Secrets Manager if DB_SECRET_ARN is set
+        #    (works in both Lambda and local development)
+        if os.environ.get("DB_SECRET_ARN"):
+            env_type = (
+                "AWS Lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "Local"
+            )
+            logger.info(f"Running in {env_type} environment with DB_SECRET_ARN")
             try:
                 db_url = self._get_rds_connection_uri()
                 logger.info("Successfully constructed RDS connection URI")
                 return db_url
             except Exception as e:
-                logger.error("Failed to initialize RDS connection", exc_info=True)
-                # In production, you might want to fail fast
+                logger.error(
+                    "Failed to initialize RDS connection: %s", str(e), exc_info=True
+                )
+                # In production, fail fast to avoid silent fallbacks
                 if os.environ.get("FLASK_ENV") == "production":
+                    logger.critical(
+                        "Failing fast in production due to RDS connection error"
+                    )
                     raise
                 logger.warning(
                     "Falling back to direct DB config due to RDS connection error"
@@ -175,52 +196,91 @@ class Config:
         """
         db_secret_arn = os.environ.get("DB_SECRET_ARN")
         if not db_secret_arn:
-            raise ValueError("DB_SECRET_ARN environment variable is not set")
+            error_msg = "DB_SECRET_ARN environment variable is not set"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
-        logger.info(f"Retrieving database secret from ARN: {db_secret_arn}")
+        logger.info("Retrieving database secret from Secrets Manager")
+        logger.debug("Secret ARN: %s", db_secret_arn)
 
         try:
             # Get secret from AWS Secrets Manager
+            logger.debug("Attempting to retrieve secret...")
             secret = get_secret(db_secret_arn)
 
-            # Extract and validate required fields
+            if not secret:
+                error_msg = "Received empty secret from Secrets Manager"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            # Log available secret keys (masking sensitive values)
+            secret_keys = list(secret.keys())
+            logger.debug(
+                "Available secret keys: %s",
+                ", ".join(k for k in secret_keys if k != "db_password"),
+            )
+
+            # Define required fields with descriptions
             required_fields = {
-                "db_username": "DB username",
-                "db_password": "DB password",
-                "db_host": "DB host",
-                "db_port": "DB port",
-                "db_name": "DB name",
+                "db_username": "Database username",
+                "db_password": "Database password",
+                "db_host": "Database host",
+                "db_port": "Database port",
+                "db_name": "Database name",
             }
 
             # Validate all required fields exist and are non-empty
             missing = []
-            for field in required_fields:
-                if not secret.get(field):
-                    missing.append(field)
+            for field, description in required_fields.items():
+                if field not in secret or not secret[field]:
+                    missing.append(f"{description} ({field})")
 
             if missing:
-                raise ValueError(
+                error_msg = (
                     f"Missing or empty required secret fields: {', '.join(missing)}"
                 )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            # Get database connection parameters
+            db_user = secret["db_username"]
+            db_pass = secret["db_password"]
+            db_host = secret["db_host"]
+            db_port = secret["db_port"]
+            db_name = secret["db_name"]
 
             # Construct connection string with URL-encoded password
             connection_uri = (
-                f"postgresql://{secret['db_username']}:"
-                f"{urllib.parse.quote_plus(secret['db_password'])}"
-                f"@{secret['db_host']}:{secret['db_port']}/{secret['db_name']}"
+                f"postgresql://{db_user}:"
+                f"{urllib.parse.quote_plus(db_pass)}"
+                f"@{db_host}:{db_port}/{db_name}"
             )
 
-            # Log a masked version for security
+            # Log connection details (masking sensitive info)
             logger.info(
-                f"Constructed database connection to {secret['db_host']} "
-                f"for database {secret['db_name']}"
+                "Successfully constructed database connection URI for host: %s, \n"
+                "database: %s",
+                db_host,
+                db_name,
+            )
+            logger.debug(
+                "Full connection URI: postgresql://%s:*****@%s:%s/%s",
+                db_user,
+                db_host,
+                db_port,
+                db_name,
             )
 
             return connection_uri
 
+        except ValueError as ve:
+            # Re-raise validation errors directly
+            logger.error("Validation error in RDS connection: %s", str(ve))
+            raise
         except Exception as e:
-            logger.error("Failed to construct RDS connection URI", exc_info=True)
-            raise ValueError(f"Failed to construct database connection: {str(e)}")
+            error_msg = f"Failed to construct RDS connection: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise ValueError(error_msg) from e
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY")

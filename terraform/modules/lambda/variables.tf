@@ -54,6 +54,24 @@ variable "timeout" {
   default     = 30
 }
 
+variable "run_migrations" {
+  description = "Whether to run database migrations on Lambda startup"
+  type        = bool
+  default     = false
+}
+
+variable "log_level" {
+  description = "Logging level for the application (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
+  type        = string
+  default     = "INFO"
+}
+
+variable "extra_environment_variables" {
+  description = "A map of additional environment variables to pass to the Lambda function"
+  type        = map(string)
+  default     = {}
+}
+
 variable "architectures" {
   description = "Instruction set architecture for your Lambda function"
   type        = list(string)

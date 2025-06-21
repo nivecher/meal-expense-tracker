@@ -149,14 +149,61 @@ resource "aws_s3_bucket_public_access_block" "access_logs" {
   restrict_public_buckets = true
 }
 
+# S3 bucket policy for lambda deployment bucket
+resource "aws_s3_bucket_policy" "lambda_deployment" {
+  bucket = aws_s3_bucket.lambda_deployment.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AllowSSLRequestsOnly"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.lambda_deployment.arn,
+          "${aws_s3_bucket.lambda_deployment.arn}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      },
+      {
+        Sid    = "AllowS3LogDelivery"
+        Effect = "Allow"
+        Principal = {
+          Service = "logging.s3.amazonaws.com"
+        }
+        Action = [
+          "s3:PutObject"
+        ]
+        Resource = "${aws_s3_bucket.lambda_deployment.arn}/s3/${var.app_name}-${var.environment}-deployment/*"
+        Condition = {
+          StringEquals = {
+            "s3:x-amz-acl"      = "bucket-owner-full-control"
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
+          }
+          ArnLike = {
+            "aws:SourceArn" = aws_s3_bucket.access_logs.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
 # Enable server access logging for the deployment bucket
 resource "aws_s3_bucket_logging" "lambda_deployment" {
   bucket        = aws_s3_bucket.lambda_deployment.id
   target_bucket = aws_s3_bucket.access_logs.id
   target_prefix = "s3/${var.app_name}-${var.environment}-deployment/"
+  depends_on = [
+    aws_s3_bucket_policy.lambda_deployment
+  ]
 }
-
-
 
 # Block public access to the bucket
 resource "aws_s3_bucket_public_access_block" "lambda_deployment" {
@@ -332,7 +379,28 @@ module "rds" {
 
   # Tags
   tags = local.tags
+}
 
+# Secret Rotation for RDS
+module "secret_rotation" {
+  source = "./modules/secret_rotation"
+
+  # Basic configuration
+  app_name = var.app_name
+
+  # Secret configuration
+  secret_arn = module.rds.db_secret_arn
+
+  # Network configuration
+  vpc_id                = module.network.vpc_id
+  vpc_cidr              = var.vpc_cidr
+  subnet_ids            = module.network.private_subnet_ids
+  rds_security_group_id = module.rds.db_security_group_id
+
+  # Lambda configuration
+  lambda_package_path = "${path.module}/../dist/secret_rotation.zip"
+  lambda_runtime      = "python3.13"
+  rotation_days       = 30
 }
 
 # API Gateway Module
@@ -410,6 +478,10 @@ module "lambda" {
   runtime     = var.lambda_runtime
   memory_size = var.lambda_memory_size
   timeout     = var.lambda_timeout
+
+  # Enable migrations for the first deployment
+  run_migrations = var.run_migrations
+  log_level      = var.log_level
 
   # IAM Policy
   lambda_combined_policy_arn = module.iam.lambda_combined_policy_arn

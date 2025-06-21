@@ -219,7 +219,7 @@ resource "aws_lambda_function" "main" {
   runtime       = var.runtime
   architectures = var.architectures
   memory_size   = var.memory_size
-  timeout       = var.timeout
+  timeout       = var.run_migrations ? max(var.timeout, 300) : var.timeout # Min 5 min for migrations
   publish       = true
 
   # Enable X-Ray tracing
@@ -237,17 +237,19 @@ resource "aws_lambda_function" "main" {
 
   # Environment variables including enhanced monitoring
   environment {
-    variables = {
+    variables = merge({
       # Database configuration
-      DB_SECRET_ARN = var.db_secret_arn
+      DB_SECRET_ARN  = var.db_secret_arn
+      RUN_MIGRATIONS = var.run_migrations ? "true" : "false"
 
       # Application configuration
       ENVIRONMENT             = var.environment
       FLASK_ENV               = var.environment == "prod" ? "production" : "development"
       AWS_LAMBDA_EXEC_WRAPPER = var.enable_otel_tracing ? "/opt/otel-instrument" : ""
+      LOG_LEVEL               = var.log_level
 
       # Note: DATABASE_URL will be constructed at runtime using the password from Secrets Manager
-    }
+    }, var.extra_environment_variables)
   }
 
   # VPC configuration if VPC ID is provided

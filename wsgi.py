@@ -9,6 +9,9 @@ For local development, it can be run directly with `python wsgi.py`.
 import logging
 import os
 import sys
+import time
+
+from sqlalchemy import text
 
 # Add the current directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -37,21 +40,9 @@ def _setup_app_context(app):
     """Set up application context including logging and database."""
     with app.app_context():
         setup_logger(app)
-        try:
-            # Initialize database and verify connection
-            _initialize_database(app)
 
-            # Verify database connection using SQLAlchemy text() for raw SQL
-            from sqlalchemy import text
-
-            db.session.execute(text("SELECT 1"))
-            logger.info("Successfully connected to the database")
-
-        except Exception as e:
-            logger.critical("Database error: %s", str(e), exc_info=True)
-            # Re-raise to fail fast in production
-            if os.environ.get("FLASK_ENV") == "production":
-                raise
+        # Initialize database and verify connection
+        _initialize_database(app)
 
         # Register routes and handlers
         register_routes(app)
@@ -75,35 +66,35 @@ def configure_application():
         # Determine the environment
         env = os.environ.get("FLASK_ENV", "development")
         logger.info("Starting application in %s environment", env)
+
+        # Log environment variables for debugging (excluding sensitive data)
+        logger.debug(
+            "Environment variables: %s",
+            {
+                k: v
+                for k, v in os.environ.items()
+                if not any(s in k.lower() for s in ["key", "secret", "pass", "token"])
+            },
+        )
+
         app = _create_app_with_env(env)
         _setup_app_context(app)
-        try:
-            db.session.execute("SELECT 1")
-            logger.info("Successfully connected to the database")
-        except Exception as e:
-            logger.critical(f"Database error: {str(e)}", exc_info=True)
-            # Re-raise to fail fast in production
-            if os.environ.get("FLASK_ENV") == "production":
-                raise
-        except ImportError as e:
-            logger.critical(f"Failed to import models: {str(e)}", exc_info=True)
-            # List contents of app directory for debugging
-            try:
-                import os
-
-                app_dir = os.path.join(os.path.dirname(__file__), "app")
-                if os.path.exists(app_dir):
-                    logger.info(f"Contents of app directory: {os.listdir(app_dir)}")
-                else:
-                    logger.error(f"App directory not found at: {app_dir}")
-            except Exception as debug_e:
-                logger.error(f"Error listing app directory: {str(debug_e)}")
-                raise
-
         return app
 
+    except ImportError as e:
+        logger.critical(f"Failed to import module: {str(e)}", exc_info=True)
+        # List contents of app directory for debugging
+        try:
+            app_dir = os.path.join(os.path.dirname(__file__), "app")
+            if os.path.exists(app_dir):
+                logger.info(f"Contents of app directory: {os.listdir(app_dir)}")
+            else:
+                logger.error(f"App directory not found at: {app_dir}")
+        except Exception as debug_e:
+            logger.error(f"Error listing app directory: {str(debug_e)}")
+        raise
     except Exception as e:
-        logger.critical(f"Failed to initialize application: {str(e)}", exc_info=True)
+        logger.critical(f"Failed to configure application: {str(e)}", exc_info=True)
         raise
 
 
@@ -164,33 +155,131 @@ def register_routes(app):
 
 
 def check_database_migrations(app):
-    """Check and apply database migrations if needed."""
-    if not app.config.get("SQLALCHEMY_DATABASE_URI", "").startswith("postgresql"):
+    """Check and apply database migrations if needed.
+
+    This function will:
+    1. Check if migrations are enabled via RUN_MIGRATIONS environment variable
+    2. Verify we're using PostgreSQL
+    3. Check if the migrations table exists
+    4. Apply any pending migrations
+    """
+    # Only run migrations if explicitly enabled
+    migrations_enabled = os.environ.get("RUN_MIGRATIONS", "false").lower() == "true"
+    if not migrations_enabled:
+        app.logger.info("Skipping database migrations (RUN_MIGRATIONS not enabled)")
         return
 
-    from sqlalchemy import inspect
+    db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if not db_uri.startswith("postgresql"):
+        app.logger.warning("Skipping migrations - not using PostgreSQL")
+        return
 
-    inspector = inspect(db.engine)
-    tables = inspector.get_table_names()
-    table_list = ", ".join(tables) if tables else "None"
-    app.logger.info(f"Database contains tables: {table_list}")
+    try:
+        from sqlalchemy import inspect
+        from flask_migrate import upgrade, Migrate
 
-    migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
-    if os.path.exists(migration_dir):
-        try:
-            from flask_migrate import upgrade as migration_upgrade
+        # Initialize Flask-Migrate (assign to _ to indicate it's intentionally unused)
+        _ = Migrate(app, db)
 
-            migration_upgrade()
-            app.logger.info("Database migrations applied successfully")
-        except Exception as e:
-            app.logger.error(f"Error applying database migrations: {str(e)}")
-            # Re-raise the exception to fail fast in production
-            if os.environ.get("FLASK_ENV") == "production":
-                raise
-            app.logger.error(f"Error applying database migrations: {str(e)}")
-            # Re-raise the exception to fail fast if migrations are required
+        # Check if migrations table exists
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+
+        # Log current tables for debugging
+        table_list = ", ".join(tables) if tables else "None"
+        app.logger.info(f"Current database tables: {table_list}")
+
+        # Check database state
+        migrations_table = "alembic_version"  # Default table name used by Flask-Migrate
+        has_migrations = migrations_table in tables
+        is_fresh_database = not tables
+
+        # Log migration status
+        if is_fresh_database:
+            app.logger.info("Fresh database detected - will apply all migrations")
+        elif has_migrations:
+            app.logger.info("Existing migrations detected - checking for updates")
+        else:
+            app.logger.warning(
+                "Database has tables but no migrations table - "
+                "assuming legacy database"
+            )
+
+        # Apply migrations
+        app.logger.info("Applying database migrations...")
+        upgrade()
+        app.logger.info("Database migrations applied successfully")
+
+    except Exception as e:
+        error_msg = f"Error applying database migrations: {str(e)}"
+        app.logger.error(error_msg, exc_info=True)
+        # In production, we might want to fail fast
+        if os.environ.get("FLASK_ENV") == "production":
+            app.logger.critical("Failing fast due to migration error in production")
             raise
-            app.logger.warning(f"Could not apply migrations: {str(e)}")
+        # In development, log the error but continue
+        app.logger.warning("Continuing with potentially outdated database schema")
+
+
+def _verify_database_connection(app):
+    """Verify database connection with retry logic.
+
+    Args:
+        app: Flask application instance
+
+    Returns:
+        bool: True if connection is successful, False otherwise
+    """
+    max_retries = 3
+    retry_delay = 2  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            db.session.execute(text("SELECT 1"))
+            logger.info("Database connection verified")
+            return True
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                logger.warning(
+                    "Database connection attempt %d failed, " "retrying in %ds...",
+                    attempt + 1,
+                    retry_delay,
+                )
+                time.sleep(retry_delay)
+
+    error_msg = f"Failed to verify database connection: {str(last_error)}"
+    if app.config.get("FLASK_ENV") == "production":
+        logger.critical(error_msg)
+        raise RuntimeError(error_msg)
+    logger.warning("%s - Continuing in non-production environment", error_msg)
+    return False
+
+
+def _initialize_sqlalchemy(app):
+    """Initialize SQLAlchemy if not already done."""
+    if "sqlalchemy" not in app.extensions:
+        db.init_app(app)
+        logger.debug("Initialized SQLAlchemy with Flask app")
+    else:
+        logger.debug("SQLAlchemy already initialized for this app")
+
+
+def _create_tables_if_needed(app):
+    """Create database tables in development or testing environments."""
+    if app.config.get("FLASK_ENV") not in ["development", "testing"]:
+        return
+
+    try:
+        logger.debug("Creating database tables...")
+        db.create_all()
+        logger.info("Database tables created/verified")
+    except Exception as e:
+        error_msg = f"Failed to create tables: {str(e)}"
+        if app.config.get("FLASK_ENV") == "production":
+            logger.critical(error_msg)
+            raise RuntimeError(error_msg)
+        logger.warning("%s - Continuing in non-production environment", error_msg)
 
 
 def _initialize_database(app):
@@ -200,29 +289,24 @@ def _initialize_database(app):
         app: Flask application instance
 
     Raises:
-        RuntimeError: If database initialization fails
+        RuntimeError: If database initialization fails in production
     """
-    with app.app_context():
-        try:
-            # Verify database connection
-            app.logger.info("Verifying database connection...")
-            db.session.execute(db.text("SELECT 1"))
 
-            # Create tables if they don't exist
-            app.logger.info("Creating database tables if they don't exist...")
-            db.create_all()
+    try:
+        _initialize_sqlalchemy(app)
 
-            # Check for pending migrations
-            check_database_migrations(app)
-
-            app.logger.info("Database initialization completed successfully")
-            return True
-
-        except Exception as e:
-            app.logger.error(
-                "Database initialization failed: %s", str(e), exc_info=True
-            )
-            raise RuntimeError(f"Failed to initialize database: {str(e)}") from e
+        with app.app_context():
+            _create_tables_if_needed(app)
+            _verify_database_connection(app)
+            logger.info("Database initialization completed successfully")
+    except Exception as e:
+        error_msg = f"Failed to initialize database: {str(e)}"
+        logger.critical(error_msg)
+        if app.config.get("FLASK_ENV") == "production":
+            raise RuntimeError(error_msg) from e
+        logger.warning(
+            "Continuing with potential database issues in non-production environment"
+        )
 
 
 def create_application(env=None):

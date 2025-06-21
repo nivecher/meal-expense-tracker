@@ -115,6 +115,8 @@ resource "random_password" "db_password" {
   special = false # Avoid special chars that might cause issues
 }
 
+// TODO add secret rotation
+
 # Store DB credentials in Secrets Manager with KMS encryption
 resource "aws_secretsmanager_secret" "db_credentials" {
   name        = "${var.app_name}/${var.environment}/db-credentials"

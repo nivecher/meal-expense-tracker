@@ -129,6 +129,29 @@ variable "lambda_runtime" {
   description = "Runtime for Lambda function"
 }
 
+variable "run_migrations" {
+  type        = bool
+  default     = true
+  description = "Run database migrations on first deployment"
+}
+
+variable "log_level" {
+  type        = string
+  default     = "INFO"
+  description = "Logging level for the application (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
+
+  validation {
+    condition     = contains(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], var.log_level)
+    error_message = "Log level must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL"
+  }
+}
+
+variable "extra_environment_variables" {
+  type        = map(string)
+  default     = {}
+  description = "Additional environment variables for Lambda functions"
+}
+
 # ======================
 # Database Configuration
 # ======================
