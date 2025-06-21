@@ -54,13 +54,22 @@ def test_expense_creation_with_restaurant(client, app, auth):
 
     # Verify the expense was created with correct restaurant association
     with app.app_context():
-        expense = Expense.query.get(1)
+        # Get the current SQLAlchemy session
+        from sqlalchemy.orm import Session
+
+        session = Session.object_session(
+            Expense.query.first() or Restaurant.query.first()
+        )
+
+        # Use Session.get() instead of Query.get()
+        expense = session.get(Expense, 1)
         assert expense is not None
         assert expense.amount == 25.50
         assert expense.notes == "Test expense"
         assert expense.restaurant_id == 1
         assert expense.category == "Dining"  # Should be set based on restaurant type
-        restaurant = Restaurant.query.get(1)
+
+        restaurant = session.get(Restaurant, 1)
         assert restaurant is not None
         assert restaurant.name == "Test Restaurant"
 
@@ -124,7 +133,15 @@ def test_expense_editing_with_restaurant(client, app, auth):
 
     # Verify the expense was updated correctly
     with app.app_context():
-        expense = Expense.query.get(1)
+        # Get the current SQLAlchemy session
+        from sqlalchemy.orm import Session
+
+        session = Session.object_session(
+            Expense.query.first() or Restaurant.query.first()
+        )
+
+        # Use Session.get() instead of Query.get()
+        expense = session.get(Expense, 1)
         assert expense is not None
         assert expense.amount == 35.50
         assert expense.notes == "Updated expense"
@@ -187,9 +204,18 @@ def test_expense_deletion_with_restaurant(client, app, auth):
 
     # Verify the expense was deleted but restaurant remains
     with app.app_context():
-        expense = Expense.query.get(1)
+        # Get the current SQLAlchemy session
+        from sqlalchemy.orm import Session
+
+        session = Session.object_session(
+            Expense.query.first() or Restaurant.query.first()
+        )
+
+        # Use Session.get() instead of Query.get()
+        expense = session.get(Expense, 1)
         assert expense is None
-        restaurant = Restaurant.query.get(1)
+
+        restaurant = session.get(Restaurant, 1)
         assert restaurant is not None
         assert restaurant.name == "Test Restaurant"
 

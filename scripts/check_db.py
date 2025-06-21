@@ -38,7 +38,8 @@ def _get_secret_dict(secret_arn: str) -> SecretDict:
         secret_arn: ARN of the secret in AWS Secrets Manager
 
     Returns:
-        SecretDict: Dictionary containing database connection parameters with standard keys
+        SecretDict: Dictionary containing database connection parameters with
+        standard keys
 
     Raises:
         ValueError: If required keys are missing from the secret

@@ -2,6 +2,8 @@
 
 data "aws_caller_identity" "current" {}
 
+data "aws_region" "current" {}
+
 # Note: DB_URL will be constructed at runtime in the Lambda function using the secret
 
 # S3 Object for Lambda Layer Package
@@ -169,7 +171,8 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Resource = [
           var.db_secret_arn
         ]
-      }
+      },
+
     ]
   })
 }
@@ -243,6 +246,7 @@ resource "aws_lambda_function" "main" {
       # Database configuration
       DB_SECRET_ARN  = var.db_secret_arn
       RUN_MIGRATIONS = var.run_migrations ? "true" : "false"
+
 
       # Application configuration
       ENVIRONMENT             = var.environment

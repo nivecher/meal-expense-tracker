@@ -46,6 +46,11 @@ output "log_group_name" {
   value       = aws_cloudwatch_log_group.lambda.name
 }
 
+output "lambda_role_name" {
+  description = "The name of the IAM role used by the Lambda function"
+  value       = aws_iam_role.lambda_role.name
+}
+
 output "log_group_arn" {
   description = "The ARN of the CloudWatch Log Group for the Lambda function"
   value       = aws_cloudwatch_log_group.lambda.arn

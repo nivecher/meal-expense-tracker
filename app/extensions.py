@@ -1,7 +1,8 @@
 """
 Application extensions module.
 
-This module initializes and provides access to Flask extensions used throughout the application.
+This module initializes and provides access to Flask extensions used throughout
+the application.
 """
 
 from flask_sqlalchemy import SQLAlchemy

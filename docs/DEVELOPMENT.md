@@ -190,28 +190,6 @@ make tf-apply
 make tf-destroy
 ```
 
-## API Documentation
-
-### Local Development
-
-When running the Flask development server, access the API documentation at:
-- Swagger UI: http://localhost:5000/api/docs
-- ReDoc: http://localhost:5000/api/redoc
-
-### Production
-
-In production, the API documentation is automatically generated and available at:
-- Swagger UI: https://api.yourdomain.com/docs
-- ReDoc: https://api.yourdomain.com/redoc
-
-### API Versioning
-
-- The API follows semantic versioning (e.g., v1, v2)
-- Version is included in the URL path: `/api/v1/...`
-- Current API version: v1
-
-## 🧪 Testing
-
 ### Running Tests
 
 ```bash

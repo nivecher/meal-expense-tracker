@@ -1,41 +1,81 @@
-from flask import render_template, redirect, url_for, flash, request, Response
-from flask_login import login_required, current_user
+from datetime import datetime, timedelta
+import csv
+import logging
+from io import StringIO
+from typing import Optional
+
+from flask import (
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    Response,
+    url_for,
+)
+from flask_login import current_user, login_required
+from sqlalchemy.exc import SQLAlchemyError
+
 from app import db
 from app.expenses import bp
 from app.expenses.models import Expense
 from app.restaurants.models import Restaurant
-from datetime import datetime, timedelta
-import csv
-from io import StringIO
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
-def apply_filters(query, search, meal_type, category, start_date, end_date):
-    """Apply filters to the expense query."""
-    if search:
-        query = query.join(Restaurant).filter(
-            db.or_(
-                Restaurant.name.ilike(f"%{search}%"),
-                Restaurant.city.ilike(f"%{search}%"),
-                Restaurant.cuisine.ilike(f"%{search}%"),
-                Restaurant.type.ilike(f"%{search}%"),
-                Expense.notes.ilike(f"%{search}%"),
-                Expense.category.ilike(f"%{search}%"),
-                Expense.meal_type.ilike(f"%{search}%"),
+def apply_filters(
+    query,
+    search: Optional[str] = None,
+    meal_type: Optional[str] = None,
+    category: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+):
+    """Apply filters to the expense query.
+
+    Args:
+        query: The base query to apply filters to
+        search: Search term to filter by
+        meal_type: Filter by meal type
+        category: Filter by category
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+
+    Returns:
+        Query: The filtered query
+    """
+    try:
+        if search:
+            search = f"%{search}%"
+            query = query.join(Restaurant).filter(
+                db.or_(
+                    Restaurant.name.ilike(search),
+                    Restaurant.city.ilike(search),
+                    Restaurant.cuisine.ilike(search),
+                    Restaurant.type.ilike(search),
+                    Expense.notes.ilike(search),
+                    Expense.category.ilike(search),
+                    Expense.meal_type.ilike(search),
+                )
             )
-        )
-    if meal_type:
-        query = query.filter(Expense.meal_type == meal_type)
-    if category:
-        query = query.filter(Expense.category == category)
-    if start_date:
-        query = query.filter(
-            Expense.date >= datetime.strptime(start_date, "%Y-%m-%d").date()
-        )
-    if end_date:
-        query = query.filter(
-            Expense.date <= datetime.strptime(end_date, "%Y-%m-%d").date()
-        )
-    return query
+        if meal_type:
+            query = query.filter(Expense.meal_type == meal_type)
+        if category:
+            query = query.filter(Expense.category == category)
+        if start_date:
+            query = query.filter(
+                Expense.date >= datetime.strptime(start_date, "%Y-%m-%d").date()
+            )
+        if end_date:
+            query = query.filter(
+                Expense.date <= datetime.strptime(end_date, "%Y-%m-%d").date()
+            )
+        return query
+    except Exception as e:
+        logger.error(f"Error applying filters: {str(e)}")
+        raise
 
 
 def apply_sorting(query, sort_by, sort_order):
@@ -200,7 +240,11 @@ def add_expense():
 @bp.route("/<int:expense_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_expense(expense_id):
-    expense = Expense.query.get_or_404(expense_id)
+    # Use db.session.get() directly with explicit 404 handling
+    expense = db.session.get(Expense, expense_id)
+    if expense is None:
+        abort(404)
+
     if expense.user_id != current_user.id:
         flash("You do not have permission to edit this expense.", "error")
         return redirect(url_for("main.index"))
@@ -278,14 +322,49 @@ def edit_expense(expense_id):
 
 @bp.route("/<int:expense_id>/delete", methods=["POST"])
 @login_required
-def delete_expense(expense_id):
-    expense = Expense.query.get_or_404(expense_id)
-    if expense.user_id != current_user.id:
-        flash("You do not have permission to delete this expense.", "error")
-        return redirect(url_for("main.index"))
-    db.session.delete(expense)
-    db.session.commit()
-    flash("Expense deleted successfully!", "success")
+def delete_expense(expense_id: int):
+    """Delete an expense.
+
+    Args:
+        expense_id: The ID of the expense to delete
+
+    Returns:
+        Redirect to main index
+    """
+    try:
+        expense = db.session.get(Expense, expense_id)
+        if expense is None:
+            logger.warning(f"Expense {expense_id} not found")
+            abort(404)
+
+        if expense.user_id != current_user.id:
+            logger.warning(
+                f"User {current_user.id} attempted to delete expense {expense_id} "
+                f"owned by user {expense.user_id}"
+            )
+            flash("You do not have permission to delete this expense.", "error")
+            return redirect(url_for("main.index"))
+
+        db.session.delete(expense)
+        db.session.commit()
+        logger.info(
+            f"Expense {expense_id} deleted successfully by user {current_user.id}"
+        )
+        flash("Expense deleted successfully!", "success")
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.error(
+            f"Database error deleting expense {expense_id}: {str(e)}", exc_info=True
+        )
+        flash(
+            "An error occurred while deleting the expense. Please try again.", "error"
+        )
+    except Exception as e:
+        logger.error(
+            f"Unexpected error deleting expense {expense_id}: {str(e)}", exc_info=True
+        )
+        flash("An unexpected error occurred. Please try again later.", "error")
+
     return redirect(url_for("main.index"))
 
 
@@ -322,12 +401,41 @@ def expense_stats():
 
 @bp.route("/<int:expense_id>")
 @login_required
-def expense_details(expense_id):
-    expense = Expense.query.get_or_404(expense_id)
-    if expense.user_id != current_user.id:
-        flash("You do not have permission to view this expense.", "error")
+def expense_details(expense_id: int):
+    """Display details of a specific expense.
+
+    Args:
+        expense_id: The ID of the expense to display
+
+    Returns:
+        Rendered template with expense details or redirect
+    """
+    try:
+        expense = db.session.get(Expense, expense_id)
+        if expense is None:
+            logger.warning(f"Expense {expense_id} not found")
+            abort(404)
+
+        if expense.user_id != current_user.id:
+            logger.warning(
+                f"User {current_user.id} attempted to view expense {expense_id} "
+                f"owned by user {expense.user_id}"
+            )
+            flash("You do not have permission to view this expense.", "error")
+            return redirect(url_for("main.index"))
+
+        return render_template("expenses/expense_detail.html", expense=expense)
+
+    except SQLAlchemyError as e:
+        logger.error(
+            f"Database error fetching expense {expense_id}: {str(e)}", exc_info=True
+        )
+        flash("An error occurred while fetching the expense details.", "error")
         return redirect(url_for("main.index"))
-    return render_template("expenses/expense_detail.html", expense=expense)
+    except Exception as e:
+        logger.error(f"Unexpected error in expense_details: {str(e)}", exc_info=True)
+        flash("An unexpected error occurred.", "error")
+        return redirect(url_for("main.index"))
 
 
 @bp.route("/export")

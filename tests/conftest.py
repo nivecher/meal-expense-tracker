@@ -1,10 +1,17 @@
+import os
+import sys
+from sqlalchemy.exc import SQLAlchemyError
+
 import pytest
 from app import create_app, db
 from app.auth.models import User
-from app.restaurants.models import Restaurant
 from app.expenses.models import Expense
+from app.restaurants.models import Restaurant
 from config import config
-from sqlalchemy.exc import SQLAlchemyError
+
+# Add the project root to the Python path to ensure imports work correctly
+# This is necessary because tests are now in a subdirectory
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 @pytest.fixture(scope="session")

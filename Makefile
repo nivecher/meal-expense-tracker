@@ -106,6 +106,7 @@ help:
 	@echo "  \033[1mmake deploy-staging\033[0m  Deploy to staging environment"
 	@echo "  \033[1mmake deploy-prod\033[0m     Deploy to production environment"
 	@echo "  \033[1mmake package-lambda\033[0m  Create Lambda deployment package using package_lambda.sh"
+	@echo "  \033[1mmake deploy-lambda\033[0m   Deploy the Lambda function with the latest package"
 
 	@echo "\n\033[1;34mVirtual Environment:\033[0m"
 	@echo "  \033[1mmake venv\033[0m           Create Python virtual environment (if not exists)"
@@ -451,6 +452,12 @@ deploy-staging: package-lambda
 	@$(MAKE) TF_ENV=staging tf-apply
 
 ## Deploy to production environment
+.PHONY: deploy-lambda
+deploy-lambda:
+	@echo "Deploying Lambda function with update..."
+	@./scripts/deploy-lambda.sh --app --update
+
+# Deploy to production
 .PHONY: deploy-prod
 deploy-prod: package-lambda
 	@echo "WARNING: You are about to deploy to PRODUCTION!"
@@ -525,20 +532,6 @@ check-lambda-package:
 ## Deploy the Lambda function with the latest package
 # Default Lambda function name
 LAMBDA_FUNCTION_NAME ?= meal-expense-tracker-$(TF_ENV)
-
-.PHONY: deploy-lambda
-deploy-lambda: check-lambda-package
-	@echo "\033[1m🔄 Deploying Lambda function...\033[0m"
-	@echo "Using Lambda function: $(LAMBDA_FUNCTION_NAME)"
-	@echo "\033[1m📦 Updating Lambda function code...\033[0m"
-	@aws lambda update-function-code \
-		--function-name "$(LAMBDA_FUNCTION_NAME)" \
-		--zip-file fileb://dist/app.zip \
-		--publish \
-		--output json
-	@echo "\n\033[1m✅ Successfully updated Lambda function: $(LAMBDA_FUNCTION_NAME)\033[0m"
-	@echo "\033[1m📊 Function details:\033[0m"
-	@aws lambda get-function --function-name "$(LAMBDA_FUNCTION_NAME)" --query 'Configuration.{FunctionName:FunctionName,Version:Version,LastModified:LastModified,State:State}' --output table
 
 ## Invoke the Lambda function with a test event
 .PHONY: invoke-lambda

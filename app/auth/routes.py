@@ -86,7 +86,7 @@ def register():
         except SQLAlchemyError as e:
             db.session.rollback()
             logger.error(f"Database error during registration: {str(e)}", exc_info=True)
-            flash("An error occurred during registration. Please try again.", "error")
+            flash(f"Error creating user: {str(e)}", "error")
             return redirect(url_for("auth.register"))
         except Exception as e:
             db.session.rollback()
