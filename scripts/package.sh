@@ -11,9 +11,22 @@ echo "Using Python version: $PYTHON_VERSION"
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Ensure output directory exists
+# Clean up function
+cleanup() {
+  echo -e "${YELLOW}[*] Cleaning up temporary files...${NC}"
+  rm -rf "${TEMP_DIR}"
+  echo -e "${GREEN}[✓] Cleanup complete${NC}"
+}
+
+# Set up trap to ensure cleanup happens even on error
+trap cleanup EXIT
+
+# Ensure clean output directory
+echo -e "${YELLOW}[*] Cleaning output directory: ${OUTPUT_DIR}${NC}"
+rm -rf "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}"
 
 # Function to display usage information
@@ -43,47 +56,99 @@ package_app() {
 
   # Create necessary directories in the temp directory
   mkdir -p "${app_temp_dir}/app"
-  mkdir -p "${app_temp_dir}/migrations"
+  mkdir -p "${app_temp_dir}/migrations/versions" # Ensure versions directory exists
   mkdir -p "${app_temp_dir}/scripts"
   mkdir -p "${app_temp_dir}/instance"
 
-  # Copy application code
-  cp -r app/ "${app_temp_dir}/"
+  # Define files and directories to exclude
+  local exclude_patterns=(
+    "__pycache__"
+    "*.py[cod]"
+    "*.so"
+    "*.egg-info"
+    ".DS_Store"
+    "*.sqlite"
+    "*.log"
+    "*.swp"
+    "*~"
+    "*.bak"
+    "*.tmp"
+    ".pytest_cache"
+    ".mypy_cache"
+    ".coverage"
+    "htmlcov"
+    ".env.local"
+    ".venv"
+    "venv"
+    "env"
+    ".git"
+    ".github"
+    ".vscode"
+    ".idea"
+  )
 
-  # Copy root Python files
-  cp *.py "${app_temp_dir}/" 2>/dev/null || true
+  # Build rsync exclude string
+  local exclude_opts=()
+  for pattern in "${exclude_patterns[@]}"; do
+    exclude_opts+=(--exclude="$pattern")
+  done
 
-  # Copy requirements and config
-  cp requirements.txt "${app_temp_dir}/"
-  cp config.py "${app_temp_dir}/"
+  # Copy application code with exclusions
+  echo -e "${YELLOW}[*] Copying application files...${NC}"
+  rsync -a "${exclude_opts[@]}" app/ "${app_temp_dir}/app/"
+
+  # Copy root Python files with exclusions
+  echo -e "${YELLOW}[*] Copying root Python files...${NC}"
+  for py_file in *.py; do
+    if [ -f "$py_file" ]; then
+      cp "$py_file" "${app_temp_dir}/"
+    fi
+  done
+
+  # Copy required configuration files
+  echo -e "${YELLOW}[*] Copying configuration files...${NC}"
+  [ -f "requirements.txt" ] && cp requirements.txt "${app_temp_dir}/"
+  [ -f "config.py" ] && cp config.py "${app_temp_dir}/"
+  [ -f ".env.example" ] && cp .env.example "${app_temp_dir}/.env.example"
 
   # Copy migrations if they exist
   if [ -d "migrations" ]; then
-    cp -r migrations/ "${app_temp_dir}/"
+    echo -e "${YELLOW}[*] Copying migrations...${NC}"
+    rsync -a --exclude='__pycache__' --exclude='*.pyc' migrations/ "${app_temp_dir}/migrations/"
   fi
 
-  # Copy any .env file if it exists
-  [ -f ".env" ] && cp .env "${app_temp_dir}/.env"
-  [ -f ".env.example" ] && cp .env.example "${app_temp_dir}/.env.example"
-
-  # Ensure __init__.py files exist in all packages
+  # Create necessary __init__.py files if they don't exist
+  echo -e "${YELLOW}[*] Ensuring package structure...${NC}"
   touch "${app_temp_dir}/__init__.py"
-  touch "${app_temp_dir}/app/__init__.py"
-  touch "${app_temp_dir}/app/auth/__init__.py"
-  touch "${app_temp_dir}/app/expenses/__init__.py"
-  touch "${app_temp_dir}/app/restaurants/__init__.py"
+  [ ! -f "${app_temp_dir}/app/__init__.py" ] && touch "${app_temp_dir}/app/__init__.py"
+  [ ! -f "${app_temp_dir}/app/auth/__init__.py" ] && touch "${app_temp_dir}/app/auth/__init__.py"
+  [ ! -f "${app_temp_dir}/app/expenses/__init__.py" ] && touch "${app_temp_dir}/app/expenses/__init__.py"
+  [ ! -f "${app_temp_dir}/app/restaurants/__init__.py" ] && touch "${app_temp_dir}/app/restaurants/__init__.py"
 
-  # Copy any additional required files
-  [ -f "scripts/check_rds.py" ] && cp scripts/check_rds.py "${app_temp_dir}/scripts/"
+  # Copy specific script files if they exist
+  local required_scripts=("check_rds.py" "check_db.py")
+  for script in "${required_scripts[@]}"; do
+    if [ -f "scripts/${script}" ]; then
+      echo -e "${YELLOW}[*] Copying script: ${script}${NC}"
+      mkdir -p "${app_temp_dir}/scripts"
+      cp "scripts/${script}" "${app_temp_dir}/scripts/"
+    fi
+  done
 
-  # Ensure all Python files are readable
+  # Set proper permissions
+  echo -e "${YELLOW}[*] Setting file permissions...${NC}"
   find "${app_temp_dir}" -type f -name "*.py" -exec chmod 644 {} \;
-
-  # Create __init__.py in the root if it doesn't exist
-  touch "${app_temp_dir}/__init__.py"
+  find "${app_temp_dir}" -type d -exec chmod 755 {} \;
 
   # Create the deployment package
+  echo -e "${GREEN}[*] Creating deployment package...${NC}"
   (cd "${app_temp_dir}" && zip -r9 "${OUTPUT_DIR}/app.zip" .)
+
+  # Verify the zip was created
+  if [ ! -f "${OUTPUT_DIR}/app.zip" ]; then
+    echo -e "${RED}[!] Failed to create deployment package${NC}"
+    exit 1
+  fi
 
   echo -e "${GREEN}[✓] Application packaged: ${OUTPUT_DIR}/app.zip${NC}"
 }

@@ -9,10 +9,10 @@ import logging
 import os
 from flask import Flask
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_login import LoginManager
 from dotenv import load_dotenv
+
+# Import extensions from extensions module
+from .extensions import db, migrate, login_manager
 from config import config
 
 # Version information
@@ -20,11 +20,6 @@ from ._version import __version__
 
 # Version information dictionary used throughout the application
 version = {"app": __version__, "api": "v1"}
-
-# Initialize extensions
-db = SQLAlchemy()
-migrate = Migrate()
-login_manager = LoginManager()
 
 
 def create_app(config_name=None):
@@ -55,11 +50,10 @@ def create_app(config_name=None):
     # Configure logging
     _configure_logging(app)
 
-    # Initialize extensions
+    # Initialize extensions with the app
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
-    login_manager.login_view = "auth.login"
 
     # Enable CORS for all routes
     CORS(app)

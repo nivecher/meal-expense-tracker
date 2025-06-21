@@ -2,6 +2,8 @@
 
 data "aws_caller_identity" "current" {}
 
+# Note: DB_URL will be constructed at runtime in the Lambda function using the secret
+
 # S3 Object for Lambda Layer Package
 resource "aws_s3_object" "lambda_layer_package" {
   count = var.layer_s3_bucket != "" && var.layer_s3_key != "" ? 1 : 0
@@ -248,7 +250,7 @@ resource "aws_lambda_function" "main" {
       AWS_LAMBDA_EXEC_WRAPPER = var.enable_otel_tracing ? "/opt/otel-instrument" : ""
       LOG_LEVEL               = var.log_level
 
-      # Note: DATABASE_URL will be constructed at runtime using the password from Secrets Manager
+      # Note: DB_URL will be constructed at runtime in the Lambda function
     }, var.extra_environment_variables)
   }
 

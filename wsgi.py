@@ -10,17 +10,22 @@ import logging
 import os
 import sys
 import time
+import site
+from pathlib import Path
 
-from sqlalchemy import text
-
-# Add the current directory to Python path
+# Ensure the app directory is in the Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
+app_dir = os.path.join(current_dir, "app")
+
+# Add the current directory and app directory to Python path
+for path in [current_dir, app_dir]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 # Import app components after path configuration
 from app import create_app, db, setup_logger  # noqa: E402
 from flask import jsonify  # noqa: E402
+from sqlalchemy import text
 
 # Configure logging after imports to ensure all loggers are properly configured
 logging.basicConfig(
@@ -154,78 +159,258 @@ def register_routes(app):
         )
 
 
+def _construct_db_url_from_secret():
+    """Construct DB_URL from AWS Secrets Manager secret.
+
+    Returns:
+        str: The constructed database URL
+
+    Raises:
+        KeyError: If required keys are missing from the secret
+        ValueError: If DB_SECRET_ARN is not set
+    """
+    import boto3
+    import json
+    import os
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    secret_arn = os.environ.get("DB_SECRET_ARN")
+    if not secret_arn:
+        raise ValueError("DB_SECRET_ARN environment variable not set")
+
+    try:
+        logger.info(f"Retrieving secret from ARN: {secret_arn}")
+        client = boto3.client("secretsmanager")
+        response = client.get_secret_value(SecretId=secret_arn)
+        secret = json.loads(response["SecretString"])
+
+        # Log the available keys for debugging
+        logger.info(f"Available secret keys: {list(secret.keys())}")
+
+        # Try different key formats
+        username = secret.get("db_username") or secret.get("username")
+        password = secret.get("db_password") or secret.get("password")
+        host = secret.get("host") or secret.get("db_host")
+        port = secret.get("port") or secret.get(
+            "db_port", "5432"
+        )  # Default PostgreSQL port
+        dbname = secret.get("dbname") or secret.get("db_name") or secret.get("database")
+
+        # Validate all required fields are present
+        if not all([username, password, host, dbname]):
+            missing = []
+            if not username:
+                missing.append("username")
+            if not password:
+                missing.append("password")
+            if not host:
+                missing.append("host")
+            if not dbname:
+                missing.append("dbname")
+            raise KeyError(f"Missing required fields in secret: {', '.join(missing)}")
+
+        # Construct the database URL
+        db_url = f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{dbname}"
+        logger.info(f"Constructed database URL for host: {host}, database: {dbname}")
+        return db_url
+
+    except Exception as e:
+        logger.error(f"Failed to construct DB_URL from secret: {str(e)}")
+        logger.debug(
+            f"Secret content (sensitive data redacted): { {k: '***' for k in secret.keys()} }"
+        )
+        raise
+
+
 def check_database_migrations(app):
     """Check and apply database migrations if needed.
 
     This function will:
     1. Check if migrations are enabled via RUN_MIGRATIONS environment variable
-    2. Verify we're using PostgreSQL
-    3. Check if the migrations table exists
-    4. Apply any pending migrations
+    2. Construct DB_URL from secret if not already set
+    3. Verify we're using PostgreSQL
+    4. Check if the migrations table exists
+    5. Apply any pending migrations
     """
+    import traceback
+
+    app.logger.info("=" * 80)
+    app.logger.info("STARTING DATABASE MIGRATION CHECK")
+    app.logger.info("=" * 80)
+
     # Only run migrations if explicitly enabled
     migrations_enabled = os.environ.get("RUN_MIGRATIONS", "false").lower() == "true"
     if not migrations_enabled:
         app.logger.info("Skipping database migrations (RUN_MIGRATIONS not enabled)")
         return
 
+    app.logger.info("Database migrations are ENABLED via RUN_MIGRATIONS")
+    app.logger.info(f"Current working directory: {os.getcwd()}")
+    app.logger.info(f"Python path: {sys.path}")
+
+    # Construct DB_URL from secret if not already set
+    if "DB_URL" not in os.environ:
+        try:
+            app.logger.info("Constructing DB_URL from secret...")
+            db_url = _construct_db_url_from_secret()
+            os.environ["DB_URL"] = db_url
+            app.logger.info("Successfully constructed DB_URL from secret")
+        except Exception as e:
+            error_msg = f"Failed to construct DB_URL from secret: {str(e)}\n{traceback.format_exc()}"
+            app.logger.error(error_msg)
+            raise RuntimeError(error_msg) from e
+    else:
+        app.logger.info("Using existing DB_URL from environment")
+
     db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    app.logger.info(f"Database URI from config: {db_uri}")
+
     if not db_uri.startswith("postgresql"):
-        app.logger.warning("Skipping migrations - not using PostgreSQL")
-        return
+        error_msg = (
+            f"Skipping migrations - not using PostgreSQL (found: {db_uri[:20]}...)"
+        )
+        app.logger.error(error_msg)
+        raise RuntimeError(error_msg)
 
     try:
-        from sqlalchemy import inspect
-        from flask_migrate import upgrade, Migrate
+        # Import here to avoid circular imports
+        app.logger.info("Importing Flask-Migrate and extensions...")
+        from app.extensions import db  # Changed from relative to absolute import
+        from flask_migrate import Migrate
+        from alembic import command
+        from alembic.config import Config
+        import alembic
 
-        # Initialize Flask-Migrate (assign to _ to indicate it's intentionally unused)
-        _ = Migrate(app, db)
+        app.logger.info(
+            f"Using Flask-Migrate version: {getattr(Migrate, '__version__', 'unknown')}"
+        )
+        app.logger.info(
+            f"Using Alembic version: {getattr(alembic, '__version__', 'unknown')}"
+        )
 
-        # Check if migrations table exists
-        inspector = inspect(db.engine)
-        tables = inspector.get_table_names()
+        # Initialize Flask-Migrate
+        app.logger.info("Initializing Flask-Migrate...")
+        migrate = Migrate()
+        migrate.init_app(app, db)
 
-        # Log current tables for debugging
-        table_list = ", ".join(tables) if tables else "None"
-        app.logger.info(f"Current database tables: {table_list}")
+        # Initialize SQLAlchemy if not already done
+        app.logger.info("Initializing SQLAlchemy...")
+        _initialize_sqlalchemy(app)
 
-        # Check database state
-        migrations_table = "alembic_version"  # Default table name used by Flask-Migrate
-        has_migrations = migrations_table in tables
-        is_fresh_database = not tables
+        # Get engine and inspector
+        app.logger.info("Getting database engine and inspector...")
+        engine = db.get_engine()
+        inspector = db.inspect(engine)
 
-        # Log migration status
-        if is_fresh_database:
-            app.logger.info("Fresh database detected - will apply all migrations")
-        elif has_migrations:
-            app.logger.info("Existing migrations detected - checking for updates")
-        else:
+        # Check if alembic_version table exists
+        has_alembic_version = inspector.has_table("alembic_version")
+
+        if not has_alembic_version:
             app.logger.warning(
-                "Database has tables but no migrations table - "
-                "assuming legacy database"
+                "ALEMBIC VERSION TABLE NOT FOUND - Fresh database or not yet initialized"
+            )
+            tables = inspector.get_table_names()
+            app.logger.info(f"Current tables in database: {tables}")
+            if not tables:
+                app.logger.info("Database appears to be completely empty")
+        else:
+            app.logger.info(
+                "Found existing alembic_version table - database has been migrated before"
             )
 
-        # Apply migrations
-        app.logger.info("Applying database migrations...")
-        upgrade()
-        app.logger.info("Database migrations applied successfully")
+            # Get current revision from database
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT version_num FROM alembic_version"))
+                current_rev = result.scalar()
+                app.logger.info(f"Current database revision: {current_rev}")
+
+        # Run migrations with detailed logging
+        app.logger.info("=" * 40)
+        app.logger.info("STARTING DATABASE MIGRATIONS")
+        app.logger.info("=" * 40)
+
+        # Get absolute path to migrations directory
+        migrations_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "migrations"
+        )
+        app.logger.info(f"Using migrations directory: {migrations_dir}")
+
+        # Verify migrations directory exists and contains files
+        if not os.path.exists(migrations_dir):
+            error_msg = f"Migrations directory not found: {migrations_dir}"
+            app.logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        migration_files = os.listdir(migrations_dir)
+        app.logger.info(f"Found {len(migration_files)} items in migrations directory")
+
+        # Run the upgrade with more context
+        with app.app_context():
+            try:
+                # Initialize Alembic config
+                alembic_cfg = Config(os.path.join(migrations_dir, "alembic.ini"))
+                alembic_cfg.set_main_option("script_location", migrations_dir)
+                alembic_cfg.set_main_option("sqlalchemy.url", db_uri)
+
+                # Log current revision before upgrade
+                from flask_migrate import current as current_revision
+
+                try:
+                    rev = current_revision()
+                    app.logger.info(
+                        f"Current database revision (before upgrade): {rev}"
+                    )
+                except Exception as e:
+                    app.logger.warning(
+                        f"Could not determine current revision: {str(e)}"
+                    )
+
+                # Run the upgrade
+                app.logger.info("Executing 'flask db upgrade'...")
+                command.upgrade(alembic_cfg, "head")
+                app.logger.info("Database migrations completed successfully")
+
+                # Verify the upgrade
+                try:
+                    rev = current_revision()
+                    app.logger.info(f"Database now at revision: {rev}")
+                except Exception as e:
+                    app.logger.warning(f"Could not verify final revision: {str(e)}")
+
+                # Log final table list
+                inspector = db.inspect(engine)
+                tables = inspector.get_table_names()
+                app.logger.info(f"Final tables in database ({len(tables)}): {tables}")
+
+            except Exception as e:
+                error_msg = (
+                    f"Error during migration: {str(e)}\n{traceback.format_exc()}"
+                )
+                app.logger.error(error_msg)
+                raise RuntimeError(f"Migration failed: {str(e)}") from e
 
     except Exception as e:
-        error_msg = f"Error applying database migrations: {str(e)}"
-        app.logger.error(error_msg, exc_info=True)
-        # In production, we might want to fail fast
-        if os.environ.get("FLASK_ENV") == "production":
-            app.logger.critical("Failing fast due to migration error in production")
-            raise
-        # In development, log the error but continue
-        app.logger.warning("Continuing with potentially outdated database schema")
+        error_msg = (
+            f"FATAL ERROR during database migration: {str(e)}\n{traceback.format_exc()}"
+        )
+        app.logger.error(error_msg)
+        # Reraise with additional context
+        raise RuntimeError(f"Database migration failed: {str(e)}") from e
+
+    app.logger.info("=" * 80)
+    app.logger.info("DATABASE MIGRATION CHECK COMPLETED SUCCESSFULLY")
+    app.logger.info("=" * 80)
+    return True
 
 
-def _verify_database_connection(app):
+def _verify_database_connection(app, db):
     """Verify database connection with retry logic.
 
     Args:
         app: Flask application instance
+        db: SQLAlchemy database instance
 
     Returns:
         bool: True if connection is successful, False otherwise
@@ -235,24 +420,37 @@ def _verify_database_connection(app):
 
     for attempt in range(max_retries):
         try:
-            db.session.execute(text("SELECT 1"))
-            logger.info("Database connection verified")
+            app.logger.debug("Attempting to verify database connection...")
+            result = db.session.execute(text("SELECT 1"))
+            app.logger.debug(
+                "Database connection test query result: %s", result.fetchone()
+            )
+            app.logger.info("Database connection verified")
             return True
         except Exception as e:
             last_error = e
+            app.logger.error(
+                "Database connection attempt %d failed: %s",
+                attempt + 1,
+                str(e),
+                exc_info=app.config.get("FLASK_ENV") != "production",
+            )
             if attempt < max_retries - 1:
-                logger.warning(
-                    "Database connection attempt %d failed, " "retrying in %ds...",
-                    attempt + 1,
+                app.logger.warning(
+                    "Retrying in %ds... (attempt %d/%d)",
                     retry_delay,
+                    attempt + 1,
+                    max_retries,
                 )
                 time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
 
-    error_msg = f"Failed to verify database connection: {str(last_error)}"
+    error_msg = f"Failed to verify database connection after {max_retries} attempts: {str(last_error)}"
     if app.config.get("FLASK_ENV") == "production":
-        logger.critical(error_msg)
-        raise RuntimeError(error_msg)
-    logger.warning("%s - Continuing in non-production environment", error_msg)
+        app.logger.critical(error_msg, exc_info=True)
+        raise RuntimeError(error_msg) from last_error
+
+    app.logger.warning("%s - Continuing in non-production environment", error_msg)
     return False
 
 
@@ -295,13 +493,16 @@ def _initialize_database(app):
     try:
         _initialize_sqlalchemy(app)
 
+        # Import db here to avoid circular imports
+        from app.extensions import db
+
         with app.app_context():
             _create_tables_if_needed(app)
-            _verify_database_connection(app)
+            _verify_database_connection(app, db)
             logger.info("Database initialization completed successfully")
     except Exception as e:
         error_msg = f"Failed to initialize database: {str(e)}"
-        logger.critical(error_msg)
+        logger.critical(error_msg, exc_info=True)
         if app.config.get("FLASK_ENV") == "production":
             raise RuntimeError(error_msg) from e
         logger.warning(
