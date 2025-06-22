@@ -3,6 +3,8 @@
 import os
 import sys
 
+from sqlalchemy import select
+
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "."))
 sys.path.insert(0, project_root)
@@ -20,8 +22,8 @@ def test_login():
         db.create_all()
 
         # Create a test user if it doesn't exist
-        user = User.query.filter_by(username="nivecher").first()
-        if not user:
+        user = db.session.scalars(select(User).where(User.username == "nivecher")).first()
+        if user is None:
             user = User(username="nivecher")
             user.set_password("nivecher")  # Set the password
             db.session.add(user)

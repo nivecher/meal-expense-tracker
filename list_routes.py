@@ -13,9 +13,7 @@ def list_routes():
     routes = []
     for rule in app.url_map.iter_rules():
         methods = sorted(rule.methods - {"OPTIONS", "HEAD"})
-        routes.append(
-            {"endpoint": rule.endpoint, "methods": methods, "rule": str(rule)}
-        )
+        routes.append({"endpoint": rule.endpoint, "methods": methods, "rule": str(rule)})
 
     # Sort routes by URL
     routes.sort(key=lambda x: x["rule"])

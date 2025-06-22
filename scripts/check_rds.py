@@ -12,9 +12,7 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.exc import SQLAlchemyError
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -67,9 +65,7 @@ def main():
     try:
         engine = create_engine(db_url)
         if not check_tables(engine):
-            logger.warning(
-                "Some required tables are missing. You may need to run migrations."
-            )
+            logger.warning("Some required tables are missing. You may need to run migrations.")
             # Don't fail if tables are missing, as migrations might be applied later
     except SQLAlchemyError as e:
         logger.error("Error checking database tables: %s", str(e))

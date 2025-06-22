@@ -226,10 +226,7 @@ def test_edit_expense_invalid_data(client, auth):
         },
     )
     assert response.status_code == 400  # Should be 400 Bad Request
-    assert (
-        b"Invalid date format." in response.data
-        or b"Invalid amount format." in response.data
-    )
+    assert b"Invalid date format." in response.data or b"Invalid amount format." in response.data
 
 
 def test_delete_expense(client, auth):

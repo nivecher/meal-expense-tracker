@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import logging
+
 from flask import render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, current_user
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+
 from app import db
 from app.auth import bp
 from app.auth.models import User
-from sqlalchemy.exc import SQLAlchemyError
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -13,17 +18,23 @@ def login():
         return redirect(url_for("main.index"))
 
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-        user = User.query.filter_by(username=username).first()
+        username = request.form.get("username")
+        password = request.form.get("password")
 
-        if user and user.check_password(password):
+        if not username or not password:
+            flash("Please provide both username and password", "danger")
+            return render_template("auth/login.html")
+
+        stmt = select(User).where(User.username == username)
+        user = db.session.scalar(stmt)
+
+        if user is not None and user.check_password(password):
             login_user(user)
             flash("Welcome back!", "success")
             next_page = request.args.get("next")
             return redirect(next_page or url_for("main.index"))
-        else:
-            flash("Invalid username or password", "danger")
+
+        flash("Invalid username or password", "danger")
 
     return render_template("auth/login.html")
 
@@ -51,9 +62,7 @@ def register():
 
         masked_username = "*" * len(username) if username else "None"
         masked_password = "*" * len(password) if password else "None"
-        logger.debug(
-            f"Form data - Username: {masked_username}, " f"Password: {masked_password}"
-        )
+        logger.debug(f"Form data - Username: {masked_username}, " f"Password: {masked_password}")
 
         if not username or not password:
             logger.warning("Registration failed: Missing required fields")
@@ -62,10 +71,10 @@ def register():
 
         try:
             logger.debug("Checking for existing user")
-            if User.query.filter_by(username=username).first():
-                logger.warning(
-                    f"Registration failed: Username '{username}' already exists"
-                )
+            existing_user = db.session.scalars(select(User).where(User.username == username)).first()
+
+            if existing_user is not None:
+                logger.warning(f"Registration failed: Username '{username}' already exists")
                 flash("Username already exists", "danger")
                 return render_template("auth/register.html", username=username)
 
@@ -90,9 +99,7 @@ def register():
             return redirect(url_for("auth.register"))
         except Exception as e:
             db.session.rollback()
-            logger.critical(
-                f"Unexpected error during registration: {str(e)}", exc_info=True
-            )
+            logger.critical(f"Unexpected error during registration: {str(e)}", exc_info=True)
             flash("An unexpected error occurred. Please try again later.", "error")
             return redirect(url_for("auth.register"))
 

@@ -146,9 +146,7 @@ def test_get_db_credentials_aws_secrets(monkeypatch):
 
     # Set up the mock AWS client
     mock_client = MagicMock()
-    mock_client.get_secret_value.return_value = {
-        "SecretString": json.dumps(mock_secret)
-    }
+    mock_client.get_secret_value.return_value = {"SecretString": json.dumps(mock_secret)}
 
     # Import get_db_credentials at module level to ensure it's available
     from app import get_db_credentials

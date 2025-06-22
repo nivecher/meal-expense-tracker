@@ -91,9 +91,7 @@ def _get_secret_dict(secret_arn: str) -> SecretDict:
 
         logger.debug(
             "Resolved secret keys: %s",
-            ", ".join(
-                f"{k}:{'*' * len(v) if 'pass' in k else v}" for k, v in result.items()
-            ),
+            ", ".join(f"{k}:{'*' * len(v) if 'pass' in k else v}" for k, v in result.items()),
         )
 
         return result

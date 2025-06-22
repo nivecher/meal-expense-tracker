@@ -1,0 +1,23 @@
+{% extends "main/base.html" %}
+
+{% block title %}500 - Internal Server Error{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h1 class="h4 mb-0">500 - Internal Server Error</h1>
+                </div>
+                <div class="card-body">
+                    <p class="lead">Something went wrong on our end.</p>
+                    <p>We're experiencing some technical difficulties. Please try again later or contact support if the
+                        problem persists.</p>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-primary">Return Home</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

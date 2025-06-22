@@ -5,12 +5,8 @@ import ruamel.yaml
 
 def construct_aws_tag(loader, tag_suffix, node):
     if tag_suffix == "GetAtt":
-        return ruamel.yaml.scalarstring.SingleQuotedScalarString(
-            f"!{tag_suffix} {node.value}"
-        )
-    return ruamel.yaml.scalarstring.SingleQuotedScalarString(
-        f"!{tag_suffix} {node.value}"
-    )
+        return ruamel.yaml.scalarstring.SingleQuotedScalarString(f"!{tag_suffix} {node.value}")
+    return ruamel.yaml.scalarstring.SingleQuotedScalarString(f"!{tag_suffix} {node.value}")
 
 
 def validate_cloudformation(file_path):
@@ -62,9 +58,7 @@ def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser(description="Validate CloudFormation templates.")
-    parser.add_argument(
-        "files", nargs="*", help="Path(s) to the CloudFormation template file(s)"
-    )
+    parser.add_argument("files", nargs="*", help="Path(s) to the CloudFormation template file(s)")
     return parser.parse_args()
 
 

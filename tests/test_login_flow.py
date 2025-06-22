@@ -1,6 +1,7 @@
 import sys
 from app import create_app, db
 from app.auth.models import User
+from sqlalchemy import select
 
 
 def test_login_flow():
@@ -13,7 +14,7 @@ def test_login_flow():
         password = "testpassword123"
 
         # Delete existing test user if it exists
-        existing_user = User.query.filter_by(username=username).first()
+        existing_user = db.session.scalars(select(User).where(User.username == username)).first()
         if existing_user:
             db.session.delete(existing_user)
             db.session.commit()
@@ -23,8 +24,6 @@ def test_login_flow():
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
-
-        print(f"Created test user: {username}")
 
         # Test password verification
         if user.check_password(password):
@@ -36,6 +35,7 @@ def test_login_flow():
         # Test login with correct password
         from flask_login import login_user
 
+        # Create a test request context
         with app.test_request_context():
             # Simulate login
             login_success = login_user(user)

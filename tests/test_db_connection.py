@@ -37,9 +37,7 @@ class TestDatabaseConnection(unittest.TestCase):
         os.environ["DB_PORT"] = "5432"
         os.environ["DB_NAME"] = "testdb"
         os.environ["DB_USERNAME"] = "testuser"
-        os.environ["DB_SECRET_ARN"] = (
-            "arn:aws:secretsmanager:us-west-2:123456789012:secret:test-secret"
-        )
+        os.environ["DB_SECRET_ARN"] = "arn:aws:secretsmanager:us-west-2:123456789012:secret:test-secret"
         os.environ["AWS_REGION"] = "us-west-2"
 
         # Create app with test config

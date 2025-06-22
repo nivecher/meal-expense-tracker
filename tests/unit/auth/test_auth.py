@@ -3,6 +3,7 @@
 import os
 import sys
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -30,7 +31,8 @@ def test_register(client, app):
 
     # Verify user was created in database
     with app.app_context():
-        user = User.query.filter_by(username="testuser").first()
+        stmt = select(User).where(User.username == "testuser")
+        user = db.session.scalars(stmt).first()
         assert user is not None
         assert user.username == "testuser"
         assert user.check_password("testpass")

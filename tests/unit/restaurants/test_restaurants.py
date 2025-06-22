@@ -4,6 +4,7 @@ from datetime import datetime, date
 import os
 import sys
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -62,7 +63,8 @@ def test_edit_restaurant(client, auth):
     )
 
     # Get the restaurant ID after creation
-    restaurant = Restaurant.query.filter_by(name="Test Restaurant").first()
+    stmt = select(Restaurant).where(Restaurant.name == "Test Restaurant")
+    restaurant = db.session.scalars(stmt).first()
     assert restaurant is not None
 
     # Edit the restaurant
@@ -111,7 +113,8 @@ def test_restaurant_details(client, auth, app):
         db.session.commit()
 
         # Get the test user
-        user = User.query.filter_by(username="testuser").first()
+        stmt = select(User).where(User.username == "testuser")
+        user = db.session.scalars(stmt).first()
         # Add an expense for the restaurant
         expense = Expense(
             user_id=user.id,
@@ -215,7 +218,7 @@ def test_restaurant_details_with_multiple_expenses(client, auth, app):
         db.session.commit()
 
         # Get the test user
-        user = User.query.filter_by(username="testuser").first()
+        user = db.session.execute(select(User).where(User.username == "testuser")).scalar_one()
 
         # Add multiple expenses
         expenses = [
@@ -283,13 +286,11 @@ def test_delete_restaurant_without_expenses(client, auth, app):
         restaurant_id = restaurant.id
 
         # Verify no expenses exist
-        query = db.session.query(Expense).filter_by(restaurant_id=restaurant_id)
+        query = db.session.scalars(select(Expense).where(Expense.restaurant_id == restaurant_id)).all()
         assert len(query.all()) == 0
 
     # Try to delete the restaurant
-    response = client.post(
-        f"/restaurants/{restaurant_id}/delete", follow_redirects=True
-    )
+    response = client.post(f"/restaurants/{restaurant_id}/delete", follow_redirects=True)
     assert response.status_code == 200  # After following redirect
     assert b"Restaurant and associated expenses deleted successfully." in response.data
 
@@ -297,7 +298,7 @@ def test_delete_restaurant_without_expenses(client, auth, app):
     with app.app_context():
         assert db.session.get(Restaurant, restaurant_id) is None
         # Verify no expenses exist
-        query = db.session.query(Expense).filter_by(restaurant_id=restaurant_id)
+        query = db.session.scalars(select(Expense).where(Expense.restaurant_id == restaurant_id)).all()
         assert len(query.all()) == 0
 
 
@@ -325,25 +326,21 @@ def test_delete_restaurant_with_expenses(client, auth, app):
         restaurant_id = restaurant.id
 
         # Get the current user
-        user = User.query.filter_by(username="testuser").first()
+        user = db.session.scalars(select(User).where(User.username == "testuser")).first()
         assert user is not None
 
         # Add some expenses
         expenses = [
             Expense(
-                date=datetime.strptime("2024-02-20", "%Y-%m-%d").date(),
+                date=datetime.strptime("2024-02-20 12:00:00", "%Y-%m-%d %H:%M:%S"),
                 amount=25.50,
-                category="Dining",
-                meal_type="Lunch",
                 notes="Test expense 1",
                 restaurant_id=restaurant_id,
                 user_id=user.id,
             ),
             Expense(
-                date=datetime.strptime("2024-02-21", "%Y-%m-%d").date(),
+                date=datetime.strptime("2024-02-21 19:30:00", "%Y-%m-%d %H:%M:%S"),
                 amount=35.75,
-                category="Dining",
-                meal_type="Dinner",
                 notes="Test expense 2",
                 restaurant_id=restaurant_id,
                 user_id=user.id,
@@ -354,18 +351,17 @@ def test_delete_restaurant_with_expenses(client, auth, app):
         db.session.commit()
 
         # Verify expenses were created
-        query = db.session.query(Expense).filter_by(restaurant_id=restaurant_id)
-        assert len(query.all()) == 2
+        stmt = select(Expense).where(Expense.restaurant_id == restaurant_id)
+        expenses = db.session.scalars(stmt).all()
+        assert len(expenses) == 2
 
     # Try to delete the restaurant
-    response = client.post(
-        f"/restaurants/{restaurant_id}/delete", follow_redirects=True
-    )
+    response = client.post(f"/restaurants/{restaurant_id}/delete", follow_redirects=True)
     assert response.status_code == 200  # After following redirect
     assert b"Restaurant and associated expenses deleted successfully." in response.data
 
     # Verify both restaurant and its expenses are deleted
     with app.app_context():
         assert db.session.get(Restaurant, restaurant_id) is None
-        query = db.session.query(Expense).filter_by(restaurant_id=restaurant_id)
+        query = db.session.scalars(select(Expense).where(Expense.restaurant_id == restaurant_id)).all()
         assert len(query.all()) == 0

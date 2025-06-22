@@ -164,9 +164,7 @@ def test_get_db_credentials_aws_secrets(mock_boto, monkeypatch):
 
     # Set up the mock client
     mock_client = MagicMock()
-    mock_client.get_secret_value.return_value = {
-        "SecretString": json.dumps(mock_secret)
-    }
+    mock_client.get_secret_value.return_value = {"SecretString": json.dumps(mock_secret)}
     mock_boto.return_value = mock_client
 
     # Reload the module to pick up the new environment variables

@@ -8,23 +8,17 @@ the Flask application instance for both WSGI and AWS Lambda environments.
 import json
 import logging
 import os
-
-import boto3
-import urllib
-from botocore.exceptions import ClientError
-from dotenv import load_dotenv
-from flask import Flask
-from flask_cors import CORS
-
-from config import config
-
-# Import extensions from extensions module
-from .extensions import db, login_manager, migrate
-
-# Version information
 from typing import Optional, TypedDict
 
+import boto3
+from botocore.exceptions import ClientError
+from flask import Flask
+from flask_cors import CORS
+from sqlalchemy.pool import StaticPool
+
+from config import config
 from ._version import __version__
+from .extensions import db, login_manager, migrate
 
 
 # Version information dictionary used throughout the application
@@ -73,9 +67,7 @@ def _get_credentials_from_secrets_manager() -> Optional[DBCredentials]:
         return None
     try:
         logger.info("Fetching database credentials from AWS Secrets Manager")
-        client = boto3.client(
-            "secretsmanager", region_name=os.environ.get("AWS_REGION", "us-east-1")
-        )
+        client = boto3.client("secretsmanager", region_name=os.environ.get("AWS_REGION", "us-east-1"))
         response = client.get_secret_value(SecretId=secret_arn)
         secret = json.loads(response["SecretString"])
 
@@ -93,16 +85,11 @@ def _get_credentials_from_secrets_manager() -> Optional[DBCredentials]:
             missing = [k for k, v in secret_creds.items() if not v]
             raise ValueError(f"Missing required fields in secret: {', '.join(missing)}")
 
-        logger.info(
-            "Successfully retrieved database credentials from AWS Secrets Manager"
-        )
+        logger.info("Successfully retrieved database credentials from AWS Secrets Manager")
         return secret_creds
 
     except ClientError as e:
-        error_msg = (
-            f"Failed to retrieve database credentials from "
-            f"AWS Secrets Manager: {str(e)}"
-        )
+        error_msg = f"Failed to retrieve database credentials from " f"AWS Secrets Manager: {str(e)}"
         logger.error(error_msg)
         raise RuntimeError(error_msg) from e
     except (json.JSONDecodeError, KeyError) as e:
@@ -146,7 +133,7 @@ def get_db_credentials() -> DBCredentials:
     raise RuntimeError(error_msg)
 
 
-def get_database_url() -> str:
+def _get_database_url() -> str:
     """Construct a database URL from available configuration sources.
 
     Priority order:
@@ -160,84 +147,132 @@ def get_database_url() -> str:
     Raises:
         RuntimeError: If required configuration is missing in production.
     """
-    logger = logging.getLogger(__name__)
+    app_logger = logging.getLogger(__name__)
+
     # 1. Check for explicit DATABASE_URL
-    if db_url := os.environ.get("DATABASE_URL"):
-        logger.info("Using database URL from DATABASE_URL environment variable")
-        return db_url
-    # 2. Try to construct URL from credentials
+    if db_url := os.getenv("DATABASE_URL"):
+        return _ensure_proper_db_url(db_url)
+
+    # 2. Try to get credentials from environment or Secrets Manager
     try:
         creds = get_db_credentials()
-        db_url = "postgresql://{username}:{password}@{host}:{port}/{dbname}".format(
-            username=creds["username"],
-            password=urllib.parse.quote_plus(creds["password"]),
-            host=creds["host"],
-            port=creds["port"],
-            dbname=creds["dbname"],
+        return _ensure_proper_db_url(
+            f"postgresql+psycopg2://{creds['username']}:{creds['password']}@"
+            f"{creds['host']}:{creds['port']}/{creds['dbname']}"
         )
-        logger.info("Constructed database URL from credentials")
-        return db_url
-    except Exception as e:
-        # In production, fail fast if we can't construct a valid URL
-        if os.environ.get("FLASK_ENV") == "production":
-            raise RuntimeError(
-                "Failed to construct database URL from credentials. " f"Error: {str(e)}"
-            ) from e
+    except RuntimeError as e:
+        # Only log the error if we're not in production
+        if os.environ.get("FLASK_ENV") != "production":
+            app_logger.warning("Could not get database credentials: %s", e)
+
     # 3. Fall back to SQLite for development
-    db_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "instance/meal_expenses.db"
+    if os.environ.get("FLASK_ENV") != "production":
+        app_logger.warning("No database configuration found, using SQLite")
+        db_dir = os.path.join(os.path.dirname(__file__), "instance")
+        os.makedirs(db_dir, exist_ok=True)
+        db_file = os.path.join(db_dir, "meal_expenses.db")
+        return f"sqlite:///{db_file}?check_same_thread=False"
+
+    raise RuntimeError(
+        "Database configuration is required in production. "
+        "Please set DATABASE_URL or configure database credentials."
     )
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    logger.warning("Falling back to SQLite database for development")
-    return f"sqlite:///{db_path}"
 
 
-def create_app(config_obj=None):
-    """Create and configure the Flask application.
+def _ensure_proper_db_url(db_url: str) -> str:
+    """Ensure the database URL is properly formatted for SQLAlchemy 2.0.
 
     Args:
-        config_obj (str or object): Either a configuration name (str) or a
-                                 configuration class/object. If None, uses
-                                 FLASK_ENV environment variable or defaults to
-                                 'development'.
+        db_url: The database URL to check/format
 
     Returns:
-        Flask: The configured Flask application instance
+        str: A properly formatted database URL
     """
-    app = Flask(__name__)
+    # Handle SQLite URLs
+    if db_url.startswith("sqlite"):
+        # Ensure check_same_thread is set for SQLite
+        if "?" not in db_url:
+            db_url += "?check_same_thread=False"
+        elif "check_same_thread=" not in db_url:
+            db_url += "&check_same_thread=False"
+        return db_url
 
-    # Load environment variables
-    load_dotenv()
-    # Handle different types of configuration input
-    if config_obj is None:
-        # Default to FLASK_ENV or 'development'
-        config_name = os.getenv("FLASK_ENV", "development")
-        config_obj = config[config_name]
+    # Handle PostgreSQL URLs
+    if db_url.startswith("postgres"):
+        # Ensure we're using psycopg2 driver
+        if "postgresql+psycopg2" not in db_url:
+            db_url = db_url.replace("postgresql://", "postgresql+psycopg2://")
+            db_url = db_url.replace("postgres://", "postgresql+psycopg2://")
 
-    # If config_obj is a string, treat it as a config name
-    if isinstance(config_obj, str):
-        config_obj = config[config_obj]
+    return db_url
 
-    # Load the configuration
-    app.config.from_object(config_obj)
 
-    # Initialize the configuration if it has an init_app method
-    if hasattr(config_obj, "init_app"):
-        config_obj.init_app(app)
+def _configure_sqlalchemy(app):
+    """Configure SQLAlchemy for the application.
 
-    # Configure logging
-    _configure_logging(app)
+    Args:
+        app: Flask application instance
+    """
+    # Get database URI
+    db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
 
-    # Initialize extensions with the app
+    # Configure engine options based on database type
+    if db_uri.startswith("sqlite"):
+        # SQLite specific configuration
+        engine_options = {
+            "connect_args": {"check_same_thread": False},
+            "poolclass": StaticPool,
+            "future": True,  # Enable SQLAlchemy 2.0 behavior
+        }
+        _configure_sqlite(app)
+    else:
+        # PostgreSQL/other databases
+        engine_options = {"pool_pre_ping": True, "pool_recycle": 300, "future": True}  # Enable SQLAlchemy 2.0 behavior
+
+        # Add PostgreSQL specific options
+        if db_uri.startswith("postgresql"):
+            engine_options.update(
+                {
+                    "pool_size": 5,
+                    "max_overflow": 10,
+                    "pool_timeout": 30,
+                }
+            )
+
+    # Set the engine options in the app config
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
+
+    # Initialize SQLAlchemy with the app
     db.init_app(app)
+
+    # Initialize Flask-Migrate
     migrate.init_app(app, db)
 
-    # Initialize and configure login manager
-    login_manager.init_app(app)
-    login_manager.login_view = "auth.login"
-    login_manager.login_message_category = "info"
 
-    # Configure session management based on environment
+def _configure_sqlite(app):
+    """Configure SQLite specific settings.
+
+    Args:
+        app: Flask application instance
+    """
+    if "sqlite" in app.config.get("SQLALCHEMY_DATABASE_URI", ""):
+        from sqlalchemy import event
+        from sqlalchemy.engine import Engine
+
+        # Enable foreign key constraints for SQLite
+        @event.listens_for(Engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+
+def _configure_session(app):
+    """Configure session management for the application.
+
+    Args:
+        app: Flask application instance
+    """
     if app.config.get("SESSION_TYPE") == "dynamodb":
         try:
             from flask_session import Session
@@ -245,52 +280,140 @@ def create_app(config_obj=None):
             Session(app)
             app.logger.info("Configured DynamoDB for session storage")
         except ImportError:
-            app.logger.warning(
-                "Flask-Session not installed. Using default session backend."
-            )
+            app.logger.warning("Flask-Session not installed. Using default session backend.")
     else:
         # Default session configuration for development
         app.config.update(
             SESSION_COOKIE_SECURE=app.config.get("SESSION_COOKIE_SECURE", False),
             SESSION_COOKIE_HTTPONLY=app.config.get("SESSION_COOKIE_HTTPONLY", True),
             SESSION_COOKIE_SAMESITE=app.config.get("SESSION_COOKIE_SAMESITE", "Lax"),
-            PERMANENT_SESSION_LIFETIME=app.config.get(
-                "PERMANENT_SESSION_LIFETIME", 86400
-            ),  # 24 hours
+            PERMANENT_SESSION_LIFETIME=app.config.get("PERMANENT_SESSION_LIFETIME", 86400),  # 24 hours
         )
         app.logger.info("Using default session configuration")
 
-    # Initialize the user loader
+
+def _setup_config(app, config_obj):
+    """Set up application configuration.
+
+    Args:
+        app: Flask application instance
+        config_obj: Configuration object or name
+
+    Returns:
+        The configuration object
+    """
+    if config_obj is None:
+        # Load configuration from environment variable or use default
+        config_name = os.getenv("FLASK_ENV", "development")
+        config_obj = config[config_name]
+
+    if isinstance(config_obj, str):
+        config_obj = config[config_obj]
+
+    app.config.from_object(config_obj)
+
+    # Allow for environment variable overrides
+    if "SQLALCHEMY_DATABASE_URI" not in app.config:
+        app.config["SQLALCHEMY_DATABASE_URI"] = _get_database_url()
+
+    return config_obj
+
+
+def _setup_extensions(app):
+    """Set up Flask extensions.
+
+    Args:
+        app: Flask application instance
+    """
+    # Configure SQLAlchemy for the app
+    _configure_sqlalchemy(app)
+
+    # Initialize and configure login manager
+    login_manager.init_app(app)
+    login_manager.login_view = "auth.login"
+    login_manager.login_message_category = "info"
+
+    # Initialize login manager for authentication
     from app.auth.models import init_login_manager
 
     init_login_manager(login_manager)
 
+    # Import models to ensure they are registered with SQLAlchemy
+    from app.auth import models as auth_models  # noqa: F401
+    from app.expenses import models as expense_models  # noqa: F401
+    from app.expenses.category import Category  # noqa: F401
+    from app.restaurants import models as restaurant_models  # noqa: F401
+    from app.expenses import init_default_categories
+
+    # Initialize default categories after the database is created
+    with app.app_context():
+        try:
+            init_default_categories()
+        except Exception as e:
+            app.logger.error(f"Failed to initialize default categories: {e}")
+
     # Enable CORS for all routes
     CORS(app)
 
+
+def create_app(config_obj=None):
+    """Create and configure the Flask application.
+
+    Args:
+        config_obj: Configuration object or name of configuration to use.
+
+    Returns:
+        Flask: The configured Flask application.
+    """
+    # Create and configure the app
+    app = Flask(__name__)
+
+    # Set up configuration
+    _setup_config(app, config_obj)
+    # Configure logging
+    _configure_logging(app)
+    # Set up extensions
+    _setup_extensions(app)
     # Register blueprints
     _register_blueprints(app)
-
-    # Shell context for flask shell
-    @app.shell_context_processor
-    def make_shell_context():
-        return {"db": db}
+    # Add shell context
+    _add_shell_context(app)
 
     return app
+
+
+def _add_shell_context(app):
+    """Add shell context to the Flask application.
+
+    Args:
+        app: Flask application instance
+    """
+
+    @app.shell_context_processor
+    def make_shell_context():
+        """Make objects available in the Flask shell."""
+        from sqlalchemy.orm import Session
+
+        return {
+            "db": db,
+            "session": db.session,
+            "Session": Session,
+            "engine": db.engine,
+        }
 
 
 def _register_blueprints(app):
     """Register all blueprints with the application."""
     from app.auth import bp as auth_bp
     from app.expenses import bp as expenses_bp
-    from app.restaurants import bp as restaurants_bp
     from app.main import bp as main_bp
+    from app.restaurants import bp as restaurants_bp
     from app.health import bp as health_bp
 
-    app.register_blueprint(auth_bp, url_prefix="/auth")
-    app.register_blueprint(expenses_bp, url_prefix="/expenses")
-    app.register_blueprint(restaurants_bp, url_prefix="/restaurants")
-    app.register_blueprint(main_bp, url_prefix="/")
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(expenses_bp)
+    app.register_blueprint(main_bp)
+    app.register_blueprint(restaurants_bp)
     app.register_blueprint(health_bp)
 
 
@@ -315,9 +438,7 @@ def setup_logger(app=None):
     Returns:
         logging.Formatter: Configured formatter for log messages
     """
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     if app is not None:
         # Configure root logger

@@ -6,9 +6,7 @@ class MealExpenseUser(HttpUser):
 
     def on_start(self):
         """Log in at the start of each user session."""
-        self.client.post(
-            "/auth/login", {"username": "testuser", "password": "testpass"}
-        )
+        self.client.post("/auth/login", {"username": "testuser", "password": "testpass"})
 
     @task(3)
     def view_restaurants(self):

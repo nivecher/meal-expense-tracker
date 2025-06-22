@@ -201,7 +201,7 @@
                                     -
                                 {% endif %}
                             </td>
-                            <td>{{ expense.category or '-' }}</td>
+                            <td>{{ expense.category.name if expense.category else '-' }}</td>
                             <td class="fw-bold">${{ "%.2f"|format(expense.amount) }}</td>
                             <td>
                                 <div class="btn-group">

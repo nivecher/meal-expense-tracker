@@ -9,10 +9,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
 from flask import Request
-from sqlalchemy.orm import Query
+from sqlalchemy import select, or_
 
 from app import db
 from app.expenses.models import Expense
+from app.expenses.category import Category
 from app.restaurants.models import Restaurant
 
 
@@ -36,9 +37,7 @@ def get_expense_filters(request: Request) -> Dict[str, Any]:
     }
 
 
-def get_user_expenses(
-    user_id: int, filters: Dict[str, Any]
-) -> Tuple[List[Expense], float]:
+def get_user_expenses(user_id: int, filters: Dict[str, Any]) -> Tuple[List[Expense], float]:
     """Get expenses for a user with the given filters.
 
     Args:
@@ -49,16 +48,17 @@ def get_user_expenses(
         Tuple of (expenses, total_amount)
     """
     # Base query
-    query = Expense.query.filter_by(user_id=user_id)
+    stmt = select(Expense).where(Expense.user_id == user_id)
 
     # Apply filters
-    query = apply_filters(query, filters)
+    stmt = apply_filters(stmt, filters)
 
     # Apply sorting
-    query = apply_sorting(query, filters["sort_by"], filters["sort_order"])
+    stmt = apply_sorting(stmt, filters["sort_by"], filters["sort_order"])
 
     # Execute query
-    expenses = query.all()
+    result = db.session.execute(stmt)
+    expenses = result.scalars().all()
 
     # Calculate total
     total_amount = sum(expense.amount for expense in expenses) if expenses else 0.0
@@ -77,73 +77,76 @@ def get_filter_options(user_id: int) -> Dict[str, List[str]]:
     """
     # Get unique meal types and categories for filter dropdowns
     meal_types = (
-        db.session.query(Expense.meal_type)
-        .filter(Expense.user_id == user_id, Expense.meal_type != "")
-        .distinct()
-        .all()
+        db.session.query(Expense.meal_type).filter(Expense.user_id == user_id, Expense.meal_type != "").distinct().all()
     )
 
+    # Get unique categories through the relationship
     categories = (
-        db.session.query(Expense.category)
-        .filter(Expense.user_id == user_id, Expense.category != "")
+        db.session.query(Category.name)
+        .join(Expense, Expense.category_id == Category.id)
+        .filter(Expense.user_id == user_id)
         .distinct()
         .all()
     )
 
     return {
-        "meal_types": [m[0] for m in meal_types],
-        "categories": [c[0] for c in categories],
+        "meal_types": [m[0] for m in meal_types if m[0]],  # Filter out None values
+        "categories": [c[0] for c in categories if c[0]],  # Filter out None values
     }
 
 
-def apply_filters(query: Query, filters: Dict[str, Any]) -> Query:
+def apply_filters(stmt, filters: Dict[str, Any]):
     """Apply filters to the query.
 
     Args:
-        query: The SQLAlchemy query
+        stmt: The SQLAlchemy select statement
         filters: Dictionary of filter parameters
 
     Returns:
-        The modified query with filters applied
+        The modified select statement with filters applied
     """
     if filters["search"]:
-        query = query.join(Restaurant).filter(
-            db.or_(
+        stmt = stmt.join(Expense.restaurant).where(
+            or_(
                 Restaurant.name.ilike(f"%{filters['search']}%"),
                 Restaurant.address.ilike(f"%{filters['search']}%"),
                 Expense.notes.ilike(f"%{filters['search']}%"),
             )
         )
+    else:
+        stmt = stmt.join(Expense.restaurant, isouter=True)
 
     if filters["meal_type"]:
-        query = query.filter(Expense.meal_type == filters["meal_type"])
+        stmt = stmt.where(Expense.meal_type == filters["meal_type"])
 
     if filters["category"]:
-        query = query.filter(Expense.category == filters["category"])
+        # Use the relationship with Category model
+        stmt = stmt.join(Expense.category).where(Expense.category.has(name=filters["category"]))
 
     if filters["start_date"]:
         start_date = datetime.strptime(filters["start_date"], "%Y-%m-%d").date()
-        query = query.filter(Expense.date >= start_date)
+        stmt = stmt.where(Expense.date >= start_date)
 
     if filters["end_date"]:
         end_date = datetime.strptime(filters["end_date"], "%Y-%m-%d").date()
-        query = query.filter(Expense.date <= end_date)
+        stmt = stmt.where(Expense.date <= end_date)
 
-    return query
+    return stmt
 
 
-def apply_sorting(query: Query, sort_by: str, sort_order: str) -> Query:
+def apply_sorting(stmt, sort_by: str, sort_order: str):
     """Apply sorting to the query.
 
     Args:
-        query: The SQLAlchemy query
+        stmt: The SQLAlchemy select statement
         sort_by: Field to sort by
         sort_order: Sort order ('asc' or 'desc')
 
     Returns:
-        The modified query with sorting applied
+        The modified select statement with sorting applied
     """
     sort_field = None
+    is_desc = sort_order.lower() == "desc"
 
     if sort_by == "date":
         sort_field = Expense.date
@@ -152,15 +155,13 @@ def apply_sorting(query: Query, sort_by: str, sort_order: str) -> Query:
     elif sort_by == "meal_type":
         sort_field = Expense.meal_type
     elif sort_by == "category":
-        sort_field = Expense.category
+        # Sort by category name through the relationship
+        stmt = stmt.join(Expense.category)
+        sort_field = Category.name
     elif sort_by == "restaurant":
-        return query.join(Restaurant).order_by(
-            Restaurant.name.desc() if sort_order == "desc" else Restaurant.name.asc()
-        )
+        return stmt.order_by(Restaurant.name.desc() if is_desc else Restaurant.name.asc())
 
     if sort_field:
-        return query.order_by(
-            sort_field.desc() if sort_order == "desc" else sort_field.asc()
-        )
+        return stmt.order_by(sort_field.desc() if is_desc else sort_field.asc())
 
-    return query
+    return stmt

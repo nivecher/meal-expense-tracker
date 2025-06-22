@@ -19,9 +19,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file if it exists
 # Note: In Lambda, environment variables should be set via the Lambda configuration
 basedir = os.path.abspath(os.path.dirname(__file__))
-if os.path.exists(os.path.join(basedir, ".env")) and not os.environ.get(
-    "AWS_LAMBDA_FUNCTION_NAME"
-):
+if os.path.exists(os.path.join(basedir, ".env")) and not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
     load_dotenv(os.path.join(basedir, ".env"))
 
 # Configure logging
@@ -85,7 +83,107 @@ class Config:
         "pool_timeout": 30,
         "pool_size": 5,
         "max_overflow": 10,
+        "future": True,  # Enable SQLAlchemy 2.0 behavior
     }
+
+    def _log_environment_info(self):
+        """Log information about the current environment and configuration."""
+        env_type = "AWS Lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "Local"
+        logger.info(f"Running in {env_type} environment")
+
+        # Log relevant environment variables (masking sensitive data)
+        env_vars = {
+            "FLASK_ENV": os.environ.get("FLASK_ENV"),
+            "DB_SECRET_ARN": "***" if os.environ.get("DB_SECRET_ARN") else None,
+            "DB_HOST": "***" if os.environ.get("DB_HOST") else None,
+            "DB_NAME": os.environ.get("DB_NAME"),
+            "AWS_REGION": os.environ.get("AWS_REGION"),
+            "AWS_LAMBDA_FUNCTION_NAME": os.environ.get("AWS_LAMBDA_FUNCTION_NAME"),
+        }
+        logger.debug("Database configuration environment: %s", env_vars)
+        return env_type
+
+    def _get_database_uri_from_env(self):
+        """Get database URI from environment variables.
+
+        Returns:
+            str: Database URI if found, None otherwise
+        """
+        if db_url := os.environ.get("DATABASE_URL"):
+            logger.info("Using DATABASE_URL from environment")
+            return self._ensure_proper_db_url(db_url)
+        return None
+
+    def _get_database_uri_from_secrets_manager(self):
+        """Get database URI from AWS Secrets Manager.
+
+        Returns:
+            str: Database URI if successful, None otherwise
+        """
+        if not os.environ.get("DB_SECRET_ARN"):
+            return None
+
+        try:
+            db_url = self._get_rds_connection_uri()
+            logger.info("Successfully constructed RDS connection URI")
+            return db_url
+        except Exception as e:
+            logger.error("Failed to initialize RDS connection: %s", str(e), exc_info=True)
+            if os.environ.get("FLASK_ENV") == "production":
+                logger.critical("Failing fast in production due to RDS connection error")
+                raise
+            logger.warning("Falling back to direct DB config due to RDS connection error")
+            return None
+
+    def _get_database_uri_from_env_vars(self):
+        """Get database URI from individual environment variables.
+
+        Returns:
+            str: Database URI if all required variables are set, None otherwise
+        """
+        db_host = os.environ.get("DB_HOST")
+        if not db_host:
+            return None
+
+        db_config = {
+            "username": os.environ.get("DB_USERNAME"),
+            "password": os.environ.get("DB_PASSWORD"),
+            "host": db_host,
+            "port": os.environ.get("DB_PORT", "5432"),
+            "dbname": os.environ.get("DB_NAME"),
+        }
+
+        if not all(db_config.values()):
+            return None
+
+        logger.info("Using direct DB environment variables for connection")
+        return "postgresql://{username}:{password}@{host}:{port}/{dbname}".format(
+            username=db_config["username"],
+            password=urllib.parse.quote_plus(db_config["password"]),
+            host=db_config["host"],
+            port=db_config["port"],
+            dbname=db_config["dbname"],
+        )
+
+    def _get_sqlite_uri(self):
+        """Get SQLite database URI for development.
+
+        Returns:
+            str: SQLite database URI
+
+        Raises:
+            ValueError: If in production environment
+        """
+        if os.environ.get("FLASK_ENV") == "production":
+            raise ValueError(
+                "Database configuration is required in production. "
+                "Please set DATABASE_URL or DB_* environment variables."
+            )
+
+        logger.warning("No database configuration found, defaulting to SQLite")
+        db_path = os.path.join(basedir, "instance/dev.db")
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        return f"sqlite:///{db_path}?check_same_thread=False"
 
     def _get_database_uri(self):
         """Dynamically construct the database URI based on the environment.
@@ -102,88 +200,44 @@ class Config:
         Raises:
             ValueError: If required configuration is missing or invalid
         """
-        # Log which environment we're running in
-        env_type = (
-            "AWS Lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "Local"
-        )
-        logger.info(f"Running in {env_type} environment")
+        self._log_environment_info()
 
-        # Log relevant environment variables (masking sensitive data)
-        env_vars = {
-            "FLASK_ENV": os.environ.get("FLASK_ENV"),
-            "DB_SECRET_ARN": "***" if os.environ.get("DB_SECRET_ARN") else None,
-            "DB_HOST": "***" if os.environ.get("DB_HOST") else None,
-            "DB_NAME": os.environ.get("DB_NAME"),
-            "AWS_REGION": os.environ.get("AWS_REGION"),
-            "AWS_LAMBDA_FUNCTION_NAME": os.environ.get("AWS_LAMBDA_FUNCTION_NAME"),
-        }
-        logger.debug("Database configuration environment: %s", env_vars)
+        # Try each configuration method in order of priority
+        methods = [
+            self._get_database_uri_from_env,
+            self._get_database_uri_from_secrets_manager,
+            self._get_database_uri_from_env_vars,
+        ]
 
-        # 1. Check for explicit DATABASE_URL (highest priority)
-        if db_url := os.environ.get("DATABASE_URL"):
-            logger.info("Using DATABASE_URL from environment")
-            return db_url
+        for method in methods:
+            if db_url := method():
+                return self._ensure_proper_db_url(db_url) if isinstance(db_url, str) else db_url
 
-        # 2. Use RDS connection via Secrets Manager if DB_SECRET_ARN is set
-        #    (works in both Lambda and local development)
-        if os.environ.get("DB_SECRET_ARN"):
-            env_type = (
-                "AWS Lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "Local"
-            )
-            logger.info(f"Running in {env_type} environment with DB_SECRET_ARN")
-            try:
-                db_url = self._get_rds_connection_uri()
-                logger.info("Successfully constructed RDS connection URI")
-                return db_url
-            except Exception as e:
-                logger.error(
-                    "Failed to initialize RDS connection: %s", str(e), exc_info=True
-                )
-                # In production, fail fast to avoid silent fallbacks
-                if os.environ.get("FLASK_ENV") == "production":
-                    logger.critical(
-                        "Failing fast in production due to RDS connection error"
-                    )
-                    raise
-                logger.warning(
-                    "Falling back to direct DB config due to RDS connection error"
-                )
+        # Default to SQLite if no other method succeeded
+        return self._get_sqlite_uri()
 
-        # 3. Check for direct DB environment variables
-        db_host = os.environ.get("DB_HOST")
-        if db_host:
-            # Build connection string from individual components
-            db_config = {
-                "username": os.environ.get("DB_USERNAME"),
-                "password": os.environ.get("DB_PASSWORD"),
-                "host": db_host,
-                "port": os.environ.get("DB_PORT", "5432"),
-                "dbname": os.environ.get("DB_NAME"),
-            }
+    def _ensure_proper_db_url(self, db_url: str) -> str:
+        """Ensure the database URL is properly formatted for SQLAlchemy 2.0.
 
-            if all(db_config.values()):
-                logger.info("Using direct DB environment variables for connection")
-                return (
-                    "postgresql://{username}:{password}@{host}:{port}/{dbname}".format(
-                        username=db_config["username"],
-                        password=urllib.parse.quote_plus(db_config["password"]),
-                        host=db_config["host"],
-                        port=db_config["port"],
-                        dbname=db_config["dbname"],
-                    )
-                )
+        Args:
+            db_url: The database URL to check/format
 
-        # 4. Default to SQLite for local development as last resort
-        if os.environ.get("FLASK_ENV") == "production":
-            raise ValueError(
-                "Database configuration is required in production. "
-                "Please set DATABASE_URL or DB_* environment variables."
-            )
+        Returns:
+            str: A properly formatted database URL
+        """
+        # For SQLite, ensure check_same_thread is set to False
+        if db_url.startswith("sqlite"):
+            if "?" not in db_url:
+                db_url += "?check_same_thread=False"
+            elif "check_same_thread" not in db_url:
+                db_url += "&check_same_thread=False"
+        # For PostgreSQL, ensure it uses the postgresql+psycopg2:// prefix
+        elif "postgresql://" not in db_url and "postgres://" in db_url:
+            db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+        elif "postgresql://" in db_url and "+psycopg2" not in db_url:
+            db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
-        logger.warning("No database configuration found, defaulting to SQLite")
-        db_path = os.path.join(basedir, "instance/meal_expenses.db")
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        return f"sqlite:///{db_path}"
+        return db_url
 
     def _get_rds_connection_uri(self):
         """Construct a PostgreSQL connection string from AWS Secrets Manager.
@@ -236,9 +290,7 @@ class Config:
                     missing.append(f"{description} ({field})")
 
             if missing:
-                error_msg = (
-                    f"Missing or empty required secret fields: {', '.join(missing)}"
-                )
+                error_msg = f"Missing or empty required secret fields: {', '.join(missing)}"
                 logger.error(error_msg)
                 raise ValueError(error_msg)
 
@@ -251,15 +303,12 @@ class Config:
 
             # Construct connection string with URL-encoded password
             connection_uri = (
-                f"postgresql://{db_user}:"
-                f"{urllib.parse.quote_plus(db_pass)}"
-                f"@{db_host}:{db_port}/{db_name}"
+                f"postgresql://{db_user}:" f"{urllib.parse.quote_plus(db_pass)}" f"@{db_host}:{db_port}/{db_name}"
             )
 
             # Log connection details (masking sensitive info)
             logger.info(
-                "Successfully constructed database connection URI for host: %s, \n"
-                "database: %s",
+                "Successfully constructed database connection URI for host: %s, \n" "database: %s",
                 db_host,
                 db_name,
             )
@@ -318,40 +367,68 @@ class Config:
                 logger.info(f"Using database: {db_uri.split('://')[0]}")
 
             # Create instance directory for SQLite if needed
-            if db_uri.startswith("sqlite") and not os.environ.get(
-                "AWS_LAMBDA_FUNCTION_NAME"
-            ):
+            if db_uri.startswith("sqlite") and not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
                 db_path = db_uri.split("sqlite:///")[-1]
                 os.makedirs(os.path.dirname(db_path), exist_ok=True)
                 logger.info(f"SQLite database will be created at: {db_path}")
 
         except Exception as e:
-            logger.critical(
-                "Failed to initialize application configuration", exc_info=True
-            )
+            logger.critical("Failed to initialize application configuration", exc_info=True)
             raise ValueError(f"Failed to initialize application: {str(e)}")
 
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    # Use a simple SQLite database in the instance directory
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    os.makedirs(os.path.join(basedir, "instance"), exist_ok=True)
+    SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(basedir, 'instance', 'dev.db')}"
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "pool_timeout": 30,
+        "pool_size": 5,
+        "max_overflow": 10,
+        "future": True,  # Enable SQLAlchemy 2.0 behavior
+    }
 
 
 class TestingConfig(Config):
     TESTING = True
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:?check_same_thread=False"
     WTF_CSRF_ENABLED = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "pool_timeout": 30,
+        "pool_size": 1,  # Keep pool size small for tests
+        "max_overflow": 0,
+        "future": True,  # Enable SQLAlchemy 2.0 behavior
+    }
 
 
 class ProductionConfig(Config):
-    # Use secure session settings for production
-    SESSION_TYPE = "dynamodb"  # Requires Flask-Session with DynamoDB
+    """Production configuration."""
+
+    # Database settings
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 3600,  # Recycle connections after 1 hour
+        "pool_timeout": 30,
+        "pool_size": 5,
+        "max_overflow": 10,
+        "future": True,  # Enable SQLAlchemy 2.0 behavior
+    }
+
+    # Use DynamoDB for session storage in production
+    SESSION_TYPE = "dynamodb"
     SESSION_DYNAMODB_TABLE = "flask_sessions"
-    SESSION_DYNAMODB_REGION = None  # Will use AWS_DEFAULT_REGION
-    SESSION_USE_SIGNER = True
-    SESSION_COOKIE_SECURE = True
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = "Lax"
-    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours in seconds
+    SESSION_DYNAMODB_REGION = None  # Will use AWS_REGION
+    SESSION_USE_SIGNER = True  # Encrypt session data
+    SESSION_COOKIE_SECURE = True  # Only send cookie over HTTPS
+    SESSION_COOKIE_HTTPONLY = True  # Prevent client-side JS access
+    SESSION_COOKIE_SAMESITE = "Lax"  # CSRF protection
+    PERMANENT_SESSION_LIFETIME = 86400  # 1 day in seconds
 
     @classmethod
     def init_app(cls, app):
@@ -363,9 +440,7 @@ class ProductionConfig(Config):
             session = Session()
             session.init_app(app)
         except ImportError:
-            app.logger.warning(
-                "Flask-Session not installed. Using default session backend."
-            )
+            app.logger.warning("Flask-Session not installed. Using default session backend.")
         except Exception as e:
             app.logger.error("Failed to initialize session: %s", str(e))
             raise

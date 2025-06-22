@@ -54,12 +54,7 @@ def test_expense_creation_with_restaurant(client, app, auth):
 
     # Verify the expense was created with correct restaurant association
     with app.app_context():
-        # Get the current SQLAlchemy session
-        from sqlalchemy.orm import Session
-
-        session = Session.object_session(
-            Expense.query.first() or Restaurant.query.first()
-        )
+        session = db.session
 
         # Use Session.get() instead of Query.get()
         expense = session.get(Expense, 1)
@@ -134,11 +129,7 @@ def test_expense_editing_with_restaurant(client, app, auth):
     # Verify the expense was updated correctly
     with app.app_context():
         # Get the current SQLAlchemy session
-        from sqlalchemy.orm import Session
-
-        session = Session.object_session(
-            Expense.query.first() or Restaurant.query.first()
-        )
+        session = db.session
 
         # Use Session.get() instead of Query.get()
         expense = session.get(Expense, 1)
@@ -148,9 +139,7 @@ def test_expense_editing_with_restaurant(client, app, auth):
         assert expense.meal_type == "Dinner"
         assert expense.date == tomorrow
         assert expense.restaurant_id == 1
-        assert (
-            expense.category == "Dining"
-        )  # Should maintain category based on restaurant type
+        assert expense.category == "Dining"  # Should maintain category based on restaurant type
 
 
 def test_expense_deletion_with_restaurant(client, app, auth):
@@ -205,11 +194,7 @@ def test_expense_deletion_with_restaurant(client, app, auth):
     # Verify the expense was deleted but restaurant remains
     with app.app_context():
         # Get the current SQLAlchemy session
-        from sqlalchemy.orm import Session
-
-        session = Session.object_session(
-            Expense.query.first() or Restaurant.query.first()
-        )
+        session = db.session
 
         # Use Session.get() instead of Query.get()
         expense = session.get(Expense, 1)
@@ -271,10 +256,7 @@ def test_expense_export(client, app, auth):
     # Verify CSV content
     csv_data = response.data.decode("utf-8").split("\n")
     assert len(csv_data) >= 2  # Header + at least one row
-    header = (
-        "Date,Restaurant,Meal Type,Amount,Notes,"
-        "Restaurant Type,Cuisine,Price Range,Location"
-    )
+    header = "Date,Restaurant,Meal Type,Amount,Notes," "Restaurant Type,Cuisine,Price Range,Location"
     assert header in csv_data[0]
     assert "Test Restaurant" in csv_data[1]
     assert "Lunch" in csv_data[1]

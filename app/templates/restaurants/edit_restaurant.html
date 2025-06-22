@@ -204,39 +204,39 @@
                                     <select class="form-select" id="cuisine" name="cuisine"
                                            data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Select the type of cuisine served">
-                                        <option value="">Select cuisine type</option>
-                                        <option value="american">American</option>
-                                        <option value="asian">Asian</option>
-                                        <option value="barbecue">Barbecue</option>
-                                        <option value="brazilian">Brazilian</option>
-                                        <option value="breakfast">Breakfast</option>
-                                        <option value="burgers">Burgers</option>
-                                        <option value="cafe">Cafe</option>
-                                        <option value="caribbean">Caribbean</option>
-                                        <option value="chinese">Chinese</option>
-                                        <option value="coffee_shop">Coffee Shop</option>
-                                        <option value="dessert">Dessert</option>
-                                        <option value="fast_food">Fast Food</option>
-                                        <option value="french">French</option>
-                                        <option value="german">German</option>
-                                        <option value="greek">Greek</option>
-                                        <option value="ice_cream">Ice Cream</option>
-                                        <option value="indian">Indian</option>
-                                        <option value="italian">Italian</option>
-                                        <option value="japanese">Japanese</option>
-                                        <option value="korean">Korean</option>
-                                        <option value="mediterranean">Mediterranean</option>
-                                        <option value="mexican">Mexican</option>
-                                        <option value="middle_eastern">Middle Eastern</option>
-                                        <option value="pizza">Pizza</option>
-                                        <option value="sandwiches">Sandwiches</option>
-                                        <option value="seafood">Seafood</option>
-                                        <option value="spanish">Spanish</option>
-                                        <option value="steakhouse">Steakhouse</option>
-                                        <option value="sushi">Sushi</option>
-                                        <option value="thai">Thai</option>
-                                        <option value="vietnamese">Vietnamese</option>
-                                        <option value="other">Other</option>
+                                        <option value="" {% if not restaurant.cuisine %}selected{% endif %}>Select cuisine type</option>
+                                        <option value="american" {% if restaurant.cuisine == 'american' %}selected{% endif %}>American</option>
+                                        <option value="asian" {% if restaurant.cuisine == 'asian' %}selected{% endif %}>Asian</option>
+                                        <option value="barbecue" {% if restaurant.cuisine == 'barbecue' %}selected{% endif %}>Barbecue</option>
+                                        <option value="brazilian" {% if restaurant.cuisine == 'brazilian' %}selected{% endif %}>Brazilian</option>
+                                        <option value="breakfast" {% if restaurant.cuisine == 'breakfast' %}selected{% endif %}>Breakfast</option>
+                                        <option value="burgers" {% if restaurant.cuisine == 'burgers' %}selected{% endif %}>Burgers</option>
+                                        <option value="cafe" {% if restaurant.cuisine == 'cafe' %}selected{% endif %}>Cafe</option>
+                                        <option value="caribbean" {% if restaurant.cuisine == 'caribbean' %}selected{% endif %}>Caribbean</option>
+                                        <option value="chinese" {% if restaurant.cuisine == 'chinese' %}selected{% endif %}>Chinese</option>
+                                        <option value="coffee_shop" {% if restaurant.cuisine == 'coffee_shop' %}selected{% endif %}>Coffee Shop</option>
+                                        <option value="dessert" {% if restaurant.cuisine == 'dessert' %}selected{% endif %}>Dessert</option>
+                                        <option value="fast_food" {% if restaurant.cuisine == 'fast_food' %}selected{% endif %}>Fast Food</option>
+                                        <option value="french" {% if restaurant.cuisine == 'french' %}selected{% endif %}>French</option>
+                                        <option value="german" {% if restaurant.cuisine == 'german' %}selected{% endif %}>German</option>
+                                        <option value="greek" {% if restaurant.cuisine == 'greek' %}selected{% endif %}>Greek</option>
+                                        <option value="ice_cream" {% if restaurant.cuisine == 'ice_cream' %}selected{% endif %}>Ice Cream</option>
+                                        <option value="indian" {% if restaurant.cuisine == 'indian' %}selected{% endif %}>Indian</option>
+                                        <option value="italian" {% if restaurant.cuisine == 'italian' %}selected{% endif %}>Italian</option>
+                                        <option value="japanese" {% if restaurant.cuisine == 'japanese' %}selected{% endif %}>Japanese</option>
+                                        <option value="korean" {% if restaurant.cuisine == 'korean' %}selected{% endif %}>Korean</option>
+                                        <option value="mediterranean" {% if restaurant.cuisine == 'mediterranean' %}selected{% endif %}>Mediterranean</option>
+                                        <option value="mexican" {% if restaurant.cuisine == 'mexican' %}selected{% endif %}>Mexican</option>
+                                        <option value="middle_eastern" {% if restaurant.cuisine == 'middle_eastern' %}selected{% endif %}>Middle Eastern</option>
+                                        <option value="pizza" {% if restaurant.cuisine == 'pizza' %}selected{% endif %}>Pizza</option>
+                                        <option value="sandwiches" {% if restaurant.cuisine == 'sandwiches' %}selected{% endif %}>Sandwiches</option>
+                                        <option value="seafood" {% if restaurant.cuisine == 'seafood' %}selected{% endif %}>Seafood</option>
+                                        <option value="spanish" {% if restaurant.cuisine == 'spanish' %}selected{% endif %}>Spanish</option>
+                                        <option value="steakhouse" {% if restaurant.cuisine == 'steakhouse' %}selected{% endif %}>Steakhouse</option>
+                                        <option value="sushi" {% if restaurant.cuisine == 'sushi' %}selected{% endif %}>Sushi</option>
+                                        <option value="thai" {% if restaurant.cuisine == 'thai' %}selected{% endif %}>Thai</option>
+                                        <option value="vietnamese" {% if restaurant.cuisine == 'vietnamese' %}selected{% endif %}>Vietnamese</option>
+                                        <option value="other" {% if restaurant.cuisine == 'other' %}selected{% endif %}>Other</option>
                                     </select>
                                 </div>
                             </div>

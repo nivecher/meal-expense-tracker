@@ -31,7 +31,7 @@
                             <p><strong>Meal Type:</strong> {{ expense.meal_type }}</p>
                             {% endif %}
                             {% if expense.category %}
-                            <p><strong>Category:</strong> {{ expense.category }}</p>
+                            <p><strong>Category:</strong> {{ expense.category.name }}</p>
                             {% endif %}
                         </div>
                         <div class="col-md-6">

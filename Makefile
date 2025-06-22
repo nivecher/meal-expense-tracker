@@ -435,41 +435,55 @@ destroy-tf-backend:
 
 ## Deploy to dev environment
 .PHONY: deploy-dev
-deploy-dev: package-lambda
+deploy-dev: check-lambda-package
 	@echo "Deploying to dev environment..."
-	@$(MAKE) TF_ENV=dev tf-init
-	@$(MAKE) TF_ENV=dev tf-plan
-	@$(MAKE) TF_ENV=dev tf-apply
+	@./scripts/deploy_lambda.sh \
+	  --function-name "$(LAMBDA_FUNCTION_NAME)-dev" \
+	  --environment dev \
+	  --profile "$(DEFAULT_AWS_PROFILE)" \
+	  --region "$(DEFAULT_AWS_REGION)" \
+	  --package both
 
 ## Deploy to staging environment
 .PHONY: deploy-staging
-deploy-staging: package-lambda
+deploy-staging: check-lambda-package
 	@echo "Deploying to staging environment..."
-	@echo "Are you sure you want to deploy to staging? This will apply all pending changes."
-	@read -p "Type 'yes' to continue: " confirm && [ $$confirm = yes ]
-	@$(MAKE) TF_ENV=staging tf-init
-	@$(MAKE) TF_ENV=staging tf-plan
-	@$(MAKE) TF_ENV=staging tf-apply
+	@read -p "This will deploy to the staging environment. Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "Aborting..."; exit 1)
+	@./scripts/deploy_lambda.sh \
+	  --function-name "$(LAMBDA_FUNCTION_NAME)-staging" \
+	  --environment staging \
+	  --profile "$(DEFAULT_AWS_PROFILE)" \
+	  --region "$(DEFAULT_AWS_REGION)" \
+	  --package both
 
 ## Deploy to production environment
-.PHONY: deploy-lambda
-deploy-lambda:
-	@echo "Deploying Lambda function with update..."
-	@./scripts/deploy-lambda.sh --app --update
-
-# Deploy to production
 .PHONY: deploy-prod
-deploy-prod: package-lambda
+deploy-prod: check-lambda-package
 	@echo "WARNING: You are about to deploy to PRODUCTION!"
 	@echo "This will apply all pending changes to your production environment."
 	@read -p "Type 'production' to continue: " confirm && [ "$$confirm" = "production" ]
-	@$(MAKE) TF_ENV=prod tf-init
-	@$(MAKE) TF_ENV=prod tf-plan
-	@$(MAKE) TF_ENV=prod tf-apply
+	@./scripts/deploy_lambda.sh \
+	  --function-name "$(LAMBDA_FUNCTION_NAME)" \
+	  --environment prod \
+	  --profile "$(DEFAULT_AWS_PROFILE)" \
+	  --region "$(DEFAULT_AWS_REGION)" \
+	  --package both
 
 # =======================
 # Lambda Deployment
 # =======================
+
+## Deploy the latest Lambda function code
+.PHONY: deploy-lambda
+deploy-lambda: check-lambda-package
+	@echo "🚀 Deploying Lambda function with update..."
+	@./scripts/deploy_lambda.sh \
+	  --function-name "$(LAMBDA_FUNCTION_NAME)" \
+	  --environment "$(ENV)" \
+	  --profile "$(DEFAULT_AWS_PROFILE)" \
+	  --region "$(DEFAULT_AWS_REGION)" \
+	  --package app \
+	  --update
 
 ## Package the application and dependencies for Lambda deployment
 .PHONY: package-lambda
@@ -484,11 +498,34 @@ package-lambda: package-layer
 		exit 1; \
 	fi
 	@chmod +x scripts/package.sh
-	@if ! ./scripts/package.sh -a; then \
+	@if ! ./scripts/package.sh; then \
 		echo "\033[1;31m❌ Failed to create Lambda package\033[0m"; \
 		exit 1; \
 	fi
 	@echo "\033[1;32m✅ Lambda package created at dist/app.zip\033[0m"
+
+## Run database migrations on the deployed Lambda function
+.PHONY: run-migrations
+run-migrations: check-aws-cli
+	@if [ -z "$(FUNCTION_NAME)" ]; then \
+		read -p "Enter Lambda function name: " FUNCTION_NAME; \
+	else \
+		FUNCTION_NAME="$(FUNCTION_NAME)"; \
+	fi; \
+	if [ -z "$(REGION)" ]; then \
+		read -p "Enter AWS region [us-east-1]: " REGION; \
+		REGION=$${REGION:-us-east-1}; \
+	else \
+		REGION="$(REGION)"; \
+	fi; \
+	if [ -z "$(PROFILE)" ]; then \
+		read -p "Enter AWS profile [default]: " PROFILE; \
+		PROFILE=$${PROFILE:-default}; \
+	else \
+		PROFILE="$(PROFILE)"; \
+	fi; \
+	echo "🚀 Invoking migrations on Lambda function $$FUNCTION_NAME in region $$REGION with profile $$PROFILE..."; \
+	python3 scripts/invoke_migrations.py --function-name "$$FUNCTION_NAME" --region "$$REGION" --profile "$$PROFILE"
 
 ## Package only the Lambda layer
 .PHONY: package-layer
@@ -509,7 +546,57 @@ package-layer:
 	fi
 	@echo "\033[1;32m✅ Lambda layer package created at dist/layers/python-dependencies.zip\033[0m"
 
+.PHONY: deploy
+## Deploy the Lambda function and run migrations
+deploy:
+	@echo "🚀 Deploying Lambda function and running migrations..."
+	@read -p "Enter Lambda function name: " FUNCTION_NAME; \
+	read -p "Enter AWS region [$(DEFAULT_AWS_REGION)]: " REGION; \
+	read -p "Enter AWS profile [$(DEFAULT_AWS_PROFILE)]: " PROFILE; \
+	read -p "Enter environment [dev]: " ENV; \
+	REGION=$${REGION:-$(DEFAULT_AWS_REGION)}; \
+	PROFILE=$${PROFILE:-$(DEFAULT_AWS_PROFILE)}; \
+	ENV=$${ENV:-dev}; \
+	echo "🚀 Deploying Lambda function $$FUNCTION_NAME in region $$REGION with profile $$PROFILE (env: $$ENV)..."; \
+	./scripts/deploy_lambda.sh \
+	  --function-name "$$FUNCTION_NAME" \
+	  --region "$$REGION" \
+	  --profile "$$PROFILE" \
+	  --environment "$$ENV" \
+	  --package both
+
 ## Check if Lambda package exists
+.PHONY: test-db-connection
+test-db-connection:
+	@echo "\033[1m🔍 Testing database connection...\033[0m"
+	@if [ ! -f ".env" ] && [ ! -f ".env.local" ]; then \
+		echo "\033[1;33m⚠️  No .env file found. Creating from example...\033[0m"; \
+		cp -n .env.example .env.local 2>/dev/null || cp -n .env.example .env 2>/dev/null || true; \
+	fi
+	@if [ ! -x "$(shell which python3)" ]; then \
+		echo "\033[1;31m❌ Python 3 is required but not installed\033[0m"; \
+		exit 1; \
+	fi
+	@if ! python3 -c "import sqlalchemy" >/dev/null 2>&1; then \
+		echo "\033[1;33m⚠️  SQLAlchemy not found. Installing dependencies...\033[0m"; \
+		pip install -r requirements.txt || { echo "\033[1;31m❌ Failed to install dependencies\033[0m"; exit 1; }; \
+	fi
+	@echo "\033[1m🔧 Running database connection test...\033[0m"
+	@if ! python3 scripts/test_db_connection.py; then \
+		echo "\033[1;31m❌ Database connection test failed\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ Database connection test passed!\033[0m"
+
+.PHONY: run-migrations-local
+run-migrations-local: test-db-connection
+	@echo "\033[1m🔄 Running database migrations...\033[0m"
+	@if ! python3 scripts/test_db_connection.py --migrate; then \
+		echo "\033[1;31m❌ Database migrations failed\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ Database migrations completed successfully!\033[0m"
+
 .PHONY: check-lambda-package
 check-lambda-package:
 	@if [ ! -f "dist/app.zip" ]; then \

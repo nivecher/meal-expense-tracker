@@ -228,9 +228,7 @@ def set_secret(service_client, arn, token):
                 sql = """
                 ALTER USER %s WITH PASSWORD %s;
                 """
-                cur.execute(
-                    sql, (pending_dict["db_username"], pending_dict["db_password"])
-                )
+                cur.execute(sql, (pending_dict["db_username"], pending_dict["db_password"]))
                 conn.commit()
 
             logger.info("Successfully set new password in database")
@@ -351,9 +349,7 @@ def get_secret_dict(service_client, arn, stage, token=None):
     try:
         # Get the secret value
         if token:
-            secret = service_client.get_secret_value(
-                SecretId=arn, VersionId=token, VersionStage=stage
-            )
+            secret = service_client.get_secret_value(SecretId=arn, VersionId=token, VersionStage=stage)
         else:
             secret = service_client.get_secret_value(SecretId=arn, VersionStage=stage)
 
@@ -364,16 +360,10 @@ def get_secret_dict(service_client, arn, stage, token=None):
             secret_dict = json.loads(secret["SecretBinary"].decode("utf-8"))
 
         # Verify all required fields are present and non-empty
-        missing_fields = [
-            field
-            for field in required_fields
-            if field not in secret_dict or not secret_dict[field]
-        ]
+        missing_fields = [field for field in required_fields if field not in secret_dict or not secret_dict[field]]
 
         if missing_fields:
-            raise ValueError(
-                f"Secret is missing required fields: {', '.join(missing_fields)}"
-            )
+            raise ValueError(f"Secret is missing required fields: {', '.join(missing_fields)}")
 
         return secret_dict
 

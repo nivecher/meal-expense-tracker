@@ -10,11 +10,11 @@
                 </div>
                 <div class="card-body">
                     {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category }}">{{ message }}</div>
-                            {% endfor %}
-                        {% endif %}
+                    {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                    {% endif %}
                     {% endwith %}
 
                     <form method="POST">
@@ -24,20 +24,22 @@
                                 <select class="form-select" id="restaurant_id" name="restaurant_id" required>
                                     <option value="">Select a restaurant</option>
                                     {% for restaurant in restaurants %}
-                                    <option value="{{ restaurant.id }}" {% if expense.restaurant_id == restaurant.id %}selected{% endif %}>
+                                    <option value="{{ restaurant.id }}" {% if expense.restaurant_id==restaurant.id
+                                        %}selected{% endif %} data-type="{{ restaurant.type }}">
                                         {{ restaurant.full_name }}
                                     </option>
                                     {% endfor %}
                                 </select>
                                 <div class="form-text">
-                                    <a href="{{ url_for('restaurants.add_restaurant') }}" target="_blank">Add a new restaurant</a>
+                                    <a href="{{ url_for('restaurants.add_restaurant') }}" target="_blank">Add a new
+                                        restaurant</a>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <label for="date" class="form-label">Date</label>
                                 <input type="date" class="form-control" id="date" name="date"
-                                       value="{{ expense.date.strftime('%Y-%m-%d') }}"
-                                       min="{{ min_date }}" max="{{ today }}" required>
+                                    value="{{ expense.date.strftime('%Y-%m-%d') }}" min="{{ min_date }}"
+                                    max="{{ today }}" required>
                             </div>
                         </div>
 
@@ -47,19 +49,25 @@
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
                                     <input type="number" step="0.01" class="form-control" id="amount" name="amount"
-                                           value="{{ expense.amount }}" required>
+                                        value="{{ expense.amount }}" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <label for="meal_type" class="form-label">Meal Type (Optional)</label>
                                 <select class="form-select" id="meal_type" name="meal_type">
                                     <option value="">Select a meal type (optional)</option>
-                                    <option value="Breakfast" {% if expense.meal_type == 'Breakfast' %}selected{% endif %}>Breakfast</option>
-                                    <option value="Lunch" {% if expense.meal_type == 'Lunch' %}selected{% endif %}>Lunch</option>
-                                    <option value="Dinner" {% if expense.meal_type == 'Dinner' %}selected{% endif %}>Dinner</option>
-                                    <option value="Snacks" {% if expense.meal_type == 'Snacks' %}selected{% endif %}>Snacks</option>
-                                    <option value="Groceries" {% if expense.meal_type == 'Groceries' %}selected{% endif %}>Groceries</option>
-                                    <option value="Other" {% if expense.meal_type == 'Other' %}selected{% endif %}>Other</option>
+                                    <option value="Breakfast" {% if expense.meal_type=='Breakfast' %}selected{% endif
+                                        %}>Breakfast</option>
+                                    <option value="Lunch" {% if expense.meal_type=='Lunch' %}selected{% endif %}>Lunch
+                                    </option>
+                                    <option value="Dinner" {% if expense.meal_type=='Dinner' %}selected{% endif %}>
+                                        Dinner</option>
+                                    <option value="Snacks" {% if expense.meal_type=='Snacks' %}selected{% endif %}>
+                                        Snacks</option>
+                                    <option value="Groceries" {% if expense.meal_type=='Groceries' %}selected{% endif
+                                        %}>Groceries</option>
+                                    <option value="Other" {% if expense.meal_type=='Other' %}selected{% endif %}>Other
+                                    </option>
                                 </select>
                             </div>
                         </div>
@@ -69,18 +77,18 @@
                                 <label for="category" class="form-label">Category (Optional)</label>
                                 <select class="form-select" id="category" name="category">
                                     <option value="">Select a category (optional)</option>
-                                    <option value="Dining Out" {% if expense.category == 'Dining Out' %}selected{% endif %}>Dining Out</option>
-                                    <option value="Takeout" {% if expense.category == 'Takeout' %}selected{% endif %}>Takeout</option>
-                                    <option value="Groceries" {% if expense.category == 'Groceries' %}selected{% endif %}>Groceries</option>
-                                    <option value="Coffee" {% if expense.category == 'Coffee' %}selected{% endif %}>Coffee</option>
-                                    <option value="Snacks" {% if expense.category == 'Snacks' %}selected{% endif %}>Snacks</option>
-                                    <option value="Other" {% if expense.category == 'Other' %}selected{% endif %}>Other</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.name }}" {% if expense.category and
+                                        expense.category.id==category.id %}selected{% endif %}>
+                                        {{ category.name }}
+                                    </option>
+                                    {% endfor %}
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <label for="notes" class="form-label">Notes (Optional)</label>
                                 <input type="text" class="form-control" id="notes" name="notes"
-                                       value="{{ expense.notes }}" placeholder="Brief description of the expense">
+                                    value="{{ expense.notes }}" placeholder="Brief description of the expense">
                             </div>
                         </div>
 
@@ -99,62 +107,73 @@
 {% block scripts %}
 {{ super() }}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const restaurantSelect = document.getElementById('restaurant_id');
-    const categorySelect = document.getElementById('category');
+    document.addEventListener('DOMContentLoaded', function () {
+        const restaurantSelect = document.getElementById('restaurant_id');
+        const categorySelect = document.getElementById('category');
 
-    // Map of restaurant types to expense categories
-    const typeToCategoryMap = {
-        'restaurant': 'Dining Out',
-        'cafe': 'Coffee',
-        'bar': 'Dining Out',
-        'meal_delivery': 'Takeout',
-        'meal_takeaway': 'Takeout',
-        'supermarket': 'Groceries',
-        'grocery_or_supermarket': 'Groceries',
-        'convenience_store': 'Groceries',
-        'coffee_shop': 'Coffee',
-        'bakery': 'Snacks',
-        'dessert_shop': 'Snacks',
-        'ice_cream_shop': 'Snacks',
-        'other': 'Other'
-    };
+        // Map of restaurant types to expense categories
+        const typeToCategoryMap = {
+            'restaurant': 'Dining Out',
+            'cafe': 'Coffee',
+            'bar': 'Dining Out',
+            'meal_delivery': 'Takeout',
+            'meal_takeaway': 'Takeout',
+            'supermarket': 'Groceries',
+            'grocery_or_supermarket': 'Groceries',
+            'convenience_store': 'Groceries',
+            'coffee_shop': 'Coffee',
+            'bakery': 'Snacks',
+            'dessert_shop': 'Snacks',
+            'ice_cream_shop': 'Snacks',
+            'other': 'Other'
+        };
 
-    // Function to update category based on restaurant type
-    function updateCategory(restaurantId) {
-        if (!restaurantId) {
-            categorySelect.value = '';
-            return;
+        // Function to update category based on restaurant type
+        function updateCategory(restaurantId) {
+            if (!restaurantId) {
+                return;
+            }
+
+            try {
+                const selectedOption = restaurantSelect.options[restaurantSelect.selectedIndex];
+                if (!selectedOption) return;
+
+                const restaurantType = selectedOption.getAttribute('data-type');
+                if (restaurantType && typeToCategoryMap[restaurantType]) {
+                    // Only update if the suggested category exists in the dropdown
+                    const suggestedCategory = typeToCategoryMap[restaurantType];
+                    const categoryExists = Array.from(categorySelect.options).some(
+                        option => option.value === suggestedCategory
+                    );
+
+                    if (categoryExists) {
+                        categorySelect.value = suggestedCategory;
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating category:', error);
+            }
         }
 
-        // Get the selected restaurant's type from the data attribute
-        const selectedOption = restaurantSelect.options[restaurantSelect.selectedIndex];
-        const restaurantType = selectedOption.getAttribute('data-type');
+        // Only auto-update category if no category is already selected
+        let categoryManuallyChanged = false;
 
-        if (restaurantType && typeToCategoryMap[restaurantType]) {
-            categorySelect.value = typeToCategoryMap[restaurantType];
-        } else {
-            categorySelect.value = '';
+        // Update category when restaurant selection changes
+        restaurantSelect.addEventListener('change', function () {
+            if (!categoryManuallyChanged) {
+                updateCategory(this.value);
+            }
+        });
+
+        // Track manual category changes
+        categorySelect.addEventListener('change', function () {
+            categoryManuallyChanged = true;
+        });
+
+        // Initialize category if a restaurant is pre-selected and no category is set
+        if (restaurantSelect.value && !categorySelect.value) {
+            updateCategory(restaurantSelect.value);
         }
-    }
-
-    // Add data-type attribute to restaurant options
-    {% for restaurant in restaurants %}
-    const option = restaurantSelect.querySelector('option[value="{{ restaurant.id }}"]');
-    if (option) {
-        option.setAttribute('data-type', '{{ restaurant.type }}');
-    }
-    {% endfor %}
-
-    // Update category when restaurant selection changes
-    restaurantSelect.addEventListener('change', function() {
-        updateCategory(this.value);
     });
-
-    // Initialize category if a restaurant is pre-selected
-    if (restaurantSelect.value) {
-        updateCategory(restaurantSelect.value);
-    }
-});
 </script>
 {% endblock %}

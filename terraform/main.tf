@@ -374,6 +374,9 @@ module "rds" {
   vpc_cidr             = var.vpc_cidr
   db_subnet_group_name = module.network.database_subnet_group_name
 
+  # Security configuration
+  lambda_security_group_id = module.lambda.security_group_id
+
   # Use the main KMS key for encryption
   db_kms_key_arn = aws_kms_key.main.arn
 

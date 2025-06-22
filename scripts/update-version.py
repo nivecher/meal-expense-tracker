@@ -8,9 +8,7 @@ def get_latest_git_tag():
     """Get the latest git tag."""
     try:
         # Get all tags sorted by version
-        tags = (
-            subprocess.check_output(["git", "tag", "-l"]).decode("utf-8").splitlines()
-        )
+        tags = subprocess.check_output(["git", "tag", "-l"]).decode("utf-8").splitlines()
         # Filter out invalid tags (like vv0.1.1)
         tags = [tag for tag in tags if re.match(r"^v\d+\.\d+\.\d+$", tag)]
         # Sort by version

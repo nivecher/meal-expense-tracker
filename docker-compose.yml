@@ -12,7 +12,7 @@ services:
     environment:
       - FLASK_APP=wsgi.py
       - FLASK_ENV=development
-      - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5432/meal_expenses
+      - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5433/meal_expenses
       - PYTHONUNBUFFERED=1
       - FLASK_DEBUG=1
     depends_on:
@@ -37,7 +37,7 @@ services:
       - AWS_LAMBDA_FUNCTION_TIMEOUT=30
       - AWS_LAMBDA_FUNCTION_HANDLER=lambda.handler
       - AWS_LAMBDA_EVENT_BODY={}
-      - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5432/meal_expenses
+      - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5433/meal_expenses
       - PYTHONUNBUFFERED=1
       - FLASK_APP=wsgi.py
       - FLASK_ENV=production
@@ -87,7 +87,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mealuser -d meal_expenses"]
       interval: 5s

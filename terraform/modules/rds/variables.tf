@@ -45,6 +45,12 @@ variable "cloudwatch_logs_prefix_list_id" {
   default     = ""
 }
 
+variable "lambda_security_group_id" {
+  description = "The security group ID of the Lambda function that needs to access the database"
+  type        = string
+  default     = null
+}
+
 # Tags
 variable "tags" {
   description = "A map of tags to add to all resources"

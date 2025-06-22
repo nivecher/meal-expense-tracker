@@ -127,7 +127,7 @@
                                         </a>
                                     </td>
                                     <td>${{ "%.2f"|format(expense.amount) }}</td>
-                                    <td>{{ expense.category }}</td>
+                                    <td>{{ expense.category.name if expense.category else 'Uncategorized' }}</td>
                                     <td>{{ expense.meal_type }}</td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
