@@ -1,11 +1,11 @@
 """Health check endpoints for the application."""
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
 from flask import Blueprint, jsonify
 from sqlalchemy import text
 
 from app import db, version
-
 
 bp = Blueprint("health", __name__)
 

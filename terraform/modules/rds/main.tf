@@ -1,4 +1,3 @@
-# AWS provider configuration is handled by the root module
 # IAM Role for RDS Enhanced Monitoring
 resource "aws_iam_role" "rds_enhanced_monitoring" {
   name = "${var.app_name}-${var.environment}-rds-monitoring-role"
@@ -29,7 +28,6 @@ resource "aws_iam_role_policy_attachment" "rds_enhanced_monitoring" {
 
 # RDS Instance with cost-optimized settings
 resource "aws_db_instance" "main" {
-  # Basic configuration - optimized for free tier
   identifier            = "${var.app_name}-${var.environment}"
   allocated_storage     = 20 # Free tier allows up to 20GB
   max_allocated_storage = 20 # Disable storage autoscaling for free tier
@@ -38,17 +36,14 @@ resource "aws_db_instance" "main" {
   engine_version        = "14.18"
   instance_class        = "db.t3.micro" # Free tier eligible
 
-  # Database credentials
-  # Ensure db_name and username start with a letter and contain only alphanumeric characters
   db_name  = replace(lower(var.app_name), "/[^a-z0-9]+/", "")
   username = "db_${replace(lower(var.app_name), "/[^a-z0-9]+/", "")}" # Prefix with db_ to ensure it starts with a letter
   password = random_password.db_password.result
 
-  # Network configuration
   db_subnet_group_name   = var.db_subnet_group_name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  publicly_accessible    = false  # Keep database private
-  network_type           = "IPV4" # Explicitly disable public access
+  publicly_accessible    = false
+  network_type           = "IPV4"
 
   # Backup & maintenance
   backup_retention_period = 7                     # Keep backups for 7 days
@@ -131,10 +126,10 @@ resource "aws_secretsmanager_secret" "db_credentials" {
 resource "aws_secretsmanager_secret_version" "db_credentials" {
   secret_id = aws_secretsmanager_secret.db_credentials.id
   secret_string = jsonencode({
-    db_host     = aws_db_instance.main.address
-    db_port     = aws_db_instance.main.port
-    db_name     = aws_db_instance.main.db_name
-    db_username = aws_db_instance.main.username
-    db_password = aws_db_instance.main.password
+    host     = aws_db_instance.main.address
+    port     = aws_db_instance.main.port
+    dbname   = aws_db_instance.main.db_name
+    username = aws_db_instance.main.username
+    password = aws_db_instance.main.password
   })
 }

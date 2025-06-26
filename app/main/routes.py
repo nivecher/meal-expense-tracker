@@ -8,12 +8,9 @@ from flask import render_template, request
 from flask_login import current_user, login_required
 
 from app import version
+
 from . import bp
-from .services import (
-    get_expense_filters,
-    get_user_expenses,
-    get_filter_options,
-)
+from .services import get_expense_filters, get_filter_options, get_user_expenses
 
 
 @bp.route("/about")

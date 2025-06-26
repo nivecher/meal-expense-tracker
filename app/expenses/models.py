@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, Numeric, Text, DateTime, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
 
 if TYPE_CHECKING:
     from app.auth.models import User
-    from app.restaurants.models import Restaurant
     from app.expenses.category import Category
+    from app.restaurants.models import Restaurant
 
 
 class Expense(db.Model):

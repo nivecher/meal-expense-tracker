@@ -8,11 +8,12 @@ This module handles all configuration for the application, including:
 Environment variables take precedence over .env file values.
 """
 
-import os
 import json
-import boto3
 import logging
+import os
 import urllib.parse
+
+import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 

@@ -1,4 +1,5 @@
 from flask import Blueprint
+
 from app.extensions import login_manager
 
 bp = Blueprint("auth", __name__)

@@ -1,8 +1,9 @@
 """Tests for restaurant-related functionality."""
 
-from datetime import datetime
 import os
 import sys
+from datetime import datetime
+
 from sqlalchemy import select
 
 # Add the project root to the Python path

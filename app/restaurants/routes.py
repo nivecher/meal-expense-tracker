@@ -1,7 +1,7 @@
 # Standard library imports
 import csv
 from datetime import datetime
-from io import StringIO, BytesIO
+from io import BytesIO, StringIO
 
 # Third-party imports
 from flask import (
@@ -15,12 +15,13 @@ from flask import (
     url_for,
 )
 from flask_login import login_required
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 from sqlalchemy.exc import SQLAlchemyError
+
+from app.expenses.models import Expense
 
 # Local application imports
 from app.extensions import db
-from app.expenses.models import Expense
 from app.restaurants import bp
 from app.restaurants.models import Restaurant
 

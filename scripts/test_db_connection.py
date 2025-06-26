@@ -25,8 +25,9 @@ logger = logging.getLogger(__name__)
 def test_database_connection():
     """Test the database connection using the application's configuration."""
     try:
-        from app import create_app, db
         from sqlalchemy import text
+
+        from app import create_app, db
 
         # Create the Flask application
         app = create_app()
@@ -57,8 +58,8 @@ def test_database_connection():
 def run_migrations():
     """Run database migrations using the application's configuration."""
     try:
-        from migrate_db import run_migrations as run_migrations_func
         from app import create_app
+        from migrate_db import run_migrations as run_migrations_func
 
         # Create the Flask application
         app = create_app()

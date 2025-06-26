@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 
-from flask import render_template, redirect, url_for, flash, request
-from flask_login import login_user, logout_user, current_user
+from flask import flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_user, logout_user
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 

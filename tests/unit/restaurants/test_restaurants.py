@@ -1,10 +1,11 @@
 """Tests for restaurant-related functionality."""
 
-from datetime import datetime, date
 import os
 import sys
-from sqlalchemy.exc import SQLAlchemyError
+from datetime import date, datetime
+
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))

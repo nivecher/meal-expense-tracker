@@ -2,7 +2,8 @@
 
 import os
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from app import create_app, db
 
 

@@ -153,9 +153,13 @@ setup:
 run:
 	FLASK_APP=$(FLASK_APP) FLASK_ENV=$(FLASK_ENV) flask run --port $(PORT)
 
-## Run linters
+## Run linters and formatters
 .PHONY: lint
-lint:
+lint: format lint-only
+
+## Run only linting (without formatting)
+.PHONY: lint-only
+lint-only:
 	@echo "\n\033[1m=== Running Python Linters ===\033[0m"
 	@flake8 app/ tests/
 	@black --check app/ tests/ migrations/ */*.py *.py
@@ -168,14 +172,17 @@ lint:
 
 ## Format code
 .PHONY: format
-format: format-python format-shell
-
-## Format Python code
-.PHONY: format-python
-format-python:
+format:
 	@echo "\n\033[1m=== Formatting Python code ===\033[0m"
 	@black app/ tests/ migrations/ */*.py *.py
-	@autoflake --in-place --remove-all-unused-imports --recursive app/ tests/
+	@isort app/ tests/ migrations/ */*.py *.py
+	@echo "\n\033[1;32m✓ Code formatting complete\033[0m"
+	@echo "\n\033[1m=== Verifying formatting and style ===\033[0m"
+	@black --check app/ tests/ migrations/ */*.py *.py || \
+		echo "\n\033[1;31m✗ Formatting issues found. Run 'make format' to fix.\033[0m" && exit 1
+	@flake8 app/ tests/ || \
+		echo "\n\033[1;31m✗ Linting issues found. Fix the issues above.\033[0m" && exit 1
+	@echo "\n\033[1;32m✓ Code is properly formatted and linted\033[0m"
 
 ## Format Shell scripts
 .PHONY: format-shell

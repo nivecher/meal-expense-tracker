@@ -169,11 +169,11 @@ def create_secret(service_client, arn, token):
 
         # Create a new secret with the same structure but new password
         new_secret = {
-            "db_host": current_dict["db_host"],
-            "db_port": current_dict["db_port"],
-            "db_username": current_dict["db_username"],
-            "db_password": new_password,
-            "db_name": current_dict["db_name"],
+            "host": current_dict["host"],
+            "port": current_dict["port"],
+            "username": current_dict["username"],
+            "password": new_password,
+            "dbname": current_dict["dbname"],
             "engine": "postgres",
         }
 
@@ -216,11 +216,11 @@ def set_secret(service_client, arn, token):
         conn = None
         try:
             conn = psycopg2.connect(
-                host=pending_dict["db_host"],
-                port=int(pending_dict["db_port"]),
-                dbname=current_dict["db_name"],
-                user=current_dict["db_username"],
-                password=current_dict["db_password"],
+                host=pending_dict["host"],
+                port=int(pending_dict["port"]),
+                dbname=current_dict["dbname"],
+                user=current_dict["username"],
+                password=current_dict["password"],
             )
 
             with conn.cursor() as cur:
@@ -228,7 +228,7 @@ def set_secret(service_client, arn, token):
                 sql = """
                 ALTER USER %s WITH PASSWORD %s;
                 """
-                cur.execute(sql, (pending_dict["db_username"], pending_dict["db_password"]))
+                cur.execute(sql, (pending_dict["username"], pending_dict["password"]))
                 conn.commit()
 
             logger.info("Successfully set new password in database")
@@ -264,11 +264,11 @@ def test_secret(service_client, arn, token):
         conn = None
         try:
             conn = psycopg2.connect(
-                host=pending_dict["db_host"],
-                port=int(pending_dict["db_port"]),
-                dbname=pending_dict["db_name"],
-                user=pending_dict["db_username"],
-                password=pending_dict["db_password"],
+                host=pending_dict["host"],
+                port=int(pending_dict["port"]),
+                dbname=pending_dict["dbname"],
+                user=pending_dict["username"],
+                password=pending_dict["password"],
             )
 
             # Execute a simple query to verify the connection
@@ -344,7 +344,7 @@ def get_secret_dict(service_client, arn, stage, token=None):
     Raises:
         ValueError: If the secret is invalid or missing required fields
     """
-    required_fields = ["db_host", "db_port", "db_username", "db_password", "db_name"]
+    required_fields = ["host", "port", "username", "password", "dbname"]
 
     try:
         # Get the secret value

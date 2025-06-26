@@ -4,32 +4,30 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from sqlalchemy import desc, distinct
 from datetime import datetime, timedelta
 from typing import Optional
 
 # Third-party imports
 from flask import (
+    abort,
+    current_app,
     flash,
     redirect,
     render_template,
     request,
-    url_for,
-    abort,
-    current_app,
     send_file,
+    url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy import desc, distinct, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import select, or_, func
-
 from sqlalchemy.orm import joinedload
 
 # Local application imports
 from app import db
 from app.expenses import bp
-from app.expenses.models import Expense
 from app.expenses.category import Category
+from app.expenses.models import Expense
 from app.restaurants.models import Restaurant
 
 logger = logging.getLogger(__name__)

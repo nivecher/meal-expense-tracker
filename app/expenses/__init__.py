@@ -1,7 +1,7 @@
 from flask import Blueprint
 
-from app.extensions import db
 from app.expenses.category import Category
+from app.extensions import db
 
 bp = Blueprint("expenses", __name__, url_prefix="/expenses")
 

@@ -253,8 +253,8 @@ resource "aws_lambda_function" "main" {
       FLASK_ENV               = var.environment == "prod" ? "production" : "development"
       AWS_LAMBDA_EXEC_WRAPPER = var.enable_otel_tracing ? "/opt/otel-instrument" : ""
       LOG_LEVEL               = var.log_level
-
-      # Note: DB_URL will be constructed at runtime in the Lambda function
+      PYTHONUNBUFFERED        = "1" # Ensure Python output is sent to CloudWatch immediately
+      ALLOW_SQLITE_FALLBACK   = var.environment == "dev" ? "true" : "false"
     }, var.extra_environment_variables)
   }
 

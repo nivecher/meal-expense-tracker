@@ -9,7 +9,7 @@ import json
 import logging
 import subprocess
 import sys
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 # Configure logging
 logging.basicConfig(

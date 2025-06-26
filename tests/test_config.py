@@ -60,13 +60,13 @@ class TestConfig:
 
         # Import all models to ensure they are registered with SQLAlchemy
         from app.auth import models as auth_models  # noqa: F401
-        from app.expenses import models as expense_models  # noqa: F401
-        from app.expenses.category import Category  # noqa: F401
-        from app.restaurants import models as restaurant_models  # noqa: F401
-        from app.expenses import init_default_categories
 
         # Initialize login manager
         from app.auth.models import init_login_manager
+        from app.expenses import init_default_categories
+        from app.expenses import models as expense_models  # noqa: F401
+        from app.expenses.category import Category  # noqa: F401
+        from app.restaurants import models as restaurant_models  # noqa: F401
 
         login_manager.init_app(app)
         init_login_manager(login_manager)

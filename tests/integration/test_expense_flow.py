@@ -1,8 +1,9 @@
+from datetime import datetime, timedelta
+
+from app import db
+from app.auth.models import User
 from app.expenses.models import Expense
 from app.restaurants.models import Restaurant
-from app.auth.models import User
-from datetime import datetime, timedelta
-from app import db
 
 
 def test_expense_creation_with_restaurant(client, app, auth):

@@ -25,21 +25,21 @@ usage() {
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -f|--function)
-      FUNCTION_NAME="$2"
-      shift 2
-      ;;
-    -e|--env)
-      ENVIRONMENT="$2"
-      shift 2
-      ;;
-    -h|--help)
-      usage
-      ;;
-    *)
-      log "Error: Unknown option: $1"
-      usage
-      ;;
+  -f | --function)
+    FUNCTION_NAME="$2"
+    shift 2
+    ;;
+  -e | --env)
+    ENVIRONMENT="$2"
+    shift 2
+    ;;
+  -h | --help)
+    usage
+    ;;
+  *)
+    log "Error: Unknown option: $1"
+    usage
+    ;;
   esac
 done
 
@@ -94,7 +94,7 @@ update_lambda() {
 run_migrations() {
   log "Running database migrations..."
   if [ -f "scripts/invoke_migrations.py" ]; then
-    if ! python3 scripts/invoke_migrations.py "$FUNCTION_NAME"; then
+    if ! python3 scripts/invoke_migrations.py -f "$FUNCTION_NAME"; then
       log "Warning: Database migrations completed with errors"
       return 1
     fi
