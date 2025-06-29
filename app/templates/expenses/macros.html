@@ -1,6 +1,6 @@
 {% macro expense_form(form, expense=None, is_edit=false) %}
     <form id="expenseForm"
-          method="POST"
+          method="post"
           novalidate
           action="{% if is_edit %}{{ url_for('expenses.edit_expense', expense_id=expense.id) }}{% else %}{{ url_for('expenses.add_expense', restaurant_id=request.view_args.get('restaurant_id') ) if request.view_args and request.view_args.get('restaurant_id') else url_for('expenses.add_expense') }}{% endif %}"
           data-ajax

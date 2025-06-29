@@ -1,5 +1,5 @@
 {% extends "main/base.html" %}
-{% block title %}Add Restaurant{% endblock %}
+{% block title %}Add Restaurant{% endblock title %}
 {% block content %}
     <div class="container mt-4">
         <div class="row justify-content-center">
@@ -19,7 +19,7 @@
                                 {% endfor %}
                             {% endif %}
                         {% endwith %}
-                        <form method="POST" class="needs-validation" novalidate>
+                        <form method="post" class="needs-validation" novalidate>
                             <!-- Google Address Search -->
                             <div class="mb-4">
                                 <h3 class="h5 mb-3">Find Restaurant</h3>
@@ -303,7 +303,7 @@
             </div>
         </div>
     </div>
-{% endblock %}
+{% endblock content %}
 {% block scripts %}
     {{ super() }}
     <script>
@@ -546,4 +546,4 @@
             });
         });
     </script>
-{% endblock %}
+{% endblock scripts %}

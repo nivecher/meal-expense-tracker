@@ -3,7 +3,7 @@
 {% block title %}
     Add Expense
     {% if restaurant %}for {{ restaurant.name }}{% endif %}
-{% endblock %}
+{% endblock title %}
 {% block content %}
     <div class="container mt-4">
         <div class="row justify-content-center">
@@ -29,10 +29,10 @@
             </div>
         </div>
     </div>
-{% endblock %}
+{% endblock content %}
 {% block scripts %}
     {{ super() }}
     {{ expense_scripts() }}
     <script type="module"
             src="{{ url_for('static', filename='js/pages/expense-form.js') }}"></script>
-{% endblock %}
+{% endblock scripts %}

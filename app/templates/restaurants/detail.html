@@ -33,7 +33,7 @@
                         </div>
                         <div class="card-body">
                             {% if is_editing %}
-                                <form method="POST"
+                                <form method="post"
                                       action="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">
                                     {{ form.hidden_tag() }}
                                     <div class="mb-3">

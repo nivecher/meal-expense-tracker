@@ -146,11 +146,31 @@ def _generate_result_message(imported: int, skipped: int) -> str:
     return result_msg
 
 
-def _validate_csv_reader(reader) -> Tuple[bool, str]:
+def _validate_csv_reader(reader):
     """Validate the CSV reader has required columns."""
-    if "name" not in (reader.fieldnames or []):
-        return False, "Missing required column: 'name'"
+    required_columns = {"name", "address", "city", "state", "postal_code", "country"}
+    if not required_columns.issubset(reader.fieldnames):
+        return False, f"Missing required columns. Required: {', '.join(required_columns)}"
     return True, ""
+
+
+def _handle_import_error(error: Exception) -> Tuple[bool, str]:
+    """Handle errors during restaurant import."""
+    logger.exception("Error importing restaurants")
+    return False, f"Error processing import: {str(error)}"
+
+
+def _process_import(reader, user_id: int) -> Tuple[int, int]:
+    """Process the CSV import after validation."""
+    imported = 0
+    skipped = 0
+    for row in reader:
+        success, _ = _process_restaurant_row(row, user_id)
+        if success:
+            imported += 1
+        else:
+            skipped += 1
+    return imported, skipped
 
 
 def import_restaurants_from_csv(file_stream, user) -> Tuple[bool, str]:
@@ -175,15 +195,10 @@ def import_restaurants_from_csv(file_stream, user) -> Tuple[bool, str]:
             return False, error_msg
 
         # Process the CSV data
-        imported, skipped = _process_restaurant_batch(reader, user.id)
-        db.session.commit()
-
-        return True, _generate_result_message(imported, skipped)
+        return _process_import(reader, user.id)
 
     except Exception as e:
-        db.session.rollback()
-        logger.error("Error importing restaurants: %s", str(e), exc_info=True)
-        return False, f"Error importing restaurants: {str(e)}"
+        return _handle_import_error(e)
 
 
 def export_restaurants_to_csv(user_id) -> Response:
