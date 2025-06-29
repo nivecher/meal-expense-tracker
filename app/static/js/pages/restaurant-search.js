@@ -4,7 +4,7 @@
  */
 
 // Import dependencies
-import { loadGoogleMapsAPI } from '../services/google-maps.service.js';
+import googleMapsService from '../services/google-maps.service.js';
 import { initSearchForm } from './search-init.js';
 
 // Constants
@@ -82,12 +82,45 @@ const setLoading = (isLoading) => {
  * Clear all markers from the map
  */
 const clearMarkers = () => {
-    markers.forEach(marker => marker.setMap(null));
+    if (!window.google?.maps) {
+        console.warn('Google Maps not available when trying to clear markers');
+        return;
+    }
+
+    markers.forEach(marker => {
+        try {
+            // Remove marker from the map
+            if (marker.setMap) {
+                marker.setMap(null);
+            }
+
+            // Remove all listeners from the marker
+            if (marker.addListener) {
+                google.maps.event.clearInstanceListeners(marker);
+            }
+        } catch (error) {
+            console.error('Error removing marker:', error);
+        }
+    });
+
     markers = [];
+
+    // Also clear the user location marker if it exists
+    if (userLocationMarker) {
+        try {
+            if (userLocationMarker.setMap) {
+                userLocationMarker.setMap(null);
+            }
+            google.maps.event.clearInstanceListeners(userLocationMarker);
+            userLocationMarker = null;
+        } catch (error) {
+            console.error('Error removing user location marker:', error);
+        }
+    }
 };
 
 /**
- * Add a marker to the map
+ * Add a standard Google Maps Marker to the map
  * @param {Object} options - Marker options
  * @param {Object} options.position - Marker position { lat, lng }
  * @param {string} options.title - Marker title
@@ -96,31 +129,53 @@ const clearMarkers = () => {
  * @returns {google.maps.Marker} - The created marker
  */
 const addMarker = ({ position, title, icon, content }) => {
-    const marker = new google.maps.Marker({
-        position,
-        map,
-        title,
-        icon,
-        animation: google.maps.Animation.DROP
-    });
-
-    if (content) {
-        const infoWindow = new google.maps.InfoWindow({ content });
-
-        marker.addListener('click', () => {
-            // Close any open info windows
-            if (currentInfoWindow) {
-                currentInfoWindow.close();
-            }
-
-            // Open new info window
-            infoWindow.open(map, marker);
-            currentInfoWindow = infoWindow;
-        });
+    if (!window.google?.maps?.Marker) {
+        console.error('Google Maps Marker is not available');
+        return null;
     }
 
-    markers.push(marker);
-    return marker;
+    const { maps } = window.google;
+    const positionObj = new maps.LatLng(position.lat, position.lng);
+
+    try {
+        // Create a standard Marker
+        const marker = new maps.Marker({
+            position: positionObj,
+            map,
+            title,
+            icon: icon?.url,
+            animation: maps.Animation.DROP
+        });
+
+        // Handle info window if content is provided
+        if (content) {
+            const infoWindow = new maps.InfoWindow({
+                content,
+                disableAutoPan: true
+            });
+
+            marker.addListener('click', () => {
+                // Close any open info windows
+                if (currentInfoWindow) {
+                    currentInfoWindow.close();
+                }
+                // Open new info window at marker position
+                infoWindow.open({
+                    anchor: marker,
+                    map,
+                    shouldFocus: false
+                });
+                currentInfoWindow = infoWindow;
+            });
+        }
+
+
+        markers.push(marker);
+        return marker;
+    } catch (error) {
+        console.error('Error creating marker:', error);
+        return null;
+    }
 };
 
 /**
@@ -249,60 +304,62 @@ const searchRestaurants = async (query) => {
 
     } catch (error) {
         console.error('Search error:', error);
-        const errorMessage = error.message || 'An error occurred while searching for restaurants. Please try again.';
-                    errorMessage = 'Location information is unavailable.';
-                    break;
-                case error.TIMEOUT:
-                    errorMessage = 'The request to get your location timed out.';
-                    break;
-            }
+        let errorMessage = 'An error occurred while searching for restaurants. Please try again.';
 
-            showError(errorMessage);
-        },
-        {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
+        if (error.code === error.PERMISSION_DENIED) {
+            errorMessage = 'Location access was denied. Please enable location services and try again.';
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+            errorMessage = 'Location information is unavailable.';
+        } else if (error.code === error.TIMEOUT) {
+            errorMessage = 'The request to get your location timed out.';
+        } else if (error.message) {
+            errorMessage = error.message;
         }
-    );
+
+        showError(errorMessage);
+    }
 };
 
 /**
  * Initialize the map
- * @returns {Promise<google.maps.Map>} The initialized map instance
+ * @returns {Promise<google.maps.Map>} The initialized map
  */
 const initMap = async () => {
     if (!mapContainer) {
         throw new Error('Map container not found');
     }
 
-    try {
-        // Add loading state
-        mapContainer.innerHTML = `
-            <div class="d-flex flex-column align-items-center justify-content-center h-100 bg-light">
-                <div class="spinner-border text-primary mb-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="text-muted">Loading map...</p>
+    // Add loading state
+    mapContainer.innerHTML = `
+        <div class="d-flex flex-column align-items-center justify-content-center h-100 bg-light">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
             </div>
-        `;
+            <p class="text-muted">Loading map...</p>
+        </div>
+    `;
 
-        // Load configuration
-        const config = await import('../config.js').then(m => m.default);
+    try {
+        // Load Google Maps API
+        await googleMapsService.load().catch(error => {
+            console.error('Failed to load Google Maps API:', error);
+            throw new Error('Failed to load Google Maps. Please try again later.');
+        });
 
-        if (!config.googleMaps?.apiKey) {
-            throw new Error('Google Maps API key is not configured');
+        if (!window.google?.maps) {
+            throw new Error('Google Maps API failed to initialize');
         }
 
-        // Load Google Maps API with the configured API key
-        await loadGoogleMapsAPI(config.googleMaps.apiKey);
+        const { maps } = window.google;
 
-        if (!window.google || !window.google.maps) {
-            throw new Error('Google Maps API failed to load');
+        // Clear any existing map instance
+        if (map) {
+            map.unbindAll();
+            map = null;
         }
 
         // Create map centered on default location
-        map = new google.maps.Map(mapContainer, {
+        map = new maps.Map(mapContainer, {
             center: DEFAULT_LOCATION,
             zoom: DEFAULT_ZOOM,
             mapTypeControl: false,
@@ -338,14 +395,15 @@ const initMap = async () => {
                 // Center map on user's location
                 map.setCenter(userLocation);
 
+
                 // Add a marker for user's location
-                userLocationMarker = new google.maps.Marker({
+                userLocationMarker = new maps.Marker({
                     position: userLocation,
                     map: map,
                     title: 'Your Location',
                     icon: {
-                        url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-                        scaledSize: new google.maps.Size(32, 32)
+                        url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                        scaledSize: new maps.Size(32, 32)
                     }
                 });
 
@@ -355,8 +413,9 @@ const initMap = async () => {
             }
         }
 
+
         // Initialize Places Service
-        placesService = new google.maps.places.PlacesService(map);
+        placesService = new maps.places.PlacesService(map);
 
         // Add click listener to close info windows when clicking on the map
         map.addListener('click', () => {
@@ -405,7 +464,13 @@ const initMap = async () => {
  */
 const initEventListeners = () => {
     if (searchForm) {
-        searchForm.addEventListener('submit', handleSearch);
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = searchInput?.value.trim();
+            if (query) {
+                searchRestaurants(query);
+            }
+        });
     }
 
     if (currentLocationBtn) {
@@ -414,48 +479,138 @@ const initEventListeners = () => {
 };
 
 /**
+ * Handle current location button click
+ */
+const handleCurrentLocation = () => {
+    if (!navigator.geolocation) {
+        showError('Geolocation is not supported by your browser');
+        return;
+    }
+
+    setLoading(true);
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude, longitude } = position.coords;
+
+            // Update map center
+            if (map) {
+                const newCenter = new google.maps.LatLng(latitude, longitude);
+                map.setCenter(newCenter);
+
+                // Add a marker at current location
+                addMarker({
+                    position: { lat: latitude, lng: longitude },
+                    title: 'Your Location',
+                    icon: {
+                        url: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png'
+                    }
+                });
+
+                // Optional: Search for nearby restaurants
+                searchRestaurants('restaurants near me');
+            }
+
+            setLoading(false);
+        },
+        (error) => {
+            let errorMessage = 'Unable to retrieve your location';
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage = 'Location access was denied. Please enable location services and try again.';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage = 'Location information is unavailable.';
+                    break;
+                case error.TIMEOUT:
+                    errorMessage = 'The request to get your location timed out.';
+                    break;
+            }
+            showError(errorMessage);
+            setLoading(false);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+};
+
+/**
  * Clean up event listeners
  */
 const cleanupEventListeners = () => {
     if (searchForm) {
-        searchForm.removeEventListener('submit', handleSearch);
+        // Create a new function reference to match the one used in addEventListener
+        const handleSubmit = (e) => {
+            e.preventDefault();
+            const query = searchInput?.value.trim();
+            if (query) {
+                searchRestaurants(query);
+            }
+        };
+        searchForm.removeEventListener('submit', handleSubmit);
     }
 
     if (currentLocationBtn) {
         currentLocationBtn.removeEventListener('click', handleCurrentLocation);
     }
 };
+
+/**
  * Initialize the restaurant search page
  */
 export async function init() {
     console.log('Initializing restaurant search...');
 
-    try {
-        // Initialize search form with URL parameters
-        initSearchForm();
+    // Show loading state
+    const loadingContainer = document.createElement('div');
+    loadingContainer.className = 'd-flex justify-content-center align-items-center h-100';
+    loadingContainer.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted">Initializing map...</p>
+        </div>
+    `;
 
-        // Get DOM elements
+    try {
+        // Get DOM elements first
         mapContainer = document.getElementById('map');
         searchForm = document.getElementById('restaurant-search-form');
         searchInput = document.getElementById('search-query');
         searchButton = document.getElementById('search-button');
         currentLocationBtn = document.getElementById('current-location-btn');
 
-        // Check if we're on a page that needs the map
         if (!mapContainer) {
-            console.log('No map container found, skipping map initialization');
-            return;
+            throw new Error('Map container not found. Please refresh the page or contact support if the issue persists.');
         }
 
-        // Load configuration
-        const config = await import('../config.js').then(m => m.default);
+        // Show loading state in map container
+        mapContainer.innerHTML = '';
+        mapContainer.appendChild(loadingContainer);
 
-        // Check if Google Maps API key is configured
-        if (!config.googleMaps?.apiKey) {
-            throw new Error('Google Maps API key is not configured');
+        // Check if Google Maps API key is available
+        if (!window.GOOGLE_MAPS_API_KEY) {
+            throw new Error('Google Maps API key is not configured. Please contact support.');
         }
 
-        // Initialize map
+        // Initialize Google Maps API
+        try {
+            await googleMapsService.ensureLoaded();
+        } catch (error) {
+            console.error('Google Maps API load error:', error);
+            throw new Error('Failed to load Google Maps. Please check your internet connection and try again.');
+        }
+
+        // Initialize search form with URL parameters
+        if (searchForm) {
+            initSearchForm();
+        }
+
+        // Initialize the map
         await initMap();
 
         // Initialize event listeners
@@ -463,26 +618,48 @@ export async function init() {
 
         // If there's a search query in the URL, perform the search
         const urlParams = new URLSearchParams(window.location.search);
-        const searchQuery = urlParams.get('q');
-        if (searchQuery && searchQuery.trim() !== '') {
-            await searchRestaurants(searchQuery);
+        const query = urlParams.get('q');
+
+        if (query) {
+            searchInput.value = query;
+            try {
+                await searchRestaurants(query);
+            } catch (error) {
+                console.error('Search error:', error);
+                showError('Failed to perform search. ' + (error.message || 'Please try again.'));
+            }
         }
 
         // Show success message if redirected from another page with success message
         const successMessage = document.getElementById('success-message');
-        if (successMessage && successMessage.textContent.trim() !== '') {
+        if (successMessage?.textContent?.trim()) {
             showSuccess(successMessage.textContent);
         }
 
         // Show error message if redirected from another page with error message
         const errorMessage = document.getElementById('error-message');
-        if (errorMessage && errorMessage.textContent.trim() !== '') {
+        if (errorMessage?.textContent?.trim()) {
             showError(errorMessage.textContent);
         }
 
     } catch (error) {
         console.error('Initialization error:', error);
         const errorMessage = error.message || 'Failed to initialize the page. Please try again later.';
+
+        // Show error in map container if possible
+        if (mapContainer) {
+            mapContainer.innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <h5 class="alert-heading">Unable to load map</h5>
+                    <p class="mb-2">${errorMessage}</p>
+                    <button class="btn btn-primary btn-sm mt-2" onclick="window.location.reload()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Try Again
+                    </button>
+                </div>
+            `;
+        }
+
+        // Also show as a toast/notification
         showError(errorMessage);
 
         // Dispatch custom event for error handling
@@ -532,7 +709,6 @@ export const __test__ = {
     init,
     cleanup,
     searchRestaurants,
-    handleSearch,
     handleCurrentLocation,
     showError,
     showSuccess

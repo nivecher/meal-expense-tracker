@@ -4,6 +4,18 @@
 {% endblock title %}
 {% block head_extra %}
     {{ super() }}
+    <!-- Set Google Maps API Key -->
+    <script>
+        // Make API key available to all scripts
+        window.GOOGLE_MAPS_API_KEY = '{{ google_maps_api_key }}';
+
+        // Log API key status for debugging
+        if (!window.GOOGLE_MAPS_API_KEY) {
+            console.warn('Google Maps API key is not set');
+        } else {
+            console.log('Google Maps API key is set');
+        }
+    </script>
     <style>
         #map {
             min-height: 70vh;
@@ -99,7 +111,7 @@
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <!-- Main restaurant search module that handles both map and search functionality -->
+    <!-- Initialize restaurant search functionality -->
     <script type="module"
-            src="{{ url_for('static', filename='js/pages/restaurant-search.js') }}"></script>
+            src="{{ url_for('static', filename='js/pages/restaurant-search-init.js') }}"></script>
 {% endblock scripts %}

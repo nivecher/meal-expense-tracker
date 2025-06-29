@@ -337,8 +337,10 @@ def search_restaurants():
     zoom = request.args.get("zoom", "12")
     query = request.args.get("q", "")
 
-    # Get Google Maps API key from config
-    google_maps_api_key = current_app.config.get("GOOGLE_PLACES_API_KEY")
+    # Get Google Maps API key from config - try both possible config keys
+    google_maps_api_key = current_app.config.get("GOOGLE_MAPS_API_KEY") or current_app.config.get(
+        "GOOGLE_PLACES_API_KEY"
+    )
 
     # Log the status of the API key for debugging
     if not google_maps_api_key:
@@ -348,10 +350,10 @@ def search_restaurants():
         )
 
         # Try to get from environment directly as fallback
-        google_maps_api_key = os.environ.get("GOOGLE_PLACES_API_KEY")
+        google_maps_api_key = os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_PLACES_API_KEY")
         if google_maps_api_key:
             current_app.logger.info("Found Google Maps API key in environment variables")
-            current_app.config["GOOGLE_PLACES_API_KEY"] = google_maps_api_key
+            current_app.config["GOOGLE_MAPS_API_KEY"] = google_maps_api_key
         else:
             current_app.logger.error("Google Maps API key is not configured in environment or config")
     else:

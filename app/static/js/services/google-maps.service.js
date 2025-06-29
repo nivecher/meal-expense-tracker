@@ -9,9 +9,11 @@ const handleAuthFailure = () => {
     console.error(errorMsg);
 
     // Dispatch custom event for error handling
-    document.dispatchEvent(new CustomEvent('googleMaps:error', {
-        detail: { message: errorMsg }
-    }));
+    if (typeof document !== 'undefined') {
+        document.dispatchEvent(new CustomEvent('googleMaps:error', {
+            detail: { message: errorMsg }
+        }));
+    }
 };
 
 // Set up global auth failure handler
@@ -21,130 +23,78 @@ if (typeof window !== 'undefined') {
 
 /**
  * Google Maps Service
- * Singleton service to handle Google Maps API loading and initialization
+ * A simple service to load the Google Maps API
  */
 class GoogleMapsService {
-    static instance = null;
+    static SCRIPT_ID = 'google-maps-script';
 
     constructor() {
-        if (GoogleMapsService.instance) {
-            return GoogleMapsService.instance;
-        }
-
-        this.isLoaded = false;
-        this.isLoading = false;
-        this.callbacks = [];
+        this.API_KEY = typeof window !== 'undefined' ? window.GOOGLE_MAPS_API_KEY || '' : '';
         this.loadPromise = null;
-
-        GoogleMapsService.instance = this;
     }
 
     /**
-     * Execute all registered callbacks
-     * @private
-     */
-    executeCallbacks() {
-        while (this.callbacks.length) {
-            const callback = this.callbacks.pop();
-            if (typeof callback === 'function') {
-                callback();
-            }
-        }
-    }
-
-    /**
-     * Load Google Maps API
-     * @param {string} apiKey - Google Maps API key
+     * Load Google Maps API if not already loaded
      * @returns {Promise<void>}
      */
-    async load(apiKey) {
+    async load() {
+        if (typeof window === 'undefined') {
+            return Promise.reject(new Error('Google Maps can only be loaded in a browser environment'));
+        }
+
+        if (window.google?.maps) {
+            return Promise.resolve();
+        }
+
         if (this.loadPromise) {
             return this.loadPromise;
         }
 
-        if (this.isLoaded) {
-            return Promise.resolve();
-        }
-
-        if (this.isLoading) {
-            return new Promise((resolve) => {
-                this.callbacks.push(resolve);
-            });
-        }
-
-        this.isLoading = true;
-
-        // If no API key provided, try to get it from config
-        if (!apiKey) {
-            try {
-                const config = await import('../config.js');
-                apiKey = config.default.googleMaps?.apiKey;
-
-                if (!apiKey) {
-                    throw new Error('Google Maps API key is not configured');
-                }
-            } catch (error) {
-                this.isLoading = false;
-                return Promise.reject(error);
-            }
+        if (!this.API_KEY) {
+            return Promise.reject(new Error('Google Maps API key is not configured'));
         }
 
         this.loadPromise = new Promise((resolve, reject) => {
+            // Remove any existing script
+            const existingScript = document.getElementById(GoogleMapsService.SCRIPT_ID);
+            if (existingScript) {
+                document.head.removeChild(existingScript);
+            }
+
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
+            script.id = GoogleMapsService.SCRIPT_ID;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${this.API_KEY}&libraries=places&callback=Function.prototype`;
             script.async = true;
             script.defer = true;
+
             script.onload = () => {
-                this.isLoaded = true;
-                this.isLoading = false;
-                this.executeCallbacks();
+                if (!window.google?.maps) {
+                    reject(new Error('Google Maps API failed to load'));
+                    return;
+                }
                 resolve();
             };
-            script.onerror = (error) => {
-                this.isLoading = false;
-                this.loadPromise = null;
-                const errorDetail = 'Failed to load Google Maps API. Please check your API key and network connection.';
-                console.error(errorDetail, error);
-                // Dispatch error event
-                document.dispatchEvent(new CustomEvent('googleMaps:error', {
-                    detail: { message: errorDetail, error }
-                }));
 
-                reject(new Error(errorDetail));
+            script.onerror = (error) => {
+                console.error('Google Maps API script error:', error);
+                reject(new Error('Failed to load Google Maps API'));
             };
 
-            // Add script to document
             document.head.appendChild(script);
-            console.log('GoogleMapsService: Script element added to document');
         });
 
         return this.loadPromise;
     }
 
+    /**
+     * Alias for load() for backward compatibility
+     */
+    ensureLoaded() {
+        return this.load();
+    }
 }
 
 // Create and export singleton instance
 const googleMapsService = new GoogleMapsService();
 
-export { googleMapsService as default };
-
-// Export a function to load Google Maps API with the provided key
-export const loadGoogleMapsAPI = async () => {
-    // Import the config to get the API key
-    const config = await import('../config.js');
-    const apiKey = config.default.googleMaps?.apiKey;
-
-    if (!apiKey) {
-        const error = new Error('Google Maps API key is not configured');
-        console.error(error);
-        throw error;
-    }
-
-    // The actual loading is handled by the GoogleMapsService class
-    return googleMapsService.load(apiKey);
-};
-
-// Also make it available globally for legacy code
-if (typeof window !== 'undefined') {
-    window.GoogleMapsService = googleMapsService;
-}
+export default googleMapsService;

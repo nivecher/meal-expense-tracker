@@ -2,6 +2,7 @@
 
 # Standard library imports
 from datetime import datetime
+from math import ceil
 
 # Third-party imports
 from flask import (
@@ -21,9 +22,12 @@ from werkzeug import Response
 from app import db
 from app.expenses import bp  # noqa: F401 - Used for route registration
 from app.expenses.forms import ExpenseForm
-from app.expenses.models import Category  # Import Category model
-from app.expenses.models import Expense
-from app.restaurants.models import Restaurant  # Import Restaurant model
+from app.expenses.models import Category, Expense
+from app.expenses.services import get_user_expenses, get_expense_filters, get_filter_options
+from app.restaurants.models import Restaurant
+
+# Constants
+PER_PAGE = 10  # Number of expenses per page
 
 
 @bp.route("/add", methods=["GET", "POST"])
@@ -249,11 +253,53 @@ def _handle_expense_update(
 def _update_expense_from_form(expense: Expense, form: ExpenseForm, category_id: int | None) -> None:
     """Update expense fields from form data."""
     expense.amount = float(form.amount.data)
-    expense.date = datetime.strptime(form.date.data, "%Y-%m-%d")
+    # Handle both string and date objects for the date field
+    if isinstance(form.date.data, str):
+        expense.date = datetime.strptime(form.date.data, "%Y-%m-%d").date()
+    else:
+        expense.date = form.date.data  # Already a date object
     expense.notes = form.notes.data.strip() if form.notes.data else None
     expense.category_id = category_id
     expense.restaurant_id = int(form.restaurant_id.data) if form.restaurant_id.data else None
     expense.meal_type = form.meal_type.data or None
+
+
+@bp.route("/")
+@login_required
+def list_expenses() -> str:
+    """List all expenses for the current user with optional filtering."""
+    # Get filter parameters from request
+    filters = get_expense_filters(request)
+
+    # Get pagination parameters
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", PER_PAGE, type=int)
+    # Get expenses for the current user with filters
+    expenses, total_amount = get_user_expenses(current_user.id, filters)
+    # Calculate pagination
+    total_pages = ceil(len(expenses) / per_page) if expenses else 1
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_expenses = expenses[start_idx:end_idx]
+
+    # Get filter options for the filter form
+    filter_options = get_filter_options(current_user.id)
+    # Prepare filter values for the template
+    search = request.args.get("search", "")
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+    return render_template(
+        "expenses/list.html",
+        expenses=paginated_expenses,
+        total_amount=total_amount,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+        search=search,
+        start_date=start_date,
+        end_date=end_date,
+        **filter_options,
+    )
 
 
 def _handle_error_response(error_msg: str, is_ajax: bool) -> tuple[bool, str]:
@@ -284,8 +330,51 @@ def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
         expense: The expense containing the data
     """
     form.amount.data = expense.amount
-    form.date.data = expense.date.strftime("%Y-%m-%d") if expense.date else ""
-    form.notes.data = expense.notes or ""
-    form.category_id.data = str(expense.category_id) if expense.category_id else ""
-    form.restaurant_id.data = str(expense.restaurant_id) if expense.restaurant_id else ""
-    form.meal_type.data = expense.meal_type or ""
+    form.date.data = expense.date
+    form.notes.data = expense.notes
+    form.meal_type.data = expense.meal_type
+    form.category_id.data = expense.category_id
+    form.restaurant_id.data = expense.restaurant_id
+
+
+@bp.route("/<int:expense_id>", methods=["GET"])
+@login_required
+def expense_details(expense_id: int) -> str:
+    """View details of a specific expense.
+
+    Args:
+        expense_id: The ID of the expense to view
+
+    Returns:
+        Rendered template with expense details
+    """
+    expense = Expense.query.get_or_404(expense_id)
+    if expense.user_id != current_user.id:
+        abort(403)
+    return render_template("expenses/details.html", expense=expense)
+
+
+@bp.route("/<int:expense_id>/delete", methods=["POST"])
+@login_required
+def delete_expense(expense_id: int) -> Response:
+    """Delete an expense.
+
+    Args:
+        expense_id: The ID of the expense to delete
+
+    Returns:
+        Redirect to expenses list or JSON response for AJAX
+    """
+    expense = Expense.query.get_or_404(expense_id)
+    if expense.user_id != current_user.id:
+        abort(403)
+
+    try:
+        db.session.delete(expense)
+        db.session.commit()
+        flash("Expense deleted successfully.", "success")
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting expense: {e}")
+        flash("An error occurred while deleting the expense.", "danger")
+    return redirect(url_for("expenses.list_expenses"))

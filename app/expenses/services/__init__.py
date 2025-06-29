@@ -168,8 +168,9 @@ def get_user_expenses(user_id: int, filters: Dict[str, Any]) -> Tuple[List[Expen
         # Then filter expenses where either notes match or restaurant_id is in the matching restaurants
         query = query.filter(or_(Expense.notes.ilike(search), Expense.restaurant_id.in_(matching_restaurant_ids)))
 
-    # Get total amount - ensure we're using the same filters for the sum
-    total_amount = db.session.scalar(db.select(func.sum(Expense.amount)).select_from(query.subquery())) or 0.0
+    # Get total amount - create a subquery and select the sum
+    subq = query.subquery()
+    total_amount = db.session.scalar(db.select(func.sum(subq.c.amount))) or 0.0
     total_amount = float(total_amount)
 
     # Get paginated expenses
