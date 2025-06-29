@@ -97,6 +97,62 @@ def _process_restaurant_row(row: Dict[str, str], user_id: int) -> Optional[Resta
     )
 
 
+def _process_csv_file(file_stream):
+    """Read and parse CSV file."""
+    try:
+        content = file_stream.read().decode("utf-8")
+        return csv.DictReader(StringIO(content)), None
+    except UnicodeDecodeError:
+        return None, "Invalid file encoding. Please use UTF-8 encoded CSV files."
+
+
+def _process_restaurant_batch(reader, user_id):
+    """Process a batch of restaurant rows from CSV."""
+    imported = 0
+    skipped = 0
+
+    for row_num, row in enumerate(reader, 2):  # Start at 2 for 1-based row numbers
+        try:
+            if not any(row.values()):
+                skipped += 1
+                continue
+
+            restaurant = _process_restaurant_row(row, user_id)
+            if not restaurant:
+                skipped += 1
+                continue
+
+            db.session.add(restaurant)
+            imported += 1
+
+            # Commit in batches
+            if imported % 50 == 0:
+                db.session.commit()
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error("Error processing row %d: %s", row_num, str(e))
+            skipped += 1
+            continue
+
+    return imported, skipped
+
+
+def _generate_result_message(imported: int, skipped: int) -> str:
+    """Generate result message based on import results."""
+    result_msg = f"Successfully imported {imported} restaurants"
+    if skipped > 0:
+        result_msg += f", skipped {skipped} rows (duplicates or invalid data)"
+    return result_msg
+
+
+def _validate_csv_reader(reader) -> Tuple[bool, str]:
+    """Validate the CSV reader has required columns."""
+    if "name" not in (reader.fieldnames or []):
+        return False, "Missing required column: 'name'"
+    return True, ""
+
+
 def import_restaurants_from_csv(file_stream, user) -> Tuple[bool, str]:
     """Import restaurants from a CSV file.
 
@@ -109,51 +165,20 @@ def import_restaurants_from_csv(file_stream, user) -> Tuple[bool, str]:
     """
     try:
         # Read and decode the file
-        try:
-            content = file_stream.read().decode("utf-8")
-            reader = csv.DictReader(StringIO(content))
-        except UnicodeDecodeError:
-            return False, "Invalid file encoding. Please use UTF-8 encoded CSV files."
+        reader, error = _process_csv_file(file_stream)
+        if error:
+            return False, error
 
-        # Check for required columns
-        if "name" not in (reader.fieldnames or []):
-            return False, "Missing required column: 'name'"
+        # Validate CSV structure
+        is_valid, error_msg = _validate_csv_reader(reader)
+        if not is_valid:
+            return False, error_msg
 
-        imported = 0
-        skipped = 0
-
-        for row_num, row in enumerate(reader, 2):  # Start at 2 for 1-based row numbers
-            try:
-                if not any(row.values()):
-                    skipped += 1
-                    continue
-
-                restaurant = _process_restaurant_row(row, user.id)
-                if not restaurant:
-                    skipped += 1
-                    continue
-
-                db.session.add(restaurant)
-                imported += 1
-
-                # Commit in batches
-                if imported % 50 == 0:
-                    db.session.commit()
-
-            except Exception as e:
-                db.session.rollback()
-                logger.error("Error processing row %d: %s", row_num, str(e))
-                skipped += 1
-                continue
-
+        # Process the CSV data
+        imported, skipped = _process_restaurant_batch(reader, user.id)
         db.session.commit()
 
-        # Prepare result message
-        result_msg = f"Successfully imported {imported} restaurants"
-        if skipped > 0:
-            result_msg += f", skipped {skipped} rows (duplicates or invalid data)"
-
-        return True, result_msg
+        return True, _generate_result_message(imported, skipped)
 
     except Exception as e:
         db.session.rollback()

@@ -8,11 +8,12 @@ the Flask application instance for both WSGI and AWS Lambda environments.
 import json
 import logging
 import os
+import traceback
 from typing import Optional, TypedDict
 
 import boto3
 from botocore.exceptions import ClientError
-from flask import Flask
+from flask import current_app, Flask
 from flask_cors import CORS
 from flask_wtf.csrf import generate_csrf
 from sqlalchemy.pool import StaticPool
@@ -86,15 +87,89 @@ def _get_credentials_from_env() -> Optional[DBCredentials]:
     return creds if all(creds.values()) else None
 
 
+def _get_secrets_manager_client(region: str = "us-east-1"):
+    """Create and return a Secrets Manager client.
+
+    Args:
+        region: AWS region to use for the client
+
+    Returns:
+        boto3 client for AWS Secrets Manager
+    """
+    logger = logging.getLogger(__name__)
+    logger.info(f"Initializing Secrets Manager client in region: {region}")
+    session = boto3.Session(region_name=region)
+    client = session.client("secretsmanager")
+    logger.info("Created Secrets Manager client")
+    return client
+
+
+def _describe_secret(client, secret_arn: str) -> bool:
+    """Describe a secret to check permissions.
+
+    Args:
+        client: Secrets Manager client
+        secret_arn: ARN of the secret to describe
+
+    Returns:
+        bool: True if the secret can be described, False otherwise
+    """
+    logger = logging.getLogger(__name__)
+    try:
+        logger.info(f"Describing secret: {secret_arn}")
+        client.describe_secret(SecretId=secret_arn)
+        logger.info("Successfully described secret")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to describe secret: {str(e)}")
+        return False
+
+
+def _extract_credentials_from_secret(secret: dict) -> Optional[DBCredentials]:
+    """Extract and validate credentials from secret data.
+
+    Args:
+        secret: Dictionary containing secret data
+
+    Returns:
+        DBCredentials if valid, None otherwise
+    """
+    logger = logging.getLogger(__name__)
+    logger.info(f"Secret keys: {list(secret.keys())}")
+
+    # Map the secret fields to the expected credential keys
+    secret_creds: DBCredentials = {
+        "username": secret.get("db_username"),
+        "password": secret.get("db_password"),
+        "host": secret.get("db_host"),
+        "port": str(secret.get("db_port", "5432")),
+        "dbname": secret.get("db_name"),
+    }
+
+    # Log the values (without passwords)
+    logger.info(f"Mapped credentials - username: {secret_creds['username']}")
+    logger.info(f"Mapped credentials - host: {secret_creds['host']}")
+    logger.info(f"Mapped credentials - port: {secret_creds['port']}")
+    logger.info(f"Mapped credentials - dbname: {secret_creds['dbname']}")
+    logger.info(f"Mapped credentials - password: {'*' * 8 if secret_creds['password'] else 'None'}")
+
+    # Check if all required fields are present
+    if not all(secret_creds.values()):
+        missing = [k for k, v in secret_creds.items() if not v]
+        error_msg = f"Missing required database credentials in secret: {', '.join(missing)}"
+        logger.error(error_msg)
+        logger.error(f"Available secret keys: {list(secret.keys())}")
+        return None
+
+    return secret_creds
+
+
 def _get_credentials_from_secrets_manager() -> Optional[DBCredentials]:
     """Retrieve database credentials from AWS Secrets Manager.
 
     Returns:
         Optional[DBCredentials]: Dictionary of credentials if successful,
         None otherwise.
-
-    Raises:
-        RuntimeError: If there's an error retrieving or parsing the secret.
     """
     logger = logging.getLogger(__name__)
     secret_arn = os.environ.get("DB_SECRET_ARN")
@@ -105,22 +180,12 @@ def _get_credentials_from_secrets_manager() -> Optional[DBCredentials]:
         return None
 
     try:
-        logger.info(f"Initializing Secrets Manager client in region: {region}")
-        session = boto3.Session(region_name=region)
-        client = session.client("secretsmanager")
-
-        logger.info("Created Secrets Manager client")
-
-        # Try to describe the secret first to check permissions
-        try:
-            logger.info(f"Describing secret: {secret_arn}")
-            client.describe_secret(SecretId=secret_arn)
-            logger.info("Successfully described secret")
-        except Exception as e:
-            logger.error(f"Failed to describe secret: {str(e)}")
+        # Initialize client and verify access
+        client = _get_secrets_manager_client(region)
+        if not _describe_secret(client, secret_arn):
             return None
 
-        # Now get the secret value
+        # Get and parse the secret
         logger.info("Getting secret value...")
         response = client.get_secret_value(SecretId=secret_arn)
 
@@ -131,35 +196,8 @@ def _get_credentials_from_secrets_manager() -> Optional[DBCredentials]:
         logger.info("Parsing secret JSON...")
         secret = json.loads(response["SecretString"])
 
-        # Log all keys in the secret for debugging (without values for security)
-        logger.info(f"Secret keys: {list(secret.keys())}")
-
-        # Map the secret fields to the expected credential keys
-        secret_creds: DBCredentials = {
-            "username": secret.get("db_username"),
-            "password": secret.get("db_password"),
-            "host": secret.get("db_host"),
-            "port": str(secret.get("db_port", "5432")),
-            "dbname": secret.get("db_name"),
-        }
-
-        # Log the values (without passwords)
-        logger.info(f"Mapped credentials - username: {secret_creds['username']}")
-        logger.info(f"Mapped credentials - host: {secret_creds['host']}")
-        logger.info(f"Mapped credentials - port: {secret_creds['port']}")
-        logger.info(f"Mapped credentials - dbname: {secret_creds['dbname']}")
-        logger.info(f"Mapped credentials - password: {'*' * 8 if secret_creds['password'] else 'None'}")
-
-        # Check if all required fields are present
-        if not all(secret_creds.values()):
-            missing = [k for k, v in secret_creds.items() if not v]
-            error_msg = f"Missing required database credentials in secret: {', '.join(missing)}"
-            logger.error(error_msg)
-            logger.error(f"Available secret keys: {list(secret.keys())}")
-            return None
-
-        logger.info("Successfully retrieved and validated database credentials from Secrets Manager")
-        return secret_creds
+        # Extract and validate credentials
+        return _extract_credentials_from_secret(secret)
 
     except ClientError as e:
         error_code = e.response.get("Error", {}).get("Code", "Unknown")
@@ -176,8 +214,6 @@ def _get_credentials_from_secrets_manager() -> Optional[DBCredentials]:
     except Exception as e:
         error_type = type(e).__name__
         logger.error(f"Unexpected error getting database credentials ({error_type}): {str(e)}")
-        import traceback
-
         logger.error(f"Traceback: {traceback.format_exc()}")
         return None
 
@@ -242,32 +278,9 @@ def get_db_credentials() -> DBCredentials:
     raise RuntimeError(error_msg)
 
 
-def _get_database_url() -> str:
-    """Construct a database URL from available configuration sources.
-
-    Priority order:
-    1. DATABASE_URL environment variable
-    2. Credentials from get_db_credentials() (AWS Secrets Manager or env vars)
-    3. SQLite fallback for development only
-
-    Returns:
-        str: A SQLAlchemy-compatible database URL.
-
-    Raises:
-        RuntimeError: If required configuration is missing in production.
-    """
+def _log_environment_vars():
+    """Log relevant environment variables for debugging."""
     logger = logging.getLogger(__name__)
-    logger.info("Constructing database URL...")
-
-    # Determine environment
-    is_production = os.environ.get("FLASK_ENV") == "production" or os.environ.get("ENVIRONMENT") == "production"
-    is_lambda = "LAMBDA_TASK_ROOT" in os.environ
-
-    logger.info(f"Environment: {'production' if is_production else 'development'}")
-    logger.info(f"AWS Lambda: {is_lambda}")
-    logger.info(f"Current working directory: {os.getcwd()}")
-
-    # Log relevant environment variables
     logger.info("Checking environment variables...")
     env_vars = [
         "FLASK_ENV",
@@ -286,12 +299,105 @@ def _get_database_url() -> str:
 
     for var in env_vars:
         if var in os.environ:
-            if "PASSWORD" in var or "SECRET" in var or "KEY" in var:
+            if any(s in var for s in ["PASSWORD", "SECRET", "KEY"]):
                 logger.info(f"{var}: {'*' * 8}")
             else:
                 logger.info(f"{var}: {os.environ[var]}")
         else:
             logger.info(f"{var}: Not set")
+
+
+def _get_database_url_from_creds() -> Optional[str]:
+    """Get database URL from credentials."""
+    logger = logging.getLogger(__name__)
+    try:
+        logger.info("Attempting to get database credentials...")
+        creds = get_db_credentials()
+        logger.info("Successfully retrieved database credentials")
+
+        safe_url = (
+            f"postgresql+psycopg2://{creds['username']}:{'*'*8}@" f"{creds['host']}:{creds['port']}/{creds['dbname']}"
+        )
+        logger.info(f"Constructed database URL: {safe_url}")
+
+        return (
+            f"postgresql+psycopg2://{creds['username']}:{creds['password']}@"
+            f"{creds['host']}:{creds['port']}/{creds['dbname']}"
+        )
+    except Exception as e:
+        logger.warning("Failed to get database credentials: %s", str(e), exc_info=True)
+        return None
+
+
+def _get_sqlite_url() -> str:
+    """Get SQLite database URL for development.
+
+    Returns:
+        str: SQLite database URL
+
+    Raises:
+        RuntimeError: If SQLite database setup fails
+    """
+    logger = logging.getLogger(__name__)
+    logger.warning("No production database configuration found, falling back to SQLite for development")
+    try:
+        db_dir = os.path.join(os.path.dirname(__file__), "instance")
+        os.makedirs(db_dir, exist_ok=True)
+        db_file = os.path.join(db_dir, "meal_expenses.db")
+        sqlite_url = f"sqlite:///{db_file}?check_same_thread=False"
+        logger.warning(f"Using SQLite database at: {sqlite_url}")
+        return sqlite_url
+    except Exception as e:
+        error_msg = f"Failed to set up SQLite database: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise RuntimeError(error_msg) from e
+
+
+def _handle_production_error() -> None:
+    """Handle production environment error when database configuration is missing."""
+    error_msg = (
+        "Database configuration is required in production. "
+        "Please set DATABASE_URL or configure database credentials. "
+        f"Environment: {os.environ.get('FLASK_ENV', 'not set')}"
+    )
+    logger = logging.getLogger(__name__)
+    logger.error(error_msg)
+    if "current_app" in globals() and hasattr(current_app, "logger"):
+        current_app.logger.error(error_msg)
+    raise RuntimeError(error_msg)
+
+
+def _is_production_environment() -> bool:
+    """Check if the application is running in production environment."""
+    return os.environ.get("FLASK_ENV") == "production" or os.environ.get("ENVIRONMENT") == "production"
+
+
+def _log_environment_info() -> None:
+    """Log information about the current environment."""
+    logger = logging.getLogger(__name__)
+    logger.info(f"Environment: {'production' if _is_production_environment() else 'development'}")
+    logger.info(f"AWS Lambda: {'LAMBDA_TASK_ROOT' in os.environ}")
+    logger.info(f"Current working directory: {os.getcwd()}")
+    _log_environment_vars()
+
+
+def _get_database_url() -> str:
+    """Construct a database URL from available configuration sources.
+
+    Priority order:
+    1. DATABASE_URL environment variable
+    2. Credentials from get_db_credentials() (AWS Secrets Manager or env vars)
+    3. SQLite fallback for development only
+
+    Returns:
+        str: A SQLAlchemy-compatible database URL.
+
+    Raises:
+        RuntimeError: If required configuration is missing in production.
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("Constructing database URL...")
+    _log_environment_info()
 
     # 1. Check for explicit DATABASE_URL first
     if db_url := os.getenv("DATABASE_URL"):
@@ -299,52 +405,15 @@ def _get_database_url() -> str:
         return _ensure_proper_db_url(db_url)
 
     # 2. Try to get credentials from environment or Secrets Manager
-    try:
-        logger.info("Attempting to get database credentials...")
-        creds = get_db_credentials()
-        logger.info("Successfully retrieved database credentials")
-
-        # Log the constructed URL without password
-        safe_url = (
-            f"postgresql+psycopg2://{creds['username']}:{'*'*8}@{creds['host']}:{creds['port']}/{creds['dbname']}"
-        )
-        logger.info(f"Constructed database URL: {safe_url}")
-
-        # Construct the actual URL with password
-        db_url = f"postgresql+psycopg2://{creds['username']}:{creds['password']}@{creds['host']}:{creds['port']}/{creds['dbname']}"
-        return _ensure_proper_db_url(db_url)
-
-    except Exception as e:
-        error_msg = f"Failed to get database credentials: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-
-        # In production, fail fast if we can't get credentials
-        if is_production or is_lambda:
-            logger.error("Running in production/Lambda - failing fast due to missing database credentials")
-            raise RuntimeError("Failed to get database credentials in production environment") from e
+    if db_url := _get_database_url_from_creds():
+        return db_url
 
     # 3. Fall back to SQLite for development only
-    if not is_production:
-        logger.warning("No production database configuration found, falling back to SQLite for development")
-        try:
-            db_dir = os.path.join(os.path.dirname(__file__), "instance")
-            os.makedirs(db_dir, exist_ok=True)
-            db_file = os.path.join(db_dir, "meal_expenses.db")
-            sqlite_url = f"sqlite:///{db_file}?check_same_thread=False"
-            logger.warning(f"Using SQLite database at: {sqlite_url}")
-            return sqlite_url
-        except Exception as e:
-            logger.error(f"Failed to set up SQLite database: {str(e)}", exc_info=True)
-            raise RuntimeError("Failed to set up SQLite database") from e
+    if not _is_production_environment():
+        return _get_sqlite_url()
 
-    # If we get here, we're in production and couldn't get a database URL
-    error_msg = (
-        "Database configuration is required in production. "
-        "Please set DATABASE_URL or configure database credentials. "
-        f"Environment: {os.environ.get('FLASK_ENV', 'not set')}"
-    )
-    app_logger.error(error_msg)
-    raise RuntimeError(error_msg)
+    # 4. Handle production error case
+    _handle_production_error()
 
 
 def _ensure_proper_db_url(db_url: str) -> str:

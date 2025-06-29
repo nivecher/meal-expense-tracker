@@ -56,8 +56,11 @@ def app() -> Generator[Flask, None, None]:
     with app.app_context():
         db.session.remove()
         db.drop_all()
-    os.close(db_fd)
-    os.unlink(db_path)
+
+    # Clean up the temporary database file if it exists
+    db_path = app.config["SQLALCHEMY_DATABASE_URI"].replace("sqlite:///", "")
+    if os.path.exists(db_path):
+        os.unlink(db_path)
 
 
 @pytest.fixture

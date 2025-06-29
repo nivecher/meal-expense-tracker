@@ -85,7 +85,7 @@ def index():
 
         return render_template("main/index.html", **template_vars)
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error in index route")
         return (
             render_template(
