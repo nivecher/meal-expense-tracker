@@ -1,0 +1,156 @@
+{% macro expense_form(form, expense=None, is_edit=false) %}
+    <form id="expenseForm"
+          method="POST"
+          novalidate
+          action="{% if is_edit %}{{ url_for('expenses.edit_expense', expense_id=expense.id) }}{% else %}{{ url_for('expenses.add_expense', restaurant_id=request.view_args.get('restaurant_id') ) if request.view_args and request.view_args.get('restaurant_id') else url_for('expenses.add_expense') }}{% endif %}"
+          data-ajax
+          data-validate>
+        {% if form %}
+            {{ form.hidden_tag() }}
+        {% else %}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% endif %}
+        <div id="formErrors" class="alert alert-danger d-none"></div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                {{ form.restaurant_id.label(class="form-label") }}
+                {{ form.restaurant_id(class="form-select" + (' is-invalid' if form.restaurant_id.errors else '') ) }}
+                {% if form.restaurant_id.errors %}<div class="invalid-feedback">{{ form.restaurant_id.errors[0] }}</div>{% endif %}
+                <div class="form-text">
+                    <a href="{{ url_for("restaurants.add_restaurant") }}" target="_blank">Add a new restaurant</a>
+                </div>
+            </div>
+            <div class="col-md-6">
+                {{ form.date.label(class="form-label") }}
+                {% set date_value = "" %}
+                {% if form.date.data %}
+                    {% if form.date.data is string %}
+                        {% set date_value = form.date.data %}
+                    {% else %}
+                        {% set date_value = form.date.data.strftime('%Y-%m-%d') %}
+                    {% endif %}
+                {% endif %}
+                <input type="date"
+                       id="{{ form.date.id }}"
+                       name="{{ form.date.name }}"
+                       class="form-control{{ ' is-invalid' if form.date.errors else '' }}"
+                       value="{{ date_value }}"
+                       required>
+                {% if form.date.errors %}<div class="invalid-feedback">{{ form.date.errors[0] }}</div>{% endif %}
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                {{ form.amount.label(class="form-label") }}
+                <div class="input-group">
+                    <span class="input-group-text">$</span>
+                    {{ form.amount(class="form-control" + (' is-invalid' if form.amount.errors else '') , step="0.01", min="0.01") }}
+                </div>
+                {% if form.amount.errors %}<div class="invalid-feedback d-block">{{ form.amount.errors[0] }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+                <label for="meal_type" class="form-label">Meal Type (Optional)</label>
+                <select class="form-select" id="meal_type" name="meal_type">
+                    <option value="">Select a meal type (optional)</option>
+                    {% for mt in ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Groceries', 'Other'] %}
+                        <option value="{{ mt }}"
+                                {% if form and form.meal_type.data == mt %}selected{% endif %}>{{ mt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                {{ form.category_id.label(class="form-label") }}
+                {{ form.category_id(class="form-select" + (' is-invalid' if form.category_id.errors else '') ) }}
+                {% if form.category_id.errors %}<div class="invalid-feedback">{{ form.category_id.errors[0] }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+                {{ form.notes.label(class="form-label") }}
+                {{ form.notes(class="form-control" + (' is-invalid' if form.notes.errors else '') ,
+                placeholder="Brief description of the expense") }}
+                {% if form.notes.errors %}<div class="invalid-feedback">{{ form.notes.errors[0] }}</div>{% endif %}
+            </div>
+        </div>
+        <div class="d-flex justify-content-between">
+            {% if expense and expense.restaurant %}
+                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
+                   class="btn btn-secondary">Cancel</a>
+            {% else %}
+                <a href="{{ url_for("main.index") }}" class="btn btn-secondary">Cancel</a>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">{{ 'Update' if is_edit else 'Add' }} Expense</button>
+        </div>
+    </form>
+{% endmacro %}
+{% macro expense_scripts() %}
+    <!-- Expense form handler (handles form submission via Fetch API) -->
+    <script type="module"
+            src="{{ url_for('static', filename='js/pages/expense-form-handler.js') }}"></script>
+    <!-- Category and restaurant type handling -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Track if category was manually changed
+            let categoryManuallyChanged = false;
+
+            // Function to update category based on restaurant type
+            function updateCategory(restaurantId) {
+                if (categoryManuallyChanged) return;
+
+                // Skip if no restaurant selected
+                if (!restaurantId) return;
+
+                // Get the category select element
+                const categorySelect = document.getElementById('category_id');
+                if (!categorySelect) return;
+
+                // Get the restaurant type from the selected option
+                const restaurantSelect = document.getElementById('restaurant_id');
+                const selectedOption = restaurantSelect?.options[restaurantSelect.selectedIndex];
+                const restaurantType = selectedOption?.dataset.type;
+
+                if (!restaurantType) return;
+
+                // Find the category that matches the restaurant type
+                for (let i = 0; i < categorySelect.options.length; i++) {
+                    const option = categorySelect.options[i];
+                    if (option.text.toLowerCase() === restaurantType.toLowerCase()) {
+                        categorySelect.value = option.value;
+                        break;
+                    }
+                }
+            }
+
+            // Set up event listeners
+            function setupExpenseFormListeners() {
+                const form = document.getElementById('expenseForm');
+                if (!form) return;
+
+                // Category change handler
+                const categorySelect = document.getElementById('category_id');
+                if (categorySelect) {
+                    categorySelect.addEventListener('change', () => {
+                        categoryManuallyChanged = true;
+                    });
+                }
+
+                // Restaurant change handler
+                const restaurantSelect = document.getElementById('restaurant_id');
+                if (restaurantSelect) {
+                    restaurantSelect.addEventListener('change', (e) => {
+                        updateCategory(e.target.value);
+                    });
+                }
+            }
+
+
+            // Initialize
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', setupExpenseFormListeners);
+            } else {
+                // DOM already loaded, initialize immediately
+                setupExpenseFormListeners();
+            }
+        });
+    </script>
+{% endmacro %}

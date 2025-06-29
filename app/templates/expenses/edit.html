@@ -1,0 +1,32 @@
+{% extends "main/base.html" %}
+{% from "expenses/macros.html" import expense_form, expense_scripts %}
+{% block title %}Edit Expense{% endblock %}
+{% block content %}
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="mb-0">Edit Expense</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="alert-container">
+                            {% with messages = get_flashed_messages(with_categories=true) %}
+                                {% if messages %}
+                                    {% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+                        {{ expense_form(form=form, expense=expense, is_edit=true) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block scripts %}
+    {{ super() }}
+    {{ expense_scripts() }}
+    <script type="module"
+            src="{{ url_for('static', filename='js/pages/expense-form.js') }}"></script>
+{% endblock %}

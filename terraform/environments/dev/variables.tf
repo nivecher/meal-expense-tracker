@@ -32,6 +32,11 @@ variable "db_allocated_storage" {
   type        = number
 }
 
+variable "vpc_cidr" {
+  description = "The CIDR block for the VPC"
+  type        = string
+}
+
 # Security & Access
 variable "allowed_ip_ranges" {
   description = "List of allowed IP ranges for accessing the application"

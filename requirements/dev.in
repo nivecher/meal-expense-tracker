@@ -5,10 +5,12 @@ pytest>=8.0.0,<9.0.0
 pytest-cov>=4.0.0,<5.0.0
 factory-boy>=3.3.0,<4.0.0
 Faker>=25.0.0,<26.0.0
+openpyxl>=3.1.0,<4.0.0  # Excel file handling
 
 # Linting & Formatting
 autoflake>=1.7.0,<2.0.0
 black>=24.0.0,<25.0.0  # Downgraded for safety compatibility
+djlint>=1.19.0,<2.0.0  # HTML template linter - using 1.19.0 as it's the latest available
 flake8>=7.0.0,<8.0.0
 isort>=5.12.0,<6.0.0
 mypy>=1.0.0,<2.0.0

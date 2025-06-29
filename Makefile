@@ -154,11 +154,56 @@ run:
 	FLASK_APP=$(FLASK_APP) FLASK_ENV=$(FLASK_ENV) flask run --port $(PORT)
 
 ## Run linters
-.PHONY: lint
-lint:
-	@echo "\n\033[1m=== Running Python Linters ===\033[0m"
-	@flake8 app/ tests/
-	@black --check app/ tests/ migrations/ */*.py *.py
+.PHONY: lint lint-all lint-python lint-html lint-js lint-css
+
+## Run all linters
+lint: lint-python lint-html lint-js lint-css
+
+## Run all linters including optional ones
+lint-all: lint lint-optional
+
+## Python linter
+lint-python:
+	@echo "\n\033[1m=== Running Python Linter ===\033[0m"
+	@flake8 app tests
+	@black --check app tests
+
+## HTML template linter
+lint-html:
+	@echo "\n\033[1m=== Running HTML Template Linter ===\033[0m"
+	@djlint app/templates --profile=django --lint
+
+## JavaScript linter (if you add JavaScript files later)
+.PHONY: lint-js
+lint-js:
+	@if [ -d "app/static/js" ]; then \
+		echo "\n\033[1m=== Running JavaScript Linter ===\033[0m"; \
+		npx eslint app/static/js --ext .js; \
+	fi
+
+## CSS linter
+.PHONY: lint-css
+lint-css:
+	@if [ -d "app/static/css" ]; then \
+		echo "\n\033[1m=== Running CSS Linter ===\033[0m"; \
+		npx stylelint "app/static/css/**/*.css"; \
+	fi
+
+## Optional linters (not run by default)
+.PHONY: lint-optional
+lint-optional: lint-security lint-docker
+
+## Security linter
+.PHONY: lint-security
+lint-security:
+	@echo "\n\033[1m=== Running Security Linter ===\033[0m"
+	@pip-audit || echo "pip-audit not installed, skipping security audit"
+
+format-html:
+	@echo "\n\033[1m=== Formatting HTML Templates ===\033[0m"
+	@djlint app/templates --profile=django --reformat
+
+format: format-html
 	@echo "\n\033[1m=== Running Shell Script Linter ===\033[0m"
 	@find . -type f -name '*.sh' \
 		-not -path '*/.*' \
@@ -168,12 +213,13 @@ lint:
 
 ## Format code
 .PHONY: format
-format: format-python format-shell
+format: format-html format-python format-shell
 
 ## Format Python code
 .PHONY: format-python
 format-python:
 	@echo "\n\033[1m=== Formatting Python code ===\033[0m"
+	@isort app/ tests/ migrations/ *.py
 	@black app/ tests/ migrations/ */*.py *.py
 	@autoflake --in-place --remove-all-unused-imports --recursive app/ tests/
 
@@ -305,7 +351,8 @@ tf-plan: tf-init
 		echo "Please create the file with the required variables for the $(TF_ENV) environment."; \
 		exit 1; \
 	fi
-	@cd terraform && terraform plan \
+	@cd terraform && \
+	terraform plan \
 		-var-file=environments/$(TF_ENV)/terraform.tfvars \
 		-out=environments/$(TF_ENV)/tfplan-$(TF_ENV) \
 		-var="environment=$(TF_ENV)" \
@@ -321,7 +368,8 @@ tf-apply:
 		exit 1; \
 	fi
 	@echo "Applying Terraform changes to environment: $(TF_ENV)"
-	@cd terraform && terraform apply \
+	@cd terraform && \
+	terraform apply \
 		-input=false \
 		-lock=true \
 		-parallelism=$(TF_PARALLELISM) \
@@ -333,7 +381,8 @@ tf-destroy:
 	@echo "WARNING: This will destroy all resources in the $(TF_ENV) environment!"
 	@read -p "Are you sure you want to continue? [y/N] " confirm && \
 		[ $$confirm = y ] || [ $$confirm = Y ] || (echo "Aborting..."; exit 1)
-	@cd terraform && terraform destroy \
+	@cd terraform && \
+	terraform destroy \
 		-var-file=environments/$(TF_ENV)/terraform.tfvars \
 		-var="environment=$(TF_ENV)" \
 		-input=false \
@@ -349,8 +398,10 @@ tf-validate:
 		exit 1; \
 	fi
 	@echo "Validating Terraform configuration for $(TF_ENV)..."
-	@cd "$(TF_ENV_DIR)" && terraform init -backend=false
-	@cd "$(TF_ENV_DIR)" && terraform validate
+	@cd terraform && \
+	cd "environments/$(TF_ENV)" && \
+	terraform init -backend=false && \
+	terraform validate
 
 ## Format Terraform files
 .PHONY: tf-fmt
@@ -360,7 +411,9 @@ tf-fmt:
 		exit 1; \
 	fi
 	@echo "Formatting Terraform files in $(TF_ENV_DIR)..."
-	@cd "$(TF_ENV_DIR)" && terraform fmt -recursive
+	@cd terraform && \
+	cd "environments/$(TF_ENV)" && \
+	terraform fmt -recursive
 
 ## Clean Terraform lock files and cache
 .PHONY: tf-clean
@@ -370,7 +423,10 @@ tf-clean:
 		exit 1; \
 	fi
 	@echo "Cleaning Terraform lock files and cache for $(TF_ENV)..."
-	@rm -rf "$(TF_ENV_DIR)/.terraform" "$(TF_ENV_DIR)/.terraform.lock.hcl" "$(TF_ENV_DIR)/tfplan-$(TF_ENV)"
+	@cd terraform && \
+	rm -rf "environments/$(TF_ENV)/.terraform" \
+		"environments/$(TF_ENV)/.terraform.lock.hcl" \
+		"environments/$(TF_ENV)/tfplan-$(TF_ENV)"
 	@echo "Terraform cache, lock files, and plan files have been removed"
 
 ## Check infrastructure
@@ -395,9 +451,12 @@ trivy:
 		exit 1; \
 	fi
 	@echo "📋 Scanning Terraform files..."
-	@cd terraform/environments/$(TF_ENV) && trivy config --tf-vars terraform.tfvars .
+	@cd terraform && \
+	cd environments/$(TF_ENV) && \
+	trivy config --tf-vars terraform.tfvars .
 	@echo "\n📋 Scanning CloudFormation files..."
-	@find . -path "*/cloudformation/*.y*ml" -type f -exec echo "Scanning {}" \; -exec trivy config "{}" \;
+	@cd terraform && \
+	find . -path "*/cloudformation/*.y*ml" -type f -exec echo "Scanning {}" \; -exec trivy config "{}" \;
 	@echo "✅ Trivy scan completed"
 
 # -------------------------------------------------------

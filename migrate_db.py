@@ -3,8 +3,10 @@
 import logging
 import os
 import traceback
+
 from flask import current_app
-from flask_migrate import current, history, upgrade as _upgrade
+from flask_migrate import current, history
+from flask_migrate import upgrade as _upgrade
 from sqlalchemy import inspect, text
 
 from app import create_app

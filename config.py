@@ -8,11 +8,12 @@ This module handles all configuration for the application, including:
 Environment variables take precedence over .env file values.
 """
 
-import os
 import json
-import boto3
 import logging
+import os
 import urllib.parse
+
+import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
@@ -74,6 +75,27 @@ class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY") or "you-will-never-guess"
     DEBUG = False
     TESTING = False
+
+    # Google Places API
+    GOOGLE_PLACES_API_KEY = None
+
+    def __init__(self):
+        """Initialize configuration."""
+        # Try to get API key from environment first, then from AWS Secrets Manager
+        self.GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY")
+
+        # If not in environment, try to get from AWS Secrets Manager
+        if not self.GOOGLE_PLACES_API_KEY and os.environ.get("AWS_SECRETS_MANAGER_ENABLED", "false").lower() == "true":
+            try:
+                secret_arn = os.environ.get("GOOGLE_PLACES_API_KEY_SECRET_ARN")
+                if secret_arn:
+                    secret = get_secret(secret_arn)
+                    self.GOOGLE_PLACES_API_KEY = secret.get("api_key")
+            except Exception as e:
+                logger.warning("Failed to fetch Google Places API key from Secrets Manager: %s", str(e))
+
+        if not self.GOOGLE_PLACES_API_KEY:
+            logger.warning("Google Places API key not configured. " "Google Places features will be disabled.")
 
     # Database settings
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -181,7 +203,7 @@ class Config:
             )
 
         logger.warning("No database configuration found, defaulting to SQLite")
-        db_path = os.path.join(basedir, "instance/dev.db")
+        db_path = os.path.join(basedir, "instance/meal_expenses.db")
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         return f"sqlite:///{db_path}?check_same_thread=False"
 

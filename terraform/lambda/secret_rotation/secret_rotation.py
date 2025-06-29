@@ -225,10 +225,13 @@ def set_secret(service_client, arn, token):
 
             with conn.cursor() as cur:
                 # Set the new password
-                sql = """
-                ALTER USER %s WITH PASSWORD %s;
+                # Format the username directly into the query string after proper escaping
+                # to prevent SQL injection while maintaining parameterization for the password
+                username = pending_dict["db_username"].replace('"', '""')
+                sql = f"""
+                ALTER USER "{username}" WITH PASSWORD %s;
                 """
-                cur.execute(sql, (pending_dict["db_username"], pending_dict["db_password"]))
+                cur.execute(sql, (pending_dict["db_password"],))
                 conn.commit()
 
             logger.info("Successfully set new password in database")

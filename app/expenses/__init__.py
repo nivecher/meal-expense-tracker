@@ -1,34 +1,38 @@
+"""Expenses blueprint."""
+
 from flask import Blueprint
 
-from app.extensions import db
-from app.expenses.category import Category
+from app import db
 
-bp = Blueprint("expenses", __name__, url_prefix="/expenses")
+from .models import Category
+
+bp = Blueprint("expenses", __name__)
 
 
 def init_default_categories():
     """Initialize default expense categories if they don't exist."""
     default_categories = [
-        ("Dining", "Restaurant meals, takeout, coffee shops"),
-        ("Groceries", "Grocery store purchases"),
-        ("Entertainment", "Movies, concerts, events"),
-        ("Transportation", "Public transit, taxis, rideshares"),
-        ("Travel", "Hotels, flights, vacation expenses"),
-        ("Utilities", "Bills and utilities"),
-        ("Shopping", "Retail and online shopping"),
-        ("Other", "Miscellaneous expenses"),
+        {"name": "Food", "description": "General food expenses"},
+        {"name": "Drinks", "description": "Beverages and drinks"},
+        {"name": "Groceries", "description": "Grocery shopping"},
+        {"name": "Dining Out", "description": "Restaurant and takeout"},
+        {"name": "Transportation", "description": "Transportation costs"},
+        {"name": "Utilities", "description": "Bills and utilities"},
+        {"name": "Entertainment", "description": "Movies, events, etc."},
+        {"name": "Other", "description": "Miscellaneous expenses"},
     ]
 
-    for name, description in default_categories:
-        if not Category.query.filter_by(name=name).first():
-            category = Category(name=name, description=description)
+    for category_data in default_categories:
+        if not Category.query.filter_by(name=category_data["name"]).first():
+            category = Category(name=category_data["name"], description=category_data["description"])
             db.session.add(category)
 
     try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        print(f"Error initializing default categories: {e}")
+        raise e
 
 
-from app.expenses import routes  # noqa: E402
+# Import routes after blueprint creation to avoid circular imports
+from . import routes  # noqa: E402

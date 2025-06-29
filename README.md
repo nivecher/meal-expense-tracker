@@ -66,7 +66,7 @@ You can check the current version in several ways:
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Initial Prerequisites
 
 - Python 3.13+
 - Docker & Docker Compose
@@ -123,6 +123,46 @@ pytest --cov=app --cov-report=term-missing
    # Run isort
    isort app tests
 ```
+
+## 🗄️ Database Management
+
+The application includes a utility script for database initialization and management:
+
+### Initializing the Database
+
+```bash
+# Basic initialization (development environment)
+python init_db.py
+
+# Initialize for a specific environment
+python init_db.py --env=testing
+
+# Reset database (drops all tables and recreates them)
+python init_db.py --reset
+
+# Run database migrations after initialization
+python init_db.py --migrate
+
+# Combine options (reset and migrate)
+python init_db.py --reset --migrate
+```
+
+### Available Options
+
+- `--env`: Environment to use (default: development)
+  - Choices: development, testing, production
+- `--reset`: Drop all tables before creating them
+- `--migrate`: Run database migrations after initialization
+
+### Safety Features
+
+- The script will prompt for confirmation before dropping tables
+- Uses proper transaction management for database operations
+- Includes comprehensive error handling and logging
+
+### Environment Configuration
+
+The script respects the application's environment configuration, ensuring proper database connection settings for each environment.
 
 ## 📚 Documentation
 
@@ -194,13 +234,13 @@ To update the requirements:
    make requirements
    ```
 
-1. Install the updated requirements:
+3. Install the updated requirements:
 
    ```bash
    pip-sync requirements.txt requirements-dev.txt
    ```
 
-1. **Run the development server**:
+4. **Run the development server**:
 
    ```bash
    make run
@@ -246,12 +286,13 @@ We provide a unified script to package both the application and its dependencies
 ```
 
 This will create the following files:
+
 - `dist/app.zip` - The application package
 - `dist/layers/python-dependencies.zip` - The dependencies layer
 
 ## 🚀 AWS Lambda Deployment
 
-### Prerequisites
+### Deployment Prerequisites
 
 - AWS Account with appropriate permissions
 - AWS CLI configured with credentials

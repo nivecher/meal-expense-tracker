@@ -5,8 +5,6 @@ from typing import Any, Dict, Optional
 from flask import Flask
 from flask.testing import FlaskClient as BaseFlaskClient
 
-from app.extensions import db
-
 
 class TestConfig:
     """Test configuration with SQLite in-memory database for SQLAlchemy 2.0."""
@@ -36,6 +34,11 @@ class TestConfig:
         "autoflush": False,
     }
 
+    # Login manager configuration
+    LOGIN_DISABLED = False
+    LOGIN_VIEW = "auth.login"
+    LOGIN_MESSAGE_CATEGORY = "info"
+
     @classmethod
     def init_app(cls, app: Flask) -> Flask:
         """Initialize the application with this configuration.
@@ -50,23 +53,34 @@ class TestConfig:
         app.config.from_object(cls)
 
         # Initialize extensions
-        from app.extensions import login_manager, migrate
+        from app.auth.models import init_login_manager
+        from app.extensions import db, login_manager, migrate
 
-        # Initialize SQLAlchemy with the app
+        # Initialize SQLAlchemy
         db.init_app(app)
 
         # Initialize Flask-Migrate
         migrate.init_app(app, db)
 
+        # Initialize Login Manager with authentication
+        login_manager.init_app(app)
+        login_manager.login_view = cls.LOGIN_VIEW
+        login_manager.login_message_category = cls.LOGIN_MESSAGE_CATEGORY
+        init_login_manager(login_manager)
+
+        # Ensure login manager is registered in app.extensions
+        if "login_manager" not in app.extensions:
+            app.extensions["login_manager"] = login_manager
+
         # Import all models to ensure they are registered with SQLAlchemy
         from app.auth import models as auth_models  # noqa: F401
-        from app.expenses import models as expense_models  # noqa: F401
-        from app.expenses.category import Category  # noqa: F401
-        from app.restaurants import models as restaurant_models  # noqa: F401
-        from app.expenses import init_default_categories
 
         # Initialize login manager
         from app.auth.models import init_login_manager
+        from app.expenses import init_default_categories
+        from app.expenses import models as expense_models  # noqa: F401
+        from app.expenses.category import Category  # noqa: F401
+        from app.restaurants import models as restaurant_models  # noqa: F401
 
         login_manager.init_app(app)
         init_login_manager(login_manager)

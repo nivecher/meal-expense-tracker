@@ -1,18 +1,23 @@
 [build-system]
-requires = [ "setuptools>=45", "wheel",]
+requires = [ "setuptools>=45", "wheel", "setuptools-scm>=8.0.0",]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "meal-expense-tracker"
-version = "0.5.2.dev0"
+dynamic = [ "version",]
 description = "A Flask-based web application for tracking meal expenses"
-requires-python = ">=3.13,<3.14"  # Match Lambda runtime version
+requires-python = ">=3.13,<3.14"
 [[project.authors]]
 name = "nivecher"
 email = "mtd37@hotmail.com"
 
 [project.urls]
 homepage = "https://github.com/nivecher/meal-expense-tracker"
+
+[tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+write_to = "app/_version.py"
+write_to_template = "__version__ = \"{version}\"\n"
 
 [tool.setuptools]
 packages = [ "app",]
@@ -21,7 +26,7 @@ zip-safe = false
 
 [tool.black]
 line-length = 120
-target-version = [ "py312",]  # Using the latest supported version by Black as of now
+target-version = [ "py312",]
 include = "\\.pyi?$"
 
 [tool.isort]
@@ -29,8 +34,19 @@ profile = "black"
 multi_line_output = 3
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "0.5"
 ignore_missing_imports = true
+
+[tool.djlint]
+profile = "django"
+indent = 4
+max_line_length = 120
+require_pragma = false
+format_attribute_template_tags = true
+format_css = true
+format_js = true
+use_gitignore = true
+extend_include = [ "*.html", "*.jinja", "*.j2",]
 
 [tool.pytest.ini_options]
 testpaths = [ "tests",]
@@ -45,3 +61,9 @@ omit = [ "tests/*",]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+[tool.djlint.ignore]
+ignore = [ "venv/*", ".git/*", "node_modules/*", "*.min.*",]
+
+[tool.djlint.extend]
+rules = [ "H025", "H006", "H007",]

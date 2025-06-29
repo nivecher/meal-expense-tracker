@@ -1,7 +1,9 @@
 import sys
+
+from sqlalchemy import select
+
 from app import create_app, db
 from app.auth.models import User
-from sqlalchemy import select
 
 
 def test_login_flow():

@@ -1,0 +1,105 @@
+{% extends "main/base.html" %}
+{% block title %}
+    Find Restaurants - Meal Expense Tracker
+{% endblock title %}
+{% block head_extra %}
+    {{ super() }}
+    <style>
+        #map {
+            min-height: 70vh;
+            width: 100%;
+            background-color: #f8f9fa;
+        }
+
+        .search-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .map-info-window {
+            padding: 8px;
+            min-width: 200px;
+        }
+
+        .map-info-window h6 {
+            margin: 0 0 8px 0;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .map-info-window p {
+            margin: 0 0 4px 0;
+            font-size: 0.875rem;
+        }
+
+        .map-info-window .btn {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .back-button {
+            margin-bottom: 1.5rem;
+        }
+    </style>
+{% endblock head_extra %}
+{% block content %}
+    <div class="container mt-4">
+        <!-- Back button -->
+        <div class="back-button">
+            <a href="{{ url_for("restaurants.list_restaurants") }}"
+               class="btn btn-outline-secondary btn-sm"
+               id="back-button">
+                <i class="fas fa-arrow-left me-1"></i> Back to Restaurants
+            </a>
+        </div>
+        <div class="row mb-4">
+            <div class="col">
+                <h1>Find Restaurants</h1>
+                <p class="lead">Search for restaurants near you or a specific location</p>
+            </div>
+        </div>
+        <!-- Search Form -->
+        <div class="row mb-4">
+            <div class="col-md-8 offset-md-2">
+                <form id="restaurant-search-form"
+                      class="mb-3"
+                      data-module="restaurant-search">
+                    <div class="input-group">
+                        <input type="text"
+                               class="form-control form-control-lg"
+                               id="search-query"
+                               name="q"
+                               placeholder="Search for restaurants..."
+                               aria-label="Search for restaurants"
+                               value="{{ query|default('', true) }}"
+                               required>
+                        <button class="btn btn-primary" type="submit" id="search-button">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+                        <button type="button"
+                                id="current-location-btn"
+                                class="btn btn-outline-secondary"
+                                title="Use current location">
+                            <i class="bi bi-geo-alt"></i>
+                        </button>
+                    </div>
+                </form>
+                <div id="search-status"></div>
+            </div>
+        </div>
+        <!-- Map Container -->
+        <div class="row">
+            <div class="col-12">
+                <div id="map"></div>
+            </div>
+        </div>
+        <!-- Search Results (populated dynamically) -->
+        <div id="search-results" class="mt-4"></div>
+    </div>
+{% endblock content %}
+{% block scripts %}
+    {{ super() }}
+    <!-- Main restaurant search module that handles both map and search functionality -->
+    <script type="module"
+            src="{{ url_for('static', filename='js/pages/restaurant-search.js') }}"></script>
+{% endblock scripts %}

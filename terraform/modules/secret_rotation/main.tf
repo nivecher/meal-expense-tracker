@@ -146,6 +146,7 @@ resource "aws_security_group" "lambda_sg" {
   description = "Security group for secret rotation Lambda function"
   vpc_id      = var.vpc_id
 
+  # Allow HTTPS outbound to AWS services within VPC
   egress {
     from_port   = 443
     to_port     = 443
@@ -154,20 +155,30 @@ resource "aws_security_group" "lambda_sg" {
     description = "Allow HTTPS outbound to AWS services within VPC"
   }
 
+  # Allow outbound to RDS on port 5432
+  egress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+    description = "Allow outbound to RDS on port 5432"
+  }
+
   tags = {
     Name = "${var.app_name}-secret-rotation-sg"
   }
 }
 
-# Allow Lambda to access RDS
+# Allow Lambda to access RDS if RDS security group ID is provided
 resource "aws_security_group_rule" "lambda_to_rds" {
+  count                    = var.rds_security_group_id != "" ? 1 : 0
   type                     = "ingress"
   from_port                = 5432
   to_port                  = 5432
   protocol                 = "tcp"
   security_group_id        = var.rds_security_group_id
   source_security_group_id = aws_security_group.lambda_sg.id
-  description              = "Allow Lambda to access RDS"
+  description              = "Allow PostgreSQL access from Secret Rotation Lambda"
 }
 
 # Enable rotation for the secret

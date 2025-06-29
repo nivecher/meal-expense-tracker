@@ -14,12 +14,25 @@ import boto3
 from botocore.exceptions import ClientError
 from flask import Flask
 from flask_cors import CORS
+from flask_wtf.csrf import generate_csrf
 from sqlalchemy.pool import StaticPool
 
 from config import config
-from ._version import __version__
+
 from .extensions import db, login_manager, migrate
 
+try:
+    from importlib.metadata import version as get_package_version
+
+    __version__ = get_package_version("meal-expense-tracker")
+except ImportError:
+    # Fallback for development/editable installs
+    try:
+        from setuptools_scm import get_version
+
+        __version__ = get_version(fallback_version="0.0.0.dev0")
+    except ImportError:
+        __version__ = "0.0.0.dev0"
 
 # Version information dictionary used throughout the application
 version = {"app": __version__, "api": "v1"}
@@ -42,13 +55,34 @@ def _get_credentials_from_env() -> Optional[DBCredentials]:
         Optional[DBCredentials]: Dictionary of credentials if all required
         environment variables are set, None otherwise.
     """
+    logger = logging.getLogger(__name__)
+
+    # Define required environment variables
+    required_vars = ["DB_USERNAME", "DB_PASSWORD", "DB_HOST", "DB_NAME"]
+    optional_vars = {"DB_PORT": "5432"}  # var_name: default_value
+
+    # Check for missing required variables
+    missing_vars = [var for var in required_vars if not os.environ.get(var)]
+    if missing_vars:
+        logger.debug(f"Missing required environment variables: {', '.join(missing_vars)}")
+        return None
+
+    # Get all required variables
     creds: DBCredentials = {
-        "username": os.environ.get("DB_USERNAME"),
-        "password": os.environ.get("DB_PASSWORD"),
-        "host": os.environ.get("DB_HOST"),
-        "port": os.environ.get("DB_PORT", "5432"),
-        "dbname": os.environ.get("DB_NAME"),
+        "username": os.environ["DB_USERNAME"],  # Required, already checked above
+        "password": os.environ["DB_PASSWORD"],  # Required, already checked above
+        "host": os.environ["DB_HOST"],  # Required, already checked above
+        "port": os.environ.get("DB_PORT", optional_vars["DB_PORT"]),
+        "dbname": os.environ["DB_NAME"],  # Required, already checked above
     }
+
+    # Log that we found all required environment variables
+    logger.debug("Found all required database credentials in environment variables")
+
+    # Log a safe version of the credentials (without password)
+    safe_creds = creds.copy()
+    safe_creds["password"] = "*" * 8
+    logger.debug(f"Database credentials from environment: {safe_creds}")
     return creds if all(creds.values()) else None
 
 
@@ -63,39 +97,89 @@ def _get_credentials_from_secrets_manager() -> Optional[DBCredentials]:
         RuntimeError: If there's an error retrieving or parsing the secret.
     """
     logger = logging.getLogger(__name__)
-    if not (secret_arn := os.environ.get("DB_SECRET_ARN")):
+    secret_arn = os.environ.get("DB_SECRET_ARN")
+    region = os.environ.get("AWS_REGION", "us-east-1")
+
+    if not secret_arn:
+        logger.error("DB_SECRET_ARN environment variable not set")
         return None
+
     try:
-        logger.info("Fetching database credentials from AWS Secrets Manager")
-        client = boto3.client("secretsmanager", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        logger.info(f"Initializing Secrets Manager client in region: {region}")
+        session = boto3.Session(region_name=region)
+        client = session.client("secretsmanager")
+
+        logger.info("Created Secrets Manager client")
+
+        # Try to describe the secret first to check permissions
+        try:
+            logger.info(f"Describing secret: {secret_arn}")
+            client.describe_secret(SecretId=secret_arn)
+            logger.info("Successfully described secret")
+        except Exception as e:
+            logger.error(f"Failed to describe secret: {str(e)}")
+            return None
+
+        # Now get the secret value
+        logger.info("Getting secret value...")
         response = client.get_secret_value(SecretId=secret_arn)
+
+        if "SecretString" not in response:
+            logger.error("No SecretString in response")
+            return None
+
+        logger.info("Parsing secret JSON...")
         secret = json.loads(response["SecretString"])
 
-        # Map secret fields to our expected format
+        # Log all keys in the secret for debugging (without values for security)
+        logger.info(f"Secret keys: {list(secret.keys())}")
+
+        # Map the secret fields to the expected credential keys
         secret_creds: DBCredentials = {
-            "username": secret.get("username"),
-            "password": secret.get("password"),
-            "host": secret.get("hostname") or secret.get("host"),
-            "port": str(secret.get("port", "5432")),
-            "dbname": secret.get("dbname") or secret.get("database"),
+            "username": secret.get("db_username"),
+            "password": secret.get("db_password"),
+            "host": secret.get("db_host"),
+            "port": str(secret.get("db_port", "5432")),
+            "dbname": secret.get("db_name"),
         }
 
-        # Verify we have all required fields
+        # Log the values (without passwords)
+        logger.info(f"Mapped credentials - username: {secret_creds['username']}")
+        logger.info(f"Mapped credentials - host: {secret_creds['host']}")
+        logger.info(f"Mapped credentials - port: {secret_creds['port']}")
+        logger.info(f"Mapped credentials - dbname: {secret_creds['dbname']}")
+        logger.info(f"Mapped credentials - password: {'*' * 8 if secret_creds['password'] else 'None'}")
+
+        # Check if all required fields are present
         if not all(secret_creds.values()):
             missing = [k for k, v in secret_creds.items() if not v]
-            raise ValueError(f"Missing required fields in secret: {', '.join(missing)}")
+            error_msg = f"Missing required database credentials in secret: {', '.join(missing)}"
+            logger.error(error_msg)
+            logger.error(f"Available secret keys: {list(secret.keys())}")
+            return None
 
-        logger.info("Successfully retrieved database credentials from AWS Secrets Manager")
+        logger.info("Successfully retrieved and validated database credentials from Secrets Manager")
         return secret_creds
 
     except ClientError as e:
-        error_msg = f"Failed to retrieve database credentials from " f"AWS Secrets Manager: {str(e)}"
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        error_msg = f"AWS ClientError ({error_code}) retrieving secret: {str(e)}"
         logger.error(error_msg)
-        raise RuntimeError(error_msg) from e
-    except (json.JSONDecodeError, KeyError) as e:
-        error_msg = f"Invalid secret format in AWS Secrets Manager: {str(e)}"
-        logger.error(error_msg)
-        raise RuntimeError(error_msg) from e
+        if "Error" in e.response:
+            logger.error(f"Error details: {e.response['Error']}")
+        return None
+    except json.JSONDecodeError as e:
+        logger.error(f"Error parsing secret JSON: {e}")
+        if "response" in locals():
+            logger.error(f"Raw secret value: {response.get('SecretString', 'No SecretString')}")
+        return None
+    except Exception as e:
+        error_type = type(e).__name__
+        logger.error(f"Unexpected error getting database credentials ({error_type}): {str(e)}")
+        import traceback
+
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return None
 
 
 def get_db_credentials() -> DBCredentials:
@@ -112,22 +196,47 @@ def get_db_credentials() -> DBCredentials:
         RuntimeError: If no valid credentials can be found.
     """
     logger = logging.getLogger(__name__)
-    # Try environment variables first
-    if creds := _get_credentials_from_env():
-        logger.info("Using database credentials from environment variables")
-        return creds
-    # Fall back to AWS Secrets Manager
+    logger.info("Attempting to retrieve database credentials...")
+
+    # Track where we're getting credentials from for logging
+    cred_source = None
+    creds = None
+
+    # 1. Try environment variables first
     try:
-        if creds := _get_credentials_from_secrets_manager():
-            return creds
+        logger.info("Checking for credentials in environment variables...")
+        if creds := _get_credentials_from_env():
+            cred_source = "environment variables"
+            logger.info("Found valid database credentials in environment variables")
     except Exception as e:
-        logger.warning("Failed to get credentials from AWS Secrets Manager: %s", str(e))
+        logger.warning("Error getting credentials from environment variables: %s", str(e))
+
+    # 2. Fall back to AWS Secrets Manager if needed
+    if not creds and os.environ.get("DB_SECRET_ARN"):
+        try:
+            logger.info("Attempting to get credentials from AWS Secrets Manager...")
+            if new_creds := _get_credentials_from_secrets_manager():
+                creds = new_creds
+                cred_source = "AWS Secrets Manager"
+                logger.info("Successfully retrieved database credentials from AWS Secrets Manager")
+        except Exception as e:
+            logger.error("Failed to get credentials from AWS Secrets Manager: %s", str(e), exc_info=True)
+
+    # If we have credentials, log and return them
+    if creds and cred_source:
+        # Log a safe version of the credentials (without password)
+        safe_creds = creds.copy()
+        if "password" in safe_creds:
+            safe_creds["password"] = "********"
+        logger.info("Retrieved database credentials from %s: %s", cred_source, safe_creds)
+        return creds
 
     # No credentials found
     error_msg = (
         "Could not find valid database credentials. "
-        "Please set either DB_* environment variables or DB_SECRET_ARN "
-        "pointing to a valid AWS Secrets Manager secret."
+        "Please ensure one of the following is set up correctly:\n"
+        "1. Required environment variables: DB_USERNAME, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME\n"
+        "2. A valid DB_SECRET_ARN pointing to an AWS Secrets Manager secret with the required fields"
     )
     logger.error(error_msg)
     raise RuntimeError(error_msg)
@@ -147,36 +256,95 @@ def _get_database_url() -> str:
     Raises:
         RuntimeError: If required configuration is missing in production.
     """
-    app_logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__)
+    logger.info("Constructing database URL...")
 
-    # 1. Check for explicit DATABASE_URL
+    # Determine environment
+    is_production = os.environ.get("FLASK_ENV") == "production" or os.environ.get("ENVIRONMENT") == "production"
+    is_lambda = "LAMBDA_TASK_ROOT" in os.environ
+
+    logger.info(f"Environment: {'production' if is_production else 'development'}")
+    logger.info(f"AWS Lambda: {is_lambda}")
+    logger.info(f"Current working directory: {os.getcwd()}")
+
+    # Log relevant environment variables
+    logger.info("Checking environment variables...")
+    env_vars = [
+        "FLASK_ENV",
+        "ENVIRONMENT",
+        "DB_SECRET_ARN",
+        "DB_HOST",
+        "DB_PORT",
+        "DB_NAME",
+        "DB_USERNAME",
+        "DB_PASSWORD",
+        "AWS_DEFAULT_REGION",
+        "AWS_REGION",
+        "AWS_LAMBDA_FUNCTION_NAME",
+        "LAMBDA_TASK_ROOT",
+    ]
+
+    for var in env_vars:
+        if var in os.environ:
+            if "PASSWORD" in var or "SECRET" in var or "KEY" in var:
+                logger.info(f"{var}: {'*' * 8}")
+            else:
+                logger.info(f"{var}: {os.environ[var]}")
+        else:
+            logger.info(f"{var}: Not set")
+
+    # 1. Check for explicit DATABASE_URL first
     if db_url := os.getenv("DATABASE_URL"):
+        logger.info("Using DATABASE_URL from environment")
         return _ensure_proper_db_url(db_url)
 
     # 2. Try to get credentials from environment or Secrets Manager
     try:
+        logger.info("Attempting to get database credentials...")
         creds = get_db_credentials()
-        return _ensure_proper_db_url(
-            f"postgresql+psycopg2://{creds['username']}:{creds['password']}@"
-            f"{creds['host']}:{creds['port']}/{creds['dbname']}"
+        logger.info("Successfully retrieved database credentials")
+
+        # Log the constructed URL without password
+        safe_url = (
+            f"postgresql+psycopg2://{creds['username']}:{'*'*8}@{creds['host']}:{creds['port']}/{creds['dbname']}"
         )
-    except RuntimeError as e:
-        # Only log the error if we're not in production
-        if os.environ.get("FLASK_ENV") != "production":
-            app_logger.warning("Could not get database credentials: %s", e)
+        logger.info(f"Constructed database URL: {safe_url}")
 
-    # 3. Fall back to SQLite for development
-    if os.environ.get("FLASK_ENV") != "production":
-        app_logger.warning("No database configuration found, using SQLite")
-        db_dir = os.path.join(os.path.dirname(__file__), "instance")
-        os.makedirs(db_dir, exist_ok=True)
-        db_file = os.path.join(db_dir, "meal_expenses.db")
-        return f"sqlite:///{db_file}?check_same_thread=False"
+        # Construct the actual URL with password
+        db_url = f"postgresql+psycopg2://{creds['username']}:{creds['password']}@{creds['host']}:{creds['port']}/{creds['dbname']}"
+        return _ensure_proper_db_url(db_url)
 
-    raise RuntimeError(
+    except Exception as e:
+        error_msg = f"Failed to get database credentials: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+
+        # In production, fail fast if we can't get credentials
+        if is_production or is_lambda:
+            logger.error("Running in production/Lambda - failing fast due to missing database credentials")
+            raise RuntimeError("Failed to get database credentials in production environment") from e
+
+    # 3. Fall back to SQLite for development only
+    if not is_production:
+        logger.warning("No production database configuration found, falling back to SQLite for development")
+        try:
+            db_dir = os.path.join(os.path.dirname(__file__), "instance")
+            os.makedirs(db_dir, exist_ok=True)
+            db_file = os.path.join(db_dir, "meal_expenses.db")
+            sqlite_url = f"sqlite:///{db_file}?check_same_thread=False"
+            logger.warning(f"Using SQLite database at: {sqlite_url}")
+            return sqlite_url
+        except Exception as e:
+            logger.error(f"Failed to set up SQLite database: {str(e)}", exc_info=True)
+            raise RuntimeError("Failed to set up SQLite database") from e
+
+    # If we get here, we're in production and couldn't get a database URL
+    error_msg = (
         "Database configuration is required in production. "
-        "Please set DATABASE_URL or configure database credentials."
+        "Please set DATABASE_URL or configure database credentials. "
+        f"Environment: {os.environ.get('FLASK_ENV', 'not set')}"
     )
+    app_logger.error(error_msg)
+    raise RuntimeError(error_msg)
 
 
 def _ensure_proper_db_url(db_url: str) -> str:
@@ -216,30 +384,25 @@ def _configure_sqlalchemy(app):
     # Get database URI
     db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
 
-    # Configure engine options based on database type
+    # Start with default engine options
+    engine_options = {}
+
+    # Only apply connection pooling for non-SQLite databases
+    if not db_uri.startswith("sqlite"):
+        # Get base engine options from app.config (set by config.py)
+        engine_options = app.config.get("SQLALCHEMY_ENGINE_OPTIONS", {})
+
+    # Apply SQLite specific configuration if using SQLite
     if db_uri.startswith("sqlite"):
-        # SQLite specific configuration
-        engine_options = {
-            "connect_args": {"check_same_thread": False},
-            "poolclass": StaticPool,
-            "future": True,  # Enable SQLAlchemy 2.0 behavior
-        }
-        _configure_sqlite(app)
-    else:
-        # PostgreSQL/other databases
-        engine_options = {"pool_pre_ping": True, "pool_recycle": 300, "future": True}  # Enable SQLAlchemy 2.0 behavior
+        engine_options.update(
+            {
+                "connect_args": {"check_same_thread": False},
+                "poolclass": StaticPool,
+            }
+        )
+        _configure_sqlite(app)  # This function also sets PRAGMA foreign_keys=ON
 
-        # Add PostgreSQL specific options
-        if db_uri.startswith("postgresql"):
-            engine_options.update(
-                {
-                    "pool_size": 5,
-                    "max_overflow": 10,
-                    "pool_timeout": 30,
-                }
-            )
-
-    # Set the engine options in the app config
+    # Set the final engine options in the app config
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_options
 
     # Initialize SQLAlchemy with the app
@@ -302,6 +465,17 @@ def _setup_config(app, config_obj):
     Returns:
         The configuration object
     """
+    # Load environment variables from .env file if it exists
+    from pathlib import Path
+
+    from dotenv import load_dotenv
+
+    # Look for .env file in the root directory
+    env_path = Path(__file__).parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path, override=True)
+        print(f"Loaded environment variables from {env_path}")
+
     if config_obj is None:
         # Load configuration from environment variable or use default
         config_name = os.getenv("FLASK_ENV", "development")
@@ -311,6 +485,13 @@ def _setup_config(app, config_obj):
         config_obj = config[config_obj]
 
     app.config.from_object(config_obj)
+
+    # Load environment variables into app config
+    app.config.update(
+        GOOGLE_PLACES_API_KEY=os.getenv("GOOGLE_PLACES_API_KEY"),
+        GOOGLE_MAPS_API_KEY=os.getenv("GOOGLE_MAPS_API_KEY"),
+        SECRET_KEY=os.getenv("SECRET_KEY", "dev"),
+    )
 
     # Allow for environment variable overrides
     if "SQLALCHEMY_DATABASE_URI" not in app.config:
@@ -328,6 +509,17 @@ def _setup_extensions(app):
     # Configure SQLAlchemy for the app
     _configure_sqlalchemy(app)
 
+    # Import models to ensure they are registered with SQLAlchemy
+    from app.auth import models as auth_models  # noqa: F401
+    from app.expenses import init_default_categories  # noqa: F401
+    from app.expenses import models as expense_models  # noqa: F401
+    from app.expenses.models import Category  # noqa: F401
+    from app.restaurants import models as restaurant_models  # noqa: F401
+
+    # Create database tables
+    with app.app_context():
+        db.create_all()
+
     # Initialize and configure login manager
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
@@ -338,21 +530,14 @@ def _setup_extensions(app):
 
     init_login_manager(login_manager)
 
-    # Import models to ensure they are registered with SQLAlchemy
-    from app.auth import models as auth_models  # noqa: F401
-    from app.expenses import models as expense_models  # noqa: F401
-    from app.expenses.category import Category  # noqa: F401
-    from app.restaurants import models as restaurant_models  # noqa: F401
-    from app.expenses import init_default_categories
+    # Ensure login manager is registered in app.extensions
+    if "login_manager" not in app.extensions:
+        app.extensions["login_manager"] = login_manager
 
-    # Initialize default categories after the database is created
-    with app.app_context():
-        try:
-            init_default_categories()
-        except Exception as e:
-            app.logger.error(f"Failed to initialize default categories: {e}")
+    # Register template filters
+    from . import template_filters
 
-    # Enable CORS for all routes
+    template_filters.init_app(app)
     CORS(app)
 
 
@@ -379,6 +564,11 @@ def create_app(config_obj=None):
     # Add shell context
     _add_shell_context(app)
 
+    # CSRF token context processor
+    @app.context_processor
+    def inject_template_vars():
+        return {"config": app.config, "csrf_token": generate_csrf}  # Return the function, don't call it
+
     return app
 
 
@@ -403,18 +593,36 @@ def _add_shell_context(app):
 
 
 def _register_blueprints(app):
-    """Register all blueprints with the application."""
-    from app.auth import bp as auth_bp
-    from app.expenses import bp as expenses_bp
-    from app.main import bp as main_bp
-    from app.restaurants import bp as restaurants_bp
-    from app.health import bp as health_bp
+    """Register all blueprints with the application.
 
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(expenses_bp)
+    Args:
+        app: The Flask application instance
+    """
+    from .api import bp as api_bp
+    from .auth import bp as auth_bp
+    from .expenses import bp as expenses_bp
+    from .health import bp as health_bp
+    from .main import bp as main_bp
+    from .reports import bp as reports_bp
+    from .restaurants import bp as restaurants_bp
+
     app.register_blueprint(main_bp)
-    app.register_blueprint(restaurants_bp)
-    app.register_blueprint(health_bp)
+    app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(expenses_bp, url_prefix="/expenses")
+    app.register_blueprint(restaurants_bp, url_prefix="/restaurants")
+    app.register_blueprint(reports_bp, url_prefix="/reports")
+    app.register_blueprint(api_bp, url_prefix="/api/v1")
+    app.register_blueprint(health_bp, url_prefix="/health")
+
+    # Only register blueprints that haven't been registered by their init_app
+    blueprints_to_register = []
+
+    for bp, url_prefix in blueprints_to_register:
+        if bp.name not in app.blueprints:
+            app.register_blueprint(bp, url_prefix=url_prefix)
+            app.logger.info(f"Registered blueprint: {bp.name} at {url_prefix}")
+        else:
+            app.logger.debug(f"Blueprint {bp.name} already registered")
 
 
 def _configure_logging(app):

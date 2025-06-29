@@ -1,0 +1,424 @@
+{% extends "main/base.html" %}
+{% block title %}
+    {{ 'Edit' if is_edit else 'Add New' }} Restaurant - Meal Expense Tracker
+{% endblock title %}
+{% block styles %}
+    {{ super() }}
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
+          rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css"
+          rel="stylesheet" />
+    <style>
+        .form-section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+        }
+
+        .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
+            display: block;
+            padding: 0.375rem 0.75rem;
+            font-size: 1rem;
+            font-weight: 400;
+            line-height: 1.5;
+            color: #212529;
+            background-color: #fff;
+            background-clip: padding-box;
+            border: 1px solid #ced4da;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            border-radius: 0.25rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
+            display: inline-block;
+            padding: 0.25em 0.5em;
+            margin: 0.25em 0.25em 0.25em 0;
+            font-size: 0.875em;
+            color: #fff;
+            background-color: #0d6efd;
+            border: 1px solid #0d6efd;
+            border-radius: 0.25rem;
+        }
+
+        .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove {
+            color: #fff;
+            margin-right: 0.5em;
+            border-right: 1px solid rgba(255, 255, 255, 0.3);
+            padding-right: 0.5em;
+        }
+
+        .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__display {
+            padding-left: 0.5em;
+        }
+    </style>
+{% endblock styles %}
+{% block content %}
+    <!-- Loading Indicator -->
+    <div id="loading-indicator"
+         class="position-fixed top-0 start-0 w-100 text-center p-2 bg-primary text-white d-none"
+         style="z-index: 1060">
+        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+        <span>Loading...</span>
+    </div>
+    <!-- Error Container -->
+    <div id="error-container"
+         class="position-fixed top-0 end-0 p-3"
+         style="z-index: 1060;
+                max-width: 400px">
+        <!-- Errors will be inserted here by JavaScript -->
+    </div>
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white py-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h1 class="h4 mb-0">
+                                <i class="fas fa-utensils me-2 text-primary"></i>
+                                {{ 'Edit' if is_edit else 'Add New' }} Restaurant
+                            </h1>
+                            {% if is_edit %}
+                                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i> Back to Details
+                                </a>
+                            {% else %}
+                                <a href="{{ url_for("restaurants.list_restaurants") }}"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i> Back to List
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body position-relative" id="form-container">
+                        <!-- Loading Overlay -->
+                        <div id="form-overlay"
+                             class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none"
+                             style="z-index: 10">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Saving changes...</p>
+                            </div>
+                        </div>
+                        <!-- Flash Messages -->
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                                        <i class="fas
+                                                  {% if category == 'success' %}
+                                                      fa-check-circle
+                                                  {% else %}
+                                                      fa-exclamation-circle
+                                                  {% endif %}
+                                                  me-2"></i>
+                                        {{ message }}
+                                        <button type="button"
+                                                class="btn-close"
+                                                data-bs-dismiss="alert"
+                                                aria-label="Close"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+                        <!-- Main Form -->
+                        <form method="post"
+                              action="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) if is_edit and restaurant else url_for('restaurants.add_restaurant') }}"
+                              class="needs-validation"
+                              novalidate
+                              enctype="multipart/form-data"
+                              id="restaurantForm">
+                            {{ form.hidden_tag() }}
+                            {{ form.google_place_id() }}
+                            {{ form.place_name() }}
+                            {{ form.latitude() }}
+                            {{ form.longitude() }}
+                            <!-- Search Section -->
+                            <div class="form-section">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-search me-2 text-primary"></i>Find Restaurant
+                                    </h5>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-primary"
+                                            id="useCurrentLocation">
+                                        <i class="fas fa-location-arrow me-1"></i>Use My Location
+                                    </button>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-8">
+                                        <label for="restaurantSearch" class="form-label">Search by Name or Address</label>
+                                        <div class="input-group">
+                                            <input type="text"
+                                                   class="form-control"
+                                                   id="restaurantSearch"
+                                                   placeholder="Enter restaurant name or address..."
+                                                   autocomplete="off">
+                                            <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                                                <i class="fas fa-search"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="placeType" class="form-label">Place Type</label>
+                                        <select class="form-select" id="placeType">
+                                            <option value="restaurant" selected>Restaurant</option>
+                                            <option value="cafe">Cafe</option>
+                                            <option value="bar">Bar</option>
+                                            <option value="bakery">Bakery</option>
+                                            <option value="food">Food (Any)</option>
+                                            <option value="establishment">Any Business</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div id="searchResults" class="mt-3 d-none">
+                                    <div class="card">
+                                        <div class="card-body p-0">
+                                            <ul class="list-group list-group-flush" id="searchResultsList">
+                                                <!-- Search results will be populated here -->
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Restaurant Information Section -->
+                            <div class="form-section">
+                                <h5 class="mb-4">
+                                    <i class="fas fa-info-circle me-2 text-primary"></i>Restaurant Information
+                                </h5>
+                                <div class="row g-3">
+                                    <div class="col-md-8">
+                                        <label for="name" class="form-label">Restaurant Name *</label>
+                                        <div class="input-group">
+                                            {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "") , placeholder="Enter restaurant name") }}
+                                            <button class="btn btn-outline-secondary"
+                                                    type="button"
+                                                    id="clearSearch"
+                                                    title="Clear and start over">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                        {% for error in form.name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        <div class="form-text text-muted small">Or search for a restaurant above to auto-fill details</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="type" class="form-label">Restaurant Type</label>
+                                        {{ form.type(class="form-select" + (" is-invalid" if form.type.errors else "") ) }}
+                                        {% for error in form.type.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-6">
+                                        <label for="price_range" class="form-label">Price Range</label>
+                                        {{ form.price_range(class="form-select" + (" is-invalid" if form.price_range.errors else "") ) }}
+                                        {% for error in form.price_range.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="cuisine" class="form-label">Cuisine Type</label>
+                                        {{ form.cuisine(class="form-select" + (" is-invalid" if form.cuisine.errors else "") ) }}
+                                        {% for error in form.cuisine.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <label for="description" class="form-label">Description</label>
+                                    {{ form.description(class="form-control" + (" is-invalid" if form.description.errors else "") , rows="3", placeholder="Brief description of the restaurant") }}
+                                    {% for error in form.description.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                </div>
+                            </div>
+                            <!-- Contact Information Section -->
+                            <div class="form-section">
+                                <h5 class="mb-4">
+                                    <i class="fas fa-address-card me-2 text-primary"></i>Contact Information
+                                </h5>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="phone" class="form-label">Phone Number</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                            {{ form.phone(class="form-control" + (" is-invalid" if form.phone.errors else "") , placeholder="(123) 456-7890") }}
+                                            {% for error in form.phone.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="website" class="form-label">Website</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">https://</span>
+                                            {{ form.website(class="form-control" + (" is-invalid" if form.website.errors else "") , placeholder="example.com") }}
+                                            {% for error in form.website.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Address Section -->
+                            <div class="form-section">
+                                <h5 class="mb-4">
+                                    <i class="fas fa-map-marker-alt me-2 text-primary"></i>Address
+                                </h5>
+                                <div class="mb-3">
+                                    <label for="address" class="form-label">Street Address</label>
+                                    {{ form.address(class="form-control" + (" is-invalid" if form.address.errors else "") , placeholder="123 Main St") }}
+                                    {% for error in form.address.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="city" class="form-label">City</label>
+                                        {{ form.city(class="form-control" + (" is-invalid" if form.city.errors else "") , placeholder="New York") }}
+                                        {% for error in form.city.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="state" class="form-label">State</label>
+                                        {{ form.state(class="form-select" + (" is-invalid" if form.state.errors else "") ) }}
+                                        {% for error in form.state.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="zip_code" class="form-label">ZIP Code</label>
+                                        {{ form.zip_code(class="form-control" + (" is-invalid" if form.zip_code.errors else "") , placeholder="10001") }}
+                                        {% for error in form.zip_code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Additional Information Section -->
+                            <div class="form-section">
+                                <h5 class="mb-4">
+                                    <i class="fas fa-ellipsis-h me-2 text-primary"></i>Additional Information
+                                </h5>
+                                <div class="mb-3">
+                                    <label for="notes" class="form-label">Notes</label>
+                                    {{ form.notes(class="form-control" + (" is-invalid" if form.notes.errors else "") , rows="3", placeholder="Any additional notes about this restaurant") }}
+                                    <div class="form-text">Add any special instructions, dietary information, or other relevant notes.</div>
+                                    {% for error in form.notes.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                </div>
+                            </div>
+                            <!-- Hidden Fields -->
+                            {{ form.latitude() }}
+                            {{ form.longitude() }}
+                            {{ form.google_place_id() }}
+                            <!-- Form Actions -->
+                            <div class="d-flex justify-content-between mt-5 pt-3 border-top">
+                                <div>
+                                    {% if is_edit %}
+                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                           class="btn btn-outline-secondary">
+                                            <i class="fas fa-times me-1"></i>Cancel
+                                        </a>
+                                    {% else %}
+                                        <a href="{{ url_for("restaurants.list_restaurants") }}"
+                                           class="btn btn-outline-secondary">
+                                            <i class="fas fa-arrow-left me-1"></i>Back to List
+                                        </a>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>
+                                        {{ 'Update' if is_edit else 'Save' }} Restaurant
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Map container for Google Places -->
+    <div class="form-section">
+        <h5 class="mb-4">
+            <i class="fas fa-map-marker-alt me-2 text-primary"></i>Location
+        </h5>
+        <div class="mb-3">
+            <label for="restaurantSearch" class="form-label">Search for a location</label>
+            <div class="input-group">
+                <input type="text"
+                       class="form-control"
+                       id="restaurantSearch"
+                       placeholder="Search for a location...">
+                <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                    <i class="fas fa-search"></i>
+                </button>
+                <button class="btn btn-outline-secondary"
+                        type="button"
+                        id="useCurrentLocation">
+                    <i class="fas fa-location-arrow"></i>
+                </button>
+                <button class="btn btn-outline-secondary" type="button" id="clearSearch">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div id="map"
+             style="height: 300px;
+                    width: 100%;
+                    border-radius: 0.25rem;
+                    border: 1px solid #dee2e6"></div>
+        <div class="form-text mt-2">Search for a location or click on the map to set the exact coordinates.</div>
+    </div>
+    <!-- Debug Info (visible only in development) -->
+    {% if config.DEBUG %}
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">
+                    <button class="btn btn-link text-decoration-none"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#debugInfo"
+                            aria-expanded="false"
+                            aria-controls="debugInfo">
+                        <i class="fas fa-bug me-2"></i>Debug Information
+                    </button>
+                </h6>
+            </div>
+            <div class="collapse" id="debugInfo">
+                <div class="card-body bg-light">
+                    <h6>Form Data:</h6>
+                    <pre class="mb-0"><code id="formData"></code></pre>
+                    <hr>
+                    <h6>Place Data:</h6>
+                    <pre class="mb-0"><code id="placeData">No place data available</code></pre>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock content %}
+{% block scripts %}
+    {{ super() }}
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <!-- Form submission handling -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('restaurantForm');
+            const formOverlay = document.getElementById('form-overlay');
+
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    // Show loading overlay
+                    if (formOverlay) {
+                        formOverlay.classList.remove('d-none');
+                    }
+
+                    // Disable submit button to prevent double submission
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+                });
+            }
+
+            // Initialize restaurant form if available
+            if (window.restaurantForm && typeof window.restaurantForm.initializeRestaurantForm === 'function') {
+                window.restaurantForm.initializeRestaurantForm();
+            }
+        });
+    </script>
+{% endblock scripts %}

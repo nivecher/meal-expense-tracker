@@ -128,7 +128,6 @@ terraform/.terraform.tfstate.lock.info
 **/.terraformrc
 **/terraform.rc
 **/crash.log
-**/*.tfvars
 **/*.tfplan
 **/plan.out
 **/*.tfplan.json

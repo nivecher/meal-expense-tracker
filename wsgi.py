@@ -194,7 +194,7 @@ def handle_database_operation(app, operation, **kwargs):
     """
     with app.app_context():
         try:
-            from migrate_db import run_migrations, reset_database
+            from migrate_db import reset_database, run_migrations
 
             if operation == "migrate":
                 logger.info("Running database migrations")
@@ -221,6 +221,7 @@ def handle_database_operation(app, operation, **kwargs):
 
             elif operation == "status":
                 from sqlalchemy import inspect
+
                 from app.extensions import db
 
                 inspector = inspect(db.engine)
@@ -800,6 +801,9 @@ def main():
 
     # Set debug mode based on environment
     debug = os.environ.get("FLASK_ENV") == "development"
+
+    # Suppress Werkzeug logs below WARNING level
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
     # Log startup information
     logger.info("Starting local development server at http://%s:%s", host, port)

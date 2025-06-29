@@ -1,8 +1,9 @@
 """Tests for restaurant-related functionality."""
 
-from datetime import datetime
 import os
 import sys
+from datetime import datetime
+
 from sqlalchemy import select
 
 # Add the project root to the Python path
@@ -17,8 +18,10 @@ from app.restaurants.models import Restaurant  # noqa: E402
 
 def test_restaurants_list(client, auth):
     """Test listing restaurants."""
-    auth.create_user()
+    # Register and login a test user
+    auth.register()
     auth.login()
+    # Test accessing the restaurants list
     response = client.get("/restaurants/")
     assert response.status_code == 200
     assert b"Restaurants" in response.data
@@ -26,7 +29,8 @@ def test_restaurants_list(client, auth):
 
 def test_add_restaurant(client, auth):
     """Test adding a restaurant."""
-    auth.create_user()
+    # Register and login a test user
+    auth.register()
     auth.login()
     response = client.post(
         "/restaurants/add",

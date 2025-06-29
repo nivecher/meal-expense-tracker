@@ -9,11 +9,10 @@ from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
 from flask import Request
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 
 from app import db
-from app.expenses.models import Expense
-from app.expenses.category import Category
+from app.expenses.models import Category, Expense
 from app.restaurants.models import Restaurant
 
 

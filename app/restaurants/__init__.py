@@ -1,5 +1,9 @@
+"""Restaurants blueprint."""
+
 from flask import Blueprint
 
-bp = Blueprint("restaurants", __name__, url_prefix="/restaurants")
+# Initialize Blueprint
+bp = Blueprint("restaurants", __name__)
 
-from app.restaurants import routes  # noqa: E402
+# Import routes after blueprint creation to avoid circular imports
+from . import routes  # noqa: E402

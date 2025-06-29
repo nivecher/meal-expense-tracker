@@ -8,6 +8,7 @@ module "common" {
   environment = var.environment
   aws_region  = var.aws_region
   app_name    = var.app_name
+  vpc_cidr    = var.vpc_cidr
 
   # Pass through other variables
   tags = var.common_tags

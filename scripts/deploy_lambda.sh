@@ -25,21 +25,21 @@ usage() {
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -f|--function)
-      FUNCTION_NAME="$2"
-      shift 2
-      ;;
-    -e|--env)
-      ENVIRONMENT="$2"
-      shift 2
-      ;;
-    -h|--help)
-      usage
-      ;;
-    *)
-      log "Error: Unknown option: $1"
-      usage
-      ;;
+  -f | --function)
+    FUNCTION_NAME="$2"
+    shift 2
+    ;;
+  -e | --env)
+    ENVIRONMENT="$2"
+    shift 2
+    ;;
+  -h | --help)
+    usage
+    ;;
+  *)
+    log "Error: Unknown option: $1"
+    usage
+    ;;
   esac
 done
 
@@ -141,9 +141,3 @@ if ! main; then
 fi
 
 exit 0
-
-# Execute main function
-if ! main; then
-  log_error "❌ Deployment failed"
-  exit 1
-fi

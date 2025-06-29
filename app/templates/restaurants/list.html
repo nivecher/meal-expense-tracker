@@ -1,0 +1,412 @@
+{% extends "main/base.html" %}
+{% block title %}
+    Restaurants - Meal Expense Tracker
+{% endblock title %}
+{% block styles %}
+    {{ super() }}
+    <style>
+        /* View mode toggle */
+        .view-mode-toggle .btn {
+            border-radius: 0.25rem;
+        }
+
+        .view-mode-toggle .btn:first-child {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .view-mode-toggle .btn:last-child {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+
+        .view-mode-toggle .btn.active {
+            background-color: var(--bs-primary);
+            color: white;
+        }
+
+        /* Table view styles */
+        .restaurant-table tbody tr {
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        .restaurant-table tbody tr:hover {
+            background-color: rgba(var(--bs-primary-rgb), 0.05);
+        }
+
+        .restaurant-table .cuisine-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .restaurant-table .actions {
+            white-space: nowrap;
+        }
+
+        .restaurant-table .last-visited {
+            font-size: 0.875rem;
+            color: var(--bs-gray-600);
+        }
+
+        /* Custom styles for the restaurant list */
+        .restaurant-card {
+            height: 100%;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid var(--bs-border-color);
+        }
+
+        .restaurant-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+        }
+
+        .restaurant-card .card-img-top {
+            height: 160px;
+            object-fit: cover;
+        }
+
+        .restaurant-card .card-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .restaurant-meta {
+            font-size: 0.875rem;
+            color: var(--bs-gray-600);
+        }
+
+        .restaurant-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--bs-border-color);
+        }
+
+        .stat-item {
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: var(--bs-primary);
+            white-space: nowrap;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--bs-gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .last-visited {
+            font-size: 0.8rem;
+            color: var(--bs-gray-600);
+            margin-top: 0.5rem;
+        }
+
+        .no-restaurants {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--bs-gray-600);
+        }
+
+        .no-restaurants i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .sort-arrow {
+            display: inline-block;
+            margin-left: 0.25rem;
+            color: var(--bs-secondary);
+        }
+
+        .summary-card {
+            border-left: 4px solid var(--bs-primary);
+            transition: all 0.3s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
+        }
+    </style>
+{% endblock styles %}
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="fas fa-utensils text-primary me-2"></i>My Restaurants
+        </h1>
+        <div class="d-flex align-items-center">
+            <div class="btn-group view-mode-toggle me-3"
+                 role="group"
+                 aria-label="View mode">
+                <input type="radio"
+                       class="btn-check"
+                       name="viewMode"
+                       id="cardView"
+                       autocomplete="off"
+                       checked>
+                <label class="btn btn-outline-primary" for="cardView" title="Card View">
+                    <i class="fas fa-th-large"></i>
+                </label>
+                <input type="radio"
+                       class="btn-check"
+                       name="viewMode"
+                       id="tableView"
+                       autocomplete="off">
+                <label class="btn btn-outline-primary" for="tableView" title="Table View">
+                    <i class="fas fa-list"></i>
+                </label>
+            </div>
+            <a href="{{ url_for("restaurants.add_restaurant") }}"
+               class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Add Restaurant
+            </a>
+        </div>
+    </div>
+    <!-- Summary Cards -->
+    <div class="row mb-4 g-3">
+        <div class="col-md-4">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-muted mb-1">Total Restaurants</h6>
+                    <h3 class="mb-0">{{ total_restaurants }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-muted mb-1">Total Visits</h6>
+                    <h3 class="mb-0">{{ total_visits }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card summary-card h-100">
+                <div class="card-body">
+                    <h6 class="text-uppercase text-muted mb-1">Total Spent</h6>
+                    <h3 class="mb-0">${{ "%.2f"|format(total_spent) }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Filters and Sorting -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-5">
+                    <label for="sort" class="form-label">Sort By</label>
+                    <div class="input-group">
+                        <select class="form-select"
+                                id="sort"
+                                name="sort"
+                                onchange="this.form.submit()">
+                            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name</option>
+                            <option value="visits" {% if sort_by == 'visits' %}selected{% endif %}>Number of Visits</option>
+                            <option value="spent" {% if sort_by == 'spent' %}selected{% endif %}>Total Spent</option>
+                            <option value="last_visit"
+                                    {% if sort_by == 'last_visit' %}selected{% endif %}>Last Visit</option>
+                        </select>
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm ms-2"
+                                id="toggleSortOrder"
+                                data-sort-order="{{ sort_order }}"
+                                title="Toggle sort order">
+                            <i class="fas fa-sort-amount-{{ 'down' if sort_order == 'desc' else 'up' }}"></i>
+                        </button>
+                        <input type="hidden" name="order" id="sortOrder" value="{{ sort_order }}">
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <label for="cuisine" class="form-label">Filter by Cuisine</label>
+                    <select class="form-select"
+                            id="cuisine"
+                            name="cuisine"
+                            onchange="this.form.submit()">
+                        <option value="">All Cuisines</option>
+                        {% for cuisine in cuisines %}
+                            <option value="{{ cuisine }}"
+                                    {% if cuisine_filter == cuisine %}selected{% endif %}>{{ cuisine }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <a href="{{ url_for("restaurants.list_restaurants") }}"
+                       class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-sync-alt me-1"></i> Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Restaurant List -->
+    {% if restaurants %}
+        <!-- Card View -->
+        <div id="cardView" class="view-mode">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                {% for restaurant_data in restaurants %}
+                    {% set restaurant = restaurant_data[0] %}
+                    {% set visit_count = restaurant_data.visit_count %}
+                    {% set total_spent = restaurant_data.total_spent %}
+                    {% set last_visit = restaurant_data.last_visit %}
+                    <div class="col">
+                        <div class="card restaurant-card h-100">
+                            {% if restaurant.photo_url %}
+                                <img src="{{ restaurant.photo_url }}"
+                                     class="card-img-top"
+                                     alt="{{ restaurant.name }}"
+                                     style="height: 160px;
+                                            object-fit: cover">
+                            {% else %}
+                                <div class="bg-light d-flex align-items-center justify-content-center"
+                                     style="height: 160px">
+                                    <i class="fas fa-utensils fa-4x text-muted"></i>
+                                </div>
+                            {% endif %}
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <h5 class="card-title mb-1">{{ restaurant.name }}</h5>
+                                    {% if restaurant.cuisine %}<span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>{% endif %}
+                                </div>
+                                <p class="restaurant-meta mb-2">
+                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                    {% if restaurant.city %}
+                                        {{ restaurant.city }}
+                                    {% else %}
+                                        <span class="text-muted">No location</span>
+                                    {% endif %}
+                                </p>
+                                <div class="restaurant-stats">
+                                    <div class="stat-item">
+                                        <div class="stat-value">{{ visit_count }}</div>
+                                        <div class="stat-label">Visits</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-value">${{ "%.2f"|format(total_spent) }}</div>
+                                        <div class="stat-label">Spent</div>
+                                    </div>
+                                    {% if restaurant.rating %}
+                                        <div class="stat-item">
+                                            <div class="stat-value">{{ "%.1f"|format(restaurant.rating) }}</div>
+                                            <div class="stat-label">Rating</div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                {% if last_visit %}
+                                    <div class="last-visited">
+                                        <i class="far fa-calendar-alt me-1"></i>
+                                        Last visited {{ last_visit|time_ago }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="card-footer bg-transparent border-top-0 pt-0">
+                                <div class="d-grid">
+                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-eye me-1"></i> View Details
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        <!-- Table View -->
+        <div id="tableView" class="view-mode d-none">
+            <div class="table-responsive">
+                <table class="table table-striped restaurant-table">
+                    <thead>
+                        <tr>
+                            <th>Restaurant</th>
+                            <th>Location</th>
+                            <th>Visits</th>
+                            <th>Total Spent</th>
+                            <th>Rating</th>
+                            <th>Last Visit</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for restaurant_data in restaurants %}
+                            {% set restaurant = restaurant_data[0] %}
+                            {% set visit_count = restaurant_data.visit_count %}
+                            {% set total_spent = restaurant_data.total_spent %}
+                            {% set last_visit = restaurant_data.last_visit %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">{{ restaurant.name }}</a>
+                                    {% if restaurant.cuisine %}<span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>{% endif %}
+                                </td>
+                                <td>{{ restaurant.city or '' }}</td>
+                                <td>{{ visit_count }}</td>
+                                <td>${{ "%.2f"|format(total_spent) if total_spent else '0.00' }}</td>
+                                <td>
+                                    {% if restaurant.rating %}
+                                        <span class="badge bg-{{ 'success' if restaurant.rating >= 4 else 'warning' if restaurant.rating >= 3 else 'danger' }}">
+                                            {{ "%.1f"|format(restaurant.rating) }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">No rating</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if last_visit %}
+                                        {{ last_visit|time_ago }}
+                                    {% else %}
+                                        <span class="text-muted">No visits</span>
+                                    {% endif %}
+                                </td>
+                                <td class="actions">
+                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                       class="btn btn-sm btn-outline-primary"
+                                       data-bs-toggle="tooltip"
+                                       title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
+                                       class="btn btn-sm btn-outline-secondary"
+                                       data-bs-toggle="tooltip"
+                                       title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <div class="mb-4">
+                <i class="fas fa-utensils fa-4x text-muted mb-3"></i>
+                <h3>No restaurants found</h3>
+                <p class="text-muted">
+                    {% if cuisine_filter %}
+                        No restaurants match your filter criteria.
+                    {% else %}
+                        You haven't added any restaurants yet.
+                    {% endif %}
+                </p>
+                <a href="{{ url_for("restaurants.add_restaurant") }}"
+                   class="btn btn-primary mt-2">
+                    <i class="fas fa-plus me-1"></i> Add Your First Restaurant
+                </a>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+{% block scripts %}
+    {{ super() }}
+    <script type="module"
+            src="{{ url_for('static', filename='js/pages/restaurant-list-view.js') }}"></script>
+{% endblock scripts %}

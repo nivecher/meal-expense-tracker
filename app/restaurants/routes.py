@@ -1,619 +1,558 @@
+"""Restaurant-related routes for the application.
+
+This module handles all restaurant-related routes including CRUD operations,
+search functionality, and Google Places API integration.
+"""
+
 # Standard library imports
-import csv
+import logging
+import os
 from datetime import datetime
-from io import StringIO, BytesIO
+
+import requests
 
 # Third-party imports
 from flask import (
-    abort,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
-    send_file,
     url_for,
 )
-from flask_login import login_required
-from sqlalchemy import select, or_
-from sqlalchemy.exc import SQLAlchemyError
+from flask_login import current_user, login_required
+from sqlalchemy import exists, func, select
 
 # Local application imports
-from app.extensions import db
+from app import db
 from app.expenses.models import Expense
-from app.restaurants import bp
 from app.restaurants.models import Restaurant
 
-# Display names for restaurant types and cuisines
-RESTAURANT_TYPE_DISPLAY_NAMES = {
-    "sit_down": "Sit-down Restaurant",
-    "fast_food": "Fast Food",
-    "cafe": "Café",
-    "diner": "Diner",
-    "food_truck": "Food Truck",
-    "buffet": "Buffet",
-    "bar": "Bar/Pub",
-    "pub": "Bar/Pub",
-    "food_stand": "Food Stand",
-    "other": "Other",
-}
+# Local imports
+from . import bp
+from .services import (
+    export_restaurants_to_csv,
+    get_restaurant,
+    import_restaurants_from_csv,
+)
 
-CUISINE_DISPLAY_NAMES = {
-    "american": "American",
-    "mexican": "Mexican",
-    "italian": "Italian",
-    "chinese": "Chinese",
-    "japanese": "Japanese",
-    "indian": "Indian",
-    "mediterranean": "Mediterranean",
-    "thai": "Thai",
-    "vietnamese": "Vietnamese",
-    "greek": "Greek",
-    "korean": "Korean",
-    "french": "French",
-    "spanish": "Spanish",
-    "middle_eastern": "Middle Eastern",
-    "caribbean": "Caribbean",
-    "african": "African",
-    "latin_american": "Latin American",
-    "asian": "Asian",
-    "other": "Other",
-}
+# Set up logger
+logger = logging.getLogger(__name__)
 
 
-def get_type_display_name(type_code):
-    """Get the display name for a restaurant type code."""
-    # Convert underscores to spaces and capitalize
-    formatted_code = type_code.replace("_", " ").title()
-    # Handle special cases
-    if type_code.lower() == "cafe":
-        return "Café"
-    return RESTAURANT_TYPE_DISPLAY_NAMES.get(type_code.lower(), formatted_code)
-
-
-def get_cuisine_display_name(cuisine_code):
-    """Get the display name for a cuisine code."""
-    return CUISINE_DISPLAY_NAMES.get(cuisine_code.lower(), cuisine_code.title())
-
-
+# Restaurant CRUD routes
 @bp.route("/")
 @login_required
 def list_restaurants():
-    # Get filter and sort parameters from query string
-    search = request.args.get("search", "")
-    cuisine = request.args.get("cuisine", "")
-    city = request.args.get("city", "")
-    type_ = request.args.get("type", "")
-    price_range = request.args.get("price_range", "")
-    sort_by = request.args.get("sort_by", "name")
-    sort_order = request.args.get("sort_order", "asc")
+    """Show a list of all restaurants with stats and filtering options."""
+    # Get filter and sort parameters
+    sort_by = request.args.get("sort", "name")
+    sort_order = request.args.get("order", "asc")
+    cuisine_filter = request.args.get("cuisine")
 
-    # Start query
-    stmt = select(Restaurant)
-
-    # Apply filters
-    if search:
-        stmt = stmt.where(Restaurant.name.ilike(f"%{search}%"))
-    if cuisine:
-        stmt = stmt.where(Restaurant.cuisine == cuisine)
-    if city:
-        stmt = stmt.where(Restaurant.city == city)
-    if type_:
-        stmt = stmt.where(Restaurant.type == type_)
-    if price_range:
-        stmt = stmt.where(Restaurant.price_range == price_range)
-
-    # Apply sorting
-    sort_column = getattr(Restaurant, sort_by, Restaurant.name)
-    stmt = stmt.order_by(sort_column.desc() if sort_order == "desc" else sort_column.asc())
-
-    # Execute query
-    restaurants = db.session.scalars(stmt).all()
-
-    # For filter dropdowns
-    def get_distinct_values(column):
-        stmt = select(column).distinct().where(column.isnot(None))
-        results = db.session.scalars(stmt).all()
-        # Convert scalar results to a list directly
-        return list(results)
-
-    cuisines = get_distinct_values(Restaurant.cuisine)
-    cities = get_distinct_values(Restaurant.city)
-    types = get_distinct_values(Restaurant.type)
-    price_ranges = get_distinct_values(Restaurant.price_range)
-
-    return render_template(
-        "restaurants/list_restaurants.html",
-        restaurants=restaurants,
-        search=search,
-        cuisine=cuisine,
-        city=city,
-        type_=type_,
-        price_range=price_range,
-        sort_by=sort_by,
-        sort_order=sort_order,
-        cuisines=cuisines,
-        cities=cities,
-        types=types,
-        price_ranges=price_ranges,
-        get_cuisine_display_name=get_cuisine_display_name,
-        get_type_display_name=get_type_display_name,
+    # Base query for all restaurants with stats
+    stmt = (
+        select(
+            Restaurant,
+            func.count(Expense.id).label("visit_count"),
+            func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
+            func.max(Expense.date).label("last_visit"),
+        )
+        .outerjoin(Expense, (Expense.restaurant_id == Restaurant.id) & (Expense.user_id == current_user.id))
+        .where(Restaurant.user_id == current_user.id)
+        .group_by(Restaurant.id)
     )
 
+    # Apply cuisine filter if provided
+    if cuisine_filter:
+        stmt = stmt.where(Restaurant.cuisine == cuisine_filter)
 
-@bp.route("/<int:restaurant_id>/details")
-@login_required
-def restaurant_details(restaurant_id):
-    """Display details for a specific restaurant.
+    # Apply sorting
+    sort_column = {
+        "name": Restaurant.name,
+        "visits": func.count(Expense.id),
+        "spent": func.coalesce(func.sum(Expense.amount), 0),
+        "last_visit": func.max(Expense.date),
+    }.get(sort_by, Restaurant.name)
 
-    Args:
-        restaurant_id: The ID of the restaurant to display
+    sort_direction = sort_order.upper() if sort_order.lower() in ["asc", "desc"] else "ASC"
+    stmt = stmt.order_by(
+        sort_column.asc() if sort_direction == "ASC" else sort_column.desc(),
+        Restaurant.name.asc(),  # Secondary sort by name for consistent ordering
+    )
 
-    Returns:
-        Rendered template with restaurant details and expenses
-    """
-    try:
-        # First, get the restaurant
-        restaurant = db.session.get(Restaurant, restaurant_id)
-        if not restaurant:
-            abort(404)
+    # Get all matching restaurants
+    restaurants = db.session.execute(stmt).all()
 
-        # Then get its expenses
-        stmt = (
-            select(Expense)
-            .where(Expense.restaurant_id == restaurant_id)
-            .order_by(Expense.date.desc() if Expense.date is not None else None)
-        )
-        expenses = db.session.scalars(stmt).all()
+    # Get unique cuisines for filter dropdown
+    cuisines = db.session.scalars(
+        select(Restaurant.cuisine)
+        .where(Restaurant.user_id == current_user.id, Restaurant.cuisine.isnot(None))
+        .distinct()
+        .order_by(Restaurant.cuisine)
+    ).all()
 
-        # Get restaurant type and cuisine display names
-        type_display = get_type_display_name(restaurant.type)
-        cuisine_display = get_cuisine_display_name(restaurant.cuisine) if restaurant.cuisine else ""
+    # Calculate summary stats
+    total_restaurants = len(restaurants)
+    total_visits = sum(r.visit_count for r in restaurants)
+    total_spent = sum(r.total_spent or 0 for r in restaurants)
 
-        return render_template(
-            "restaurants/restaurant_details.html",
-            restaurant=restaurant,
-            expenses=expenses,
-            type_display=type_display,
-            cuisine_display=cuisine_display,
-        )
-
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        current_app.logger.error(f"Database error in restaurant_details: {str(e)}", exc_info=True)
-        flash("Error loading restaurant details. Please try again.", "error")
-        abort(500)
+    return render_template(
+        "restaurants/list.html",
+        restaurants=restaurants,
+        cuisines=cuisines,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        cuisine_filter=cuisine_filter,
+        total_restaurants=total_restaurants,
+        total_visits=total_visits,
+        total_spent=total_spent,
+        now=datetime.utcnow(),
+    )
 
 
 @bp.route("/add", methods=["GET", "POST"])
 @login_required
 def add_restaurant():
-    """Add a new restaurant to the database.
+    """Add a new restaurant."""
+    from .forms import RestaurantForm
 
-    Handles both GET (display form) and POST (process form) requests.
-    """
-    if request.method == "POST":
+    form = RestaurantForm()
+    if request.method == "POST" and form.validate_on_submit():
         try:
-            # Validate required fields
-            required_fields = ["name", "address", "city"]
-            for field in required_fields:
-                if not request.form.get(field):
-                    flash(f"{field.title()} is required", "error")
-                    return render_template("restaurants/add_restaurant.html")
-
-            # Check for duplicate restaurant using SQLAlchemy 2.0 style
-            stmt = select(Restaurant).where(
-                db.func.lower(Restaurant.name) == request.form["name"].lower(),
-                db.func.lower(Restaurant.city) == request.form["city"].lower(),
-            )
-            existing_restaurant = db.session.scalars(stmt).first()
-
-            if existing_restaurant:
-                flash("A restaurant with this name already exists in this city.", "error")
-                return render_template("restaurants/add_restaurant.html")
-
-            # Create new restaurant
+            # Create new restaurant with user_id and form data
             restaurant = Restaurant(
-                name=request.form["name"].strip(),
-                type=request.form.get("type", "restaurant"),
-                description=request.form.get("description", "").strip(),
-                address=request.form["address"].strip(),
-                city=request.form["city"].strip(),
-                state=request.form.get("state", "").strip(),
-                zip_code=request.form.get("zip_code", "").strip(),
-                price_range=request.form.get("price_range", "").strip(),
-                cuisine=request.form.get("cuisine", "").strip(),
-                website=request.form.get("website", "").strip(),
-                phone=request.form.get("phone", "").strip(),
-                notes=request.form.get("notes", "").strip(),
+                user_id=current_user.id,
+                name=form.name.data,
+                type=form.type.data,
+                price_range=form.price_range.data,
+                cuisine=form.cuisine.data,
+                description=form.description.data,
+                address=form.address.data,
+                city=form.city.data,
+                state=form.state.data,
+                zip_code=form.zip_code.data,
+                country=form.country.data or "US",  # Default to US if not provided
+                phone=form.phone.data,
+                website=form.website.data,
+                is_chain=form.is_chain.data,
+                notes=form.notes.data,
+                # Google Places fields
+                google_place_id=form.google_place_id.data or None,
+                place_name=form.place_name.data or None,
+                latitude=float(form.latitude.data) if form.latitude.data else None,
+                longitude=float(form.longitude.data) if form.longitude.data else None,
             )
             db.session.add(restaurant)
             db.session.commit()
-
-            # Verify restaurant was created successfully
-            stmt = select(Restaurant).where(Restaurant.name == request.form["name"].strip())
-            created_restaurant = db.session.scalars(stmt).first()
-            if not created_restaurant:
-                raise SQLAlchemyError("Restaurant was not created successfully")
-
             flash("Restaurant added successfully!", "success")
-            return redirect(url_for("restaurants.list_restaurants"))
-        except SQLAlchemyError as e:
+            return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
+        except Exception as e:
             db.session.rollback()
-            flash(f"Error adding restaurant: {str(e)}", "error")
-            return render_template("restaurants/add_restaurant.html")
-    return render_template("restaurants/add_restaurant.html")
+            current_app.logger.error("Error adding restaurant: %s", str(e), exc_info=True)
+            flash("An error occurred while adding the restaurant. Please try again.", "error")
+
+    # For GET request or failed POST, render the form template
+    return render_template(
+        "restaurants/form.html",
+        form=form,
+        restaurant=None,
+        is_edit=False,
+        google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY", ""),
+    )
+
+
+@bp.route("/<int:restaurant_id>", methods=["GET", "POST"])
+@login_required
+def restaurant_details(restaurant_id):
+    """Show details for a specific restaurant with inline editing."""
+    from .forms import RestaurantForm
+
+    restaurant = get_restaurant(restaurant_id)
+    form = RestaurantForm(obj=restaurant)
+    if request.method == "POST" and form.validate_on_submit():
+        try:
+            form.populate_obj(restaurant)
+            db.session.commit()
+            flash("Restaurant updated successfully!", "success")
+            return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Error updating restaurant: {str(e)}")
+            flash(f"An error occurred while updating the restaurant: {str(e)}", "error")
+
+    # Get recent expenses for this restaurant
+    expenses = (
+        Expense.query.filter_by(restaurant_id=restaurant_id, user_id=current_user.id)
+        .order_by(Expense.date.desc())
+        .limit(10)
+        .all()
+    )
+
+    return render_template(
+        "restaurants/detail.html",
+        restaurant=restaurant,
+        expenses=expenses,
+        form=form,
+        is_editing=request.args.get("edit") == "true",
+        google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY", ""),
+    )
 
 
 @bp.route("/<int:restaurant_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_restaurant(restaurant_id):
-    """Edit an existing restaurant.
+    """Edit a restaurant's details."""
+    from .forms import RestaurantForm
 
-    Args:
-        restaurant_id: The ID of the restaurant to edit
+    restaurant = get_restaurant(restaurant_id)
+    form = RestaurantForm(obj=restaurant)  # Automatically populate form from restaurant object
 
-    Returns:
-        Rendered template with edit form (GET) or redirects to restaurant details (POST)
-    """
-    # Get restaurant using SQLAlchemy 2.0 style
-    restaurant = db.session.get(Restaurant, restaurant_id)
-    if restaurant is None:
-        abort(404)
-
-    if request.method == "POST":
+    if request.method == "POST" and form.validate_on_submit():
         try:
-            # Check for duplicate restaurant (excluding current one)
-            stmt = select(Restaurant).where(
-                db.func.lower(Restaurant.name) == request.form["name"].lower(),
-                db.func.lower(Restaurant.city) == request.form["city"].lower(),
-                Restaurant.id != restaurant_id,
-            )
-            existing_restaurant = db.session.scalars(stmt).first()
+            # Update restaurant fields from form data
+            restaurant.name = form.name.data
+            restaurant.type = form.type.data
+            restaurant.price_range = form.price_range.data
+            restaurant.cuisine = form.cuisine.data
+            restaurant.description = form.description.data
+            restaurant.address = form.address.data
+            restaurant.city = form.city.data
+            restaurant.state = form.state.data
+            restaurant.zip_code = form.zip_code.data
+            restaurant.country = form.country.data or "US"  # Default to US if not provided
+            restaurant.phone = form.phone.data
+            restaurant.website = form.website.data
+            restaurant.is_chain = form.is_chain.data
+            restaurant.notes = form.notes.data
 
-            if existing_restaurant:
-                flash("A restaurant with this name already exists in this city.", "error")
-                return render_template("restaurants/edit_restaurant.html", restaurant=restaurant)
-
-            # Update restaurant fields
-            restaurant.name = request.form["name"].strip()
-            restaurant.type = request.form.get("type", "restaurant").strip()
-            restaurant.description = request.form.get("description", "").strip()
-            restaurant.address = request.form["address"].strip()
-            restaurant.city = request.form["city"].strip()
-            restaurant.state = request.form.get("state", "").strip()
-            restaurant.zip_code = request.form.get("zip_code", "").strip()
-            restaurant.price_range = request.form.get("price_range", "").strip()
-            restaurant.cuisine = request.form.get("cuisine", "").strip()
-            restaurant.website = request.form.get("website", "").strip()
-            restaurant.phone = request.form.get("phone", "").strip()
-            restaurant.notes = request.form.get("notes", "").strip()
+            # Update Google Places fields
+            restaurant.google_place_id = form.google_place_id.data or None
+            restaurant.place_name = form.place_name.data or None
+            restaurant.latitude = float(form.latitude.data) if form.latitude.data else None
+            restaurant.longitude = float(form.longitude.data) if form.longitude.data else None
 
             db.session.commit()
-            flash("Restaurant updated successfully.", "success")
+            flash("Restaurant updated successfully!", "success")
             return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
-
-        except SQLAlchemyError as e:
+        except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f"Error updating restaurant: {str(e)}", exc_info=True)
-            flash("An error occurred while updating the restaurant.", "error")
+            current_app.logger.error("Error updating restaurant: %s", str(e), exc_info=True)
+            flash("An error occurred while updating the restaurant. Please try again.", "error")
 
-    return render_template("restaurants/edit_restaurant.html", restaurant=restaurant)
+    # For GET request or failed POST, render the form template with restaurant data
+    return render_template(
+        "restaurants/form.html",
+        form=form,
+        restaurant=restaurant,
+        is_edit=True,
+        google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY", ""),
+    )
 
 
 @bp.route("/<int:restaurant_id>/delete", methods=["POST"])
 @login_required
 def delete_restaurant(restaurant_id):
-    """Delete a restaurant and all its associated expenses.
+    """Delete a restaurant."""
+    restaurant = get_restaurant(restaurant_id)
 
-    Args:
-        restaurant_id: The ID of the restaurant to delete
+    # Check if restaurant has any expenses
+    has_expenses = db.session.scalar(select(exists().where(Expense.restaurant_id == restaurant_id)))
 
-    Returns:
-        Redirects to the restaurants list with a status message
-    """
-    try:
-        # Get restaurant using SQLAlchemy 2.0 style
-        restaurant = db.session.get(Restaurant, restaurant_id)
-        if restaurant is None:
-            flash("Restaurant not found.", "error")
-            return redirect(url_for("restaurants.list_restaurants"))
-
-        # Delete the restaurant (expenses are handled by cascade delete in the model)
-        db.session.delete(restaurant)
-        db.session.commit()
-
-        flash("Restaurant and all associated expenses have been deleted.", "success")
-        return redirect(url_for("restaurants.list_restaurants"))
-
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error deleting restaurant {restaurant_id}: {str(e)}", exc_info=True)
-        flash("An error occurred while deleting the restaurant.", "error")
-        return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant_id))
+    if has_expenses:
+        flash("Cannot delete a restaurant with associated expenses.", "error")
+    else:
+        try:
+            db.session.delete(restaurant)
+            db.session.commit()
+            flash("Restaurant deleted successfully!", "success")
+        except Exception as e:
+            db.session.rollback()
+            logger.error("Error deleting restaurant: %s", str(e))
+            flash("Error deleting restaurant. Please try again.", "error")
+    return redirect(url_for("restaurants.list_restaurants"))
 
 
-@bp.route("/search")
+# Import/Export routes
+@bp.route("/import", methods=["GET", "POST"])
 @login_required
-def search_restaurants():
-    """Search for restaurants based on a query string.
+def import_restaurants():
+    """Handle importing restaurants from CSV."""
+    if request.method == "POST":
+        if "file" not in request.files:
+            flash("No file selected", "error")
+            return redirect(request.url)
 
-    Searches in restaurant name, city, and cuisine fields.
+        file = request.files["file"]
+        if file.filename == "":
+            flash("No file selected", "error")
+            return redirect(request.url)
 
-    Returns:
-        Rendered template with search results or redirects to restaurants list
-    """
-    query = request.args.get("q", "").strip()
-    if not query:
-        return redirect(url_for("restaurants.list_restaurants"))
+        if file and file.filename.endswith(".csv"):
+            success, message = import_restaurants_from_csv(file.stream, current_user)
+            if success:
+                flash(message, "success")
+                return redirect(url_for("restaurants.list_restaurants"))
+            else:
+                flash(message, "error")
 
-    try:
-        # Build the search query using SQLAlchemy 2.0 style
-        stmt = (
-            select(Restaurant)
-            .where(
-                or_(
-                    db.func.lower(Restaurant.name).like(f"%{query.lower()}%"),
-                    db.func.lower(Restaurant.city).like(f"%{query.lower()}%"),
-                    db.func.lower(Restaurant.cuisine).like(f"%{query.lower()}%"),
-                )
-            )
-            .order_by(Restaurant.name)
-        )
-
-        restaurants = db.session.scalars(stmt).all()
-
-        return render_template(
-            "restaurants/search_results.html",
-            restaurants=restaurants,
-            query=query,
-            get_type_display_name=get_type_display_name,
-            get_cuisine_display_name=get_cuisine_display_name,
-        )
-
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error searching restaurants: {str(e)}", exc_info=True)
-        flash("An error occurred during the search. Please try again.", "error")
-        return redirect(url_for("restaurants.list_restaurants"))
+    return render_template("restaurants/import.html")
 
 
 @bp.route("/export")
 @login_required
 def export_restaurants():
-    """Export all restaurants to a CSV file.
-
-    Returns:
-        CSV file download of all restaurants
-    """
+    """Export restaurants to CSV."""
     try:
-        # Get all restaurants using SQLAlchemy 2.0 style
-        stmt = select(Restaurant).order_by(Restaurant.name)
-        restaurants = db.session.scalars(stmt).all()
-
-        # Create CSV in memory
-        output = StringIO()
-        writer = csv.writer(output)
-
-        # Write header
-        writer.writerow(
-            [
-                "Name",
-                "Type",
-                "Description",
-                "Address",
-                "City",
-                "State",
-                "Zip Code",
-                "Price Range",
-                "Cuisine",
-                "Website",
-                "Phone",
-                "Notes",
-            ]
-        )
-
-        # Write data rows
-        for restaurant in restaurants:
-            writer.writerow(
-                [
-                    restaurant.name or "",
-                    restaurant.type or "",
-                    restaurant.description or "",
-                    restaurant.address or "",
-                    restaurant.city or "",
-                    restaurant.state or "",
-                    restaurant.zip_code or "",
-                    restaurant.price_range or "",
-                    restaurant.cuisine or "",
-                    restaurant.website or "",
-                    restaurant.phone or "",
-                    restaurant.notes or "",
-                ]
-            )
-
-        # Convert to bytes for download
-        mem = BytesIO()
-        mem.write(output.getvalue().encode("utf-8"))
-        mem.seek(0)
-        output.close()
-
-        return send_file(
-            mem,
-            mimetype="text/csv",
-            as_attachment=True,
-            download_name=f"restaurants_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        )
-
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error exporting restaurants: {str(e)}", exc_info=True)
+        response = export_restaurants_to_csv(current_user.id)
+        # Update the filename to include timestamp
+        filename = f'restaurants_export_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.csv'
+        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
+    except Exception as e:
+        logger.error(f"Error exporting restaurants: {str(e)}", exc_info=True)
         flash("An error occurred while exporting restaurants. Please try again.", "error")
         return redirect(url_for("restaurants.list_restaurants"))
 
 
-@bp.route("/import", methods=["GET", "POST"])
+# Search routes
+@bp.route("/search/restaurants")
 @login_required
-def import_restaurants():
-    """Display the import form or process uploaded CSV file."""
-    if request.method == "GET":
-        return render_template("restaurants/import_restaurants.html")
-    return _process_restaurant_import()
+def search_restaurants():
+    """Render the map-based restaurant search page.
+
+    Query Parameters:
+        lat (float): Default latitude for the map center
+        lng (float): Default longitude for the map center
+        zoom (int): Default zoom level for the map
+        q (str): Initial search query
+
+    Returns:
+        Rendered template with the map search interface
+    """
+    # Get parameters with defaults
+    lat = request.args.get("lat", "40.7128")
+    lng = request.args.get("lng", "-74.0060")
+    zoom = request.args.get("zoom", "12")
+    query = request.args.get("q", "")
+
+    # Get Google Maps API key from config
+    google_maps_api_key = current_app.config.get("GOOGLE_PLACES_API_KEY")
+
+    # Log the status of the API key for debugging
+    if not google_maps_api_key:
+        current_app.logger.warning("Google Maps API key is not configured in Flask config")
+        current_app.logger.warning(
+            "Environment variables: %s", {k: v for k, v in os.environ.items() if "GOOGLE" in k or "API" in k}
+        )
+
+        # Try to get from environment directly as fallback
+        google_maps_api_key = os.environ.get("GOOGLE_PLACES_API_KEY")
+        if google_maps_api_key:
+            current_app.logger.info("Found Google Maps API key in environment variables")
+            current_app.config["GOOGLE_PLACES_API_KEY"] = google_maps_api_key
+        else:
+            current_app.logger.error("Google Maps API key is not configured in environment or config")
+    else:
+        current_app.logger.info("Google Maps API key is configured in Flask config")
+
+    current_app.logger.debug(
+        "Rendering template with lat=%s, lng=%s, zoom=%s, query=%s, has_api_key=%s",
+        lat,
+        lng,
+        zoom,
+        query,
+        bool(google_maps_api_key),
+    )
+
+    return render_template(
+        "restaurants/search.html",
+        lat=lat,
+        lng=lng,
+        zoom=zoom,
+        query=query,
+        google_maps_api_key=google_maps_api_key or "",
+    )
 
 
-def _process_restaurant_import():
-    """Process the uploaded CSV file and import restaurants."""
-    file = _get_uploaded_file()
-    if not file:
-        return redirect(request.url)
+def _validate_search_params(args):
+    """Validate search parameters.
+
+    Args:
+        args: The request args
+
+    Returns:
+        tuple: (lat, lng, radius, keyword) if valid, None if invalid with error response
+    """
+    if not all(args.get(param) for param in ["lat", "lng"]):
+        return None, (jsonify({"error": "Missing required parameters: lat and lng are required"}), 400)
 
     try:
-        csv_input = _read_csv_file(file)
-        required_fields = ["Name", "Address", "City"]
+        lat = float(args.get("lat"))
+        lng = float(args.get("lng"))
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            msg = "Invalid coordinates: lat must be between -90 and 90, lng between -180 and 180"
+            return None, (jsonify({"error": msg}), 400)
 
-        if not _validate_csv_headers(csv_input, required_fields):
-            return redirect(request.url)
+        radius = min(max(int(args.get("radius", 1000)), 1), 50000)
+        keyword = args.get("keyword", "").strip()
+        return (lat, lng, radius, keyword), None
 
-        imported, errors = _process_csv_rows(csv_input, required_fields)
-        _show_import_results(imported, errors)
-
-        return redirect(url_for("restaurants.list_restaurants"))
-
-    except UnicodeDecodeError:
-        _handle_import_error("Invalid file encoding. Please use UTF-8 encoding.")
-    except csv.Error as e:
-        _handle_import_error(f"Error parsing CSV file: {str(e)}")
-    except SQLAlchemyError as e:
-        _handle_import_error("A database error occurred during import. Please try again.", e)
-    except Exception as e:
-        _handle_import_error("An unexpected error occurred during import. Please try again.", e)
-
-    return redirect(request.url)
+    except (ValueError, TypeError) as e:
+        return None, (jsonify({"error": f"Invalid parameter values: {str(e)}"}), 400)
 
 
-def _get_uploaded_file():
-    """Get and validate the uploaded file."""
-    if "file" not in request.files:
-        flash("No file selected", "error")
-        return None
+def _make_places_api_request(params, api_key):
+    """Make request to Google Places API.
 
-    file = request.files["file"]
-    if file.filename == "":
-        flash("No file selected", "error")
-        return None
+    Args:
+        params: The request parameters
+        api_key: The Google Places API key
 
-    if not file.filename.lower().endswith(".csv"):
-        flash("Please upload a CSV file", "error")
-        return None
+    Returns:
+        tuple: (response_data, error_response) if error occurs
+    """
+    try:
+        response = requests.get(
+            "https://maps.googleapis.com/maps/api/place/nearbysearch/json", params=params, timeout=15
+        )
+        response.raise_for_status()
+        return response.json(), None
 
-    return file
-
-
-def _read_csv_file(file):
-    """Read and parse the uploaded CSV file."""
-    stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
-    return csv.DictReader(stream)
+    except requests.exceptions.RequestException as e:
+        logger.error("Error making request to Google Places API: %s", str(e))
+        return None, (jsonify({"error": "Error connecting to the Google Places API service"}), 503)
 
 
-def _validate_csv_headers(csv_input, required_fields):
-    """Validate that the CSV contains all required fields."""
-    for field in required_fields:
-        if field not in csv_input.fieldnames:
-            flash(f"Missing required field in CSV: {field}", "error")
-            return False
-    return True
+@bp.route("/api/places/search")
+@login_required
+def search_places():
+    """Search for places using Google Places API.
+
+    Query Parameters:
+        lat (float): Latitude of the search location (required)
+        lng (float): Longitude of the search location (required)
+        radius (int): Search radius in meters (default: 1000, max: 50000)
+        keyword (str): Optional search term
+
+    Returns:
+        JSON response with list of places or error message
+    """
+    try:
+        # Log the incoming request for debugging
+        logger.debug("Received Places API search request with args: %s", dict(request.args))
+
+        # Validate parameters
+        params, error = _validate_search_params(request.args)
+        if error:
+            logger.warning("Invalid search parameters: %s", error.get_json())
+            return error
+
+        lat, lng, radius, keyword = params
+
+        # Get and validate API key
+        api_key = current_app.config.get("GOOGLE_PLACES_API_KEY")
+        logger.debug("Using Google Places API key (truncated): %s...", api_key[:8] + "..." if api_key else "None")
+
+        # Check if API key is missing or using default value
+        if not api_key or api_key == "your_google_places_api_key_here":
+            error_msg = "Google Places API key is not properly configured in server settings"
+            logger.error(error_msg)
+            return (
+                jsonify(
+                    {
+                        "error": "Server configuration error: Missing or invalid Google Places API key",
+                        "details": "Please contact the system administrator",
+                        "status": "error",
+                    }
+                ),
+                500,
+            )
+
+        # Build the API request
+        request_params = {
+            "location": f"{lat},{lng}",
+            "radius": radius,
+            "key": api_key,
+            "type": "restaurant",
+            "rankby": "prominence",
+        }
+
+        if keyword:
+            request_params["keyword"] = keyword
+
+        # Log the request without exposing the API key
+        safe_params = request_params.copy()
+        if "key" in safe_params:
+            safe_params["key"] = "***REDACTED***"
+        logger.debug("Making Places API request with params: %s", safe_params)
+
+        # Make the API request
+        data, error = _make_places_api_request(request_params, api_key)
+        if error:
+            logger.error("Error in Places API request: %s", error[0].get_json())
+            return error
+
+        # Handle API response
+        status = data.get("status")
+        if status != "OK":
+            error_msg = data.get("error_message", f"Google Places API error: {status}")
+            logger.warning("Places API error: %s", error_msg)
+            return jsonify({"error": error_msg, "status": status, "details": data}), 400
+
+        logger.debug("Successfully retrieved %d places", len(data.get("results", [])))
+        return jsonify({"results": data.get("results", []), "status": "success"})
+
+    except Exception as err:
+        error_msg = f"Unexpected error in search_places: {str(err)}"
+        logger.exception(error_msg)
+        return (
+            jsonify(
+                {
+                    "error": "An unexpected error occurred while searching for places",
+                    "details": str(err),
+                    "status": "error",
+                }
+            ),
+            500,
+        )
 
 
-def _process_csv_rows(csv_input, required_fields):
-    """Process each row in the CSV and import restaurants."""
-    imported = 0
-    errors = []
+@bp.route("/api/places/<place_id>")
+@login_required
+def get_place_details(place_id):
+    """Get details for a specific place using Google Places API.
 
-    for i, row in enumerate(csv_input, 1):
-        try:
-            row = {k: (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
+    Args:
+        place_id (str): Google Place ID
 
-            if not _validate_required_fields(row, required_fields, i, errors):
-                continue
+    Returns:
+        JSON response with place details or error message
+    """
+    try:
+        # Make the request to Google Places API
+        response = requests.get(
+            "https://maps.googleapis.com/maps/api/place/details/json",
+            params={
+                "place_id": place_id,
+                "fields": (
+                    "name,formatted_address,formatted_phone_number,website,"
+                    "opening_hours,price_level,rating,types,geometry"
+                ),
+                "key": current_app.config.get("GOOGLE_PLACES_API_KEY"),
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
 
-            if _is_duplicate_restaurant(row, i, errors):
-                continue
+        data = response.json()
 
-            _create_restaurant(row)
-            imported += 1
+        if data.get("status") != "OK":
+            return jsonify({"error": data.get("error_message", "Error getting place details")}), 400
 
-            if imported % 50 == 0:
-                db.session.commit()
+        return jsonify(data.get("result", {}))
 
-        except Exception as e:
-            db.session.rollback()
-            errors.append(f"Row {i}: {str(e)}")
-
-    if imported % 50 != 0:
-        db.session.commit()
-
-    return imported, errors
-
-
-def _validate_required_fields(row, required_fields, row_num, errors):
-    """Validate that all required fields are present in the row."""
-    missing_fields = [field for field in required_fields if not row.get(field)]
-    if missing_fields:
-        errors.append(f"Row {row_num}: Missing required fields: {', '.join(missing_fields)}")
-        return False
-    return True
-
-
-def _is_duplicate_restaurant(row, row_num, errors):
-    """Check if a restaurant with the same name and city already exists."""
-    stmt = select(Restaurant).where(
-        db.func.lower(Restaurant.name) == row["Name"].lower(), db.func.lower(Restaurant.city) == row["City"].lower()
-    )
-    existing = db.session.scalars(stmt).first()
-
-    if existing:
-        errors.append(f"Row {row_num}: Restaurant already exists: {row['Name']} in {row['City']}")
-        return True
-    return False
-
-
-def _create_restaurant(row):
-    """Create a new restaurant from a CSV row."""
-    restaurant = Restaurant(
-        name=row["Name"],
-        type=row.get("Type", "restaurant"),
-        description=row.get("Description", ""),
-        address=row["Address"],
-        city=row["City"],
-        state=row.get("State", ""),
-        zip_code=row.get("Zip Code", ""),
-        price_range=row.get("Price Range", ""),
-        cuisine=row.get("Cuisine", ""),
-        website=row.get("Website", ""),
-        phone=row.get("Phone", ""),
-        notes=row.get("Notes", ""),
-    )
-    db.session.add(restaurant)
-
-
-def _show_import_results(imported, errors):
-    """Show the results of the import operation."""
-    if errors:
-        error_msg = f"Imported {imported} restaurants with {len(errors)} errors."
-        if len(errors) > 5:
-            error_msg += f" First 5 errors: {'; '.join(errors[:5])}..."
-        else:
-            error_msg += f" Errors: {'; '.join(errors)}"
-        flash(error_msg, "warning" if imported > 0 else "error")
-    else:
-        flash(f"Successfully imported {imported} restaurants", "success")
-
-
-def _handle_import_error(message, error=None):
-    """Handle import errors consistently."""
-    db.session.rollback()
-    if error:
-        current_app.logger.error(f"{message}: {str(error)}", exc_info=True)
-    else:
-        current_app.logger.error(message)
-    flash(message, "error")
+    except (ValueError, requests.RequestException) as e:
+        logger.error("Error getting place details: %s", str(e))
+        return jsonify({"error": str(e)}), 400

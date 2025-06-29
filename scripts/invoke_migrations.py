@@ -9,7 +9,7 @@ import json
 import logging
 import subprocess
 import sys
-from typing import Optional, Dict, Any
+from typing import Optional
 
 # Configure logging
 logging.basicConfig(
@@ -17,6 +17,69 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def _parse_lambda_response(response_text: str) -> bool:
+    """Parse and validate the Lambda function response.
+
+    Args:
+        response_text: Raw response text from the Lambda invocation
+
+    Returns:
+        bool: True if migrations were successful, False otherwise
+
+    Raises:
+        json.JSONDecodeError: If response cannot be parsed as JSON
+        KeyError: If required fields are missing from the response
+    """
+    response = json.loads(response_text)
+
+    # Handle API Gateway response format
+    if "statusCode" in response:
+        if response["statusCode"] == 200:
+            logger.info("✅ Database migrations completed successfully")
+            return True
+        logger.error("❌ Migration failed with status code: %s", response["statusCode"])
+        return False
+
+    # Handle AWS CLI response format
+    if "StatusCode" in response:
+        if response["StatusCode"] == 200:
+            logger.info("✅ Lambda executed successfully")
+            return True
+        logger.error("❌ Lambda execution failed with status: %s", response["StatusCode"])
+        return False
+
+    # Handle error cases
+    if "FunctionError" in response:
+        error_msg = response.get("errorMessage", "Unknown error occurred")
+        logger.error("❌ Lambda error: %s", error_msg)
+        return False
+
+    logger.error("❌ Unexpected response format: %s", json.dumps(response, indent=2))
+    return False
+
+
+def process_lambda_response(result: subprocess.CompletedProcess) -> bool:
+    """Process the response from the Lambda function.
+
+    Args:
+        result: Completed process from subprocess.run()
+
+    Returns:
+        bool: True if migrations were successful, False otherwise
+    """
+    if result.stderr:
+        logger.warning("Lambda logs: %s", result.stderr.strip())
+
+    try:
+        return _parse_lambda_response(result.stdout)
+    except json.JSONDecodeError:
+        logger.error("❌ Failed to parse Lambda response: %s", result.stdout)
+        return False
+    except Exception as e:
+        logger.error("❌ Unexpected error processing Lambda response: %s", str(e))
+        return False
 
 
 def build_aws_cli_command(function_name: str, region: Optional[str] = None, profile: Optional[str] = None) -> list[str]:
@@ -49,58 +112,6 @@ def build_aws_cli_command(function_name: str, region: Optional[str] = None, prof
         cmd.extend(["--profile", profile])
 
     return cmd
-
-
-def process_lambda_response(result: subprocess.CompletedProcess) -> bool:
-    """Process the response from the Lambda function.
-
-    Args:
-        result: Completed process from subprocess.run()
-
-    Returns:
-        bool: True if migrations were successful, False otherwise
-    """
-    if result.stderr:
-        logger.warning("Lambda logs: %s", result.stderr.strip())
-
-    try:
-        # Try to parse the response as JSON
-        response = json.loads(result.stdout)
-
-        # Handle API Gateway response format
-        if "statusCode" in response:
-            message = "Migrations completed successfully"
-            if response["statusCode"] != 200:
-                logger.error("❌ Migration failed with status code: %s", response["statusCode"])
-                return False
-            try:
-                body = json.loads(response.get("body", "{}"))
-                message = body.get("message", message)
-            except json.JSONDecodeError:
-                pass
-            logger.info("✅ %s", message)
-            return response["statusCode"] == 200
-
-        # Handle AWS CLI response format
-        if "StatusCode" in response:
-            if response["StatusCode"] == 200:
-                logger.info("✅ Lambda executed successfully")
-                return True
-            logger.error("❌ Lambda execution failed with status: %s", response["StatusCode"])
-            return False
-
-        # Handle error cases
-        if "FunctionError" in response:
-            error_msg = response.get("errorMessage", "Unknown error occurred")
-            logger.error("❌ Lambda error: %s", error_msg)
-            return False
-
-        logger.error("❌ Unexpected response format: %s", json.dumps(response, indent=2))
-        return False
-
-    except json.JSONDecodeError:
-        logger.error("❌ Failed to parse Lambda response: %s", result.stdout)
-        return False
 
 
 def invoke_lambda_migrations(function_name: str, region: Optional[str] = None, profile: Optional[str] = None) -> bool:

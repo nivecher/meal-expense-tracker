@@ -5,9 +5,9 @@ This module initializes and provides access to Flask extensions used throughout
 the application.
 """
 
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 from flask_login import LoginManager
+from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
 
 # Initialize SQLAlchemy for database access
 db = SQLAlchemy()

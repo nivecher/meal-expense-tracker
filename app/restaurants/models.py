@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -8,16 +8,19 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.extensions import db
 
 if TYPE_CHECKING:
+    from app.auth.models import User  # noqa: F401
     from app.expenses.models import Expense
 
 
 class Restaurant(db.Model):
     __tablename__ = "restaurant"
+    __allow_unmapped__ = True
 
-    __table_args__ = (UniqueConstraint("name", "city", name="uix_restaurant_name_city"),)
+    __table_args__ = (UniqueConstraint("name", "city", "user_id", name="uix_restaurant_name_city_user"),)
 
     # Columns
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(db.ForeignKey("user.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     type: Mapped[Optional[str]] = mapped_column(String(50))
     description: Mapped[Optional[str]] = mapped_column(Text)
@@ -30,8 +33,13 @@ class Restaurant(db.Model):
     website: Mapped[Optional[str]] = mapped_column(String(200))
     phone: Mapped[Optional[str]] = mapped_column(String(20))
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    google_place_id: Mapped[Optional[str]] = mapped_column(String(255), index=True, comment="Google Maps Place ID")
+    place_name: Mapped[Optional[str]] = mapped_column(String(255), comment="Official name from Google Places")
+    latitude: Mapped[Optional[float]] = mapped_column(db.Float, comment="Geographic latitude")
+    longitude: Mapped[Optional[float]] = mapped_column(db.Float, comment="Geographic longitude")
 
     # Relationships
+    user = relationship("User", back_populates="restaurants", lazy="select")  # type: ignore[valid-type]
     expenses: Mapped[List["Expense"]] = relationship(
         "Expense", back_populates="restaurant", cascade="all, delete-orphan"
     )
