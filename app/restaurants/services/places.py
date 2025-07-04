@@ -7,6 +7,8 @@ import requests
 from flask import current_app
 from werkzeug.exceptions import BadRequest, ServiceUnavailable
 
+from app.utils.ssm import get_parameter_from_env
+
 
 class PlacesService:
     """Service class for Google Places API interactions."""
@@ -156,8 +158,23 @@ def init_places_service(app) -> PlacesService:
 
     Returns:
         Configured PlacesService instance
+
+    Raises:
+        ValueError: If the Google Maps API key is not configured
     """
-    api_key = app.config.get("GOOGLE_MAPS_API_KEY")
-    if not api_key:
-        app.logger.warning("Google Maps API key not configured")
-    return PlacesService(api_key)
+    try:
+        # Get the API key from environment variable or SSM
+        api_key = get_parameter_from_env("GOOGLE_MAPS_API_KEY", default=app.config.get("GOOGLE_MAPS_API_KEY", ""))
+
+        if not api_key:
+            app.logger.warning("Google Maps API key not configured")
+            # Return a service instance with an empty key - calls will fail with a clear error
+            return PlacesService("")
+
+        return PlacesService(api_key)
+    except Exception as e:
+        app.logger.error("Failed to initialize PlacesService: %s", str(e))
+        # In production, we might want to return a dummy service that fails gracefully
+        if app.config.get("FLASK_ENV") == "production":
+            return PlacesService("")
+        raise

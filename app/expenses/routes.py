@@ -23,8 +23,14 @@ from app import db
 from app.expenses import bp  # noqa: F401 - Used for route registration
 from app.expenses.forms import ExpenseForm
 from app.expenses.models import Category, Expense
-from app.expenses.services import get_user_expenses, get_expense_filters, get_filter_options
+from app.expenses.services import (
+    get_expense_filters,
+    get_filter_options,
+    get_user_expenses,
+)
 from app.restaurants.models import Restaurant
+from app.utils.decorators import db_transaction
+from app.utils.messages import FlashMessages
 
 # Constants
 PER_PAGE = 10  # Number of expenses per page
@@ -32,6 +38,7 @@ PER_PAGE = 10  # Number of expenses per page
 
 @bp.route("/add", methods=["GET", "POST"])
 @login_required
+@db_transaction(success_message=FlashMessages.EXPENSE_ADDED, error_message=FlashMessages.EXPENSE_ADD_ERROR)
 def add_expense() -> Response | str:
     """Add a new expense."""
     # Get all categories (not user-specific) and order by name
@@ -41,38 +48,44 @@ def add_expense() -> Response | str:
     form, categories, restaurants = _prepare_expense_form(categories, restaurants)
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
-    if request.method == "POST" and form.validate_on_submit():
-        expense, error_msg = _create_expense_from_form(form, categories, current_user.id)
-
-        if not expense:
-            if is_ajax:
-                return jsonify({"status": "error", "message": error_msg}), 400
-            flash(error_msg, "danger")
-            return render_template("expenses/add.html", form=form, categories=categories, restaurants=restaurants)
-
-        try:
+    if request.method == "POST":
+        if form.validate_on_submit():
+            expense, error_msg = _create_expense_from_form(form, categories, current_user.id)
+            if not expense:
+                if is_ajax:
+                    return jsonify({"status": "error", "message": error_msg}), 400
+                flash(error_msg, "danger")
+                return render_template(
+                    "expenses/add.html",
+                    form=form,
+                    categories=categories,
+                    restaurants=restaurants,
+                    today=datetime.utcnow().date(),
+                )
             db.session.add(expense)
-            db.session.commit()
-
             if is_ajax:
                 return jsonify(
                     {
                         "status": "success",
-                        "message": "Expense added successfully!",
+                        "message": FlashMessages.EXPENSE_ADDED,
                         "redirect": url_for("expenses.list_expenses"),
                     }
                 )
-
-            flash("Expense added successfully!", "success")
             return redirect(url_for("expenses.list_expenses"))
-
-        except Exception as e:
-            db.session.rollback()
-            error_msg = "An error occurred while saving the expense. Please try again."
-            current_app.logger.error(f"Error adding expense: {str(e)}")
+        else:
             if is_ajax:
-                return jsonify({"status": "error", "message": error_msg}), 500
-            flash(error_msg, "danger")
+                errors = {field.name: field.errors for field in form if field.errors}
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "message": FlashMessages.EXPENSE_FORM_INVALID,
+                            "errors": errors,
+                            "form_data": {k: v for k, v in request.form.items()},
+                        }
+                    ),
+                    400,
+                )
 
     # For GET requests or failed POSTs
     return render_template(
@@ -82,6 +95,7 @@ def add_expense() -> Response | str:
 
 @bp.route("/<int:expense_id>/edit", methods=["GET", "POST"])
 @login_required
+@db_transaction(success_message=FlashMessages.EXPENSE_UPDATED, error_message=FlashMessages.EXPENSE_UPDATE_ERROR)
 def edit_expense(expense_id: int) -> Response | str:
     """Edit an existing expense."""
     expense = Expense.query.get_or_404(expense_id)
@@ -92,30 +106,67 @@ def edit_expense(expense_id: int) -> Response | str:
     categories = Category.query.order_by(Category.name).all()
     # Filter restaurants by user and order by name
     restaurants = Restaurant.query.filter_by(user_id=current_user.id).order_by(Restaurant.name).all()
-    form, categories, restaurants = _prepare_expense_form(categories, restaurants)
+
+    # Initialize the form with the correct choices
+    form = ExpenseForm()
+
+    # Set up the form choices
+    form.category_id.choices = [("", "Select a category (optional)")] + [(str(c.id), c.name) for c in categories]
+    form.restaurant_id.choices = [("", "Select a restaurant")] + [(str(r.id), r.name) for r in restaurants]
+
+    # Always populate the form with expense data for both GET and failed POST requests
+    if request.method == "GET" or not form.validate_on_submit():
+        # Process the form to initialize it with the choices
+        form.process()
+
+        # Populate the form data
+        form.amount.data = expense.amount
+        form.date.data = expense.date
+        form.meal_type.data = expense.meal_type
+        form.notes.data = expense.notes
+
+        # Set category and restaurant data
+        if expense.category_id:
+            form.category_id.data = str(expense.category_id)
+        if expense.restaurant_id:
+            form.restaurant_id.data = str(expense.restaurant_id)
+
+        # Debug output
+        print(f"Form category_id.choices: {form.category_id.choices}")
+        print(f"Form category_id.data: {form.category_id.data}")
+        print(f"Expense category_id: {expense.category_id}")
+
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-
-    if request.method == "GET":
-        _populate_expense_form(form, expense)
-
     if request.method == "POST":
-        result = _handle_expense_update(expense, form, categories, is_ajax)
-        if isinstance(result, tuple):
-            success, response = result
-            if not success:
+        # For POST requests, process the form
+        if form.validate_on_submit():
+            is_valid, category_id, error_msg = _validate_expense_form_data(form, categories)
+            if not is_valid:
                 if is_ajax:
-                    return jsonify({"status": "error", "message": response}), 400
-                flash(response, "danger")
-            else:
-                if is_ajax:
-                    return response
-                flash("Expense updated successfully!", "success")
-                return redirect(url_for("expenses.list_expenses"))
+                    return jsonify({"status": "error", "message": error_msg}), 400
+                flash(error_msg, "danger")
+                return render_template(
+                    "expenses/edit.html",
+                    form=form,
+                    expense=expense,
+                    categories=categories,
+                    restaurants=restaurants,
+                    today=datetime.utcnow().date(),
+                    min_date=datetime.utcnow().date(),
+                )
+            _update_expense_from_form(expense, form, category_id)
+            if is_ajax:
+                return jsonify(
+                    {
+                        "status": "success",
+                        "message": FlashMessages.EXPENSE_UPDATED,
+                        "redirect": url_for("expenses.list_expenses"),
+                    }
+                )
+            return redirect(url_for("expenses.list_expenses"))
 
-    # Prepare form for GET request or failed POST
-    form, categories, restaurants = _prepare_expense_form(categories, restaurants)
-    _populate_expense_form(form, expense)
-
+    # For GET requests or failed POSTs, render the edit template with the form
+    # The form has already been populated above
     # Get minimum date for date picker
     expenses = Expense.query.filter_by(user_id=current_user.id).all()
     min_date = min((r.date for r in expenses if r.date), default=datetime.utcnow().date())
@@ -128,6 +179,7 @@ def edit_expense(expense_id: int) -> Response | str:
         restaurants=restaurants,
         today=datetime.utcnow().date(),
         min_date=min_date,
+        debug=True,  # Enable debug mode to show debug information
     )
 
 
@@ -143,12 +195,13 @@ def _prepare_expense_form(categories: list, restaurants: list) -> tuple[ExpenseF
     """
     form = ExpenseForm()
 
-    # Set up category choices
-    form.category_id.choices = [(str(c.id), c.name) for c in categories]
-
-    # Set up restaurant choices
-    form.restaurant_id.choices = [("", "Select a restaurant...")] + [(str(r.id), r.name) for r in restaurants]
-
+    # Prepend an empty option to categories
+    form.category_id.choices = [("", "Select a category (optional)")] + [(str(c.id), c.name) for c in categories]
+    # Add empty option for restaurant selection
+    form.restaurant_id.choices = [("", "Select a restaurant")] + [(str(r.id), r.name) for r in restaurants]
+    # Set default date to today for new expenses
+    if not form.date.data:
+        form.date.data = datetime.utcnow().date()
     return form, categories, restaurants
 
 
@@ -172,11 +225,18 @@ def _create_expense_from_form(form, categories: list, user_id: int) -> tuple[Exp
         # Get restaurant
         restaurant_id = int(form.restaurant_id.data) if form.restaurant_id.data else None
 
+        # Handle date - it might already be a date object or a string
+        date_value = form.date.data
+        if isinstance(date_value, str):
+            date_value = datetime.strptime(date_value, "%Y-%m-%d").date()
+        elif hasattr(date_value, "date"):  # Already a datetime/date object
+            date_value = date_value.date() if hasattr(date_value, "date") else date_value
+
         # Create expense
         expense = Expense(
             user_id=user_id,
             amount=float(form.amount.data),
-            date=datetime.strptime(form.date.data, "%Y-%m-%d"),
+            date=date_value,
             notes=form.notes.data.strip() if form.notes.data else None,
             category_id=category_id,
             restaurant_id=restaurant_id,
@@ -203,14 +263,25 @@ def _validate_expense_form_data(form, categories: list) -> tuple[bool, int | Non
         Tuple of (is_valid, category_id, error_message)
     """
     category_id = None
-    if form.category_id.data:
-        try:
-            category_id = int(form.category_id.data)
-            if not any(c.id == category_id for c in categories):
-                return False, None, "Invalid category selected"
-        except ValueError:
-            return False, None, "Invalid category ID format"
-    return True, category_id, None
+    category_data = form.category_id.data
+
+    # Handle empty/None category
+    if not category_data or str(category_data).strip() == "":
+        return True, None, None
+
+    try:
+        category_id = int(category_data)
+        if not any(c.id == category_id for c in categories):
+            current_app.logger.warning(
+                "Invalid category ID %s. Available categories: %s", category_id, [c.id for c in categories]
+            )
+            return False, None, "Invalid category selected"
+        return True, category_id, None
+    except (ValueError, TypeError) as e:
+        current_app.logger.error(
+            "Error parsing category ID: %s (type: %s, value: %s)", str(e), type(category_data), category_data
+        )
+        return False, None, "Invalid category ID format"
 
 
 def _handle_expense_update(
@@ -252,16 +323,24 @@ def _handle_expense_update(
 
 def _update_expense_from_form(expense: Expense, form: ExpenseForm, category_id: int | None) -> None:
     """Update expense fields from form data."""
-    expense.amount = float(form.amount.data)
-    # Handle both string and date objects for the date field
-    if isinstance(form.date.data, str):
-        expense.date = datetime.strptime(form.date.data, "%Y-%m-%d").date()
-    else:
-        expense.date = form.date.data  # Already a date object
-    expense.notes = form.notes.data.strip() if form.notes.data else None
-    expense.category_id = category_id
-    expense.restaurant_id = int(form.restaurant_id.data) if form.restaurant_id.data else None
-    expense.meal_type = form.meal_type.data or None
+    try:
+        expense.amount = float(form.amount.data)
+
+        # Handle date - it might already be a date object or a string
+        date_value = form.date.data
+        if isinstance(date_value, str):
+            date_value = datetime.strptime(date_value, "%Y-%m-%d").date()
+        elif hasattr(date_value, "date"):  # Already a datetime/date object
+            date_value = date_value.date() if hasattr(date_value, "date") else date_value
+
+        expense.date = date_value
+        expense.notes = form.notes.data.strip() if form.notes.data else None
+        expense.category_id = category_id
+        expense.restaurant_id = int(form.restaurant_id.data) if form.restaurant_id.data else None
+        expense.meal_type = form.meal_type.data or None
+    except Exception as e:
+        current_app.logger.error(f"Error updating expense from form: {str(e)}")
+        raise ValueError("Invalid form data")
 
 
 @bp.route("/")
@@ -322,21 +401,6 @@ def _handle_success_response(is_ajax: bool) -> tuple[bool, Response] | tuple[boo
     return True, "Expense updated successfully!"
 
 
-def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
-    """Populate the form fields with expense data.
-
-    Args:
-        form: The form to populate
-        expense: The expense containing the data
-    """
-    form.amount.data = expense.amount
-    form.date.data = expense.date
-    form.notes.data = expense.notes
-    form.meal_type.data = expense.meal_type
-    form.category_id.data = expense.category_id
-    form.restaurant_id.data = expense.restaurant_id
-
-
 @bp.route("/<int:expense_id>", methods=["GET"])
 @login_required
 def expense_details(expense_id: int) -> str:
@@ -356,6 +420,7 @@ def expense_details(expense_id: int) -> str:
 
 @bp.route("/<int:expense_id>/delete", methods=["POST"])
 @login_required
+@db_transaction(success_message=FlashMessages.EXPENSE_DELETED, error_message=FlashMessages.EXPENSE_DELETE_ERROR)
 def delete_expense(expense_id: int) -> Response:
     """Delete an expense.
 
@@ -368,13 +433,5 @@ def delete_expense(expense_id: int) -> Response:
     expense = Expense.query.get_or_404(expense_id)
     if expense.user_id != current_user.id:
         abort(403)
-
-    try:
-        db.session.delete(expense)
-        db.session.commit()
-        flash("Expense deleted successfully.", "success")
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Error deleting expense: {e}")
-        flash("An error occurred while deleting the expense.", "danger")
+    db.session.delete(expense)
     return redirect(url_for("expenses.list_expenses"))

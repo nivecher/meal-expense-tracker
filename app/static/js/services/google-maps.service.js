@@ -63,9 +63,10 @@ class GoogleMapsService {
 
             const script = document.createElement('script');
             script.id = GoogleMapsService.SCRIPT_ID;
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${this.API_KEY}&libraries=places&callback=Function.prototype`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${this.API_KEY}&libraries=places,marker&callback=Function.prototype`;
             script.async = true;
             script.defer = true;
+            script.setAttribute('loading', 'async');
 
             script.onload = () => {
                 if (!window.google?.maps) {

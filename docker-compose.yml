@@ -10,7 +10,7 @@ services:
       - .:/app
       - app_instance:/app/instance
     environment:
-      - FLASK_APP=wsgi.py
+      - FLASK_APP=wsgi:app
       - FLASK_ENV=development
       - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5433/meal_expenses
       - PYTHONUNBUFFERED=1
@@ -39,7 +39,7 @@ services:
       - AWS_LAMBDA_EVENT_BODY={}
       - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5433/meal_expenses
       - PYTHONUNBUFFERED=1
-      - FLASK_APP=wsgi.py
+      - FLASK_APP=app
       - FLASK_ENV=production
     volumes:
       - .:/var/task

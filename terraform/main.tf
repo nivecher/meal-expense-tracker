@@ -7,11 +7,6 @@ data "aws_caller_identity" "current" {}
 # Get the current AWS region
 data "aws_region" "current" {}
 
-# Data sources for VPC endpoints
-# We'll use specific endpoint IDs or names to avoid conflicts
-
-
-
 # Generate a random password for Flask secret key
 resource "random_password" "flask_secret_key" {
   length           = 50
@@ -251,13 +246,14 @@ module "network" {
 module "iam" {
   source = "./modules/iam"
 
-  region        = local.current_region
-  app_name      = var.app_name
-  environment   = var.environment
-  account_id    = data.aws_caller_identity.current.account_id
-  db_secret_arn = module.rds.db_secret_arn
-  tags          = local.tags
-
+  app_name               = var.app_name
+  environment            = var.environment
+  region                 = var.aws_region
+  account_id             = data.aws_caller_identity.current.account_id
+  db_secret_arn          = module.rds.db_secret_arn
+  db_instance_identifier = module.rds.db_instance_identifier
+  db_username            = module.rds.db_username
+  tags                   = local.tags
 }
 
 # Main KMS Key for all encryption

@@ -103,8 +103,7 @@ class Config:
         "pool_pre_ping": True,
         "pool_recycle": 300,
         "pool_timeout": 30,
-        "pool_size": 5,
-        "max_overflow": 10,
+        "max_overflow": 0,
         "future": True,  # Enable SQLAlchemy 2.0 behavior
     }
 
@@ -224,6 +223,12 @@ class Config:
         """
         self._log_environment_info()
 
+        # In development, if DATABASE_URL is set to PostgreSQL but we can't connect,
+        # fall back to SQLite with a warning
+        if os.environ.get("FLASK_ENV") == "development" and os.environ.get("DATABASE_URL"):
+            logger.warning("Development mode: Forcing SQLite database for local development")
+            return self._get_sqlite_uri()
+
         # Try each configuration method in order of priority
         methods = [
             self._get_database_uri_from_env,
@@ -232,8 +237,15 @@ class Config:
         ]
 
         for method in methods:
-            if db_url := method():
-                return self._ensure_proper_db_url(db_url) if isinstance(db_url, str) else db_url
+            try:
+                if db_url := method():
+                    return self._ensure_proper_db_url(db_url) if isinstance(db_url, str) else db_url
+            except Exception as e:
+                logger.warning(f"Database configuration method {method.__name__} failed: {str(e)}")
+                if os.environ.get("FLASK_ENV") == "development":
+                    logger.warning("Falling back to SQLite due to development mode")
+                    return self._get_sqlite_uri()
+                raise
 
         # Default to SQLite if no other method succeeded
         return self._get_sqlite_uri()
@@ -401,24 +413,37 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
-    # Use a simple SQLite database in the instance directory
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    os.makedirs(os.path.join(basedir, "instance"), exist_ok=True)
-    SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(basedir, 'instance', 'dev.db')}"
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_pre_ping": True,
-        "pool_recycle": 300,
-        "pool_timeout": 30,
-        "pool_size": 5,
-        "max_overflow": 10,
-        "future": True,  # Enable SQLAlchemy 2.0 behavior
-    }
+
+    def __init__(self):
+        super().__init__()
+        # Use DATABASE_URL from environment if set, otherwise use SQLite in instance directory
+        self.SQLALCHEMY_DATABASE_URI = (
+            os.environ.get("DATABASE_URL")
+            or f"sqlite:///{os.path.join(os.path.dirname(__file__), 'instance', 'meal_expenses.db')}"
+        )
+
+        # Ensure the instance directory exists
+        instance_path = os.path.join(os.path.dirname(__file__), "instance")
+        os.makedirs(instance_path, exist_ok=True)
+
+        # Set SQLAlchemy engine options
+        self.SQLALCHEMY_ENGINE_OPTIONS = {
+            "pool_pre_ping": True,
+            "pool_recycle": 300,
+            "pool_timeout": 30,
+            "pool_size": 5,
+            "max_overflow": 10,
+            "connect_args": {"check_same_thread": False},  # Required for SQLite
+        }
 
 
 class TestingConfig(Config):
+    """Testing configuration."""
+
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:?check_same_thread=False"
     WTF_CSRF_ENABLED = False
+    WTF_CSRF_CHECK_DEFAULT = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_pre_ping": True,
         "pool_recycle": 300,
@@ -427,6 +452,15 @@ class TestingConfig(Config):
         "max_overflow": 0,
         "future": True,  # Enable SQLAlchemy 2.0 behavior
     }
+    # URL building configuration for testing
+    SERVER_NAME = "localhost"  # Required for URL building in tests
+    APPLICATION_ROOT = "/"  # Root URL path
+    PREFERRED_URL_SCHEME = "http"  # Default URL scheme
+
+    def __init__(self):
+        super().__init__()
+        # Ensure CSRF is disabled for testing
+        self.WTF_CSRF_ENABLED = False
 
 
 class ProductionConfig(Config):

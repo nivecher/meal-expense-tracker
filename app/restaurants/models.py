@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import String, Text, UniqueConstraint
+from sqlalchemy import String, Text, UniqueConstraint, Float, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
@@ -21,22 +22,42 @@ class Restaurant(db.Model):
     # Columns
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(db.ForeignKey("user.id"), nullable=False, index=True)
+
+    # Basic Information
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     type: Mapped[Optional[str]] = mapped_column(String(50))
     description: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Location Information
     address: Mapped[Optional[str]] = mapped_column(String(200))
     city: Mapped[Optional[str]] = mapped_column(String(100))
-    state: Mapped[Optional[str]] = mapped_column(String(50))
-    zip_code: Mapped[Optional[str]] = mapped_column(String(20))
-    price_range: Mapped[Optional[str]] = mapped_column(String(10))
-    cuisine: Mapped[Optional[str]] = mapped_column(String(100))
-    website: Mapped[Optional[str]] = mapped_column(String(200))
+    state: Mapped[Optional[str]] = mapped_column(String(100))
+    postal_code: Mapped[Optional[str]] = mapped_column(String(20))
+    country: Mapped[Optional[str]] = mapped_column(String(100))
+    latitude: Mapped[Optional[float]] = mapped_column(Float, comment="Geographic latitude")
+    longitude: Mapped[Optional[float]] = mapped_column(Float, comment="Geographic longitude")
+
+    # Contact Information
     phone: Mapped[Optional[str]] = mapped_column(String(20))
+    website: Mapped[Optional[str]] = mapped_column(String(200))
+    email: Mapped[Optional[str]] = mapped_column(String(100))
+
+    # Business Details
+    price_range: Mapped[Optional[int]]
+    cuisine: Mapped[Optional[str]] = mapped_column(String(100))
+    rating: Mapped[Optional[float]]
     notes: Mapped[Optional[str]] = mapped_column(Text)
-    google_place_id: Mapped[Optional[str]] = mapped_column(String(255), index=True, comment="Google Maps Place ID")
-    place_name: Mapped[Optional[str]] = mapped_column(String(255), comment="Official name from Google Places")
-    latitude: Mapped[Optional[float]] = mapped_column(db.Float, comment="Geographic latitude")
-    longitude: Mapped[Optional[float]] = mapped_column(db.Float, comment="Geographic longitude")
+
+    # Google Places Integration
+    google_place_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True)
+    place_name: Mapped[Optional[str]] = mapped_column(String(255))
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
     # Relationships
     user = relationship("User", back_populates="restaurants", lazy="select")  # type: ignore[valid-type]
@@ -59,8 +80,8 @@ class Restaurant(db.Model):
             parts.append(self.city)
         if self.state:
             parts.append(self.state)
-        if self.zip_code:
-            parts.append(self.zip_code)
+        if self.postal_code:
+            parts.append(self.postal_code)
         return ", ".join(parts) if parts else None
 
     @property

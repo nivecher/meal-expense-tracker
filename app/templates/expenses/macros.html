@@ -22,19 +22,11 @@
             </div>
             <div class="col-md-6">
                 {{ form.date.label(class="form-label") }}
-                {% set date_value = "" %}
-                {% if form.date.data %}
-                    {% if form.date.data is string %}
-                        {% set date_value = form.date.data %}
-                    {% else %}
-                        {% set date_value = form.date.data.strftime('%Y-%m-%d') %}
-                    {% endif %}
-                {% endif %}
                 <input type="date"
                        id="{{ form.date.id }}"
                        name="{{ form.date.name }}"
                        class="form-control{{ ' is-invalid' if form.date.errors else '' }}"
-                       value="{{ date_value }}"
+                       value="{{ form.date.data.strftime("%Y-%m-%d") if form.date.data else '' }}"
                        required>
                 {% if form.date.errors %}<div class="invalid-feedback">{{ form.date.errors[0] }}</div>{% endif %}
             </div>
@@ -88,69 +80,6 @@
     <script type="module"
             src="{{ url_for('static', filename='js/pages/expense-form-handler.js') }}"></script>
     <!-- Category and restaurant type handling -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Track if category was manually changed
-            let categoryManuallyChanged = false;
-
-            // Function to update category based on restaurant type
-            function updateCategory(restaurantId) {
-                if (categoryManuallyChanged) return;
-
-                // Skip if no restaurant selected
-                if (!restaurantId) return;
-
-                // Get the category select element
-                const categorySelect = document.getElementById('category_id');
-                if (!categorySelect) return;
-
-                // Get the restaurant type from the selected option
-                const restaurantSelect = document.getElementById('restaurant_id');
-                const selectedOption = restaurantSelect?.options[restaurantSelect.selectedIndex];
-                const restaurantType = selectedOption?.dataset.type;
-
-                if (!restaurantType) return;
-
-                // Find the category that matches the restaurant type
-                for (let i = 0; i < categorySelect.options.length; i++) {
-                    const option = categorySelect.options[i];
-                    if (option.text.toLowerCase() === restaurantType.toLowerCase()) {
-                        categorySelect.value = option.value;
-                        break;
-                    }
-                }
-            }
-
-            // Set up event listeners
-            function setupExpenseFormListeners() {
-                const form = document.getElementById('expenseForm');
-                if (!form) return;
-
-                // Category change handler
-                const categorySelect = document.getElementById('category_id');
-                if (categorySelect) {
-                    categorySelect.addEventListener('change', () => {
-                        categoryManuallyChanged = true;
-                    });
-                }
-
-                // Restaurant change handler
-                const restaurantSelect = document.getElementById('restaurant_id');
-                if (restaurantSelect) {
-                    restaurantSelect.addEventListener('change', (e) => {
-                        updateCategory(e.target.value);
-                    });
-                }
-            }
-
-
-            // Initialize
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', setupExpenseFormListeners);
-            } else {
-                // DOM already loaded, initialize immediately
-                setupExpenseFormListeners();
-            }
-        });
-    </script>
+    <script type="module"
+            src="{{ url_for('static', filename='js/pages/expense-form.js') }}"></script>
 {% endmacro %}

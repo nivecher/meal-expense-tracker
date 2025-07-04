@@ -20,10 +20,10 @@ from app.restaurants.models import Restaurant  # noqa: E402
 def test_restaurants_list(client, auth):
     """Test listing restaurants."""
     # Register and login a test user
-    auth.register()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
     # Test accessing the restaurants list
-    response = client.get("/restaurants/")
+    response = client.get("/restaurants/", follow_redirects=True)
     assert response.status_code == 200
     assert b"Restaurants" in response.data
 
@@ -31,8 +31,8 @@ def test_restaurants_list(client, auth):
 def test_add_restaurant(client, auth):
     """Test adding a restaurant."""
     # Register and login a test user
-    auth.register()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
     response = client.post(
         "/restaurants/add",
         data={
@@ -51,8 +51,8 @@ def test_add_restaurant(client, auth):
 
 def test_edit_restaurant(client, auth):
     """Test editing a restaurant."""
-    auth.create_user()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
     # First add a restaurant
     client.post(
         "/restaurants/add",
@@ -96,8 +96,8 @@ def test_edit_restaurant(client, auth):
 def test_restaurant_details(client, auth, app):
     """Test viewing restaurant details."""
     # Create user and login
-    auth.create_user()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
 
     with app.app_context():
         # Create a test restaurant directly
@@ -117,7 +117,7 @@ def test_restaurant_details(client, auth, app):
         db.session.commit()
 
         # Get the test user
-        stmt = select(User).where(User.username == "testuser")
+        stmt = select(User).where(User.username == "testuser_1")
         user = db.session.scalars(stmt).first()
         # Add an expense for the restaurant
         expense = Expense(
@@ -147,16 +147,16 @@ def test_restaurant_details(client, auth, app):
 
 def test_restaurant_details_not_found(client, auth):
     """Test viewing details of a non-existent restaurant."""
-    auth.create_user()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
     response = client.get("/restaurants/999/details", follow_redirects=True)
     assert response.status_code == 404
 
 
 def test_restaurant_details_database_error(client, auth, monkeypatch):
     """Test handling database error when viewing restaurant details."""
-    auth.create_user()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
 
     with client.application.app_context():
         # Create a test restaurant directly
@@ -201,8 +201,8 @@ def test_restaurant_details_database_error(client, auth, monkeypatch):
 def test_restaurant_details_with_multiple_expenses(client, auth, app):
     """Test viewing restaurant details with multiple expenses."""
     # Create user and login
-    auth.create_user()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
 
     with app.app_context():
         # Create a test restaurant directly
@@ -222,7 +222,7 @@ def test_restaurant_details_with_multiple_expenses(client, auth, app):
         db.session.commit()
 
         # Get the test user
-        user = db.session.execute(select(User).where(User.username == "testuser")).scalar_one()
+        user = db.session.execute(select(User).where(User.username == "testuser_1")).scalar_one()
 
         # Add multiple expenses
         expenses = [
@@ -270,11 +270,11 @@ def test_delete_restaurant_without_expenses(client, auth, app):
     """Test deleting a restaurant that has no expenses."""
     # Create and login user
     with app.app_context():
-        user = User(username="testuser")
+        user = User(username="testuser_1")
         user.set_password("testpass")
         db.session.add(user)
         db.session.commit()
-    auth.login()
+    auth.login("testuser_1", "testpass")
 
     # Create a restaurant first
     restaurant = Restaurant(
@@ -310,11 +310,11 @@ def test_delete_restaurant_with_expenses(client, auth, app):
     """Test deleting a restaurant that has associated expenses."""
     # Create and login user
     with app.app_context():
-        user = User(username="testuser")
+        user = User(username="testuser_1")
         user.set_password("testpass")
         db.session.add(user)
         db.session.commit()
-    auth.login()
+    auth.login("testuser_1", "testpass")
 
     # Create a restaurant first
     restaurant = Restaurant(
@@ -330,7 +330,7 @@ def test_delete_restaurant_with_expenses(client, auth, app):
         restaurant_id = restaurant.id
 
         # Get the current user
-        user = db.session.scalars(select(User).where(User.username == "testuser")).first()
+        user = db.session.scalars(select(User).where(User.username == "testuser_1")).first()
         assert user is not None
 
         # Add some expenses

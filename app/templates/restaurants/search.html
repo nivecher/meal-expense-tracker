@@ -6,15 +6,12 @@
     {{ super() }}
     <!-- Set Google Maps API Key -->
     <script>
-        // Make API key available to all scripts
         window.GOOGLE_MAPS_API_KEY = '{{ google_maps_api_key }}';
-
-        // Log API key status for debugging
-        if (!window.GOOGLE_MAPS_API_KEY) {
-            console.warn('Google Maps API key is not set');
-        } else {
-            console.log('Google Maps API key is set');
-        }
+        window.GOOGLE_MAPS_MAP_ID = 'fd6f9096c4c4db22913a0cae';
+    </script>
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places,marker&map_ids=fd6f9096c4c4db22913a0cae&callback=Function.prototype"
+      async defer loading="async">
     </script>
     <style>
         #map {
@@ -79,13 +76,13 @@
                     <div class="input-group">
                         <input type="text"
                                class="form-control form-control-lg"
-                               id="search-query"
+                               id="restaurant-search-input"
                                name="q"
                                placeholder="Search for restaurants..."
                                aria-label="Search for restaurants"
                                value="{{ query|default('', true) }}"
                                required>
-                        <button class="btn btn-primary" type="submit" id="search-button">
+                        <button class="btn btn-primary" type="submit" id="restaurant-search-btn">
                             <i class="bi bi-search"></i> Search
                         </button>
                         <button type="button"
@@ -111,7 +108,5 @@
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <!-- Initialize restaurant search functionality -->
-    <script type="module"
-            src="{{ url_for('static', filename='js/pages/restaurant-search-init.js') }}"></script>
+    <!-- Restaurant search initialization is handled by base.html -->
 {% endblock scripts %}

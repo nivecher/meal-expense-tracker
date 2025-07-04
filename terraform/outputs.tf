@@ -45,6 +45,28 @@ output "lambda_layer_version_arn" {
   value       = module.lambda.lambda_layer_version_arn
 }
 
+# RDS Outputs
+output "rds_endpoint" {
+  description = "The connection endpoint for the RDS instance"
+  value       = module.rds.db_endpoint
+}
+
+output "rds_database_name" {
+  description = "The name of the database"
+  value       = module.rds.db_name
+}
+
+output "rds_username" {
+  description = "The master username for the database"
+  value       = module.rds.db_username
+  sensitive   = true
+}
+
+output "rds_port" {
+  description = "The port on which the RDS instance accepts connections"
+  value       = module.rds.db_port
+}
+
 output "lambda_function_name" {
   description = "The name of the Lambda function"
   value       = module.lambda.name

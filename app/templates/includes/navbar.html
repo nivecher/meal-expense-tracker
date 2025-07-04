@@ -1,11 +1,14 @@
 {# Main Navigation #}
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+<nav class="navbar navbar-expand-lg navbar-light sticky-top">
     <div class="container">
+        <!-- Brand -->
         <a class="navbar-brand"
            href="{{ url_for("main.index") }}"
            aria-label="Meal Expense Tracker Home">
-            <i class="fas fa-utensils me-2" aria-hidden="true"></i>Meal Expense Tracker
+            <i class="fas fa-utensils" aria-hidden="true"></i>
+            <span>Meal Expense Tracker</span>
         </a>
+        <!-- Mobile Toggle -->
         <button class="navbar-toggler"
                 type="button"
                 data-bs-toggle="collapse"
@@ -15,6 +18,7 @@
                 aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+        <!-- Navigation Links -->
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
@@ -26,7 +30,8 @@
                                      {% else %}
                                          false
                                      {% endif %}">
-                        <i class="fas fa-receipt me-1" aria-hidden="true"></i>Expenses
+                        <i class="fas fa-receipt" aria-hidden="true"></i>
+                        <span>Expenses</span>
                     </a>
                 </li>
                 <li class="nav-item dropdown">
@@ -36,30 +41,33 @@
                        id="restaurantsDropdown"
                        role="button"
                        data-bs-toggle="dropdown"
-                       aria-expanded="false"
-                       aria-haspopup="true">
-                        <i class="fas fa-utensils me-1" aria-hidden="true"></i>Restaurants
+                       aria-expanded="false">
+                        <i class="fas fa-utensils" aria-hidden="true"></i>
+                        <span>Restaurants</span>
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="restaurantsDropdown">
                         <li>
                             <a class="dropdown-item
                                       {% if request.endpoint == 'restaurants.list_restaurants' %}active{% endif %}"
                                href="{{ url_for("restaurants.list_restaurants") }}">
-                                <i class="fas fa-list me-2"></i>All Restaurants
+                                <i class="fas fa-list" aria-hidden="true"></i>
+                                <span>All Restaurants</span>
                             </a>
                         </li>
                         <li>
                             <a class="dropdown-item
                                       {% if request.endpoint == 'restaurants.add_restaurant' %}active{% endif %}"
                                href="{{ url_for("restaurants.add_restaurant") }}">
-                                <i class="fas fa-plus-circle me-2"></i>Add New
+                                <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                                <span>Add New</span>
                             </a>
                         </li>
                         <li>
                             <a class="dropdown-item
                                       {% if request.endpoint == 'restaurants.search_restaurants' %}active{% endif %}"
                                href="{{ url_for("restaurants.search_restaurants") }}">
-                                <i class="fas fa-map-marked-alt me-2"></i>Find on Map
+                                <i class="fas fa-map-marked-alt" aria-hidden="true"></i>
+                                <span>Find on Map</span>
                             </a>
                         </li>
                         <li>
@@ -69,91 +77,133 @@
                             <a class="dropdown-item
                                       {% if request.endpoint == 'restaurants.import_restaurants' %}active{% endif %}"
                                href="{{ url_for("restaurants.import_restaurants") }}">
-                                <i class="fas fa-file-import me-2"></i>Import from CSV
+                                <i class="fas fa-file-import" aria-hidden="true"></i>
+                                <span>Import from CSV</span>
                             </a>
                         </li>
                         <li>
                             <a class="dropdown-item"
                                href="{{ url_for("restaurants.export_restaurants") }}">
-                                <i class="fas fa-file-export me-2"></i>Export to CSV
+                                <i class="fas fa-file-export" aria-hidden="true"></i>
+                                <span>Export to CSV</span>
                             </a>
                         </li>
                     </ul>
                 </li>
             </ul>
-            <!-- Search Form -->
-            <form class="d-flex ms-auto me-3"
-                  action="{{ url_for("restaurants.search_restaurants") }}"
-                  method="get"
-                  role="search">
-                <div class="input-group">
-                    <input class="form-control form-control-sm"
-                           type="search"
-                           name="q"
-                           placeholder="Search restaurants..."
-                           aria-label="Search"
-                           value="{{ request.args.get('q', '') }}">
-                    <button class="btn btn-outline-light btn-sm" type="submit">
-                        <i class="fas fa-search"></i>
-                        <span class="visually-hidden">Search</span>
-                    </button>
-                </div>
-            </form>
-            <ul class="navbar-nav">
+            <!-- Right-aligned navigation items -->
+            <ul class="navbar-nav ms-auto">
+                <!-- UI Demo Link -->
+                <li class="nav-item">
+                    <a id="ui-demo-btn"
+                       class="nav-link
+                              {% if request.endpoint == 'main.ui_demo' %}active{% endif %}"
+                       href="{{ url_for("main.ui_demo") }}"
+                       aria-current="{% if request.endpoint == 'main.ui_demo' %}
+                                         page
+                                     {% else %}
+                                         false
+                                     {% endif %}">
+                        <i class="fas fa-paint-brush" aria-hidden="true"></i>
+                        <span>UI Demo</span>
+                    </a>
+                </li>
+                <!-- User Dropdown -->
                 {% if current_user.is_authenticated %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle"
+                        <a class="nav-link dropdown-toggle d-flex align-items-center"
                            href="#"
                            id="userDropdown"
                            role="button"
                            data-bs-toggle="dropdown"
-                           aria-expanded="false"
-                           aria-haspopup="true">
-                            <i class="fas fa-user-circle me-1" aria-hidden="true"></i>
-                            <span class="visually-hidden">User menu for</span>
-                            {{ current_user.username }}
+                           aria-expanded="false">
+                            <div class="position-relative">
+                                <img src="{{ current_user.avatar_url or url_for('static', filename='img/default-avatar.png') }}"
+                                     alt="{{ current_user.username }}"
+                                     class="rounded-circle"
+                                     width="32"
+                                     height="32"
+                                     data-avatar
+                                     data-default-src="{{ url_for('static', filename='img/default-avatar.png') }}">
+                            </div>
+                            <span class="ms-2 d-none d-lg-inline">{{ current_user.username }}</span>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end"
-                            aria-labelledby="userDropdown">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for("auth.change_password") }}">
-                                    <i class="fas fa-key me-1" aria-hidden="true"></i>Change Password
+                        <div class="dropdown-menu dropdown-menu-end"
+                             aria-labelledby="userDropdown"
+                             role="menu">
+                            <!-- User Info -->
+                            <div class="user-info" role="none">
+                                <div class="d-flex align-items-center">
+                                    <img src="{{ current_user.avatar_url or url_for('static', filename='img/default-avatar.svg') }}"
+                                         alt=""
+                                         class="user-avatar me-3"
+                                         data-avatar
+                                         data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
+                                         onerror="this.onerror=null; this.src=this.dataset.defaultSrc">
+                                    <div>
+                                        <div class="user-name">{{ current_user.username }}</div>
+                                        <div class="user-email">{{ current_user.email }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <!-- Menu Items -->
+                            <div class="px-2">
+                                <a href="{{ url_for("main.ui_demo") }}" class="dropdown-item">
+                                    <i class="fas fa-user"></i>
+                                    <span>Profile</span>
                                 </a>
-                            </li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for("auth.logout") }}">
-                                    <i class="fas fa-sign-out-alt me-1" aria-hidden="true"></i>Logout
+                                <a href="{{ url_for("auth.change_password") }}" class="dropdown-item">
+                                    <i class="fas fa-lock"></i>
+                                    <span>Security</span>
                                 </a>
-                            </li>
-                        </ul>
+                                <a href="#" class="dropdown-item">
+                                    <i class="fas fa-cog"></i>
+                                    <span>Settings</span>
+                                </a>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <div class="px-2">
+                                <a href="#" class="dropdown-item">
+                                    <i class="fas fa-question-circle"></i>
+                                    <span>Help</span>
+                                </a>
+                                <a href="{{ url_for("auth.logout") }}" class="dropdown-item text-danger">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>Logout</span>
+                                </a>
+                            </div>
+                        </div>
                     </li>
                 {% else %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for("auth.login") }}">
-                            <i class="fas fa-sign-in-alt me-1" aria-hidden="true"></i>Login
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for("auth.register") }}">
-                            <i class="fas fa-user-plus me-1" aria-hidden="true"></i>Register
-                        </a>
-                    </li>
+                    <div class="d-flex gap-2">
+                        <li class="nav-item">
+                            <a class="btn btn-outline-primary btn-sm"
+                               href="{{ url_for("auth.login") }}">
+                                <i class="fas fa-sign-in-alt me-1"></i>
+                                <span>Login</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="btn btn-primary btn-sm" href="{{ url_for("auth.register") }}">
+                                <i class="fas fa-user-plus me-1"></i>
+                                <span>Register</span>
+                            </a>
+                        </li>
+                    </div>
                 {% endif %}
             </ul>
         </div>
     </div>
 </nav>
 {# Flash Messages #}
-<div class="container">
+<div class="container mt-3">
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show mt-3"
+                <div class="alert alert-{{ category }} alert-dismissible fade show"
                      role="alert">
-                    {{ message }}
+                    <div class="alert-message">{{ message }}</div>
                     <button type="button"
                             class="btn-close"
                             data-bs-dismiss="alert"

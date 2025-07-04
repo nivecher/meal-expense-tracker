@@ -1,6 +1,5 @@
 """Tests for the Flask application initialization and configuration."""
 
-import importlib
 import json
 import os
 import sys
@@ -10,7 +9,7 @@ from unittest.mock import MagicMock, patch
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.insert(0, project_root)
 
-from app import create_app, get_db_credentials, version  # noqa: E402
+from app import create_app  # noqa: E402
 
 
 class TestConfig:
@@ -75,107 +74,60 @@ def test_create_app_with_default_config():
         assert len(secret_key) > 0
 
 
-def test_version_import():
-    """Test that version information is properly imported."""
-    assert "app" in version
-    assert isinstance(version["app"], str)
+def test_get_database_url_local(monkeypatch):
+    """Test getting database URL in local development."""
+    # Mock environment variables for local development
+    env_vars = {"DATABASE_URL": "postgresql://testuser:testpass@localhost:5432/testdb"}
 
-
-def test_get_db_credentials_local(monkeypatch):
-    """Test getting DB credentials in local development."""
-    # Set up test environment variables
-    test_env_vars = {
-        "FLASK_ENV": "development",
-        "DB_USERNAME": "testuser",
-        "DB_PASSWORD": "testpass",
-        "DB_HOST": "localhost",
-        "DB_PORT": "5432",
-        "DB_NAME": "testdb",
-        # Ensure we don't try to use AWS Secrets Manager
-        "DB_SECRET_ARN": "",
-    }
-
-    # Apply the environment variables
-    for key, value in test_env_vars.items():
+    for key, value in env_vars.items():
         monkeypatch.setenv(key, value)
 
-    # Mock the boto3 client to ensure we don't make real AWS calls
-    with patch("boto3.client") as mock_boto:
-        # Reload the module to pick up the new environment variables
-        if "app" in sys.modules:
-            importlib.reload(sys.modules["app"])
+    # Import here to ensure monkeypatching takes effect
+    from app.utils.db_utils import get_database_url
 
-        # Get the credentials
-        credentials = get_db_credentials()
+    # Test with DATABASE_URL
+    db_url = get_database_url()
+    assert db_url == "postgresql://testuser:testpass@localhost:5432/testdb"
 
-        # Verify boto3 was not called (we should use local env vars)
-        mock_boto.assert_not_called()
+    # Test with no database config (should use SQLite)
+    for key in env_vars:
+        monkeypatch.delenv(key, raising=False)
 
-        # Verify the credentials
-        assert credentials == {
-            "username": "testuser",
-            "password": "testpass",
-            "host": "localhost",
-            "port": "5432",
-            "dbname": "testdb",
-        }
+    db_url = get_database_url()
+    assert db_url.startswith("sqlite:///")
+    assert "instance/app.db" in db_url
 
 
-def test_get_db_credentials_aws_secrets(monkeypatch):
-    """Test getting DB credentials from AWS Secrets Manager."""
-    # Set up test environment variables
-    secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-credentials"
-    test_env_vars = {
-        "FLASK_ENV": "production",
-        "AWS_REGION": "us-east-1",
-        "DB_SECRET_ARN": secret_arn,
-    }
-
-    # Set up the mock secret with all required fields
-    mock_secret = {
-        "username": "awsuser",
-        "password": "awspass",
-        "host": "db-host",
+def test_get_database_url_aws_secrets(monkeypatch):
+    """Test getting database URL from AWS Secrets Manager."""
+    # Mock AWS Secrets Manager response
+    secret_value = {
+        "username": "testuser",
+        "password": "testpass",  # noqa: S105
+        "host": "aws-host.rds.amazonaws.com",
         "port": "5432",
-        "dbname": "testdb",
+        "dbname": "awsdb",
     }
 
-    # Apply the environment variables
-    for key, value in test_env_vars.items():
-        monkeypatch.setenv(key, value)
+    # Mock environment variable
+    secret_arn = "arn:aws:secretsmanager:us-west-2:123456789012:secret:test-secret"
+    monkeypatch.setenv("DB_SECRET_ARN", secret_arn)
 
-    # Set up the mock AWS client
-    mock_client = MagicMock()
-    mock_client.get_secret_value.return_value = {"SecretString": json.dumps(mock_secret)}
+    # Mock boto3 client and session
+    with patch("boto3.session.Session") as mock_session:
+        mock_client = MagicMock()
+        mock_session.return_value.client.return_value = mock_client
+        mock_client.get_secret_value.return_value = {"SecretString": json.dumps(secret_value)}
 
-    # Import get_db_credentials at module level to ensure it's available
-    from app import get_db_credentials
+        # Import here to ensure monkeypatching takes effect
+        from app.utils.db_utils import get_database_url
 
-    # Mock boto3.client to return our mock client
-    with patch("boto3.client", return_value=mock_client) as mock_boto3:
-        # Reload the module to pick up the new environment variables
-        if "app" in sys.modules:
-            importlib.reload(sys.modules["app"])
-            from app import get_db_credentials as reloaded_get_db_credentials
-        else:
-            from app import get_db_credentials as reloaded_get_db_credentials
+        db_url = get_database_url()
 
-        # Use the reloaded version if available, otherwise use the original
-        test_get_db_credentials = reloaded_get_db_credentials or get_db_credentials
+        # Verify the expected database URL format
+        expected = "postgresql://testuser:testpass@aws-host.rds.amazonaws.com:5432/awsdb"
+        assert db_url == expected
 
-        # Get the credentials using the correct function
-        credentials = test_get_db_credentials()
-
-        # Verify the credentials
-        expected_credentials = {
-            "username": "awsuser",
-            "password": "awspass",
-            "host": "db-host",
-            "port": "5432",
-            "dbname": "testdb",
-        }
-        assert credentials == expected_credentials
-
-        # Verify boto3 was called correctly
-        mock_boto3.assert_called_once_with("secretsmanager", region_name="us-east-1")
+        # Verify the boto3 client was called with the correct parameters
+        mock_session.return_value.client.assert_called_once_with(service_name="secretsmanager", region_name="us-east-1")
         mock_client.get_secret_value.assert_called_once_with(SecretId=secret_arn)

@@ -14,9 +14,10 @@ function init() {
     // Check if we're on a page that needs the restaurant search functionality
     const searchForm = document.getElementById('restaurant-search-form');
     const mapContainer = document.getElementById('map');
+    const isRestaurantSearchPage = searchForm && mapContainer;
 
-    if (!searchForm && !mapContainer) {
-        console.log('No restaurant search elements found, skipping initialization');
+    if (!isRestaurantSearchPage) {
+        console.log('Not on restaurant search page, skipping initialization');
         return;
     }
 

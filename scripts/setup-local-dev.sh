@@ -118,6 +118,9 @@ install_python_requirements() {
   echo "Upgrading pip..."
   pip install --upgrade pip
 
+  echo "Generating requirements files..."
+  make requirements
+
   # Install requirements
   echo "Installing Python requirements..."
   if [ -f "requirements.txt" ]; then
@@ -324,7 +327,7 @@ fi
 if [ ! -f .env ]; then
   echo "Creating .env file..."
   {
-    echo "FLASK_APP=app.py"
+    echo "FLASK_APP=wsgi:app"
     echo "FLASK_ENV=development"
     echo "DATABASE_URL=postgresql://localhost:5432/meal_expenses"
     echo "SECRET_KEY=your-secret-key-here"

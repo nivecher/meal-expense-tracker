@@ -1,118 +1,145 @@
 #!/usr/bin/env python3
-"""Database initialization script for the Meal Expense Tracker application.
+"""Database initialization script for the Meal Expense Tracker.
 
-This script handles database initialization and migration operations.
-It can be used to create the initial database, apply migrations, or reset the database.
-
-Usage:
-    python init_db.py [--env ENV] [--reset] [--migrate]
-
-Options:
-    --env ENV     Environment to use (development, testing, production) [default: development]
-    --reset       Drop all tables and recreate them
-    --migrate     Run database migrations after initialization
+This script initializes the database and creates all necessary tables.
+It can be run directly or imported as a module.
 """
-
 import argparse
 import logging
 import sys
+from pathlib import Path
 
-from flask import current_app
+# Add the project root to the Python path
+project_root = Path(__file__).parent.absolute()
+sys.path.insert(0, str(project_root))
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+# Set up logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def init_database(env: str = "development", reset: bool = False, migrate: bool = False) -> bool:
-    """Initialize the database.
+def init_default_data():
+    """Initialize default data in the database."""
+    from app.auth.models import User
+    from app.database import db
+    from app.expenses.models import ExpenseCategory
+
+    try:
+        # Add default expense categories
+        categories = [
+            "Food",
+            "Groceries",
+            "Transportation",
+            "Utilities",
+            "Entertainment",
+            "Shopping",
+            "Healthcare",
+            "Other",
+        ]
+
+        for name in categories:
+            if not db.session.query(ExpenseCategory).filter_by(name=name).first():
+                category = ExpenseCategory(name=name)
+                db.session.add(category)
+                logger.info("Added category: %s", name)
+
+        # Add a default admin user if none exists
+        if not db.session.query(User).filter_by(username="admin").first():
+            admin = User(username="admin", email="admin@example.com", is_admin=True)
+            admin.set_password("admin")
+            db.session.add(admin)
+            logger.info("Added default admin user")
+
+        db.session.commit()
+        logger.info("Successfully initialized default data")
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error("Error initializing default data: %s", e, exc_info=True)
+        raise
+
+
+def init_db(drop_all=False):
+    """Initialize the database with all models.
 
     Args:
-        env: Environment to use (development, testing, production)
-        reset: If True, drop all tables before creating them
-        migrate: If True, run database migrations after initialization
+        drop_all: If True, drop all tables before creating them
 
     Returns:
-        bool: True if successful, False otherwise
+        bool: True if initialization was successful, False otherwise
     """
+    from app.database import create_tables, db, drop_tables
+
     try:
-        from app import create_app, db
+        if drop_all:
+            logger.info("Dropping all tables...")
+            drop_tables()
+            logger.info("All tables dropped")
 
-        # Create app with specified environment
-        app = create_app(env)
-        with app.app_context():
-            if reset:
-                logger.info("Dropping all database tables...")
-                db.drop_all()
-                logger.info("All tables dropped.")
-            logger.info("Creating database tables...")
-            db.create_all()
-            logger.info("Database tables created successfully!")
+        # Create all tables
+        logger.info("Creating database tables...")
+        create_tables()
 
-            # Initialize default categories
-            from app.expenses import init_default_categories
+        # Initialize default data
+        logger.info("Initializing default data...")
+        init_default_data()
 
-            init_default_categories()
-            logger.info("Default categories initialized successfully!")
+        logger.info("Database initialization completed successfully")
+        return True
 
-            if migrate:
-                logger.info("Running database migrations...")
-                from flask_migrate import upgrade
-
-                upgrade()
-                logger.info("Database migrations applied successfully!")
-            return True
     except Exception as e:
-        logger.error("Error initializing database: %s", str(e))
-        if current_app and current_app.debug:
-            import traceback
-
-            traceback.print_exc()
+        logger.error("Error initializing database: %s", str(e), exc_info=True)
+        if db.session.is_active:
+            db.session.rollback()
         return False
 
 
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Initialize the database.")
-    parser.add_argument(
-        "--env",
-        type=str,
-        default="development",
-        choices=["development", "testing", "production"],
-        help="Environment to use (default: development)",
-    )
-    parser.add_argument("--reset", action="store_true", help="Drop all tables before creating them")
-    parser.add_argument("--migrate", action="store_true", help="Run database migrations after initialization")
-    return parser.parse_args()
-
-
 def main():
-    """Run the main application logic."""
-    # Print header
-    print("\n" + "=" * 80)
-    print(f"{'Initializing database':^80}")
+    """Main entry point for the database initialization script."""
+    parser = argparse.ArgumentParser(description="Initialize the database.")
+    parser.add_argument("--reset", action="store_true", help="Drop all tables before creating them")
+
+    args = parser.parse_args()
+
     print("=" * 80)
-    args = parse_arguments()
-    print(f"Initializing {args.env} database...")
-
+    print("Initializing database")
     if args.reset:
-        print("WARNING: This will drop all tables in the database!")
-        confirm = input("Are you sure you want to continue? (y/N): ")
+        print("WARNING: This will DROP ALL TABLES before creating them!")
+        confirm = input("Are you sure you want to continue? (y/N) ")
         if confirm.lower() != "y":
-            print("Operation cancelled.")
-            sys.exit(0)
+            print("Aborting database initialization.")
+            return
 
-    success = init_database(env=args.env, reset=args.reset, migrate=args.migrate)
+    print("-" * 80)
 
-    if success:
-        print("Database initialized successfully!")
-        sys.exit(0)
-    else:
-        print("Failed to initialize database.", file=sys.stderr)
+    # Create app and initialize database within app context
+    from app import create_app
+
+    app = create_app()
+
+    try:
+        with app.app_context():
+            success = init_db(args.reset)
+
+        print("=" * 80)
+        if success:
+            print("\n✅ Database initialized successfully!")
+            print("\nYou can now start the application with:")
+            print("  flask run")
+            if args.reset:
+                print("\nDefault admin credentials:")
+                print("  Username: admin")
+                print("  Password: admin")
+                print("\n⚠️  Remember to change the default admin password after first login!")
+        else:
+            print("\n❌ ERROR: Failed to initialize database. Check the logs for details.")
+            sys.exit(1)
+
+    except Exception as e:
+        logger.error("Error during database initialization: %s", str(e), exc_info=True)
+        print("\n" + "=" * 80)
+        print("❌ Database initialization failed with error!")
+        print("=" * 80)
         sys.exit(1)
 
 

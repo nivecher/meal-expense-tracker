@@ -47,10 +47,10 @@ resource "aws_security_group_rule" "lambda_egress_dns_tcp" {
   protocol          = "tcp"
   cidr_blocks       = [var.vpc_cidr]
   security_group_id = aws_security_group.lambda.id
-  description       = "Allow DNS (TCP) outbound within VPC"
+  description       = "Allow DNS (TCP) outbound for large DNS responses"
 }
 
-# Allow Lambda to access RDS if database security group ID is provided
+# Allow Lambda to access RDS using security group reference
 resource "aws_security_group_rule" "lambda_to_rds" {
   count                    = var.db_security_group_id != "" ? 1 : 0
   type                     = "egress"

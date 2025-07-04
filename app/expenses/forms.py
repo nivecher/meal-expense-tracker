@@ -18,10 +18,9 @@ class ExpenseForm(FlaskForm):
         places=2,
     )
     date = DateField("Date", validators=[DataRequired(message="Date is required")], format="%Y-%m-%d")
-    notes = TextAreaField("Notes", validators=[DataRequired(message="Notes are required")], render_kw={"rows": 3})
     # Category and Restaurant
     category_id = SelectField(
-        "Category", coerce=lambda x: int(x) if x else None, validators=[DataRequired(message="Category is required")]
+        "Category", coerce=lambda x: int(x) if x else None, validators=[Optional()], render_kw={"class": "form-select"}
     )
     restaurant_id = SelectField("Restaurant", coerce=lambda x: int(x) if x else None, validators=[Optional()])
     # Optional Fields

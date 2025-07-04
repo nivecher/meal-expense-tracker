@@ -42,66 +42,101 @@
         }
 
         /* Map container */
-        #map {
-            height: 400px;
+        #map-container {
+            height: 300px;
             width: 100%;
-            margin-top: 1rem;
-            border-radius: 0.25rem;
+            margin: 1rem 0;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            border: 1px solid #dee2e6;
+            position: relative;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
         }
 
         .form-section:last-child {
             border-bottom: none;
         }
 
-        .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
-            display: block;
-            padding: 0.375rem 0.75rem;
-            font-size: 1rem;
-            font-weight: 400;
-            line-height: 1.5;
-            color: #212529;
-            background-color: #fff;
-            background-clip: padding-box;
-            border: 1px solid #ced4da;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            border-radius: 0.25rem;
-            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        /* Location search */
+        .location-search-container {
+            position: relative;
+            margin-bottom: 1rem;
         }
 
-        .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice {
-            display: inline-block;
-            padding: 0.25em 0.5em;
-            margin: 0.25em 0.25em 0.25em 0;
-            font-size: 0.875em;
-            color: #fff;
-            background-color: #0d6efd;
-            border: 1px solid #0d6efd;
-            border-radius: 0.25rem;
+        .location-search-input {
+            padding-right: 2.5rem;
         }
 
-        .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__remove {
-            color: #fff;
-            margin-right: 0.5em;
-            border-right: 1px solid rgba(255, 255, 255, 0.3);
-            padding-right: 0.5em;
+        .location-search-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
         }
 
-        .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__choice__display {
-            padding-left: 0.5em;
+        /* Form controls */
+        .form-floating > label {
+            padding: 1rem 0.75rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .location-search-container {
+                margin-bottom: 1.5rem;
+            }
+
+            #map-container {
+                height: 250px;
+                margin: 1rem 0;
+            }
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            border-radius: 0.5rem;
+        }
+
+        .spinner-border {
+            width: 2rem;
+            height: 2rem;
         }
     </style>
 {% endblock styles %}
 {% block content %}
     <!-- Loading Indicator -->
-    <div id="loading-indicator" class="position-fixed top-0 start-0 w-100 text-center p-2 bg-primary text-white d-none">
+    <div id="loading-indicator"
+         class="position-fixed top-0 start-0 w-100 text-center p-2 bg-primary text-white d-none">
         <div class="spinner-border spinner-border-sm me-2" role="status"></div>
         <span>Loading...</span>
     </div>
+
+    <!-- Success Container -->
+    <div id="success-container" class="alert alert-success d-none position-fixed top-0 start-50 translate-middle-x mt-5 z-3">
+        <i class="fas fa-check-circle me-2"></i>
+        <span id="success-message"></span>
+        <button type="button" class="btn-close float-end" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
     <!-- Error Container -->
-    <div id="error-container" class="position-fixed top-0 end-0 p-3">
-        <!-- Errors will be inserted here by JavaScript -->
+    <div id="error-container" class="alert alert-danger d-none position-fixed top-0 start-50 translate-middle-x mt-5 z-3">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        <span id="error-message"></span>
+        <button type="button" class="btn-close float-end" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     <div class="container mt-4">
         <div class="row justify-content-center">
@@ -263,98 +298,139 @@
                                     {% for error in form.description.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                 </div>
                             </div>
-                            <!-- Contact Information Section -->
-                            <div class="form-section">
-                                <h5 class="mb-4">
-                                    <i class="fas fa-address-card me-2 text-primary"></i>Contact Information
-                                </h5>
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="phone" class="form-label">Phone Number</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text"><i class="fas fa-phone"></i></span>
-                                            {{ form.phone(class="form-control" + (" is-invalid" if form.phone.errors else "") , placeholder="(123) 456-7890") }}
-                                            {% for error in form.phone.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                        </div>
+                            <div class="text-end mb-3">
+                                <button type="button" id="use-location" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-location-arrow me-1"></i> Use My Location
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h5 class="mb-4">
+                                <i class="fas fa-info-circle me-2 text-primary"></i>Restaurant Details
+                            </h5>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        {{ form.name(class_="form-control" + (" is-invalid" if form.name.errors else ""), placeholder="Restaurant Name", autocomplete="off") }}
+                                        <label for="name">Restaurant Name *</label>
+                                        {% if form.name.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ form.name.errors[0] }}
+                                            </div>
+                                        {% endif %}
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="website" class="form-label">Website</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">https://</span>
-                                            {{ form.website(class="form-control" + (" is-invalid" if form.website.errors else "") , placeholder="example.com") }}
-                                            {% for error in form.website.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                        </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        {{ form.cuisine_type(class_="form-select" + (" is-invalid" if form.cuisine_type.errors else ""), placeholder="Cuisine Type") }}
+                                        <label for="cuisine_type">Cuisine Type</label>
+                                        {% if form.cuisine_type.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ form.cuisine_type.errors[0] }}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
-                            <!-- Address Section -->
-                            <div class="form-section">
-                                <h5 class="mb-4">
-                                    <i class="fas fa-map-marker-alt me-2 text-primary"></i>Address
-                                </h5>
-                                <div class="mb-3">
-                                    <label for="address" class="form-label">Street Address</label>
-                                    {{ form.address(class="form-control" + (" is-invalid" if form.address.errors else "") , placeholder="123 Main St") }}
-                                    {% for error in form.address.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                        </div>
+
+                        <div class="form-section">
+                            <h5 class="mb-4">
+                                <i class="fas fa-address-card me-2 text-primary"></i>Address
+                            </h5>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <div class="form-floating">
+                                        {{ form.address(class_="form-control" + (" is-invalid" if form.address.errors else ""), placeholder="Address", autocomplete="off") }}
+                                        <label for="address">Street Address *</label>
+                                        {% if form.address.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ form.address.errors[0] }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="city" class="form-label">City</label>
-                                        {{ form.city(class="form-control" + (" is-invalid" if form.city.errors else "") , placeholder="New York") }}
-                                        {% for error in form.city.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        {{ form.city(class_="form-control" + (" is-invalid" if form.city.errors else ""), placeholder="City", autocomplete="off") }}
+                                        <label for="city">City *</label>
+                                        {% if form.city.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ form.city.errors[0] }}
+                                            </div>
+                                        {% endif %}
                                     </div>
-                                    <div class="col-md-3">
-                                        <label for="state" class="form-label">State</label>
-                                        {{ form.state(class="form-select" + (" is-invalid" if form.state.errors else "") ) }}
-                                        {% for error in form.state.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-floating">
+                                        {{ form.state_province(class_="form-control" + (" is-invalid" if form.state_province.errors else ""), placeholder="State/Province", autocomplete="off") }}
+                                        <label for="state_province">State/Province</label>
+                                        {% if form.state_province.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ form.state_province.errors[0] }}
+                                            </div>
+                                        {% endif %}
                                     </div>
-                                    <div class="col-md-3">
-                                        <label for="zip_code" class="form-label">ZIP Code</label>
-                                        {{ form.zip_code(class="form-control" + (" is-invalid" if form.zip_code.errors else "") , placeholder="10001") }}
-                                        {% for error in form.zip_code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-floating">
+                                        {{ form.postal_code(class_="form-control" + (" is-invalid" if form.postal_code.errors else ""), placeholder="Postal Code", autocomplete="off") }}
+                                        <label for="postal_code">Postal Code</label>
+                                        {% if form.postal_code.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ form.postal_code.errors[0] }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        {{ form.country(class_="form-control" + (" is-invalid" if form.country.errors else ""), placeholder="Country", autocomplete="off") }}
+                                        <label for="country">Country</label>
+                                        {% if form.country.errors %}
+                                            <div class="invalid-feedback">
+                                                {{ form.country.errors[0] }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch mt-3">
+                                        {{ form.is_chain(class_="form-check-input" + (" is-invalid" if form.is_chain.errors else ""), role="switch") }}
+                                        <label class="form-check-label" for="is_chain">This is a chain restaurant</label>
+                                        {% if form.is_chain.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {{ form.is_chain.errors[0] }}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
-                            <!-- Additional Information Section -->
-                            <div class="form-section">
-                                <h5 class="mb-4">
-                                    <i class="fas fa-ellipsis-h me-2 text-primary"></i>Additional Information
-                                </h5>
-                                <div class="mb-3">
-                                    <label for="notes" class="form-label">Notes</label>
-                                    {{ form.notes(class="form-control" + (" is-invalid" if form.notes.errors else "") , rows="3", placeholder="Any additional notes about this restaurant") }}
-                                    <div class="form-text">Add any special instructions, dietary information, or other relevant notes.</div>
-                                    {% for error in form.notes.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                </div>
+                        </div>
+
+                        <!-- Hidden Fields -->
+                        {{ form.latitude() }}
+                        {{ form.longitude() }}
+                        {{ form.google_place_id() }}
+                        {{ form.hidden_tag() }}
+
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-between mt-5 pt-3 border-top">
+                            <div>
+                                <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i> Back to List
+                                </a>
                             </div>
-                            <!-- Hidden Fields -->
-                            {{ form.latitude() }}
-                            {{ form.longitude() }}
-                            {{ form.google_place_id() }}
-                            <!-- Form Actions -->
-                            <div class="d-flex justify-content-between mt-5 pt-3 border-top">
-                                <div>
-                                    {% if is_edit %}
-                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                                           class="btn btn-outline-secondary">
-                                            <i class="fas fa-times me-1"></i>Cancel
-                                        </a>
-                                    {% else %}
-                                        <a href="{{ url_for("restaurants.list_restaurants") }}"
-                                           class="btn btn-outline-secondary">
-                                            <i class="fas fa-arrow-left me-1"></i>Back to List
-                                        </a>
-                                    {% endif %}
-                                </div>
-                                <div>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>
-                                        {{ 'Update' if is_edit else 'Save' }} Restaurant
-                                    </button>
-                                </div>
+                            <div>
+                                <button type="submit" class="btn btn-primary position-relative" id="submit-button">
+                                    <i class="fas fa-save me-1"></i>
+                                    <span id="button-text">{{ 'Update' if is_edit else 'Save' }} Restaurant</span>
+                                    <span id="loading-spinner" class="spinner-border spinner-border-sm d-none position-absolute" role="status" style="right: 10px; top: 50%; transform: translateY(-50%);" aria-hidden="true"></span>
+                                </button>
                             </div>
-                        </form>
-                    </div>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -362,80 +438,100 @@
     <!-- Map container for Google Places -->
     <div class="form-section">
         <h5 class="mb-4">
-            <i class="fas fa-map-marker-alt me-2 text-primary"></i>Location
+            <i class="fas fa-map-marker-alt me-2 text-primary"></i>Find Restaurant
         </h5>
-        <div id="map" class="map-container"></div>
-        <div class="form-text mt-2">
-            Drag the marker to set the exact location of the restaurant.
-                </button>
-                <button class="btn btn-outline-secondary" type="button" id="clearSearch">
-                    <i class="fas fa-times"></i>
+
+        <!-- Search and Location Controls -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-9">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text"
+                           id="restaurant-search"
+                           class="form-control"
+                           placeholder="Search for a restaurant or address"
+                           autocomplete="off" />
+                </div>
+                <div class="form-text">Start typing to search for a restaurant or address</div>
+            </div>
+            <div class="col-md-3">
+                <button type="button"
+                        class="btn btn-outline-primary w-100 h-100"
+                        id="use-location">
+                    <i class="fas fa-location-arrow me-2"></i>Use My Location
                 </button>
             </div>
         </div>
-        <div id="map"
-             style="height: 300px;
-                    width: 100%;
-                    border-radius: 0.25rem;
-                    border: 1px solid #dee2e6"></div>
-        <div class="form-text mt-2">Search for a location or click on the map to set the exact coordinates.</div>
-    </div>
-    <!-- Debug Info (visible only in development) -->
-    {% if config.DEBUG %}
-        <div class="card mt-4">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">
-                    <button class="btn btn-link text-decoration-none"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#debugInfo"
-                            aria-expanded="false"
-                            aria-controls="debugInfo">
-                        <i class="fas fa-bug me-2"></i>Debug Information
-                    </button>
-                </h6>
-            </div>
-            <div class="collapse" id="debugInfo">
-                <div class="card-body bg-light">
-                    <h6>Form Data:</h6>
-                    <pre class="mb-0"><code id="formData"></code></pre>
-                    <hr>
-                    <h6>Place Data:</h6>
-                    <pre class="mb-0"><code id="placeData">No place data available</code></pre>
+
+        <!-- Map Container with Loading Overlay -->
+        <div class="position-relative mb-3" id="map-container">
+            <div id="map-loading" class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center" style="z-index: 1; display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
                 </div>
             </div>
+            <div id="map" class="w-100 rounded" style="height: 300px;"></div>
         </div>
-    {% endif %}
+
+        <!-- Error Container -->
+        <div id="error-container" class="alert alert-danger d-none" role="alert"></div>
+        <div class="collapse" id="debugInfo">
+            <div class="card-body bg-light">
+                <h6>Form Data:</h6>
+                <pre class="mb-0"><code id="formData"></code></pre>
+                <hr>
+                <h6>Place Data:</h6>
+                <pre class="mb-0"><code id="placeData">No place data available</code></pre>
+            </div>
+        </div>
+    </div>
 {% endblock content %}
+
 {% block scripts %}
     {{ super() }}
     <!-- Select2 JS -->
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    <!-- Form submission handling -->
+
+    <!-- Google Maps API Key -->
     <script>
+        // Set the Google Maps API key from server-side variable
+        window.GOOGLE_MAPS_API_KEY = '{{ config.get("GOOGLE_MAPS_API_KEY", "") }}';
+
+        // Set CSRF token for AJAX requests
         document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('restaurantForm');
-            const formOverlay = document.getElementById('form-overlay');
+            const csrfToken = document.querySelector('input[name="csrf_token"]')?.value;
+            if (csrfToken) {
+                // Set as meta tag for easier access
+                let meta = document.createElement('meta');
+                meta.name = 'csrf-token';
+                meta.content = csrfToken;
+                document.head.appendChild(meta);
 
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    // Show loading overlay
-                    if (formOverlay) {
-                        formOverlay.classList.remove('d-none');
-                    }
-
-                    // Disable submit button to prevent double submission
-                    const submitButton = form.querySelector('button[type="submit"]');
-                    if (submitButton) {
-                        submitButton.disabled = true;
-                    }
-                });
+                // Set as header for fetch requests
+                const originalFetch = window.fetch;
+                window.fetch = function(resource, options = {}) {
+                    options.headers = {
+                        ...options.headers,
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    };
+                    return originalFetch(resource, options);
+                };
             }
 
-            // Initialize restaurant form if available
-            if (window.restaurantForm && typeof window.restaurantForm.initializeRestaurantForm === 'function') {
-                window.restaurantForm.initializeRestaurantForm();
+            // Initialize Select2
+            if (window.jQuery && jQuery.fn.select2) {
+                jQuery('select').select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    placeholder: 'Select an option',
+                    allowClear: true,
+                    dropdownParent: jQuery('#form-container')
+                });
             }
         });
     </script>
-{% endblock scripts %}
+
+    <!-- Restaurant Form Module -->
+    <script type="module" src="{{ url_for('static', filename='js/init/restaurant-form.js') }}"></script>
+{% endblock %}

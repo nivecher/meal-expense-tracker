@@ -1,11 +1,13 @@
--r base.in
-
-# Testing
-pytest>=8.0.0,<9.0.0
-pytest-cov>=4.0.0,<5.0.0
-factory-boy>=3.3.0,<4.0.0
-Faker>=25.0.0,<26.0.0
-openpyxl>=3.1.0,<4.0.0  # Excel file handling
+# Tools
+pre-commit>=4.0.0,<5.0.0
+pyproject-hooks>=1.2.0,<2.0.0
+rich>=13.0.0,<14.0.0
+ruamel-yaml>=0.18.14,<0.19.0
+ruamel-yaml-clib>=0.2.12,<0.2.13
+s3transfer>=0.13.0,<0.14.0
+six>=1.17.0,<1.18.0
+snowballstemmer>=3.0.1,<4.0.0
+stevedore>=5.4.1,<6.0.0
 
 # Linting & Formatting
 autoflake>=1.7.0,<2.0.0
@@ -14,6 +16,19 @@ djlint>=1.19.0,<2.0.0  # HTML template linter - using 1.19.0 as it's the latest 
 flake8>=7.0.0,<8.0.0
 isort>=5.12.0,<6.0.0
 mypy>=1.0.0,<2.0.0
+mypy-extensions>=1.0.0,<2.0.0
+pylint>=3.0.0,<4.0.0
+pyupgrade>=3.0.0,<4.0.0
+
+# Testing
+pytest>=8.0.0,<9.0.0
+pytest-cov>=4.0.0,<5.0.0
+coverage>=7.0.0,<8.0.0
+factory-boy>=3.3.0,<4.0.0
+Faker>=25.0.0,<26.0.0
+openpyxl>=3.1.0,<4.0.0  # Excel file handling
+selenium>=4.0.0,<5.0.0
+webdriver-manager>=4.0.0,<5.0.0
 
 # Security
 bandit>=1.7.0,<2.0.0
@@ -25,3 +40,6 @@ sphinx-rtd-theme>=2.0.0,<3.0.0
 
 # Image processing
 Pillow>=10.0.0,<11.0.0
+
+# Debugging
+ipdb>=0.13.1,<0.14.0

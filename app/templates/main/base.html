@@ -49,6 +49,12 @@
               rel="stylesheet">
         <link href="{{ url_for('static', filename='css/utilities.css') }}"
               rel="stylesheet">
+        <link href="{{ url_for('static', filename='css/components/navbar.css') }}"
+              rel="stylesheet">
+        <link href="{{ url_for('static', filename='css/loading.css') }}"
+              rel="stylesheet">
+        <link href="{{ url_for('static', filename='css/map.css') }}"
+              rel="stylesheet">
         <!-- Select2 CSS -->
         <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
               rel="stylesheet">
@@ -147,6 +153,11 @@
         <!-- Initialize page modules -->
         <script type="module"
                 src="{{ url_for('static', filename='js/pages/restaurant-search-init.js') }}"
+                defer></script>
+        <!-- Navbar components -->
+        <script src="{{ url_for('static', filename='js/components/avatar.js') }}"
+                defer></script>
+        <script src="{{ url_for('static', filename='js/components/navbar.js') }}"
                 defer></script>
     </body>
 </html>

@@ -1,14 +1,23 @@
-# Core dependencies
-toml>=0.10.2,<1.0.0
+# Core
 Flask>=3.0.0,<4.0.0
-Flask-SQLAlchemy>=3.1.0,<4.0.0
-Flask-Login>=0.6.3,<0.7.0
-Flask-WTF>=1.2.2,<2.0.0
-Flask-Migrate>=4.1.0,<5.0.0
-Flask-CORS>=4.0.0,<5.0.0
+toml>=0.10.2,<1.0.0
 python-dotenv==1.1.1,<2.0.0
+Flask-babel>=4.0.0,<5.0.0
+Flask-Bootstrap>=3.3.7,<4.0.0
+Flask-Caching>=2.0.1,<3.0.0
+Flask-Mail>=0.9.1,<1.0.0
+Flask-RESTful>=0.3.10,<1.0.0
+Flask-WTF>=1.2.2,<2.0.0
+
+# Security
+Flask-CORS>=4.0.0,<5.0.0
+Flask-Limiter>=3.5.0,<4.0.0
+Flask-Login>=0.6.3,<0.7.0
 
 # Database
+Alembic>=1.12.0,<2.0.0
+Flask-Migrate>=4.1.0,<5.0.0
+Flask-SQLAlchemy>=3.1.0,<4.0.0
 psycopg2-binary>=2.9.9,<3.0.0
 SQLAlchemy>=2.0.0,<3.0.0
 

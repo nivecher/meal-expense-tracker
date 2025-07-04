@@ -4,6 +4,7 @@ from app import db
 from app.auth.models import User
 from app.expenses.models import Expense
 from app.restaurants.models import Restaurant
+from app.utils.messages import FlashMessages
 
 
 def test_expense_creation_with_restaurant(client, app, auth):
@@ -15,7 +16,7 @@ def test_expense_creation_with_restaurant(client, app, auth):
         db.session.add(user)
         db.session.commit()
 
-    auth.login()
+    auth.login("testuser_1", "testpass")
 
     # Create a restaurant
     response = client.post(
@@ -35,7 +36,7 @@ def test_expense_creation_with_restaurant(client, app, auth):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Restaurant added successfully!" in response.data
+    assert FlashMessages.RESTAURANT_ADDED.encode() in response.data
 
     # Add an expense for the restaurant
     today = datetime.now().date()
@@ -51,7 +52,7 @@ def test_expense_creation_with_restaurant(client, app, auth):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Expense added successfully!" in response.data
+    assert FlashMessages.EXPENSE_ADDED.encode() in response.data
 
     # Verify the expense was created with correct restaurant association
     with app.app_context():
@@ -79,7 +80,7 @@ def test_expense_editing_with_restaurant(client, app, auth):
         db.session.add(user)
         db.session.commit()
 
-    auth.login()
+    auth.login("testuser_1", "testpass")
 
     # Create a restaurant
     client.post(
@@ -125,7 +126,7 @@ def test_expense_editing_with_restaurant(client, app, auth):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Expense updated successfully!" in response.data
+    assert FlashMessages.EXPENSE_UPDATED.encode() in response.data
 
     # Verify the expense was updated correctly
     with app.app_context():
@@ -152,7 +153,7 @@ def test_expense_deletion_with_restaurant(client, app, auth):
         db.session.add(user)
         db.session.commit()
 
-    auth.login()
+    auth.login("testuser_1", "testpass")
 
     # Create a restaurant
     client.post(
@@ -190,7 +191,7 @@ def test_expense_deletion_with_restaurant(client, app, auth):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Expense deleted successfully!" in response.data
+    assert FlashMessages.EXPENSE_DELETED.encode() in response.data
 
     # Verify the expense was deleted but restaurant remains
     with app.app_context():
@@ -215,7 +216,7 @@ def test_expense_export(client, app, auth):
         db.session.add(user)
         db.session.commit()
 
-    auth.login()
+    auth.login("testuser_1", "testpass")
 
     # Create a restaurant
     client.post(

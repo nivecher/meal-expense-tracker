@@ -13,6 +13,7 @@ import requests
 
 # Third-party imports
 from flask import (
+    Blueprint,
     current_app,
     flash,
     jsonify,
@@ -28,6 +29,8 @@ from sqlalchemy import exists, func, select
 from app import db
 from app.expenses.models import Expense
 from app.restaurants.models import Restaurant
+from app.utils.decorators import db_transaction
+from app.utils.messages import FlashMessages
 
 # Local imports
 from . import bp
@@ -114,46 +117,36 @@ def list_restaurants():
 
 @bp.route("/add", methods=["GET", "POST"])
 @login_required
+@db_transaction(success_message=FlashMessages.RESTAURANT_ADDED, error_message=FlashMessages.RESTAURANT_ADD_ERROR)
 def add_restaurant():
     """Add a new restaurant."""
     from .forms import RestaurantForm
 
     form = RestaurantForm()
     if request.method == "POST" and form.validate_on_submit():
-        try:
-            # Create new restaurant with user_id and form data
-            restaurant = Restaurant(
-                user_id=current_user.id,
-                name=form.name.data,
-                type=form.type.data,
-                price_range=form.price_range.data,
-                cuisine=form.cuisine.data,
-                description=form.description.data,
-                address=form.address.data,
-                city=form.city.data,
-                state=form.state.data,
-                zip_code=form.zip_code.data,
-                country=form.country.data or "US",  # Default to US if not provided
-                phone=form.phone.data,
-                website=form.website.data,
-                is_chain=form.is_chain.data,
-                notes=form.notes.data,
-                # Google Places fields
-                google_place_id=form.google_place_id.data or None,
-                place_name=form.place_name.data or None,
-                latitude=float(form.latitude.data) if form.latitude.data else None,
-                longitude=float(form.longitude.data) if form.longitude.data else None,
-            )
-            db.session.add(restaurant)
-            db.session.commit()
-            flash("Restaurant added successfully!", "success")
-            return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error("Error adding restaurant: %s", str(e), exc_info=True)
-            flash("An error occurred while adding the restaurant. Please try again.", "error")
-
-    # For GET request or failed POST, render the form template
+        restaurant = Restaurant(
+            user_id=current_user.id,
+            name=form.name.data,
+            type=form.type.data,
+            price_range=form.price_range.data,
+            cuisine=form.cuisine.data,
+            description=form.description.data,
+            address=form.address.data,
+            city=form.city.data,
+            state=form.state_province.data,
+            postal_code=form.postal_code.data,
+            country=form.country.data or "US",
+            phone=form.phone.data,
+            website=form.website.data,
+            is_chain=form.is_chain.data,
+            notes=form.notes.data,
+            google_place_id=form.google_place_id.data or None,
+            place_name=form.place_name.data or None,
+            latitude=float(form.latitude.data) if form.latitude.data else None,
+            longitude=float(form.longitude.data) if form.longitude.data else None,
+        )
+        db.session.add(restaurant)
+        return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
     return render_template(
         "restaurants/form.html",
         form=form,
@@ -165,6 +158,7 @@ def add_restaurant():
 
 @bp.route("/<int:restaurant_id>", methods=["GET", "POST"])
 @login_required
+@db_transaction(success_message=FlashMessages.RESTAURANT_UPDATED, error_message=FlashMessages.RESTAURANT_UPDATE_ERROR)
 def restaurant_details(restaurant_id):
     """Show details for a specific restaurant with inline editing."""
     from .forms import RestaurantForm
@@ -172,24 +166,14 @@ def restaurant_details(restaurant_id):
     restaurant = get_restaurant(restaurant_id)
     form = RestaurantForm(obj=restaurant)
     if request.method == "POST" and form.validate_on_submit():
-        try:
-            form.populate_obj(restaurant)
-            db.session.commit()
-            flash("Restaurant updated successfully!", "success")
-            return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error(f"Error updating restaurant: {str(e)}")
-            flash(f"An error occurred while updating the restaurant: {str(e)}", "error")
-
-    # Get recent expenses for this restaurant
+        form.populate_obj(restaurant)
+        return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
     expenses = (
         Expense.query.filter_by(restaurant_id=restaurant_id, user_id=current_user.id)
         .order_by(Expense.date.desc())
         .limit(10)
         .all()
     )
-
     return render_template(
         "restaurants/detail.html",
         restaurant=restaurant,
@@ -200,48 +184,69 @@ def restaurant_details(restaurant_id):
     )
 
 
+@bp.route("/<int:restaurant_id>/sync-google", methods=["POST"])
+@login_required
+def sync_google_places(restaurant_id):
+    """Sync restaurant data from Google Places."""
+    restaurant = get_restaurant(restaurant_id)
+
+    if not restaurant.google_place_id:
+        return jsonify({"success": False, "message": "No Google Place ID associated with this restaurant"}), 400
+
+    places_service = PlacesService(current_app.config.get("GOOGLE_PLACES_API_KEY"))
+    success = places_service.sync_restaurant_from_google(restaurant)
+
+    if success:
+        return jsonify(
+            {
+                "success": True,
+                "message": "Restaurant data synced successfully",
+                "restaurant": {
+                    "name": restaurant.name,
+                    "address": restaurant.address,
+                    "city": restaurant.city,
+                    "state": restaurant.state,
+                    "postal_code": restaurant.postal_code,
+                    "phone": restaurant.phone,
+                    "website": restaurant.website,
+                    "rating": restaurant.rating,
+                    "type": restaurant.type,
+                },
+            }
+        )
+
+    return jsonify({"success": False, "message": "Failed to sync restaurant data"}), 400
+
+
 @bp.route("/<int:restaurant_id>/edit", methods=["GET", "POST"])
 @login_required
+@db_transaction(success_message=FlashMessages.RESTAURANT_UPDATED, error_message=FlashMessages.RESTAURANT_UPDATE_ERROR)
 def edit_restaurant(restaurant_id):
     """Edit a restaurant's details."""
     from .forms import RestaurantForm
 
     restaurant = get_restaurant(restaurant_id)
-    form = RestaurantForm(obj=restaurant)  # Automatically populate form from restaurant object
-
+    form = RestaurantForm(obj=restaurant)
     if request.method == "POST" and form.validate_on_submit():
-        try:
-            # Update restaurant fields from form data
-            restaurant.name = form.name.data
-            restaurant.type = form.type.data
-            restaurant.price_range = form.price_range.data
-            restaurant.cuisine = form.cuisine.data
-            restaurant.description = form.description.data
-            restaurant.address = form.address.data
-            restaurant.city = form.city.data
-            restaurant.state = form.state.data
-            restaurant.zip_code = form.zip_code.data
-            restaurant.country = form.country.data or "US"  # Default to US if not provided
-            restaurant.phone = form.phone.data
-            restaurant.website = form.website.data
-            restaurant.is_chain = form.is_chain.data
-            restaurant.notes = form.notes.data
-
-            # Update Google Places fields
-            restaurant.google_place_id = form.google_place_id.data or None
-            restaurant.place_name = form.place_name.data or None
-            restaurant.latitude = float(form.latitude.data) if form.latitude.data else None
-            restaurant.longitude = float(form.longitude.data) if form.longitude.data else None
-
-            db.session.commit()
-            flash("Restaurant updated successfully!", "success")
-            return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
-        except Exception as e:
-            db.session.rollback()
-            current_app.logger.error("Error updating restaurant: %s", str(e), exc_info=True)
-            flash("An error occurred while updating the restaurant. Please try again.", "error")
-
-    # For GET request or failed POST, render the form template with restaurant data
+        restaurant.name = form.name.data
+        restaurant.type = form.type.data
+        restaurant.price_range = form.price_range.data
+        restaurant.cuisine = form.cuisine.data
+        restaurant.description = form.description.data
+        restaurant.address = form.address.data
+        restaurant.city = form.city.data
+        restaurant.state = form.state_province.data
+        restaurant.postal_code = form.postal_code.data
+        restaurant.country = form.country.data or "US"
+        restaurant.phone = form.phone.data
+        restaurant.website = form.website.data
+        restaurant.is_chain = form.is_chain.data
+        restaurant.notes = form.notes.data
+        restaurant.google_place_id = form.google_place_id.data or None
+        restaurant.place_name = form.place_name.data or None
+        restaurant.latitude = float(form.latitude.data) if form.latitude.data else None
+        restaurant.longitude = float(form.longitude.data) if form.longitude.data else None
+        return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
     return render_template(
         "restaurants/form.html",
         form=form,
@@ -253,24 +258,15 @@ def edit_restaurant(restaurant_id):
 
 @bp.route("/<int:restaurant_id>/delete", methods=["POST"])
 @login_required
+@db_transaction(success_message=FlashMessages.RESTAURANT_DELETED, error_message=FlashMessages.RESTAURANT_DELETE_ERROR)
 def delete_restaurant(restaurant_id):
     """Delete a restaurant."""
     restaurant = get_restaurant(restaurant_id)
-
-    # Check if restaurant has any expenses
     has_expenses = db.session.scalar(select(exists().where(Expense.restaurant_id == restaurant_id)))
-
     if has_expenses:
-        flash("Cannot delete a restaurant with associated expenses.", "error")
+        flash(FlashMessages.CANNOT_DELETE_WITH_EXPENSES, "error")
     else:
-        try:
-            db.session.delete(restaurant)
-            db.session.commit()
-            flash("Restaurant deleted successfully!", "success")
-        except Exception as e:
-            db.session.rollback()
-            logger.error("Error deleting restaurant: %s", str(e))
-            flash("Error deleting restaurant. Please try again.", "error")
+        db.session.delete(restaurant)
     return redirect(url_for("restaurants.list_restaurants"))
 
 
@@ -281,12 +277,12 @@ def import_restaurants():
     """Handle importing restaurants from CSV."""
     if request.method == "POST":
         if "file" not in request.files:
-            flash("No file selected", "error")
+            flash("No file selected", "danger")
             return redirect(request.url)
 
         file = request.files["file"]
         if file.filename == "":
-            flash("No file selected", "error")
+            flash("No file selected", "danger")
             return redirect(request.url)
 
         if file and file.filename.endswith(".csv"):
@@ -295,7 +291,7 @@ def import_restaurants():
                 flash(message, "success")
                 return redirect(url_for("restaurants.list_restaurants"))
             else:
-                flash(message, "error")
+                flash(message, "danger")
 
     return render_template("restaurants/import.html")
 
@@ -368,13 +364,19 @@ def search_restaurants():
         bool(google_maps_api_key),
     )
 
+    # Ensure we have a valid API key
+    if not google_maps_api_key:
+        current_app.logger.error("Google Maps API key is required but not found in config or environment variables")
+        flash("Google Maps integration is not properly configured. Please contact support.", "error")
+        return redirect(url_for("restaurants.list_restaurants"))
+
     return render_template(
         "restaurants/search.html",
         lat=lat,
         lng=lng,
         zoom=zoom,
         query=query,
-        google_maps_api_key=google_maps_api_key or "",
+        google_maps_api_key=google_maps_api_key,
     )
 
 
@@ -443,12 +445,12 @@ def search_places():
     """
     try:
         # Log the incoming request for debugging
-        logger.debug("Received Places API search request with args: %s", dict(request.args))
+        logger.debug("Received Places API search request with args: %s", request.args.to_dict())
 
         # Validate parameters
         params, error = _validate_search_params(request.args)
         if error:
-            logger.warning("Invalid search parameters: %s", error.get_json())
+            logger.warning("Invalid search parameters: %s", error[0].get_json())
             return error
 
         lat, lng, radius, keyword = params

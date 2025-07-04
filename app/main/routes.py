@@ -45,7 +45,7 @@ def index():
 
     try:
         # Debug: Log request args
-        logger.debug("Request args: %s", dict(request.args))
+        logger.debug("Request args: %s", request.args.to_dict())
 
         # Get filter parameters from request
         filters = get_expense_filters(request)
@@ -117,3 +117,13 @@ def internal_error(error):
         Rendered 500 error template
     """
     return render_template("errors/500.html", error=str(error)), 500
+
+
+@bp.route("/ui-demo")
+def ui_demo():
+    """Render the UI components demo page.
+
+    Returns:
+        Rendered UI demo template
+    """
+    return render_template("main/ui_demo.html")

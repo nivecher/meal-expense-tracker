@@ -87,7 +87,7 @@ def _process_restaurant_row(row: Dict[str, str], user_id: int) -> Optional[Resta
         address=(row.get("address") or "").strip(),
         city=city,
         state=(row.get("state") or "").strip(),
-        zip_code=(row.get("zip_code") or "").strip(),
+        postal_code=(row.get("zip_code") or "").strip(),
         phone=(row.get("phone") or "").strip(),
         website=(row.get("website") or "").strip(),
         price_range=row.get("price_range") or None,
@@ -147,10 +147,9 @@ def _generate_result_message(imported: int, skipped: int) -> str:
 
 
 def _validate_csv_reader(reader):
-    """Validate the CSV reader has required columns."""
-    required_columns = {"name", "address", "city", "state", "postal_code", "country"}
-    if not required_columns.issubset(reader.fieldnames):
-        return False, f"Missing required columns. Required: {', '.join(required_columns)}"
+    """Validate the CSV reader has at least the name column."""
+    if "name" not in reader.fieldnames:
+        return False, "Missing required column: 'name'"
     return True, ""
 
 
@@ -160,17 +159,38 @@ def _handle_import_error(error: Exception) -> Tuple[bool, str]:
     return False, f"Error processing import: {str(error)}"
 
 
-def _process_import(reader, user_id: int) -> Tuple[int, int]:
-    """Process the CSV import after validation."""
+def _process_import(reader, user_id: int) -> Tuple[bool, str]:
+    """Process the CSV import after validation.
+
+    Args:
+        reader: CSV reader object
+        user_id: ID of the user importing the restaurants
+
+    Returns:
+        tuple: (success: bool, message: str)
+    """
     imported = 0
     skipped = 0
-    for row in reader:
-        success, _ = _process_restaurant_row(row, user_id)
-        if success:
-            imported += 1
-        else:
-            skipped += 1
-    return imported, skipped
+
+    try:
+        for row in reader:
+            restaurant = _process_restaurant_row(row, user_id)
+            if restaurant:
+                db.session.add(restaurant)
+                imported += 1
+
+                # Commit in batches
+                if imported % 50 == 0:
+                    db.session.commit()
+            else:
+                skipped += 1
+
+        db.session.commit()
+        return True, _generate_result_message(imported, skipped)
+
+    except Exception as e:
+        db.session.rollback()
+        return _handle_import_error(e)
 
 
 def import_restaurants_from_csv(file_stream, user) -> Tuple[bool, str]:
@@ -227,7 +247,7 @@ def export_restaurants_to_csv(user_id) -> Response:
                 "address",
                 "city",
                 "state",
-                "zip_code",
+                "postal_code",
                 "phone",
                 "website",
                 "price_range",
@@ -246,7 +266,7 @@ def export_restaurants_to_csv(user_id) -> Response:
                     restaurant.address or "",
                     restaurant.city or "",
                     restaurant.state or "",
-                    restaurant.zip_code or "",
+                    restaurant.postal_code or "",
                     restaurant.phone or "",
                     restaurant.website or "",
                     restaurant.price_range or "",

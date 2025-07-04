@@ -47,6 +47,73 @@ This project uses [setuptools_scm](https://github.com/pypa/setuptools_scm/) for 
 
 2. The next build will automatically use this version
 
+## 🌍 Environment Configuration
+
+The application supports different environment configurations using `.env` files following the `dev`, `test`, and `prod` naming convention.
+
+### Available Environments
+
+1. **Development** (`.env.dev`)
+   - Default environment for local development
+   - Debug mode enabled
+   - Uses SQLite database by default
+   - Run with: `python scripts/run.py dev` or just `python scripts/run.py`
+
+2. **Testing** (`.env.test`)
+   - Used for running tests
+   - Uses a separate test database
+   - Debug mode disabled
+   - Run with: `python scripts/run.py test`
+
+3. **Production** (`.env.prod`)
+   - Used in production environments
+   - Debug mode disabled
+   - Uses PostgreSQL/MySQL database
+   - Run with: `python scripts/run.py prod`
+
+### Setting Up Environments
+
+1. Copy the example environment file for each environment you need:
+
+   ```bash
+   # For development
+   cp env.example .env.dev
+
+   # For testing
+   cp env.example .env.test
+
+   # For production
+   cp env.example .env.prod
+   ```
+
+2. Edit each `.env` file with the appropriate configuration values for that environment.
+
+3. Run the application with the desired environment:
+
+   ```bash
+   # For development (default)
+   python scripts/run.py dev
+
+   # For testing
+   python scripts/run.py test
+
+   # For production
+   python scripts/run.py prod
+   ```
+
+### Environment Variables
+
+Key environment variables (set in each `.env` file):
+
+- `FLASK_APP`: Entry point of the application (default: `wsgi:app`)
+- `FLASK_ENV`: Environment (`development` for dev, `production` otherwise)
+- `SECRET_KEY`: Secret key for session security
+- `DATABASE_URL`: Database connection URL
+- `DEBUG`: Set to `True` for development
+- `DATABASE_URL`: Database connection URL
+- `AWS_*`: AWS credentials (if using AWS services)
+- `MAIL_*`: Email configuration
+
 ### Development Version
 
 - When running from source without installation, the version will be `0.0.0.dev0`
@@ -202,7 +269,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 1. **Create a `.env` file** with these variables:
 
    ```env
-   FLASK_APP=wsgi.py
+   FLASK_APP=wsgi:app
    FLASK_ENV=development
    SECRET_KEY=your-secret-key
    SQLALCHEMY_DATABASE_URI=sqlite:///instance/meals_expenses.db
@@ -321,11 +388,11 @@ This will create the following files:
      --zip-file fileb://dist/app.zip
    ```
 
-### Environment Variables
+### Lambda Environment Variables
 
 Make sure to set the following environment variables in your Lambda function:
 
-- `FLASK_APP=wsgi.py`
+- `FLASK_APP=wsgi:app`
 - `FLASK_ENV=production`
 - `SQLALCHEMY_DATABASE_URI` - Your database connection string
 - `SECRET_KEY` - A secure secret key for Flask

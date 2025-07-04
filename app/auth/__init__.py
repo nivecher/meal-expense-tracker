@@ -22,8 +22,7 @@ def init_app(app):
         app: The Flask application instance
     """
     # Import models here to avoid circular imports
-    from . import models  # noqa: F401
-    from .models import init_login_manager
+    from .models import User, init_login_manager  # noqa: F401
 
     # Register the auth blueprint
     app.register_blueprint(bp, url_prefix="/auth")

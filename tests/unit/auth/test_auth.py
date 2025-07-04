@@ -6,6 +6,8 @@ import sys
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.utils.messages import FlashMessages
+
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.insert(0, project_root)
@@ -28,7 +30,7 @@ def test_register(client, app):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Registration successful! Please login." in response.data
+    assert FlashMessages.REGISTRATION_SUCCESS.encode() in response.data
 
     # Verify user was created in database
     with app.app_context():
@@ -47,7 +49,7 @@ def test_register_missing_fields(client):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Please fill out all fields." in response.data
+    assert FlashMessages.FIELDS_REQUIRED.encode() in response.data
 
     response = client.post(
         "/auth/register",
@@ -55,7 +57,7 @@ def test_register_missing_fields(client):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Please fill out all fields." in response.data
+    assert FlashMessages.FIELDS_REQUIRED.encode() in response.data
 
 
 def test_register_existing_username(client, app):
@@ -74,7 +76,7 @@ def test_register_existing_username(client, app):
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert b"Username already exists" in response.data
+    assert FlashMessages.USERNAME_EXISTS.encode() in response.data
     assert b"Register" in response.data  # Should stay on register page
 
 
@@ -87,7 +89,7 @@ def test_register_authenticated_user(client, auth, app):
         db.session.add(user)
         db.session.commit()
 
-    auth.login()
+    auth.login("testuser_1", "testpass")
     response = client.get("/auth/register", follow_redirects=True)
     assert response.status_code == 200
     assert b"Meal Expenses" in response.data  # Should redirect to index
@@ -151,7 +153,7 @@ def test_login_authenticated_user(client, auth, app):
         db.session.add(user)
         db.session.commit()
 
-    auth.login()
+    auth.login("testuser_1", "testpass")
     response = client.get("/auth/login", follow_redirects=True)
     assert response.status_code == 200
     assert b"Meal Expenses" in response.data  # Should redirect to index
@@ -159,7 +161,7 @@ def test_login_authenticated_user(client, auth, app):
 
 def test_logout(client, auth):
     """Test user logout."""
-    auth.login()
+    auth.login("testuser_1", "testpass")
     response = client.get("/auth/logout", follow_redirects=True)
     assert response.status_code == 200
     assert b"You have been logged out" in response.data

@@ -20,18 +20,26 @@ resource "aws_iam_policy" "lambda_combined" {
           var.db_secret_arn
         ]
       },
-      # RDS access - Using wildcards to avoid circular dependency
+      # RDS Database Access
       {
         Effect = "Allow"
         Action = [
-          "rds:Connect",
-          "rds-db:connect"
+          "rds-db:connect",
+          "rds-db:executeStatement",
+          "rds-db:select"
         ]
         Resource = [
-          "arn:aws:rds:${var.region}:${var.account_id}:db:*",
-          "arn:aws:rds:${var.region}:${var.account_id}:cluster:*",
-          "arn:aws:rds-db:${var.region}:${var.account_id}:dbuser:*/${var.app_name}"
+          "arn:aws:rds-db:${var.region}:${var.account_id}:dbuser:${var.db_instance_identifier}/${var.db_username}"
         ]
+      },
+      # RDS Management
+      {
+        Effect = "Allow"
+        Action = [
+          "rds:DescribeDBInstances",
+          "rds:DescribeDBClusters"
+        ]
+        Resource = "*"
       },
       # CloudWatch Logs
       {
@@ -76,6 +84,18 @@ resource "aws_iam_policy" "lambda_combined" {
         ]
         Resource = [
           "*" # This should be scoped to the specific KMS key ARN when known
+        ]
+      },
+      # SSM Parameter Store access for Google API keys
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = [
+          "arn:aws:ssm:${var.region}:${var.account_id}:parameter/${var.app_name}/${var.environment}/google/*"
         ]
       }
     ]

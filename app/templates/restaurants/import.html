@@ -23,51 +23,54 @@
                         {% endwith %}
                         <div class="mb-4">
                             <h3 class="h5 mb-3">Instructions</h3>
-                            <p>Upload a CSV file containing restaurant information. The file must include the following field:</p>
-                            <h4 class="h6 mt-3">Required Field:</h4>
+                            <p>Upload a CSV file containing restaurant information. The file must include the following required fields:</p>
+                            <h4 class="h6 mt-3">Required Fields:</h4>
                             <div class="alert alert-info">
                                 <i class="fas fa-info-circle me-2"></i>
-                                Only the <strong>Name</strong> field is required. All other fields are optional.
+                                The following fields are <strong>required</strong> in your CSV file:
                             </div>
                             <ul class="mb-3">
                                 <li>
-                                    <code>Name</code> - Restaurant name (required)
+                                    <code>name</code> - Restaurant name
+                                </li>
+                                <li>
+                                    <code>address</code> - Street address
+                                </li>
+                                <li>
+                                    <code>city</code> - City name
+                                </li>
+                                <li>
+                                    <code>state</code> - State/province
+                                </li>
+                                <li>
+                                    <code>postal_code</code> - Postal/ZIP code
+                                </li>
+                                <li>
+                                    <code>country</code> - Country name
                                 </li>
                             </ul>
                             <h4 class="h6 mt-3">Optional Fields:</h4>
                             <ul>
                                 <li>
-                                    <code>Type</code> - Restaurant type (e.g., restaurant, cafe, bar)
+                                    <code>type</code> - Restaurant type (e.g., restaurant, cafe, bar)
                                 </li>
                                 <li>
-                                    <code>Address</code> - Street address
+                                    <code>price_range</code> - $ to $$$$
                                 </li>
                                 <li>
-                                    <code>City</code> - City name
+                                    <code>cuisine</code> - Type of cuisine
                                 </li>
                                 <li>
-                                    <code>State</code> - State code (e.g., CA, NY)
+                                    <code>website</code> - Restaurant website URL
                                 </li>
                                 <li>
-                                    <code>Zip Code</code> - Postal code
+                                    <code>phone</code> - Contact number
                                 </li>
                                 <li>
-                                    <code>Price Range</code> - $ to $$$$
+                                    <code>description</code> - Brief description
                                 </li>
                                 <li>
-                                    <code>Cuisine</code> - Type of cuisine
-                                </li>
-                                <li>
-                                    <code>Website</code> - Restaurant website URL
-                                </li>
-                                <li>
-                                    <code>Phone</code> - Contact number
-                                </li>
-                                <li>
-                                    <code>Description</code> - Brief description
-                                </li>
-                                <li>
-                                    <code>Notes</code> - Additional notes
+                                    <code>notes</code> - Additional notes
                                 </li>
                             </ul>
                             <div class="alert alert-info mt-3">

@@ -6,7 +6,7 @@ env:
   APP_NAME: meal-expense-tracker
   PYTHON_VERSION: '3.13'
   PYTHONPATH: ${{ github.workspace }}
-  FLASK_APP: wsgi.py
+  FLASK_APP: wsgi:app
   FLASK_ENV: test
   TESTING: 'true'
 

@@ -2,7 +2,7 @@
 
 import csv
 import io
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from flask import Response
@@ -249,12 +249,8 @@ def test_process_restaurant_form_sql_error(session, test_restaurant):
                 mock_field.data = getattr(self, field, "")
                 yield mock_field
 
-    # Mock the session to raise an exception on commit
-    with patch("app.restaurants.services.db.session.commit") as mock_commit:
-        mock_commit.side_effect = Exception("Database error")
+    form = MockForm()
+    success, message = process_restaurant_form(test_restaurant, form)
 
-        form = MockForm()
-        success, message = process_restaurant_form(test_restaurant, form)
-
-        assert success is False
-        assert "Error saving restaurant" in message
+    assert success is False
+    assert "Error saving restaurant" in message

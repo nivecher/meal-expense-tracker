@@ -48,18 +48,40 @@ function loadModule(moduleName, element) {
 }
 
 /**
- * Initialize modules based on data attributes
+ * Check if a module's required elements are present
+ * @param {string} moduleName - Name of the module to check
+ * @returns {boolean} True if all required elements are present
+ */
+function shouldLoadModule(moduleName) {
+    switch(moduleName) {
+        case 'restaurant-search':
+            // Only load if the search form and map container exist
+            return document.getElementById('restaurant-search-form') &&
+                   document.getElementById('map');
+        // Add other module conditions here
+        default:
+            return true; // Default to loading if we don't have specific conditions
+    }
+}
+
+/**
+ * Initialize all modules found in the document
  */
 function initModules() {
+    console.log('Initializing modules...');
+
     // Find all elements with data-module attribute
     const moduleElements = document.querySelectorAll('[data-module]');
 
+    // Load each module if its required elements are present
     moduleElements.forEach(element => {
-        const moduleName = element.getAttribute('data-module');
-        if (moduleName) {
+        const moduleName = element.dataset.module;
+        if (moduleName && shouldLoadModule(moduleName)) {
             // Add a data attribute to mark this element as initialized
             element.setAttribute('data-module-initialized', 'true');
             loadModule(moduleName, element).catch(console.error);
+        } else if (moduleName) {
+            console.log(`Skipping module ${moduleName} - required elements not found`);
         }
     });
 }

@@ -99,7 +99,7 @@ If you prefer to set up manually:
 source venv/bin/activate
 
 # Set environment variables
-export FLASK_APP=app.py
+export FLASK_APP=wsgi:app
 export FLASK_ENV=development
 
 # Start Flask development server
@@ -227,7 +227,7 @@ Add this to your `.vscode/launch.json` for debugging:
             "request": "launch",
             "module": "flask",
             "env": {
-                "FLASK_APP": "app.py",
+                "FLASK_APP": "wsgi:app",
                 "FLASK_ENV": "development"
             },
             "args": [

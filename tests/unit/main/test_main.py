@@ -14,8 +14,8 @@ def test_index_redirects_to_login(client):
 
 def test_index_with_expenses(client, auth):
     """Test index page with expenses."""
-    auth.create_user()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
     # Add a restaurant and expense
     client.post(
         "/restaurants/add",
@@ -26,6 +26,7 @@ def test_index_with_expenses(client, auth):
             "phone": "123-456-7890",
             "website": "http://test.com",
         },
+        follow_redirects=True,
     )
 
     # Add an expense
@@ -39,18 +40,19 @@ def test_index_with_expenses(client, auth):
             "amount": "25.50",
             "notes": "Test expense",
         },
+        follow_redirects=True,
     )
 
     # Check the index page
-    response = client.get("/")
+    response = client.get("/", follow_redirects=True)
     assert response.status_code == 200
     assert b"Test Restaurant" in response.data
 
 
 def test_index_sorting(client, auth):
     """Test index page sorting."""
-    auth.create_user()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
     # Add a restaurant and multiple expenses
     client.post(
         "/restaurants/add",
@@ -61,6 +63,7 @@ def test_index_sorting(client, auth):
             "phone": "123-456-7890",
             "website": "http://test.com",
         },
+        follow_redirects=True,
     )
 
     # Add expenses with different amounts
@@ -74,6 +77,7 @@ def test_index_sorting(client, auth):
             "amount": "15.50",
             "notes": "Cheaper expense",
         },
+        follow_redirects=True,
     )
 
     client.post(
@@ -86,10 +90,11 @@ def test_index_sorting(client, auth):
             "amount": "35.50",
             "notes": "More expensive expense",
         },
+        follow_redirects=True,
     )
 
     # Test sorting by amount
-    response = client.get("/?sort=amount&order=asc")
+    response = client.get("/?sort=amount&order=asc", follow_redirects=True)
     assert response.status_code == 200
     assert b"15.50" in response.data
     assert b"35.50" in response.data
@@ -97,8 +102,8 @@ def test_index_sorting(client, auth):
 
 def test_index_search(client, auth):
     """Test index page search functionality."""
-    auth.create_user()
-    auth.login()
+    auth.register("testuser_1", "testpass")
+    auth.login("testuser_1", "testpass")
     # Add a restaurant and expense
     client.post(
         "/restaurants/add",
@@ -109,6 +114,7 @@ def test_index_search(client, auth):
             "phone": "123-456-7890",
             "website": "http://test.com",
         },
+        follow_redirects=True,
     )
 
     # Add an expense
@@ -122,9 +128,10 @@ def test_index_search(client, auth):
             "amount": "25.50",
             "notes": "Test expense",
         },
+        follow_redirects=True,
     )
 
     # Test search functionality
-    response = client.get("/?search=Test")
+    response = client.get("/?search=Test", follow_redirects=True)
     assert response.status_code == 200
     assert b"Test Restaurant" in response.data

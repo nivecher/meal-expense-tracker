@@ -4,6 +4,14 @@ data "aws_caller_identity" "current" {}
 
 data "aws_region" "current" {}
 
+data "aws_ssm_parameter" "google_places_api_key" {
+  name = "/${var.app_name}/${var.environment}/google/places-api-key"
+}
+
+data "aws_ssm_parameter" "google_maps_api_key" {
+  name = "/${var.app_name}/${var.environment}/google/maps-api-key"
+}
+
 # Note: DB_URL will be constructed at runtime in the Lambda function using the secret
 
 # S3 Object for Lambda Layer Package
@@ -247,12 +255,20 @@ resource "aws_lambda_function" "main" {
       DB_SECRET_ARN  = var.db_secret_arn
       RUN_MIGRATIONS = var.run_migrations ? "true" : "false"
 
+      # Google API keys from SSM Parameter Store
+      GOOGLE_PLACES_API_KEY_SSM_PATH = data.aws_ssm_parameter.google_places_api_key.name
+      GOOGLE_MAPS_API_KEY_SSM_PATH   = data.aws_ssm_parameter.google_maps_api_key.name
+
+      # Backward compatibility - will be loaded from SSM at runtime
+      GOOGLE_MAPS_API_KEY   = "ssm:${data.aws_ssm_parameter.google_maps_api_key.name}"
+      GOOGLE_PLACES_API_KEY = "ssm:${data.aws_ssm_parameter.google_places_api_key.name}"
 
       # Application configuration
       ENVIRONMENT             = var.environment
       FLASK_ENV               = var.environment == "prod" ? "production" : "development"
       AWS_LAMBDA_EXEC_WRAPPER = var.enable_otel_tracing ? "/opt/otel-instrument" : ""
       LOG_LEVEL               = var.log_level
+      ENABLE_AWS_SERVICES     = "true"
 
       # Note: DB_URL will be constructed at runtime in the Lambda function
     }, var.extra_environment_variables)

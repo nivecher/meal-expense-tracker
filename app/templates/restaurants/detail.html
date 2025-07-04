@@ -10,238 +10,261 @@
     <div class="container mt-4">
         {% if restaurant %}
             <div class="row">
-                <!-- Restaurant Details Column -->
-                <div class="col-md-4">
-                    <div class="card mb-4">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h1 class="h4 mb-0">
-                                <i class="fas fa-utensils me-2"></i>
-                                {% if is_editing %}
-                                    Edit
+                <div class="col-md-8">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h1 class="mb-0">{{ restaurant.name }}</h1>
+                        {% if restaurant.google_place_id %}
+                        <div class="d-flex align-items-center">
+                            <span class="text-muted me-2" id="last-synced">
+                                {% if restaurant.last_synced_at %}
+                                    Last synced: {{ restaurant.last_synced_at|datetimeformat('%b %d, %Y %I:%M %p') }}
                                 {% else %}
-                                    Restaurant
+                                    Never synced
                                 {% endif %}
-                                Details
-                            </h1>
-                            {% if not is_editing %}
-                                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id, edit='true') }}"
-                                   class="btn btn-sm btn-outline-primary"
-                                   aria-label="Edit {{ restaurant.name }}">
-                                    <i class="fas fa-edit me-1" aria-hidden="true"></i>Edit
-                                </a>
-                            {% endif %}
+                            </span>
+                            <button id="sync-google-places"
+                                    class="btn btn-outline-primary btn-sm"
+                                    data-restaurant-id="{{ restaurant.id }}"
+                                    title="Sync with Google Places">
+                                <span id="sync-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                <i class="bi bi-arrow-repeat"></i> Sync
+                            </button>
                         </div>
-                        <div class="card-body">
-                            {% if is_editing %}
-                                <form method="post"
-                                      action="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">
-                                    {{ form.hidden_tag() }}
+                        {% endif %}
+                    </div>
+                    <!-- Restaurant Details Column -->
+                    <div class="col-md-4">
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h1 class="h4 mb-0">
+                                    <i class="fas fa-utensils me-2"></i>
+                                    {% if is_editing %}
+                                        Edit
+                                    {% else %}
+                                        Restaurant
+                                    {% endif %}
+                                    Details
+                                </h1>
+                                {% if not is_editing %}
+                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id, edit='true') }}"
+                                       class="btn btn-sm btn-outline-primary"
+                                       aria-label="Edit {{ restaurant.name }}">
+                                        <i class="fas fa-edit me-1" aria-hidden="true"></i>Edit
+                                    </a>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                {% if is_editing %}
+                                    <form method="post"
+                                          action="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">
+                                        {{ form.hidden_tag() }}
+                                        <div class="mb-3">
+                                            {{ form.name.label(class="form-label") }}
+                                            {{ form.name(class="form-control") }}
+                                        </div>
+                                        <div class="mb-3">
+                                            {{ form.type.label(class="form-label") }}
+                                            {{ form.type(class="form-select") }}
+                                        </div>
+                                        <div class="mb-3">
+                                            <h5 class="text-muted mb-2">Address</h5>
+                                            <div class="mb-2">
+                                                {{ form.address.label(class="form-label") }}
+                                                {{ form.address(class="form-control", placeholder="Street address") }}
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-md-6">
+                                                    {{ form.city.label(class="form-label") }}
+                                                    {{ form.city(class="form-control") }}
+                                                </div>
+                                                <div class="col-md-3">
+                                                    {{ form.state_province.label(class="form-label") }}
+                                                    {{ form.state_province(class="form-control") }}
+                                                </div>
+                                                <div class="col-md-3">
+                                                    {{ form.postal_code.label(class="form-label") }}
+                                                    {{ form.postal_code(class="form-control") }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-6">
+                                                {{ form.price_range.label(class="form-label") }}
+                                                {{ form.price_range(class="form-select") }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ form.cuisine.label(class="form-label") }}
+                                                {{ form.cuisine(class="form-control") }}
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            {{ form.website.label(class="form-label") }}
+                                            {{ form.website(class="form-control") }}
+                                        </div>
+                                        <div class="mb-3">
+                                            {{ form.phone.label(class="form-label") }}
+                                            {{ form.phone(class="form-control") }}
+                                        </div>
+                                        <div class="mb-3">
+                                            {{ form.description.label(class="form-label") }}
+                                            {{ form.description(class="form-control", rows=3) }}
+                                        </div>
+                                        <div class="mb-3">
+                                            {{ form.notes.label(class="form-label") }}
+                                            {{ form.notes(class="form-control", rows=3) }}
+                                        </div>
+                                        <div class="d-flex gap-2 mt-4">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fas fa-save me-1"></i>Save Changes
+                                            </button>
+                                            <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                               class="btn btn-outline-secondary">
+                                                <i class="fas fa-times me-1"></i>Cancel
+                                            </a>
+                                        </div>
+                                    </form>
+                                {% else %}
+                                    <h3 class="h5 mb-3">{{ restaurant.name }}</h3>
                                     <div class="mb-3">
-                                        {{ form.name.label(class="form-label") }}
-                                        {{ form.name(class="form-control") }}
-                                    </div>
-                                    <div class="mb-3">
-                                        {{ form.type.label(class="form-label") }}
-                                        {{ form.type(class="form-select") }}
+                                        <strong>Type:</strong>
+                                        <span class="badge bg-secondary">{{ restaurant.type or 'Not specified' }}</span>
                                     </div>
                                     <div class="mb-3">
                                         <h5 class="text-muted mb-2">Address</h5>
-                                        <div class="mb-2">
-                                            {{ form.address.label(class="form-label") }}
-                                            {{ form.address(class="form-control", placeholder="Street address") }}
-                                        </div>
-                                        <div class="row g-2">
-                                            <div class="col-md-6">
-                                                {{ form.city.label(class="form-label") }}
-                                                {{ form.city(class="form-control") }}
-                                            </div>
-                                            <div class="col-md-3">
-                                                {{ form.state.label(class="form-label") }}
-                                                {{ form.state(class="form-control") }}
-                                            </div>
-                                            <div class="col-md-3">
-                                                {{ form.zip_code.label(class="form-label") }}
-                                                {{ form.zip_code(class="form-control") }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row g-2 mb-3">
-                                        <div class="col-md-6">
-                                            {{ form.price_range.label(class="form-label") }}
-                                            {{ form.price_range(class="form-select") }}
-                                        </div>
-                                        <div class="col-md-6">
-                                            {{ form.cuisine.label(class="form-label") }}
-                                            {{ form.cuisine(class="form-control") }}
-                                        </div>
+                                        <p class="mb-1">
+                                            {% if restaurant.address %}
+                                                {{ restaurant.address }}
+                                                <br>
+                                            {% endif %}
+                                            {% if restaurant.city or restaurant.state or restaurant.postal_code %}
+                                                {% if restaurant.city %}{{ restaurant.city }}{% endif %}
+                                                {% if restaurant.state %}, {{ restaurant.state }}{% endif %}
+                                                {% if restaurant.postal_code %}{{ restaurant.postal_code }}{% endif %}
+                                            {% else %}
+                                                No address information available
+                                            {% endif %}
+                                        </p>
                                     </div>
                                     <div class="mb-3">
-                                        {{ form.website.label(class="form-label") }}
-                                        {{ form.website(class="form-control") }}
+                                        <strong>Price Range:</strong>
+                                        <span>{{ restaurant.price_range or 'Not specified' }}</span>
                                     </div>
                                     <div class="mb-3">
-                                        {{ form.phone.label(class="form-label") }}
-                                        {{ form.phone(class="form-control") }}
+                                        <strong>Cuisine:</strong>
+                                        <span>{{ restaurant.cuisine|replace('_', ' ') |title if restaurant.cuisine else 'Not specified' }}</span>
                                     </div>
-                                    <div class="mb-3">
-                                        {{ form.description.label(class="form-label") }}
-                                        {{ form.description(class="form-control", rows=3) }}
-                                    </div>
-                                    <div class="mb-3">
-                                        {{ form.notes.label(class="form-label") }}
-                                        {{ form.notes(class="form-control", rows=3) }}
-                                    </div>
+                                    {% if restaurant.website %}
+                                        <div class="mb-3">
+                                            <strong>Website:</strong>
+                                            <a href="{{ restaurant.website }}"
+                                               target="_blank"
+                                               rel="noopener noreferrer"
+                                               class="text-decoration-none">
+                                                {{ restaurant.website }}
+                                                <span class="visually-hidden">(opens in new tab)</span>
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                    {% if restaurant.phone %}
+                                        <div class="mb-3">
+                                            <strong>Phone:</strong>
+                                            <a href="tel:{{ restaurant.phone }}"
+                                               class="text-decoration-none"
+                                               aria-label="Call {{ restaurant.phone }}">
+                                                <i class="fas fa-phone-alt me-1" aria-hidden="true"></i>
+                                                {{ restaurant.phone }}
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                    {% if restaurant.description %}
+                                        <div class="mb-3">
+                                            <strong>Description:</strong>
+                                            <p class="mb-0">{{ restaurant.description }}</p>
+                                        </div>
+                                    {% endif %}
+                                    {% if restaurant.notes %}
+                                        <div class="mb-3">
+                                            <strong>Notes:</strong>
+                                            <p class="mb-0">{{ restaurant.notes }}</p>
+                                        </div>
+                                    {% endif %}
                                     <div class="d-flex gap-2 mt-4">
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-save me-1"></i>Save Changes
-                                        </button>
-                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                                           class="btn btn-outline-secondary">
-                                            <i class="fas fa-times me-1"></i>Cancel
+                                        <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
+                                           class="btn btn-primary"
+                                           aria-label="Edit {{ restaurant.name }}">
+                                            <i class="fas fa-edit me-1" aria-hidden="true"></i>Edit Restaurant
                                         </a>
-                                    </div>
-                                </form>
-                            {% else %}
-                                <h3 class="h5 mb-3">{{ restaurant.name }}</h3>
-                                <div class="mb-3">
-                                    <strong>Type:</strong>
-                                    <span class="badge bg-secondary">{{ restaurant.type or 'Not specified' }}</span>
-                                </div>
-                                <div class="mb-3">
-                                    <h5 class="text-muted mb-2">Address</h5>
-                                    <p class="mb-1">
-                                        {% if restaurant.address %}
-                                            {{ restaurant.address }}
-                                            <br>
-                                        {% endif %}
-                                        {% if restaurant.city or restaurant.state or restaurant.zip_code %}
-                                            {% if restaurant.city %}{{ restaurant.city }}{% endif %}
-                                            {% if restaurant.state %}, {{ restaurant.state }}{% endif %}
-                                            {% if restaurant.zip_code %}{{ restaurant.zip_code }}{% endif %}
-                                        {% else %}
-                                            No address information available
-                                        {% endif %}
-                                    </p>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Price Range:</strong>
-                                    <span>{{ restaurant.price_range or 'Not specified' }}</span>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Cuisine:</strong>
-                                    <span>{{ restaurant.cuisine|replace('_', ' ') |title if restaurant.cuisine else 'Not specified' }}</span>
-                                </div>
-                                {% if restaurant.website %}
-                                    <div class="mb-3">
-                                        <strong>Website:</strong>
-                                        <a href="{{ restaurant.website }}"
-                                           target="_blank"
-                                           rel="noopener noreferrer"
-                                           class="text-decoration-none">
-                                            {{ restaurant.website }}
-                                            <span class="visually-hidden">(opens in new tab)</span>
+                                        <a href="{{ url_for("restaurants.list_restaurants") }}"
+                                           class="btn btn-outline-secondary"
+                                           aria-label="Back to restaurants list">
+                                            <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>Back to List
                                         </a>
                                     </div>
                                 {% endif %}
-                                {% if restaurant.phone %}
-                                    <div class="mb-3">
-                                        <strong>Phone:</strong>
-                                        <a href="tel:{{ restaurant.phone }}"
-                                           class="text-decoration-none"
-                                           aria-label="Call {{ restaurant.phone }}">
-                                            <i class="fas fa-phone-alt me-1" aria-hidden="true"></i>
-                                            {{ restaurant.phone }}
-                                        </a>
-                                    </div>
-                                {% endif %}
-                                {% if restaurant.description %}
-                                    <div class="mb-3">
-                                        <strong>Description:</strong>
-                                        <p class="mb-0">{{ restaurant.description }}</p>
-                                    </div>
-                                {% endif %}
-                                {% if restaurant.notes %}
-                                    <div class="mb-3">
-                                        <strong>Notes:</strong>
-                                        <p class="mb-0">{{ restaurant.notes }}</p>
-                                    </div>
-                                {% endif %}
-                                <div class="d-flex gap-2 mt-4">
-                                    <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
-                                       class="btn btn-primary"
-                                       aria-label="Edit {{ restaurant.name }}">
-                                        <i class="fas fa-edit me-1" aria-hidden="true"></i>Edit Restaurant
-                                    </a>
-                                    <a href="{{ url_for("restaurants.list_restaurants") }}"
-                                       class="btn btn-outline-secondary"
-                                       aria-label="Back to restaurants list">
-                                        <i class="fas fa-arrow-left me-1" aria-hidden="true"></i>Back to List
-                                    </a>
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                <!-- Expenses Column -->
-                <div class="col-md-8">
-                    <div class="card">
-                        <div class="card-header bg-white py-3"
-                             role="region"
-                             aria-labelledby="expenses-heading">
-                            <h2 id="expenses-heading" class="h5 mb-0">Expenses</h2>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h2 class="h4 mb-0">Expenses at {{ restaurant.name }}</h2>
-                                <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
-                                   class="btn btn-primary">
-                                    <i class="fas fa-plus me-2"></i>Add Expense
-                                </a>
                             </div>
                         </div>
-                        <div class="card-body">
-                            {% if expenses %}
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Amount</th>
-                                                <th>Category</th>
-                                                <th>Meal Type</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for expense in expenses %}
-                                                <tr>
-                                                    <td>
-                                                        <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
-                                                           class="text-decoration-none">
-                                                            {{ expense.date.strftime("%Y-%m-%d") }}
-                                                        </a>
-                                                    </td>
-                                                    <td>${{ "%.2f"|format(expense.amount) }}</td>
-                                                    <td>{{ expense.category.name if expense.category else 'Uncategorized' }}</td>
-                                                    <td>{{ expense.meal_type }}</td>
-                                                    <td>
-                                                        <div class="btn-group btn-group-sm">
-                                                            <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
-                                                               class="btn btn-outline-primary">Edit</a>
-                                                            <button type="button"
-                                                                    class="btn btn-outline-danger"
-                                                                    data-bs-toggle="modal"
-                                                                    data-bs-target="#deleteModal{{ expense.id }}">
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
+                    </div>
+                    <!-- Expenses Column -->
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header bg-white py-3"
+                                 role="region"
+                                 aria-labelledby="expenses-heading">
+                                <h2 id="expenses-heading" class="h5 mb-0">Expenses</h2>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h2 class="h4 mb-0">Expenses at {{ restaurant.name }}</h2>
+                                    <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                       class="btn btn-primary">
+                                        <i class="fas fa-plus me-2"></i>Add Expense
+                                    </a>
                                 </div>
-                            {% else %}
-                                <p class="text-muted">No expenses recorded for this restaurant yet.</p>
-                            {% endif %}
+                            </div>
+                            <div class="card-body">
+                                {% if expenses %}
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Amount</th>
+                                                    <th>Category</th>
+                                                    <th>Meal Type</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for expense in expenses %}
+                                                    <tr>
+                                                        <td>
+                                                            <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
+                                                               class="text-decoration-none">
+                                                                {{ expense.date.strftime("%Y-%m-%d") }}
+                                                            </a>
+                                                        </td>
+                                                        <td>${{ "%.2f"|format(expense.amount) }}</td>
+                                                        <td>{{ expense.category.name if expense.category else 'Uncategorized' }}</td>
+                                                        <td>{{ expense.meal_type }}</td>
+                                                        <td>
+                                                            <div class="btn-group btn-group-sm">
+                                                                <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+                                                                   class="btn btn-outline-primary">Edit</a>
+                                                                <button type="button"
+                                                                        class="btn btn-outline-danger"
+                                                                        data-bs-toggle="modal"
+                                                                        data-bs-target="#deleteModal{{ expense.id }}">
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted">No expenses recorded for this restaurant yet.</p>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -293,13 +316,10 @@
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize all modals
-            var modals = document.querySelectorAll('.modal');
-            modals.forEach(function(modal) {
-                new bootstrap.Modal(modal);
-            });
-        });
+    <script src="{{ url_for('static', filename='js/restaurant-form.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pages/restaurant-detail.js') }}"></script>
+    {% if config.GOOGLE_PLACES_API_KEY %}
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_PLACES_API_KEY }}&libraries=places&callback=Function.prototype" async defer></script>
+    {% endif %}
     </script>
 {% endblock scripts %}

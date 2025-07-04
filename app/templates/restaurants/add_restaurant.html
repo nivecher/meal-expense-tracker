@@ -1,5 +1,7 @@
 {% extends "main/base.html" %}
-{% block title %}Add Restaurant{% endblock title %}
+{% block title %}
+    Add Restaurant
+{% endblock title %}
 {% block content %}
     <div class="container mt-4">
         <div class="row justify-content-center">
@@ -170,11 +172,11 @@
                                         </select>
                                     </div>
                                     <div class="col-md-4 mb-3">
-                                        <label for="zip_code" class="form-label">Zip Code</label>
+                                        <label for="postal_code" class="form-label">ZIP/Postal Code</label>
                                         <input type="text"
                                                class="form-control"
-                                               id="zip_code"
-                                               name="zip_code"
+                                               id="postal_code"
+                                               name="postal_code"
                                                placeholder="Enter zip code"
                                                data-bs-toggle="tooltip"
                                                data-bs-placement="top"
@@ -391,7 +393,7 @@
                                 }
 
                                 // Set zip code
-                                const zipInput = document.getElementById('zip_code');
+                                const zipInput = document.getElementById('postal_code');
                                 if (zipInput) {
                                     zipInput.value = zipCode;
                                 }

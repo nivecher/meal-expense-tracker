@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background circle -->
+    <circle cx="100" cy="100" r="100" fill="#e9ecef"/>
+
+    <!-- Head -->
+    <circle cx="100" cy="80" r="50" fill="#f8f9fa" stroke="#6c757d" stroke-width="2"/>
+
+    <!-- Eyes -->
+    <circle cx="80" cy="70" r="8" fill="#6c757d"/>
+    <circle cx="120" cy="70" r="8" fill="#6c757d"/>
+
+    <!-- Smile -->
+    <path d="M80 110 Q100 130 120 110" stroke="#6c757d" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+    <!-- Body -->
+    <path d="M100 130 L100 180" stroke="#6c757d" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Arms -->
+    <path d="M100 150 L70 140" stroke="#6c757d" stroke-width="3" stroke-linecap="round"/>
+    <path d="M100 150 L130 140" stroke="#6c757d" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Legs -->
+    <path d="M100 180 L80 210" stroke="#6c757d" stroke-width="3" stroke-linecap="round"/>
+    <path d="M100 180 L120 210" stroke="#6c757d" stroke-width="3" stroke-linecap="round"/>
+</svg>

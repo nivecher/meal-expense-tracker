@@ -38,7 +38,7 @@ REPO_NAME ?= meal-expense-tracker
 
 # Python settings
 PYTHONPATH = $(shell pwd)
-FLASK_APP = wsgi.py
+FLASK_APP = wsgi:app
 FLASK_ENV = development
 
 # Enable BuildKit for better build performance and features

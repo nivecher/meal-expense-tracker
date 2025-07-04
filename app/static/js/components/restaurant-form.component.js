@@ -716,18 +716,18 @@ function updateLocation(location) {
 
     // Update or create marker
     if (!appState.marker) {
-        appState.marker = new google.maps.Marker({
-            position: location,
+        appState.marker = new google.maps.marker.AdvancedMarkerElement({
             map: appState.map,
-            draggable: true
+            position: location,
+            title: 'Selected Location',
+            gmpDraggable: true
         });
 
-        // Add dragend listener
-        appState.marker.addListener('dragend', () => {
-            updateFormFields(appState.marker.getPosition());
+        appState.marker.addEventListener('gmp-dragend', () => {
+            updateFormFields(appState.marker.position);
         });
     } else {
-        appState.marker.setPosition(location);
+        appState.marker.position = location;
     }
 
     // Update form fields

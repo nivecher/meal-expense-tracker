@@ -34,6 +34,25 @@ class RestaurantForm(FlaskForm):
         render_kw={"class": "form-select"},
     )
 
+    cuisine_type = SelectField(
+        "Cuisine Type",
+        choices=[
+            ("", "Select cuisine..."),
+            ("american", "American"),
+            ("chinese", "Chinese"),
+            ("mexican", "Mexican"),
+            ("italian", "Italian"),
+            ("japanese", "Japanese"),
+            ("indian", "Indian"),
+            ("thai", "Thai"),
+            ("french", "French"),
+            ("mediterranean", "Mediterranean"),
+            ("other", "Other"),
+        ],
+        validators=[Optional()],
+        render_kw={"class": "form-select"},
+    )
+
     description = TextAreaField(
         "Description",
         validators=[Optional(), Length(max=500)],
@@ -50,16 +69,22 @@ class RestaurantForm(FlaskForm):
         "City", validators=[Optional(), Length(max=100)], render_kw={"class": "form-control", "placeholder": "City"}
     )
 
-    state = StringField(
+    state_province = StringField(
         "State/Province",
         validators=[Optional(), Length(max=50)],
         render_kw={"class": "form-control", "placeholder": "State/Province"},
     )
 
-    zip_code = StringField(
+    postal_code = StringField(
         "ZIP/Postal Code",
         validators=[Optional(), Length(max=20)],
         render_kw={"class": "form-control", "placeholder": "ZIP/Postal code"},
+    )
+
+    country = StringField(
+        "Country",
+        validators=[Optional(), Length(max=100)],
+        render_kw={"class": "form-control", "placeholder": "Country"},
     )
 
     price_range = SelectField(
@@ -97,6 +122,10 @@ class RestaurantForm(FlaskForm):
         "Notes",
         validators=[Optional()],
         render_kw={"class": "form-control", "rows": 3, "placeholder": "Any additional notes about this restaurant"},
+    )
+
+    is_chain = BooleanField(
+        "Is this a chain restaurant?", validators=[Optional()], render_kw={"class": "form-check-input"}, default=False
     )
     # Hidden fields for Google Places data
     google_place_id = StringField(

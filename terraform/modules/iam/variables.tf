@@ -26,11 +26,16 @@ variable "db_secret_arn" {
   type        = string
 }
 
-# db_identifier is no longer needed as we use wildcards in the IAM policy
-# variable "db_identifier" {
-#   description = "Identifier of the RDS database"
-#   type        = string
-# }
+variable "db_instance_identifier" {
+  description = "The RDS instance identifier (e.g., mydb-instance-1)"
+  type        = string
+}
+
+variable "db_username" {
+  description = "Database username for IAM authentication"
+  type        = string
+  default     = "app_user"
+}
 
 # Tags
 variable "tags" {
