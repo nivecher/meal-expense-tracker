@@ -128,12 +128,15 @@ for ENV in dev staging prod; do
 
   BACKEND_FILE="terraform/environments/$ENV/backend.hcl"
 
+  mkdir -p "$(dirname "$BACKEND_FILE")"
+
   # Create backend.hcl
   cat >"$BACKEND_FILE" <<-EOM
 # Backend configuration for $ENV environment
 bucket         = "$STATE_BUCKET"
 key            = "$ENV/terraform.tfstate"
 region         = "$REGION"
+dynamodb_table = "$LOCK_TABLE"
 use_lockfile   = true
 encrypt        = true
 EOM

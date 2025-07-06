@@ -59,6 +59,12 @@ variable "enable_public_access" {
   default     = false
 }
 
+variable "enable_nat_gateway" {
+  type        = bool
+  description = "Enable NAT Gateway for outbound traffic from private subnets"
+  default     = false
+}
+
 # ======================
 # Domain Configuration
 # ======================
@@ -80,7 +86,7 @@ variable "api_subdomain" {
 
 variable "lambda_architecture" {
   type        = string
-  default     = "x86_64"
+  default     = "arm64"
   description = "Instruction set architecture for Lambda (x86_64 or arm64)"
 
   validation {
@@ -158,12 +164,12 @@ variable "extra_environment_variables" {
 
 variable "db_allocated_storage" {
   type        = number
-  default     = 20
+  default     = 10
   description = "Allocated storage in GB for RDS instance"
 
   validation {
-    condition     = var.db_allocated_storage >= 20 && var.db_allocated_storage <= 65536
-    error_message = "Database storage must be between 20GB and 64TB (65536GB)"
+    condition     = var.db_allocated_storage >= 10 && var.db_allocated_storage <= 65536
+    error_message = "Database storage must be between 10GB and 64TB (65536GB)"
   }
 }
 
@@ -237,6 +243,12 @@ variable "enable_encryption_in_transit" {
 # ======================
 # Budget & Monitoring Configuration
 # ======================
+variable "enable_cost_alert" {
+  type        = bool
+  description = "Enable a budget and cost alerts for the environment"
+  default     = false
+}
+
 variable "monthly_budget_amount" {
   type        = string
   default     = "50.00"

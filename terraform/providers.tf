@@ -11,9 +11,10 @@ provider "aws" {
     }
   }
 
-  default_tags {
-    tags = local.tags
-  }
+  # TODO: Re-enable provider-level default_tags when Trivy bug is fixed
+  # default_tags {
+  #   tags = local.tags
+  # }
 }
 
 # AWS provider alias for us-east-1 (required for ACM certificates used by API Gateway)
@@ -30,7 +31,8 @@ provider "aws" {
     }
   }
 
-  default_tags {
-    tags = local.tags
-  }
+  # TODO: Re-enable provider-level default_tags when Trivy bug is fixed
+  # default_tags {
+  #   tags = local.tags
+  # }
 }

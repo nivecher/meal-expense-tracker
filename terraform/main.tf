@@ -378,6 +378,9 @@ module "rds" {
 
   # Tags
   tags = local.tags
+
+  # Database configuration
+  db_allocated_storage = var.db_allocated_storage
 }
 
 # Secret Rotation for RDS
@@ -468,6 +471,11 @@ module "lambda" {
   # Database configuration
   db_secret_arn        = module.rds.db_secret_arn
   db_security_group_id = module.rds.db_security_group_id
+  db_username          = module.rds.db_username
+  db_password          = module.rds.db_password
+  db_host              = module.rds.db_host
+  db_port              = module.rds.db_port
+  db_name              = module.rds.db_name
 
   # API Gateway integration
   api_gateway_execution_arn = module.api_gateway.api_execution_arn

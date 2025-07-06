@@ -26,6 +26,11 @@ variable "vpc_cidr" {
   type        = string
 }
 
+variable "db_allocated_storage" {
+  description = "The allocated storage in GB for the RDS database"
+  type        = number
+}
+
 variable "db_kms_key_arn" {
   description = "The ARN of the KMS key to use for encrypting the database. If not provided, a default AWS-managed key is used."
   type        = string

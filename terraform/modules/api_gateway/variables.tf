@@ -49,11 +49,6 @@ variable "api_domain_name" {
   default     = null
 
   validation {
-    condition     = var.domain_name == null || (var.api_domain_name != null && var.api_domain_name != "")
-    error_message = "api_domain_name must be provided if domain_name is provided"
-  }
-
-  validation {
     condition     = var.api_domain_name == null || can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:[.][a-zA-Z0-9-]+)*[.][a-zA-Z]{2,}$", var.api_domain_name))
     error_message = "The api_domain_name must be a valid domain name (e.g., 'api.example.com')"
   }
@@ -67,17 +62,6 @@ variable "cert_domain" {
   EOT
   type        = string
   default     = null
-
-  validation {
-    condition = var.cert_domain == null || (
-      can(regex("^\\*\\..+$", var.cert_domain)) &&
-      (var.api_domain_name == null ||
-        var.cert_domain == var.api_domain_name ||
-        (startswith(var.cert_domain, "*.") &&
-      endswith(var.api_domain_name, substr(var.cert_domain, 1, length(var.cert_domain)))))
-    )
-    error_message = "The cert_domain must be a wildcard domain (e.g., '*.example.com')"
-  }
 }
 
 # Integration Configuration

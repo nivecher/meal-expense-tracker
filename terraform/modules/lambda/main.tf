@@ -193,7 +193,6 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
 
 # Attach AWS managed policy for VPC access if VPC is configured
 resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
-  count      = var.vpc_id != "" ? 1 : 0
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
@@ -255,13 +254,12 @@ resource "aws_lambda_function" "main" {
       DB_SECRET_ARN  = var.db_secret_arn
       RUN_MIGRATIONS = var.run_migrations ? "true" : "false"
 
-      # Google API keys from SSM Parameter Store
-      GOOGLE_PLACES_API_KEY_SSM_PATH = data.aws_ssm_parameter.google_places_api_key.name
-      GOOGLE_MAPS_API_KEY_SSM_PATH   = data.aws_ssm_parameter.google_maps_api_key.name
+      # Google API keys: pass actual values in non-prod, SSM paths in prod
+      GOOGLE_PLACES_API_KEY = var.environment != "prod" ? data.aws_ssm_parameter.google_places_api_key.value : "ssm:${data.aws_ssm_parameter.google_places_api_key.name}"
+      GOOGLE_MAPS_API_KEY   = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_api_key.value   : "ssm:${data.aws_ssm_parameter.google_maps_api_key.name}"
 
-      # Backward compatibility - will be loaded from SSM at runtime
-      GOOGLE_MAPS_API_KEY   = "ssm:${data.aws_ssm_parameter.google_maps_api_key.name}"
-      GOOGLE_PLACES_API_KEY = "ssm:${data.aws_ssm_parameter.google_places_api_key.name}"
+      # Database URL: construct in non-prod, use secret in prod
+      DATABASE_URL = var.environment != "prod" ? "postgresql+psycopg2://${var.db_username}:${var.db_password}@${var.db_host}:${var.db_port}/${var.db_name}" : null
 
       # Application configuration
       ENVIRONMENT             = var.environment
@@ -270,7 +268,7 @@ resource "aws_lambda_function" "main" {
       LOG_LEVEL               = var.log_level
       ENABLE_AWS_SERVICES     = "true"
 
-      # Note: DB_URL will be constructed at runtime in the Lambda function
+      # Note: DB_URL will be constructed at runtime in the Lambda function for prod
     }, var.extra_environment_variables)
   }
 
@@ -302,4 +300,14 @@ resource "aws_lambda_function" "main" {
     },
     var.tags
   )
+}
+
+resource "aws_security_group_rule" "lambda_to_rds" {
+  type                     = "egress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.lambda.id
+  source_security_group_id = var.db_security_group_id
+  description              = "Allow Lambda to access RDS"
 }

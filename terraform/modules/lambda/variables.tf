@@ -87,7 +87,7 @@ variable "s3_bucket" {
 variable "log_retention_in_days" {
   description = "Number of days to retain Lambda function logs in CloudWatch"
   type        = number
-  default     = 30
+  default     = 7
 }
 
 variable "create_dlq" {
@@ -168,6 +168,36 @@ variable "db_security_group_id" {
   description = "The security group ID of the RDS instance"
   type        = string
   default     = ""
+}
+
+variable "db_username" {
+  description = "Database username for direct connection in non-prod environments."
+  type        = string
+  default     = null
+}
+
+variable "db_password" {
+  description = "Database password for direct connection in non-prod environments."
+  type        = string
+  default     = null
+}
+
+variable "db_host" {
+  description = "Database host for direct connection in non-prod environments."
+  type        = string
+  default     = null
+}
+
+variable "db_port" {
+  description = "Database port for direct connection in non-prod environments."
+  type        = string
+  default     = null
+}
+
+variable "db_name" {
+  description = "Database name for direct connection in non-prod environments."
+  type        = string
+  default     = null
 }
 
 # API Gateway Integration

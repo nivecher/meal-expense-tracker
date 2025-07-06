@@ -40,6 +40,13 @@ variable "logs_kms_key_arn" {
   default     = null
 }
 
+# NAT Gateway Configuration
+variable "enable_nat_gateway" {
+  description = "Whether to create a NAT Gateway for outbound internet access from private subnets. Default is false (off)."
+  type        = bool
+  default     = false
+}
+
 # No existing resources - we'll always create new ones
 # Tags
 variable "tags" {

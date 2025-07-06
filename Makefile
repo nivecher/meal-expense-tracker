@@ -332,10 +332,6 @@ TF_BACKEND_CONFIG = $(TF_ENV_DIR)/backend.hcl
 ## Initialize Terraform for a specific environment
 .PHONY: tf-init
 tf-init:
-	@if [ -z "$(TF_ENV)" ]; then \
-		echo "Error: TF_ENV is not set. Usage: make tf-init TF_ENV=<env>"; \
-		exit 1; \
-	fi
 	@echo "🚀 Initializing Terraform in $(TF_ENV) environment..."
 	@cd terraform && \
 	TF_PLUGIN_CACHE_DIR="$(HOME)/.terraform.d/plugin-cache" \
@@ -393,14 +389,8 @@ tf-destroy:
 ## Validate Terraform configuration
 .PHONY: tf-validate
 tf-validate:
-	@if [ -z "$(TF_ENV)" ]; then \
-		echo "Error: TF_ENV is not set. Usage: make tf-validate TF_ENV=<env>"; \
-		exit 1; \
-	fi
 	@echo "Validating Terraform configuration for $(TF_ENV)..."
 	@cd terraform && \
-	cd "environments/$(TF_ENV)" && \
-	terraform init -backend=false && \
 	terraform validate
 
 ## Format Terraform files

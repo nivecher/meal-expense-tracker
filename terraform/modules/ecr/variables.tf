@@ -35,7 +35,7 @@ variable "image_tag_mutability" {
 variable "max_image_count" {
   description = "Maximum number of images to retain in the repository"
   type        = number
-  default     = 30
+  default     = 10
 }
 
 # Tags

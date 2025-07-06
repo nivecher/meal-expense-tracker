@@ -12,14 +12,18 @@ resource "aws_vpc" "main" {
 # VPC Flow Logs Resources
 # Note: These resources are conditionally created based on the enable_flow_logs variable
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
-  count             = var.enable_flow_logs ? 1 : 0
+  count = var.enable_flow_logs ? 1 : 0
+
   name              = "/aws/vpc-flow-logs/${var.app_name}-${var.environment}"
   retention_in_days = var.flow_logs_retention_in_days
-  kms_key_id        = var.logs_kms_key_arn
 
   tags = merge({
     Name = "${var.app_name}-${var.environment}-vpc-flow-logs"
   }, var.tags)
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # IAM Role for VPC Flow Logs
@@ -123,6 +127,7 @@ resource "aws_internet_gateway" "main" {
 
 # NAT Gateway
 resource "aws_eip" "nat" {
+  count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
 
   tags = merge({
@@ -131,7 +136,8 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
+  count         = var.enable_nat_gateway ? 1 : 0
+  allocation_id = aws_eip.nat[0].id
   subnet_id     = aws_subnet.public[0].id
 
   tags = merge({
@@ -158,14 +164,21 @@ resource "aws_route_table" "public" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
+  dynamic "route" {
+    for_each = var.enable_nat_gateway ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.main[0].id
+    }
   }
 
   tags = merge({
     Name = "${var.app_name}-${var.environment}-private-rt"
   }, var.tags)
+
+  depends_on = [
+    aws_nat_gateway.main
+  ]
 }
 
 # Route Table Associations
@@ -176,8 +189,8 @@ resource "aws_route_table_association" "public" {
 }
 
 resource "aws_route_table_association" "private" {
-  count          = length(aws_subnet.private)
-  subnet_id      = aws_subnet.private[count.index].id
+  for_each = toset(var.enable_nat_gateway ? aws_subnet.private[*].id : [])
+  subnet_id      = each.value
   route_table_id = aws_route_table.private.id
 }
 
@@ -196,21 +209,16 @@ resource "aws_vpc_endpoint" "s3" {
   vpc_id            = aws_vpc.main.id
   service_name      = "com.amazonaws.${var.region}.s3"
   vpc_endpoint_type = "Gateway"
-
-  # Since we only have one private route table, we can reference it directly
-  # If you have multiple private route tables, you can use a for_each or count
-  route_table_ids = [aws_route_table.private.id]
+  route_table_ids   = [aws_route_table.private.id]
 
   tags = merge({
     Name = "${var.app_name}-${var.environment}-s3-endpoint"
   }, var.tags)
 }
 
-# Keep only essential VPC endpoints to reduce costs
-# Removed ECR, Logs, and SSM endpoints as they can use NAT Gateway
-# Kept Secrets Manager and KMS as they are critical for application security
-
+# Only create interface endpoints in production
 resource "aws_vpc_endpoint" "secretsmanager" {
+  count               = var.environment == "prod" ? 1 : 0
   vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${var.region}.secretsmanager"
   vpc_endpoint_type   = "Interface"
@@ -224,6 +232,7 @@ resource "aws_vpc_endpoint" "secretsmanager" {
 }
 
 resource "aws_vpc_endpoint" "kms" {
+  count               = var.environment == "prod" ? 1 : 0
   vpc_id              = aws_vpc.main.id
   service_name        = "com.amazonaws.${var.region}.kms"
   vpc_endpoint_type   = "Interface"

@@ -17,7 +17,7 @@ locals {
       "Project"     = var.app_name
       "Owner"       = var.owner
     },
-    var.tags
+    coalesce(var.tags, {})
   )
 
   # Domain names configuration

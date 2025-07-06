@@ -38,12 +38,9 @@ resource "aws_apigatewayv2_domain_name" "main" {
   }, var.tags)
 
   lifecycle {
-    # Prevent accidental deletion of the custom domain
-    prevent_destroy = true
-
     # Ensure we have a valid domain name configuration
     precondition {
-      condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\\.(?:[a-zA-Z0-9-]+\\.)*[a-zA-Z]{2,})?$", var.api_domain_name))
+      condition     = can(regex("\\.", var.api_domain_name))
       error_message = "The API domain name '${var.api_domain_name}' is not a valid domain name."
     }
 

@@ -163,6 +163,11 @@ package_app() {
 package_layer() {
   echo -e "${GREEN}[*] Creating Lambda layer with Python dependencies...${NC}"
 
+  # Create a virtual environment
+  local venv_dir="${TEMP_DIR}/venv"
+  python${PYTHON_VERSION} -m venv "${venv_dir}"
+  source "${venv_dir}/bin/activate"
+
   # Create the Python package directory structure
   local layer_dir="${TEMP_DIR}/layer"
   local package_dir="${layer_dir}/python/lib/python${PYTHON_VERSION}/site-packages"
@@ -197,6 +202,10 @@ package_layer() {
       "psycopg2-binary==$(grep 'psycopg2-binary' requirements.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
   fi
 
+  # Deactivate and remove the virtual environment
+  deactivate
+  rm -rf "${venv_dir}"
+
   # Remove unnecessary files
   echo -e "${GREEN}[*] Cleaning up...${NC}"
   find "${package_dir}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -216,6 +225,11 @@ package_secret_rotation() {
   local temp_dir="${TEMP_DIR}/secret_rotation"
   echo -e "${YELLOW}[*] Packaging secret rotation lambda...${NC}"
 
+  # Create a virtual environment
+  local venv_dir="${TEMP_DIR}/secret_rotation_venv"
+  python${PYTHON_VERSION} -m venv "${venv_dir}"
+  source "${venv_dir}/bin/activate"
+
   # Create directory structure
   mkdir -p "${temp_dir}"
 
@@ -234,6 +248,10 @@ package_secret_rotation() {
   else
     echo -e "${YELLOW}[*] No requirements.txt found for secret rotation, skipping dependency installation${NC}"
   fi
+
+  # Deactivate and remove the virtual environment
+  deactivate
+  rm -rf "${venv_dir}"
 
   # Create ZIP package
   echo -e "${YELLOW}[*] Creating secret rotation package...${NC}"

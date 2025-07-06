@@ -112,6 +112,10 @@ tfsec-results.*
 .tfsec.log
 
 # Terraform
+.terraform/
+terraform.tfstate*
+*.tfstate
+*.tfstate.backup
 **/.terraform/*
 **/terraform.tfstate
 **/terraform.tfstate.*

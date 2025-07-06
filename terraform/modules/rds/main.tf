@@ -31,8 +31,8 @@ resource "aws_iam_role_policy_attachment" "rds_enhanced_monitoring" {
 resource "aws_db_instance" "main" {
   # Basic configuration - optimized for free tier
   identifier            = "${var.app_name}-${var.environment}"
-  allocated_storage     = 20 # Free tier allows up to 20GB
-  max_allocated_storage = 20 # Disable storage autoscaling for free tier
+  allocated_storage     = var.db_allocated_storage
+  max_allocated_storage = 100 # Allow storage to grow to 100GB
   storage_type          = "gp2"
   engine                = "postgres"
   engine_version        = "14.18"
@@ -126,6 +126,10 @@ resource "aws_secretsmanager_secret" "db_credentials" {
   tags = merge({
     Name = "${var.app_name}-${var.environment}-db-credentials"
   }, var.tags)
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_secretsmanager_secret_version" "db_credentials" {

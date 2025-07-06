@@ -51,13 +51,4 @@ resource "aws_security_group_rule" "lambda_egress_dns_tcp" {
 }
 
 # Allow Lambda to access RDS using security group reference
-resource "aws_security_group_rule" "lambda_to_rds" {
-  count                    = var.db_security_group_id != "" ? 1 : 0
-  type                     = "egress"
-  from_port                = 5432 # PostgreSQL default port
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.lambda.id
-  source_security_group_id = var.db_security_group_id
-  description              = "Allow Lambda to access RDS"
-}
+

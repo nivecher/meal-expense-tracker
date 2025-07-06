@@ -171,7 +171,6 @@ resource "aws_security_group" "lambda_sg" {
 
 # Allow Lambda to access RDS if RDS security group ID is provided
 resource "aws_security_group_rule" "lambda_to_rds" {
-  count                    = var.rds_security_group_id != "" ? 1 : 0
   type                     = "ingress"
   from_port                = 5432
   to_port                  = 5432
