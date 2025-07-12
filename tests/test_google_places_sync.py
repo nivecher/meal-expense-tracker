@@ -1,9 +1,10 @@
 """Test script for Google Places sync functionality."""
 
 import os
-import sys
 import unittest
-from flask import url_for, current_app
+
+from flask import url_for
+
 from app import create_app, db
 from app.auth.models import User
 from app.restaurants.models import Restaurant

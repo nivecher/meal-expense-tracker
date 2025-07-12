@@ -13,7 +13,6 @@ import requests
 
 # Third-party imports
 from flask import (
-    Blueprint,
     current_app,
     flash,
     jsonify,
@@ -23,6 +22,9 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileRequired, FileAllowed
+from wtforms import SubmitField
 from sqlalchemy import exists, func, select
 
 # Local application imports
@@ -34,7 +36,8 @@ from app.utils.messages import FlashMessages
 
 # Local imports
 from . import bp
-from .services import (
+from .services.places import PlacesService
+from .services.services import (
     export_restaurants_to_csv,
     get_restaurant,
     import_restaurants_from_csv,
@@ -123,30 +126,47 @@ def add_restaurant():
     from .forms import RestaurantForm
 
     form = RestaurantForm()
-    if request.method == "POST" and form.validate_on_submit():
-        restaurant = Restaurant(
-            user_id=current_user.id,
-            name=form.name.data,
-            type=form.type.data,
-            price_range=form.price_range.data,
-            cuisine=form.cuisine.data,
-            description=form.description.data,
-            address=form.address.data,
-            city=form.city.data,
-            state=form.state_province.data,
-            postal_code=form.postal_code.data,
-            country=form.country.data or "US",
-            phone=form.phone.data,
-            website=form.website.data,
-            is_chain=form.is_chain.data,
-            notes=form.notes.data,
-            google_place_id=form.google_place_id.data or None,
-            place_name=form.place_name.data or None,
-            latitude=float(form.latitude.data) if form.latitude.data else None,
-            longitude=float(form.longitude.data) if form.longitude.data else None,
-        )
-        db.session.add(restaurant)
-        return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
+    if request.method == "POST":
+        logger.info(f"Form data: {request.form}")
+        if not form.validate_on_submit():
+            logger.error(f"Form validation failed: {form.errors}")
+            return render_template(
+                "restaurants/form.html",
+                form=form,
+                restaurant=None,
+                is_edit=False,
+                google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY", ""),
+            )
+
+        try:
+            restaurant = Restaurant(
+                user_id=current_user.id,
+                name=form.name.data,
+                type=form.type.data,
+                price_range=form.price_range.data,
+                cuisine=form.cuisine_type.data,  # Changed from form.cuisine.data
+                description=form.description.data,
+                address=form.address.data,
+                city=form.city.data,
+                state=form.state_province.data,
+                postal_code=form.postal_code.data,
+                country=form.country.data or "US",
+                phone=form.phone.data,
+                website=form.website.data,
+                is_chain=form.is_chain.data if hasattr(form, "is_chain") else False,
+                notes=form.notes.data,
+                google_place_id=getattr(form, "google_place_id", None) and form.google_place_id.data or None,
+                place_name=getattr(form, "place_name", None) and form.place_name.data or None,
+                latitude=float(form.latitude.data) if hasattr(form, "latitude") and form.latitude.data else None,
+                longitude=float(form.longitude.data) if hasattr(form, "longitude") and form.longitude.data else None,
+            )
+            db.session.add(restaurant)
+            db.session.flush()  # This will generate the ID without committing
+            logger.info(f"Created restaurant with ID: {restaurant.id}")
+            return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
+        except Exception as e:
+            logger.error(f"Error creating restaurant: {str(e)}", exc_info=True)
+            raise
     return render_template(
         "restaurants/form.html",
         form=form,
@@ -271,20 +291,22 @@ def delete_restaurant(restaurant_id):
 
 
 # Import/Export routes
+class ImportForm(FlaskForm):
+    """Form for importing restaurants from CSV."""
+    file = FileField('CSV File', validators=[
+        FileRequired(),
+        FileAllowed(['csv'], 'CSV files only!')
+    ])
+    submit = SubmitField('Import')
+
+
 @bp.route("/import", methods=["GET", "POST"])
 @login_required
 def import_restaurants():
     """Handle importing restaurants from CSV."""
-    if request.method == "POST":
-        if "file" not in request.files:
-            flash("No file selected", "danger")
-            return redirect(request.url)
-
-        file = request.files["file"]
-        if file.filename == "":
-            flash("No file selected", "danger")
-            return redirect(request.url)
-
+    form = ImportForm()
+    if form.validate_on_submit():
+        file = form.file.data
         if file and file.filename.endswith(".csv"):
             success, message = import_restaurants_from_csv(file.stream, current_user)
             if success:
@@ -292,8 +314,7 @@ def import_restaurants():
                 return redirect(url_for("restaurants.list_restaurants"))
             else:
                 flash(message, "danger")
-
-    return render_template("restaurants/import.html")
+    return render_template("restaurants/import.html", form=form)
 
 
 @bp.route("/export")

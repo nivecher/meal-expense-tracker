@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import String, Text, UniqueConstraint, Float, DateTime
+from sqlalchemy import DateTime, Float, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
@@ -45,6 +45,7 @@ class Restaurant(db.Model):
     # Business Details
     price_range: Mapped[Optional[int]]
     cuisine: Mapped[Optional[str]] = mapped_column(String(100))
+    is_chain: Mapped[bool] = mapped_column(default=False, nullable=False)
     rating: Mapped[Optional[float]]
     notes: Mapped[Optional[str]] = mapped_column(Text)
 

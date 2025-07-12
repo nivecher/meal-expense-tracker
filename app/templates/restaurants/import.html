@@ -78,27 +78,25 @@
                                 You can download a sample CSV file from the restaurants page to see the correct format.
                             </div>
                         </div>
-                        <form method="post"
-                              enctype="multipart/form-data"
-                              class="needs-validation"
-                              novalidate>
+                        <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                            {{ form.hidden_tag() }}
                             <div class="mb-3">
-                                <label for="file" class="form-label">CSV File</label>
-                                <input type="file"
-                                       class="form-control"
-                                       id="file"
-                                       name="file"
-                                       accept=".csv"
-                                       required
-                                       data-bs-toggle="tooltip"
-                                       data-bs-placement="top"
-                                       title="Select a CSV file containing restaurant data">
-                                <div class="invalid-feedback">Please select a CSV file.</div>
+                                {{ form.file.label(class_="form-label") }}
+                                {{ form.file(
+                                    class_=("form-control is-invalid" if form.file.errors else "form-control"),
+                                    **{"data-bs-toggle": "tooltip", "data-bs-placement": "top", "title": "Select a CSV file containing restaurant data"}
+                                ) }}
+                                {% if form.file.errors %}
+                                    {% for error in form.file.errors %}
+                                        <div class="invalid-feedback">{{ error }}</div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="form-text">Please upload a CSV file with the required fields.</div>
+                                {% endif %}
                             </div>
                             <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary">Import Restaurants</button>
-                                <a href="{{ url_for("restaurants.list_restaurants") }}"
-                                   class="btn btn-outline-secondary">Cancel</a>
+                                {{ form.submit(class_="btn btn-primary") }}
+                                <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary">Cancel</a>
                             </div>
                         </form>
                     </div>

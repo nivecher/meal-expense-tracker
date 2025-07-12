@@ -5,8 +5,9 @@ This module contains the route handlers for the main blueprint.
 """
 
 import logging
+import os
 
-from flask import render_template, request
+from flask import send_from_directory, render_template, request, current_app
 from flask_login import current_user, login_required
 
 from app import version
@@ -18,7 +19,19 @@ from app.expenses.services import (
 
 from . import bp
 
-# HTTP exceptions are used in error handlers below
+
+@bp.route('/favicon.ico')
+def favicon():
+    """Serve the favicon.ico file.
+
+    Returns:
+        The favicon.ico file
+    """
+    return send_from_directory(
+        os.path.join(current_app.root_path, 'static/img'),
+        'favicon.ico',
+        mimetype='image/vnd.microsoft.icon'
+    )
 
 
 @bp.route("/about")
@@ -94,36 +107,3 @@ def index():
             ),
             500,
         )
-
-
-@bp.app_errorhandler(404)
-def not_found_error(error):
-    """Handle 404 errors.
-
-    Args:
-        error: The error that was raised
-    Returns:
-        Rendered 404 error template
-    """
-    return render_template("errors/404.html"), 404
-
-
-@bp.app_errorhandler(500)
-def internal_error(error):
-    """Handle 500 errors.
-    Args:
-        error: The error that was raised
-    Returns:
-        Rendered 500 error template
-    """
-    return render_template("errors/500.html", error=str(error)), 500
-
-
-@bp.route("/ui-demo")
-def ui_demo():
-    """Render the UI components demo page.
-
-    Returns:
-        Rendered UI demo template
-    """
-    return render_template("main/ui_demo.html")

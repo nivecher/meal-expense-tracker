@@ -10,7 +10,6 @@ from typing import Any, Dict, Optional
 
 from flask import Flask, jsonify
 from flask_cors import CORS
-from flask_wtf.csrf import generate_csrf
 
 from config import config
 
@@ -63,10 +62,14 @@ def _configure_extensions(app: Flask) -> None:
     from .auth import models as _  # noqa: F401
 
     # Initialize Flask-Migrate
-    from .extensions import migrate
+    from .extensions import migrate, csrf
 
     migrate.init_app(app, db)
     logger.info("Flask-Migrate initialized")
+
+    # Initialize CSRF protection
+    csrf.init_app(app)
+    logger.info("CSRF protection initialized")
 
     # Initialize login manager
     login_manager.init_app(app)
@@ -78,12 +81,11 @@ def _configure_extensions(app: Flask) -> None:
 
     init_login_manager(login_manager)
 
-    # Enable CORS if needed
+    # Enable CORS for API endpoints
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-    # CSRF protection
-    app.config["WTF_CSRF_ENABLED"] = True
-    app.config["WTF_CSRF_TIME_LIMIT"] = 3600  # 1 hour
+    # Exempt API endpoints from CSRF protection
+    csrf.exempt('api.*')
 
     # Initialize services with AWS resources (e.g., SSM Parameter Store)
     if app.config.get("ENABLE_AWS_SERVICES", True):
@@ -97,15 +99,16 @@ def _configure_extensions(app: Flask) -> None:
             if app.config.get("FLASK_ENV") == "development":
                 raise
 
-    # Add CSRF token to all templates
-    @app.context_processor
-    def inject_csrf_token():
-        return {"csrf_token": generate_csrf}
-
     # Register custom template filters
     from .utils.filters import init_app as init_filters
 
     init_filters(app)
+
+    # Make CSRF token available in all templates
+    @app.context_processor
+    def inject_csrf_token():
+        from flask_wtf.csrf import generate_csrf
+        return dict(csrf_token=generate_csrf)
 
 
 def _setup_config(app: Flask, config_obj: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

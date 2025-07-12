@@ -24,8 +24,30 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:?check_same_thread=False"
 @pytest.fixture(scope="session")
 def app() -> Generator[Flask, None, None]:
     """Create and configure a new app instance for testing."""
+    # Create app with testing config
     app = create_app(TestingConfig)
     app.testing = True
+
+    # Configure test settings
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False  # Disable CSRF for testing
+    app.config["WTF_CSRF_CHECK_DEFAULT"] = False
+
+    # Create a test client that handles CSRF tokens properly
+    class TestClient(FlaskClient):
+        def open(self, *args, **kwargs):
+            # Add CSRF token to form data for POST requests
+            if kwargs.get('method') in ('POST', 'PUT', 'PATCH', 'DELETE'):
+                if 'data' in kwargs and isinstance(kwargs['data'], dict):
+                    kwargs['data']['csrf_token'] = 'dummy_csrf_token'
+            return super().open(*args, **kwargs)
+    
+    # Add CSRF token to template context
+    @app.context_processor
+    def inject_csrf_token():
+        return {'csrf_token': lambda: 'dummy_csrf_token'}
+
+    app.test_client_class = TestClient
 
     with app.app_context():
         db.create_all()
@@ -117,15 +139,20 @@ def auth(client):
 
 @pytest.fixture
 def test_user(session: Session) -> User:
-    """Create and return a test user."""
-    username = f"testuser_{uuid.uuid4().hex[:8]}"
+    """Create and return a test user with known credentials."""
+    from app.auth.models import User
+
+    username = "testuser_1"
     password = "testpass"  # noqa: S105
 
-    user = User(username=username)
-    user.set_password(password)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
+    # Check if user already exists
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        user = User(username=username)
+        user.set_password(password)
+        session.add(user)
+        session.commit()  # Ensure the user is committed to the database
+        session.refresh(user)
     return user
 
 

@@ -4,7 +4,7 @@ This module provides functions to initialize and manage services that require
 AWS resources or other external dependencies.
 """
 
-from flask import Flask, current_app
+from flask import Flask
 
 
 def init_services(app: Flask) -> None:
@@ -26,17 +26,3 @@ def init_services(app: Flask) -> None:
         # Re-raise in development to fail fast
         if app.config.get("FLASK_ENV") == "development":
             raise
-
-
-def get_places_service():
-    """Get the PlacesService instance.
-
-    Returns:
-        The PlacesService instance
-
-    Raises:
-        RuntimeError: If the PlacesService is not initialized
-    """
-    if not hasattr(current_app, "places_service"):
-        raise RuntimeError("PlacesService not initialized. Call init_services() first.")
-    return current_app.places_service

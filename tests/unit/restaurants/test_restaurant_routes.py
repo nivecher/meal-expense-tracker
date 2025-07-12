@@ -18,13 +18,22 @@ def test_list_restaurants(client, auth, test_restaurant):
     assert test_restaurant.name.encode() in response.data
 
 
-def test_add_restaurant(client, auth, session):
+def test_add_restaurant(client, test_user, session):
     """Test adding a new restaurant."""
-    auth.login("testuser_1", "testpass")
+    # Login the test user
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(test_user.id)
+        sess["_fresh"] = True
 
+    # Get the add restaurant page to get a fresh CSRF token
+    response = client.get(url_for("restaurants.add_restaurant"))
+    assert response.status_code == 200
+
+    # Since we're in test mode, we can use a dummy CSRF token
     response = client.post(
         url_for("restaurants.add_restaurant"),
         data={
+            "csrf_token": "dummy_csrf_token",
             "name": "New Test Restaurant",
             "city": "Test City",
             "address": "123 Test St",

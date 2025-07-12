@@ -14,22 +14,24 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h1 class="mb-0">{{ restaurant.name }}</h1>
                         {% if restaurant.google_place_id %}
-                        <div class="d-flex align-items-center">
-                            <span class="text-muted me-2" id="last-synced">
-                                {% if restaurant.last_synced_at %}
-                                    Last synced: {{ restaurant.last_synced_at|datetimeformat('%b %d, %Y %I:%M %p') }}
-                                {% else %}
-                                    Never synced
-                                {% endif %}
-                            </span>
-                            <button id="sync-google-places"
-                                    class="btn btn-outline-primary btn-sm"
-                                    data-restaurant-id="{{ restaurant.id }}"
-                                    title="Sync with Google Places">
-                                <span id="sync-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
-                                <i class="bi bi-arrow-repeat"></i> Sync
-                            </button>
-                        </div>
+                            <div class="d-flex align-items-center">
+                                <span class="text-muted me-2" id="last-synced">
+                                    {% if restaurant.last_synced_at %}
+                                        Last synced: {{ restaurant.last_synced_at|datetimeformat("%b %d, %Y %I:%M %p") }}
+                                    {% else %}
+                                        Never synced
+                                    {% endif %}
+                                </span>
+                                <button id="sync-google-places"
+                                        class="btn btn-outline-primary btn-sm"
+                                        data-restaurant-id="{{ restaurant.id }}"
+                                        title="Sync with Google Places">
+                                    <span id="sync-spinner"
+                                          class="spinner-border spinner-border-sm d-none"
+                                          role="status"></span>
+                                    <i class="bi bi-arrow-repeat"></i> Sync
+                                </button>
+                            </div>
                         {% endif %}
                     </div>
                     <!-- Restaurant Details Column -->
@@ -319,7 +321,9 @@
     <script src="{{ url_for('static', filename='js/restaurant-form.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pages/restaurant-detail.js') }}"></script>
     {% if config.GOOGLE_PLACES_API_KEY %}
-    <script src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_PLACES_API_KEY }}&libraries=places&callback=Function.prototype" async defer></script>
+        <script src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_PLACES_API_KEY }}&libraries=places&callback=Function.prototype"
+                async
+                defer></script>
     {% endif %}
     </script>
 {% endblock scripts %}

@@ -1,7 +1,9 @@
 """Script to create a test user for Google Places sync testing."""
 
 import os
+
 from dotenv import load_dotenv
+
 from app import create_app, db
 from app.auth.models import User
 

@@ -93,21 +93,6 @@
             </ul>
             <!-- Right-aligned navigation items -->
             <ul class="navbar-nav ms-auto">
-                <!-- UI Demo Link -->
-                <li class="nav-item">
-                    <a id="ui-demo-btn"
-                       class="nav-link
-                              {% if request.endpoint == 'main.ui_demo' %}active{% endif %}"
-                       href="{{ url_for("main.ui_demo") }}"
-                       aria-current="{% if request.endpoint == 'main.ui_demo' %}
-                                         page
-                                     {% else %}
-                                         false
-                                     {% endif %}">
-                        <i class="fas fa-paint-brush" aria-hidden="true"></i>
-                        <span>UI Demo</span>
-                    </a>
-                </li>
                 <!-- User Dropdown -->
                 {% if current_user.is_authenticated %}
                     <li class="nav-item dropdown">
@@ -149,17 +134,9 @@
                             <div class="dropdown-divider"></div>
                             <!-- Menu Items -->
                             <div class="px-2">
-                                <a href="{{ url_for("main.ui_demo") }}" class="dropdown-item">
-                                    <i class="fas fa-user"></i>
-                                    <span>Profile</span>
-                                </a>
                                 <a href="{{ url_for("auth.change_password") }}" class="dropdown-item">
                                     <i class="fas fa-lock"></i>
-                                    <span>Security</span>
-                                </a>
-                                <a href="#" class="dropdown-item">
-                                    <i class="fas fa-cog"></i>
-                                    <span>Settings</span>
+                                    <span>Change Password</span>
                                 </a>
                             </div>
                             <div class="dropdown-divider"></div>

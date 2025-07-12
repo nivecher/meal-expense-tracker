@@ -1,9 +1,11 @@
 """Service for handling Google Places API integration."""
 
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
 import requests
 from flask import current_app
+
 from ...extensions import db
 from ..models import Restaurant
 
