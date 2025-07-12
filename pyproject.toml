@@ -48,6 +48,12 @@ format_js = true
 use_gitignore = true
 extend_include = [ "*.html", "*.jinja", "*.j2",]
 
+[tool.djlint.ignore]
+ignore = [ "venv/*", ".git/*", "node_modules/*", "*.min.*",]
+
+[tool.djlint.extend]
+rules = [ "H025", "H006", "H007",]
+
 [tool.pytest.ini_options]
 testpaths = [ "tests",]
 python_files = [ "test_*.py",]
@@ -61,9 +67,3 @@ omit = [ "tests/*",]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-
-[tool.djlint.ignore]
-ignore = [ "venv/*", ".git/*", "node_modules/*", "*.min.*",]
-
-[tool.djlint.extend]
-rules = [ "H025", "H006", "H007",]
