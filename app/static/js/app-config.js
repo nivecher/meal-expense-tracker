@@ -10,12 +10,6 @@ const AppConfig = {
         version: '1.0.0'
     },
 
-    // Google Maps configuration
-    googleMaps: {
-        apiKey: '',
-        libraries: ['places']
-    },
-
     // Initialize configuration
     init() {
         // Configuration will be set from the base template

@@ -14,12 +14,6 @@ const defaultConfig = {
         debug: false,
         env: 'production',
         version: '1.0.0'
-    },
-
-    // Google Maps configuration
-    googleMaps: {
-        apiKey: '',
-        libraries: ['places']
     }
 };
 
@@ -46,16 +40,9 @@ const config = {
                     app: {
                         ...defaultConfig.app,
                         ...(userConfig.app || {})
-                    },
-                    googleMaps: {
-                        ...defaultConfig.googleMaps,
-                        ...(userConfig.googleMaps || {})
                     }
                 });
             }
-
-            // Set Google Maps load promise
-            window.googleMapsLoadPromise = null;
 
             return this;
         } catch (error) {

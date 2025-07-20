@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}
+    Find Restaurants - {{ super() }}
+{% endblock title %}
+{% block styles %}
+    {{ super() }}
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/pages/restaurant-search.css') }}">
+{% endblock %}
+{% block content %}
+    <!-- Add CSRF token meta tag for AJAX requests -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <div class="container mt-3">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h1 class="h4 mb-0">
+                        <i class="fas fa-search-location text-primary me-2"></i>Find Restaurants
+                    </h1>
+                    <a href="{{ url_for("restaurants.list_restaurants") }}"
+                       class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Back to My Restaurants
+                    </a>
+                </div>
+                <!-- Google Places Search Component -->
+                <div id="google-places-search">
+                    <!-- Search input will be inserted here by JavaScript -->
+                    <div id="search-results" class="mt-4">
+                        <!-- Search results will be inserted here -->
+                    </div>
+                    <!-- Loading indicator (initially hidden) -->
+                    <div id="loading-indicator" class="text-center py-5 d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3">Searching for restaurants...</p>
+                    </div>
+                </div>
+                <!-- Hidden form for adding a restaurant -->
+                <form id="add-restaurant-form"
+                      method="POST"
+                      action="{{ url_for("restaurants.add_restaurant") }}"
+                      class="d-none">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="name" id="restaurant-name">
+                    <input type="hidden" name="address" id="restaurant-address">
+                    <input type="hidden" name="city" id="restaurant-city">
+                    <input type="hidden" name="state" id="restaurant-state">
+                    <input type="hidden" name="postal_code" id="restaurant-postal-code">
+                    <input type="hidden" name="country" id="restaurant-country">
+                    <input type="hidden" name="phone" id="restaurant-phone">
+                    <input type="hidden" name="website" id="restaurant-website">
+                    <input type="hidden" name="google_place_id" id="restaurant-google-place-id">
+                    <input type="hidden" name="latitude" id="restaurant-latitude">
+                    <input type="hidden" name="longitude" id="restaurant-longitude">
+                </form>
+            </div>
+        </div>
+        <!-- Success Modal -->
+        <div class="modal fade"
+             id="successModal"
+             tabindex="-1"
+             aria-labelledby="successModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title" id="successModalLabel">Success!</h5>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <div class="mb-3">
+                            <i class="fas fa-check-circle fa-4x text-success"></i>
+                        </div>
+                        <h5>Restaurant Added Successfully</h5>
+                        <p class="mb-0" id="success-message">The restaurant has been added to your list.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <a href="{{ url_for("restaurants.list_restaurants") }}"
+                           class="btn btn-outline-secondary">View All Restaurants</a>
+                        <button type="button" class="btn btn-success" data-bs-dismiss="modal">Continue Searching</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Error Modal -->
+        <div class="modal fade"
+             id="errorModal"
+             tabindex="-1"
+             aria-labelledby="errorModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="errorModalLabel">Error</h5>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <div class="mb-3">
+                            <i class="fas fa-exclamation-circle fa-4x text-danger"></i>
+                        </div>
+                        <h5>Something Went Wrong</h5>
+                        <p class="mb-0" id="error-message">An error occurred while processing your request.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" id="retry-button">
+                            <i class="fas fa-sync-alt me-1"></i> Try Again
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Restaurant Exists Modal -->
+        <div class="modal fade"
+             id="existingRestaurantModal"
+             tabindex="-1"
+             aria-labelledby="existingRestaurantModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title" id="existingRestaurantModalLabel">Restaurant Exists</h5>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <div class="mb-3">
+                            <i class="fas fa-info-circle fa-4x text-warning"></i>
+                        </div>
+                        <h5>Restaurant Already in Your List</h5>
+                        <p class="mb-0" id="existingRestaurantModalBody">This restaurant is already in your list.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                data-bs-dismiss="modal">Continue Searching</button>
+                        <a href="#" id="viewExistingRestaurantBtn" class="btn btn-warning">
+                            <i class="fas fa-utensils me-1"></i> View Restaurant
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block scripts %}
+    {{ super() }}
+    <script>
+        // Initialize the Google Maps API key
+        window.GOOGLE_MAPS_API_KEY = '{{ google_maps_api_key or "" }}';
+    </script>
+    <script type="module"
+            src="{{ url_for('static', filename='js/pages/restaurant-places-search.js') }}"></script>
+{% endblock %}

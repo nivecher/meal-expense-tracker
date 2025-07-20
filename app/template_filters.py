@@ -1,9 +1,11 @@
 """Custom template filters for the application."""
 
-from datetime import datetime
+from datetime import datetime, timezone
+
+from flask import Flask
 
 
-def time_ago(value):
+def time_ago(value: datetime) -> str:
     """Format a datetime as a relative time string (e.g., '2 hours ago').
 
     Args:
@@ -15,7 +17,7 @@ def time_ago(value):
     if not value:
         return "Never"
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     diff = now - value
 
     # Calculate time differences
@@ -39,6 +41,10 @@ def time_ago(value):
     return "Just now"
 
 
-def init_app(app):
-    """Register template filters with the Flask app."""
+def init_app(app: Flask) -> None:
+    """Initialize template filters for the Flask app.
+
+    Args:
+        app: The Flask application instance.
+    """
     app.add_template_filter(time_ago, name="time_ago")

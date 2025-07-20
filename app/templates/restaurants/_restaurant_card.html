@@ -1,0 +1,60 @@
+<div class="col">
+    <div class="card restaurant-card h-100">
+        {% if restaurant.photo_url %}
+            <img src="{{ restaurant.photo_url }}"
+                 class="card-img-top"
+                 alt="{{ restaurant.name }}"
+                 style="height: 160px;
+                        object-fit: cover">
+        {% else %}
+            <div class="bg-light d-flex align-items-center justify-content-center"
+                 style="height: 160px">
+                <i class="fas fa-utensils fa-4x text-muted"></i>
+            </div>
+        {% endif %}
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <h5 class="card-title mb-1">{{ restaurant.name }}</h5>
+                {% if restaurant.cuisine %}<span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>{% endif %}
+            </div>
+            <p class="restaurant-meta mb-2">
+                <i class="fas fa-map-marker-alt me-1"></i>
+                {% if restaurant.city %}
+                    {{ restaurant.city }}
+                {% else %}
+                    <span class="text-muted">No location</span>
+                {% endif %}
+            </p>
+            <div class="restaurant-stats">
+                <div class="stat-item">
+                    <div class="stat-value">{{ visit_count }}</div>
+                    <div class="stat-label">Visits</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${{ "%.2f"|format(total_spent) }}</div>
+                    <div class="stat-label">Spent</div>
+                </div>
+                {% if restaurant.rating %}
+                    <div class="stat-item">
+                        <div class="stat-value">{{ "%.1f"|format(restaurant.rating) }}</div>
+                        <div class="stat-label">Rating</div>
+                    </div>
+                {% endif %}
+            </div>
+            {% if last_visit %}
+                <div class="last-visited">
+                    <i class="far fa-calendar-alt me-1"></i>
+                    Last visited {{ last_visit|time_ago }}
+                </div>
+            {% endif %}
+        </div>
+        <div class="card-footer bg-transparent border-top-0 pt-0">
+            <div class="d-grid">
+                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                   class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-eye me-1"></i> View Details
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

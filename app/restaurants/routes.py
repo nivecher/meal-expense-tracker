@@ -1,583 +1,704 @@
-"""Restaurant-related routes for the application.
+"""Restaurant-related routes for the application."""
 
-This module handles all restaurant-related routes including CRUD operations,
-search functionality, and Google Places API integration.
-"""
+import csv
+import io
+import json
 
-# Standard library imports
-import logging
-import os
-from datetime import datetime
-
-import requests
-
-# Third-party imports
 from flask import (
+    abort,
     current_app,
     flash,
     jsonify,
+    make_response,
     redirect,
     render_template,
     request,
     url_for,
 )
 from flask_login import current_user, login_required
-from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileRequired, FileAllowed
-from wtforms import SubmitField
-from sqlalchemy import exists, func, select
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
-# Local application imports
-from app import db
-from app.expenses.models import Expense
+from app.extensions import db
+from app.restaurants import services
+from app.restaurants.forms import RestaurantForm
 from app.restaurants.models import Restaurant
-from app.utils.decorators import db_transaction
-from app.utils.messages import FlashMessages
 
-# Local imports
 from . import bp
-from .services.places import PlacesService
-from .services.services import (
-    export_restaurants_to_csv,
-    get_restaurant,
-    import_restaurants_from_csv,
-)
-
-# Set up logger
-logger = logging.getLogger(__name__)
 
 
-# Restaurant CRUD routes
 @bp.route("/")
 @login_required
 def list_restaurants():
-    """Show a list of all restaurants with stats and filtering options."""
-    # Get filter and sort parameters
-    sort_by = request.args.get("sort", "name")
-    sort_order = request.args.get("order", "asc")
-    cuisine_filter = request.args.get("cuisine")
-
-    # Base query for all restaurants with stats
-    stmt = (
-        select(
-            Restaurant,
-            func.count(Expense.id).label("visit_count"),
-            func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
-            func.max(Expense.date).label("last_visit"),
-        )
-        .outerjoin(Expense, (Expense.restaurant_id == Restaurant.id) & (Expense.user_id == current_user.id))
-        .where(Restaurant.user_id == current_user.id)
-        .group_by(Restaurant.id)
-    )
-
-    # Apply cuisine filter if provided
-    if cuisine_filter:
-        stmt = stmt.where(Restaurant.cuisine == cuisine_filter)
-
-    # Apply sorting
-    sort_column = {
-        "name": Restaurant.name,
-        "visits": func.count(Expense.id),
-        "spent": func.coalesce(func.sum(Expense.amount), 0),
-        "last_visit": func.max(Expense.date),
-    }.get(sort_by, Restaurant.name)
-
-    sort_direction = sort_order.upper() if sort_order.lower() in ["asc", "desc"] else "ASC"
-    stmt = stmt.order_by(
-        sort_column.asc() if sort_direction == "ASC" else sort_column.desc(),
-        Restaurant.name.asc(),  # Secondary sort by name for consistent ordering
-    )
-
-    # Get all matching restaurants
-    restaurants = db.session.execute(stmt).all()
-
-    # Get unique cuisines for filter dropdown
-    cuisines = db.session.scalars(
-        select(Restaurant.cuisine)
-        .where(Restaurant.user_id == current_user.id, Restaurant.cuisine.isnot(None))
-        .distinct()
-        .order_by(Restaurant.cuisine)
-    ).all()
-
-    # Calculate summary stats
-    total_restaurants = len(restaurants)
-    total_visits = sum(r.visit_count for r in restaurants)
-    total_spent = sum(r.total_spent or 0 for r in restaurants)
-
-    return render_template(
-        "restaurants/list.html",
-        restaurants=restaurants,
-        cuisines=cuisines,
-        sort_by=sort_by,
-        sort_order=sort_order,
-        cuisine_filter=cuisine_filter,
-        total_restaurants=total_restaurants,
-        total_visits=total_visits,
-        total_spent=total_spent,
-        now=datetime.utcnow(),
-    )
+    """Show a list of all restaurants."""
+    restaurants, _ = services.get_restaurants_with_stats(current_user.id, request.args)
+    return render_template("restaurants/list.html", restaurants=restaurants)
 
 
 @bp.route("/add", methods=["GET", "POST"])
 @login_required
-@db_transaction(success_message=FlashMessages.RESTAURANT_ADDED, error_message=FlashMessages.RESTAURANT_ADD_ERROR)
 def add_restaurant():
-    """Add a new restaurant."""
-    from .forms import RestaurantForm
+    """Add a new restaurant or redirect to existing one.
 
+    If a restaurant with the same name and city already exists for the user,
+    redirects to the existing restaurant's page instead of creating a duplicate.
+    Handles both regular form submissions and AJAX requests.
+    """
     form = RestaurantForm()
-    if request.method == "POST":
-        logger.info(f"Form data: {request.form}")
-        if not form.validate_on_submit():
-            logger.error(f"Form validation failed: {form.errors}")
-            return render_template(
-                "restaurants/form.html",
-                form=form,
-                restaurant=None,
-                is_edit=False,
-                google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY", ""),
-            )
-
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    if form.validate_on_submit():
         try:
-            restaurant = Restaurant(
-                user_id=current_user.id,
-                name=form.name.data,
-                type=form.type.data,
-                price_range=form.price_range.data,
-                cuisine=form.cuisine_type.data,  # Changed from form.cuisine.data
-                description=form.description.data,
-                address=form.address.data,
-                city=form.city.data,
-                state=form.state_province.data,
-                postal_code=form.postal_code.data,
-                country=form.country.data or "US",
-                phone=form.phone.data,
-                website=form.website.data,
-                is_chain=form.is_chain.data if hasattr(form, "is_chain") else False,
-                notes=form.notes.data,
-                google_place_id=getattr(form, "google_place_id", None) and form.google_place_id.data or None,
-                place_name=getattr(form, "place_name", None) and form.place_name.data or None,
-                latitude=float(form.latitude.data) if hasattr(form, "latitude") and form.latitude.data else None,
-                longitude=float(form.longitude.data) if hasattr(form, "longitude") and form.longitude.data else None,
+            restaurant, is_new = services.create_restaurant(current_user.id, form)
+            if is_ajax:
+                if is_new:
+                    return (
+                        jsonify(
+                            {
+                                "status": "success",
+                                "message": "Restaurant added successfully!",
+                                "redirect_url": url_for("restaurants.list_restaurants"),
+                            }
+                        ),
+                        200,
+                    )
+                return (
+                    jsonify(
+                        {
+                            "status": "info",
+                            "message": (
+                                f"A restaurant with the name '{restaurant.name}' in "
+                                f"'{restaurant.city or 'unknown location'}' already exists."
+                            ),
+                            "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=restaurant.id),
+                        }
+                    ),
+                    200,
+                )
+
+            # Regular form submission handling
+            if is_new:
+                flash("Restaurant added successfully!", "success")
+                return redirect(url_for("restaurants.list_restaurants"))
+
+            flash(
+                f"A restaurant with the name '{restaurant.name}' in "
+                f"'{restaurant.city or 'unknown location'}' already exists.",
+                "info",
             )
-            db.session.add(restaurant)
-            db.session.flush()  # This will generate the ID without committing
-            logger.info(f"Created restaurant with ID: {restaurant.id}")
             return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
+
         except Exception as e:
-            logger.error(f"Error creating restaurant: {str(e)}", exc_info=True)
-            raise
-    return render_template(
-        "restaurants/form.html",
-        form=form,
-        restaurant=None,
-        is_edit=False,
-        google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY", ""),
-    )
+            if is_ajax:
+                return jsonify({"status": "error", "message": f"Error saving restaurant: {str(e)}"}), 400
+            flash(f"Error saving restaurant: {str(e)}", "error")
+
+    # Handle form validation errors
+    if request.method == "POST" and is_ajax:
+        return jsonify({"status": "error", "message": "Form validation failed", "errors": form.errors}), 400
+
+    return render_template("restaurants/form.html", form=form, is_edit=False)
 
 
-@bp.route("/<int:restaurant_id>", methods=["GET", "POST"])
+@bp.route("/<int:restaurant_id>", methods=["GET"])
 @login_required
-@db_transaction(success_message=FlashMessages.RESTAURANT_UPDATED, error_message=FlashMessages.RESTAURANT_UPDATE_ERROR)
 def restaurant_details(restaurant_id):
-    """Show details for a specific restaurant with inline editing."""
-    from .forms import RestaurantForm
+    """View restaurant details with expenses.
 
-    restaurant = get_restaurant(restaurant_id)
-    form = RestaurantForm(obj=restaurant)
-    if request.method == "POST" and form.validate_on_submit():
-        form.populate_obj(restaurant)
-        return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
-    expenses = (
-        Expense.query.filter_by(restaurant_id=restaurant_id, user_id=current_user.id)
-        .order_by(Expense.date.desc())
-        .limit(10)
-        .all()
+    GET: Display restaurant details with expenses
+    """
+    # Get the restaurant with its expenses relationship loaded
+    stmt = (
+        select(Restaurant)
+        .options(joinedload(Restaurant.expenses))
+        .where(Restaurant.id == restaurant_id, Restaurant.user_id == current_user.id)
     )
-    return render_template(
-        "restaurants/detail.html",
-        restaurant=restaurant,
-        expenses=expenses,
-        form=form,
-        is_editing=request.args.get("edit") == "true",
-        google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY", ""),
-    )
+    restaurant = db.session.scalar(stmt)
 
+    if not restaurant:
+        abort(404, "Restaurant not found")
 
-@bp.route("/<int:restaurant_id>/sync-google", methods=["POST"])
-@login_required
-def sync_google_places(restaurant_id):
-    """Sync restaurant data from Google Places."""
-    restaurant = get_restaurant(restaurant_id)
+    # Load expenses for the restaurant
+    expenses = sorted(restaurant.expenses, key=lambda x: x.date, reverse=True)
 
-    if not restaurant.google_place_id:
-        return jsonify({"success": False, "message": "No Google Place ID associated with this restaurant"}), 400
-
-    places_service = PlacesService(current_app.config.get("GOOGLE_PLACES_API_KEY"))
-    success = places_service.sync_restaurant_from_google(restaurant)
-
-    if success:
-        return jsonify(
-            {
-                "success": True,
-                "message": "Restaurant data synced successfully",
-                "restaurant": {
-                    "name": restaurant.name,
-                    "address": restaurant.address,
-                    "city": restaurant.city,
-                    "state": restaurant.state,
-                    "postal_code": restaurant.postal_code,
-                    "phone": restaurant.phone,
-                    "website": restaurant.website,
-                    "rating": restaurant.rating,
-                    "type": restaurant.type,
-                },
-            }
-        )
-
-    return jsonify({"success": False, "message": "Failed to sync restaurant data"}), 400
+    return render_template("restaurants/detail.html", restaurant=restaurant, expenses=expenses)
 
 
 @bp.route("/<int:restaurant_id>/edit", methods=["GET", "POST"])
 @login_required
-@db_transaction(success_message=FlashMessages.RESTAURANT_UPDATED, error_message=FlashMessages.RESTAURANT_UPDATE_ERROR)
 def edit_restaurant(restaurant_id):
-    """Edit a restaurant's details."""
-    from .forms import RestaurantForm
+    """Edit restaurant details using the same form as add_restaurant.
 
-    restaurant = get_restaurant(restaurant_id)
-    form = RestaurantForm(obj=restaurant)
-    if request.method == "POST" and form.validate_on_submit():
-        restaurant.name = form.name.data
-        restaurant.type = form.type.data
-        restaurant.price_range = form.price_range.data
-        restaurant.cuisine = form.cuisine.data
-        restaurant.description = form.description.data
-        restaurant.address = form.address.data
-        restaurant.city = form.city.data
-        restaurant.state = form.state_province.data
-        restaurant.postal_code = form.postal_code.data
-        restaurant.country = form.country.data or "US"
-        restaurant.phone = form.phone.data
-        restaurant.website = form.website.data
-        restaurant.is_chain = form.is_chain.data
-        restaurant.notes = form.notes.data
-        restaurant.google_place_id = form.google_place_id.data or None
-        restaurant.place_name = form.place_name.data or None
-        restaurant.latitude = float(form.latitude.data) if form.latitude.data else None
-        restaurant.longitude = float(form.longitude.data) if form.longitude.data else None
-        return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
-    return render_template(
-        "restaurants/form.html",
-        form=form,
-        restaurant=restaurant,
-        is_edit=True,
-        google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY", ""),
+    GET: Display form pre-populated with restaurant data
+    POST: Update restaurant with form data
+    """
+    # Get the restaurant
+    restaurant = db.session.scalar(
+        select(Restaurant).where(Restaurant.id == restaurant_id, Restaurant.user_id == current_user.id)
     )
 
+    if not restaurant:
+        abort(404, "Restaurant not found")
 
-@bp.route("/<int:restaurant_id>/delete", methods=["POST"])
-@login_required
-@db_transaction(success_message=FlashMessages.RESTAURANT_DELETED, error_message=FlashMessages.RESTAURANT_DELETE_ERROR)
-def delete_restaurant(restaurant_id):
-    """Delete a restaurant."""
-    restaurant = get_restaurant(restaurant_id)
-    has_expenses = db.session.scalar(select(exists().where(Expense.restaurant_id == restaurant_id)))
-    if has_expenses:
-        flash(FlashMessages.CANNOT_DELETE_WITH_EXPENSES, "error")
-    else:
-        db.session.delete(restaurant)
-    return redirect(url_for("restaurants.list_restaurants"))
+    form = RestaurantForm()
 
-
-# Import/Export routes
-class ImportForm(FlaskForm):
-    """Form for importing restaurants from CSV."""
-    file = FileField('CSV File', validators=[
-        FileRequired(),
-        FileAllowed(['csv'], 'CSV files only!')
-    ])
-    submit = SubmitField('Import')
-
-
-@bp.route("/import", methods=["GET", "POST"])
-@login_required
-def import_restaurants():
-    """Handle importing restaurants from CSV."""
-    form = ImportForm()
     if form.validate_on_submit():
-        file = form.file.data
-        if file and file.filename.endswith(".csv"):
-            success, message = import_restaurants_from_csv(file.stream, current_user)
+        try:
+            # Update restaurant with form data
+            services.update_restaurant(restaurant.id, current_user.id, form)
+            flash("Restaurant updated successfully!", "success")
+            return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
+        except Exception as e:
+            flash(f"Error updating restaurant: {str(e)}", "danger")
+    elif request.method == "GET":
+        # Pre-populate form with existing data
+        form = RestaurantForm(obj=restaurant)
+
+    return render_template("restaurants/form.html", form=form, is_edit=True, restaurant=restaurant)
+
+
+@bp.route("/delete/<int:restaurant_id>", methods=["POST"])
+@login_required
+def delete_restaurant(restaurant_id):
+    """Delete a restaurant.
+
+    This endpoint handles both HTML form submissions and JSON API requests.
+    For HTML, it redirects to the restaurant list with a flash message.
+    For JSON, it returns a JSON response with the result.
+    """
+    try:
+        success, message = services.delete_restaurant_by_id(restaurant_id, current_user.id)
+
+        if request.is_json or request.content_type == "application/json":
             if success:
-                flash(message, "success")
-                return redirect(url_for("restaurants.list_restaurants"))
+                return jsonify(
+                    {"success": True, "message": str(message), "redirect": url_for("restaurants.list_restaurants")}
+                )
             else:
-                flash(message, "danger")
-    return render_template("restaurants/import.html", form=form)
+                return jsonify({"success": False, "error": str(message)}), 400
+
+        # For HTML form submissions
+        flash(message, "success" if success else "error")
+        return redirect(url_for("restaurants.list_restaurants"))
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting restaurant {restaurant_id}: {str(e)}")
+        if request.is_json or request.content_type == "application/json":
+            return jsonify({"success": False, "error": "An error occurred while deleting the restaurant"}), 500
+
+        flash("An error occurred while deleting the restaurant", "error")
+        return redirect(url_for("restaurants.list_restaurants"))
 
 
 @bp.route("/export")
 @login_required
 def export_restaurants():
-    """Export restaurants to CSV."""
-    try:
-        response = export_restaurants_to_csv(current_user.id)
-        # Update the filename to include timestamp
-        filename = f'restaurants_export_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.csv'
-        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
-        return response
-    except Exception as e:
-        logger.error(f"Error exporting restaurants: {str(e)}", exc_info=True)
-        flash("An error occurred while exporting restaurants. Please try again.", "error")
+    """Export restaurants as CSV or JSON."""
+    format_type = request.args.get("format", "csv").lower()
+
+    # Get the data from the service
+    restaurants = services.export_restaurants_for_user(current_user.id)
+
+    if not restaurants:
+        flash("No restaurants found to export", "warning")
         return redirect(url_for("restaurants.list_restaurants"))
 
+    if format_type == "json":
+        response = make_response(json.dumps(restaurants, indent=2))
+        response.headers["Content-Type"] = "application/json"
+        response.headers["Content-Disposition"] = "attachment; filename=restaurants.json"
+        return response
 
-# Search routes
-@bp.route("/search/restaurants")
+    # Default to CSV format
+    output = io.StringIO()
+    writer = csv.DictWriter(
+        output, fieldnames=restaurants[0].keys() if restaurants else [], quoting=csv.QUOTE_NONNUMERIC
+    )
+    writer.writeheader()
+    writer.writerows(restaurants)
+
+    response = make_response(output.getvalue())
+    response.headers["Content-Type"] = "text/csv"
+    response.headers["Content-Disposition"] = "attachment; filename=restaurants.csv"
+    return response
+
+
+def _validate_import_file(file):
+    """Validate the uploaded file for restaurant import."""
+    if not file or file.filename == "":
+        flash("No file selected", "error")
+        return False
+
+    if not file.filename.lower().endswith((".csv", ".json")):
+        flash("Unsupported file type. Please upload a CSV or JSON file.", "error")
+        return False
+    return True
+
+
+def _parse_import_file(file):
+    """Parse the uploaded file and return the data."""
+    if file.filename.lower().endswith(".json"):
+        data = json.load(file)
+        if not isinstance(data, list):
+            flash("Invalid JSON format. Expected an array of restaurants.", "error")
+            return None
+        return data
+
+    # Parse CSV file
+    try:
+        csv_data = file.read().decode("utf-8")
+        reader = csv.DictReader(io.StringIO(csv_data))
+        return list(reader)
+    except UnicodeDecodeError:
+        flash(
+            "Error decoding the file. Please ensure it's a valid CSV or JSON file.",
+            "error",
+        )
+        return None
+
+
+@bp.route("/import", methods=["GET", "POST"])
 @login_required
-def search_restaurants():
-    """Render the map-based restaurant search page.
+def import_restaurants():
+    """Handle restaurant import from file upload."""
+    if request.method == "POST":
+        if "file" not in request.files:
+            flash("No file part", "error")
+            return redirect(request.url)
 
-    Query Parameters:
-        lat (float): Default latitude for the map center
-        lng (float): Default longitude for the map center
-        zoom (int): Default zoom level for the map
-        q (str): Initial search query
+        file = request.files["file"]
+        if file.filename == "":
+            flash("No selected file", "error")
+            return redirect(request.url)
+
+        try:
+            # Validate file
+            _validate_import_file(file)
+
+            # Parse the file
+            data = _parse_import_file(file)
+
+            # Process and save restaurants
+            success, message = services.import_restaurants_from_csv(data, current_user.id)
+            # Extract the number of imported restaurants from the message
+            added = message.count("imported")
+            # This is a simple approximation, adjust as needed
+            skipped = message.count("skipped")
+
+            flash(
+                f"Successfully imported {added} restaurants. {skipped} duplicates skipped.",
+                "success",
+            )
+            return redirect(url_for("restaurants.list_restaurants"))
+
+        except ValueError as e:
+            flash(str(e), "error")
+        except Exception as e:
+            current_app.logger.error("Error importing restaurants: %s", str(e), exc_info=True)
+            flash("An error occurred while importing restaurants.", "error")
+
+    return render_template("restaurants/import.html")
+
+
+@bp.route("/google-places", methods=["GET", "POST"])
+@login_required
+def google_places_search():
+    """Search for restaurants using Google Places API.
+
+    This route renders a page where users can search for restaurants
+    using Google Places API and add them to their list.
 
     Returns:
-        Rendered template with the map search interface
+        Rendered template with the Google Places search interface
     """
-    # Get parameters with defaults
-    lat = request.args.get("lat", "40.7128")
-    lng = request.args.get("lng", "-74.0060")
-    zoom = request.args.get("zoom", "12")
-    query = request.args.get("q", "")
+    # Check if Google Maps API key is configured
+    google_maps_api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
+    if not google_maps_api_key:
+        current_app.logger.warning("Google Maps API key is not configured")
+        flash("Google Maps integration is not properly configured. Please contact support.", "warning")
 
-    # Get Google Maps API key from config - try both possible config keys
-    google_maps_api_key = current_app.config.get("GOOGLE_MAPS_API_KEY") or current_app.config.get(
-        "GOOGLE_PLACES_API_KEY"
+    # Render the Google Places search template
+    return render_template("restaurants/places_search.html", google_maps_api_key=google_maps_api_key or "")
+
+
+def _validate_google_places_request():
+    """Validate the incoming Google Places request and return the JSON data.
+
+    Returns:
+        tuple: (data, error_response) where error_response is None if validation passes.
+              data is a dictionary containing the parsed JSON and CSRF token.
+    """
+    current_app.logger.info("Validating Google Places request")
+
+    if not request.is_json:
+        error_msg = f"Invalid content type: {request.content_type}. Expected application/json"
+        current_app.logger.warning(error_msg)
+        return None, (jsonify({"success": False, "message": error_msg}), 400)
+
+    try:
+        data = request.get_json()
+        current_app.logger.debug(f"Received data: {data}")
+    except Exception as e:
+        error_msg = f"Failed to parse JSON data: {str(e)}"
+        current_app.logger.error(error_msg)
+        return None, (jsonify({"success": False, "message": error_msg}), 400)
+
+    if not data:
+        error_msg = "No data provided in request"
+        current_app.logger.warning(error_msg)
+        return None, (jsonify({"success": False, "message": error_msg}), 400)
+
+    csrf_token = request.headers.get("X-CSRFToken")
+    current_app.logger.debug(f"CSRF Token from headers: {csrf_token}")
+
+    if not csrf_token:
+        error_msg = "CSRF token is missing from request headers"
+        current_app.logger.warning(error_msg)
+        return None, (jsonify({"success": False, "message": error_msg}), 403)
+
+    # Return both the data and CSRF token as a dictionary
+    return {"data": data, "csrf_token": csrf_token}, None
+
+    return (data, csrf_token), None
+
+
+def _prepare_restaurant_form(data, csrf_token):
+    """Prepare and validate the restaurant form with the provided data.
+
+    Args:
+        data: Dictionary containing restaurant data
+        csrf_token: CSRF token for form validation
+
+    Returns:
+        tuple: (form, error_response) where error_response is None if validation passes
+    """
+    from app.restaurants.forms import RestaurantForm
+
+    # Ensure data is a dictionary
+    if not isinstance(data, dict):
+        error_msg = "Invalid data format. Expected a dictionary."
+        current_app.logger.error(error_msg)
+        return None, (jsonify({"success": False, "message": error_msg}), 400)
+
+    form_data = {
+        "name": data.get("name", ""),
+        "address": data.get("formatted_address") or data.get("address", ""),
+        "city": data.get("city", ""),
+        "state": data.get("state", ""),
+        "postal_code": data.get("postal_code", ""),
+        "country": data.get("country", ""),
+        "phone": data.get("formatted_phone_number") or data.get("phone", ""),
+        "website": data.get("website", ""),
+        "google_place_id": data.get("place_id") or data.get("google_place_id", ""),
+        "latitude": data.get("geometry", {}).get("location", {}).get("lat") or data.get("latitude"),
+        "longitude": data.get("geometry", {}).get("location", {}).get("lng") or data.get("longitude"),
+        "csrf_token": csrf_token,
+    }
+
+    current_app.logger.debug(f"Form data prepared: {form_data}")
+
+    form = RestaurantForm(data=form_data)
+    current_app.logger.debug("Form created. Validating...")
+
+    if not form.validate():
+        errors = {field: errors[0] for field, errors in form.errors.items()}
+        current_app.logger.warning(f"Form validation failed: {errors}")
+        return None, (jsonify({"success": False, "message": "Validation failed", "errors": errors}), 400)
+
+    return form, None
+
+
+def _create_restaurant_from_form(form):
+    """Create or update a restaurant from the validated form.
+
+    Args:
+        form: Validated RestaurantForm instance
+
+    Returns:
+        tuple: (restaurant, is_new) if successful, (None, error_response) if failed
+    """
+    from app.restaurants.services import create_restaurant
+
+    try:
+        current_app.logger.debug("Creating restaurant...")
+        restaurant, is_new = create_restaurant(current_user.id, form)
+        current_app.logger.info(f"Restaurant {'created' if is_new else 'updated'}: {restaurant.id}")
+        return (restaurant, is_new), None
+    except Exception as e:
+        current_app.logger.error(f"Error creating restaurant: {str(e)}", exc_info=True)
+        return None, (jsonify({"success": False, "message": "An error occurred while creating the restaurant"}), 500)
+
+
+@bp.route("/check-restaurant-exists", methods=["POST"])
+@login_required
+def check_restaurant_exists():
+    """Check if a restaurant with the given Google Place ID already exists.
+
+    Expected JSON payload:
+    {
+        "google_place_id": "ChIJ..."
+    }
+
+    Returns:
+        JSON response with exists (bool) and restaurant_id (int) if exists
+    """
+    data = request.get_json()
+    if not data or "google_place_id" not in data:
+        return jsonify({"success": False, "message": "Missing google_place_id"}), 400
+
+    # Check if a restaurant with this Google Place ID already exists for the current user
+    restaurant = Restaurant.query.filter_by(google_place_id=data["google_place_id"], user_id=current_user.id).first()
+
+    return jsonify(
+        {
+            "success": True,
+            "exists": restaurant is not None,
+            "restaurant_id": restaurant.id if restaurant else None,
+            "restaurant_name": restaurant.name if restaurant else None,
+        }
     )
 
-    # Log the status of the API key for debugging
-    if not google_maps_api_key:
-        current_app.logger.warning("Google Maps API key is not configured in Flask config")
-        current_app.logger.warning(
-            "Environment variables: %s", {k: v for k, v in os.environ.items() if "GOOGLE" in k or "API" in k}
+
+@bp.route("/add-from-google-places", methods=["POST"])
+@login_required
+def add_from_google_places():
+    """Add a new restaurant from Google Places data.
+
+    This endpoint is called via AJAX when a user selects a restaurant
+    from the Google Places search results.
+
+    Expected JSON payload:
+    {
+        "name": "Restaurant Name",
+        "address": "123 Main St",
+        "city": "City",
+        "state": "State",
+        "postal_code": "12345",
+        "country": "Country",
+        "phone": "+1234567890",
+        "website": "https://example.com",
+        "google_place_id": "ChIJ...",
+        "latitude": 40.7128,
+        "longitude": -74.0060
+    }
+
+    Returns:
+        JSON response with success status and redirect URL
+    """
+    # Validate the request
+    validation_result, error_response = _validate_google_places_request()
+    if error_response:
+        return error_response
+
+    # Extract data and CSRF token from validation result
+    data = validation_result["data"]
+    csrf_token = validation_result["csrf_token"]
+
+    # Check if restaurant already exists by google_place_id
+    if "google_place_id" in data and data["google_place_id"]:
+        existing_restaurant = Restaurant.query.filter_by(
+            google_place_id=data["google_place_id"], user_id=current_user.id
+        ).first()
+
+        if existing_restaurant:
+            return jsonify(
+                {
+                    "success": True,
+                    "exists": True,
+                    "restaurant_id": existing_restaurant.id,
+                    "restaurant_name": existing_restaurant.name,
+                    "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=existing_restaurant.id),
+                }
+            )
+
+    # Prepare the form data
+    form, error_response = _prepare_restaurant_form(data, csrf_token)
+    if error_response:
+        return error_response
+
+    # Create the restaurant
+    result, error_response = _create_restaurant_from_form(form)
+    if error_response:
+        return error_response
+
+    restaurant, is_new = result
+
+    try:
+        # Update with Google Places data
+        restaurant.update_from_google_places(data)
+        db.session.commit()
+
+        # Set flash message based on whether it's a new restaurant
+        if is_new:
+            flash("Restaurant added successfully!", "success")
+        else:
+            flash("Restaurant updated with the latest information.", "info")
+
+        return jsonify(
+            {
+                "success": True,
+                "is_new": is_new,
+                "exists": False,
+                "restaurant_id": restaurant.id,
+                "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=restaurant.id),
+            }
         )
 
-        # Try to get from environment directly as fallback
-        google_maps_api_key = os.environ.get("GOOGLE_MAPS_API_KEY") or os.environ.get("GOOGLE_PLACES_API_KEY")
-        if google_maps_api_key:
-            current_app.logger.info("Found Google Maps API key in environment variables")
-            current_app.config["GOOGLE_MAPS_API_KEY"] = google_maps_api_key
-        else:
-            current_app.logger.error("Google Maps API key is not configured in environment or config")
-    else:
-        current_app.logger.info("Google Maps API key is configured in Flask config")
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Unexpected error in add_from_google_places: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
+        return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
 
-    current_app.logger.debug(
-        "Rendering template with lat=%s, lng=%s, zoom=%s, query=%s, has_api_key=%s",
-        lat,
-        lng,
-        zoom,
-        query,
-        bool(google_maps_api_key),
-    )
 
-    # Ensure we have a valid API key
-    if not google_maps_api_key:
-        current_app.logger.error("Google Maps API key is required but not found in config or environment variables")
-        flash("Google Maps integration is not properly configured. Please contact support.", "error")
-        return redirect(url_for("restaurants.list_restaurants"))
+@bp.route("/search", methods=["GET"])
+@login_required
+def search_restaurants():
+    """Search for restaurants by name, cuisine, or location.
+
+    Query Parameters:
+        q: Search query string
+        page: Page number for pagination
+        per_page: Number of results per page
+        sort: Field to sort by (name, city, cuisine, etc.)
+        order: Sort order (asc or desc)
+
+    Returns:
+        Rendered template with search results
+    """
+    query = request.args.get("q", "").strip()
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 10, type=int)
+    sort = request.args.get("sort", "name")
+    order = request.args.get("order", "asc")
+
+    # Validate sort field
+    valid_sort_fields = ["name", "city", "cuisine", "created_at", "updated_at"]
+    if sort not in valid_sort_fields:
+        sort = "name"
+
+    # Validate order
+    order = order.lower()
+    if order not in ["asc", "desc"]:
+        order = "asc"
+
+    # Build base query
+    stmt = select(Restaurant).filter(Restaurant.user_id == current_user.id)
+
+    # Apply search filters
+    if query:
+        search = f"%{query}%"
+        stmt = stmt.filter(
+            (Restaurant.name.ilike(search))
+            | (Restaurant.city.ilike(search))
+            | (Restaurant.cuisine.ilike(search))
+            | (Restaurant.address.ilike(search))
+        )
+
+    # Apply sorting
+    sort_field = getattr(Restaurant, sort, Restaurant.name)
+    if order == "desc":
+        sort_field = sort_field.desc()
+    stmt = stmt.order_by(sort_field)
+
+    # Paginate results
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
+    restaurants = pagination.items
 
     return render_template(
         "restaurants/search.html",
-        lat=lat,
-        lng=lng,
-        zoom=zoom,
+        restaurants=restaurants,
         query=query,
-        google_maps_api_key=google_maps_api_key,
+        pagination=pagination,
+        sort=sort,
+        order=order,
+        per_page=per_page,
+        google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY"),
     )
 
 
-def _validate_search_params(args):
-    """Validate search parameters.
-
-    Args:
-        args: The request args
-
-    Returns:
-        tuple: (lat, lng, radius, keyword) if valid, None if invalid with error response
-    """
-    if not all(args.get(param) for param in ["lat", "lng"]):
-        return None, (jsonify({"error": "Missing required parameters: lat and lng are required"}), 400)
-
-    try:
-        lat = float(args.get("lat"))
-        lng = float(args.get("lng"))
-        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
-            msg = "Invalid coordinates: lat must be between -90 and 90, lng between -180 and 180"
-            return None, (jsonify({"error": msg}), 400)
-
-        radius = min(max(int(args.get("radius", 1000)), 1), 50000)
-        keyword = args.get("keyword", "").strip()
-        return (lat, lng, radius, keyword), None
-
-    except (ValueError, TypeError) as e:
-        return None, (jsonify({"error": f"Invalid parameter values: {str(e)}"}), 400)
-
-
-def _make_places_api_request(params, api_key):
-    """Make request to Google Places API.
-
-    Args:
-        params: The request parameters
-        api_key: The Google Places API key
-
-    Returns:
-        tuple: (response_data, error_response) if error occurs
-    """
-    try:
-        response = requests.get(
-            "https://maps.googleapis.com/maps/api/place/nearbysearch/json", params=params, timeout=15
-        )
-        response.raise_for_status()
-        return response.json(), None
-
-    except requests.exceptions.RequestException as e:
-        logger.error("Error making request to Google Places API: %s", str(e))
-        return None, (jsonify({"error": "Error connecting to the Google Places API service"}), 503)
-
-
-@bp.route("/api/places/search")
+@bp.route("/find-by-google-place", methods=["GET"])
 @login_required
-def search_places():
-    """Search for places using Google Places API.
+def find_by_google_place():
+    """Find restaurant details by Google Place ID.
 
     Query Parameters:
-        lat (float): Latitude of the search location (required)
-        lng (float): Longitude of the search location (required)
-        radius (int): Search radius in meters (default: 1000, max: 50000)
-        keyword (str): Optional search term
+        place_id: Google Place ID to look up
 
     Returns:
-        JSON response with list of places or error message
+        JSON response with restaurant details or error message
     """
+    place_id = request.args.get("place_id")
+    if not place_id:
+        return jsonify({"error": "Missing place_id parameter"}), 400
+
     try:
-        # Log the incoming request for debugging
-        logger.debug("Received Places API search request with args: %s", request.args.to_dict())
+        # Initialize Google Places client
+        import googlemaps
+        from flask import current_app
 
-        # Validate parameters
-        params, error = _validate_search_params(request.args)
-        if error:
-            logger.warning("Invalid search parameters: %s", error[0].get_json())
-            return error
+        gmaps = googlemaps.Client(key=current_app.config["GOOGLE_MAPS_API_KEY"])
 
-        lat, lng, radius, keyword = params
+        # Get place details
+        place = gmaps.place(
+            place_id=place_id,
+            fields=[
+                "name",
+                "formatted_address",
+                "formatted_phone_number",
+                "website",
+                "geometry",
+                "opening_hours",
+                "price_level",
+                "rating",
+                "user_ratings_total",
+                "photos",
+                "types",
+                "url",
+            ],
+        )
 
-        # Get and validate API key
-        api_key = current_app.config.get("GOOGLE_PLACES_API_KEY")
-        logger.debug("Using Google Places API key (truncated): %s...", api_key[:8] + "..." if api_key else "None")
+        if not place or "result" not in place:
+            return jsonify({"error": "Place not found"}), 404
 
-        # Check if API key is missing or using default value
-        if not api_key or api_key == "your_google_places_api_key_here":
-            error_msg = "Google Places API key is not properly configured in server settings"
-            logger.error(error_msg)
-            return (
-                jsonify(
-                    {
-                        "error": "Server configuration error: Missing or invalid Google Places API key",
-                        "details": "Please contact the system administrator",
-                        "status": "error",
-                    }
-                ),
-                500,
-            )
-
-        # Build the API request
-        request_params = {
-            "location": f"{lat},{lng}",
-            "radius": radius,
-            "key": api_key,
-            "type": "restaurant",
-            "rankby": "prominence",
+        # Format the response
+        result = place["result"]
+        address_components = {
+            "street_number": "",
+            "route": "",
+            "locality": "",
+            "administrative_area_level_1": "",
+            "postal_code": "",
+            "country": "",
         }
 
-        if keyword:
-            request_params["keyword"] = keyword
+        # Parse address components if available
+        if "address_components" in result:
+            for component in result["address_components"]:
+                for address_type in component["types"]:
+                    if address_type in address_components:
+                        address_components[address_type] = component["long_name"]
 
-        # Log the request without exposing the API key
-        safe_params = request_params.copy()
-        if "key" in safe_params:
-            safe_params["key"] = "***REDACTED***"
-        logger.debug("Making Places API request with params: %s", safe_params)
+        # Build the response
+        response = {
+            "name": result.get("name", ""),
+            "address": f"{address_components['street_number']} {address_components['route']}".strip(),
+            "city": address_components["locality"],
+            "state": address_components["administrative_area_level_1"],
+            "postal_code": address_components["postal_code"],
+            "country": address_components["country"],
+            "phone": result.get("formatted_phone_number", ""),
+            "website": result.get("website", ""),
+            "google_place_id": place_id,
+            "google_maps_url": result.get("url", ""),
+            "latitude": result.get("geometry", {}).get("location", {}).get("lat"),
+            "longitude": result.get("geometry", {}).get("location", {}).get("lng"),
+            "rating": result.get("rating"),
+            "price_level": result.get("price_level"),
+            "types": result.get("types", []),
+        }
 
-        # Make the API request
-        data, error = _make_places_api_request(request_params, api_key)
-        if error:
-            logger.error("Error in Places API request: %s", error[0].get_json())
-            return error
+        return jsonify(response)
 
-        # Handle API response
-        status = data.get("status")
-        if status != "OK":
-            error_msg = data.get("error_message", f"Google Places API error: {status}")
-            logger.warning("Places API error: %s", error_msg)
-            return jsonify({"error": error_msg, "status": status, "details": data}), 400
-
-        logger.debug("Successfully retrieved %d places", len(data.get("results", [])))
-        return jsonify({"results": data.get("results", []), "status": "success"})
-
-    except Exception as err:
-        error_msg = f"Unexpected error in search_places: {str(err)}"
-        logger.exception(error_msg)
-        return (
-            jsonify(
-                {
-                    "error": "An unexpected error occurred while searching for places",
-                    "details": str(err),
-                    "status": "error",
-                }
-            ),
-            500,
-        )
-
-
-@bp.route("/api/places/<place_id>")
-@login_required
-def get_place_details(place_id):
-    """Get details for a specific place using Google Places API.
-
-    Args:
-        place_id (str): Google Place ID
-
-    Returns:
-        JSON response with place details or error message
-    """
-    try:
-        # Make the request to Google Places API
-        response = requests.get(
-            "https://maps.googleapis.com/maps/api/place/details/json",
-            params={
-                "place_id": place_id,
-                "fields": (
-                    "name,formatted_address,formatted_phone_number,website,"
-                    "opening_hours,price_level,rating,types,geometry"
-                ),
-                "key": current_app.config.get("GOOGLE_PLACES_API_KEY"),
-            },
-            timeout=10,
-        )
-        response.raise_for_status()
-
-        data = response.json()
-
-        if data.get("status") != "OK":
-            return jsonify({"error": data.get("error_message", "Error getting place details")}), 400
-
-        return jsonify(data.get("result", {}))
-
-    except (ValueError, requests.RequestException) as e:
-        logger.error("Error getting place details: %s", str(e))
-        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error fetching Google Place details: {str(e)}")
+        return jsonify({"error": "Failed to fetch place details"}), 500

@@ -7,9 +7,13 @@ using the AWS CLI. It handles the invocation and provides clear success/error me
 
 import json
 import logging
+import os
+import re
+import shlex
+import shutil
 import subprocess
 import sys
-from typing import Optional
+from typing import List, Optional
 
 # Configure logging
 logging.basicConfig(
@@ -82,7 +86,50 @@ def process_lambda_response(result: subprocess.CompletedProcess) -> bool:
         return False
 
 
-def build_aws_cli_command(function_name: str, region: Optional[str] = None, profile: Optional[str] = None) -> list[str]:
+def _validate_aws_identifier(identifier: str, identifier_type: str) -> None:
+    """Validate AWS resource identifiers.
+
+    Args:
+        identifier: The identifier to validate
+        identifier_type: Type of identifier (e.g., 'function_name', 'region', 'profile')
+
+    Raises:
+        ValueError: If the identifier is invalid
+    """
+    if not identifier or not isinstance(identifier, str):
+        raise ValueError(f"Invalid {identifier_type}: must be a non-empty string")
+
+    # Basic pattern validation for AWS identifiers
+    if identifier_type == "function_name":
+        if not re.match(r"^[a-zA-Z0-9\-_]{1,64}$", identifier):
+            raise ValueError(
+                "Function name can only contain alphanumeric characters, hyphens, and underscores, "
+                "and must be between 1 and 64 characters long"
+            )
+    elif identifier_type == "region":
+        if not re.match(r"^[a-z]{2}-[a-z]+-\d+$", identifier):
+            raise ValueError("Invalid AWS region format")
+    elif identifier_type == "profile":
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", identifier):
+            raise ValueError("AWS profile name contains invalid characters")
+
+
+def _find_aws_cli() -> str:
+    """Find the AWS CLI executable.
+
+    Returns:
+        str: Path to the AWS CLI executable
+
+    Raises:
+        RuntimeError: If AWS CLI is not found
+    """
+    aws_path = shutil.which("aws")
+    if not aws_path:
+        raise RuntimeError("AWS CLI is not installed or not in PATH")
+    return aws_path
+
+
+def build_aws_cli_command(function_name: str, region: Optional[str] = None, profile: Optional[str] = None) -> List[str]:
     """Build the AWS CLI command for invoking the Lambda function.
 
     Args:
@@ -92,26 +139,46 @@ def build_aws_cli_command(function_name: str, region: Optional[str] = None, prof
 
     Returns:
         list: Command parts as a list
+
+    Raises:
+        ValueError: If any of the input parameters are invalid
     """
-    cmd = [
-        "aws",
+    # Validate inputs
+    _validate_aws_identifier(function_name, "function_name")
+    if region:
+        _validate_aws_identifier(region, "region")
+    if profile:
+        _validate_aws_identifier(profile, "profile")
+
+    # Get AWS CLI path
+    aws_path = _find_aws_cli()
+
+    # Build command parts
+    cmd_parts = [
+        aws_path,
         "lambda",
         "invoke",
         "--function-name",
         function_name,
+        "--invocation-type",
+        "RequestResponse",
+        "--log-type",
+        "Tail",
         "--payload",
-        json.dumps({"db_operation": "migrate"}),
-        "--cli-binary-format",
-        "raw-in-base64-out",
-        "/dev/stdout",
+        '{"action": "migrate"}',
     ]
 
+    # Add optional parameters
     if region:
-        cmd.extend(["--region", region])
+        cmd_parts.extend(["--region", region])
     if profile:
-        cmd.extend(["--profile", profile])
+        cmd_parts.extend(["--profile", profile])
 
-    return cmd
+    # Add output file
+    null_device = "nul" if os.name == "nt" else "/dev/null"
+    cmd_parts.append(null_device)
+
+    return cmd_parts
 
 
 def invoke_lambda_migrations(function_name: str, region: Optional[str] = None, profile: Optional[str] = None) -> bool:
@@ -124,12 +191,27 @@ def invoke_lambda_migrations(function_name: str, region: Optional[str] = None, p
 
     Returns:
         bool: True if migrations were successful, False otherwise
+
+    Raises:
+        ValueError: If input validation fails
+        subprocess.SubprocessError: If the subprocess call fails
     """
     try:
+        # Build and validate the command
         cmd = build_aws_cli_command(function_name, region, profile)
-        logger.info("🚀 Invoking Lambda function: %s", function_name)
+        logger.debug("Running command: %s", " ".join(shlex.quote(arg) for arg in cmd))
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        # Execute the command with a timeout
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=300,  # 5 minute timeout
+            shell=False,  # Prevent shell injection
+            encoding="utf-8",
+            errors="replace",  # Handle encoding errors gracefully
+        )
 
         if result.returncode != 0:
             logger.error("❌ Failed to invoke Lambda: %s", result.stderr or "Unknown error")

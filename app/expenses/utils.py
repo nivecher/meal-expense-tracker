@@ -1,7 +1,7 @@
 """Utility functions for the expenses module."""
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from werkzeug.datastructures import FileStorage
@@ -25,7 +25,7 @@ def save_receipt(file_storage: FileStorage, upload_folder: str) -> str:
     os.makedirs(upload_folder, exist_ok=True)
 
     # Generate a unique filename
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     original_filename = file_storage.filename or "receipt"
     file_ext = Path(original_filename).suffix.lower()
 

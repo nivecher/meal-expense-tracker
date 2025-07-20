@@ -1,0 +1,51 @@
+/* Card styles */
+.card {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    margin-bottom: 1.5rem;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1rem 1.25rem;
+}
+
+.card-title {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+.card-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 0.75rem 1.25rem;
+}
+
+/* Card variants */
+.card-primary {
+    border-top: 3px solid var(--primary-color);
+}
+
+.card-success {
+    border-top: 3px solid var(--secondary-color);
+}
+
+.card-danger {
+    border-top: 3px solid var(--danger-color);
+}
+
+.card-warning {
+    border-top: 3px solid var(--warning-color);
+}

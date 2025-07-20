@@ -189,7 +189,7 @@ resource "aws_route_table_association" "public" {
 }
 
 resource "aws_route_table_association" "private" {
-  for_each = toset(var.enable_nat_gateway ? aws_subnet.private[*].id : [])
+  for_each       = toset(var.enable_nat_gateway ? aws_subnet.private[*].id : [])
   subnet_id      = each.value
   route_table_id = aws_route_table.private.id
 }

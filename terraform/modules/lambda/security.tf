@@ -51,4 +51,3 @@ resource "aws_security_group_rule" "lambda_egress_dns_tcp" {
 }
 
 # Allow Lambda to access RDS using security group reference
-

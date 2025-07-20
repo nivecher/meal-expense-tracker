@@ -2,9 +2,9 @@
 
 This directory contains utility scripts for setting up and managing the meal expense tracker application.
 
-## Google Places API Key Setup
+## Google Maps API Key Setup
 
-To set up the Google Places API key in AWS Secrets Manager, use the `setup_google_places_secret.py` script.
+To set up the Google Maps API key in AWS Secrets Manager, use the `setup_google_maps_secret.py` script.
 
 ### Prerequisites
 
@@ -16,11 +16,11 @@ To set up the Google Places API key in AWS Secrets Manager, use the `setup_googl
 
 ```bash
 # Basic usage
-./scripts/setup_google_places_secret.py --api-key "YOUR_GOOGLE_PLACES_API_KEY"
+./scripts/setup_google_maps_secret.py --api-key "YOUR_GOOGLE_MAPS_API_KEY"
 
 # With custom AWS profile and region
-./scripts/setup_google_places_secret.py \
-  --api-key "YOUR_GOOGLE_PLACES_API_KEY" \
+./scripts/setup_google_maps_secret.py \
+  --api-key "YOUR_GOOGLE_MAPS_API_KEY" \
   --profile your-aws-profile \
   --region us-east-1 \
   --app-name meal-expense-tracker \
@@ -37,8 +37,8 @@ To set up the Google Places API key in AWS Secrets Manager, use the `setup_googl
 
 ### What the Script Does
 
-1. Creates or updates a secret in AWS Secrets Manager with the name format: `{app_name}/{environment}/google-places-api-key`
-2. Stores the Google Places API key as the secret value
+1. Creates or updates a secret in AWS Secrets Manager with the name format: `{app_name}/{environment}/google/maps-api-key`
+2. Stores the Google Maps API key as the secret value
 3. Tags the secret with appropriate metadata
 4. Outputs the secret ARN that you need to add to your Terraform configuration
 
@@ -48,7 +48,7 @@ After running the script, update your Terraform configuration with the secret AR
 
 ```hcl
 # In your environment's variables file (e.g., dev.tfvars)
-google_places_api_key_secret_arn = "arn:aws:secretsmanager:region:account-id:secret:your-secret-name-xxxxxx"
+google_maps_api_key_secret_arn = "arn:aws:secretsmanager:region:account-id:secret:your-secret-name-xxxxxx"
 ```
 
 ### Security Notes

@@ -1,12 +1,13 @@
 """Health check endpoints for the application."""
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from flask import jsonify
 from sqlalchemy import text
 
-from app import db, version
+from app._version import __version__
+from app.extensions import db
 
 from . import bp  # Import the blueprint from __init__.py
 
@@ -32,8 +33,8 @@ def check():
     return jsonify(
         {
             "status": "ok",
-            "version": version,
-            "timestamp": datetime.now(UTC).isoformat(),
+            "version": __version__,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "database": db_status,
         }
     )

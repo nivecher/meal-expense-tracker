@@ -11,8 +11,8 @@ from typing import Any, Dict, List, Tuple
 from flask import Request
 from sqlalchemy import or_, select
 
-from app import db
 from app.expenses.models import Category, Expense
+from app.extensions import db
 from app.restaurants.models import Restaurant
 
 

@@ -4,23 +4,65 @@ This module provides a centralized way to manage database connections,
 initialization, and utilities for the application.
 """
 
+from __future__ import annotations
+
+# Standard library imports
 import logging
 import os
-from typing import Optional
+import sys
+from typing import TYPE_CHECKING, Optional, TypeVar
 
+# Third-party imports
 from flask import Flask, current_app
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm.session import Session as SQLAlchemySession
+
+# Local application imports
+from .extensions import db
+
+if TYPE_CHECKING:
+    from flask.typing import ResponseValue
+    from typing_extensions import TypeAlias
+    from werkzeug.wrappers import Response as WerkzeugResponse
+
+# Type variable for SQLAlchemy models
+T = TypeVar("T")
+
+# Type alias for scoped session
+ScopedSession: TypeAlias = scoped_session[sessionmaker[SQLAlchemySession]]
+
+if TYPE_CHECKING:
+    # Type aliases for better readability
+    FlaskResponse: TypeAlias = ResponseValue | WerkzeugResponse
+
+# Export the db instance for use in other modules
+__all__ = [
+    "db",
+    "get_database_uri",
+    "init_database",
+    "create_tables",
+    "drop_tables",
+    "get_session",
+    "get_engine",
+]
 
 # Initialize logger
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize SQLAlchemy without binding to an app yet
-db = SQLAlchemy()
+engine: Optional[Engine] = None
 
 # Create a thread-local session factory
-Session = scoped_session(sessionmaker(autocommit=False, autoflush=False))
+db_session_factory: ScopedSession = scoped_session(
+    sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=db.engine if db.engine else None,
+        class_=SQLAlchemySession,
+    )
+)
 
 
 def _get_database_path() -> str:
@@ -34,7 +76,7 @@ def _get_database_path() -> str:
     return os.path.join("instance", "meal_expenses.db")
 
 
-def get_database_uri(app: Optional[Flask] = None) -> str:
+def get_database_uri(app: Optional["Flask"] = None) -> str:
     """Get the database URI from environment or use SQLite as default.
 
     Args:
@@ -85,46 +127,46 @@ def get_database_uri(app: Optional[Flask] = None) -> str:
         return "sqlite:///:memory:"
 
 
-def init_database(app: Flask) -> None:
+def init_database(app: "Flask") -> None:
     """Initialize the database with the Flask app.
 
     Args:
-        app: The Flask application instance
+        app: The Flask application instance to initialize with the database
+
+    Raises:
+        RuntimeError: If there's an error initializing the database
     """
-    # Configure SQLAlchemy
-    db_uri = get_database_uri(app)
-    logger.info("Initializing database with URI: %s", db_uri)
+    global engine
 
-    app.config.update(
-        SQLALCHEMY_DATABASE_URI=db_uri,
-        SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        SQLALCHEMY_ENGINE_OPTIONS={
-            "pool_pre_ping": True,
-            "pool_recycle": 300,
-        },
-    )
+    try:
+        # Configure SQLAlchemy
+        app.config.setdefault("SQLALCHEMY_DATABASE_URI", get_database_uri(app))
+        app.config.setdefault("SQLALCHEMY_TRACK_MODIFICATIONS", False)
 
-    # Register teardown for the session first to ensure it's properly registered
-    @app.teardown_appcontext
-    def shutdown_session(exception=None):
-        Session.remove()
-        logger.debug("Database session removed")
+        # Initialize the database with the app
+        db.init_app(app)
 
-    # Initialize SQLAlchemy with the app
-    db.init_app(app)
+        # Create the engine
+        engine = db.engine
 
-    # Configure the session factory to use the app's database
-    with app.app_context():
-        Session.configure(bind=db.engine)
+        # Configure the session factory
+        db_session_factory.configure(bind=engine)
 
-        # Import models to ensure they are registered with SQLAlchemy
-        from .auth import models as auth_models  # noqa: F401
-        from .expenses import models as expense_models  # noqa: F401
-        from .restaurants import models as restaurant_models  # noqa: F401
+        # Create tables only if not running a db command
+        if "db" not in sys.argv:
+            with app.app_context():
+                # Import models to ensure they are registered with SQLAlchemy
+                from .auth import models as auth_models  # noqa: F401
+                from .expenses import models as expense_models  # noqa: F401
+                from .restaurants import models as restaurant_models  # noqa: F401
 
-        # Create tables if they don't exist
-        db.create_all()
-        logger.info("Database tables created/verified")
+                # Tables will be created by Flask-Migrate
+                # db.create_all()
+                logger.info("Database tables managed by Flask-Migrate.")
+
+    except Exception as e:
+        logger.error("Failed to initialize database: %s", e)
+        raise RuntimeError(f"Failed to initialize database: {e}") from e
 
 
 def create_tables() -> None:
@@ -155,19 +197,29 @@ def drop_tables() -> None:
         raise
 
 
-def get_session() -> scoped_session:
+def get_session() -> ScopedSession:
     """Get a scoped database session.
 
     Returns:
-        SQLAlchemy scoped session
+        ScopedSession: A scoped SQLAlchemy session
+
+    Raises:
+        RuntimeError: If the database session factory is not initialized
     """
-    return Session
+    if db_session_factory is None:
+        raise RuntimeError("Database session factory not initialized. Call init_database() first.")
+    return db_session_factory
 
 
 def get_engine() -> Engine:
     """Get the SQLAlchemy engine.
 
     Returns:
-        SQLAlchemy engine
+        Engine: The SQLAlchemy engine instance
+
+    Raises:
+        RuntimeError: If the engine is not initialized
     """
-    return db.engine
+    if engine is None:
+        raise RuntimeError("Database engine not initialized. Call init_database() first.")
+    return engine

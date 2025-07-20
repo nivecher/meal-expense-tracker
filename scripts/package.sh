@@ -165,7 +165,8 @@ package_layer() {
 
   # Create a virtual environment
   local venv_dir="${TEMP_DIR}/venv"
-  python${PYTHON_VERSION} -m venv "${venv_dir}"
+  "python${PYTHON_VERSION}" -m venv "${venv_dir}"
+  # shellcheck source=/dev/null
   source "${venv_dir}/bin/activate"
 
   # Create the Python package directory structure
@@ -225,9 +226,10 @@ package_secret_rotation() {
   local temp_dir="${TEMP_DIR}/secret_rotation"
   echo -e "${YELLOW}[*] Packaging secret rotation lambda...${NC}"
 
-  # Create a virtual environment
-  local venv_dir="${TEMP_DIR}/secret_rotation_venv"
-  python${PYTHON_VERSION} -m venv "${venv_dir}"
+  # Create a virtual environment for the layer
+  local venv_dir="${TEMP_DIR}/layer_venv"
+  "python${PYTHON_VERSION}" -m venv "${venv_dir}"
+  # shellcheck source=/dev/null
   source "${venv_dir}/bin/activate"
 
   # Create directory structure

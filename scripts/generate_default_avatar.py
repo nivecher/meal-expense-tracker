@@ -2,8 +2,9 @@
 """
 Generate a simple default avatar image.
 """
-from PIL import Image, ImageDraw, ImageFont
 import os
+
+from PIL import Image, ImageDraw, ImageFont
 
 
 def generate_avatar():

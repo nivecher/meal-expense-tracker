@@ -1,131 +1,160 @@
 /**
- * Main application entry point
- * Handles dynamic imports and module initialization.
+ * Main application entry point.
+ *
+ * This module serves as the main entry point for the application, handling
+ * initialization of UI components and dynamic loading of page-specific modules.
+ *
+ * @module main
  */
 
-// Import necessary utilities
-import { loadGoogleMapsAPI } from './services/google-maps.service.js';
+import { showErrorToast } from './utils/notifications.js';
 
-// Page modules map - maps URL paths to their corresponding module paths
+/**
+ * Maps URL paths to their corresponding module paths.
+ * @type {Object.<string, string>}
+ */
 const PAGE_MODULES = {
     '/restaurants/add': '/static/js/pages/restaurant-form.js',
     '/restaurants/search': '/static/js/pages/restaurant-search.js',
-    // Add more routes as needed
+    '/expenses/add': '/static/js/pages/expense-form.js',
+    '/expenses': '/static/js/pages/expense-list.js',
+    '/restaurants': '/static/js/pages/restaurant-list.js'
 };
 
-// Initialize the application
-async function init() {
+/**
+ * Initialize global UI components.
+ * Sets up tooltips, popovers, and other UI elements that are used across the application.
+ * @returns {void}
+ */
+function initUI() {
     try {
-        // Initialize UI components
-        initUI();
+        // Initialize tooltips
+        const tooltipTriggerList = Array.from(
+            document.querySelectorAll('[data-bs-toggle="tooltip"]')
+        );
 
-        // Load and initialize the current page module
-        await loadPageModule();
+        tooltipTriggerList.forEach(tooltipEl => {
+            new bootstrap.Tooltip(tooltipEl, {
+                trigger: 'hover focus',
+                boundary: 'viewport'
+            });
+        });
 
+        // Initialize popovers
+        const popoverTriggerList = Array.from(
+            document.querySelectorAll('[data-bs-toggle="popover"]')
+        );
+
+        popoverTriggerList.forEach(popoverEl => {
+            new bootstrap.Popover(popoverEl, {
+                trigger: 'focus',
+                html: true,
+                sanitize: false
+            });
+        });
+
+        // Add smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const target = document.querySelector(targetId);
+
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
     } catch (error) {
-        console.error('Error initializing application:', error);
+        console.error('UI initialization failed:', error);
+        showErrorToast('Failed to initialize UI components.');
     }
 }
 
-// Initialize UI components
-function initUI() {
-    // Initialize tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-
-    // Initialize popovers
-    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-    popoverTriggerList.map(function (popoverTriggerEl) {
-        return new bootstrap.Popover(popoverTriggerEl);
-    });
-
-    // Add smooth scrolling for anchor links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                target.scrollIntoView({
-                    behavior: 'smooth'
-                });
-            }
-        });
-    });
-
-    // Add animation to cards on scroll
-    const animateOnScroll = function() {
-        const cards = document.querySelectorAll('.card, .animate-on-scroll');
-        cards.forEach(card => {
-            const cardTop = card.getBoundingClientRect().top;
-            const windowHeight = window.innerHeight;
-
-            if (cardTop < windowHeight - 100) {
-                card.classList.add('animate__animated', 'animate__fadeInUp');
-            }
-        });
-    };
-
-    // Add scroll event listener
-    window.addEventListener('scroll', animateOnScroll);
-    animateOnScroll(); // Run once on page load
-
-    // Add loading state to buttons with data-loading attribute
-    document.querySelectorAll('[data-loading]').forEach(button => {
-        button.addEventListener('click', function() {
-            this.setAttribute('data-text', this.innerHTML);
-            this.disabled = true;
-            this.innerHTML = `
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                ${this.getAttribute('data-loading')}
-            `;
-        });
-    });
-}
-
-// Load and initialize the current page module
+/**
+ * Load and initialize the appropriate page module based on current URL.
+ * @async
+ * @returns {Promise<void>}
+ */
 async function loadPageModule() {
     const currentPath = window.location.pathname;
-    let modulePath = null;
-
-    // Find the matching module path for the current route
-    for (const [path, module] of Object.entries(PAGE_MODULES)) {
-        if (currentPath.startsWith(path)) {
-            modulePath = module;
-            break;
-        }
-    }
+    const modulePath = PAGE_MODULES[currentPath];
 
     if (!modulePath) {
-        console.log('No specific module found for path:', currentPath);
         return;
     }
 
     try {
-        // Load the module
         const module = await import(modulePath);
-
-        // Initialize the module if it has an init function
         if (typeof module.init === 'function') {
-            console.log('Initializing module:', modulePath);
             await module.init();
         }
-
     } catch (error) {
-        console.error(`Error loading module ${modulePath}:`, error);
+        console.error(`Failed to load module: ${modulePath}`, error);
+        showErrorToast('Failed to load page module. Please refresh the page.');
     }
 }
 
-// Load Google Maps API if needed
-async function loadGoogleMapsIfNeeded() {
-    const needsGoogleMaps = document.querySelector('.needs-google-maps');
-    if (needsGoogleMaps && !window.google) {
-        try {
-            await loadGoogleMapsAPI();
-        } catch (error) {
-            console.error('Failed to load Google Maps API:', error);
-        }
+
+
+/**
+ * Initialize the application.
+ * Sets up UI components and loads the appropriate page module.
+ * @async
+ * @returns {Promise<void>}
+ */
+async function init() {
+    try {
+        initUI();
+        await loadPageModule();
+
+        // Add animation to cards on scroll
+        const animateOnScroll = () => {
+            const cards = document.querySelectorAll('.card, .animate-on-scroll');
+            cards.forEach(card => {
+                const cardTop = card.getBoundingClientRect().top;
+                const windowHeight = window.innerHeight;
+
+                if (cardTop < windowHeight - 100) {
+                    card.classList.add('animate__animated', 'animate__fadeInUp');
+                }
+            });
+        };
+
+        // Add scroll event listener
+        window.addEventListener('scroll', animateOnScroll);
+        animateOnScroll(); // Run once on page load
+
+        // Add loading state to buttons with data-loading attribute
+        document.querySelectorAll('[data-loading]').forEach(button => {
+            button.addEventListener('click', function() {
+                this.setAttribute('data-text', this.innerHTML);
+                this.disabled = true;
+                this.innerHTML = `
+                    <span class="spinner-border spinner-border-sm"
+                          role="status"
+                          aria-hidden="true">
+                    </span>
+                    ${this.getAttribute('data-loading')}
+                `;
+            });
+        });
+
+        // Flash message auto-dismiss
+        const alerts = document.querySelectorAll('.alert-dismissible');
+        alerts.forEach(alert => {
+            setTimeout(() => {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }, 5000); // Auto-dismiss after 5 seconds
+        });
+
+        document.dispatchEvent(new CustomEvent('app:initialized'));
+    } catch (error) {
+        console.error('Application initialization failed:', error);
+        showErrorToast('Failed to initialize application. Please refresh the page.');
     }
 }
 
@@ -136,21 +165,12 @@ if (document.readyState === 'loading') {
     init();
 }
 
-// Flash message auto-dismiss
-document.addEventListener('DOMContentLoaded', function() {
-    const alerts = document.querySelectorAll('.alert-dismissible');
-    alerts.forEach(alert => {
-        setTimeout(() => {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
-        }, 5000); // Auto-dismiss after 5 seconds
-    });
-});
+// Export for testing purposes
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        init,
+        initUI,
+        loadPageModule,
 
-// Export for testing
-export {
-    init,
-    initUI,
-    loadPageModule,
-    loadGoogleMapsIfNeeded
-};
+    };
+}

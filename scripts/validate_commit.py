@@ -1,5 +1,5 @@
-import sys
 import re
+import sys
 
 
 def validate_commit_message(message: str) -> None:

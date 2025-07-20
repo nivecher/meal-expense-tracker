@@ -2,8 +2,8 @@
 """Script to verify database connection and list all tables with row counts."""
 
 import sys
+
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 
 
@@ -17,7 +17,7 @@ def main():
 
         # Test connection
         with engine.connect() as conn:
-            result = conn.execute(text("SELECT 1"))
+            conn.execute(text("SELECT 1"))
             print("✓ Successfully connected to the database")
 
             # Get database info
@@ -26,13 +26,22 @@ def main():
 
             print("\nTables in database:")
             for table in tables:
-                # Get row count for each table
-                count = conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
-                print(f"- {table}: {count} rows")
+                # Get row count for each table using parameterized query
+                try:
+                    # First verify the table name is valid
+                    if not inspector.has_table(table):
+                        print(f"- {table}: Table not found")
+                        continue
 
-                # Show columns for each table
-                columns = inspector.get_columns(table)
-                print(f"  Columns: {', '.join(col['name'] for col in columns)}")
+                    # Get row count safely using SQLAlchemy's text() with parameters
+                    count = conn.execute(text("SELECT COUNT(*) FROM :table"), {"table": table}).scalar()
+                    print(f"- {table}: {count} rows")
+
+                    # Show columns for each table
+                    columns = inspector.get_columns(table)
+                    print(f"  Columns: {', '.join(col['name'] for col in columns)}")
+                except Exception as e:
+                    print(f"- {table}: Error - {str(e)}")
 
             # Check if migrations table exists and is up to date
             if "alembic_version" in tables:
@@ -44,11 +53,11 @@ def main():
         return 0
 
     except SQLAlchemyError as e:
-        print(f"\n❌ Database connection failed:")
+        print("\n❌ Database connection failed:")
         print(str(e))
         return 1
     except Exception as e:
-        print(f"\n❌ An error occurred:")
+        print("\n❌ An error occurred:")
         print(str(e))
         return 1
 

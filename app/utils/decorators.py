@@ -2,7 +2,7 @@
 
 # Standard library imports
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Any, Callable, TypeVar, cast
 
 # Third-party imports
 from flask import flash, jsonify, redirect, request, url_for
@@ -14,8 +14,8 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def db_transaction(
-    success_message: Optional[str] = None,
-    error_message: Optional[str] = "An error occurred. Please try again.",
+    success_message: str = "",
+    error_message: str = "An error occurred. Please try again.",
 ) -> Callable[[F], F]:
     """Decorator to handle database transactions with success/error messages.
 
@@ -32,7 +32,7 @@ def db_transaction(
         def wrapper(*args: Any, **kwargs: Any) -> ResponseReturnValue:
             from flask import current_app
 
-            from app import db
+            from app.extensions import db
 
             try:
                 result = func(*args, **kwargs)

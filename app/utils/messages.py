@@ -44,8 +44,8 @@ class FlashMessages:
     REGISTRATION_ERROR = "An error occurred during registration. Please try again."
     EMAIL_ALREADY_EXISTS = "An account with this email already exists."
     INVALID_TOKEN = "Invalid or expired token."
-    PASSWORD_RESET_SENT = "Password reset instructions have been sent to your email."
-    PASSWORD_RESET = "Your password has been reset. You can now log in with your new password."
+    PASSWORD_RESET_SENT = "If an account exists with this email, password reset instructions have been sent."
+    PASSWORD_RESET = "Your password has been successfully reset. Please log in with your new credentials."
 
     # Additional messages for test compatibility
     FIELDS_REQUIRED = "Please fill out all fields."
@@ -53,3 +53,5 @@ class FlashMessages:
     WELCOME_BACK = "Welcome back!"
     ADD_EXPENSE = "Add Expense"
     ERROR_CREATING_USER = "Error creating user:"
+    PASSWORDS_DONT_MATCH = "Passwords do not match."
+    CANNOT_DELETE_WITH_EXPENSES = "Cannot delete a restaurant with associated expenses."

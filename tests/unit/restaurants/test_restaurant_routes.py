@@ -87,7 +87,8 @@ def test_delete_restaurant(client, auth, test_restaurant, session):
     auth.login("testuser_1", "testpass")
 
     response = client.post(
-        url_for("restaurants.delete_restaurant", restaurant_id=test_restaurant.id), follow_redirects=True
+        url_for("restaurants.delete_restaurant", restaurant_id=test_restaurant.id),
+        follow_redirects=True,
     )
 
     assert response.status_code == 200
@@ -106,8 +107,24 @@ def test_import_restaurants_csv(client, auth, session):
     # Create a test CSV file
     csv_data = [
         ["name", "city", "address", "phone", "website", "cuisine", "postal_code"],
-        ["CSV Restaurant 1", "Test City", "123 Test St", "123-456-7890", "http://test1.com", "Italian", "12345"],
-        ["CSV Restaurant 2", "Test City", "456 Test Ave", "987-654-3210", "http://test2.com", "Mexican", "54321"],
+        [
+            "CSV Restaurant 1",
+            "Test City",
+            "123 Test St",
+            "123-456-7890",
+            "http://test1.com",
+            "Italian",
+            "12345",
+        ],
+        [
+            "CSV Restaurant 2",
+            "Test City",
+            "456 Test Ave",
+            "987-654-3210",
+            "http://test2.com",
+            "Mexican",
+            "54321",
+        ],
     ]
 
     # Create a file-like object
@@ -203,10 +220,22 @@ def test_unauthorized_access(client, test_restaurant):
         (url_for("restaurants.list_restaurants"), "GET"),
         (url_for("restaurants.add_restaurant"), "GET"),
         (url_for("restaurants.add_restaurant"), "POST"),
-        (url_for("restaurants.restaurant_details", restaurant_id=test_restaurant.id), "GET"),
-        (url_for("restaurants.edit_restaurant", restaurant_id=test_restaurant.id), "GET"),
-        (url_for("restaurants.edit_restaurant", restaurant_id=test_restaurant.id), "POST"),
-        (url_for("restaurants.delete_restaurant", restaurant_id=test_restaurant.id), "POST"),
+        (
+            url_for("restaurants.restaurant_details", restaurant_id=test_restaurant.id),
+            "GET",
+        ),
+        (
+            url_for("restaurants.edit_restaurant", restaurant_id=test_restaurant.id),
+            "GET",
+        ),
+        (
+            url_for("restaurants.edit_restaurant", restaurant_id=test_restaurant.id),
+            "POST",
+        ),
+        (
+            url_for("restaurants.delete_restaurant", restaurant_id=test_restaurant.id),
+            "POST",
+        ),
         (url_for("restaurants.import_restaurants"), "GET"),
         (url_for("restaurants.import_restaurants"), "POST"),
         (url_for("restaurants.export_restaurants"), "GET"),
@@ -261,7 +290,10 @@ def test_get_place_details_invalid_id(client, auth):
     with patch("app.restaurants.routes.requests.get") as mock_get:
         # Simulate API error
         mock_get.return_value.ok = False
-        mock_get.return_value.json.return_value = {"error_message": "Invalid request", "status": "INVALID_REQUEST"}
+        mock_get.return_value.json.return_value = {
+            "error_message": "Invalid request",
+            "status": "INVALID_REQUEST",
+        }
 
         response = client.get(url_for("restaurants.get_place_details", place_id="invalid_id"))
 

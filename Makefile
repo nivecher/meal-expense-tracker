@@ -1,24 +1,56 @@
+# =============================================================================
 # Meal Expense Tracker - Makefile
-# =============================
+# =============================================================================
 #
 # Available commands (run 'make help' for details):
-#   Development:   setup, run, test, lint, format, db-*
-#   Docker:       docker-{build,run,stop,logs,clean}
-#   Terraform:    tf-{init,plan,apply,destroy,validate,fmt,backend}
-#   Deployment:   deploy-{dev,staging,prod}
-#   Dependencies: requirements, {add,remove,list,show}-reqs
-#   Testing:      test, load-test
-#   Utilities:    help, clean, check-infra
+#   Development:   setup, run, test, lint, format, check, pre-commit
+#   Database:      db-{init,migrate,upgrade,downgrade}
+#   Docker:        docker-{up,down,logs,shell,rebuild}
+#   Testing:       test, test-unit, test-integration, test-smoke
+#   Terraform:     tf-{init,plan,apply,destroy,validate}
+#   Documentation: docs, docs-serve
+#   Utilities:     help, clean, distclean, check-env
+# =============================================================================
 
-# =======================
+# =============================================================================
 # Configuration
-# =======================
+# =============================================================================
 
 # Application settings
 APP_NAME = meal-expense-tracker
-PORT = 5000
-PYTHON = python3
+PORT = 5001
+PYTHON = python3.13
 PIP = pip3
+
+# Python settings
+PYTHONPATH = $(shell pwd)
+FLASK_APP = wsgi:app
+FLASK_ENV = development
+PYTEST_OPTS = -v --cov=app --cov-report=term-missing --cov-report=html
+TEST_PATH = tests/
+
+# Docker settings
+DOCKER_COMPOSE = docker-compose -f docker-compose.yml
+DOCKER_COMPOSE_DEV = $(DOCKER_COMPOSE) -f docker-compose.dev.yml
+CONTAINER_NAME = $(APP_NAME)-app
+IMAGE_NAME = $(APP_NAME)
+VOLUME_NAME = $(APP_NAME)-db
+
+# Terraform settings
+ENV ?= dev
+TF_ENV ?= $(ENV)
+TF_CMD = cd terraform && make ENV=$(TF_ENV)
+TF_PARALLELISM ?= 30
+TF_ARGS ?= -parallelism=$(TF_PARALLELISM) -refresh=true
+
+# GitHub settings
+GITHUB_ORG ?= nivecher
+REPO_NAME ?= meal-expense-tracker
+
+# Enable BuildKit for better build performance and features
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+export PYTHONPATH
 
 # Docker settings
 CONTAINER_NAME = $(APP_NAME)-app
@@ -60,83 +92,62 @@ venv:
 		echo "Virtual environment already exists. Run 'source venv/bin/activate' to activate."; \
 	fi
 
-# =======================
+# =============================================================================
 # Help
-# =======================
+# =============================================================================
 
-## Display comprehensive help
+## Display help message
 .PHONY: help
-help:
-	@echo "\n\033[1mMeal Expense Tracker - Available Commands:\033[0m"
-
-	@echo "\n\033[1;34mDevelopment:\033[0m"
+help:  ## Show this help message
+	@echo "\n\033[1mMeal Expense Tracker - Available Commands\033[0m\n"
+	@echo "\033[1mDevelopment:\033[0m"
 	@echo "  \033[1mmake setup\033[0m           Install development dependencies"
 	@echo "  \033[1mmake run\033[0m             Run the application locally"
-	@echo "  \033[1mmake test\033[0m            Run tests"
-	@echo "  \033[1mmake lint\033[0m            Run linters (flake8, black in check mode)"
 	@echo "  \033[1mmake format\033[0m          Format code with black and autoflake"
-	@echo "  \033[1mmake check-infra\033[0m     Validate Terraform configuration"
+	@echo "  \033[1mmake lint\033[0m            Run linters (flake8, black, mypy)"
+	@echo "  \033[1mmake check\033[0m           Run all checks (lint + test)"
+	@echo "  \033[1mmake pre-commit\033[0m      Run pre-commit checks (format + lint + test)"
 
-	@echo "\n\033[1;34mDatabase:\033[0m"
+	@echo "\n\033[1mDatabase:\033[0m"
 	@echo "  \033[1mmake db-init\033[0m         Initialize database"
 	@echo "  \033[1mmake db-migrate\033[0m      Create new database migration"
 	@echo "  \033[1mmake db-upgrade\033[0m      Upgrade database to latest migration"
 	@echo "  \033[1mmake db-downgrade\033[0m    Downgrade database by one migration"
 
-	@echo "\n\033[1;34mDocker:\033[0m"
-	@echo "  \033[1mmake docker-build\033[0m    Build Docker image"
-	@echo "  \033[1mmake docker-run\033[0m      Run application in Docker"
-	@echo "  \033[1mmake docker-stop\033[0m     Stop running containers"
+	@echo "\n\033[1mDocker:\033[0m"
+	@echo "  \033[1mmake docker-up\033[0m       Start all containers in detached mode"
+	@echo "  \033[1mmake docker-down\033[0m     Stop and remove all containers"
 	@echo "  \033[1mmake docker-logs\033[0m     View container logs (follow mode)"
-	@echo "  \033[1mmake docker-clean\033[0m    Remove containers, volumes, and images"
-	@echo "  \033[1mmake docker-rebuild\033[0m  Rebuild and run in Docker"
+	@echo "  \033[1mmake docker-shell\033[0m    Open shell in the application container"
+	@echo "  \033[1mmake docker-rebuild\033[0m  Rebuild and restart containers"
 
-	@echo "\n\033[1;34mTerraform (TF_ENV=env, default: dev):\033[0m"
+	@echo "\n\033[1mTesting:\033[0m"
+	@echo "  \033[1mmake test\033[0m            Run all tests with coverage"
+	@echo "  \033[1mmake test-unit\033[0m        Run only unit tests"
+	@echo "  \033[1mmake test-integration\033[0m Run only integration tests"
+	@echo "  \033[1mmake test-smoke\033[0m       Run smoke tests"
+
+	@echo "\n\033[1mTerraform (TF_ENV=env, default: dev):\033[0m"
 	@echo "  \033[1mmake tf-init\033[0m        Initialize Terraform with backend config"
 	@echo "  \033[1mmake tf-plan\033[0m        Generate and show execution plan"
 	@echo "  \033[1mmake tf-apply\033[0m       Apply changes to infrastructure"
 	@echo "  \033[1mmake tf-destroy\033[0m     Destroy infrastructure"
 	@echo "  \033[1mmake tf-validate\033[0m    Validate Terraform configuration"
-	@echo "  \033[1mmake tf-fmt\033[0m         Format Terraform files"
-	@echo "  \033[1mmake setup-tf-backend\033[0m  Provision remote backend & generate configs"
-	@echo "  \033[1mmake destroy-tf-backend [STACK=terraform-backend REGION=us-east-1]\033[0m  Delete backend resources"
 
-	@echo "\n\033[1;34mDeployment:\033[0m"
-	@echo "  \033[1mmake deploy-dev\033[0m      Deploy to development environment"
-	@echo "  \033[1mmake deploy-staging\033[0m  Deploy to staging environment"
-	@echo "  \033[1mmake deploy-prod\033[0m     Deploy to production environment"
-	@echo "  \033[1mmake package-lambda\033[0m  Create Lambda deployment package using package_lambda.sh"
-	@echo "  \033[1mmake deploy-lambda\033[0m   Deploy the Lambda function with the latest package"
+	@echo "\n\033[1mDocumentation:\033[0m"
+	@echo "  \033[1mmake docs\033[0m           Generate API documentation"
+	@echo "  \033[1mmake docs-serve\033[0m      Serve documentation locally"
 
-	@echo "\n\033[1;34mVirtual Environment:\033[0m"
-	@echo "  \033[1mmake venv\033[0m           Create Python virtual environment (if not exists)"
-
-	@echo "\n\033[1;34mDocker (Container Runtime):\033[0m"
-	@echo "  \033[1mmake update-lambda\033[0m   Update Lambda function code with latest package"
-	@echo "  \033[1mmake invoke-lambda\033[0m   Invoke Lambda function with test event"
-
-	@echo "\n\033[1;34mDependencies:\033[0m"
-	@echo "  \033[1mmake requirements\033[0m    Update requirements files"
-	@echo "  \033[1mmake rebuild-reqs\033[0m    Rebuild requirements.txt from requirements.in"
-	@echo "  \033[1mmake add-req PACKAGE=name\033[0m  Add a new package to requirements.in"
-	@echo "  \033[1mmake remove-req PACKAGE=name\033[0m Remove a package from requirements.in"
-	@echo "  \033[1mmake list-reqs\033[0m      List all installed packages"
-	@echo "  \033[1mmake show-deps\033[0m      Show dependency tree"
-	@echo "  \033[1mmake check-reqs\033[0m     Check for dependency conflicts"
-
-	@echo "\n\033[1;34mTesting:\033[0m"
-	@echo "  \033[1mmake test\033[0m            Run all tests"
-	@echo "  \033[1mmake load-test\033[0m        Run load tests (not yet implemented)"
-
-	@echo "\n\033[1;34mUtilities:\033[0m"
+	@echo "\n\033[1mUtilities:\033[0m"
 	@echo "  \033[1mmake clean\033[0m           Remove build artifacts and temporary files"
-	@echo "  \033[1mmake help\033[0m            Show this help message"
+	@echo "  \033[1mmake distclean\033[0m        Remove all generated files including virtual environment"
+	@echo "  \033[1mmake check-env\033[0m        Check development environment setup"
 
-	@echo "\n\033[1;33mExamples:\033[0m"
-	@echo "  \033[1mmake setup && make run\033[0m     # Setup and run locally"
-	@echo "  \033[1mmake docker-rebuild\033[0m        # Rebuild and run in Docker"
-	@echo "  \033[1mmake tf-init TF_ENV=staging\033[0m # Initialize staging environment"
-	@echo "  \033[1mmake deploy-dev\033[0m             # Deploy to development"
+	@echo "\n\033[1mExamples:\033[0m"
+	@echo "  \033[1mmake setup && make run\033[0m        # Setup and run locally"
+	@echo "  \033[1mmake docker-up\033[0m                 # Start application in Docker"
+	@echo "  \033[1mmake test TEST_PATH=tests/unit\033[0m  # Run specific test directory"
+	@echo "  \033[1mmake tf-init TF_ENV=staging\033[0m    # Initialize staging environment"
 
 # =======================
 # Development

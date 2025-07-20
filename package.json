@@ -9,5 +9,8 @@
     "eslint": "^8.0.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.25.0"
+  },
+  "dependencies": {
+    "jscpd": "^4.0.5"
   }
 }

@@ -5,9 +5,10 @@ Script to verify RDS database connection and initialization.
 This script can be used in your deployment pipeline to ensure the database
 is properly configured before deploying the application.
 """
+import logging
 import os
 import sys
-import logging
+
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -22,7 +23,9 @@ def check_database_connection(db_url):
         engine = create_engine(db_url)
         with engine.connect() as conn:
             # Simple query to check connection
-            result = conn.execute("SELECT version();")
+            from sqlalchemy import text
+
+            result = conn.execute(text("SELECT version();"))
             version = result.scalar()
             logger.info("Successfully connected to database. Version: %s", version)
             return True

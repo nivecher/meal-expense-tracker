@@ -14,7 +14,9 @@
         <div class="row mb-3">
             <div class="col-md-6">
                 {{ form.restaurant_id.label(class="form-label") }}
-                {{ form.restaurant_id(class="form-select" + (' is-invalid' if form.restaurant_id.errors else '') ) }}
+                {{ form.restaurant_id(class_="form-select" + (' is-invalid' if form.restaurant_id.errors else '') ,
+                **({'data-restaurant-id': expense.restaurant_id} if expense and expense.restaurant_id else {})
+                ) }}
                 {% if form.restaurant_id.errors %}<div class="invalid-feedback">{{ form.restaurant_id.errors[0] }}</div>{% endif %}
                 <div class="form-text">
                     <a href="{{ url_for("restaurants.add_restaurant") }}" target="_blank">Add a new restaurant</a>
@@ -22,11 +24,12 @@
             </div>
             <div class="col-md-6">
                 {{ form.date.label(class="form-label") }}
+                {% set default_date = form.date.data.strftime('%Y-%m-%d') if form.date.data else '' %}
                 <input type="date"
                        id="{{ form.date.id }}"
                        name="{{ form.date.name }}"
                        class="form-control{{ ' is-invalid' if form.date.errors else '' }}"
-                       value="{{ form.date.data.strftime("%Y-%m-%d") if form.date.data else '' }}"
+                       value="{{ default_date }}"
                        required>
                 {% if form.date.errors %}<div class="invalid-feedback">{{ form.date.errors[0] }}</div>{% endif %}
             </div>
@@ -36,19 +39,19 @@
                 {{ form.amount.label(class="form-label") }}
                 <div class="input-group">
                     <span class="input-group-text">$</span>
-                    {{ form.amount(class="form-control" + (' is-invalid' if form.amount.errors else '') , step="0.01", min="0.01") }}
+                    {{ form.amount(class_="form-control" + (' is-invalid' if form.amount.errors else '') ,
+                    placeholder="0.00",
+                    step="0.01",
+                    min="0.01",
+                    value=form.amount.data|string if form.amount.data is not none else ''
+                    ) }}
                 </div>
                 {% if form.amount.errors %}<div class="invalid-feedback d-block">{{ form.amount.errors[0] }}</div>{% endif %}
             </div>
             <div class="col-md-6">
-                <label for="meal_type" class="form-label">Meal Type (Optional)</label>
-                <select class="form-select" id="meal_type" name="meal_type">
-                    <option value="">Select a meal type (optional)</option>
-                    {% for mt in ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Groceries', 'Other'] %}
-                        <option value="{{ mt }}"
-                                {% if form and form.meal_type.data == mt %}selected{% endif %}>{{ mt }}</option>
-                    {% endfor %}
-                </select>
+                {{ form.meal_type.label(class="form-label") }}
+                {{ form.meal_type(class="form-select" + (' is-invalid' if form.meal_type.errors else '') ) }}
+                {% if form.meal_type.errors %}<div class="invalid-feedback">{{ form.meal_type.errors[0] }}</div>{% endif %}
             </div>
         </div>
         <div class="row mb-3">

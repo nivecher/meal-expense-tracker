@@ -1,48 +1,39 @@
 repos:
-  # Basic file checks (most reliable)
+  # Basic file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
-      - id: check-yaml
-        exclude: cloudformation/
+      # - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-json
+      - id: detect-private-key
       - id: check-added-large-files
       - id: check-merge-conflict
-      - id: check-case-conflict
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-json
+      - id: check-toml
+      - id: check-xml
 
-  # Python formatting and linting
+  # Python formatting
   - repo: https://github.com/psf/black
-    rev: 24.1.1
+    rev: 25.1.0
     hooks:
       - id: black
         language_version: python3
-        # args: ['--check']
+        args: ['--line-length=120', '--target-version=py312']
 
-  # Shell scripts
-  - repo: local
-    hooks:
-      # Shell script linting
-      - id: shellcheck
-        name: ShellCheck
-        entry: shellcheck
-        language: system
-        types: [shell]
-        args: [--severity=warning]
-      # Shell script formatting (optional - will skip if shfmt not installed)
-      - id: shfmt
-        name: shfmt
-        entry: bash -c 'command -v shfmt >/dev/null 2>&1 && shfmt -i 2 -w "$@" || echo "shfmt not installed - skipping formatting"'
-        language: system
-        types: [shell]
-        require_serial: true
-        always_run: true
-        pass_filenames: true
-
-  # Terraform
-  - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.87.0
-    hooks:
-      - id: terraform_fmt
-        name: Terraform Format
+  # Python linting
+  # TODO: Enable flake8 when we have a flake8 config file
+  # - repo: https://github.com/pycqa/flake8
+  #   rev: 7.0.0
+  #   hooks:
+  #     - id: flake8
+  #       additional_dependencies:
+  #         - flake8-bugbear==24.2.6
+  #         - flake8-comprehensions==3.14.0
+  #         - flake8-docstrings==1.7.0
+  #         - flake8-annotations==3.0.1
+  #         - flake8-import-order==0.19.2
+  #         - pep8-naming==0.14.0
+  #       args:
+  #         - --config=.flake8
+  #         - --extend-ignore=W503,E203

@@ -2,27 +2,62 @@
  * Handles form submission for expense forms using Fetch API
  */
 
-document.addEventListener('DOMContentLoaded', () => {
+/**
+ * Initialize the expense form
+ */
+function initializeExpenseForm() {
     const form = document.getElementById('expenseForm');
     if (!form) return;
 
+    // Set up form submission handler
     form.addEventListener('submit', handleFormSubmit);
-});
+
+    // Check if we're editing an existing expense
+    const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
+    if (restaurantSelect) {
+        // If there's a data-restaurant-id attribute, use it to set the selected option
+        const restaurantId = restaurantSelect.dataset.restaurantId;
+        if (restaurantId) {
+            const optionToSelect = restaurantSelect.querySelector(`option[value="${restaurantId}"]`);
+            if (optionToSelect) {
+                optionToSelect.selected = true;
+                console.log('Set selected restaurant:', restaurantId);
+            } else {
+                console.warn('Could not find restaurant option with value:', restaurantId);
+            }
+        }
+    }
+}
+
+// Initialize the form when the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', initializeExpenseForm);
 
 /**
  * Handle form submission with Fetch API
  * @param {Event} event - The form submission event
  */
+/**
+ * Validate form data before submission
+ * @param {FormData} formData - The form data to validate
+ * @returns {Object|null} Validation errors or null if valid
+ */
 function validateFormData(formData) {
     const errors = {};
-    // Make category_id optional by removing it from required fields
     const requiredFields = ['amount', 'restaurant_id', 'date'];
 
     requiredFields.forEach(field => {
         const value = formData.get(field);
         console.log(`Validating ${field}:`, value);
 
-        if (!value || (typeof value === 'string' && value.trim() === '')) {
+        // Special handling for restaurant_id which should be a number > 0
+        if (field === 'restaurant_id') {
+            const restaurantId = parseInt(value, 10);
+            if (isNaN(restaurantId) || restaurantId <= 0) {
+                errors[field] = ['Please select a valid restaurant'];
+            }
+        }
+        // Standard required field validation
+        else if (!value || (typeof value === 'string' && value.trim() === '')) {
             const fieldName = field.replace(/_/g, ' ');
             errors[field] = [`Please enter a valid ${fieldName}`];
         }
@@ -46,11 +81,18 @@ function validateFormData(formData) {
 
 async function handleFormSubmit(event) {
     event.preventDefault();
+    console.log('Form submission started');
 
     const form = event.target;
     const formData = new FormData(form);
     const submitButton = form.querySelector('button[type="submit"]');
     const originalButtonText = submitButton?.innerHTML;
+    const alertContainer = document.getElementById('alert-container');
+
+    // Clear previous errors
+    if (alertContainer) {
+        alertContainer.innerHTML = '';
+    }
 
     // Client-side validation
     const validationErrors = validateFormData(formData);
@@ -68,38 +110,42 @@ async function handleFormSubmit(event) {
             submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
         }
 
-        // Ensure all form fields are included in the FormData
-        const formElements = form.elements;
-        for (let i = 0; i < formElements.length; i++) {
-            const element = formElements[i];
-            if (element.name && !formData.has(element.name)) {
-                formData.append(element.name, element.value);
-            }
-        }
+        // Log the form data
+        console.log('Submitting form data:', Object.fromEntries(formData.entries()));
 
-        // Log form data for debugging
+        // Get CSRF token from the form
+        const csrfToken = document.querySelector('input[name="csrf_token"]')?.value;
+
+        // Ensure all form data is properly formatted
         const formDataObj = {};
         for (let [key, value] of formData.entries()) {
             formDataObj[key] = value;
         }
-        console.log('Submitting form data:', formDataObj);
 
-        // Get CSRF token from the form
-        const csrfToken = document.querySelector('input[name="csrf_token"]')?.value ||
-                         document.querySelector('meta[name="csrf-token"]')?.content ||
-                         '';
-
-        // Ensure CSRF token is included in the form data
+        // Add CSRF token if not already in form
         if (csrfToken && !formData.has('csrf_token')) {
             formData.append('csrf_token', csrfToken);
+            formDataObj['csrf_token'] = csrfToken;
         }
+
+        // Log the form data being sent
+        console.log('Form data being sent:', formDataObj);
+
+        // Log the request details
+        console.log('Sending request to:', form.action);
+        console.log('Request method:', 'POST');
+        console.log('Request headers:', {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+        });
 
         const response = await fetch(form.action, {
             method: 'POST',
             body: formData,
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': csrfToken
+                'Accept': 'application/json',
+                'X-CSRF-Token': csrfToken
             },
             credentials: 'same-origin'  // Important for including cookies
         });

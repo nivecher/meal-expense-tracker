@@ -1,4 +1,4 @@
-{% extends "main/base.html" %}
+{% extends "base_auth.html" %}
 {% block title %}
     Register
 {% endblock title %}
@@ -11,52 +11,29 @@
                         <h4 class="card-title mb-0">Register</h4>
                     </div>
                     <div class="card-body">
-                        {% with messages = get_flashed_messages(with_categories=true) %}
-                            {% if messages %}
-                                {% for category, message in messages %}
-                                    <div class="alert alert-{{ category }} alert-dismissible fade show">
-                                        {{ message }}
-                                        <button type="button"
-                                                class="btn-close"
-                                                data-bs-dismiss="alert"
-                                                aria-label="Close"></button>
-                                    </div>
-                                {% endfor %}
-                            {% endif %}
-                        {% endwith %}
                         <form method="post" novalidate>
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            {{ form.hidden_tag() }}
                             <div class="mb-3">
-                                <label for="username" class="form-label">Username</label>
-                                <input type="text"
-                                       class="form-control"
-                                       id="username"
-                                       name="username"
-                                       required>
+                                {{ form.username.label(class="form-label") }}
+                                {{ form.username(class="form-control") }}
+                                {% for error in form.username.errors %}<span class="text-danger">{{ error }}</span>{% endfor %}
                             </div>
                             <div class="mb-3">
-                                <label for="password" class="form-label">Password</label>
-                                <input type="password"
-                                       class="form-control"
-                                       id="password"
-                                       name="password"
-                                       required
-                                       minlength="8"
-                                       pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}"
-                                       title="Must contain at least one number, one uppercase and lowercase letter, and at least 8 or more characters">
-                                <div class="form-text">Password must be at least 8 characters long and include uppercase, lowercase, and numbers.</div>
+                                {{ form.email.label(class="form-label") }}
+                                {{ form.email(class="form-control") }}
+                                {% for error in form.email.errors %}<span class="text-danger">{{ error }}</span>{% endfor %}
                             </div>
                             <div class="mb-3">
-                                <label for="confirm_password" class="form-label">Confirm Password</label>
-                                <input type="password"
-                                       class="form-control"
-                                       id="confirm_password"
-                                       name="confirm_password"
-                                       required>
+                                {{ form.password.label(class="form-label") }}
+                                {{ form.password(class="form-control") }}
+                                {% for error in form.password.errors %}<span class="text-danger">{{ error }}</span>{% endfor %}
                             </div>
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-primary w-100">Register</button>
+                            <div class="mb-3">
+                                {{ form.password2.label(class="form-label") }}
+                                {{ form.password2(class="form-control") }}
+                                {% for error in form.password2.errors %}<span class="text-danger">{{ error }}</span>{% endfor %}
                             </div>
+                            <div class="d-grid">{{ form.submit(class="btn btn-primary w-100") }}</div>
                         </form>
                         <div class="mt-3 text-center">
                             <p class="mb-0">

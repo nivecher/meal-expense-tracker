@@ -2,8 +2,10 @@
 
 from datetime import datetime, timezone
 
+from flask import Flask
 
-def time_ago(dt):
+
+def time_ago(dt: datetime) -> str:
     """Return a string representing time since the given datetime.
 
     Args:
@@ -36,7 +38,7 @@ def time_ago(dt):
     return "just now"
 
 
-def init_app(app):
+def init_app(app: Flask):
     """Register the filter with the Flask app.
 
     Args:

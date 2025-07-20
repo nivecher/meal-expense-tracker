@@ -1,0 +1,57 @@
+/* Table Styles */
+
+/* Sortable table headers */
+th[data-sort="true"] {
+    position: relative;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+th[data-sort="true"]:hover,
+th[data-sort="true"]:focus {
+    background-color: #f1f3f5;
+    outline: none;
+}
+
+th[data-sort="true"] .sort-indicator {
+    display: inline-block;
+    width: 1em;
+    text-align: center;
+    color: #6c757d;
+    transition: transform 0.2s ease;
+}
+
+th[data-sort="true"]:focus .sort-indicator,
+th[data-sort="true"]:hover .sort-indicator {
+    color: #0d6efd;
+}
+
+/* Responsive table */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Hover effect for table rows */
+.table-hover tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+/* Ensure table cells have proper spacing */
+.table td, .table th {
+    vertical-align: middle;
+    padding: 0.75rem;
+}
+
+/* Style for the active sort column */
+th[aria-sort] {
+    background-color: #e9ecef;
+}
+
+th[aria-sort="ascending"] .sort-indicator::before {
+    content: "↑";
+}
+
+th[aria-sort="descending"] .sort-indicator::before {
+    content: "↓";
+}

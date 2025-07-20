@@ -6,11 +6,12 @@ on AWS.
 """
 
 import argparse
-import boto3
 import json
 import logging
 import sys
 from pathlib import Path
+
+import boto3
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent

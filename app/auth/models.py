@@ -1,68 +1,222 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from flask_login import UserMixin
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import event
+from sqlalchemy.orm import Mapped, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db
+from app.models.base import BaseModel
 
 if TYPE_CHECKING:
-    from app.expenses.models import Expense
+    from app.expenses.models import Category, Expense
     from app.restaurants.models import Restaurant
 
 
-class User(UserMixin, db.Model):
+class User(BaseModel, UserMixin):
+    """User model for authentication and authorization.
+
+    Attributes:
+        username: Unique username for the user
+        email: Unique email address for the user
+        password_hash: Hashed password (never store plaintext passwords!)
+        is_active: Whether the user account is active
+        is_admin: Whether the user has admin privileges
+    """
+
     __tablename__ = "user"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    password_hash: Mapped[Optional[str]] = mapped_column(String(256))
+    # Override the default id to match the existing schema
+    id: Mapped[int] = db.Column(db.Integer, primary_key=True, comment="Primary key for the user")
+
+    # User authentication information
+    username: Mapped[str] = db.Column(
+        db.String(64),
+        unique=True,
+        nullable=False,
+        index=True,
+        comment="Unique username",
+    )
+    email: Mapped[str] = db.Column(
+        db.String(120),
+        unique=True,
+        nullable=False,
+        index=True,
+        comment="User's email address",
+    )
+    password_hash: Mapped[Optional[str]] = db.Column(db.String(256), nullable=True, comment="Hashed password")
+
+    # User status flags
+    is_active: Mapped[bool] = db.Column(
+        db.Boolean,
+        default=True,
+        nullable=False,
+        comment="Whether the user account is active",
+    )
+    is_admin: Mapped[bool] = db.Column(
+        db.Boolean,
+        default=False,
+        nullable=False,
+        comment="Whether the user has admin privileges",
+    )
 
     # Relationships
-    expenses: Mapped[List["Expense"]] = relationship("Expense", back_populates="user", lazy="dynamic")
-    restaurants: Mapped[List["Restaurant"]] = relationship("Restaurant", back_populates="user", lazy="dynamic")
+    expenses: Mapped[List["Expense"]] = relationship(
+        "Expense",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    restaurants: Mapped[List["Restaurant"]] = relationship(
+        "Restaurant",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    categories: Mapped[List["Category"]] = relationship(
+        "Category",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
 
     def set_password(self, password: str) -> None:
         """Set the user's password.
 
         Args:
             password: The plaintext password to hash and store
+
+        Raises:
+            ValueError: If password is empty or None
         """
+        if not password:
+            raise ValueError("Password cannot be empty")
+
         self.password_hash = generate_password_hash(password, method="pbkdf2:sha256", salt_length=16)
 
     def check_password(self, password: str) -> bool:
-        """Verify the password against the stored hash.
+        """Check if the provided password matches the stored hash.
 
         Args:
             password: The plaintext password to verify
 
         Returns:
-            bool: True if password matches, False otherwise
+            bool: True if the password matches, False otherwise
+
+        Note:
+            Returns False if the user has no password set
         """
+        if not self.password_hash or not password:
+            return False
+
         return check_password_hash(self.password_hash, password)
 
+    def get_id(self) -> str:
+        """Return the user ID as a string for Flask-Login."""
+        return str(self.id)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary representation of the user.
+
+        Returns:
+            Dict containing the user data with sensitive fields removed
+        """
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "is_active": self.is_active,
+            "is_admin": self.is_admin,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def to_token_dict(self) -> Dict[str, Any]:
+        """Return a dictionary suitable for JWT token generation.
+
+        Returns:
+            Dict containing minimal user data for token claims
+        """
+        return {
+            "user_id": self.id,
+            "username": self.username,
+            "is_admin": self.is_admin,
+        }
+
     def __repr__(self) -> str:
-        return f"<User {self.username}>"
+        return f"<User(id={self.id}, username='{self.username}')>"
 
 
-def init_login_manager(login_manager_instance) -> None:
+@event.listens_for(User, "before_insert")
+@event.listens_for(User, "before_update")
+def validate_user(mapper, connection, target):
+    """Validate user data before insert/update."""
+    # Ensure username is lowercase
+    if target.username:
+        target.username = target.username.lower().strip()
+
+    # Ensure email is lowercase
+    if target.email:
+        target.email = target.email.lower().strip()
+
+
+def init_login_manager(login_manager) -> None:
     """Initialize the login manager with the user loader.
 
+    This function sets up the user loader callback that Flask-Login uses
+    to reload the user object from the user ID stored in the session.
+
     Args:
-        login_manager_instance: The Flask-Login LoginManager instance
+        login_manager: The Flask-Login LoginManager instance
     """
 
-    @login_manager_instance.user_loader
+    @login_manager.user_loader
     def load_user(user_id: str) -> Optional[User]:
         """Load a user by ID.
 
         Args:
-            user_id: The user ID as a string
+            user_id: The user ID as a string from the session
 
         Returns:
-            Optional[User]: The User instance if found, None otherwise
+            Optional[User]: The User instance if found and active, None otherwise
+
+        Note:
+            Only returns active users. Inactive users are treated as non-existent.
         """
-        return db.session.get(User, int(user_id))
+        if not user_id or not user_id.isdigit():
+            return None
+
+        user = db.session.get(User, int(user_id))
+
+        # Only return the user if they exist and are active
+        if user and user.is_active:
+            return user
+
+        return None
+
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        """Handle unauthorized access attempts.
+
+        Returns:
+            Response: A redirect to the login page for HTML requests,
+                     or a JSON response for API requests
+        """
+        from flask import jsonify, redirect, request, url_for
+
+        # Check if the request accepts HTML
+        if "text/html" in request.accept_mimetypes:
+            return redirect(url_for("auth.login", next=request.url))
+
+        # Default to JSON response for API requests
+        return jsonify({"error": "You must be logged in to access this resource"}), 401
+
+    @login_manager.needs_refresh_handler
+    def refresh_needed() -> tuple[dict[str, str], int]:
+        """Handle session refresh requirements."""
+        return {"error": "Session expired, please log in again"}, 401

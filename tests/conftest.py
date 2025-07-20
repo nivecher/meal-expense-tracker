@@ -1,164 +1,395 @@
+"""Pytest configuration and fixtures for the test suite."""
+
 import os
+import sys
 import uuid
-from datetime import datetime
-from typing import Generator
+from datetime import datetime, timezone
+from decimal import Decimal
+from pathlib import Path
+from typing import Generator, Optional, TypeVar
 
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient, FlaskCliRunner
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
-from app import create_app, db
-from app.auth.models import User
-from app.expenses.models import Category, Expense
-from app.restaurants.models import Restaurant
-from config import TestingConfig
+# Add the project root to the Python path first to avoid import issues
+project_root = str(Path(__file__).parent.parent)
+sys.path.insert(0, project_root)
+
+# Import application components with proper error handling
+try:
+    from app import create_app  # noqa: E402
+    from app.auth.models import User  # noqa: E402
+    from app.expenses.models import Category, Expense  # noqa: E402
+    from app.extensions import db  # noqa: E402
+    from app.restaurants.models import Restaurant  # noqa: E402
+except ImportError as e:
+    print(f"Error importing application modules: {e}")
+    raise
+
+# Type variable for generic test fixtures
+T = TypeVar("T")
 
 # Set test environment variables
-os.environ["FLASK_ENV"] = "testing"
-os.environ["FLASK_APP"] = "app"
-os.environ["SECRET_KEY"] = "test-secret-key"
-os.environ["DATABASE_URL"] = "sqlite:///:memory:?check_same_thread=False"
+os.environ.update(
+    {
+        "FLASK_ENV": "testing",
+        "FLASK_APP": "app",
+        "FLASK_CONFIG": "testing",
+        "SECRET_KEY": "test-secret-key",
+        "DATABASE_URL": "sqlite:///:memory:",
+        "TESTING": "True",
+        "WTF_CSRF_ENABLED": "False",
+    }
+)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def app() -> Generator[Flask, None, None]:
     """Create and configure a new app instance for testing."""
     # Create app with testing config
-    app = create_app(TestingConfig)
-    app.testing = True
+    app = create_app("testing")
 
-    # Configure test settings
-    app.config["TESTING"] = True
-    app.config["WTF_CSRF_ENABLED"] = False  # Disable CSRF for testing
-    app.config["WTF_CSRF_CHECK_DEFAULT"] = False
+    # Configure the test app with in-memory SQLite
+    app.config.update(
+        TESTING=True,
+        WTF_CSRF_ENABLED=False,
+        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        SECRET_KEY="test-secret-key",
+        SERVER_NAME="localhost",
+        PREFERRED_URL_SCHEME="http",
+        APPLICATION_ROOT="/",
+    )
 
-    # Create a test client that handles CSRF tokens properly
+    # Set engine options separately
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True, "pool_recycle": 300}
+
+    # Initialize template filters
+    from app.template_filters import init_app as init_filters
+    from app.utils.filters import init_app as init_utils_filters
+
+    init_filters(app)
+    init_utils_filters(app)
+
+    # Set up test client class with CSRF handling
     class TestClient(FlaskClient):
         def open(self, *args, **kwargs):
-            # Add CSRF token to form data for POST requests
-            if kwargs.get('method') in ('POST', 'PUT', 'PATCH', 'DELETE'):
-                if 'data' in kwargs and isinstance(kwargs['data'], dict):
-                    kwargs['data']['csrf_token'] = 'dummy_csrf_token'
+            # Add CSRF token to all requests
+            if kwargs.get("method") in ("POST", "PUT", "PATCH", "DELETE"):
+                if "data" in kwargs:
+                    if isinstance(kwargs["data"], dict):
+                        kwargs["data"] = {**kwargs["data"], "csrf_token": "dummy_csrf_token"}
+                    elif isinstance(kwargs["data"], str):
+                        kwargs["data"] = f"{kwargs['data']}&csrf_token=dummy_csrf_token"
             return super().open(*args, **kwargs)
-    
-    # Add CSRF token to template context
-    @app.context_processor
-    def inject_csrf_token():
-        return {'csrf_token': lambda: 'dummy_csrf_token'}
 
     app.test_client_class = TestClient
 
+    # Create database schema
     with app.app_context():
         db.create_all()
-        # Initialize default categories if needed
-        if not Category.query.first():
-            db.session.add_all(
-                [
-                    Category(name="Dining", description="Expenses at restaurants, cafes, etc.", color="#FF6347"),
-                    Category(name="Groceries", description="Food purchased from grocery stores", color="#4682B4"),
-                    Category(name="Transport", description="Travel expenses related to meals", color="#32CD32"),
-                    Category(name="Other", description="Miscellaneous meal-related expenses", color="#808080"),
-                ]
-            )
-            db.session.commit()
 
     yield app
 
+    # Clean up
     with app.app_context():
         db.session.remove()
         db.drop_all()
+        db.engine.dispose()
+        db.session.remove()
+
+
+# Type stubs are not needed as we're importing the actual models
+# at the top of the file
 
 
 @pytest.fixture
-def client(app: Flask) -> Generator[FlaskClient, None, None]:
-    """A test client for the app with request context."""
-    with app.test_client() as client:
-        yield client
+def client(app: Flask, _db: scoped_session) -> FlaskClient:
+    """Create a test client for the application with database access.
+
+    This fixture provides a test client that can be used to make requests
+    to the application for testing purposes, with proper database session handling.
+    """
+    # Ensure the database is created and the session is available
+    with app.app_context():
+        db.create_all()
+        db.session.commit()
+
+    # Create the test client
+    test_client = app.test_client()
+    test_client.application.config["TESTING"] = True
+
+    return test_client
 
 
 @pytest.fixture
 def runner(app: Flask) -> FlaskCliRunner:
-    """A test runner for the app's Click commands."""
+    """Create a CLI runner for testing Click commands.
+
+    Args:
+        app: The Flask application fixture.
+
+    Returns:
+        FlaskCliRunner: The CLI test runner.
+    """
     return app.test_cli_runner()
 
 
 @pytest.fixture(scope="function")
-def session(app: Flask) -> Generator[Session, None, None]:
-    """Create a new database session for testing with proper isolation."""
+def _db(app: Flask) -> Generator[scoped_session, None, None]:
+    """Provide a transactional scope around tests.
+
+    This fixture is used by Flask-SQLAlchemy to ensure each test runs in a transaction
+    that's rolled back at the end of the test.
+    """
     with app.app_context():
+        # Start a transaction
         connection = db.engine.connect()
         transaction = connection.begin()
-        session_factory = sessionmaker(bind=connection, expire_on_commit=False)
+
+        # Create a session bound to the connection
+        session_factory = sessionmaker(bind=connection, autocommit=False, autoflush=False, expire_on_commit=False)
         session = scoped_session(session_factory)
 
-        old_session = db.session
-        db.session = session
+        # Override the default session
+        db.session = session  # type: ignore
 
-        yield session
-
-        session.remove()
-        transaction.rollback()
-        connection.close()
-        db.session = old_session
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            # Clean up
+            session.close()
+            transaction.rollback()
+            connection.close()
+            db.session.remove()  # Ensure the session is removed
 
 
 @pytest.fixture
-def auth(client):
-    """Return an object with authentication methods for testing."""
+def session(_db: scoped_session) -> Session:
+    """Create a new database session for testing.
 
-    class AuthActions:
-        def __init__(self, client):
-            self._client = client
+    This fixture provides a session that's bound to the current test's transaction.
+    All database operations will be rolled back after the test completes.
+    """
+    return _db()
 
-        def login(self, username, password):
-            # For testing, we'll set up the session directly instead of going through the login route
-            from app.auth.models import User
 
-            # Get the user by username
+class AuthActions:
+    """Helper class for authentication-related test actions."""
+
+    def __init__(self, client: FlaskClient) -> None:
+        """Initialize with the test client.
+
+        Args:
+            client: The Flask test client.
+        """
+        self._client = client
+        self._app: Optional[Flask] = None
+
+    def _get_app(self) -> Flask:
+        """Get the Flask application instance.
+
+        Returns:
+            The Flask application instance.
+        """
+        if self._app is None:
+            from flask import current_app as flask_current_app
+
+            self._app = flask_current_app._get_current_object()  # type: ignore
+        return self._app
+
+    def login(self, username: str, password: str) -> FlaskClient:
+        """Log in a user for testing.
+
+        Args:
+            username: The username to log in with.
+            password: The password to authenticate with.
+
+        Returns:
+            The test client with an authenticated session.
+
+        Raises:
+            ValueError: If the username or password is invalid.
+        """
+        from app.auth.models import User
+
+        with self._get_app().app_context():
             user = User.query.filter_by(username=username).first()
             if not user or not user.check_password(password):
                 raise ValueError(f"Invalid username or password for test user: {username}")
 
-            # Set up the session directly
             with self._client.session_transaction() as sess:
                 sess["_user_id"] = str(user.id)
                 sess["_fresh"] = True  # Mark session as fresh
                 sess["_id"] = "test-session-id"
 
-            return self._client
+        return self._client
 
-        def logout(self):
-            # Clear the session
-            with self._client.session_transaction() as sess:
-                sess.clear()
-            return self._client
+    def logout(self) -> FlaskClient:
+        """Log out the current user.
 
+        Returns:
+            The test client with cleared session.
+        """
+        with self._client.session_transaction() as sess:
+            sess.clear()
+        return self._client
+
+    def register(self, username: str, password: str, email: Optional[str] = None) -> "User":
+        """Register and log in a new test user.
+
+        Args:
+            username: The username for the new user.
+            password: The password for the new user.
+            email: Optional email for the new user. Defaults to username@example.com.
+
+        Returns:
+            The created User instance.
+        """
+        from app.auth.models import User
+
+        if email is None:
+            email = f"{username}@example.com"
+
+        user = User(username=username, email=email)
+        user.set_password(password)
+
+        with self._get_app().app_context():
+            db.session.add(user)
+            db.session.commit()
+
+        return user
+
+    def create_user(self, username: str, password: str, email: str = "test@example.com") -> "User":
+        """Create a user directly in the database.
+
+        Args:
+            username: The username for the new user.
+            password: The password for the new user.
+            email: The email for the new user. Defaults to test@example.com.
+
+        Returns:
+            The created User instance.
+        """
+        from app.auth.models import User
+
+        user = User(username=username, email=email)
+        user.set_password(password)
+
+        with self._get_app().app_context():
+            db.session.add(user)
+            db.session.commit()
+        return user
+
+
+@pytest.fixture
+def auth(client: FlaskClient) -> AuthActions:
+    """Return an object with authentication methods for testing.
+
+    Args:
+        client: The test client fixture.
+
+    Returns:
+        AuthActions: An instance with authentication helper methods.
+    """
     return AuthActions(client)
 
 
 @pytest.fixture
 def test_user(session: Session) -> User:
-    """Create and return a test user with known credentials."""
+    """Create and return a test user with known credentials.
+
+    Args:
+        session: The database session fixture.
+
+    Returns:
+        User: A test user instance.
+    """
     from app.auth.models import User
 
     username = "testuser_1"
     password = "testpass"  # noqa: S105
+    email = f"{username}@example.com"
 
-    # Check if user already exists
-    user = User.query.filter_by(username=username).first()
-    if not user:
-        user = User(username=username)
-        user.set_password(password)
-        session.add(user)
-        session.commit()  # Ensure the user is committed to the database
-        session.refresh(user)
+    # Delete any existing test user to avoid conflicts
+    session.query(User).filter(User.username == username).delete(synchronize_session=False)
+    session.commit()
+
+    # Create a new test user
+    user = User(username=username, email=email)
+    user.set_password(password)  # noqa: S106
+
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    # Verify the user was created correctly
+    assert user.id is not None
+    assert user.check_password(password)
+
+    return user
+
+
+@pytest.fixture
+def test_user2(session: Session) -> User:
+    """Create and return a second test user for testing access control.
+
+    Args:
+        session: The database session fixture.
+
+    Returns:
+        User: A second test user instance.
+    """
+    from app.auth.models import User
+
+    username = "testuser_2"
+    password = "testpass2"  # Different password than testuser_1
+    email = f"{username}@example.com"
+
+    # Delete any existing test user to avoid conflicts
+    session.query(User).filter(User.username == username).delete(synchronize_session=False)
+    session.commit()
+
+    # Create a new test user
+    user = User(username=username, email=email)
+    user.set_password(password)
+
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    # Verify the user was created correctly
+    assert user.id is not None
+    assert user.check_password(password)
+
     return user
 
 
 @pytest.fixture
 def test_restaurant(session: Session, test_user: User) -> Restaurant:
-    """Create and return a test restaurant."""
+    """Create and return a test restaurant.
+
+    Args:
+        session: The database session fixture.
+        test_user: The test user who owns the restaurant.
+
+    Returns:
+        Restaurant: A test restaurant instance.
+    """
+    from app.restaurants.models import Restaurant
+
+    # Ensure the test user is properly committed
+    session.add(test_user)
+    session.commit()
+    session.refresh(test_user)
+
+    # Create the restaurant with all required fields
     restaurant = Restaurant(
         name=f"Test Restaurant {uuid.uuid4().hex[:8]}",
         address="123 Test St",
@@ -172,24 +403,80 @@ def test_restaurant(session: Session, test_user: User) -> Restaurant:
         type="restaurant",
         cuisine="Test Cuisine",
         price_range="$$",
+        email=f"contact@testrestaurant{uuid.uuid4().hex[:4]}.com",
+        country="United States",
     )
+
+    # Add and commit the restaurant
     session.add(restaurant)
     session.commit()
     session.refresh(restaurant)
+
+    # Ensure the relationship is properly set up
+    if restaurant not in test_user.restaurants:
+        test_user.restaurants.append(restaurant)
+        session.commit()
+        session.refresh(restaurant)
+        session.refresh(test_user)
+
     return restaurant
 
 
 @pytest.fixture
-def test_expense(session: Session, test_user: User, test_restaurant: Restaurant) -> Expense:
-    """Create a test expense."""
+def test_category(session: Session, test_user: User) -> Category:
+    """Create and return a test category.
+
+    Args:
+        session: The database session fixture.
+        test_user: The test user who owns the category.
+
+    Returns:
+        Category: A test category instance.
+    """
+    from app.expenses.models import Category
+
+    # Check if category already exists
+    category = session.query(Category).filter_by(name="Test Category", user_id=test_user.id).first()
+
+    if not category:
+        category = Category(
+            name="Test Category",
+            user_id=test_user.id,
+            description="Test category for expenses",
+            color="#FF0000",
+            is_default=False,
+        )
+        session.add(category)
+        session.commit()
+        session.refresh(category)
+
+    return category
+
+
+@pytest.fixture
+def test_expense(session: Session, test_user: User, test_restaurant: Restaurant, test_category: Category) -> Expense:
+    """Create a test expense.
+
+    Args:
+        session: The database session fixture.
+        test_user: The test user who owns the expense.
+        test_restaurant: The restaurant associated with the expense.
+        test_category: The category for the expense.
+
+    Returns:
+        Expense: A test expense instance.
+    """
+    from app.expenses.models import Expense
+
+    # Create the expense with Decimal amount and timezone-aware datetime
     expense = Expense(
-        amount=10.99,
-        date=datetime.utcnow().date(),
+        amount=Decimal("10.99"),
+        date=datetime.now(timezone.utc),
         notes="Test expense",
         user_id=test_user.id,
         restaurant_id=test_restaurant.id,
         meal_type="Lunch",
-        category_id=Category.query.filter_by(name="Dining").first().id,  # Assuming 'Dining' category exists
+        category_id=test_category.id,
     )
     session.add(expense)
     session.commit()
@@ -197,21 +484,4 @@ def test_expense(session: Session, test_user: User, test_restaurant: Restaurant)
     return expense
 
 
-@pytest.fixture(autouse=True, scope="function")
-def clean_database(app):
-    """Clean the database before each test function."""
-    with app.app_context():
-        db.drop_all()
-        db.create_all()
-        # Optionally, re-initialize default categories if needed
-        if not Category.query.first():
-            db.session.add_all(
-                [
-                    Category(name="Dining", description="Expenses at restaurants, cafes, etc.", color="#FF6347"),
-                    Category(name="Groceries", description="Food purchased from grocery stores", color="#4682B4"),
-                    Category(name="Transport", description="Travel expenses related to meals", color="#32CD32"),
-                    Category(name="Other", description="Miscellaneous meal-related expenses", color="#808080"),
-                ]
-            )
-            db.session.commit()
-        yield
+# Remove the clean_database fixture as it's causing issues with the transaction-based testing

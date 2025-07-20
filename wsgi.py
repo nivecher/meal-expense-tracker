@@ -23,6 +23,8 @@ import traceback
 from types import SimpleNamespace
 from typing import Any, Dict, Optional
 
+import awsgi
+
 # Third-party imports
 from flask import Flask
 
@@ -640,7 +642,8 @@ def _handle_awsgi_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]
             environ[key] = value
 
         # Call the WSGI app using a list to store response data
-        response_data = [{}]  # Using a list to store the dict for modification in closure
+        # Using a list to store the dict for modification in closure
+        response_data = [{}]
 
         def start_response(status, response_headers, exc_info=None):
             response_data[0]["statusCode"] = int(status.split()[0])
@@ -749,45 +752,33 @@ def _process_awsgi_request(event: Dict[str, Any], context: Any) -> Dict[str, Any
         return _create_error_response(e, 500, context)
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Lambda function handler for the Meal Expense Tracker API.
+def lambda_handler(event: dict, context: object) -> dict:
+    """AWS Lambda handler for the Flask application."""
+    processed: dict[str, Any] = preprocess_event(event)
+    return awsgi.response(app, processed, context)
 
-    This function serves as the entry point for AWS Lambda. It handles:
-    - API Gateway events (both REST and HTTP APIs)
-    - Direct Lambda invocations for database operations
 
-    Args:
-        event: The event dict containing request data
-        context: The context object provided by AWS Lambda
+def preprocess_event(event: dict) -> dict:
+    """Preprocess the Lambda event to handle different formats."""
+    if "requestContext" in event and "elb" in event["requestContext"]:
+        # This is an ALB event
+        return event
 
-    Returns:
-        dict: Response object for API Gateway
-    """
-    # Initialize context and log the incoming event
-    context = _initialize_context(context)
+    # This is a direct Lambda invocation (e.g., from API Gateway)
+    response_data: Dict[str, Any] = {
+        "method": event.get("httpMethod", "GET"),
+        "path": event.get("path", "/"),
+        "headers": event.get("headers", {}),
+        "queryStringParameters": event.get("queryStringParameters", {}),
+        "body": event.get("body", ""),
+        "isBase64Encoded": event.get("isBase64Encoded", False),
+    }
+    if response_data["body"] is None:
+        response_data["body"] = ""
+    if isinstance(response_data["body"], dict):
+        response_data["body"] = json.dumps(response_data["body"])
 
-    # Log the incoming event (redacting sensitive data)
-    _log_event(event)
-
-    try:
-        # Transform API Gateway v2.0 (HTTP API) events to v1.0 format if needed
-        if event.get("version") == "2.0" or "requestContext" in event and "http" in event.get("requestContext", {}):
-            event = _transform_v2_to_v1_event(event)
-
-        # Ensure httpMethod is present for API Gateway events
-        if "requestContext" in event and "http" in event.get("requestContext", {}):
-            event["httpMethod"] = event["requestContext"]["http"]["method"]
-
-        # Handle AWSGI requests (API Gateway)
-        if "httpMethod" in event or "requestContext" in event:
-            return _process_awsgi_request(event, context)
-
-        # Handle direct Lambda invocations
-        return _handle_event(event, context)
-
-    except Exception as e:
-        logger.error("Unhandled exception in Lambda handler: %s", str(e), exc_info=True)
-        return _create_error_response(e, 500, context)
+    return response_data
 
 
 def main():

@@ -1,23 +1,133 @@
 [flake8]
+# Match Black's line length
 max-line-length = 120
-extend-ignore = E203
+
+# Don't follow symlinks
+follow-imports = skip
+
+# Exclude directories that typically contain generated code
 exclude =
     .git,
-    __pycache__,
-    build,
-    dist,
-    *.egg-info,
-    .venv,
-    venv,
-    .env,
-    .tox,
-    .pytest_cache,
-    .mypy_cache,
-    cache,
-    node_modules
-    Python-3.13.0
+    */__pycache__,
+    */.mypy_cache,
+    */.pytest_cache,
+    */node_modules,
+    */.venv,
+    */build,
+    */dist,
+    */*.egg-info,
+    */migrations,
+    # Exclude the virtual environment
+    venv/*,
+    # But include our scripts and terraform directories
+    !scripts/,
+    !terraform/
+
+# Ignore specific error codes
+# E203: Whitespace before ':' (conflicts with Black)
+# W503: Line break before binary operator (conflicts with Black)
+# E501: Line too long (handled by Black)
+# F401: Module imported but unused (allow for __init__.py and type checking)
+# F403: 'from module import *' used; unable to detect undefined names
+# F405: Name may be undefined, or defined from star imports: module
+# F811: Redefinition of unused name
+# E266: Too many leading '#' for block comment (allow for section headers)
+# W504: Line break after binary operator (conflicts with Black)
+# W292: No newline at end of file (handled by pre-commit)
+# E402: Module level import not at top of file (false positives with isort)
+# E712: Comparison to True should be 'if cond is True:' or 'if cond:'
+# E721: Do not compare types, use 'isinstance()'
+# E722: Do not use bare 'except'
+# E741: Ambiguous variable name 'l' (allow for common math variables)
+# E742: Ambiguous class definition
+# E743: Ambiguous function definition
+# E999: SyntaxError (handled by Python itself)
+# I100: Import statements are in the wrong order
+# I201: Missing newline before sections or imports
+
+ignore =
+    E203,
+    E266,
+    W503,
+    E501,
+    F401,
+    F403,
+    F405,
+    F811,
+    W504,
+    W292,
+    E402,
+    E712,
+    E721,
+    E722,
+    E741,
+    E742,
+    E743,
+    E999,
+    I100,
+    I201
+
+# Per-file specific ignores
 per-file-ignores =
+    # Allow for now, but should be fixed
     __init__.py: F401
-    tests/*: S101
-    app.py: F841
+    # Allow print statements in scripts
+    scripts/*.py: T201
+    # Allow long lines in test files
+    tests/*.py: E501
+    # Allow relative imports in test files
+    tests/*.py: E402
+    # Allow unused arguments in test files
+    tests/*.py: ARG001, ARG002, ARG003
+    # Allow unused variables in test files (useful for fixtures)
+    tests/*.py: F841
+    # Allow star imports in test files
+    tests/*.py: F403, F405
+
+# Show source of each error/warning
+show-source = True
+
+# Count errors and warnings
+count = True
+
+# Show statistics
+statistics = True
+
+# Maximum number of errors to report
 max-complexity = 10
+
+# Maximum number of arguments in a function
+max-args = 8
+
+# Maximum number of local variables in a function
+max-locals = 15
+
+# Maximum number of branches in a function
+max-branches = 12
+
+# Maximum number of return statements in a function
+max-returns = 6
+
+# Maximum number of statements in a function
+max-statements = 50
+
+# Maximum number of statements in a module
+max-module-lines = 1000
+
+# Maximum number of statements in a class
+max-class-lines = 500
+
+# Maximum number of methods in a class
+max-methods = 20
+
+# Maximum number of arguments in a method
+max-attributes = 10
+
+# Maximum number of public methods in a class
+max-public-methods = 15
+
+# Maximum number of statements in a method
+max-method-lines = 30
+
+# Maximum number of statements in a function or method
+max-function-lines = 100

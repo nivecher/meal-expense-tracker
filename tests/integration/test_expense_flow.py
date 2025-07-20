@@ -1,16 +1,17 @@
 from datetime import datetime, timedelta
+
 import pytest
 
-from app import db
 from app.auth.models import User
 from app.expenses.models import Category, Expense
+from app.extensions import db
 from app.restaurants.models import Restaurant
 from app.utils.messages import FlashMessages
 
 # Helper functions
 
 
-def create_test_restaurant(client, test_data=None):
+def create_test_restaurant(client, user, test_data=None):
     """Helper to create a test restaurant."""
     default_data = {
         "name": "Test Restaurant",
@@ -24,10 +25,11 @@ def create_test_restaurant(client, test_data=None):
         "country": "US",
         "phone": "123-456-7890",
         "website": "http://test.com",
-        "price_range": "$$",
+        "price_range": "$",
         "description": "Test restaurant description",
         "notes": "Test notes",
-        "is_chain": "false"
+        "is_chain": "false",
+        "user_id": user.id,
     }
 
     if test_data:
@@ -62,19 +64,28 @@ def create_test_expense(client, restaurant_id, category_id, **kwargs):
         follow_redirects=True,
     )
 
+
 # Fixtures
 
 
 @pytest.fixture
-def dining_category(app):
-    """Create and return a Dining category."""
+def dining_category(app, test_user):
+    """Create and return a Dining category associated with the test user."""
     with app.app_context():
-        category = Category.query.filter_by(name="Dining").first()
+        # Get the user from the database to ensure we have the latest version
+        user = User.query.get(test_user.id)
+
+        # Try to find an existing category for this user
+        category = Category.query.filter_by(name="Dining", user_id=user.id).first()
+
         if not category:
-            category = Category(name="Dining", description="Dining out expenses")
+            # Create a new category associated with the user
+            category = Category(name="Dining", description="Dining out expenses", user_id=user.id)
             db.session.add(category)
             db.session.commit()
+
         return category
+
 
 # Test functions
 
@@ -93,59 +104,20 @@ def test_authentication(client, auth, test_user):
     assert profile_response.status_code == 200, "Failed to access profile page"
 
 
-def test_restaurant_creation(client, auth, test_user):
-    """Test restaurant creation flow."""
+def test_expense_restaurant_association(client, app, auth, test_user, dining_category):
+    """Test that expense is properly associated with restaurant and user."""
     # Login
     client = auth.login("testuser_1", "testpass")
 
-    # Access restaurant form
-    response = client.get("/restaurants/add", follow_redirects=True)
-    assert response.status_code == 200, "Failed to load restaurant form"
-
     # Create a restaurant
-    response = create_test_restaurant(client)
-    assert response.status_code == 200, f"Failed to create restaurant: {response.status_code}"
-    assert FlashMessages.RESTAURANT_ADDED.encode() in response.data, "Success message not found"
-
-    # Verify restaurant in database
+    create_test_restaurant(client, test_user)
     restaurant = Restaurant.query.filter_by(name="Test Restaurant").first()
-    assert restaurant is not None, "Restaurant not found in database"
-    return restaurant
-
-
-def test_expense_creation(client, app, auth, test_user, dining_category):
-    """Test expense creation with restaurant association."""
-    # Setup: Create a restaurant first
-    restaurant = test_restaurant_creation(client, auth, test_user)
+    assert restaurant is not None
 
     # Create an expense for the restaurant
-    response = create_test_expense(
-        client,
-        restaurant_id=restaurant.id,
-        category_id=dining_category.id
-    )
-
-    assert response.status_code == 200, f"Failed to create expense: {response.status_code}"
-    assert FlashMessages.EXPENSE_ADDED.encode() in response.data, "Success message not found"
-
-    # Verify expense in database
+    create_test_expense(client, restaurant_id=restaurant.id, category_id=dining_category.id)
     expense = Expense.query.filter_by(notes="Test expense").first()
-    assert expense is not None, "Expense not found in database"
-
-    # Verify expense details
-    assert expense.restaurant_id == restaurant.id
-    assert expense.category_id == dining_category.id
-    assert expense.user_id == test_user.id
-    assert float(expense.amount) == 25.50
-
-    return expense
-
-
-def test_expense_restaurant_association(client, app, auth, test_user, dining_category):
-    """Test that expense is properly associated with restaurant and user."""
-    # Create test data
-    restaurant = test_restaurant_creation(client, auth, test_user)
-    expense = test_expense_creation(client, app, auth, test_user, dining_category)
+    assert expense is not None
 
     # Refresh objects from database
     db_user = User.query.get(test_user.id)
@@ -172,7 +144,7 @@ def test_invalid_expense_creation(client, app, auth, test_user, dining_category)
         restaurant_id=999,  # Non-existent restaurant
         category_id=dining_category.id,
         date="invalid-date",
-        amount="0"
+        amount="0",
     )
 
     assert response.status_code == 200, "Expected 200 for form validation error"

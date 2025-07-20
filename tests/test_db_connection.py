@@ -4,7 +4,9 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app import create_app, db
+from app import create_app
+from app.extensions import db
+from config import TestingConfig
 
 
 class TestDatabaseConnection(unittest.TestCase):
@@ -12,7 +14,7 @@ class TestDatabaseConnection(unittest.TestCase):
 
     def setUp(self):
         """Set up test environment."""
-        self.app = create_app("testing")
+        self.app = create_app(TestingConfig)
         self.app_context = self.app.app_context()
         self.app_context.push()
         db.create_all()
@@ -42,7 +44,7 @@ class TestDatabaseConnection(unittest.TestCase):
         os.environ["AWS_REGION"] = "us-west-2"
 
         # Create app with test config
-        app = create_app("testing")
+        app = create_app(TestingConfig)
         with app.app_context():
             # Test database connection using SQLAlchemy 2.0's execution API
             try:

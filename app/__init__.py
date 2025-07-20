@@ -1,243 +1,67 @@
-"""
-Application factory for the Meal Expense Tracker Flask application.
-
-This module contains the application factory function that creates and configures
-the Flask application instance for both WSGI and AWS Lambda environments.
-"""
-
 import logging
-from typing import Any, Dict, Optional
+import os
 
-from flask import Flask, jsonify
-from flask_cors import CORS
+from flask import Flask
 
 from config import config
 
-from .database import db, init_database
-from .extensions import login_manager
+from .extensions import init_extensions, jwt
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+__all__ = ["create_app", "jwt"]
 
 
-def get_version() -> str:
-    """Get the application version."""
-    try:
-        from importlib.metadata import version as get_package_version
+def create_app(config_name=None):
+    """Create and configure the Flask application."""
+    if config_name is None:
+        config_name = os.environ.get("FLASK_CONFIG", "default")
 
-        return get_package_version("meal-expense-tracker")
-    except ImportError:
-        # Fallback for development/editable installs
-        try:
-            from setuptools_scm import get_version
-
-            return get_version(fallback_version="0.0.0.dev0")
-        except ImportError:
-            return "0.0.0.dev0"
-
-
-# Version information dictionary used throughout the application
-__version__ = get_version()
-version = {"app": __version__, "api": "v1"}
-
-
-def _configure_logging(app: Flask) -> None:
-    """Configure application logging."""
-    if app.debug:
-        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    else:
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-
-def _configure_extensions(app: Flask) -> None:
-    """Configure Flask extensions and services.
-
-    Args:
-        app: The Flask application instance
-    """
-    logger = logging.getLogger(__name__)
-
-    # Initialize database
-    init_database(app)
-    logger.info("Database initialized")
-
-    # Import models to ensure they are registered with SQLAlchemy
-    from .auth import models as _  # noqa: F401
-
-    # Initialize Flask-Migrate
-    from .extensions import migrate, csrf
-
-    migrate.init_app(app, db)
-    logger.info("Flask-Migrate initialized")
-
-    # Initialize CSRF protection
-    csrf.init_app(app)
-    logger.info("CSRF protection initialized")
-
-    # Initialize login manager
-    login_manager.init_app(app)
-    login_manager.login_view = "auth.login"
-    login_manager.login_message_category = "info"
-
-    # Initialize the login manager with the user loader
-    from .auth.models import init_login_manager
-
-    init_login_manager(login_manager)
-
-    # Enable CORS for API endpoints
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
-
-    # Exempt API endpoints from CSRF protection
-    csrf.exempt('api.*')
-
-    # Initialize services with AWS resources (e.g., SSM Parameter Store)
-    if app.config.get("ENABLE_AWS_SERVICES", True):
-        try:
-            from .services import init_services
-
-            init_services(app)
-            logger.info("AWS services initialized")
-        except Exception as e:
-            logger.error("Failed to initialize AWS services: %s", str(e))
-            if app.config.get("FLASK_ENV") == "development":
-                raise
-
-    # Register custom template filters
-    from .utils.filters import init_app as init_filters
-
-    init_filters(app)
-
-    # Make CSRF token available in all templates
-    @app.context_processor
-    def inject_csrf_token():
-        from flask_wtf.csrf import generate_csrf
-        return dict(csrf_token=generate_csrf)
-
-
-def _setup_config(app: Flask, config_obj: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Set up application configuration.
-
-    Args:
-        app: Flask application instance
-        config_obj: Configuration dictionary or None
-
-    Returns:
-        The configuration object
-    """
-    # Default configuration
-    app.config.from_object(config["default"])
-
-    # Override with environment-specific config if provided
-    if config_obj is not None:
-        if isinstance(config_obj, dict):
-            app.config.update(config_obj)
-        else:
-            app.config.from_object(config_obj)
-
-    # Override with environment variables if present
-    app.config.from_prefixed_env()
-
-    # Database configuration is handled in _configure_extensions
-    # to ensure proper initialization order with SQLAlchemy
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-    # Configure session
-    app.config["SESSION_TYPE"] = "filesystem"
-    app.config["PERMANENT_SESSION_LIFETIME"] = 3600  # 1 hour
-
-    # Log configuration
-    logger = logging.getLogger(__name__)
-    logger.info("Using configuration: %s", app.config.get("ENV", "default"))
-    logger.debug("Database URL: %s", app.config.get("SQLALCHEMY_DATABASE_URI"))
-
-    return app.config
-
-
-def _register_blueprints(app: Flask) -> None:
-    """Register all blueprints with the application.
-
-    Args:
-        app: Flask application instance
-    """
-    from app.api import bp as api_bp
-    from app.auth import bp as auth_bp
-    from app.errors import bp as errors_bp
-    from app.expenses import bp as expenses_bp
-    from app.main import bp as main_bp
-    from app.restaurants import bp as restaurants_bp
-
-    # Register blueprints with URL prefixes
-    blueprints = [
-        (api_bp, "/api"),
-        (auth_bp, "/auth"),
-        (main_bp, ""),
-        (errors_bp, ""),
-        (restaurants_bp, "/restaurants"),
-        (expenses_bp, "/expenses"),
-    ]
-
-    for blueprint, url_prefix in blueprints:
-        app.register_blueprint(blueprint, url_prefix=url_prefix)
-
-
-def _add_shell_context(app: Flask) -> None:
-    """Add shell context for Flask shell.
-
-    Args:
-        app: Flask application instance
-    """
-
-    @app.shell_context_processor
-    def make_shell_context():
-        from .auth.models import User
-
-        return {
-            "db": db,
-            "User": User,
-        }
-
-
-def create_app(config_obj: Optional[Dict[str, Any]] = None) -> Flask:
-    """Create and configure the Flask application.
-
-    Args:
-        config_obj: Configuration dictionary or None
-
-    Returns:
-        Flask: The configured Flask application.
-    """
     app = Flask(__name__)
+    app.config.from_object(config[config_name])
 
-    # Set up configuration
-    _setup_config(app, config_obj)
-
-    # Configure logging
-    _configure_logging(app)
-
-    # Configure extensions and services
-    _configure_extensions(app)
+    # Initialize extensions
+    init_extensions(app)
 
     # Register blueprints
-    _register_blueprints(app)
+    logger.debug("Registering blueprints...")
 
-    # Add shell context
-    _add_shell_context(app)
+    from .main import bp as main_bp
 
-    @app.route("/health")
-    def health_check() -> tuple:
-        """Health check endpoint for monitoring."""
-        return jsonify({"status": "ok", "version": version})
+    app.register_blueprint(main_bp)
+    logger.debug(f"Registered blueprint: {main_bp.name} " f"at {main_bp.url_prefix or '/'}")
 
-    @app.route("/health/db")
-    def db_health_check() -> tuple:
-        """Database health check endpoint."""
-        from .utils.db_utils import check_database_connection
+    from .auth import bp as auth_bp
 
-        success, message = check_database_connection()
-        status_code = 200 if success else 503
-        return (jsonify({"database": "ok" if success else "error", "message": message}), status_code)
+    app.register_blueprint(auth_bp, url_prefix="/auth")
+    logger.debug(f"Registered blueprint: {auth_bp.name} at /auth")
 
-    @app.teardown_appcontext
-    def shutdown_session(exception=None) -> None:
-        """Remove database session at the end of the request."""
-        if db.session is not None:
-            db.session.remove()
+    from .restaurants import bp as restaurants_bp
+
+    app.register_blueprint(restaurants_bp, url_prefix="/restaurants")
+    logger.debug(f"Registered blueprint: {restaurants_bp.name} " "at /restaurants")
+
+    from .expenses import bp as expenses_bp
+
+    app.register_blueprint(expenses_bp, url_prefix="/expenses")
+    logger.debug(f"Registered blueprint: {expenses_bp.name} at /expenses")
+
+    from .api import bp as api_bp
+
+    app.register_blueprint(api_bp, url_prefix="/api/v1")
+    logger.debug(f"Registered blueprint: {api_bp.name} at /api/v1")
+
+    from .reports import bp as reports_bp
+
+    app.register_blueprint(reports_bp, url_prefix="/reports")
+    logger.debug(f"Registered blueprint: {reports_bp.name} at /reports")
+
+    # Log registered routes
+    logger.debug("Registered routes:")
+    for rule in app.url_map.iter_rules():
+        methods = list(rule.methods - {"OPTIONS", "HEAD"})
+        logger.debug(f"  {rule.endpoint}: {rule.rule} {methods}")
 
     return app

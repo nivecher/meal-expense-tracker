@@ -1,8 +1,9 @@
 """Report-related routes for the application."""
 
 from flask import render_template
-from flask_login import login_required
+from flask_login import current_user, login_required
 
+from app.api.services import get_expenses_for_user, get_restaurants_for_user
 from app.reports import bp
 
 
@@ -10,7 +11,9 @@ from app.reports import bp
 @login_required
 def index():
     """Show the reports dashboard."""
-    return render_template("reports/index.html")
+    expenses = get_expenses_for_user(current_user.id)
+    restaurants = get_restaurants_for_user(current_user.id)
+    return render_template("reports/index.html", expenses=expenses, restaurants=restaurants)
 
 
 @bp.route("/expenses")

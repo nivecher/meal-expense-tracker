@@ -20,4 +20,3 @@ monthly_budget_amount = 10
 allowed_ip_ranges = ["0.0.0.0/0"] # Restrict this in production
 
 # Add any additional environment-specific variables below
-

@@ -1,385 +1,185 @@
-{% extends "main/base.html" %}
+{% extends "base.html" %}
 {% block title %}
     Restaurants - Meal Expense Tracker
 {% endblock title %}
 {% block styles %}
     {{ super() }}
-    <style>
-        /* View mode toggle */
-        .view-mode-toggle .btn {
-            border-radius: 0.25rem;
-        }
-
-        .view-mode-toggle .btn:first-child {
-            border-top-right-radius: 0;
-            border-bottom-right-radius: 0;
-        }
-
-        .view-mode-toggle .btn:last-child {
-            border-top-left-radius: 0;
-            border-bottom-left-radius: 0;
-        }
-
-        .view-mode-toggle .btn.active {
-            background-color: var(--bs-primary);
-            color: white;
-        }
-
-        /* Table view styles */
-        .restaurant-table tbody tr {
-            cursor: pointer;
-            transition: background-color 0.15s ease;
-        }
-
-        .restaurant-table tbody tr:hover {
-            background-color: rgba(var(--bs-primary-rgb), 0.05);
-        }
-
-        .restaurant-table .cuisine-badge {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.5rem;
-        }
-
-        .restaurant-table .actions {
-            white-space: nowrap;
-        }
-
-        .restaurant-table .last-visited {
-            font-size: 0.875rem;
-            color: var(--bs-gray-600);
-        }
-
-        /* Custom styles for the restaurant list */
-        .restaurant-card {
-            height: 100%;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            border: 1px solid var(--bs-border-color);
-        }
-
-        .restaurant-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
-        }
-
-        .restaurant-card .card-img-top {
-            height: 160px;
-            object-fit: cover;
-        }
-
-        .restaurant-card .card-title {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .restaurant-meta {
-            font-size: 0.875rem;
-            color: var(--bs-gray-600);
-        }
-
-        .restaurant-stats {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 0.75rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid var(--bs-border-color);
-        }
-
-        .stat-item {
-            text-align: center;
-            flex: 1;
-        }
-
-        .stat-value {
-            font-weight: 600;
-            color: var(--bs-primary);
-            white-space: nowrap;
-        }
-
-        .stat-label {
-            font-size: 0.7rem;
-            color: var(--bs-gray-600);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .last-visited {
-            font-size: 0.8rem;
-            color: var(--bs-gray-600);
-            margin-top: 0.5rem;
-        }
-
-        .no-restaurants {
-            text-align: center;
-            padding: 3rem 1rem;
-            color: var(--bs-gray-600);
-        }
-
-        .no-restaurants i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        .sort-arrow {
-            display: inline-block;
-            margin-left: 0.25rem;
-            color: var(--bs-secondary);
-        }
-
-        .summary-card {
-            border-left: 4px solid var(--bs-primary);
-            transition: all 0.3s ease;
-        }
-
-        .summary-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
-        }
-    </style>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}">
 {% endblock styles %}
 {% block content %}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h1 class="h3 mb-0">
             <i class="fas fa-utensils text-primary me-2"></i>My Restaurants
         </h1>
-        <div class="d-flex align-items-center">
-            <div class="btn-group view-mode-toggle me-3"
-                 role="group"
-                 aria-label="View mode">
-                <input type="radio"
-                       class="btn-check"
-                       name="viewMode"
-                       id="cardView"
-                       autocomplete="off"
-                       checked>
-                <label class="btn btn-outline-primary" for="cardView" title="Card View">
-                    <i class="fas fa-th-large"></i>
-                </label>
-                <input type="radio"
-                       class="btn-check"
-                       name="viewMode"
-                       id="tableView"
-                       autocomplete="off">
-                <label class="btn btn-outline-primary" for="tableView" title="Table View">
-                    <i class="fas fa-list"></i>
-                </label>
+        <div class="d-flex gap-2">
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle"
+                        type="button"
+                        id="exportDropdown"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false">
+                    <i class="fas fa-download me-1"></i> Export
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+                    <li>
+                        <a class="dropdown-item"
+                           href="{{ url_for('restaurants.export_restaurants', format='csv') }}">
+                            <i class="fas fa-file-csv me-1"></i> Export as CSV
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item"
+                           href="{{ url_for('restaurants.export_restaurants', format='json') }}">
+                            <i class="fas fa-file-code me-1"></i> Export as JSON
+                        </a>
+                    </li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    <li>
+                        <a class="dropdown-item"
+                           href="{{ url_for("restaurants.google_places_search") }}">
+                            <i class="fas fa-search-location me-1"></i> Find Restaurants
+                        </a>
+                    </li>
+                </ul>
             </div>
-            <a href="{{ url_for("restaurants.add_restaurant") }}"
-               class="btn btn-primary">
-                <i class="fas fa-plus me-1"></i> Add Restaurant
+            <a href="{{ url_for("restaurants.import_restaurants") }}"
+               class="btn btn-outline-primary">
+                <i class="fas fa-upload me-1"></i> Import
             </a>
-        </div>
-    </div>
-    <!-- Summary Cards -->
-    <div class="row mb-4 g-3">
-        <div class="col-md-4">
-            <div class="card summary-card h-100">
-                <div class="card-body">
-                    <h6 class="text-uppercase text-muted mb-1">Total Restaurants</h6>
-                    <h3 class="mb-0">{{ total_restaurants }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card summary-card h-100">
-                <div class="card-body">
-                    <h6 class="text-uppercase text-muted mb-1">Total Visits</h6>
-                    <h3 class="mb-0">{{ total_visits }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card summary-card h-100">
-                <div class="card-body">
-                    <h6 class="text-uppercase text-muted mb-1">Total Spent</h6>
-                    <h3 class="mb-0">${{ "%.2f"|format(total_spent) }}</h3>
-                </div>
+            <div class="btn-group">
+                <a href="{{ url_for("restaurants.add_restaurant") }}"
+                   class="btn btn-primary">
+                    <i class="fas fa-plus me-1"></i> Add Restaurant
+                </a>
+                <button type="button"
+                        class="btn btn-primary dropdown-toggle dropdown-toggle-split"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <a class="dropdown-item"
+                           href="{{ url_for("restaurants.google_places_search") }}">
+                            <i class="fas fa-search-location me-1"></i> Find with Google
+                        </a>
+                    </li>
+                </ul>
             </div>
         </div>
     </div>
-    <!-- Filters and Sorting -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="get" class="row g-3">
-                <div class="col-md-5">
-                    <label for="sort" class="form-label">Sort By</label>
-                    <div class="input-group">
-                        <select class="form-select"
-                                id="sort"
-                                name="sort"
-                                onchange="this.form.submit()">
-                            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name</option>
-                            <option value="visits" {% if sort_by == 'visits' %}selected{% endif %}>Number of Visits</option>
-                            <option value="spent" {% if sort_by == 'spent' %}selected{% endif %}>Total Spent</option>
-                            <option value="last_visit"
-                                    {% if sort_by == 'last_visit' %}selected{% endif %}>Last Visit</option>
-                        </select>
-                        <button type="button"
-                                class="btn btn-outline-secondary btn-sm ms-2"
-                                id="toggleSortOrder"
-                                data-sort-order="{{ sort_order }}"
-                                title="Toggle sort order">
-                            <i class="fas fa-sort-amount-{{ 'down' if sort_order == 'desc' else 'up' }}"></i>
-                        </button>
-                        <input type="hidden" name="order" id="sortOrder" value="{{ sort_order }}">
-                    </div>
-                </div>
-                <div class="col-md-5">
-                    <label for="cuisine" class="form-label">Filter by Cuisine</label>
-                    <select class="form-select"
-                            id="cuisine"
-                            name="cuisine"
-                            onchange="this.form.submit()">
-                        <option value="">All Cuisines</option>
-                        {% for cuisine in cuisines %}
-                            <option value="{{ cuisine }}"
-                                    {% if cuisine_filter == cuisine %}selected{% endif %}>{{ cuisine }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <a href="{{ url_for("restaurants.list_restaurants") }}"
-                       class="btn btn-outline-secondary w-100">
-                        <i class="fas fa-sync-alt me-1"></i> Reset
-                    </a>
-                </div>
-            </form>
+    <!-- View Toggle -->
+    <div class="d-flex justify-content-end mb-3">
+        <div class="btn-group" role="group" aria-label="View Toggle">
+            <input type="radio"
+                   class="btn-check"
+                   name="view-type"
+                   id="card-view"
+                   autocomplete="off"
+                   checked>
+            <label class="btn btn-outline-primary" for="card-view" id="card-view-label">
+                <i class="fas fa-th-large me-1"></i> Cards
+            </label>
+            <input type="radio"
+                   class="btn-check"
+                   name="view-type"
+                   id="table-view"
+                   autocomplete="off">
+            <label class="btn btn-outline-primary"
+                   for="table-view"
+                   id="table-view-label">
+                <i class="fas fa-table me-1"></i> Table
+            </label>
         </div>
     </div>
     <!-- Restaurant List -->
     {% if restaurants %}
         <!-- Card View -->
-        <div id="cardView" class="view-mode">
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-                {% for restaurant_data in restaurants %}
-                    {% set restaurant = restaurant_data[0] %}
-                    {% set visit_count = restaurant_data.visit_count %}
-                    {% set total_spent = restaurant_data.total_spent %}
-                    {% set last_visit = restaurant_data.last_visit %}
-                    <div class="col">
-                        <div class="card restaurant-card h-100">
-                            {% if restaurant.photo_url %}
-                                <img src="{{ restaurant.photo_url }}"
-                                     class="card-img-top"
-                                     alt="{{ restaurant.name }}"
-                                     style="height: 160px;
-                                            object-fit: cover">
-                            {% else %}
-                                <div class="bg-light d-flex align-items-center justify-content-center"
-                                     style="height: 160px">
-                                    <i class="fas fa-utensils fa-4x text-muted"></i>
-                                </div>
-                            {% endif %}
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <h5 class="card-title mb-1">{{ restaurant.name }}</h5>
-                                    {% if restaurant.cuisine %}<span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>{% endif %}
-                                </div>
-                                <p class="restaurant-meta mb-2">
-                                    <i class="fas fa-map-marker-alt me-1"></i>
-                                    {% if restaurant.city %}
-                                        {{ restaurant.city }}
-                                    {% else %}
-                                        <span class="text-muted">No location</span>
-                                    {% endif %}
-                                </p>
-                                <div class="restaurant-stats">
-                                    <div class="stat-item">
-                                        <div class="stat-value">{{ visit_count }}</div>
-                                        <div class="stat-label">Visits</div>
-                                    </div>
-                                    <div class="stat-item">
-                                        <div class="stat-value">${{ "%.2f"|format(total_spent) }}</div>
-                                        <div class="stat-label">Spent</div>
-                                    </div>
-                                    {% if restaurant.rating %}
-                                        <div class="stat-item">
-                                            <div class="stat-value">{{ "%.1f"|format(restaurant.rating) }}</div>
-                                            <div class="stat-label">Rating</div>
-                                        </div>
+        <div id="card-view-container"
+             class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+            {% for restaurant in restaurants %}
+                <div class="col">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="card-title mb-1">
+                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                           class="text-decoration-none text-dark">{{ restaurant.name }}</a>
+                                    </h5>
+                                    {% if restaurant.cuisine %}
+                                        <span class="badge bg-light text-dark border mb-2">
+                                            <i class="fas fa-utensils me-1 text-muted"></i>{{ restaurant.cuisine }}
+                                        </span>
                                     {% endif %}
                                 </div>
-                                {% if last_visit %}
-                                    <div class="last-visited">
-                                        <i class="far fa-calendar-alt me-1"></i>
-                                        Last visited {{ last_visit|time_ago }}
-                                    </div>
+                                {% if restaurant.rating %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-star"></i> {{ "%.1f"|format(restaurant.rating) }}
+                                    </span>
                                 {% endif %}
                             </div>
-                            <div class="card-footer bg-transparent border-top-0 pt-0">
-                                <div class="d-grid">
-                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                                       class="btn btn-outline-primary btn-sm">
-                                        <i class="fas fa-eye me-1"></i> View Details
-                                    </a>
-                                </div>
+                            {% if restaurant.address or restaurant.city %}
+                                <p class="card-text text-muted small mb-2">
+                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                    {% if restaurant.address %}{{ restaurant.address }}{% endif %}
+                                    {% if restaurant.city %}, {{ restaurant.city }}{% endif %}
+                                </p>
+                            {% endif %}
+                            {% if restaurant.phone %}
+                                <p class="card-text text-muted small mb-2">
+                                    <i class="fas fa-phone me-1"></i> {{ restaurant.phone }}
+                                </p>
+                            {% endif %}
+                            {% if restaurant.website %}
+                                <p class="card-text text-muted small mb-3">
+                                    <i class="fas fa-globe me-1"></i>
+                                    <a href="{{ restaurant.website }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="text-muted">{{ restaurant.website|truncate(25, '...') }}</a>
+                                </p>
+                            {% endif %}
+                            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                <span class="text-muted small">
+                                    {% set expense_count = restaurant.expenses|length %}
+                                    <i class="fas fa-receipt me-1"></i>
+                                    {{ expense_count }} {{ 'expense' if expense_count == 1 else 'expenses' }}
+                                </span>
+                                <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                   class="btn btn-sm btn-outline-primary"
+                                   data-bs-toggle="tooltip"
+                                   title="Add new expense">
+                                    <i class="fas fa-plus"></i>
+                                </a>
                             </div>
                         </div>
                     </div>
-                {% endfor %}
-            </div>
+                </div>
+            {% endfor %}
         </div>
         <!-- Table View -->
-        <div id="tableView" class="view-mode d-none">
+        <div id="table-view-container" class="d-none">
             <div class="table-responsive">
-                <table class="table table-striped restaurant-table">
-                    <thead>
+                <table class="table table-hover align-middle restaurant-table">
+                    <thead class="table-light">
                         <tr>
-                            <th>Restaurant</th>
-                            <th>Location</th>
-                            <th>Visits</th>
-                            <th>Total Spent</th>
-                            <th>Rating</th>
-                            <th>Last Visit</th>
-                            <th>Actions</th>
+                            <th data-sort="true" data-sort-type="text">Name</th>
+                            <th data-sort="true" data-sort-type="text">Location</th>
+                            <th data-sort="true" data-sort-type="number">Visits</th>
+                            <th data-sort="true" data-sort-type="currency">Total Spent</th>
+                            <th data-sort="true" data-sort-type="number">Rating</th>
+                            <th data-sort="true" data-sort-type="date">Last Visit</th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for restaurant_data in restaurants %}
-                            {% set restaurant = restaurant_data[0] %}
-                            {% set visit_count = restaurant_data.visit_count %}
-                            {% set total_spent = restaurant_data.total_spent %}
-                            {% set last_visit = restaurant_data.last_visit %}
-                            <tr>
-                                <td>
-                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">{{ restaurant.name }}</a>
-                                    {% if restaurant.cuisine %}<span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>{% endif %}
-                                </td>
-                                <td>{{ restaurant.city or '' }}</td>
-                                <td>{{ visit_count }}</td>
-                                <td>${{ "%.2f"|format(total_spent) if total_spent else '0.00' }}</td>
-                                <td>
-                                    {% if restaurant.rating %}
-                                        <span class="badge bg-{{ 'success' if restaurant.rating >= 4 else 'warning' if restaurant.rating >= 3 else 'danger' }}">
-                                            {{ "%.1f"|format(restaurant.rating) }}
-                                        </span>
-                                    {% else %}
-                                        <span class="text-muted">No rating</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if last_visit %}
-                                        {{ last_visit|time_ago }}
-                                    {% else %}
-                                        <span class="text-muted">No visits</span>
-                                    {% endif %}
-                                </td>
-                                <td class="actions">
-                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                                       class="btn btn-sm btn-outline-primary"
-                                       data-bs-toggle="tooltip"
-                                       title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
-                                       class="btn btn-sm btn-outline-secondary"
-                                       data-bs-toggle="tooltip"
-                                       title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                </td>
-                            </tr>
+                        {% for restaurant in restaurants %}
+                            {% set last_visit = restaurant.expenses|sort(attribute='date', reverse=true)|first if restaurant.expenses else None %}
+                            {% include 'restaurants/_restaurant_table_row.html' %}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -390,13 +190,7 @@
             <div class="mb-4">
                 <i class="fas fa-utensils fa-4x text-muted mb-3"></i>
                 <h3>No restaurants found</h3>
-                <p class="text-muted">
-                    {% if cuisine_filter %}
-                        No restaurants match your filter criteria.
-                    {% else %}
-                        You haven't added any restaurants yet.
-                    {% endif %}
-                </p>
+                <p class="text-muted">You haven't added any restaurants yet.</p>
                 <a href="{{ url_for("restaurants.add_restaurant") }}"
                    class="btn btn-primary mt-2">
                     <i class="fas fa-plus me-1"></i> Add Your First Restaurant
@@ -404,11 +198,177 @@
             </div>
         </div>
     {% endif %}
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade"
+         id="deleteRestaurantModal"
+         tabindex="-1"
+         aria-labelledby="deleteRestaurantModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteRestaurantModalLabel">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
+                    </h5>
+                    <button type="button"
+                            class="btn-close btn-close-white"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Are you sure you want to delete <strong id="restaurantName"></strong>?
+                    </p>
+                    <p class="text-danger">
+                        <i class="fas fa-exclamation-circle me-1"></i>
+                        This action cannot be undone. All associated expenses will also be deleted.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <form id="deleteRestaurantForm" method="POST" action="">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-1"></i> Delete Restaurant
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <script type="module"
-            src="{{ url_for('static', filename='js/pages/restaurant-list-view.js') }}"></script>
-    <script type="module"
-            src="{{ url_for('static', filename='js/pages/restaurant-delete-handler.js') }}"></script>
+    <script>
+        // Toggle between card and table views
+        document.addEventListener('DOMContentLoaded', function() {
+            const cardView = document.getElementById('card-view');
+            const tableView = document.getElementById('table-view');
+            const cardViewContainer = document.getElementById('card-view-container');
+            const tableViewContainer = document.getElementById('table-view-container');
+
+            // Load saved view preference or default to card view
+            const savedView = localStorage.getItem('restaurantViewPreference') || 'card';
+
+            if (savedView === 'table') {
+                tableView.checked = true;
+                cardViewContainer.classList.add('d-none');
+                tableViewContainer.classList.remove('d-none');
+            }
+
+            // Add event listeners for view toggle
+            cardView.addEventListener('change', function() {
+                if (this.checked) {
+                    cardViewContainer.classList.remove('d-none');
+                    tableViewContainer.classList.add('d-none');
+                    localStorage.setItem('restaurantViewPreference', 'card');
+                }
+            });
+
+            tableView.addEventListener('change', function() {
+                if (this.checked) {
+                    cardViewContainer.classList.add('d-none');
+                    tableViewContainer.classList.remove('d-none');
+                    localStorage.setItem('restaurantViewPreference', 'table');
+                }
+            });
+        });
+
+        // Handle delete restaurant modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const deleteModal = document.getElementById('deleteRestaurantModal');
+
+            if (deleteModal) {
+                // Set up the modal to show the restaurant name
+                deleteModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const restaurantId = button.getAttribute('data-restaurant-id');
+                    const restaurantName = button.getAttribute('data-restaurant-name');
+
+                    // Update the modal content
+                    const modalTitle = deleteModal.querySelector('.modal-title');
+                    const modalBody = deleteModal.querySelector('#restaurantName');
+                    const deleteForm = document.getElementById('deleteRestaurantForm');
+
+                    modalBody.textContent = restaurantName;
+                    deleteForm.action = `/restaurants/delete/${restaurantId}`;
+                });
+
+                // Handle form submission with fetch
+                const deleteForm = document.getElementById('deleteRestaurantForm');
+                if (deleteForm) {
+                    deleteForm.addEventListener('submit', function(e) {
+                        e.preventDefault();
+
+                        const formData = new FormData(deleteForm);
+                        const url = deleteForm.action;
+
+                        fetch(url, {
+                                method: 'POST',
+                                body: formData,
+                                headers: {
+                                    'X-CSRFToken': formData.get('csrf_token')
+                                }
+                            })
+                            .then(response => {
+                                if (response.redirected) {
+                                    window.location.href = response.url;
+                                } else {
+                                    return response.json().then(data => {
+                                        if (data.error) {
+                                            showToast('Error', data.error, 'danger');
+                                        } else {
+                                            window.location.reload();
+                                        }
+                                    });
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                showToast('Error', 'An error occurred while deleting the restaurant.', 'danger');
+                            });
+                    });
+                }
+            }
+
+            // Helper function to show toast notifications
+            function showToast(title, message, type = 'info') {
+                const toastContainer = document.getElementById('toastContainer') || createToastContainer();
+                const toastId = 'toast-' + Date.now();
+                const toastHtml = `
+                    <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                <strong>${title}</strong><br>${message}
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                `;
+
+                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+                const toastElement = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastElement);
+                toast.show();
+
+                // Remove the toast after it's hidden
+                toastElement.addEventListener('hidden.bs.toast', function() {
+                    toastElement.remove();
+                });
+            }
+
+            function createToastContainer() {
+                const container = document.createElement('div');
+                container.id = 'toastContainer';
+                container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                container.style.zIndex = '1100';
+                document.body.appendChild(container);
+                return container;
+            }
+        });
+    </script>
 {% endblock scripts %}

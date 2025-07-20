@@ -84,7 +84,7 @@ def test_restaurant_uniqueness(session, test_user):
 def test_restaurant_relationships(session, test_user, test_expense):
     """Test relationships with other models."""
     # Test relationship with user
-    assert test_expense.restaurant.user_id == test_user["id"]
+    assert test_expense.restaurant.user_id == test_user.id
     assert test_expense.restaurant in test_expense.user.restaurants
 
     # Test relationship with expenses

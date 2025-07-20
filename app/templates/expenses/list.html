@@ -1,4 +1,4 @@
-{% extends "main/base.html" %}
+{% extends "base.html" %}
 {% block title %}
     Expenses - Meal Expense Tracker
 {% endblock title %}
@@ -57,10 +57,10 @@
                 </form>
             </div>
         </div>
-        {% if expenses.items %}
+        {% if expenses %}
             <!-- Expenses List -->
             <div class="row">
-                {% for expense in expenses.items %}
+                {% for expense in expenses %}
                     <div class="col-12 mb-3">
                         <div class="card expense-card">
                             <div class="card-body">
@@ -68,7 +68,7 @@
                                     <div>
                                         <h5 class="card-title mb-1">
                                             <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
-                                               class="text-decoration-none">{{ expense.description }}</a>
+                                               class="text-decoration-none">{{ expense.meal_type.title() or 'Expense' }}</a>
                                         </h5>
                                         <p class="card-text text-muted mb-1">
                                             <i class="far fa-calendar-alt me-1"></i>
@@ -86,12 +86,7 @@
                                         {% endif %}
                                     </div>
                                     <div class="text-end">
-                                        <div class="expense-amount
-                                                    {% if expense.amount < 0 %}
-                                                        text-danger
-                                                    {% else %}
-                                                        text-success
-                                                    {% endif %}">${{ "%.2f"|format(expense.amount|abs) }}</div>
+                                        <div class="expense-amount text-success">${{ "%.2f"|format(expense.amount|abs) }}</div>
                                         <div class="expense-actions mt-2">
                                             <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
                                                class="btn btn-sm btn-outline-primary me-1"
@@ -104,7 +99,7 @@
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#deleteModal{{ expense.id }}"
                                                     data-expense-id="{{ expense.id }}"
-                                                    data-expense-name="{{ expense.description }}"
+                                                    data-expense-name="{{ expense.meal_type.title() or 'Expense' }}"
                                                     aria-label="Delete expense">
                                                 <i class="fas fa-trash" aria-hidden="true"></i>
                                                 <span class="visually-hidden">Delete</span>
@@ -132,7 +127,7 @@
                                     <div class="modal-body">
                                         Are you sure you want to delete this expense?
                                         <div class="mt-2">
-                                            <strong>Description:</strong> {{ expense.description }}
+                                            <strong>Description:</strong> {{ expense.meal_type.title() or 'Expense' }}
                                             <br>
                                             <strong>Amount:</strong> ${{ "%.2f"|format(expense.amount) }}
                                             <br>
@@ -141,8 +136,8 @@
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                        <form id="deleteExpenseForm"
-                                              data-expense-id="{{ expense.id }}"
+                                        <form action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}"
+                                              method="post"
                                               class="d-inline">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="btn btn-danger">
@@ -156,64 +151,13 @@
                     </div>
                 {% endfor %}
             </div>
-            <!-- Pagination -->
-            {% if expenses.pages > 1 %}
-                <nav aria-label="Expense pagination" class="mt-4">
-                    <ul class="pagination justify-content-center">
-                        {% if expenses.has_prev %}
-                            <li class="page-item">
-                                <a class="page-link"
-                                   href="{{ url_for('expenses.list_expenses', page=expenses.prev_num, q=search, start_date=start_date, end_date=end_date, sort=sort, order=order) }}">
-                                    « Previous
-                                </a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">« Previous</span>
-                            </li>
-                        {% endif %}
-                        {% for page_num in expenses.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-                            {% if page_num %}
-                                <li class="page-item {% if page_num == expenses.page %}active{% endif %}">
-                                    <a class="page-link"
-                                       href="{{ url_for('expenses.list_expenses', page=page_num, q=search, start_date=start_date, end_date=end_date, sort=sort, order=order) }}">
-                                        {{ page_num }}
-                                    </a>
-                                </li>
-                            {% else %}
-                                <li class="page-item disabled">
-                                    <span class="page-link">...</span>
-                                </li>
-                            {% endif %}
-                        {% endfor %}
-                        {% if expenses.has_next %}
-                            <li class="page-item">
-                                <a class="page-link"
-                                   href="{{ url_for('expenses.list_expenses', page=expenses.next_num, q=search, start_date=start_date, end_date=end_date, sort=sort, order=order) }}">
-                                    Next »
-                                </a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">Next »</span>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            {% endif %}
         {% else %}
             <div class="card">
                 <div class="card-body text-center py-5">
                     <div class="no-expenses">
                         <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
                         <h4>No expenses found</h4>
-                        <p class="text-muted">
-                            {% if search or start_date or end_date %}
-                                Try adjusting your search or filter criteria.
-                            {% else %}
-                                Get started by adding your first expense.
-                            {% endif %}
-                        </p>
+                        <p class="text-muted">Get started by adding your first expense.</p>
                         <a href="{{ url_for("expenses.add_expense") }}"
                            class="btn btn-primary mt-2">
                             <i class="fas fa-plus me-1"></i> Add Expense
@@ -226,10 +170,4 @@
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <!-- Expense list functionality -->
-    <script type="module"
-            src="{{ url_for('static', filename='js/pages/expense-list.js') }}"></script>
-    <!-- Expense delete handler -->
-    <script type="module"
-            src="{{ url_for('static', filename='js/pages/expense-delete-handler.js') }}"></script>
 {% endblock scripts %}

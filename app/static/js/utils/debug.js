@@ -14,7 +14,7 @@ export function initGoogleMapsDebug(apiKey) {
 
     if (!apiKey) {
         console.error('Google Maps API key is missing!');
-        console.log('Current config.GOOGLE_PLACES_API_KEY:', window.GOOGLE_MAPS_API_KEY || 'Not set');
+        console.log('Current config.GOOGLE_MAPS_API_KEY:', window.GOOGLE_MAPS_API_KEY || 'Not set');
         console.log('Current google_maps_api_key:', window.google_maps_api_key || 'Not set');
     } else {
         console.log('Google Maps API key is configured');

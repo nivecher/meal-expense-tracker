@@ -8,7 +8,7 @@ def test_blueprint_registration(app):
     # Check that all expected blueprints are registered
     # Get base blueprint names (without nested names)
     base_blueprints = {name.split(".")[0] for name in blueprints.keys()}
-    expected_blueprints = {"auth", "expenses", "main", "restaurants", "health"}
+    expected_blueprints = {"auth", "expenses", "main", "restaurants", "api", "errors"}
     if app.config.get("DEBUG"):
         expected_blueprints.add("debug")
 
@@ -19,26 +19,28 @@ def test_blueprint_registration(app):
 
     url_rules = {rule.endpoint: rule.rule for rule in app.url_map.iter_rules()}
 
-    assert any(rule.startswith("/login") for rule in url_rules.values()), "Login route not found"
-    assert any(rule.startswith("/register") for rule in url_rules.values()), "Register route not found"
+    assert "auth.login" in url_rules, "Login route not found"
+    assert "auth.register" in url_rules, "Register route not found"
 
-    assert any(rule.startswith("/expenses") for rule in url_rules.values()), "Expenses routes not found"
+    assert any(endpoint.startswith("expenses.") for endpoint in url_rules), "Expenses routes not found"
 
-    assert any(rule.startswith("/restaurants") for rule in url_rules.values()), "Restaurants routes not found"
+    assert any(endpoint.startswith("restaurants.") for endpoint in url_rules), "Restaurants routes not found"
 
-    assert "/health" in url_rules.values(), "Health check route not found"
+    assert "health_check" in url_rules, "Health check route not found"
 
 
 def test_blueprint_initialization(app):
     """Test that blueprints are properly initialized with the app."""
-    assert app.config["TESTING"] is True, "App not in testing mode"
+    with app.app_context():
+        assert app.config["TESTING"] is True, "App not in testing mode"
 
-    assert hasattr(app, "extensions"), "App extensions not initialized"
-    assert "sqlalchemy" in app.extensions, "SQLAlchemy not initialized"
-    assert "login_manager" in app.extensions, "Login manager not initialized"
+        assert hasattr(app, "extensions"), "App extensions not initialized"
+        assert "sqlalchemy" in app.extensions, "SQLAlchemy not initialized"
+        assert "login_manager" in app.extensions, "Login manager not initialized"
 
-    assert "auth" in app.blueprints, "Auth blueprint not registered"
-    assert "expenses" in app.blueprints, "Expenses blueprint not registered"
-    assert "main" in app.blueprints, "Main blueprint not registered"
-    assert "restaurants" in app.blueprints, "Restaurants blueprint not registered"
-    assert "health" in app.blueprints, "Health blueprint not registered"
+        assert "auth" in app.blueprints, "Auth blueprint not registered"
+        assert "expenses" in app.blueprints, "Expenses blueprint not registered"
+        assert "main" in app.blueprints, "Main blueprint not registered"
+        assert "restaurants" in app.blueprints, "Restaurants blueprint not registered"
+        assert "api" in app.blueprints, "API blueprint not registered"
+        assert "errors" in app.blueprints, "Errors blueprint not registered"

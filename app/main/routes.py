@@ -4,23 +4,24 @@ Main blueprint routes.
 This module contains the route handlers for the main blueprint.
 """
 
-import logging
 import os
+from datetime import datetime
 
-from flask import send_from_directory, render_template, request, current_app
-from flask_login import current_user, login_required
-
-from app import version
-from app.expenses.services import (
-    get_expense_filters,
-    get_filter_options,
-    get_user_expenses,
+from flask import (
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    send_from_directory,
+    url_for,
 )
+from flask_login import login_required
 
 from . import bp
 
 
-@bp.route('/favicon.ico')
+@bp.route("/favicon.ico")
 def favicon():
     """Serve the favicon.ico file.
 
@@ -28,82 +29,129 @@ def favicon():
         The favicon.ico file
     """
     return send_from_directory(
-        os.path.join(current_app.root_path, 'static/img'),
-        'favicon.ico',
-        mimetype='image/vnd.microsoft.icon'
+        os.path.join(current_app.root_path, "static/img/favicons"),
+        "favicon.ico",
+        mimetype="image/vnd.microsoft.icon",
     )
 
 
 @bp.route("/about")
-@login_required
 def about():
     """Render the about page.
 
     Returns:
         Rendered about page template
     """
-    return render_template("main/about.html", app_version=version["app"])
+    return render_template("main/about.html")
+
+
+@bp.route("/terms")
+def terms():
+    """Render the terms of service page.
+
+    Returns:
+        Rendered terms of service template with current datetime
+    """
+    return render_template("main/terms.html", now=datetime.utcnow())
+
+
+@bp.route("/privacy")
+def privacy():
+    """Render the privacy policy page.
+
+    Returns:
+        Rendered privacy policy template with current datetime
+    """
+    return render_template("main/privacy.html", now=datetime.utcnow())
+
+
+@bp.route("/contact", methods=["GET", "POST"])
+def contact():
+    """Render the contact page and handle form submissions.
+
+    Returns:
+        Rendered contact template with form
+    """
+    from .forms import ContactForm
+
+    form = ContactForm()
+
+    if form.validate_on_submit():
+        # In a real application, you would process the form here
+        # For example, send an email or save to database
+        flash("Thank you for your message! We will get back to you soon.", "success")
+        return redirect(url_for("main.contact"))
+
+    return render_template("main/contact.html", form=form)
+
+
+@bp.route("/test/static/<path:filename>")
+def test_static(filename):
+    """Test route to verify static file serving.
+
+    Args:
+        filename: Name of the file to serve from static folder
+
+    Returns:
+        The requested static file
+    """
+    # Debug information
+    static_folder = current_app.static_folder
+    full_path = os.path.join(static_folder, filename)
+    exists = os.path.exists(full_path)
+
+    # Log debug information
+    current_app.logger.info(f"Static folder: {static_folder}")
+    current_app.logger.info(f"Requested file: {filename}")
+    current_app.logger.info(f"Full path: {full_path}")
+    current_app.logger.info(f"File exists: {exists}")
+
+    if not exists:
+        return f"File not found: {full_path}", 404
+
+    return send_from_directory(static_folder, filename)
+
+
+@bp.route("/debug/routes")
+def debug_routes():
+    """Debug endpoint to list all registered routes."""
+    from flask import current_app
+
+    output = []
+    for rule in current_app.url_map.iter_rules():
+        methods = ",".join(rule.methods)
+        line = f"{rule.endpoint}: {rule.rule} [{methods}]"
+        output.append(line)
+
+    return "<br>".join(sorted(output))
 
 
 @bp.route("/")
 @login_required
 def index():
-    """Render the main index page with expense list and filters.
+    """Redirect to the expense listing page."""
+    return redirect(url_for("expenses.list_expenses"))
+
+
+@bp.route("/api/config/google-maps-key")
+def get_google_maps_key():
+    """Return the Google Maps API key.
 
     Returns:
-        Rendered index page template with expenses and filter options
+        JSON response containing the Google Maps API key or an error message
     """
-    logger = logging.getLogger(__name__)
-    logger.info("Index route accessed by user: %s", current_user.id)
+    key = current_app.config.get("GOOGLE_MAPS_API_KEY")
+    if not key:
+        return jsonify({"error": "Google Maps API key not configured"}), 500
+    return jsonify({"apiKey": key})
 
-    try:
-        # Debug: Log request args
-        logger.debug("Request args: %s", request.args.to_dict())
 
-        # Get filter parameters from request
-        filters = get_expense_filters(request)
-        logger.debug("Parsed filters: %s", filters)
+@bp.route("/test/google-places")
+@login_required
+def google_places_test():
+    """Render the Google Places API test page.
 
-        # Get expenses and total amount
-        expenses, total_amount = get_user_expenses(current_user.id, filters)
-        logger.debug("Retrieved %d expenses", len(expenses) if expenses else 0)
-
-        # Get filter options
-        filter_options = get_filter_options(current_user.id)
-        logger.debug(
-            "Retrieved filter options: %s",
-            {
-                "categories": len(filter_options.get("categories", [])),
-                "meal_types": len(filter_options.get("meal_types", [])),
-            },
-        )
-
-        # Prepare template variables
-        template_vars = {
-            "expenses": expenses or [],
-            "total_amount": total_amount or 0.0,
-            "search": request.args.get("search", ""),
-            "meal_type": request.args.get("meal_type", ""),
-            "category": request.args.get("category", ""),
-            "start_date": request.args.get("start_date", ""),
-            "end_date": request.args.get("end_date", ""),
-            "sort_by": request.args.get("sort", "date"),
-            "sort_order": request.args.get("order", "desc"),
-            "meal_types": filter_options.get("meal_types", []),
-            "categories": filter_options.get("categories", []),
-            "request": request,  # Make request available in template
-        }
-
-        logger.debug("Rendering template with variables: %s", {k: type(v).__name__ for k, v in template_vars.items()})
-
-        return render_template("main/index.html", **template_vars)
-
-    except Exception:
-        logger.exception("Error in index route")
-        return (
-            render_template(
-                "errors/500.html",
-                error="An error occurred while loading expenses. Please try again later.",
-            ),
-            500,
-        )
+    Returns:
+        Rendered Google Places test page template
+    """
+    return render_template("test/google_places_test.html")

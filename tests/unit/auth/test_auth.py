@@ -12,8 +12,8 @@ from app.utils.messages import FlashMessages
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.insert(0, project_root)
 
-from app import db  # noqa: E402
 from app.auth.models import User  # noqa: E402
+from app.extensions import db  # noqa: E402
 
 
 def test_register(client, app):
@@ -26,7 +26,12 @@ def test_register(client, app):
     # Test successful registration
     response = client.post(
         "/auth/register",
-        data={"username": "testuser", "password": "testpass"},
+        data={
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "testpass",
+            "confirm_password": "testpass",
+        },
         follow_redirects=True,
     )
     assert response.status_code == 200
@@ -41,11 +46,30 @@ def test_register(client, app):
         assert user.check_password("testpass")
 
 
+def test_register_password_mismatch(client):
+    """Test registration with mismatched passwords."""
+    response = client.post(
+        "/auth/register",
+        data={
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "testpass",
+            "confirm_password": "wrongpass",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert FlashMessages.PASSWORDS_DONT_MATCH.encode() in response.data
+
+
 def test_register_missing_fields(client):
     """Test registration with missing fields."""
     response = client.post(
         "/auth/register",
-        data={"username": "testuser"},  # Missing password
+        data={
+            "username": "testuser",
+            "password": "testpass",
+        },  # Missing email and confirm_password
         follow_redirects=True,
     )
     assert response.status_code == 200
@@ -53,7 +77,11 @@ def test_register_missing_fields(client):
 
     response = client.post(
         "/auth/register",
-        data={"password": "testpass"},  # Missing username
+        data={
+            "email": "test@example.com",
+            "password": "testpass",
+            "confirm_password": "testpass",
+        },  # Missing username
         follow_redirects=True,
     )
     assert response.status_code == 200
@@ -64,7 +92,7 @@ def test_register_existing_username(client, app):
     """Test registration with existing username."""
     # First register a user
     with app.app_context():
-        user = User(username="testuser")
+        user = User(username="testuser", email="test@example.com")
         user.set_password("testpass")
         db.session.add(user)
         db.session.commit()
@@ -72,11 +100,16 @@ def test_register_existing_username(client, app):
     # Try to register the same username again
     response = client.post(
         "/auth/register",
-        data={"username": "testuser", "password": "testpass"},
+        data={
+            "username": "testuser",
+            "email": "new@example.com",
+            "password": "testpass",
+            "confirm_password": "testpass",
+        },
         follow_redirects=True,
     )
     assert response.status_code == 200
-    assert FlashMessages.USERNAME_EXISTS.encode() in response.data
+    assert b"Please use a different username." in response.data
     assert b"Register" in response.data  # Should stay on register page
 
 
@@ -84,12 +117,12 @@ def test_register_authenticated_user(client, auth, app):
     """Test registration when user is already authenticated."""
     # Create and login a user first
     with app.app_context():
-        user = User(username="testuser")
+        user = User(username="testuser", email="test@example.com")
         user.set_password("testpass")
         db.session.add(user)
         db.session.commit()
 
-    auth.login("testuser_1", "testpass")
+    auth.login("testuser", "testpass")
     response = client.get("/auth/register", follow_redirects=True)
     assert response.status_code == 200
     assert b"Meal Expenses" in response.data  # Should redirect to index
@@ -99,7 +132,7 @@ def test_login(client, app):
     """Test user login."""
     # First register a user
     with app.app_context():
-        user = User(username="testuser")
+        user = User(username="testuser", email="test@example.com")
         user.set_password("testpass")
         db.session.add(user)
         db.session.commit()
@@ -118,7 +151,7 @@ def test_login_with_next(client, app):
     """Test login with next parameter."""
     # First register a user
     with app.app_context():
-        user = User(username="testuser")
+        user = User(username="testuser", email="test@example.com")
         user.set_password("testpass")
         db.session.add(user)
         db.session.commit()
@@ -148,20 +181,25 @@ def test_login_authenticated_user(client, auth, app):
     """Test login when user is already authenticated."""
     # Create and login a user first
     with app.app_context():
-        user = User(username="testuser")
+        user = User(username="testuser", email="test@example.com")
         user.set_password("testpass")
         db.session.add(user)
         db.session.commit()
 
-    auth.login("testuser_1", "testpass")
+    auth.login("testuser", "testpass")
     response = client.get("/auth/login", follow_redirects=True)
     assert response.status_code == 200
     assert b"Meal Expenses" in response.data  # Should redirect to index
 
 
-def test_logout(client, auth):
+def test_logout(client, auth, app):
     """Test user logout."""
-    auth.login("testuser_1", "testpass")
+    with app.app_context():
+        user = User(username="testuser", email="test@example.com")
+        user.set_password("testpass")
+        db.session.add(user)
+        db.session.commit()
+    auth.login("testuser", "testpass")
     response = client.get("/auth/logout", follow_redirects=True)
     assert response.status_code == 200
     assert b"You have been logged out" in response.data
@@ -180,22 +218,20 @@ def test_register_database_error(client, app, monkeypatch):
     def mock_commit_error():
         raise SQLAlchemyError("Database error")
 
-    # First register a user
-    with app.app_context():
-        user = User(username="testuser")
-        user.set_password("testpass")
-        db.session.add(user)
-        db.session.commit()
-
     # Mock the commit to raise an error
     monkeypatch.setattr(db.session, "commit", mock_commit_error)
 
     # Try to register
     response = client.post(
         "/auth/register",
-        data={"username": "newuser", "password": "testpass"},
+        data={
+            "username": "newuser",
+            "email": "new@example.com",
+            "password": "testpass",
+            "confirm_password": "testpass",
+        },
         follow_redirects=True,
     )
     assert response.status_code == 200
     # Check for the actual error message format from routes.py
-    assert b"Error creating user:" in response.data
+    assert FlashMessages.REGISTRATION_ERROR.encode() in response.data

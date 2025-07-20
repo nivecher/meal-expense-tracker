@@ -51,8 +51,18 @@
                                       {% if request.endpoint == 'restaurants.list_restaurants' %}active{% endif %}"
                                href="{{ url_for("restaurants.list_restaurants") }}">
                                 <i class="fas fa-list" aria-hidden="true"></i>
-                                <span>All Restaurants</span>
+                                <span>View All</span>
                             </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item"
+                               href="{{ url_for("restaurants.google_places_search") }}">
+                                <i class="fas fa-search-location" aria-hidden="true"></i>
+                                <span>Find Restaurants</span>
+                            </a>
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider">
                         </li>
                         <li>
                             <a class="dropdown-item
@@ -66,8 +76,8 @@
                             <a class="dropdown-item
                                       {% if request.endpoint == 'restaurants.search_restaurants' %}active{% endif %}"
                                href="{{ url_for("restaurants.search_restaurants") }}">
-                                <i class="fas fa-map-marked-alt" aria-hidden="true"></i>
-                                <span>Find on Map</span>
+                                <i class="fas fa-search" aria-hidden="true"></i>
+                                <span>Search</span>
                             </a>
                         </li>
                         <li>
@@ -78,21 +88,29 @@
                                       {% if request.endpoint == 'restaurants.import_restaurants' %}active{% endif %}"
                                href="{{ url_for("restaurants.import_restaurants") }}">
                                 <i class="fas fa-file-import" aria-hidden="true"></i>
-                                <span>Import from CSV</span>
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item"
-                               href="{{ url_for("restaurants.export_restaurants") }}">
-                                <i class="fas fa-file-export" aria-hidden="true"></i>
-                                <span>Export to CSV</span>
+                                <span>Import</span>
                             </a>
                         </li>
                     </ul>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link
+                              {% if request.endpoint and 'reports' in request.endpoint %}active{% endif %}"
+                       href="{{ url_for("reports.index") }}">
+                        <i class="fas fa-chart-line" aria-hidden="true"></i>
+                        <span>Reports</span>
+                    </a>
+                </li>
             </ul>
             <!-- Right-aligned navigation items -->
             <ul class="navbar-nav ms-auto">
+                <li class="nav-item d-flex align-items-center">
+                    <a class="btn btn-primary btn-sm"
+                       href="{{ url_for("expenses.add_expense") }}"
+                       title="Add New Expense">
+                        <i class="fas fa-plus me-1"></i> Add Expense
+                    </a>
+                </li>
                 <!-- User Dropdown -->
                 {% if current_user.is_authenticated %}
                     <li class="nav-item dropdown">

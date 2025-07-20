@@ -1,6 +1,55 @@
 /* ======================
-   Loading Skeletons
+   Loading States & Overlays
    ====================== */
+
+/* Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.85);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* Dark mode adjustments for loading overlay */
+@media (prefers-color-scheme: dark) {
+    .loading-overlay {
+        background-color: rgba(0, 0, 0, 0.8);
+    }
+
+    .loading-overlay span {
+        color: #fff;
+    }
+}
+
+/* Loading Spinner */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-overlay .spinner-border {
+    width: 2rem;
+    height: 2rem;
+    border-width: 0.25rem;
+    animation: spin 0.75s linear infinite;
+}
+
+/* Loading Text */
+.loading-overlay span {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--bs-body-color);
+    margin-left: 1rem;
+}
+
+/* Loading Skeletons */
 
 /* Base Skeleton Styles */
 .skeleton {

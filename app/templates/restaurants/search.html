@@ -1,110 +1,259 @@
-{% extends "main/base.html" %}
+{% extends "base.html" %}
 {% block title %}
-    Find Restaurants - Meal Expense Tracker
+    Search Restaurants - {{ super() }}
 {% endblock title %}
-{% block head_extra %}
-    {{ super() }}
-    <!-- Set Google Maps API Key -->
-    <script>
-        window.GOOGLE_MAPS_API_KEY = '{{ google_maps_api_key }}';
-        window.GOOGLE_MAPS_MAP_ID = 'fd6f9096c4c4db22913a0cae';
-    </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places,marker&map_ids=fd6f9096c4c4db22913a0cae&callback=Function.prototype" async defer loading="async">
-    </script>
+{% block content %}
     <style>
-        #map {
-            min-height: 70vh;
+        /* Autocomplete dropdown styles */
+        #searchSuggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 1000;
             width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 2px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            border-radius: 0.375rem;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+
+        #searchSuggestions .dropdown-item {
+            padding: 0.5rem 1rem;
+            white-space: normal;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        #searchSuggestions .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        #searchSuggestions .dropdown-item:hover,
+        #searchSuggestions .dropdown-item:focus {
             background-color: #f8f9fa;
+            color: #0d6efd;
         }
 
-        .search-container {
-            max-width: 800px;
-            margin: 0 auto;
+        #searchSuggestions .dropdown-item .text-muted {
+            font-size: 0.8125rem;
+            opacity: 0.8;
         }
 
-        .map-info-window {
-            padding: 8px;
-            min-width: 200px;
-        }
-
-        .map-info-window h6 {
-            margin: 0 0 8px 0;
-            font-size: 1rem;
-            font-weight: 600;
-        }
-
-        .map-info-window p {
-            margin: 0 0 4px 0;
-            font-size: 0.875rem;
-        }
-
-        .map-info-window .btn {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.5rem;
-        }
-
-        .back-button {
-            margin-bottom: 1.5rem;
+        /* Make the input group relative to position the dropdown */
+        .input-group {
+            position: relative;
         }
     </style>
-{% endblock head_extra %}
-{% block content %}
-    <div class="container mt-4">
-        <!-- Back button -->
-        <div class="back-button">
-            <a href="{{ url_for("restaurants.list_restaurants") }}"
-               class="btn btn-outline-secondary btn-sm"
-               id="back-button">
-                <i class="fas fa-arrow-left me-1"></i> Back to Restaurants
-            </a>
-        </div>
-        <div class="row mb-4">
-            <div class="col">
-                <h1>Find Restaurants</h1>
-                <p class="lead">Search for restaurants near you or a specific location</p>
-            </div>
-        </div>
-        <!-- Search Form -->
-        <div class="row mb-4">
-            <div class="col-md-8 offset-md-2">
-                <form id="restaurant-search-form"
-                      class="mb-3"
-                      data-module="restaurant-search">
-                    <div class="input-group">
-                        <input type="text"
-                               class="form-control form-control-lg"
-                               id="restaurant-search-input"
-                               name="q"
-                               placeholder="Search for restaurants..."
-                               aria-label="Search for restaurants"
-                               value="{{ query|default('', true) }}"
-                               required>
-                        <button class="btn btn-primary" type="submit" id="restaurant-search-btn">
-                            <i class="bi bi-search"></i> Search
-                        </button>
-                        <button type="button"
-                                id="current-location-btn"
-                                class="btn btn-outline-secondary"
-                                title="Use current location">
-                            <i class="bi bi-geo-alt"></i>
-                        </button>
-                    </div>
-                </form>
-                <div id="search-status"></div>
-            </div>
-        </div>
-        <!-- Map Container -->
+    <div class="container mt-3">
         <div class="row">
             <div class="col-12">
-                <div id="map"></div>
+                <h1 class="h4 mb-3">Search Restaurants</h1>
+                <!-- Search Form -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <form method="get"
+                              action="{{ url_for("restaurants.search_restaurants") }}"
+                              class="row g-3">
+                            <div class="col-md-8">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text"
+                                           id="restaurantSearchInput"
+                                           name="q"
+                                           value="{{ query }}"
+                                           class="form-control form-control-lg"
+                                           placeholder="Search by name, cuisine, or location..."
+                                           aria-label="Search restaurants"
+                                           autocomplete="off">
+                                    <div id="searchSuggestions"
+                                         class="dropdown-menu w-100"
+                                         style="display: none">
+                                        <!-- Search suggestions will be populated here -->
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <select name="sort" class="form-select" aria-label="Sort by">
+                                    <option value="name" {% if sort == 'name' %}selected{% endif %}>Sort by Name</option>
+                                    <option value="city" {% if sort == 'city' %}selected{% endif %}>Sort by City</option>
+                                    <option value="cuisine" {% if sort == 'cuisine' %}selected{% endif %}>Sort by Cuisine</option>
+                                    <option value="created_at" {% if sort == 'created_at' %}selected{% endif %}>Sort by Date Added</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select name="order" class="form-select" aria-label="Sort order">
+                                    <option value="asc" {% if order == 'asc' %}selected{% endif %}>Ascending</option>
+                                    <option value="desc" {% if order == 'desc' %}selected{% endif %}>Descending</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <select name="per_page"
+                                                class="form-select form-select-sm d-inline-block w-auto"
+                                                aria-label="Results per page">
+                                            <option value="10" {% if per_page == 10 %}selected{% endif %}>10 per page</option>
+                                            <option value="25" {% if per_page == 25 %}selected{% endif %}>25 per page</option>
+                                            <option value="50" {% if per_page == 50 %}selected{% endif %}>50 per page</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search me-1"></i> Search
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <!-- Search Results -->
+                <div class="card">
+                    <div class="card-body">
+                        {% if query %}
+                            <h2 class="h5 mb-4">Search Results for "{{ query }}"</h2>
+                        {% else %}
+                            <h2 class="h5 mb-4">All Restaurants</h2>
+                        {% endif %}
+                        {% if restaurants %}
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Cuisine</th>
+                                            <th>Location</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for restaurant in restaurants %}
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                                       class="text-decoration-none">{{ restaurant.name }}</a>
+                                                </td>
+                                                <td>{{ restaurant.cuisine or 'N/A' }}</td>
+                                                <td>
+                                                    {% if restaurant.city %}
+                                                        {{ restaurant.city }}
+                                                        {% if restaurant.state %}, {{ restaurant.state }}{% endif %}
+                                                    {% else %}
+                                                        N/A
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-end">
+                                                    <div class="btn-group btn-group-sm"
+                                                         role="group"
+                                                         aria-label="Restaurant actions">
+                                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                                           class="btn btn-outline-primary"
+                                                           title="View Details">
+                                                            <i class="fas fa-eye"></i>
+                                                            <span class="visually-hidden">View Details</span>
+                                                        </a>
+                                                        <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                                           class="btn btn-outline-success"
+                                                           title="Add Expense">
+                                                            <i class="fas fa-plus"></i> Expense
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- Pagination -->
+                            {% if pagination.pages > 1 %}
+                                <nav aria-label="Search results pagination" class="mt-4">
+                                    <ul class="pagination justify-content-center mb-0">
+                                        {% if pagination.has_prev %}
+                                            <li class="page-item">
+                                                <a class="page-link"
+                                                   href="{{ url_for('restaurants.search_restaurants', page=pagination.prev_num, q=query, sort=sort, order=order, per_page=per_page) }}"
+                                                   aria-label="Previous page">&laquo; Previous</a>
+                                            </li>
+                                        {% else %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">&laquo; Previous</span>
+                                            </li>
+                                        {% endif %}
+                                        {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=3) %}
+                                            {% if page_num %}
+                                                {% if page_num == pagination.page %}
+                                                    <li class="page-item active" aria-current="page">
+                                                        <span class="page-link">
+                                                            {{ page_num }}
+                                                            <span class="visually-hidden">(current)</span>
+                                                        </span>
+                                                    </li>
+                                                {% else %}
+                                                    <li class="page-item">
+                                                        <a class="page-link"
+                                                           href="{{ url_for('restaurants.search_restaurants', page=page_num, q=query, sort=sort, order=order, per_page=per_page) }}"
+                                                           aria-label="Go to page {{ page_num }}">{{ page_num }}</a>
+                                                    </li>
+                                                {% endif %}
+                                            {% else %}
+                                                <li class="page-item disabled">
+                                                    <span class="page-link">...</span>
+                                                </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if pagination.has_next %}
+                                            <li class="page-item">
+                                                <a class="page-link"
+                                                   href="{{ url_for('restaurants.search_restaurants', page=pagination.next_num, q=query, sort=sort, order=order, per_page=per_page) }}"
+                                                   aria-label="Next page">Next &raquo;</a>
+                                            </li>
+                                        {% else %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">Next &raquo;</span>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-center py-5">
+                                <div class="mb-3">
+                                    <i class="fas fa-utensils fa-4x text-muted"></i>
+                                </div>
+                                <h3 class="h5">No restaurants found</h3>
+                                <p class="text-muted">
+                                    {% if query %}
+                                        Try adjusting your search or filter to find what you're looking for.
+                                    {% else %}
+                                        No restaurants have been added yet.
+                                        <a href="{{ url_for("restaurants.add_restaurant") }}">Add your first restaurant</a>
+                                        to get started.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
-        <!-- Search Results (populated dynamically) -->
-        <div id="search-results" class="mt-4"></div>
     </div>
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <!-- Restaurant search initialization is handled by base.html -->
+    <script>
+        // Initialize Google Maps API key if it's not already set
+        if (!window.GOOGLE_MAPS_API_KEY && '{{ google_maps_api_key }}') {
+            window.GOOGLE_MAPS_API_KEY = '{{ google_maps_api_key }}';
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-submit form when sort, order, or per_page changes
+            const form = document.querySelector('form');
+            const selects = form.querySelectorAll('select');
+
+            selects.forEach(select => {
+                select.addEventListener('change', () => {
+                    form.submit();
+                });
+            });
+        });
+    </script>
 {% endblock scripts %}

@@ -4,10 +4,6 @@ data "aws_caller_identity" "current" {}
 
 data "aws_region" "current" {}
 
-data "aws_ssm_parameter" "google_places_api_key" {
-  name = "/${var.app_name}/${var.environment}/google/places-api-key"
-}
-
 data "aws_ssm_parameter" "google_maps_api_key" {
   name = "/${var.app_name}/${var.environment}/google/maps-api-key"
 }
@@ -255,8 +251,7 @@ resource "aws_lambda_function" "main" {
       RUN_MIGRATIONS = var.run_migrations ? "true" : "false"
 
       # Google API keys: pass actual values in non-prod, SSM paths in prod
-      GOOGLE_PLACES_API_KEY = var.environment != "prod" ? data.aws_ssm_parameter.google_places_api_key.value : "ssm:${data.aws_ssm_parameter.google_places_api_key.name}"
-      GOOGLE_MAPS_API_KEY   = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_api_key.value   : "ssm:${data.aws_ssm_parameter.google_maps_api_key.name}"
+      GOOGLE_MAPS_API_KEY = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_api_key.value : "ssm:${data.aws_ssm_parameter.google_maps_api_key.name}"
 
       # Database URL: construct in non-prod, use secret in prod
       DATABASE_URL = var.environment != "prod" ? "postgresql+psycopg2://${var.db_username}:${var.db_password}@${var.db_host}:${var.db_port}/${var.db_name}" : null

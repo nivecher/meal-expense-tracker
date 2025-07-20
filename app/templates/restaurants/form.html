@@ -1,4 +1,4 @@
-{% extends "main/base.html" %}
+{% extends "base.html" %}
 {% block title %}
     {{ 'Edit' if is_edit else 'Add New' }} Restaurant - Meal Expense Tracker
 {% endblock title %}
@@ -41,109 +41,32 @@
             z-index: 1060;
         }
 
-        /* Map container */
-        #map-container {
-            height: 300px;
-            width: 100%;
-            margin: 1rem 0;
-            border-radius: 0.5rem;
-            overflow: hidden;
-            border: 1px solid #dee2e6;
-            position: relative;
-        }
-
-        #map {
-            height: 100%;
-            width: 100%;
-        }
-
         .form-section:last-child {
             border-bottom: none;
-        }
-
-        /* Location search */
-        .location-search-container {
-            position: relative;
-            margin-bottom: 1rem;
-        }
-
-        .location-search-input {
-            padding-right: 2.5rem;
-        }
-
-        .location-search-icon {
-            position: absolute;
-            right: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #6c757d;
         }
 
         /* Form controls */
         .form-floating>label {
             padding: 1rem 0.75rem;
         }
-
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .location-search-container {
-                margin-bottom: 1.5rem;
-            }
-
-            #map-container {
-                height: 250px;
-                margin: 1rem 0;
-            }
-        }
-
-        /* Loading overlay */
-        .loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10;
-            border-radius: 0.5rem;
-        }
-
-        .spinner-border {
-            width: 2rem;
-            height: 2rem;
-        }
     </style>
 {% endblock styles %}
 {% block content %}
-    <!-- Loading Indicator -->
-    <div id="loading-indicator"
-         class="position-fixed top-0 start-0 w-100 text-center p-2 bg-primary text-white d-none">
-        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-        <span>Loading...</span>
-    </div>
-    <!-- Success Container -->
-    <div id="success-container"
-         class="alert alert-success d-none position-fixed top-0 start-50 translate-middle-x mt-5 z-3">
-        <i class="fas fa-check-circle me-2"></i>
-        <span id="success-message"></span>
-        <button type="button"
-                class="btn-close float-end"
-                data-bs-dismiss="alert"
-                aria-label="Close"></button>
-    </div>
-    <!-- Error Container -->
-    <div id="error-container"
-         class="alert alert-danger d-none position-fixed top-0 start-50 translate-middle-x mt-5 z-3">
-        <i class="fas fa-exclamation-circle me-2"></i>
-        <span id="error-message"></span>
-        <button type="button"
-                class="btn-close float-end"
-                data-bs-dismiss="alert"
-                aria-label="Close"></button>
-    </div>
+    <!-- Success/Error Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-circle' }} me-2"></i>
+                    {{ message }}
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="alert"
+                            aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
     <div class="container mt-4">
         <div class="row justify-content-center">
             <div class="col-lg-10">
@@ -154,112 +77,46 @@
                                 <i class="fas fa-utensils me-2 text-primary"></i>
                                 {{ 'Edit' if is_edit else 'Add New' }} Restaurant
                             </h1>
-                            {% if is_edit %}
-                                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                                   class="btn btn-sm btn-outline-secondary">
-                                    <i class="fas fa-arrow-left me-1"></i> Back to Details
-                                </a>
-                            {% else %}
-                                <a href="{{ url_for("restaurants.list_restaurants") }}"
-                                   class="btn btn-sm btn-outline-secondary">
-                                    <i class="fas fa-arrow-left me-1"></i> Back to List
-                                </a>
-                            {% endif %}
+                            <a href="{{ url_for("restaurants.list_restaurants") }}"
+                               class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Back to List
+                            </a>
                         </div>
                     </div>
-                    <div class="card-body position-relative" id="form-container">
-                        <!-- Loading Overlay -->
-                        <div id="form-overlay"
-                             class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center d-none"
-                             style="z-index: 10">
-                            <div class="text-center">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                <p class="mt-2">Saving changes...</p>
-                            </div>
+                    <div class="card-body">
+                        <!-- Google Places Search Button -->
+                        <div class="d-flex justify-content-end mb-4">
+                            <button type="button"
+                                    class="btn btn-outline-primary"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#googlePlacesModal"
+                                    id="findWithGooglePlaces">
+                                <i class="fas fa-search me-2"></i> Find with Google Places
+                            </button>
                         </div>
-                        <!-- Flash Messages -->
-                        {% with messages = get_flashed_messages(with_categories=true) %}
-                            {% if messages %}
-                                {% for category, message in messages %}
-                                    <div class="alert alert-{{ category }} alert-dismissible fade show">
-                                        <i class="fas
-                                                  {% if category == 'success' %}
-                                                      fa-check-circle
-                                                  {% else %}
-                                                      fa-exclamation-circle
-                                                  {% endif %}
-                                                  me-2"></i>
-                                        {{ message }}
-                                        <button type="button"
-                                                class="btn-close"
-                                                data-bs-dismiss="alert"
-                                                aria-label="Close"></button>
-                                    </div>
-                                {% endfor %}
-                            {% endif %}
-                        {% endwith %}
-                        <!-- Main Form -->
                         <form method="post"
                               action="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) if is_edit and restaurant else url_for('restaurants.add_restaurant') }}"
-                              class="needs-validation"
-                              novalidate
                               enctype="multipart/form-data"
+                              novalidate
                               id="restaurantForm">
                             {{ form.hidden_tag() }}
-                            {{ form.google_place_id() }}
-                            {{ form.place_name() }}
-                            {{ form.latitude() }}
-                            {{ form.longitude() }}
-                            <!-- Search Section -->
-                            <div class="form-section">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="mb-0">
-                                        <i class="fas fa-search me-2 text-primary"></i>Find Restaurant
-                                    </h5>
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-primary"
-                                            id="useCurrentLocation">
-                                        <i class="fas fa-location-arrow me-1"></i>Use My Location
-                                    </button>
-                                </div>
-                                <div class="row g-3">
-                                    <div class="col-md-8">
-                                        <label for="restaurantSearch" class="form-label">Search by Name or Address</label>
-                                        <div class="input-group">
-                                            <input type="text"
-                                                   class="form-control"
-                                                   id="restaurantSearch"
-                                                   placeholder="Enter restaurant name or address..."
-                                                   autocomplete="off">
-                                            <button class="btn btn-outline-secondary" type="button" id="searchButton">
-                                                <i class="fas fa-search"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="placeType" class="form-label">Place Type</label>
-                                        <select class="form-select" id="placeType">
-                                            <option value="restaurant" selected>Restaurant</option>
-                                            <option value="cafe">Cafe</option>
-                                            <option value="bar">Bar</option>
-                                            <option value="bakery">Bakery</option>
-                                            <option value="food">Food (Any)</option>
-                                            <option value="establishment">Any Business</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div id="searchResults" class="mt-3 d-none">
-                                    <div class="card">
-                                        <div class="card-body p-0">
-                                            <ul class="list-group list-group-flush" id="searchResultsList">
-                                                <!-- Search results will be populated here -->
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <!-- Hidden fields for Google Places data -->
+                            <input type="hidden"
+                                   id="google_place_id"
+                                   name="google_place_id"
+                                   value="{{ form.google_place_id.data or '' }}">
+                            <input type="hidden"
+                                   id="latitude"
+                                   name="latitude"
+                                   value="{{ form.latitude.data or '' }}">
+                            <input type="hidden"
+                                   id="longitude"
+                                   name="longitude"
+                                   value="{{ form.longitude.data or '' }}">
+                            <input type="hidden"
+                                   id="longitude"
+                                   name="longitude"
+                                   value="{{ form.longitude.data or '' }}">
                             <!-- Restaurant Information Section -->
                             <div class="form-section">
                                 <h5 class="mb-4">
@@ -268,249 +125,324 @@
                                 <div class="row g-3">
                                     <div class="col-md-8">
                                         <label for="name" class="form-label">Restaurant Name *</label>
-                                        <div class="input-group">
-                                            {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "") , placeholder="Enter restaurant name") }}
-                                            <button class="btn btn-outline-secondary"
-                                                    type="button"
-                                                    id="clearSearch"
-                                                    title="Clear and start over">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </div>
+                                        {{ form.name(class_="form-control" + (" is-invalid" if form.name.errors else "") , placeholder="Enter restaurant name") }}
                                         {% for error in form.name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                        <div class="form-text text-muted small">Or search for a restaurant above to auto-fill details</div>
                                     </div>
                                     <div class="col-md-4">
                                         <label for="type" class="form-label">Restaurant Type</label>
-                                        {{ form.type(class="form-select" + (" is-invalid" if form.type.errors else "") ) }}
+                                        {{ form.type(class_="form-select" + (" is-invalid" if form.type.errors else "") ) }}
                                         {% for error in form.type.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                    </div>
-                                </div>
-                                <div class="row g-3 mt-2">
-                                    <div class="col-md-6">
                                         <label for="price_range" class="form-label">Price Range</label>
-                                        {{ form.price_range(class="form-select" + (" is-invalid" if form.price_range.errors else "") ) }}
+                                        {{ form.price_range(class_="form-select" + (" is-invalid" if form.price_range.errors else "") ) }}
                                         {% for error in form.price_range.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                     <div class="col-md-6">
                                         <label for="cuisine" class="form-label">Cuisine Type</label>
-                                        {{ form.cuisine(class="form-select" + (" is-invalid" if form.cuisine.errors else "") ) }}
+                                        {{ form.cuisine(class_="form-select" + (" is-invalid" if form.cuisine.errors else "") ) }}
                                         {% for error in form.cuisine.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                 </div>
                                 <div class="mt-3">
                                     <label for="description" class="form-label">Description</label>
-                                    {{ form.description(class="form-control" + (" is-invalid" if form.description.errors else "") , rows="3", placeholder="Brief description of the restaurant") }}
+                                    {{ form.description(class_="form-control" + (" is-invalid" if form.description.errors else "") , rows="3", placeholder="Brief description of the restaurant") }}
                                     {% for error in form.description.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                 </div>
                             </div>
-                            <div class="text-end mb-3">
-                                <button type="button"
-                                        id="use-location"
-                                        class="btn btn-outline-primary btn-sm">
-                                    <i class="fas fa-location-arrow me-1"></i> Use My Location
-                                </button>
+                            <!-- Contact Information Section -->
+                            <div class="form-section">
+                                <h5 class="mb-4">
+                                    <i class="fas fa-address-card me-2 text-primary"></i>Contact Information
+                                </h5>
+                                <!-- Address Autocomplete Component -->
+                                <div class="mb-4">
+                                    <label class="form-label">Search Address</label>
+                                    <div class="input-group">
+                                        <input type="text"
+                                               class="form-control"
+                                               id="address-autocomplete"
+                                               placeholder="Search for an address..."
+                                               autocomplete="off"
+                                               value="{{ form.address.data or '' }}"
+                                               data-address-field="address"
+                                               data-city-field="city"
+                                               data-state-field="state"
+                                               data-postal-code-field="postal_code"
+                                               data-country-field="country">
+                                        <button class="btn btn-outline-secondary"
+                                                type="button"
+                                                id="update-address-btn"
+                                                disabled>
+                                            <i class="fas fa-search"></i> Search
+                                        </button>
+                                    </div>
+                                    <div id="address-suggestions" class="mt-2"></div>
+                                    <div id="address-valid-indicator" class="mt-2 small"></div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-8">
+                                        <label for="address" class="form-label">Address</label>
+                                        {{ form.address(class_="form-control" + (" is-invalid" if form.address.errors else "") ,
+                                        id="address",
+                                        placeholder="Street address"
+                                        ) }}
+                                        {% for error in form.address.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="city" class="form-label">City</label>
+                                        {{ form.city(class_="form-control" + (" is-invalid" if form.city.errors else "") ,
+                                        id="city",
+                                        placeholder="City"
+                                        ) }}
+                                        {% for error in form.city.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="state" class="form-label">State/Province</label>
+                                        {{ form.state(class_="form-control" + (" is-invalid" if form.state.errors else "") ,
+                                        id="state",
+                                        placeholder="State/Province"
+                                        ) }}
+                                        {% for error in form.state.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="postal_code" class="form-label">Postal Code</label>
+                                        {{ form.postal_code(class_="form-control" + (" is-invalid" if form.postal_code.errors else "") ,
+                                        id="postal_code",
+                                        placeholder="Postal code"
+                                        ) }}
+                                        {% for error in form.postal_code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="country" class="form-label">Country</label>
+                                        {{ form.country(class_="form-control" + (" is-invalid" if form.country.errors else "") ,
+                                        id="country",
+                                        placeholder="Country"
+                                        ) }}
+                                        {% for error in form.country.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="phone" class="form-label">Phone Number</label>
+                                        {{ form.phone(class_="form-control" + (" is-invalid" if form.phone.errors else "") , placeholder="Phone number") }}
+                                        {% for error in form.phone.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="website" class="form-label">Website</label>
+                                        {{ form.website(class_="form-control" + (" is-invalid" if form.website.errors else "") , placeholder="https://example.com") }}
+                                        {% for error in form.website.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    {% if form.google_place_id.data %}
+                                        <div class="col-12 mt-2">
+                                            <a href="https://www.google.com/maps/place/?q=place_id:{{ form.google_place_id.data }}"
+                                               target="_blank"
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-map-marker-alt me-1"></i> View on Google Maps
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </div>
-                        </div>
-                        <div class="form-section">
-                            <h5 class="mb-4">
-                                <i class="fas fa-info-circle me-2 text-primary"></i>Restaurant Details
-                            </h5>
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <div class="form-floating">
-                                        {{ form.name(class_="form-control" + (" is-invalid" if form.name.errors else "") , placeholder="Restaurant Name", autocomplete="off") }}
-                                        <label for="name">Restaurant Name *</label>
-                                        {% if form.name.errors %}<div class="invalid-feedback">{{ form.name.errors[0] }}</div>{% endif %}
-                                    </div>
+                            <!-- Form Actions -->
+                            <div class="d-flex justify-content-between mt-5 pt-3 border-top">
+                                <div>
+                                    <a href="{{ url_for("restaurants.list_restaurants") }}"
+                                       class="btn btn-outline-secondary">
+                                        <i class="fas fa-arrow-left me-1"></i> Back to List
+                                    </a>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="form-floating">
-                                        {{ form.cuisine_type(class_="form-select" + (" is-invalid" if form.cuisine_type.errors else "") , placeholder="Cuisine Type") }}
-                                        <label for="cuisine_type">Cuisine Type</label>
-                                        {% if form.cuisine_type.errors %}<div class="invalid-feedback">{{ form.cuisine_type.errors[0] }}</div>{% endif %}
-                                    </div>
+                                <div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>
+                                        {{ 'Update' if is_edit else 'Save' }} Restaurant
+                                    </button>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-section">
-                            <h5 class="mb-4">
-                                <i class="fas fa-address-card me-2 text-primary"></i>Address
-                            </h5>
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <div class="form-floating">
-                                        {{ form.address(class_="form-control" + (" is-invalid" if form.address.errors else "") , placeholder="Address", autocomplete="off") }}
-                                        <label for="address">Street Address *</label>
-                                        {% if form.address.errors %}<div class="invalid-feedback">{{ form.address.errors[0] }}</div>{% endif %}
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-floating">
-                                        {{ form.city(class_="form-control" + (" is-invalid" if form.city.errors else "") , placeholder="City", autocomplete="off") }}
-                                        <label for="city">City *</label>
-                                        {% if form.city.errors %}<div class="invalid-feedback">{{ form.city.errors[0] }}</div>{% endif %}
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-floating">
-                                        {{ form.state_province(class_="form-control" + (" is-invalid" if form.state_province.errors else "") , placeholder="State/Province", autocomplete="off") }}
-                                        <label for="state_province">State/Province</label>
-                                        {% if form.state_province.errors %}<div class="invalid-feedback">{{ form.state_province.errors[0] }}</div>{% endif %}
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-floating">
-                                        {{ form.postal_code(class_="form-control" + (" is-invalid" if form.postal_code.errors else "") , placeholder="Postal Code", autocomplete="off") }}
-                                        <label for="postal_code">Postal Code</label>
-                                        {% if form.postal_code.errors %}<div class="invalid-feedback">{{ form.postal_code.errors[0] }}</div>{% endif %}
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-floating">
-                                        {{ form.country(class_="form-control" + (" is-invalid" if form.country.errors else "") , placeholder="Country", autocomplete="off") }}
-                                        <label for="country">Country</label>
-                                        {% if form.country.errors %}<div class="invalid-feedback">{{ form.country.errors[0] }}</div>{% endif %}
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check form-switch mt-3">
-                                        {{ form.is_chain(class_="form-check-input" + (" is-invalid" if form.is_chain.errors else "") , role="switch") }}
-                                        <label class="form-check-label" for="is_chain">This is a chain restaurant</label>
-                                        {% if form.is_chain.errors %}<div class="invalid-feedback d-block">{{ form.is_chain.errors[0] }}</div>{% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Hidden Fields -->
-                        {{ form.latitude() }}
-                        {{ form.longitude() }}
-                        {{ form.google_place_id() }}
-                        {{ form.hidden_tag() }}
-                        <!-- Form Actions -->
-                        <div class="d-flex justify-content-between mt-5 pt-3 border-top">
-                            <div>
-                                <a href="{{ url_for("restaurants.list_restaurants") }}"
-                                   class="btn btn-outline-secondary">
-                                    <i class="fas fa-arrow-left me-1"></i> Back to List
-                                </a>
-                            </div>
-                            <div>
-                                <button type="submit"
-                                        class="btn btn-primary position-relative"
-                                        id="submit-button">
-                                    <i class="fas fa-save me-1"></i>
-                                    <span id="button-text">{{ 'Update' if is_edit else 'Save' }} Restaurant</span>
-                                    <span id="loading-spinner"
-                                          class="spinner-border spinner-border-sm d-none position-absolute"
-                                          role="status"
-                                          style="right: 10px;
-                                                 top: 50%;
-                                                 transform: translateY(-50%)"
-                                          aria-hidden="true"></span>
-                                </button>
-                            </div>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <!-- Map container for Google Places -->
-    <div class="form-section">
-        <h5 class="mb-4">
-            <i class="fas fa-map-marker-alt me-2 text-primary"></i>Find Restaurant
-        </h5>
-        <!-- Search and Location Controls -->
-        <div class="row g-3 mb-3">
-            <div class="col-md-9">
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-search"></i></span>
-                    <input type="text"
-                           id="restaurant-search"
-                           class="form-control"
-                           placeholder="Search for a restaurant or address"
-                           autocomplete="off" />
+    <!-- Google Places Search Modal -->
+    <div class="modal fade"
+         id="googlePlacesModal"
+         tabindex="-1"
+         aria-labelledby="googlePlacesModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="googlePlacesModalLabel">Find Restaurant with Google Places</h5>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
                 </div>
-                <div class="form-text">Start typing to search for a restaurant or address</div>
-            </div>
-            <div class="col-md-3">
-                <button type="button"
-                        class="btn btn-outline-primary w-100 h-100"
-                        id="use-location">
-                    <i class="fas fa-location-arrow me-2"></i>Use My Location
-                </button>
-            </div>
-        </div>
-        <!-- Map Container with Loading Overlay -->
-        <div class="position-relative mb-3" id="map-container">
-            <div id="map-loading"
-                 class="position-absolute top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-flex justify-content-center align-items-center"
-                 style="z-index: 1;
-                        display: none">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <input type="text"
+                                   class="form-control"
+                                   id="googlePlacesSearchInput"
+                                   placeholder="Search for a restaurant..."
+                                   autocomplete="off">
+                            <button class="btn btn-primary" type="button" id="googlePlacesSearchButton">
+                                <i class="fas fa-search me-1"></i> Search
+                            </button>
+                        </div>
+                    </div>
+                    <div id="googlePlacesError" class="alert alert-danger d-none" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="googlePlacesErrorMessage"></span>
+                    </div>
+                    <div id="googlePlacesLoading" class="text-center my-4 d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Searching for restaurants...</p>
+                    </div>
+                    <div id="googlePlacesSearchResults"
+                         class="list-group mt-3"
+                         style="max-height: 400px;
+                                overflow-y: auto">
+                        <div class="text-center text-muted p-4">
+                            <i class="fas fa-search fa-2x mb-2"></i>
+                            <p>Search for a restaurant to see results</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div id="map" class="w-100 rounded" style="height: 300px;"></div>
-        </div>
-        <!-- Error Container -->
-        <div id="error-container" class="alert alert-danger d-none" role="alert"></div>
-        <div class="collapse" id="debugInfo">
-            <div class="card-body bg-light">
-                <h6>Form Data:</h6>
-                <pre class="mb-0"><code id="formData"></code></pre>
-                <hr>
-                <h6>Place Data:</h6>
-                <pre class="mb-0"><code id="placeData">No place data available</code></pre>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary me-auto"
+                            data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" id="useSelectedPlace" disabled>
+                        <i class="fas fa-check me-1"></i> Use Selected Restaurant
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <!-- Select2 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    <!-- Google Maps API Key -->
+    <!-- Google Maps API Configuration with async loading -->
     <script>
-        // Set the Google Maps API key from server-side variable
+        // Make the Google Maps API key available to our JavaScript
         window.GOOGLE_MAPS_API_KEY = '{{ config.get("GOOGLE_MAPS_API_KEY", "") }}';
+        window.gm_authFailure = function() {
+            console.error('Google Maps API authentication failed');
+            // You could show a user-friendly error message here
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-danger';
+            errorDiv.textContent = 'Failed to load maps. Please refresh the page or try again later.';
+            document.body.prepend(errorDiv);
+        };
 
-        // Set CSRF token for AJAX requests
-        document.addEventListener('DOMContentLoaded', function() {
-            const csrfToken = document.querySelector('input[name="csrf_token"]')?.value;
-            if (csrfToken) {
-                // Set as meta tag for easier access
-                let meta = document.createElement('meta');
-                meta.name = 'csrf-token';
-                meta.content = csrfToken;
-                document.head.appendChild(meta);
-
-                // Set as header for fetch requests
-                const originalFetch = window.fetch;
-                window.fetch = function(resource, options = {}) {
-                    options.headers = {
-                        ...options.headers,
-                        'X-CSRFToken': csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    };
-                    return originalFetch(resource, options);
-                };
+        // Function to load Google Maps API
+        function loadGoogleMapsApi(callback) {
+            if (window.google && window.google.maps) {
+                callback();
+                return;
             }
 
-            // Initialize Select2
-            if (window.jQuery && jQuery.fn.select2) {
-                jQuery('select').select2({
-                    theme: 'bootstrap-5',
-                    width: '100%',
-                    placeholder: 'Select an option',
-                    allowClear: true,
-                    dropdownParent: jQuery('#form-container')
+            // Check if script is already being loaded
+            if (document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')) {
+                // If script is already loading, just set up the callback
+                const originalCallback = window.initMap;
+                window.initMap = function() {
+                    if (originalCallback) originalCallback();
+                    callback();
+                };
+                return;
+            }
+
+            const script = document.createElement('script');
+            const callbackName = 'initMap' + Date.now();
+
+            // Set up the callback
+            window[callbackName] = function() {
+                delete window[callbackName];
+                callback();
+            };
+
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${window.GOOGLE_MAPS_API_KEY}`
+                + `&libraries=places,geocoding`
+                + '&callback=' + callbackName
+                + '&v=weekly';
+
+            script.async = true;
+            script.defer = true;
+            script.onerror = function() {
+                console.error('Failed to load Google Maps API');
+                delete window[callbackName];
+                // You could show a user-friendly error message here
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger';
+                errorDiv.textContent = 'Failed to load maps. Please check your internet connection and refresh the page.';
+                document.body.prepend(errorDiv);
+            };
+
+            document.head.appendChild(script);
+        }
+
+        // Function to initialize the application after Google Maps is loaded
+        function initApplication() {
+            // Load custom scripts after Google Maps is ready
+            const scripts = [
+                '{{ url_for("static", filename="js/pages/restaurant-form.js") }}',
+                '{{ url_for("static", filename="js/pages/restaurant-address-autocomplete.js") }}'
+            ];
+
+            let loadedScripts = 0;
+
+            function loadNextScript() {
+                if (loadedScripts >= scripts.length) {
+                    // All scripts loaded, initialize the form
+                    if (window.initRestaurantForm) {
+                        window.initRestaurantForm();
+                    }
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = scripts[loadedScripts];
+                script.onload = () => {
+                    loadedScripts++;
+                    loadNextScript();
+                };
+                script.onerror = (error) => {
+                    console.error(`Failed to load script: ${scripts[loadedScripts]}`, error);
+                    loadedScripts++;
+                    loadNextScript();
+                };
+                document.head.appendChild(script);
+            }
+
+            loadNextScript();
+        }
+    </script>
+    <!-- Initialize the application -->
+    <script>
+        // Start loading Google Maps API and initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load Google Maps API and then initialize the application
+            loadGoogleMapsApi(initApplication);
+
+            // Add click handler for the Google Places search button
+            const findButton = document.getElementById('findWithGooglePlaces');
+            if (findButton) {
+                findButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const modalElement = document.getElementById('googlePlacesModal');
+                    if (modalElement && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        const modal = new bootstrap.Modal(modalElement, {
+                            backdrop: 'static',
+                            keyboard: false
+                        });
+                        modal.show();
+                    }
                 });
             }
         });
     </script>
-    <!-- Restaurant Form Module -->
-    <script type="module"
-            src="{{ url_for('static', filename='js/init/restaurant-form.js') }}"></script>
-{% endblock %}
+{% endblock scripts %}

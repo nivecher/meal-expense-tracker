@@ -23,8 +23,9 @@ def verify_persistent_db():
         print(f"Database exists: {db_path.exists()}")
 
         # Import after setting environment variables
-        from app import create_app, db
         from sqlalchemy import inspect, text
+
+        from app import create_app, db
 
         # Create app
         app = create_app()
@@ -46,8 +47,9 @@ def verify_persistent_db():
 
             # Test data persistence
             print("\nTesting data persistence...")
-            from app.auth.models import User
             from sqlalchemy.exc import IntegrityError
+
+            from app.auth.models import User
 
             try:
                 # Try to create a test user

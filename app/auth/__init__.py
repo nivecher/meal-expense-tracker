@@ -3,7 +3,6 @@
 import logging
 
 from flask import Blueprint
-from flask_login import LoginManager
 
 # Initialize Blueprint
 bp = Blueprint("auth", __name__)
@@ -22,16 +21,7 @@ def init_app(app):
         app: The Flask application instance
     """
     # Import models here to avoid circular imports
-    from .models import User, init_login_manager  # noqa: F401
+    from .models import User  # noqa: F401
 
     # Register the auth blueprint
     app.register_blueprint(bp, url_prefix="/auth")
-
-    # Initialize login manager
-    login_manager = LoginManager()
-    login_manager.login_view = "auth.login"
-    login_manager.login_message_category = "info"
-    login_manager.init_app(app)
-
-    # Initialize the login manager
-    init_login_manager(login_manager)

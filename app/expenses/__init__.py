@@ -2,7 +2,7 @@
 
 from flask import Blueprint
 
-from app import db
+from app.extensions import db
 
 from .models import Category
 

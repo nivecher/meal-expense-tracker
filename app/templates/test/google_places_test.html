@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Google Places API Test</title>
+        <link rel="stylesheet"
+              href="{{ url_for('static', filename='css/google-places-test.css') }}">
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>Google Places API Test</h1>
+                <p>Search for restaurants near a location</p>
+            </header>
+            <div class="search-container">
+                <div class="search-box">
+                    <input type="text"
+                           id="location-input"
+                           placeholder="Enter a location (e.g., New York, NY)"
+                           aria-label="Location search input">
+                    <button id="search-button" aria-label="Search">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             width="16"
+                             height="16"
+                             fill="currentColor"
+                             viewBox="0 0 16 16">
+                            <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z" />
+                        </svg>
+                        Search
+                    </button>
+                </div>
+                <div id="error-message"
+                     class="error-message"
+                     role="alert"
+                     aria-atomic="true"></div>
+            </div>
+            <div class="content">
+                <div id="map" aria-label="Map showing search results"></div>
+                <div class="results-container">
+                    <h2>Search Results</h2>
+                    <div id="results" class="results">
+                        <p class="no-results">Search for a location to see results</p>
+                    </div>
+                    <button id="more-button" class="more-button" style="display: none;">Load More Results</button>
+                </div>
+            </div>
+        </div>
+        <!-- Load the Google Maps JavaScript API with the Places library -->
+        <!-- The API key will be loaded dynamically by google-places-test.js -->
+        <script src="{{ url_for('static', filename='js/google-places-test.js') }}"></script>
+    </body>
+</html>

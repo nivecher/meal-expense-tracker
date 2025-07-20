@@ -1,5 +1,6 @@
-from PIL import Image, ImageDraw, ImageFont
 import os
+
+from PIL import Image, ImageDraw, ImageFont
 
 
 def create_icon(size, text, output_path):

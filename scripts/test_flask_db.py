@@ -18,12 +18,13 @@ def test_flask_db():
         os.environ["FLASK_ENV"] = "development"
 
         # Import Flask and create app
-        from app import create_app, db
         from flask_migrate import Migrate
+
+        from app import create_app, db
 
         # Create app
         app = create_app()
-        migrate = Migrate(app, db)
+        _ = Migrate(app, db)  # Initialize migrations
 
         # Print database URI
         print(f"Database URI: {app.config['SQLALCHEMY_DATABASE_URI']}")

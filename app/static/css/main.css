@@ -1,4 +1,6 @@
 /* Main CSS file for Meal Expense Tracker */
+@import url('../css/components/table.css');
+
 :root {
     /* Modern Color Palette */
     --primary-color: #2563eb;      /* Modern blue */
@@ -16,6 +18,14 @@
     --success-color: #10b981;      /* Modern green */
     --warning-color: #f59e0b;      /* Amber */
     --danger-color: #ef4444;       /* Red */
+
+    /* Google Places Search */
+    --google-places-selected-bg: #f0f9ff;  /* Light blue background for selected items */
+    --google-places-hover-bg: #f8fafc;     /* Slightly darker on hover */
+    --google-places-border: #e2e8f0;        /* Border color for items */
+    --google-places-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); /* Shadow for dropdowns */
+    --google-places-radius: 0.5rem;         /* Border radius for UI elements */
+    --google-places-transition: all 0.2s ease-in-out; /* Smooth transitions */
     --info-color: #3b82f6;         /* Blue */
 
     /* Grayscale */
@@ -1051,9 +1061,38 @@ footer {
 [data-bs-theme="dark"] {
     border: none;
     border-radius: 8px;
-    padding: 1rem 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Breadcrumb Navigation */
+.breadcrumb {
+    background-color: transparent;
+    padding: 0.25rem 0;
+    margin: 0 0 1rem 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    padding-left: 0;
+    font-size: 0.875rem;
+    line-height: 1.25;
+}
+
+.breadcrumb-item {
+    padding: 0.15rem 0.5rem 0.15rem 0;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    padding-right: 0.5rem;
+    color: #6b7280;
+    content: "/";
+}
+
+.breadcrumb-item a {
+    color: #4b5563;
+    text-decoration: none;
+}
+
+.breadcrumb-item.active {
+    color: #6b7280;
 }
 
 /* Alert Styles */

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Places API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            margin: 20px 0;
+            border: 1px solid #ccc;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .restaurant {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .restaurant:last-child {
+            border-bottom: none;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input[type="text"] {
+            padding: 8px;
+            margin: 10px 0;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Places API Test</h1>
+
+    <div>
+        <label for="location">Search Location (e.g., New York, NY):</label><br>
+        <input type="text" id="location" value="New York, NY">
+        <button id="searchBtn">Search Restaurants</button>
+        <button id="clearBtn">Clear Results</button>
+    </div>
+
+    <div id="map"></div>
+
+    <h2>Search Results:</h2>
+    <div id="results">
+        <p>Search results will appear here...</p>
+    </div>
+
+    <!-- Load the Google Maps JavaScript API with Places library -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap" async defer></script>
+
+    <script>
+        // This function will be called when the Google Maps API is loaded
+        function initMap() {
+            console.log('Google Maps API loaded');
+
+            // Initialize the map centered on New York
+            const map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 40.7128, lng: -74.0060 },
+                zoom: 13
+            });
+
+            // Create a marker
+            const marker = new google.maps.Marker({
+                position: { lat: 40.7128, lng: -74.0060 },
+                map: map,
+                title: 'New York'
+            });
+
+            // Add click handler for the search button
+            document.getElementById('searchBtn').addEventListener('click', searchRestaurants);
+            document.getElementById('clearBtn').addEventListener('click', clearResults);
+
+            // Function to search for restaurants
+            async function searchRestaurants() {
+                const locationInput = document.getElementById('location').value;
+                const resultsDiv = document.getElementById('results');
+
+                if (!locationInput) {
+                    resultsDiv.innerHTML = '<p>Please enter a location</p>';
+                    return;
+                }
+
+                // Use the Geocoder to convert the location string to coordinates
+                const geocoder = new google.maps.Geocoder();
+
+                try {
+                    // Show loading message
+                    resultsDiv.innerHTML = '<p>Searching for restaurants in ' + locationInput + '...</p>';
+
+                    // Get coordinates from location string
+                    const geocodeResponse = await new Promise((resolve, reject) => {
+                        geocoder.geocode({ address: locationInput }, (results, status) => {
+                            if (status === 'OK' && results[0]) {
+                                resolve(results[0]);
+                            } else {
+                                reject(new Error('Geocode was not successful for the following reason: ' + status));
+                            }
+                        });
+                    });
+
+                    const location = geocodeResponse.geometry.location;
+                    const lat = location.lat();
+                    const lng = location.lng();
+
+                    // Update the map to the new location
+                    map.setCenter({ lat, lng });
+                    marker.setPosition({ lat, lng });
+
+                    // Create a PlacesService
+                    const service = new google.maps.places.PlacesService(map);
+
+                    // Search for restaurants
+                    const request = {
+                        location: { lat, lng },
+                        radius: '1000', // 1km radius
+                        type: ['restaurant'],
+                        keyword: 'restaurant'
+                    };
+
+                    // Perform the search
+                    const placesResponse = await new Promise((resolve, reject) => {
+                        service.nearbySearch(request, (results, status, pagination) => {
+                            if (status === 'OK') {
+                                resolve({ results, pagination });
+                            } else {
+                                reject(new Error('Places API request failed: ' + status));
+                            }
+                        });
+                    });
+
+                    // Display the results
+                    displayResults(placesResponse.results, service);
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    resultsDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+                }
+            }
+
+            // Function to display results
+            function displayResults(places, placesService) {
+                const resultsDiv = document.getElementById('results');
+
+                if (!places || places.length === 0) {
+                    resultsDiv.innerHTML = '<p>No restaurants found in this area.</p>';
+                    return;
+                }
+
+                let html = `<p>Found ${places.length} restaurants:</p>`;
+
+                places.forEach((place, index) => {
+                    // Add a marker for each place
+                    new google.maps.Marker({
+                        position: place.geometry.location,
+                        map: map,
+                        title: place.name,
+                        label: (index + 1).toString()
+                    });
+
+                    // Get more details for each place
+                    getPlaceDetails(place.place_id, placesService)
+                        .then(details => {
+                            const detailElement = document.getElementById(`place-${place.place_id}`);
+                            if (detailElement) {
+                                detailElement.innerHTML += formatPlaceDetails(details);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error getting place details:', error);
+                        });
+
+                    // Add basic place info
+                    html += `
+                        <div class="restaurant" id="place-${place.place_id}">
+                            <h3>${index + 1}. ${place.name}</h3>
+                            <p>${place.vicinity || 'Address not available'}</p>
+                            <div class="details">
+                                <p>Loading details...</p>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                resultsDiv.innerHTML = html;
+            }
+
+            // Function to get more details about a place
+            function getPlaceDetails(placeId, placesService) {
+                return new Promise((resolve, reject) => {
+                    const request = {
+                        placeId: placeId,
+                        fields: [
+                            'name', 'formatted_address', 'formatted_phone_number',
+                            'website', 'rating', 'user_ratings_total', 'price_level',
+                            'opening_hours', 'photos'
+                        ]
+                    };
+
+                    placesService.getDetails(request, (place, status) => {
+                        if (status === google.maps.places.PlacesServiceStatus.OK) {
+                            resolve(place);
+                        } else {
+                            reject(new Error('Place details request failed: ' + status));
+                        }
+                    });
+                });
+            }
+
+            // Function to format place details
+            function formatPlaceDetails(place) {
+                let html = '<div class="details">';
+
+                if (place.rating) {
+                    html += `<p>Rating: ${place.rating} (${place.user_ratings_total || 0} reviews)</p>`;
+                }
+
+                if (place.price_level !== undefined) {
+                    const priceLevels = ['Free', 'Inexpensive', 'Moderate', 'Expensive', 'Very Expensive'];
+                    html += `<p>Price: ${priceLevels[place.price_level] || 'Not specified'}</p>`;
+                }
+
+                if (place.formatted_phone_number) {
+                    html += `<p>Phone: ${place.formatted_phone_number}</p>`;
+                }
+
+                if (place.website) {
+                    html += `<p>Website: <a href="${place.website}" target="_blank">${place.website}</a></p>`;
+                }
+
+                if (place.opening_hours) {
+                    const isOpen = place.opening_hours.isOpen() ? 'Open Now' : 'Closed Now';
+                    const hours = place.opening_hours.weekday_text ?
+                        place.opening_hours.weekday_text.join('<br>') : 'Hours not available';
+
+                    html += `<p>${isOpen}</p><div style="margin-left: 20px;">${hours}</div>`;
+                }
+
+                if (place.photos && place.photos.length > 0) {
+                    const photoUrl = place.photos[0].getUrl({ maxWidth: 400 });
+                    html += `<img src="${photoUrl}" alt="${place.name}" style="max-width: 200px; margin-top: 10px;">`;
+                }
+
+                html += '</div>';
+                return html;
+            }
+
+            // Function to clear search results
+            function clearResults() {
+                document.getElementById('results').innerHTML = '<p>Search results will appear here...</p>';
+                document.getElementById('location').value = 'New York, NY';
+                map.setCenter({ lat: 40.7128, lng: -74.0060 });
+                marker.setPosition({ lat: 40.7128, lng: -74.0060 });
+            }
+        }
+
+        // Handle any errors loading the Google Maps API
+        window.gm_authFailure = function() {
+            alert('Error loading Google Maps. Please check your API key and try again.');
+        };
+    </script>
+</body>
+</html>

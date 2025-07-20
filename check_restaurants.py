@@ -1,6 +1,7 @@
 """Script to check restaurant count in the database."""
 
-from app import create_app, db
+from app import create_app
+from app.extensions import db
 from app.restaurants.models import Restaurant
 
 

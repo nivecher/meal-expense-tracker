@@ -1,0 +1,49 @@
+<tr>
+    <td>
+        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">{{ restaurant.name }}</a>
+        {% if restaurant.cuisine %}<span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>{% endif %}
+    </td>
+    <td>{{ restaurant.city or '' }}</td>
+    <td>{{ restaurant.visit_count }}</td>
+    <td>${{ "%.2f"|format(restaurant.total_spent) if restaurant.total_spent is defined else '0.00' }}</td>
+    <td>
+        {% if restaurant.rating %}
+            <span class="badge bg-{{ 'success' if restaurant.rating >= 4 else 'warning' if restaurant.rating >= 3 else 'danger' }}">
+                {{ "%.1f"|format(restaurant.rating) }}
+            </span>
+        {% else %}
+            <span class="text-muted">No rating</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if last_visit %}
+            {{ last_visit|time_ago }}
+        {% else %}
+            <span class="text-muted">No visits</span>
+        {% endif %}
+    </td>
+    <td class="actions">
+        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+           class="btn btn-sm btn-outline-primary"
+           data-bs-toggle="tooltip"
+           title="View Details">
+            <i class="fas fa-eye"></i>
+        </a>
+        <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
+           class="btn btn-sm btn-outline-secondary"
+           data-bs-toggle="tooltip"
+           title="Edit">
+            <i class="fas fa-edit"></i>
+        </a>
+        <button type="button"
+                class="btn btn-sm btn-outline-danger"
+                data-bs-toggle="modal"
+                data-bs-target="#deleteRestaurantModal"
+                data-restaurant-id="{{ restaurant.id }}"
+                data-restaurant-name="{{ restaurant.name }}"
+                data-bs-toggle="tooltip"
+                title="Delete">
+            <i class="fas fa-trash"></i>
+        </button>
+    </td>
+</tr>

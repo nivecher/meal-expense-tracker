@@ -1,612 +1,375 @@
 /**
  * Restaurant Form Page Module
  * Handles form submission and initialization for restaurant addition/editing
+ * Includes Google Places integration for finding and populating restaurant details
+ *
+ * @module restaurantForm
  */
 
-// Global variables
-let map;
-let marker;
-let autocomplete;
-let geocoder;
-let placeService;
+/** @typedef {import('@types/google.maps').AutocompleteService} AutocompleteService */
+/** @typedef {import('@types/google.maps').PlacesService} PlacesService */
 
-// Flag to track if the module is initialized
-let isInitialized = false;
+/**
+ * Main restaurant form module
+ * @namespace restaurantForm
+ */
+const restaurantForm = (() => {
+  // Module state
+  const state = {
+    isInitialized: false,
+    placesService: null,
+    autocompleteService: null,
+    map: null,
+    marker: null,
+    googleMapsInitialized: false,
+    googleMapsInitializing: false,
+    googleMapsInitQueue: [],
+    GOOGLE_MAPS_API_KEY: document.currentScript?.dataset?.googleMapsApiKey || ''
+  };
 
-// Initialize the page module
-export async function init() {
-    try {
-        // Check if the module is already initialized
-        if (isInitialized) {
-            return;
-        }
+  // DOM Selectors
+  const SELECTORS = {
+    MAP_CONTAINER: 'map',
+    SEARCH_INPUT: 'googlePlacesSearchInput',
+    SEARCH_BUTTON: 'googlePlacesSearchButton',
+    SEARCH_RESULTS: 'googlePlacesSearchResults',
+    MODAL: 'googlePlacesModal',
+    USE_SELECTED_BTN: 'useSelectedPlace',
+    LOADING_INDICATOR: 'googlePlacesLoading',
+    ERROR_DISPLAY: 'googlePlacesError'
+  };
 
-        // Initialize the map and services
-        await initMap();
-        initSearch();
-        initLocationButton();
-        initForm();
+  // DOM Elements cache
+  const elements = {};
 
-        isInitialized = true;
-
-    } catch (error) {
-        console.error('Error initializing restaurant form:', error);
-        showError('Failed to initialize the form. Please refresh the page and try again.');
-        throw error; // Re-throw to allow the caller to handle the error
+  /**
+   * Initialize the module
+   * @public
+   */
+  function init() {
+    if (state.isInitialized) {
+      return;
     }
-}
 
-// Initialize the map
-async function initMap() {
     try {
-        const mapElement = document.getElementById('map');
-        if (!mapElement) {
-            throw new Error('Map element not found');
-        }
+      cacheElements();
+      setupEventListeners();
+      state.isInitialized = true;
+      console.log('Restaurant form initialized');
+    } catch (error) {
+      console.error('Error initializing restaurant form:', error);
+      throw error;
+    }
+  }
 
-        // Default to New York
-        const defaultLocation = { lat: 40.7128, lng: -74.0060 };
+  /**
+   * Cache DOM elements
+   * @private
+   */
+  function cacheElements() {
+    elements.mapContainer = document.getElementById(SELECTORS.MAP_CONTAINER);
+    elements.searchInput = document.getElementById(SELECTORS.SEARCH_INPUT);
+    elements.searchButton = document.getElementById(SELECTORS.SEARCH_BUTTON);
+    elements.searchResults = document.getElementById(SELECTORS.SEARCH_RESULTS);
+    elements.modal = document.getElementById(SELECTORS.MODAL);
+    elements.useSelectedBtn = document.getElementById(SELECTORS.USE_SELECTED_BTN);
+    elements.loadingIndicator = document.getElementById(SELECTORS.LOADING_INDICATOR);
+    elements.errorDisplay = document.getElementById(SELECTORS.ERROR_DISPLAY);
+  }
 
-        // Create the map
-        map = new google.maps.Map(mapElement, {
-            center: defaultLocation,
-            zoom: 12,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: true,
-            zoomControl: true,
-            gestureHandling: 'auto',
-            styles: [
-                {
-                    featureType: 'poi',
-                    elementType: 'labels',
-                    stylers: [{ visibility: 'off' }]
-                }
-            ]
-        });
+  /**
+   * Set up event listeners
+   * @private
+   */
+  function setupEventListeners() {
+    // Search form submission
+    const searchForm = document.querySelector('form[data-role="search-form"]');
+    if (searchForm) {
+      searchForm.addEventListener('submit', handleSearch);
+    }
 
-        // Initialize services
-        geocoder = new google.maps.Geocoder();
-        placeService = new google.maps.places.PlacesService(map);
+    // Google Places search button
+    if (elements.searchButton) {
+      elements.searchButton.addEventListener('click', handleGooglePlacesSearch);
+    }
 
-        // Add marker
-        marker = new google.maps.Marker({
-            map: map,
-            draggable: true,
-            animation: google.maps.Animation.DROP
-        });
+    // Use selected place button
+    if (elements.useSelectedBtn) {
+      elements.useSelectedBtn.addEventListener('click', handleUseSelectedPlace);
+    }
+  }
 
-        // Update form fields when marker is dragged
-        marker.addListener('dragend', () => {
-            updateFormFromLocation(marker.getPosition());
-        });
+  /**
+   * Handle search form submission
+   * @param {Event} event - The form submission event
+   */
+  function handleSearch(event) {
+    event.preventDefault();
+    // Handle search form submission
+    console.log('Search form submitted');
+  }
 
-        // Center the map on user's current location if available
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const pos = new google.maps.LatLng(
-                        position.coords.latitude,
-                        position.coords.longitude
-                    );
-                    map.setCenter(pos);
-                    updateFormFromLocation(pos);
-                },
-                () => {
-                    // Handle location access denied
-                    map.setCenter(defaultLocation);
-                }
-            );
+  /**
+   * Handle Google Places search
+   */
+  async function handleGooglePlacesSearch() {
+    try {
+      if (!elements.searchInput || !elements.searchInput.value.trim()) {
+        showErrorInModal('Please enter a search term');
+        return;
+      }
+
+      showLoading(true);
+      await ensureGoogleMapsInitialized();
+
+      const request = {
+        query: elements.searchInput.value.trim(),
+        fields: ['name', 'formatted_address', 'geometry', 'place_id']
+      };
+
+      const service = new google.maps.places.PlacesService(document.createElement('div'));
+      service.textSearch(request, (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK) {
+          displaySearchResults(results);
         } else {
-            // Browser doesn't support Geolocation
-            map.setCenter(defaultLocation);
+          showErrorInModal('Error searching for places: ' + status);
         }
-
-        return map;
-
+        showLoading(false);
+      });
     } catch (error) {
-        console.error('Error initializing map:', error);
-        showError('Failed to load the map. Please refresh the page and try again.');
-        throw error;
+      console.error('Error in Google Places search:', error);
+      showErrorInModal('Error performing search');
+      showLoading(false);
     }
-}
+  }
 
-// Initialize search functionality
-function initSearch() {
-    const searchInput = document.getElementById('restaurant-search');
-    if (!searchInput) return;
+  /**
+   * Display search results in the modal
+   * @param {Array} places - Array of place objects from Google Places API
+   */
+  function displaySearchResults(places) {
+    if (!elements.searchResults) return;
 
-    try {
-        // Create autocomplete for search input
-        autocomplete = new google.maps.places.Autocomplete(searchInput, {
-            types: ['establishment', 'geocode'],
-            fields: ['name', 'formatted_address', 'geometry', 'place_id', 'address_components']
-        });
+    elements.searchResults.innerHTML = '';
 
-        // When a place is selected from the dropdown
-        autocomplete.addListener('place_changed', () => {
-            const place = autocomplete.getPlace();
-            if (!place.geometry) {
-                console.log('No details available for input: ' + place.name);
-                return;
-            }
-
-            // Update map and form with selected place
-            updateMapAndForm(place);
-        });
-    } catch (error) {
-        console.error('Error initializing search:', error);
-        showError('Failed to initialize search. Please refresh the page and try again.');
+    if (!places || places.length === 0) {
+      elements.searchResults.innerHTML = '<div class="alert alert-info">No results found</div>';
+      return;
     }
-}
 
-// Initialize location button
-function initLocationButton() {
-    const locationButton = document.getElementById('use-location');
-    if (!locationButton) return;
+    const resultsList = document.createElement('div');
+    resultsList.className = 'list-group';
 
-    locationButton.addEventListener('click', () => {
-        if (!navigator.geolocation) {
-            showError('Geolocation is not supported by your browser.');
-            return;
-        }
+    places.forEach((place, index) => {
+      const resultItem = document.createElement('button');
+      resultItem.type = 'button';
+      resultItem.className = 'list-group-item list-group-item-action';
+      resultItem.dataset.placeId = place.place_id;
+      resultItem.dataset.index = index;
 
-        toggleLoading(true);
+      resultItem.innerHTML = `
+        <div class="d-flex w-100 justify-content-between">
+          <h5 class="mb-1">${place.name}</h5>
+        </div>
+        <p class="mb-1">${place.formatted_address || 'Address not available'}</p>
+      `;
 
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                try {
-                    const pos = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
+      resultItem.addEventListener('click', () => {
+        // Highlight selected item
+        document.querySelectorAll('.list-group-item').forEach(item => {
+          item.classList.remove('active');
+        });
+        resultItem.classList.add('active');
+        state.selectedPlace = place;
+      });
 
-                    // Update map and marker
-                    map.setCenter(pos);
-                    map.setZoom(17);
-
-                    if (marker) {
-                        marker.setPosition(pos);
-                        marker.setVisible(true);
-                    }
-
-                    // Reverse geocode to get address details
-                    const response = await new Promise((resolve, reject) => {
-                        if (!geocoder) {
-                            reject(new Error('Geocoder not initialized'));
-                            return;
-                        }
-
-                        geocoder.geocode({ location: pos }, (results, status) => {
-                            if (status === 'OK' && results[0]) {
-                                resolve(results[0]);
-                            } else {
-                                reject(new Error('Geocoder failed with status: ' + status));
-                            }
-                        });
-                    });
-
-                    // Update form with geocoded address
-                    const addressComponents = response.address_components || [];
-                    const formData = {
-                        address: getAddressComponent(addressComponents, 'street_number') + ' ' +
-                                 getAddressComponent(addressComponents, 'route'),
-                        city: getAddressComponent(addressComponents, 'locality') ||
-                              getAddressComponent(addressComponents, 'postal_town'),
-                        state_province: getAddressComponent(addressComponents, 'administrative_area_level_1'),
-                        postal_code: getAddressComponent(addressComponents, 'postal_code'),
-                        country: getAddressComponent(addressComponents, 'country'),
-                        latitude: pos.lat,
-                        longitude: pos.lng
-                    };
-
-                    // Update form fields
-                    Object.entries(formData).forEach(([field, value]) => {
-                        const input = document.getElementById(field);
-                        if (input && value) {
-                            input.value = value;
-                        }
-                    });
-
-                    // If we have a place name, update the name field
-                    if (response.formatted_address) {
-                        const nameInput = document.getElementById('name');
-                        if (nameInput && !nameInput.value) {
-                            // Try to get a meaningful name from the address components
-                            const name = response.name ||
-                                       response.formatted_address.split(',')[0] ||
-                                       'My Location';
-                            nameInput.value = name;
-                        }
-                    }
-
-                } catch (error) {
-                    console.error('Error processing location:', error);
-                    showError('Unable to get address details for your location. Please enter the address manually.');
-                } finally {
-                    toggleLoading(false);
-                }
-            },
-            (error) => {
-                console.error('Error getting location:', error);
-                let errorMessage = 'Unable to retrieve your location. ';
-
-                switch(error.code) {
-                    case error.PERMISSION_DENIED:
-                        errorMessage += 'Please enable location access in your browser settings.';
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        errorMessage += 'Location information is unavailable.';
-                        break;
-                    case error.TIMEOUT:
-                        errorMessage += 'The request to get your location timed out.';
-                        break;
-                    default:
-                        errorMessage += 'Please try again or enter an address manually.';
-                }
-
-                showError(errorMessage);
-                toggleLoading(false);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,  // 10 seconds
-                maximumAge: 60000 // 1 minute
-            }
-        );
+      resultsList.appendChild(resultItem);
     });
-}
 
-// Update map and form with place data
-function updateMapAndForm(place) {
-    try {
-        toggleLoading(true);
+    elements.searchResults.appendChild(resultsList);
+  }
 
-        // Update map view
-        if (place.geometry && place.geometry.viewport) {
-            map.fitBounds(place.geometry.viewport);
-        } else if (place.geometry && place.geometry.location) {
-            map.setCenter(place.geometry.location);
-            map.setZoom(17);
-        }
-
-        // Update marker
-        if (place.geometry && place.geometry.location) {
-            marker.setPosition(place.geometry.location);
-            marker.setVisible(true);
-
-            // Update form fields from the place data
-            updateFormFields(place);
-
-            // Also update the hidden lat/lng fields
-            const latInput = document.getElementById('latitude');
-            const lngInput = document.getElementById('longitude');
-            if (latInput) latInput.value = place.geometry.location.lat();
-            if (lngInput) lngInput.value = place.geometry.location.lng();
-        }
-
-        // If this is a place with a name, update the name field
-        if (place.name) {
-            const nameInput = document.getElementById('name');
-            if (nameInput && !nameInput.value) {
-                nameInput.value = place.name;
-            }
-        }
-
-    } catch (error) {
-        console.error('Error updating map and form:', error);
-        showError('Failed to update location. Please try again.');
-    } finally {
-        toggleLoading(false);
+  /**
+   * Handle using the selected place
+   */
+  function handleUseSelectedPlace() {
+    if (!state.selectedPlace) {
+      showErrorInModal('Please select a place from the list');
+      return;
     }
-}
 
-// Helper function to get address components
-function getAddressComponent(components, type) {
-    const component = components.find(c => c.types.includes(type));
-    return component ? component.long_name : '';
-}
+    // Update form fields with selected place data
+    updateFormWithPlaceData(state.selectedPlace);
 
-// Update form fields from place data
-function updateFormFields(place) {
-    const addressComponents = place.address_components || [];
-    const formData = {
-        name: place.name || '',
-        address: `${getAddressComponent(addressComponents, 'street_number')} ${getAddressComponent(addressComponents, 'route')}`.trim(),
-        city: getAddressComponent(addressComponents, 'locality') || getAddressComponent(addressComponents, 'postal_town'),
-        state_province: getAddressComponent(addressComponents, 'administrative_area_level_1'),
-        postal_code: getAddressComponent(addressComponents, 'postal_code'),
-        country: getAddressComponent(addressComponents, 'country'),
-        latitude: place.geometry.location.lat(),
-        longitude: place.geometry.location.lng()
-    };
+    // Close the modal
+    const modal = bootstrap.Modal.getInstance(elements.modal);
+    if (modal) {
+      modal.hide();
+    }
+  }
 
-    // Update form fields
-    Object.entries(formData).forEach(([field, value]) => {
-        const input = document.getElementById(field);
-        if (input && value) {
-            input.value = value;
-        }
+  /**
+   * Update form with place data
+   * @param {Object} place - Google Place object
+   */
+  function updateFormWithPlaceData(place) {
+    // Update name field
+    const nameInput = document.querySelector('input[name="name"]');
+    if (nameInput) {
+      nameInput.value = place.name || '';
+    }
+
+    // Update address fields
+    const addressInput = document.querySelector('input[name="address"]');
+    if (addressInput) {
+      addressInput.value = place.formatted_address || '';
+    }
+
+    // You can add more field updates here based on your form structure
+  }
+
+  /**
+   * Ensure Google Maps API is properly initialized
+   * @returns {Promise<boolean>} Resolves with true when Google Maps is ready
+   */
+  async function ensureGoogleMapsInitialized() {
+    if (state.googleMapsInitialized) {
+      return true;
+    }
+
+    if (state.googleMapsInitializing) {
+      return new Promise((resolve) => {
+        state.googleMapsInitQueue.push(resolve);
+      });
+    }
+
+    state.googleMapsInitializing = true;
+
+    return new Promise((resolve, reject) => {
+      if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
+        const error = new Error('Google Maps API not loaded');
+        console.error(error);
+        reject(error);
+        return;
+      }
+
+      try {
+        state.autocompleteService = new google.maps.places.AutocompleteService();
+        state.placesService = new google.maps.places.PlacesService(document.createElement('div'));
+        state.googleMapsInitialized = true;
+
+        // Process any queued callbacks
+        state.googleMapsInitQueue.forEach(callback => callback(true));
+        state.googleMapsInitQueue = [];
+
+        resolve(true);
+      } catch (error) {
+        console.error('Error initializing Google Maps services:', error);
+        state.googleMapsInitializing = false;
+
+        // Process any queued callbacks with error
+        state.googleMapsInitQueue.forEach(callback => callback(false, error));
+        state.googleMapsInitQueue = [];
+
+        reject(error);
+      }
     });
-}
+  }
 
-// Toggle loading state
-function toggleLoading(isLoading) {
-    const submitButton = document.getElementById('submit-button');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const mapContainer = document.getElementById('map');
-    const loadingOverlay = document.getElementById('loading-overlay');
+  /**
+   * Show loading state
+   * @param {boolean} isLoading - Whether to show or hide loading indicator
+   */
+  function showLoading(isLoading) {
+    if (!elements.loadingIndicator) return;
 
-    // Toggle form controls
-    if (submitButton) {
-        submitButton.disabled = isLoading;
-    }
-
-    // Toggle loading spinner on submit button
-    if (loadingSpinner) {
-        loadingSpinner.style.display = isLoading ? 'inline-block' : 'none';
-    }
-
-    // Toggle map loading overlay
-    if (mapContainer && loadingOverlay) {
-        if (isLoading) {
-            loadingOverlay.classList.remove('d-none');
-            mapContainer.style.opacity = '0.5';
-            mapContainer.style.pointerEvents = 'none';
-        } else {
-            loadingOverlay.classList.add('d-none');
-            mapContainer.style.opacity = '1';
-            mapContainer.style.pointerEvents = 'auto';
-        }
-    }
-
-    // Toggle cursor style on body
-    document.body.style.cursor = isLoading ? 'wait' : 'default';
-}
-
-// Update form fields from geocoded location
-async function updateFormFromLocation(location) {
-    try {
-        if (!geocoder) return;
-
-        toggleLoading(true);
-
-        // Reverse geocode the location to get address components
-        const response = await new Promise((resolve, reject) => {
-            geocoder.geocode({ location }, (results, status) => {
-                if (status === 'OK' && results[0]) {
-                    resolve(results[0]);
-                } else {
-                    reject(new Error('Geocoder failed with status: ' + status));
-                }
-            });
-        });
-
-        const addressComponents = response.address_components || [];
-        const formData = {
-            address: getAddressComponent(addressComponents, 'street_number') + ' ' +
-                     getAddressComponent(addressComponents, 'route'),
-            city: getAddressComponent(addressComponents, 'locality') ||
-                  getAddressComponent(addressComponents, 'postal_town'),
-            state_province: getAddressComponent(addressComponents, 'administrative_area_level_1'),
-            postal_code: getAddressComponent(addressComponents, 'postal_code'),
-            country: getAddressComponent(addressComponents, 'country'),
-            latitude: location.lat(),
-            longitude: location.lng()
-        };
-
-        // Update form fields
-        Object.entries(formData).forEach(([field, value]) => {
-            const input = document.getElementById(field);
-            if (input && value) {
-                input.value = value;
-            }
-        });
-
-    } catch (error) {
-        console.error('Error updating form from location:', error);
-        showError('Could not get address details for this location. Please try again.');
-    } finally {
-        toggleLoading(false);
-    }
-}
-
-// Show success message to user
-function showSuccess(message) {
-    const container = document.getElementById('success-container');
-    const messageEl = document.getElementById('success-message');
-
-    if (container && messageEl) {
-        messageEl.textContent = message;
-        container.classList.remove('d-none');
-
-        // Auto-hide success message after 5 seconds
-        setTimeout(() => {
-            container.classList.add('d-none');
-        }, 5000);
-
-        // Add click handler for close button
-        const closeBtn = container.querySelector('.btn-close');
-        if (closeBtn) {
-            const closeHandler = () => {
-                container.classList.add('d-none');
-                closeBtn.removeEventListener('click', closeHandler);
-            };
-            closeBtn.addEventListener('click', closeHandler);
-        }
+    if (isLoading) {
+      elements.loadingIndicator.classList.remove('d-none');
     } else {
-        console.log('Success:', message);
+      elements.loadingIndicator.classList.add('d-none');
     }
-}
+  }
 
-// Show error message to user
-function showError(message) {
-    const container = document.getElementById('error-container');
-    const messageEl = document.getElementById('error-message');
-
-    if (container && messageEl) {
-        messageEl.textContent = message;
-        container.classList.remove('d-none');
-
-        // Auto-hide error after 5 seconds
-        setTimeout(() => {
-            container.classList.add('d-none');
-        }, 5000);
-
-        // Add click handler for close button
-        const closeBtn = container.querySelector('.btn-close');
-        if (closeBtn) {
-            const closeHandler = () => {
-                container.classList.add('d-none');
-                closeBtn.removeEventListener('click', closeHandler);
-            };
-            closeBtn.addEventListener('click', closeHandler);
-        }
-    } else {
-        console.error('Error container not found. Message:', message);
+  /**
+   * Show error message in the modal
+   * @param {string} message - The error message to display
+   */
+  function showErrorInModal(message) {
+    if (!elements.errorDisplay) {
+      console.error('Error display element not found');
+      return;
     }
-}
 
-// Initialize form submission
-function initForm() {
-    const form = document.getElementById('restaurant-form');
-    if (!form) return;
+    const errorMessage = elements.errorDisplay.querySelector('.error-message');
+    if (errorMessage) {
+      errorMessage.textContent = message;
+      elements.errorDisplay.classList.remove('d-none');
 
-    // Handle form submission
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
+      // Auto-hide error after 5 seconds
+      setTimeout(() => {
+        elements.errorDisplay.classList.add('d-none');
+      }, 5000);
+    }
+  }
 
-        // Reset previous validation states
-        const invalidInputs = form.querySelectorAll('.is-invalid');
-        invalidInputs.forEach(input => input.classList.remove('is-invalid'));
+  // Public API
+  const publicApi = {
+    init,
+    initRestaurantForm: init, // Alias for backward compatibility
+    handleSearch,
+    handleGooglePlacesSearch,
+    handleUseSelectedPlace,
+    ensureGoogleMapsInitialized,
 
-        const errorMessages = form.querySelectorAll('.invalid-feedback');
-        errorMessages.forEach(msg => msg.remove());
+    // Expose the map for debugging purposes
+    get map() {
+      return state.map;
+    },
 
-        const submitButton = form.querySelector('button[type="submit"]');
-        const originalText = submitButton ? submitButton.innerHTML : '';
+    // Expose the places service for debugging purposes
+    get placesService() {
+      return state.placesService;
+    },
 
-        // Show loading state
-        toggleLoading(true);
-        if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
-        }
+    // Expose the autocomplete service for debugging purposes
+    get autocompleteService() {
+      return state.autocompleteService;
+    }
+  };
 
-        try {
-            // Get form data
-            const formData = new FormData(form);
+  // Initialize when DOM is loaded
+  document.addEventListener('DOMContentLoaded', () => {
+    try {
+      // Initialize the restaurant form
+      publicApi.init();
 
-            // Add CSRF token if available
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-            const headers = {
-                'X-Requested-With': 'XMLHttpRequest'
-            };
-
-            if (csrfToken) {
-                headers['X-CSRFToken'] = csrfToken;
-            }
-
-            // Submit form via AJAX
-            const response = await fetch(form.action, {
-                method: 'POST',
-                body: formData,
-                headers: headers
+      // Initialize Google Places search button if it exists
+      const findButton = document.getElementById('findWithGooglePlaces');
+      if (findButton) {
+        findButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          const modalElement = document.getElementById('googlePlacesModal');
+          if (modalElement && window.bootstrap) {
+            const modal = new bootstrap.Modal(modalElement, {
+              backdrop: 'static',
+              keyboard: false
             });
-
-            let result;
-            try {
-                result = await response.json();
-            } catch (jsonError) {
-                console.error('Error parsing JSON response:', jsonError);
-                throw new Error('Invalid response from server');
-            }
-
-            if (response.ok) {
-                // Show success message
-                showSuccess(result.message || 'Restaurant saved successfully!');
-
-                // Redirect on success after a short delay
-                if (result.redirect || result.redirect_url) {
-                    setTimeout(() => {
-                        window.location.href = result.redirect || result.redirect_url;
-                    }, 1500);
-                }
-            } else {
-                // Show error message
-                showError(result.message || result.error || 'Failed to save restaurant. Please check the form for errors.');
-
-                // Handle form errors if any
-                if (result.errors) {
-                    Object.entries(result.errors).forEach(([field, messages]) => {
-                        const input = form.querySelector(`[name="${field}"]`);
-                        const feedback = form.querySelector(`.invalid-feedback[data-field="${field}"]`);
-
-                        if (input) {
-                            input.classList.add('is-invalid');
-
-                            // Find or create feedback element
-                            let feedbackElement = feedback;
-                            if (!feedbackElement) {
-                                feedbackElement = document.createElement('div');
-                                feedbackElement.className = 'invalid-feedback';
-                                feedbackElement.setAttribute('data-field', field);
-                                input.parentNode.insertBefore(feedbackElement, input.nextSibling);
-                            }
-
-                            // Show error message
-                            feedbackElement.textContent = Array.isArray(messages) ? messages[0] : messages;
-                            feedbackElement.style.display = 'block';
-
-                            // Focus on first invalid field
-                            if (!document.querySelector('.is-invalid:focus')) {
-                                input.focus();
-                            }
-                        }
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Error submitting form:', error);
-            showError('An unexpected error occurred. Please try again.');
-        } finally {
-            toggleLoading(false);
-            // Reset button state
-            if (submitButton) {
-                submitButton.disabled = false;
-                submitButton.innerHTML = originalText;
-            }
-        }
-    });
-
-    // Add event listeners to clear validation on input
-    const formInputs = form.querySelectorAll('input, select, textarea');
-    formInputs.forEach(input => {
-        input.addEventListener('input', () => {
-            if (input.classList.contains('is-invalid')) {
-                input.classList.remove('is-invalid');
-                const feedback = input.nextElementSibling;
-                if (feedback && feedback.classList.contains('invalid-feedback')) {
-                    feedback.style.display = 'none';
-                }
-            }
+            modal.show();
+          }
         });
-    });
-}
+      }
 
-// Export for testing
-export const __test__ = {
-    initMap,
-    initSearch,
-    initLocationButton,
-    updateMapAndForm,
-    updateFormFields,
-    initForm
-};
+      // Initialize address autocomplete if available
+      if (window.restaurantAddressAutocomplete) {
+        window.restaurantAddressAutocomplete.init();
+      }
+    } catch (error) {
+      console.error('Error initializing restaurant form:', error);
+    }
+  });
 
-// Initialize the form when the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', () => {
-    init().catch(error => {
-        console.error('Error initializing restaurant form:', error);
-    });
-});
+  // Make the public API available globally
+  window.restaurantForm = publicApi;
+
+  return publicApi;
+})();

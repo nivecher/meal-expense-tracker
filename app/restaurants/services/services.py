@@ -1,294 +1,407 @@
-"""Service layer functions for restaurant operations."""
+"""Service layer for restaurant-related operations."""
 
 import csv
-import logging
-from io import StringIO
-from typing import Dict, Optional, Tuple
+import io
+from typing import Any, Dict, List, Optional, Tuple
 
-from flask import Response, abort
-from flask_wtf import FlaskForm
-from sqlalchemy import and_, exists, select
+from sqlalchemy import exists, func, select
+from werkzeug.datastructures import FileStorage
 
-from app import db
+from app.expenses.models import Expense
+from app.extensions import db
 from app.restaurants.models import Restaurant
 
-logger = logging.getLogger(__name__)
 
-
-def get_restaurant(restaurant_id: int) -> Restaurant:
-    """Get and validate a restaurant.
+def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list, dict]:
+    """
+    Get a list of restaurants for a user with calculated statistics.
 
     Args:
-        restaurant_id: ID of the restaurant to retrieve
+        user_id: The ID of the user.
+        args: Request arguments for sorting and filtering.
 
     Returns:
-        Restaurant: The restaurant object
-
-    Raises:
-        404: If the restaurant is not found
+        A tuple containing the list of restaurants (as dicts) and summary statistics.
     """
-    restaurant = db.session.get(Restaurant, restaurant_id)
-    if not restaurant:
-        abort(404, "Restaurant not found")
-    return restaurant
+    sort_by = args.get("sort", "name")
+    sort_order = args.get("order", "asc")
+    cuisine_filter = args.get("cuisine")
+
+    stmt = (
+        select(
+            Restaurant,
+            func.count(Expense.id).label("visit_count"),
+            func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
+            func.max(Expense.date).label("last_visit"),
+        )
+        .outerjoin(
+            Expense,
+            (Expense.restaurant_id == Restaurant.id) & (Expense.user_id == user_id),
+        )
+        .where(Restaurant.user_id == user_id)
+        .group_by(Restaurant.id)
+    )
+
+    if cuisine_filter:
+        stmt = stmt.where(Restaurant.cuisine == cuisine_filter)
+
+    sort_column = {
+        "name": Restaurant.name,
+        "visits": func.count(Expense.id),
+        "spent": func.coalesce(func.sum(Expense.amount), 0),
+        "last_visit": func.max(Expense.date),
+    }.get(sort_by, Restaurant.name)
+
+    sort_direction = sort_order.upper() if sort_order in ["asc", "desc"] else "ASC"
+    stmt = stmt.order_by(
+        sort_column.asc() if sort_direction == "ASC" else sort_column.desc(),
+        Restaurant.name.asc(),
+    )
+
+    # Execute query and convert results to list of dicts
+    results = db.session.execute(stmt).all()
+
+    # Convert results to list of dictionaries with all required attributes
+    restaurants = []
+    for row in results:
+        restaurant = row[0].__dict__.copy()
+        # Remove SQLAlchemy instance state
+        restaurant.pop("_sa_instance_state", None)
+        # Add the aggregated fields
+        restaurant.update(
+            {
+                "visit_count": row.visit_count,
+                "total_spent": float(row.total_spent) if row.total_spent else 0.0,
+                "last_visit": row.last_visit,
+            }
+        )
+        restaurants.append(restaurant)
+
+    total_restaurants = len(restaurants)
+    total_visits = sum(r.get("visit_count", 0) for r in restaurants)
+    total_spent = sum(r.get("total_spent", 0) for r in restaurants)
+
+    stats = {
+        "total_restaurants": total_restaurants,
+        "total_visits": total_visits,
+        "total_spent": total_spent,
+    }
+    return restaurants, stats
 
 
-def process_restaurant_form(restaurant: Restaurant, form: FlaskForm) -> Tuple[bool, str]:
-    """Process the restaurant form data.
+def get_unique_cuisines(user_id: int) -> list[str]:
+    """Get a list of unique cuisines for a user."""
+    return [
+        cuisine
+        for cuisine in db.session.scalars(
+            select(Restaurant.cuisine)
+            .where(Restaurant.user_id == user_id, Restaurant.cuisine.isnot(None))
+            .distinct()
+            .order_by(Restaurant.cuisine)
+        ).all()
+        if cuisine is not None
+    ]
+
+
+def restaurant_exists(user_id: int, name: str, city: str) -> Optional[Restaurant]:
+    """Check if a restaurant with the same name and city already exists for the user.
 
     Args:
-        restaurant: The restaurant model instance to update
-        form: The form containing the data to process
+        user_id: ID of the user
+        name: Name of the restaurant
+        city: City of the restaurant
 
     Returns:
-        tuple: (success: bool, message: str)
+        The existing restaurant if found, None otherwise
     """
-    try:
-        # Update restaurant fields from form data
-        for field in form:
-            if hasattr(restaurant, field.name) and field.data is not None:
-                # Handle special cases if needed
-                if field.type == "StringField":
-                    setattr(restaurant, field.name, field.data.strip() if field.data else "")
-                else:
-                    setattr(restaurant, field.name, field.data)
-
-        db.session.commit()
-        return True, "Restaurant updated successfully!"
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error("Error updating restaurant: %s", str(e))
-        return False, f"Error updating restaurant: {str(e)}"
-
-
-def _process_restaurant_row(row: Dict[str, str], user_id: int) -> Optional[Restaurant]:
-    """Process a single row of restaurant data."""
-    name = (row.get("name") or "").strip()
-    if not name:
-        return None
-
-    city = (row.get("city") or "").strip()
-
-    # Check for duplicates
-    conditions = [Restaurant.name == name, Restaurant.user_id == user_id]
-    if city:
-        conditions.append(Restaurant.city == city)
-
-    exists_query = select(exists().where(and_(*conditions)))
-    if db.session.execute(exists_query).scalar():
-        logger.info("Skipping duplicate restaurant: %s in %s", name, city)
-        return None
-
-    return Restaurant(
-        name=name,
-        type=(row.get("type") or "").strip(),
-        description=(row.get("description") or "").strip(),
-        address=(row.get("address") or "").strip(),
-        city=city,
-        state=(row.get("state") or "").strip(),
-        postal_code=(row.get("zip_code") or "").strip(),
-        phone=(row.get("phone") or "").strip(),
-        website=(row.get("website") or "").strip(),
-        price_range=row.get("price_range") or None,
-        cuisine=(row.get("cuisine") or "").strip(),
-        notes=(row.get("notes") or "").strip(),
-        user_id=user_id,
+    return db.session.scalar(
+        select(Restaurant).where(
+            Restaurant.user_id == user_id,
+            func.lower(Restaurant.name) == func.lower(name),
+            func.lower(Restaurant.city) == func.lower(city) if city else True,
+        )
     )
 
 
-def _process_csv_file(file_stream):
-    """Read and parse CSV file."""
-    try:
-        content = file_stream.read().decode("utf-8")
-        return csv.DictReader(StringIO(content)), None
-    except UnicodeDecodeError:
-        return None, "Invalid file encoding. Please use UTF-8 encoded CSV files."
+def create_restaurant(user_id: int, form: Any) -> Tuple[Restaurant, bool]:
+    """Create a new restaurant or return existing one.
+
+    Args:
+        user_id: ID of the user creating the restaurant
+        form: Form containing restaurant data
+
+    Returns:
+        A tuple of (restaurant, is_new) where is_new is True if the restaurant was created
+    """
+    # Check if restaurant with same name and city already exists
+    existing = restaurant_exists(user_id, form.name.data, form.city.data)
+    if existing:
+        return existing, False
+
+    # Create new restaurant
+    restaurant = Restaurant(user_id=user_id)
+    form.populate_obj(restaurant)
+    db.session.add(restaurant)
+    db.session.commit()
+    return restaurant, True
 
 
-def _process_restaurant_batch(reader, user_id):
-    """Process a batch of restaurant rows from CSV."""
-    imported = 0
-    skipped = 0
+def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant:
+    """Update an existing restaurant.
 
-    for row_num, row in enumerate(reader, 2):  # Start at 2 for 1-based row numbers
-        try:
-            if not any(row.values()):
-                skipped += 1
-                continue
+    Args:
+        restaurant_id: ID of the restaurant to update
+        user_id: ID of the user making the update
+        form: Form containing the updated restaurant data
 
-            restaurant = _process_restaurant_row(row, user_id)
-            if not restaurant:
-                skipped += 1
-                continue
+    Returns:
+        The updated Restaurant object
 
-            db.session.add(restaurant)
-            imported += 1
+    Raises:
+        ValueError: If the restaurant is not found or the user doesn't have permission
+    """
+    restaurant = get_restaurant_for_user(restaurant_id, user_id)
+    if not restaurant:
+        raise ValueError("Restaurant not found or access denied")
 
-            # Commit in batches
-            if imported % 50 == 0:
-                db.session.commit()
+    # Create a dictionary of form data, converting empty strings to None for numeric fields
+    form_data = {}
+    numeric_fields = {"rating", "latitude", "longitude"}
+    boolean_fields = {"is_chain"}
 
-        except Exception as e:
-            db.session.rollback()
-            logger.error("Error processing row %d: %s", row_num, str(e))
-            skipped += 1
-            continue
+    for field in form:
+        if field.name in numeric_fields:
+            # Convert empty strings to None for numeric fields
+            form_data[field.name] = float(field.data) if field.data and str(field.data).strip() else None
+        elif field.name in boolean_fields:
+            # Ensure boolean fields are properly converted
+            form_data[field.name] = bool(field.data) if field.data is not None else False
+        else:
+            # For all other fields, use the value as is or empty string
+            form_data[field.name] = field.data if field.data is not None else ""
 
-    return imported, skipped
+    # Update the restaurant object with the processed form data
+    for key, value in form_data.items():
+        if hasattr(restaurant, key):
+            setattr(restaurant, key, value)
+
+    db.session.commit()
+    return restaurant
 
 
-def _generate_result_message(imported: int, skipped: int) -> str:
-    """Generate result message based on import results."""
-    result_msg = f"Successfully imported {imported} restaurants"
-    if skipped > 0:
-        result_msg += f", skipped {skipped} rows (duplicates or invalid data)"
-    return result_msg
+def _validate_restaurant_row(row: dict) -> Tuple[bool, str]:
+    """Validate a single restaurant row from CSV.
 
+    Args:
+        row: Dictionary containing restaurant data
 
-def _validate_csv_reader(reader):
-    """Validate the CSV reader has at least the name column."""
-    if "name" not in reader.fieldnames:
-        return False, "Missing required column: 'name'"
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not row.get("name", "").strip():
+        return False, "Name is required"
+    if not row.get("city", "").strip():
+        return False, "City is required"
     return True, ""
 
 
-def _handle_import_error(error: Exception) -> Tuple[bool, str]:
-    """Handle errors during restaurant import."""
-    logger.exception("Error importing restaurants")
-    return False, f"Error processing import: {str(error)}"
-
-
-def _process_import(reader, user_id: int) -> Tuple[bool, str]:
-    """Process the CSV import after validation.
+def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Restaurant]:
+    """Process a single restaurant row from CSV.
 
     Args:
-        reader: CSV reader object
+        row: Dictionary containing restaurant data
         user_id: ID of the user importing the restaurants
 
     Returns:
-        tuple: (success: bool, message: str)
+        Tuple of (success, error_message, restaurant)
     """
-    imported = 0
-    skipped = 0
-
     try:
-        for row in reader:
-            restaurant = _process_restaurant_row(row, user_id)
-            if restaurant:
-                db.session.add(restaurant)
-                imported += 1
+        is_valid, error = _validate_restaurant_row(row)
+        if not is_valid:
+            return False, error, None
 
-                # Commit in batches
-                if imported % 50 == 0:
-                    db.session.commit()
-            else:
-                skipped += 1
-
-        db.session.commit()
-        return True, _generate_result_message(imported, skipped)
-
+        restaurant = Restaurant(
+            user_id=user_id,
+            name=row.get("name", "").strip(),
+            city=row.get("city", "").strip(),
+            address=row.get("address", "").strip() or None,
+            phone=row.get("phone", "").strip() or None,
+            website=row.get("website", "").strip() or None,
+            cuisine=row.get("cuisine", "").strip() or None,
+        )
+        return True, "", restaurant
     except Exception as e:
-        db.session.rollback()
-        return _handle_import_error(e)
+        return False, str(e), None
 
 
-def import_restaurants_from_csv(file_stream, user) -> Tuple[bool, str]:
+def _process_csv_file(file: FileStorage) -> Tuple[bool, str, Optional[csv.DictReader]]:
+    """Process the uploaded CSV file.
+
+    Args:
+        file: The uploaded CSV file
+
+    Returns:
+        Tuple of (success, error_message, csv_reader)
+    """
+    try:
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_reader = csv.DictReader(stream)
+
+        required_columns = {"name", "city"}
+        if not required_columns.issubset(set(csv_reader.fieldnames or [])):
+            return False, "CSV file is missing required columns: name, city", None
+
+        return True, "", csv_reader
+    except Exception as e:
+        return False, f"Error reading CSV file: {str(e)}", None
+
+
+def _import_restaurants_from_reader(csv_reader: csv.DictReader, user_id: int) -> Tuple[int, List[str]]:
+    """Import restaurants from a CSV reader.
+
+    Args:
+        csv_reader: CSV reader with restaurant data
+        user_id: ID of the user importing the restaurants
+
+    Returns:
+        Tuple of (success_count, errors)
+    """
+    success_count = 0
+    errors = []
+
+    for i, row in enumerate(csv_reader, 2):  # Start from line 2 (1-based + header)
+        success, error, restaurant = _process_restaurant_row(row, user_id)
+        if success and restaurant:
+            db.session.add(restaurant)
+            success_count += 1
+        else:
+            errors.append(f"Line {i}: {error}")
+
+    return success_count, errors
+
+
+def _generate_import_result(success_count: int, errors: List[str]) -> Tuple[bool, str]:
+    """Generate the result of the import operation.
+
+    Args:
+        success_count: Number of successfully imported restaurants
+        errors: List of error messages
+
+    Returns:
+        Tuple of (success, message)
+    """
+    if success_count > 0:
+        db.session.commit()
+
+    if errors:
+        error_msg = (
+            f"{success_count} restaurants imported successfully, but {len(errors)} "
+            f"rows had errors. Errors: {', '.join(errors)}"
+        )
+        return success_count > 0, error_msg
+
+    return True, f"{success_count} restaurants imported successfully"
+
+
+def import_restaurants_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, str]:
     """Import restaurants from a CSV file.
 
     Args:
-        file_stream: The file stream containing the CSV data
-        user: The current user object (not just the ID)
+        file: The uploaded CSV file
+        user_id: ID of the user importing the restaurants
 
     Returns:
-        tuple: (success: bool, message: str)
+        A tuple containing (success: bool, message: str)
     """
     try:
-        # Read and decode the file
-        reader, error = _process_csv_file(file_stream)
-        if error:
+        # Process the CSV file
+        success, error, csv_reader = _process_csv_file(file)
+        if not success:
             return False, error
 
-        # Validate CSV structure
-        is_valid, error_msg = _validate_csv_reader(reader)
-        if not is_valid:
-            return False, error_msg
+        # Import restaurants from the CSV data
+        success_count, errors = _import_restaurants_from_reader(csv_reader, user_id)
 
-        # Process the CSV data
-        return _process_import(reader, user.id)
+        # Generate the result message
+        return _generate_import_result(success_count, errors)
 
     except Exception as e:
-        return _handle_import_error(e)
+        db.session.rollback()
+        return False, f"Error processing CSV file: {str(e)}"
 
 
-def export_restaurants_to_csv(user_id) -> Response:
-    """Export restaurants to a CSV file.
+def export_restaurants_for_user(user_id: int) -> List[Dict[str, Any]]:
+    """Get all restaurants for a user in a format suitable for export.
 
     Args:
-        user_id: ID of the user whose restaurants to export
+        user_id: The ID of the user whose restaurants to export
 
     Returns:
-        Response: Flask response with CSV data
+        A list of dictionaries containing restaurant data
+    """
+    restaurants = db.session.scalars(
+        select(Restaurant).where(Restaurant.user_id == user_id).order_by(Restaurant.name)
+    ).all()
+
+    def safe_float(value):
+        try:
+            return float(value) if value is not None else None
+        except (ValueError, TypeError):
+            return None
+
+    return [
+        {
+            "name": r.name or "",
+            "address": r.address or "",
+            "city": r.city or "",
+            "state": r.state or "",
+            "postal_code": r.postal_code or "",
+            "country": r.country or "",
+            "phone": r.phone or "",
+            "email": r.email or "",
+            "cuisine": r.cuisine or "",
+            "website": r.website or "",
+            "price_range": r.price_range or "",
+            "rating": safe_float(r.rating) if r.rating is not None else "",
+            "is_chain": bool(r.is_chain) if r.is_chain is not None else "",
+            "latitude": safe_float(r.latitude) if r.latitude is not None else "",
+            "longitude": safe_float(r.longitude) if r.longitude is not None else "",
+            "notes": r.notes or "",
+            "created_at": r.created_at.isoformat() if r.created_at else "",
+            "updated_at": r.updated_at.isoformat() if r.updated_at else "",
+        }
+        for r in restaurants
+    ]
+
+
+def get_restaurant_for_user(restaurant_id: int, user_id: int) -> Optional[Restaurant]:
+    """Get a restaurant by ID if it belongs to the user."""
+    return db.session.scalar(select(Restaurant).where(Restaurant.id == restaurant_id, Restaurant.user_id == user_id))
+
+
+def delete_restaurant_by_id(restaurant_id: int, user_id: int) -> Tuple[bool, str]:
+    """Delete a restaurant by ID.
+
+    Args:
+        restaurant_id: The ID of the restaurant to delete
+        user_id: The ID of the user making the request
+
+    Returns:
+        A tuple of (success: bool, message: str)
     """
     try:
-        restaurants = db.session.scalars(
-            select(Restaurant).filter(Restaurant.user_id == user_id).order_by(Restaurant.name)
-        ).all()
+        restaurant = get_restaurant_for_user(restaurant_id, user_id)
+        if not restaurant:
+            return False, "Restaurant not found or you don't have permission to delete it."
 
-        output = StringIO()
-        writer = csv.writer(output)
+        has_expenses = db.session.scalar(select(exists().where(Expense.restaurant_id == restaurant_id)))
+        if has_expenses:
+            return False, "Cannot delete a restaurant with associated expenses. Please delete the expenses first."
 
-        # Write header
-        writer.writerow(
-            [
-                "name",
-                "type",
-                "description",
-                "address",
-                "city",
-                "state",
-                "postal_code",
-                "phone",
-                "website",
-                "price_range",
-                "cuisine",
-                "notes",
-            ]
-        )
-
-        # Write data rows
-        for restaurant in restaurants:
-            writer.writerow(
-                [
-                    restaurant.name,
-                    restaurant.type or "",
-                    restaurant.description or "",
-                    restaurant.address or "",
-                    restaurant.city or "",
-                    restaurant.state or "",
-                    restaurant.postal_code or "",
-                    restaurant.phone or "",
-                    restaurant.website or "",
-                    restaurant.price_range or "",
-                    restaurant.cuisine or "",
-                    restaurant.notes or "",
-                ]
-            )
-
-        # Create response with CSV data
-        return Response(
-            output.getvalue(),
-            mimetype="text/csv",
-            headers={
-                "Content-Disposition": "attachment;filename=restaurants_export.csv",
-                "Content-type": "text/csv; charset=utf-8",
-            },
-        )
+        db.session.delete(restaurant)
+        db.session.commit()
+        return True, "Restaurant deleted successfully."
 
     except Exception as e:
-        logger.error("Error exporting restaurants: %s", str(e), exc_info=True)
-        raise
-
-
-# Add type hints for better IDE support
-__all__ = ["get_restaurant", "process_restaurant_form", "import_restaurants_from_csv", "export_restaurants_to_csv"]
+        db.session.rollback()
+        raise e

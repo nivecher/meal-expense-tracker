@@ -1,0 +1,10 @@
+{% extends "base_auth.html" %}
+{% block title %}
+    Profile
+{% endblock title %}
+{% block content %}
+    <div class="container">
+        <h1>Profile</h1>
+        <p>Username: {{ current_user.username }}</p>
+    </div>
+{% endblock %}

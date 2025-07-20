@@ -1,4 +1,4 @@
-{% extends "main/base.html" %}
+{% extends "base.html" %}
 {% block title %}
     Import Restaurants
 {% endblock title %}
@@ -23,15 +23,23 @@
                         {% endwith %}
                         <div class="mb-4">
                             <h3 class="h5 mb-3">Instructions</h3>
-                            <p>Upload a CSV file containing restaurant information. The file must include the following required fields:</p>
+                            <p>
+                                Upload a CSV or JSON file containing restaurant information. The file must include the following required fields:
+                            </p>
                             <h4 class="h6 mt-3">Required Fields:</h4>
                             <div class="alert alert-info">
                                 <i class="fas fa-info-circle me-2"></i>
-                                The following fields are <strong>required</strong> in your CSV file:
+                                The following field is <strong>required</strong> in your file:
                             </div>
                             <ul class="mb-3">
                                 <li>
                                     <code>name</code> - Restaurant name
+                                </li>
+                            </ul>
+                            <h4 class="h6 mt-3">Optional Fields:</h4>
+                            <ul>
+                                <li>
+                                    <code>type</code> - Restaurant type (restaurant, cafe, bar, bakery, other)
                                 </li>
                                 <li>
                                     <code>address</code> - Street address
@@ -40,63 +48,59 @@
                                     <code>city</code> - City name
                                 </li>
                                 <li>
-                                    <code>state</code> - State/province
-                                </li>
-                                <li>
-                                    <code>postal_code</code> - Postal/ZIP code
-                                </li>
-                                <li>
-                                    <code>country</code> - Country name
-                                </li>
-                            </ul>
-                            <h4 class="h6 mt-3">Optional Fields:</h4>
-                            <ul>
-                                <li>
-                                    <code>type</code> - Restaurant type (e.g., restaurant, cafe, bar)
-                                </li>
-                                <li>
-                                    <code>price_range</code> - $ to $$$$
-                                </li>
-                                <li>
-                                    <code>cuisine</code> - Type of cuisine
+                                    <code>phone</code> - Contact number
                                 </li>
                                 <li>
                                     <code>website</code> - Restaurant website URL
                                 </li>
                                 <li>
-                                    <code>phone</code> - Contact number
+                                    <code>cuisine</code> - Type of cuisine
                                 </li>
                                 <li>
-                                    <code>description</code> - Brief description
+                                    <code>price_range</code> - $ to $$$$
                                 </li>
                                 <li>
                                     <code>notes</code> - Additional notes
                                 </li>
                             </ul>
                             <div class="alert alert-info mt-3">
-                                <i class="bi bi-info-circle"></i>
-                                You can download a sample CSV file from the restaurants page to see the correct format.
+                                <i class="fas fa-download me-2"></i>
+                                <a href="{{ url_for("restaurants.export_restaurants") }}"
+                                   class="alert-link">Download sample CSV file</a>
                             </div>
                         </div>
-                        <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
-                            {{ form.hidden_tag() }}
+                        <form method="post"
+                              enctype="multipart/form-data"
+                              id="import-form"
+                              class="needs-validation"
+                              novalidate>
                             <div class="mb-3">
-                                {{ form.file.label(class_="form-label") }}
-                                {{ form.file(
-                                    class_=("form-control is-invalid" if form.file.errors else "form-control"),
-                                    **{"data-bs-toggle": "tooltip", "data-bs-placement": "top", "title": "Select a CSV file containing restaurant data"}
-                                ) }}
-                                {% if form.file.errors %}
-                                    {% for error in form.file.errors %}
-                                        <div class="invalid-feedback">{{ error }}</div>
-                                    {% endfor %}
-                                {% else %}
-                                    <div class="form-text">Please upload a CSV file with the required fields.</div>
-                                {% endif %}
+                                <label for="file" class="form-label">Select file (CSV or JSON)</label>
+                                <input type="file"
+                                       class="form-control"
+                                       id="file"
+                                       name="file"
+                                       accept=".csv,.json"
+                                       required>
+                                <div class="invalid-feedback">Please select a file to upload.</div>
+                                <div class="form-text">Maximum file size: 5MB</div>
                             </div>
+                            {% if errors %}
+                                <div class="alert alert-danger">
+                                    <h5 class="alert-heading">Import Errors</h5>
+                                    <ul class="mb-0">
+                                        {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
                             <div class="d-flex gap-2">
-                                {{ form.submit(class_="btn btn-primary") }}
-                                <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary">Cancel</a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-upload me-1"></i> Upload File
+                                </button>
+                                <a href="{{ url_for("restaurants.list_restaurants") }}"
+                                   class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i> Cancel
+                                </a>
                             </div>
                         </form>
                     </div>
@@ -107,5 +111,6 @@
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/restaurants/import.js') }}"></script>
+    <script type="module"
+            src="{{ url_for('static', filename='js/pages/restaurant-import.js') }}"></script>
 {% endblock %}
