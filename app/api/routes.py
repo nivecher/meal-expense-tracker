@@ -108,36 +108,22 @@ def place_details() -> Response:
         if not gmaps:
             return jsonify({"error": "Google Maps API not configured"}), 500
 
-        # Get place details
+        # Get place details with valid field names
         place = gmaps.place(
             place_id=place_id,
             language=language,
-            fields=["name", "formatted_address", "geometry/location", "address_components"],
+            fields=["name", "formatted_address", "geometry/location", "address_component"],
         )
 
         if not place or "result" not in place:
             return jsonify({"error": "Place not found"}), 404
 
-        # Extract relevant address components
-        address_components = {}
-        for component in place["result"].get("address_components", []):
-            for type_name in component.get("types", []):
-                if type_name in [
-                    "street_number",
-                    "route",
-                    "locality",
-                    "administrative_area_level_1",
-                    "postal_code",
-                    "country",
-                ]:
-                    address_components[type_name] = component.get("long_name", "")
-
-        # Format the response
+        # Format the response with the full address components array
         result = {
             "name": place["result"].get("name", ""),
             "formatted_address": place["result"].get("formatted_address", ""),
             "location": place["result"].get("geometry", {}).get("location", {}),
-            "address_components": address_components,
+            "address_components": place["result"].get("address_component", []),
         }
 
         return jsonify(result)

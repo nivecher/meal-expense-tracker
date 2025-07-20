@@ -154,26 +154,35 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {Event} event - The click event
    */
-  function handleSuggestionClick(event) {
-    const suggestionItem = event.target.closest('.list-group-item-action');
-    if (!suggestionItem) return;
+  async function handleSuggestionClick(event) {
+    try {
+      const suggestion = event.target.closest('.suggestion-item');
+      if (!suggestion) return;
 
-    state.selectedPlaceId = suggestionItem.dataset.placeId;
-    const description = suggestionItem.textContent.trim();
+      const placeId = suggestion.dataset.placeId;
+      const description = suggestion.textContent.trim();
 
-    if (state.autocompleteInput) {
-      state.autocompleteInput.value = description;
+      if (placeId && state.autocompleteInput) {
+        state.autocompleteInput.value = description;
+        state.selectedPlaceId = placeId;
+
+        // Clear suggestions
+        if (state.suggestionsDiv) {
+          state.suggestionsDiv.innerHTML = '';
+        }
+
+        // Automatically update the address fields
+        await handleUpdateAddress();
+      }
+    } catch (error) {
+      console.error('Error handling suggestion click:', error);
+      showError(`Failed to load address: ${error.message}`);
+
+      // Re-enable the update button if it exists
+      if (state.updateAddressBtn) {
+        state.updateAddressBtn.disabled = false;
+      }
     }
-
-    if (state.suggestionsDiv) {
-      state.suggestionsDiv.innerHTML = '';
-    }
-
-    if (state.updateAddressBtn) {
-      state.updateAddressBtn.disabled = false;
-    }
-
-    showSuccess('Address selected');
   }
 
   /**
@@ -181,12 +190,26 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    */
   async function handleUpdateAddress() {
-    if (!state.selectedPlaceId) return;
+    // If no place is selected but we have an input value, try to find a place ID
+    if (!state.selectedPlaceId && state.autocompleteInput && state.autocompleteInput.value.trim()) {
+      const query = state.autocompleteInput.value.trim();
+      const response = await fetch(`/api/v1/address-autocomplete?query=${encodeURIComponent(query)}`);
+      const suggestions = await response.json();
 
-    showLoading('Validating address...');
+      if (suggestions && suggestions.length > 0) {
+        state.selectedPlaceId = suggestions[0].place_id;
+      }
+    }
+
+    if (!state.selectedPlaceId) {
+      showError('Please select an address from the suggestions');
+      return;
+    }
+
+    showLoading('Fetching address details...');
 
     try {
-      const response = await fetch(`/api/place-details?place_id=${encodeURIComponent(state.selectedPlaceId)}`);
+      const response = await fetch(`/api/v1/place-details?place_id=${encodeURIComponent(state.selectedPlaceId)}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -199,8 +222,6 @@ const restaurantAddressAutocomplete = (() => {
       if (state.updateAddressBtn) {
         state.updateAddressBtn.disabled = true;
       }
-
-      state.selectedPlaceId = null;
     } catch (error) {
       console.error('Error fetching place details:', error);
       showError(error.message);
@@ -208,12 +229,12 @@ const restaurantAddressAutocomplete = (() => {
   }
 
   /**
-   * Update form fields with address data
+   * Update form fields with address data from Google Places
    * @private
-   * @param {Object} data - Place details data
+   * @param {Object} data - Place details data from Google Places API
    */
   function updateFormFields(data) {
-    const { address_components: components } = data;
+    const { address_components: components, name, formatted_address, geometry } = data;
     const address = {
       streetNumber: '',
       route: '',
@@ -224,34 +245,71 @@ const restaurantAddressAutocomplete = (() => {
     };
 
     // Parse address components
-    components.forEach(component => {
-      const types = component.types;
-      if (types.includes('street_number')) {
-        address.streetNumber = component.long_name;
-      } else if (types.includes('route')) {
-        address.route = component.long_name;
-      } else if (types.includes('locality') || types.includes('postal_town')) {
-        address.city = component.long_name;
-      } else if (types.includes('administrative_area_level_1')) {
-        address.state = component.short_name;
-      } else if (types.includes('postal_code')) {
-        address.postalCode = component.long_name;
-      } else if (types.includes('country')) {
-        address.country = component.long_name;
-      }
-    });
+    if (components && Array.isArray(components)) {
+      components.forEach(component => {
+        const types = component.types || [];
+        if (types.includes('street_number')) {
+          address.streetNumber = component.long_name || '';
+        } else if (types.includes('route')) {
+          address.route = component.long_name || '';
+        } else if (types.includes('locality') || types.includes('postal_town')) {
+          address.city = component.long_name || '';
+        } else if (types.includes('administrative_area_level_1')) {
+          address.state = component.short_name || '';
+        } else if (types.includes('postal_code')) {
+          address.postalCode = component.long_name || '';
+        } else if (types.includes('country')) {
+          address.country = component.long_name || '';
+        }
+      });
+    }
 
-    // Update form fields
+    // Update restaurant name if empty
+    const nameField = document.getElementById('name');
+    if (nameField && !nameField.value && name) {
+      nameField.value = name;
+    }
+
+    // Update address fields
     if (state.formFields.address) {
       state.formFields.address.value = [address.streetNumber, address.route]
         .filter(Boolean)
         .join(' ')
         .trim();
     }
+
+    // Update other address fields
     if (state.formFields.city) state.formFields.city.value = address.city;
     if (state.formFields.state) state.formFields.state.value = address.state;
     if (state.formFields.postalCode) state.formFields.postalCode.value = address.postalCode;
     if (state.formFields.country) state.formFields.country.value = address.country;
+
+    // Update hidden fields for Google Places data
+    const googlePlaceIdField = document.getElementById('google_place_id');
+    const latitudeField = document.getElementById('latitude');
+    const longitudeField = document.getElementById('longitude');
+
+    // Update Google Place ID if available
+    if (googlePlaceIdField) {
+      googlePlaceIdField.value = data.place_id || '';
+    }
+
+    // Update coordinates if available
+    if (geometry?.location) {
+      if (latitudeField && geometry.location.lat) {
+        latitudeField.value = geometry.location.lat;
+      }
+      if (longitudeField && geometry.location.lng) {
+        longitudeField.value = geometry.location.lng;
+      }
+    }
+
+    // Enable the Update button
+    if (state.updateAddressBtn) {
+      state.updateAddressBtn.disabled = false;
+      state.updateAddressBtn.classList.remove('btn-outline-secondary');
+      state.updateAddressBtn.classList.add('btn-outline-success');
+    }
   }
 
   /**
