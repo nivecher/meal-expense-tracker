@@ -6,6 +6,7 @@
  */
 
 import GoogleMapsLoader from '../utils/google-maps-loader.js';
+import { logger } from '../utils/logger.js';
 
 const restaurantAddressAutocomplete = (() => {
   // Module state
@@ -33,20 +34,39 @@ const restaurantAddressAutocomplete = (() => {
       cacheElements();
 
       // Only proceed if we have the required elements
-      if (!state.autocompleteInput) return;
+      if (!state.autocompleteInput) {
+        logger.warn('Address autocomplete input not found');
+        return;
+      }
+
+      // Check if API key is available
+      if (!window.GOOGLE_MAPS_API_KEY) {
+        logger.error('Google Maps API key is not defined');
+        showError('Google Maps API is not properly configured. Please contact support.');
+        return;
+      }
 
       // Load Google Maps API first
       try {
-        const google = await GoogleMapsLoader.loadApi(window.GOOGLE_MAPS_API_KEY, ['places', 'geocoding']);
-        window.google = google;
-        setupEventListeners();
-        console.log('Restaurant address autocomplete initialized with Google Maps API');
+        logger.debug('Initializing Google Maps API...');
+        const google = await GoogleMapsLoader.loadApi(
+          window.GOOGLE_MAPS_API_KEY,
+          (g) => {
+            logger.debug('Google Maps API loaded successfully in callback');
+            window.google = g;
+            setupEventListeners();
+          },
+          ['places', 'geocoding']
+        );
+
+        // If we get here, the API is loaded and callbacks have been called
+        logger.info('Restaurant address autocomplete initialized with Google Maps API');
       } catch (error) {
-        console.error('Failed to load Google Maps API:', error);
+        logger.error('Failed to load Google Maps API:', error);
         showError('Failed to load address autocomplete. Please refresh the page and try again.');
       }
     } catch (error) {
-      console.error('Error initializing address autocomplete:', error);
+      logger.error('Error initializing address autocomplete:', error);
       showError('An error occurred while initializing address autocomplete.');
     }
   }

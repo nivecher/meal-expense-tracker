@@ -191,9 +191,6 @@ export class RestaurantSearch {
   }
 
   /**
-     * Handle search action
-     */
-  /**
    * Handle search action
    */
   async handleSearch () {
@@ -238,24 +235,44 @@ export class RestaurantSearch {
       }
 
       console.log('Searching with location:', this.currentLocation);
-      const results = await googlePlacesService.searchNearby(
-        this.currentLocation,
-        {
-          keyword: query || 'restaurant',
-          radius: radius,
-          maxResults: 20,
+      try {
+        console.log('Searching for restaurants...');
+        const response = await googlePlacesService.searchNearby(
+          this.currentLocation,
+          {
+            keyword: query || 'restaurant',
+            radius: radius,
+            maxResults: 20,
+          }
+        );
+
+        console.log('Search response:', response);
+
+        // The response should be an object with a results array and status
+        if (!response || !response.results || !Array.isArray(response.results)) {
+          console.error('Invalid response format from Google Places API:', response);
+          this.displayResults([]);
+          this.onError('Invalid response from search service. Please try again.');
+          return;
         }
-      );
 
-      this.displayResults(results);
+        const results = response.results;
 
-      if (!results || results.length === 0) {
+        if (results.length === 0) {
+          console.log('No restaurants found for the given criteria');
+          this.displayResults([]);
+          this.onError('No restaurants found. Try adjusting your search or location.');
+          return;
+        }
+
+        console.log(`Found ${results.length} restaurants`);
+        this.displayResults(results);
+      } catch (error) {
+        console.error('Error in search:', error);
         this.displayResults([]);
-        this.onError('No restaurants found. Try adjusting your search or location.');
-        return;
+        this.onError(`Error searching for restaurants: ${error.message || 'Unknown error'}`);
+        throw error; // Re-throw to be caught by the outer try-catch
       }
-
-      this.displayResults(results);
     } catch (error) {
       console.error('Search error:', error);
       this.onError(`Error searching for restaurants: ${error.message}`);
@@ -266,133 +283,315 @@ export class RestaurantSearch {
   }
 
   /**
-     * Display search results
-     * @param {Array} results - Array of restaurant objects
-     */
+   * Display search results in the UI
+   * @param {Array<Object>} results - Array of restaurant objects from Google Places API
+   */
   displayResults (results) {
-    console.log('Raw results:', results); // Debug log
+    console.log('Displaying results:', results);
+    const resultsContainer = this.elements.resultsContainer;
 
-    if (!results || results.length === 0) {
-      this.elements.resultsContainer.innerHTML = `
-                <div class="alert alert-info">
-                    No restaurants found. Try adjusting your search criteria.
-                </div>
-            `;
+    // Clear previous results and errors
+    resultsContainer.innerHTML = '';
+
+    // Check if results is not an array or is empty
+    if (!Array.isArray(results) || results.length === 0) {
+      resultsContainer.innerHTML = `
+        <div class="alert alert-info">
+          No restaurants found. Try adjusting your search criteria.
+        </div>
+      `;
       return;
     }
 
-    const resultsHtml = results.map((restaurant) => {
-      console.log('Processing restaurant:', restaurant); // Debug log
+    try {
+      // Create a row to contain the restaurant cards
+      const row = document.createElement('div');
+      row.className = 'row';
 
-      // Handle photo URL - support both direct URLs and photo objects with getUrl()
-      let photoUrl = '';
-      if (restaurant.photos && restaurant.photos.length > 0) {
-        const firstPhoto = restaurant.photos[0];
-        if (typeof firstPhoto === 'string') {
-          photoUrl = firstPhoto;
-        } else if (typeof firstPhoto.getUrl === 'function') {
-          // If we have a getUrl function, use it to get the URL
-          photoUrl = firstPhoto.getUrl({ maxWidth: 400 });
-        } else if (firstPhoto.url) {
-          // Fall back to the url property if available
-          photoUrl = firstPhoto.url;
-        } else if (firstPhoto.name) {
-          // For v3 API, we might need to construct the URL
-          photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${firstPhoto.name.split('/').pop()}&key=${googlePlacesService.apiKey}`;
+      // Process each restaurant in the results
+      results.forEach((restaurant, index) => {
+        // Skip if restaurant is not an object
+        if (typeof restaurant !== 'object' || restaurant === null) {
+          console.warn(`Skipping invalid restaurant at index ${index}:`, restaurant);
+          return;
         }
-      }
 
-      // Format address - use formatted_address if available, otherwise use formattedAddress or construct from components
-      let address = restaurant.formatted_address || restaurant.formattedAddress || 'Address not available';
+        // Log restaurant data for debugging
+        console.log(`Processing restaurant ${index + 1}/${results.length}:`, restaurant);
 
-      // If we have address components but no formatted address, try to construct one
-      if (address === 'Address not available' && restaurant.address_components) {
-        const components = restaurant.address_components || [];
-        const streetNumber = components.find((c) => c.types.includes('street_number'))?.long_name || '';
-        const route = components.find((c) => c.types.includes('route'))?.long_name || '';
-        const locality = components.find((c) => c.types.includes('locality'))?.long_name || '';
-        const adminArea = components.find((c) => c.types.includes('administrative_area_level_1'))?.long_name || '';
-        const postalCode = components.find((c) => c.types.includes('postal_code'))?.long_name || '';
-        const country = components.find((c) => c.types.includes('country'))?.long_name || '';
+        // Extract restaurant details with fallbacks
+        const name = restaurant.displayName?.text || restaurant.name || 'Unnamed Restaurant';
+        const address = this.formatAddress(restaurant);
+        const rating = typeof restaurant.rating === 'number' ? restaurant.rating : 'N/A';
+        const userRatingsTotal = restaurant.user_ratings_total || restaurant.userRatingCount || 0;
+        const priceLevel = restaurant.price_level || restaurant.priceLevel || 0;
+        const placeId = restaurant.place_id || restaurant.id || '';
 
-        address = [
-          [streetNumber, route].filter(Boolean).join(' '),
-          locality,
-          [adminArea, postalCode].filter(Boolean).join(' '),
-          country,
-        ].filter(Boolean).join(', ');
-      }
+        // Get photo URL
+        const photoUrl = this.getPhotoUrl(restaurant);
 
-      // Get the display name - handle both v2 and v3 API formats
-      const displayName = restaurant.displayName?.text || restaurant.name || 'Unnamed Restaurant';
+        // Create restaurant card
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-lg-4 mb-4';
+        col.dataset.placeId = placeId;
 
-      // Get rating and user ratings count
-      const rating = restaurant.rating || 0;
-      const userRatingsTotal = restaurant.user_ratings_total || restaurant.userRatingCount || 0;
+        // Create card HTML
+        col.innerHTML = `
+          <div class="card h-100 restaurant-card">
+            ${photoUrl ? `
+              <img src="${photoUrl}"
+                   class="card-img-top"
+                   alt="${name}"
+                   style="height: 200px; object-fit: cover;">
+            ` : `
+              <div class="card-img-top bg-light d-flex align-items-center justify-content-center"
+                   style="height: 200px;">
+                <i class="fas fa-utensils fa-4x text-muted"></i>
+              </div>
+            `}
 
-      // Get price level (1-4, where 1 is $, 4 is $$$$)
-      const priceLevel = restaurant.price_level || restaurant.priceLevel || 0;
+            <div class="card-body d-flex flex-column">
+              <h5 class="card-title">${name}</h5>
 
-      // Get place ID
-      const placeId = restaurant.place_id || restaurant.id || '';
-
-      return `
-            <div class="card mb-3">
-                <div class="row g-0">
-                    ${photoUrl ? `
-                        <div class="col-md-4">
-                            <img src="${photoUrl}"
-                                 class="img-fluid rounded-start h-100"
-                                 alt="${displayName}"
-                                 style="object-fit: cover; height: 150px; width: 100%;">
-                        </div>
-                    ` : ''}
-                    <div class="col-md-8">
-                        <div class="card-body">
-                            <h5 class="card-title">${displayName}</h5>
-                            <p class="card-text text-muted">
-                                <i class="fas fa-map-marker-alt me-1"></i>
-                                ${address}
-                            </p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                ${rating > 0 ? `
-                                    <div class="rating">
-                                        ${this.renderRating(rating)}
-                                        <span class="ms-1 small text-muted">
-                                            (${userRatingsTotal})
-                                        </span>
-                                    </div>
-                                ` : ''}
-                                ${priceLevel > 0 ? `
-                                    <div class="price-level">
-                                        ${'$'.repeat(priceLevel)}
-                                    </div>
-                                ` : ''}
-                            </div>
-                            <div class="mt-2">
-                                <button class="btn btn-sm btn-outline-primary select-restaurant"
-                                        data-restaurant-id="${placeId}">
-                                    <i class="fas fa-plus me-1"></i> Add to My Restaurants
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+              ${rating !== 'N/A' ? `
+                <div class="d-flex align-items-center mb-2">
+                  <div class="text-warning me-2">
+                    ${this.renderRating(rating)}
+                  </div>
+                  <span class="text-muted small">
+                    (${userRatingsTotal} ${userRatingsTotal === 1 ? 'review' : 'reviews'})
+                  </span>
                 </div>
-            </div>`;
-    }).join('');
+              ` : ''}
 
-    this.elements.resultsContainer.innerHTML = resultsHtml;
+              ${priceLevel > 0 ? `
+                <div class="mb-2">
+                  <span class="badge bg-light text-dark">${'$'.repeat(priceLevel)}</span>
+                </div>
+              ` : ''}
 
-    // Add event listeners to the select buttons
-    this.container.querySelectorAll('.select-restaurant').forEach((button) => {
-      button.addEventListener('click', (e) => {
-        const { restaurantId } = e.target.closest('button').dataset;
-        const restaurant = results.find((r) => (r.place_id || r.id) === restaurantId);
+              <p class="card-text text-muted small flex-grow-1">
+                <i class="fas fa-map-marker-alt me-1"></i> ${address}
+              </p>
+
+              <button class="btn btn-primary btn-sm mt-2 select-restaurant"
+                      data-place-id="${placeId}">
+                <i class="fas fa-plus me-1"></i> Add to List
+              </button>
+            </div>
+          </div>
+        `;
+
+        // Add click handler for the select button
+        const selectButton = col.querySelector('.select-restaurant');
+        if (selectButton) {
+          selectButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.onSelect(restaurant);
+          });
+        }
+
+        // Add column to row
+        row.appendChild(col);
+      });
+
+      // Add row to results container
+      resultsContainer.appendChild(row);
+
+      // Add event listeners to the select buttons
+      resultsContainer.querySelectorAll('.select-restaurant').forEach(button => {
+        button.addEventListener('click', (e) => {
+          e.preventDefault();
+          const placeId = e.currentTarget.dataset.placeId;
+          const restaurant = results.find(r => (r.place_id || r.id) === placeId);
+          if (restaurant && typeof this.onSelect === 'function') {
+            this.onSelect(restaurant);
+          }
+        });
+      });
+
+    } catch (error) {
+      console.error('Error displaying results:', error);
+      resultsContainer.innerHTML = `
+        <div class="alert alert-danger">
+          An error occurred while displaying results. Please try again.
+        </div>
+      `;
+    }
+  }
+
+  /**
+   * Format a restaurant's address from its components
+   * @param {Object} restaurant - Restaurant object from Google Places API
+   * @returns {string} Formatted address string
+   */
+  formatAddress(restaurant) {
+    if (!restaurant) return 'Address not available';
+
+    // Use formatted address if available
+    if (restaurant.formatted_address) return restaurant.formatted_address;
+    if (restaurant.formattedAddress) return restaurant.formattedAddress;
+
+    // Try to construct address from components if available
+    if (restaurant.address_components) {
+      return restaurant.address_components
+        .map(component => component.long_name)
+        .join(', ');
+    }
+
+    if (restaurant.vicinity) {
+      return restaurant.vicinity;
+    }
+
+    return 'Address not available';
+  }
+
+  /**
+   * Get a photo URL for a restaurant
+   * @param {Object} restaurant - Restaurant object from Google Places API
+   * @returns {string|null} Photo URL or null if not available
+   */
+  getPhotoUrl(restaurant) {
+    if (!restaurant || !restaurant.photos || restaurant.photos.length === 0) {
+      return null;
+    }
+
+    const photo = restaurant.photos[0];
+    if (!photo) {
+      return null;
+    }
+
+    if (photo.getUrl) {
+      // Google Maps JavaScript API v3
+      return photo.getUrl();
+    } else if (photo.photo_reference) {
+      // Google Places API v2
+      return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photo.photo_reference}&key=${this.apiKey}`;
+    } else if (photo.url) {
+      // Direct URL
+      return photo.url;
+    }
+
+    return null;
+  }
+
+  /**
+   * Render a single restaurant card
+   * @param {Object} restaurant - Restaurant data
+   * @returns {string} HTML string for the restaurant card
+   */
+  renderRestaurantCard (restaurant) {
+    const name = restaurant.displayName?.text || restaurant.name || 'Unnamed Restaurant';
+    const address = this.formatAddress(restaurant);
+    const rating = typeof restaurant.rating === 'number' ? restaurant.rating : 0;
+    const userRatingsTotal = restaurant.user_ratings_total || restaurant.userRatingCount || 0;
+    const priceLevel = restaurant.price_level || restaurant.priceLevel || 0;
+    const placeId = restaurant.place_id || restaurant.id || '';
+    const photoUrl = this.getPhotoUrl(restaurant);
+
+    return `
+      <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+          ${photoUrl ? `
+            <img src="${photoUrl}"
+                 class="card-img-top"
+                 alt="${name}"
+                 style="height: 180px; object-fit: cover;">
+          ` : `
+            <div class="card-img-top bg-light d-flex align-items-center justify-content-center"
+                 style="height: 180px;">
+              <i class="fas fa-utensils fa-4x text-muted"></i>
+            </div>
+          `}
+          <div class="card-body d-flex flex-column">
+            <h5 class="card-title">${name}</h5>
+            <p class="card-text text-muted small flex-grow-1">
+              <i class="fas fa-map-marker-alt me-1"></i> ${address}
+            </p>
+            ${rating > 0 ? `
+              <div class="d-flex align-items-center mb-2">
+                <div class="text-warning me-2">
+                  ${this.renderRating(rating)}
+                </div>
+                <span class="text-muted small">
+                  (${userRatingsTotal} ${userRatingsTotal === 1 ? 'review' : 'reviews'})
+                </span>
+              </div>
+            ` : ''}
+            ${priceLevel > 0 ? `
+              <div class="mb-2">
+                <span class="badge bg-light text-dark">${'$'.repeat(priceLevel)}</span>
+              </div>
+            ` : ''}
+            <button class="btn btn-primary btn-sm mt-auto select-restaurant"
+                    data-restaurant-id="${placeId}">
+              <i class="fas fa-plus me-1"></i> Add to My Restaurants
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Display search results in the UI
+   * @param {Array<Object>} results - Array of restaurant objects from Google Places API
+   */
+  displayResults (results) {
+    const resultsContainer = this.elements.resultsContainer;
+
+    // Clear previous results
+    resultsContainer.innerHTML = '';
+
+    // Check if results is not an array or is empty
+    if (!Array.isArray(results) || results.length === 0) {
+      resultsContainer.innerHTML = `
+        <div class="col-12">
+          <div class="alert alert-info mb-0">
+            No restaurants found. Try adjusting your search criteria.
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    try {
+      // Create a row to contain all restaurant cards
+      const row = document.createElement('div');
+      row.className = 'row g-3';
+
+      // Add each restaurant card to the row
+      results.forEach(restaurant => {
         if (restaurant) {
-          this.onSelect(restaurant);
+          row.insertAdjacentHTML('beforeend', this.renderRestaurantCard(restaurant));
         }
       });
-    });
+
+      // Add the row to the container
+      resultsContainer.appendChild(row);
+
+      // Add event listeners to the select buttons
+      resultsContainer.querySelectorAll('.select-restaurant').forEach(button => {
+        button.addEventListener('click', (e) => {
+          e.preventDefault();
+          const restaurantId = e.currentTarget.dataset.restaurantId;
+          const restaurant = results.find(r => (r.place_id || r.id) === restaurantId);
+          if (restaurant) {
+            this.onSelect(restaurant);
+          }
+        });
+      });
+
+    } catch (error) {
+      console.error('Error displaying results:', error);
+      resultsContainer.innerHTML = `
+        <div class="col-12">
+          <div class="alert alert-danger mb-0">
+            An error occurred while displaying results. Please try again.
+          </div>
+        </div>
+      `;
+    }
   }
 
   /**
