@@ -40,10 +40,31 @@ class TestingConfig(Config):
 
 
 class ProductionConfig(Config):
-    """Production configuration."""
+    """Production configuration for AWS Lambda."""
 
+    # Use class variables instead of instance variables
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
-    # Add other production-specific settings here, e.g., for logging, security, etc.
+
+    def __init__(self):
+        # In Lambda, we should use a proper database like RDS or Aurora
+        if not self.SQLALCHEMY_DATABASE_URI:
+            # If no DATABASE_URL is set, fall back to SQLite in /tmp (not recommended for production)
+            db_path = "/tmp/app-prod.db"
+            self.SQLALCHEMY_DATABASE_URI = f"sqlite:///{db_path}"
+            self.SQLALCHEMY_ENGINE_OPTIONS = {
+                "pool_recycle": 280,
+                "connect_args": {"timeout": 15, "check_same_thread": False},
+            }
+        else:
+            # For PostgreSQL/RDS, set appropriate engine options
+            self.SQLALCHEMY_ENGINE_OPTIONS = {
+                "pool_pre_ping": True,
+                "pool_recycle": 300,
+                "pool_size": 5,
+                "max_overflow": 10,
+                "pool_timeout": 30,
+                "connect_args": {"connect_timeout": 10},
+            }
 
 
 config = {

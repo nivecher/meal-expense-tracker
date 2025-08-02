@@ -121,7 +121,7 @@ class Restaurant(BaseModel):
         Returns:
             Optional[str]: Formatted address string or None if no address components
         """
-        parts = []
+        parts: List[str] = []
         if self.address:
             parts.append(self.address)
         if self.city:

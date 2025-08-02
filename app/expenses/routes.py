@@ -52,6 +52,105 @@ def _get_form_choices(
     return categories, restaurants
 
 
+def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
+    """Initialize the expense form with choices and handle AJAX detection.
+
+    Returns:
+        Tuple of (form, is_ajax)
+    """
+    current_app.logger.info("Initializing expense form")
+    categories, restaurants = _get_form_choices(current_user.id)
+    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    restaurant_id = request.args.get("restaurant_id")
+
+    form = ExpenseForm(
+        category_choices=[("", "Select a category (optional)")] + categories,
+        restaurant_choices=[("", "Select a restaurant (optional)")] + restaurants,
+        restaurant_id=restaurant_id,
+        meta={"csrf": False},
+    )
+    return form, is_ajax
+
+
+def _handle_expense_creation(form: ExpenseForm, is_ajax: bool) -> ResponseReturnValue:
+    """Handle the expense creation process.
+
+    Args:
+        form: The validated form
+        is_ajax: Whether the request is an AJAX request
+
+    Returns:
+        Response with appropriate success/error message
+    """
+    try:
+        expense, error = expense_services.create_expense(current_user.id, form)
+
+        if error:
+            return _handle_creation_error(error, form, is_ajax)
+
+        if expense is None:
+            return _handle_creation_error("Failed to create expense", form, is_ajax, status_code=500)
+
+        return _handle_creation_success(expense, is_ajax)
+
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error in _handle_expense_creation: {str(e)}", exc_info=True)
+        return _handle_creation_error("An unexpected error occurred", form, is_ajax, status_code=500, error=str(e))
+
+
+def _handle_creation_error(
+    error: str, form: ExpenseForm, is_ajax: bool, status_code: int = 400, **extra: dict
+) -> ResponseReturnValue:
+    """Handle expense creation errors.
+
+    Args:
+        error: Error message
+        form: The form with validation errors
+        is_ajax: Whether the request is an AJAX request
+        status_code: HTTP status code to return
+        extra: Additional error details
+
+    Returns:
+        Error response in appropriate format
+    """
+    current_app.logger.error(f"Error creating expense: {error}")
+    if is_ajax:
+        response = {"success": False, "message": str(error), "errors": {"_error": [str(error)]}}
+        response.update(extra)
+        return jsonify(response), status_code
+
+    flash(str(error), "error")
+    return render_template("expenses/form.html", form=form, is_edit=False), status_code
+
+
+def _handle_creation_success(expense: Expense, is_ajax: bool) -> ResponseReturnValue:
+    """Handle successful expense creation.
+
+    Args:
+        expense: The created expense
+        is_ajax: Whether the request is an AJAX request
+
+    Returns:
+        Success response in appropriate format
+    """
+    current_app.logger.info(f"Successfully created expense with ID: {expense.id}")
+
+    if is_ajax:
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": "Expense added successfully!",
+                    "redirect": url_for("expenses.list_expenses"),
+                }
+            ),
+            200,
+        )
+
+    flash("Expense added successfully!", "success")
+    return redirect(url_for("expenses.list_expenses"))
+
+
 @bp.route("/add", methods=["GET", "POST"])
 @login_required
 def add_expense() -> ResponseReturnValue:
@@ -62,53 +161,21 @@ def add_expense() -> ResponseReturnValue:
     """
     current_app.logger.info("=== Starting add_expense route ===")
     current_app.logger.info("Method: %s", request.method)
-    current_app.logger.info("Headers: %s", dict(request.headers))
-    current_app.logger.info("Form data: %s", request.form.to_dict())
 
-    # Get form choices
-    categories, restaurants = _get_form_choices(current_user.id)
-    is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-    current_app.logger.info(f"Is AJAX request: {is_ajax}")
-
-    # Get restaurant_id from query parameters if present
-    restaurant_id = request.args.get("restaurant_id")
-    current_app.logger.info(f"Restaurant ID from query params: {restaurant_id}")
-
-    # Initialize form with choices and restaurant_id if provided
-    form = ExpenseForm(
-        category_choices=[("", "Select a category (optional)")] + categories,
-        restaurant_choices=[("", "Select a restaurant (optional)")] + restaurants,
-        restaurant_id=restaurant_id,
-        meta={"csrf": False},  # We'll handle CSRF in the form
-    )
-
-    current_app.logger.info("Form initialized with choices")
+    # Initialize form and check if it's an AJAX request
+    form, is_ajax = _initialize_expense_form()
 
     if request.method == "POST":
-        current_app.logger.info("=== Processing POST request ===")
-        current_app.logger.info(f"Request form data: {request.form.to_dict()}")
-        current_app.logger.info(f"Request JSON: {request.get_json(silent=True) or 'No JSON data'}")
+        current_app.logger.info("Processing POST request")
 
-        # Convert form data to dict for validation
-        form_data = request.form.to_dict()
-        current_app.logger.info(f"Form data after conversion: {form_data}")
-
-        # Log CSRF token if present
-        csrf_token = request.headers.get("X-CSRFToken") or request.form.get("csrf_token")
-        current_app.logger.info(f"CSRF Token: {'Present' if csrf_token else 'Missing'}")
-
-        # Create form instance with the submitted data and restaurant_id
+        # Create form with submitted data
         form = ExpenseForm(
-            data=form_data,
-            category_choices=[("", "Select a category (optional)")] + categories,
-            restaurant_choices=[("", "Select a restaurant (optional)")] + restaurants,
-            restaurant_id=restaurant_id,  # Pass the restaurant_id from query params
+            data=request.form.to_dict(),
+            category_choices=form.category_choices,
+            restaurant_choices=form.restaurant_choices,
+            restaurant_id=form.restaurant_id,
             meta={"csrf": False},
         )
-
-        current_app.logger.info(f"Form initialized. Is valid: {form.validate()}")
-        current_app.logger.info(f"Form errors: {form.errors}")
-        current_app.logger.info(f"Form data after validation: {form.data}")
 
         # Validate form
         if not form.validate():
@@ -117,44 +184,10 @@ def add_expense() -> ResponseReturnValue:
                 return jsonify({"success": False, "message": "Form validation failed", "errors": form.errors}), 400
             return render_template("expenses/form.html", form=form, is_edit=False)
 
-        # If form is valid, try to create the expense
-        try:
-            current_app.logger.info("Form validation successful, creating expense...")
-            expense, error = expense_services.create_expense(current_user.id, form)
+        # Process valid form submission
+        return _handle_expense_creation(form, is_ajax)
 
-            if error:
-                current_app.logger.error(f"Error creating expense: {error}")
-                if is_ajax:
-                    return jsonify({"success": False, "message": str(error), "errors": {"_error": [str(error)]}}), 400
-                flash(str(error), "error")
-                return render_template("expenses/form.html", form=form, is_edit=False)
-
-            # Success case
-            current_app.logger.info(f"Successfully created expense with ID: {expense.id}")
-            if is_ajax:
-                return (
-                    jsonify(
-                        {
-                            "success": True,
-                            "message": "Expense added successfully!",
-                            "redirect": url_for("expenses.list_expenses"),
-                        }
-                    ),
-                    200,
-                )
-
-            flash("Expense added successfully!", "success")
-            return redirect(url_for("expenses.list_expenses"))
-
-        except Exception as e:
-            current_app.logger.error(f"Unexpected error in add_expense: {str(e)}", exc_info=True)
-            error_msg = "An unexpected error occurred. Please try again."
-            if is_ajax:
-                return jsonify({"success": False, "message": error_msg, "error": str(e)}), 500
-            flash(error_msg, "error")
-            return render_template("expenses/form.html", form=form, is_edit=False)
-
-    # Handle GET request or form with validation errors
+    # Handle GET request
     current_app.logger.info("Rendering expense form")
     return render_template(
         "expenses/form.html",

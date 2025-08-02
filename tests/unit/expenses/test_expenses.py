@@ -120,6 +120,7 @@ def test_edit_expense(client, auth, app):
     # Check the database for updated notes and amount
     with app.app_context():
         expense = db.session.get(Expense, 1)
+        assert expense is not None, "Expense not found in database"
         assert expense.notes == "Updated expense"
         assert expense.amount == 35.50
 
@@ -176,6 +177,7 @@ def test_edit_expense_unauthorized(client, auth, app):
     assert b"Meal Expenses" in response.data
     with app.app_context():
         expense = db.session.get(Expense, 1)
+        assert expense is not None, "Expense not found in database"
         assert expense.notes == "Test expense"
         assert expense.amount == 25.50
 

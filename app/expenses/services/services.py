@@ -280,7 +280,12 @@ def get_filter_options(user_id: int) -> Dict[str, Any]:
 
     # Remove duplicates while preserving order
     seen: set[str] = set()
-    month_options = [m for m in month_options if not (m[0] in seen or seen.add(m[0]))]
+    unique_month_options = []
+    for m in month_options:
+        if m[0] not in seen:
+            seen.add(m[0])
+            unique_month_options.append(m)
+    month_options = unique_month_options
 
     return {
         "categories": [{"name": str(cat[0]), "count": int(cat[1])} for cat in categories],

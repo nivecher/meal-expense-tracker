@@ -99,12 +99,13 @@ def add_restaurant():
     return render_template("restaurants/form.html", form=form, is_edit=False)
 
 
-@bp.route("/<int:restaurant_id>", methods=["GET"])
+@bp.route("/<int:restaurant_id>", methods=["GET", "POST"])
 @login_required
 def restaurant_details(restaurant_id):
-    """View restaurant details with expenses.
+    """View and update restaurant details with expenses.
 
     GET: Display restaurant details with expenses
+    POST: Update restaurant details
     """
     # Get the restaurant with its expenses relationship loaded
     stmt = (
@@ -117,10 +118,39 @@ def restaurant_details(restaurant_id):
     if not restaurant:
         abort(404, "Restaurant not found")
 
+    # Handle form submission
+    if request.method == "POST":
+        form = RestaurantForm()
+        if form.validate_on_submit():
+            try:
+                # Update restaurant with form data
+                services.update_restaurant(restaurant.id, current_user.id, form)
+                flash("Restaurant updated successfully!", "success")
+                return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
+            except Exception as e:
+                flash(f"Error updating restaurant: {str(e)}", "danger")
+        else:
+            # Form validation failed
+            for field, errors in form.errors.items():
+                for error in errors:
+                    flash(f"{getattr(form, field).label.text}: {error}", "danger")
+
+            # Pre-populate form with submitted data
+            form = RestaurantForm(data=request.form)
+            return render_template(
+                "restaurants/detail.html",
+                restaurant=restaurant,
+                expenses=sorted(restaurant.expenses, key=lambda x: x.date, reverse=True),
+                form=form,
+                is_edit=True,
+            )
+
     # Load expenses for the restaurant
     expenses = sorted(restaurant.expenses, key=lambda x: x.date, reverse=True)
 
-    return render_template("restaurants/detail.html", restaurant=restaurant, expenses=expenses)
+    return render_template(
+        "restaurants/detail.html", restaurant=restaurant, expenses=expenses, form=RestaurantForm(obj=restaurant)
+    )
 
 
 @bp.route("/<int:restaurant_id>/edit", methods=["GET", "POST"])
@@ -594,11 +624,24 @@ def search_restaurants():
             | (Restaurant.address.ilike(search))
         )
 
-    # Apply sorting
-    sort_field = getattr(Restaurant, sort, Restaurant.name)
-    if order == "desc":
-        sort_field = sort_field.desc()
-    stmt = stmt.order_by(sort_field)
+    # Import Type for type casting
+    from typing import cast
+
+    from sqlalchemy.sql.elements import ColumnElement
+
+    # Apply sorting with proper type checking
+    sort_field = getattr(Restaurant, sort, None) if sort else None
+
+    # Ensure we have a valid sort field
+    if sort_field is None or not hasattr(sort_field, "desc"):
+        sort_field = Restaurant.name
+
+    # Cast to ColumnElement to help mypy understand the type
+    sort_field = cast(ColumnElement, sort_field)
+
+    # Apply sort direction with type checking
+    sort_expr = sort_field.desc() if order == "desc" else sort_field.asc()
+    stmt = stmt.order_by(sort_expr)
 
     # Paginate results
     pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)

@@ -53,10 +53,14 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
     }.get(sort_by, Restaurant.name)
 
     sort_direction = sort_order.upper() if sort_order in ["asc", "desc"] else "ASC"
-    stmt = stmt.order_by(
-        sort_column.asc() if sort_direction == "ASC" else sort_column.desc(),
-        Restaurant.name.asc(),
-    )
+    # Ensure sort_column is not None before calling asc() or desc()
+    if sort_column is not None:
+        stmt = stmt.order_by(
+            sort_column.asc() if sort_direction == "ASC" else sort_column.desc(),
+            Restaurant.name.asc(),
+        )
+    else:
+        stmt = stmt.order_by(Restaurant.name.asc())
 
     # Execute query and convert results to list of dicts
     results = db.session.execute(stmt).all()

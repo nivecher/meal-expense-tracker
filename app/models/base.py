@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar, cast
 
+from flask_sqlalchemy.model import DefaultMeta
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import Session as _Session
 from sqlalchemy.orm import mapped_column
@@ -24,8 +25,15 @@ Column = _db.Column
 relationship = _db.relationship
 backref = _db.backref
 
+# Type for SQLAlchemy model base
+if TYPE_CHECKING:
+    Model = _db.Model
+else:
+    # At runtime, use the actual model
+    Model = cast(DefaultMeta, _db.Model)
 
-class BaseModel(_db.Model):
+
+class BaseModel(Model):  # type: ignore
     """Base model class with common functionality for all models.
 
     This class extends Flask-SQLAlchemy's Model class and adds common fields and methods.

@@ -5,6 +5,11 @@
  * including edit mode toggling and map initialization.
  */
 
+import GoogleMapsLoader from './utils/google-maps-loader.js';
+
+// Global map reference
+let map = null;
+
 document.addEventListener('DOMContentLoaded', () => {
   initializeTooltips();
   initializeMap();
@@ -33,20 +38,71 @@ function initializeMap () {
 
   const lat = parseFloat(mapContainer.dataset.lat);
   const lng = parseFloat(mapContainer.dataset.lng);
+  const name = mapContainer.dataset.name || 'Restaurant Location';
 
-  // This is a placeholder - in a real implementation, you would use a mapping library
-  // like Leaflet or Google Maps to display an interactive map
-  mapContainer.innerHTML = `
-        <div class="ratio ratio-16x9 bg-light">
-            <div class="d-flex align-items-center justify-content-center h-100">
-                <div class="text-center">
-                    <i class="fas fa-map-marker-alt fa-3x text-primary mb-2"></i>
-                    <p class="mb-0">Map would be displayed here</p>
-                    <small class="text-muted">(Interactive map implementation required)</small>
-                </div>
-            </div>
+  // Check if we have valid coordinates
+  if (isNaN(lat) || isNaN(lng)) {
+    showMapPlaceholder(mapContainer, 'No location data available');
+    return;
+  }
+
+  // Load Google Maps API and initialize the map
+  if (window.GOOGLE_MAPS_API_KEY) {
+    GoogleMapsLoader.loadApi(window.GOOGLE_MAPS_API_KEY, () => {
+      try {
+        const location = { lat, lng };
+
+        // Create a new map centered at the restaurant location
+        map = new google.maps.Map(mapContainer, {
+          zoom: 15,
+          center: location,
+          mapTypeId: 'roadmap',
+          styles: [
+            {
+              featureType: 'poi',
+              elementType: 'labels',
+              stylers: [{ visibility: 'off' }]
+            }
+          ]
+        });
+
+        // Add a marker for the restaurant
+        new google.maps.Marker({
+          position: location,
+          map: map,
+          title: name,
+          animation: google.maps.Animation.DROP
+        });
+      } catch (error) {
+        console.error('Error initializing Google Maps:', error);
+        showMapPlaceholder(mapContainer, 'Error loading map');
+      }
+    }, ['maps']).catch(error => {
+      console.error('Failed to load Google Maps API:', error);
+      showMapPlaceholder(mapContainer, 'Failed to load map');
+    });
+  } else {
+    console.error('Google Maps API key not found. Please set window.GOOGLE_MAPS_API_KEY');
+    showMapPlaceholder(mapContainer, 'Map configuration error');
+  }
+}
+
+/**
+ * Show a placeholder when map cannot be loaded
+ * @param {HTMLElement} container - The map container element
+ * @param {string} message - The message to display
+ */
+function showMapPlaceholder(container, message) {
+  container.innerHTML = `
+    <div class="ratio ratio-16x9 bg-light">
+      <div class="d-flex align-items-center justify-content-center h-100">
+        <div class="text-center">
+          <i class="fas fa-map-marker-alt fa-3x text-primary mb-2"></i>
+          <p class="mb-0">${message}</p>
         </div>
-    `;
+      </div>
+    </div>
+  `;
 }
 
 /**

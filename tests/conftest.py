@@ -45,9 +45,12 @@ os.environ.update(
 )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def app() -> Generator[Flask, None, None]:
-    """Create and configure a new app instance for testing."""
+    """Create and configure a new app instance for testing.
+
+    This fixture is function-scoped to ensure a clean database for each test.
+    """
     # Create app with testing config
     app = create_app("testing")
 
@@ -61,10 +64,13 @@ def app() -> Generator[Flask, None, None]:
         SERVER_NAME="localhost",
         PREFERRED_URL_SCHEME="http",
         APPLICATION_ROOT="/",
+        SQLALCHEMY_ENGINE_OPTIONS={
+            "pool_pre_ping": True,
+            "pool_recycle": 300,
+            "connect_args": {"check_same_thread": False},
+            "poolclass": None,  # Use NullPool for SQLite in-memory
+        },
     )
-
-    # Set engine options separately
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True, "pool_recycle": 300}
 
     # Initialize template filters
     from app.template_filters import init_app as init_filters
@@ -87,18 +93,28 @@ def app() -> Generator[Flask, None, None]:
 
     app.test_client_class = TestClient
 
-    # Create database schema
-    with app.app_context():
-        db.create_all()
+    # Push application context
+    ctx = app.app_context()
+    ctx.push()
+
+    # Create database schema and initialize app
+    from app.database import init_database
+
+    # Initialize the database
+    init_database(app)
+
+    # Create all tables
+    db.create_all()
 
     yield app
 
-    # Clean up
-    with app.app_context():
-        db.session.remove()
-        db.drop_all()
-        db.engine.dispose()
-        db.session.remove()
+    # Clean up after tests
+    db.session.remove()
+    db.drop_all()
+    db.session.remove()
+
+    # Pop the application context
+    ctx.pop()
 
 
 # Type stubs are not needed as we're importing the actual models
@@ -106,22 +122,36 @@ def app() -> Generator[Flask, None, None]:
 
 
 @pytest.fixture
-def client(app: Flask, _db: scoped_session) -> FlaskClient:
+def client(app: Flask) -> Generator[FlaskClient, None, None]:
     """Create a test client for the application with database access.
 
     This fixture provides a test client that can be used to make requests
     to the application for testing purposes, with proper database session handling.
     """
-    # Ensure the database is created and the session is available
-    with app.app_context():
-        db.create_all()
-        db.session.commit()
+    with app.test_client() as client:
+        with app.app_context():
+            # Create all tables if they don't exist
+            db.create_all()
 
-    # Create the test client
-    test_client = app.test_client()
-    test_client.application.config["TESTING"] = True
+            # Start a new transaction
+            connection = db.engine.connect()
+            transaction = connection.begin()
 
-    return test_client
+            # Create a new scoped session for the test
+            db.session = db.create_scoped_session(options={"bind": connection, "binds": {}})
+
+            # Bind the session to the current app context
+            db.session.begin_nested()
+
+            try:
+                yield client
+            finally:
+                # Clean up the session and transaction
+                db.session.rollback()
+                db.session.close()
+                transaction.rollback()
+                connection.close()
+                db.session.remove()
 
 
 @pytest.fixture
@@ -137,37 +167,40 @@ def runner(app: Flask) -> FlaskCliRunner:
     return app.test_cli_runner()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def _db(app: Flask) -> Generator[scoped_session, None, None]:
     """Provide a transactional scope around tests.
 
     This fixture is used by Flask-SQLAlchemy to ensure each test runs in a transaction
     that's rolled back at the end of the test.
     """
+    # Create all tables if they don't exist
     with app.app_context():
-        # Start a transaction
-        connection = db.engine.connect()
-        transaction = connection.begin()
+        db.create_all()
 
-        # Create a session bound to the connection
-        session_factory = sessionmaker(bind=connection, autocommit=False, autoflush=False, expire_on_commit=False)
-        session = scoped_session(session_factory)
+    # Create a new connection and transaction
+    connection = db.engine.connect()
+    transaction = connection.begin()
 
-        # Override the default session
-        db.session = session  # type: ignore
+    # Create a scoped session bound to the transaction
+    session_factory = sessionmaker(bind=connection)
+    session = scoped_session(session_factory)
 
-        try:
-            yield session
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            # Clean up
-            session.close()
-            transaction.rollback()
-            connection.close()
-            db.session.remove()  # Ensure the session is removed
+    # Override the default session with our scoped session
+    db.session = session
+
+    try:
+        yield session
+    finally:
+        # Clean up the session and transaction
+        session.rollback()
+        session.close()
+        transaction.rollback()
+        connection.close()
+        session.remove()
+
+        # Reset the session
+        db.session = db.create_scoped_session()
 
 
 @pytest.fixture
@@ -224,10 +257,13 @@ class AuthActions:
             if not user or not user.check_password(password):
                 raise ValueError(f"Invalid username or password for test user: {username}")
 
-            with self._client.session_transaction() as sess:
+            # Use session_transaction in a way that doesn't expect a return value
+            with self._client.session_transaction() as sess:  # type: ignore[func-returns-value]
                 sess["_user_id"] = str(user.id)
                 sess["_fresh"] = True  # Mark session as fresh
                 sess["_id"] = "test-session-id"
+            # Force the session to be saved
+            self._client.get("/")
 
         return self._client
 
@@ -237,8 +273,11 @@ class AuthActions:
         Returns:
             The test client with cleared session.
         """
-        with self._client.session_transaction() as sess:
+        # Clear the session
+        with self._client.session_transaction() as sess:  # type: ignore[func-returns-value]
             sess.clear()
+        # Force the session to be saved
+        self._client.get("/")
         return self._client
 
     def register(self, username: str, password: str, email: Optional[str] = None) -> "User":

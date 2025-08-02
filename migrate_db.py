@@ -32,10 +32,13 @@ def _get_safe_db_url(db_url):
 def _check_database_connection():
     """Check if database is accessible."""
     try:
+        # Test the connection with a simple query
         db.session.execute(text("SELECT 1"))
+        db.session.commit()
         return True
     except Exception as e:
         current_app.logger.error(f"Database connection failed: {str(e)}")
+        current_app.logger.error(traceback.format_exc())
         return False
 
 
@@ -57,6 +60,194 @@ def _check_existing_tables():
     return existing_tables and "restaurant" in existing_tables
 
 
+def _setup_sqlite_database(db_url):
+    """Handle SQLite-specific setup including directory creation and PRAGMAs."""
+    if not db_url or not isinstance(db_url, str) or not db_url.startswith("sqlite://"):
+        current_app.logger.warning(f"Invalid or non-SQLite database URL: {db_url}")
+        return False
+
+    try:
+        # Extract and prepare the database path
+        db_path = db_url.replace("sqlite:///", "")
+        db_dir = os.path.dirname(db_path)
+
+        # Ensure the directory exists and is writable
+        if db_dir and not os.path.exists(db_dir):
+            current_app.logger.info(f"Creating database directory: {db_dir}")
+            os.makedirs(db_dir, mode=0o755, exist_ok=True)
+
+        # Verify directory is writable
+        if not os.access(os.path.dirname(db_path) or ".", os.W_OK):
+            current_app.logger.error(f"Database directory is not writable: {os.path.dirname(db_path) or '.'}")
+            return False
+
+        current_app.logger.info(f"Database will be created at: {db_path}")
+
+        # Set SQLite PRAGMAs for better performance
+        current_app.logger.info("Configuring SQLite PRAGMAs...")
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(text("PRAGMA journal_mode=WAL"))
+                conn.execute(text("PRAGMA synchronous=NORMAL"))
+                conn.execute(text("PRAGMA busy_timeout=5000"))  # 5 second timeout
+                conn.commit()
+            return True
+        except Exception as e:
+            current_app.logger.error(f"Failed to set SQLite PRAGMAs: {str(e)}")
+            current_app.logger.error(traceback.format_exc())
+            return False
+
+    except Exception as e:
+        current_app.logger.error(f"Error setting up SQLite database: {str(e)}")
+        current_app.logger.error(traceback.format_exc())
+        return False
+
+
+def _setup_database_connection(db_url):
+    """Set up the database connection and handle SQLite-specific setup."""
+    current_app.logger.info("Testing database connection...")
+    if _check_database_connection():
+        return True
+
+    # For SQLite, try to create the database file
+    if db_url and db_url.startswith("sqlite://"):
+        try:
+            db_path = db_url.replace("sqlite:///", "")
+            current_app.logger.info(f"Attempting to create SQLite database at: {db_path}")
+            with open(db_path, "a", encoding="utf-8") as f:
+                f.write("")  # Create empty file
+            os.chmod(db_path, 0o666)  # Make sure it's writable
+            current_app.logger.info("Created empty SQLite database file")
+
+            # Try connecting again
+            return _check_database_connection()
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to create SQLite database file: {str(e)}")
+            current_app.logger.error(traceback.format_exc())
+
+    return False
+
+
+def _verify_migrations():
+    """Verify and log current migration state."""
+    current_rev = current()
+    current_app.logger.info(f"Current database revision: {current_rev}")
+    _log_migration_history()
+    return current_rev
+
+
+def _execute_migrations():
+    """Execute the database migrations with proper error handling.
+
+    Returns:
+        tuple: (success: bool, error: str or None)
+    """
+    current_app.logger.info("Running database migrations...")
+    try:
+        # Get the current revision before upgrade
+        current_rev = current()
+        current_app.logger.info(f"Current database revision before upgrade: {current_rev}")
+
+        # Get the latest revision available
+        head = os.popen("flask db heads").read().strip()
+        current_app.logger.info(f"Latest available migration: {head}")
+
+        # Run the upgrade
+        _upgrade()
+
+        # Verify the upgrade was successful
+        new_rev = current()
+        if new_rev == current_rev and current_rev != head:
+            error_msg = f"Migration failed - still at revision {current_rev}, " f"expected {head}"
+            current_app.logger.error(error_msg)
+            return False, error_msg
+
+        current_app.logger.info("Database migrations completed successfully.")
+        return True, None
+
+    except Exception as e:
+        error_msg = f"Error executing migrations: {str(e)}"
+        current_app.logger.error(error_msg)
+        current_app.logger.error(traceback.format_exc())
+
+        # Check for common migration issues
+        error_msg = str(e)
+        if "already exists" in error_msg:
+            error_msg = (
+                "Table already exists. Database may be in an inconsistent state. "
+                "Try running 'flask db downgrade base && flask db upgrade'"
+            )
+            current_app.logger.warning(error_msg)
+
+        return False, error_msg
+
+
+def _setup_migration_environment():
+    """Set up the migration environment and return database URL.
+
+    Returns:
+        str: The database URL being used
+    """
+    # Log database URL (masking password)
+    db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    current_app.logger.info(f"Database URL: {_get_safe_db_url(db_url)}")
+
+    # Ensure the migrations directory exists
+    migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
+    if not os.path.exists(migrations_dir):
+        raise RuntimeError(f"Migrations directory not found at {migrations_dir}")
+    current_app.logger.info(f"Using migrations from: {migrations_dir}")
+
+    # Handle SQLite-specific setup
+    if db_url.startswith("sqlite://") and not _setup_sqlite_database(db_url):
+        current_app.logger.error("SQLite database setup failed")
+        raise RuntimeError("SQLite database setup failed")
+
+    return db_url
+
+
+def _handle_migration_success(initial_rev):
+    """Handle successful migration completion.
+
+    Args:
+        initial_rev (str): The revision before migrations were run
+    """
+    final_rev = current()
+    if final_rev != initial_rev:
+        current_app.logger.info(f"Database upgraded from {initial_rev} to {final_rev}")
+    else:
+        current_app.logger.info("Database is already at the latest revision.")
+
+    # Verify all migrations were applied
+    head = os.popen("flask db heads").read().strip()
+    if final_rev != head:
+        current_app.logger.warning(
+            f"Database is at revision {final_rev} but the latest is {head}. "
+            "Some migrations may not have been applied."
+        )
+
+
+def _handle_migration_failure(error):
+    """Handle migration failure with appropriate logging and error messages.
+
+    Args:
+        error (str): The error message
+
+    Raises:
+        RuntimeError: Always raises with the error message
+    """
+    current_app.logger.error(f"Migration failed: {error}")
+
+    # If we're in development, provide helpful reset instructions
+    if current_app.debug:
+        current_app.logger.warning(
+            "To reset the database in development, you can run: " "flask db downgrade base && flask db upgrade"
+        )
+
+    raise RuntimeError(f"Migration failed: {error}")
+
+
 def run_migrations():
     """Run database migrations.
 
@@ -67,54 +258,32 @@ def run_migrations():
 
     with app.app_context():
         try:
-            # Log database URL (masking password)
-            db_url = app.config.get("SQLALCHEMY_DATABASE_URI", "")
-            current_app.logger.info(f"Database URL: {_get_safe_db_url(db_url)}")
+            # Set up migration environment
+            db_url = _setup_migration_environment()
 
-            # Ensure the migrations directory exists
-            migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
-            current_app.logger.info(f"Migrations directory: {migrations_dir}")
-
-            if not os.path.exists(migrations_dir):
-                raise RuntimeError(f"Migrations directory not found at {migrations_dir}")
-
-            # Check database connection
-            current_app.logger.info("Testing database connection...")
-            if not _check_database_connection():
-                raise RuntimeError("Failed to connect to the database")
-
-            # Log current migration state
-            current_rev = current()
-            current_app.logger.info(f"Current database revision: {current_rev}")
-
-            # Log available migrations
-            _log_migration_history()
+            # Set up database connection
+            if not _setup_database_connection(db_url):
+                raise RuntimeError("Failed to connect to the database after setup")
 
             # Check if tables already exist
             if _check_existing_tables():
-                current_app.logger.warning("Tables already exist in the database. Skipping migrations.")
-                current_app.logger.info("If you need to run migrations, please reset the database first.")
+                msg = "Tables already exist in the database. " "Skipping migrations. Reset the database if needed."
+                current_app.logger.warning(msg)
                 return True
 
-            # Run migrations
-            current_app.logger.info("Running database migrations...")
-            try:
-                upgrade()
-                current_app.logger.info("Database migrations completed successfully")
-                return True
-            except Exception as e:
-                if "already exists" in str(e):
-                    current_app.logger.warning(
-                        "Some tables already exist. " "Database may be in an inconsistent state."
-                    )
-                    current_app.logger.info(
-                        "If you need to reset the database, please run: " "flask db downgrade base && flask db upgrade"
-                    )
-                    return True
-                raise
+            # Execute migrations
+            initial_rev = _verify_migrations()
+            success, error = _execute_migrations()
+
+            if not success:
+                _handle_migration_failure(error)
+
+            _handle_migration_success(initial_rev)
+            return True
 
         except Exception as e:
-            logger.error(f"Error in migrations: {str(e)}", exc_info=True)
+            current_app.logger.error(f"Error running migrations: {str(e)}")
+            current_app.logger.error(traceback.format_exc())
             if current_app.debug:
                 logger.error("Full traceback:\n" + traceback.format_exc())
             return False

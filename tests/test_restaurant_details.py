@@ -165,8 +165,9 @@ def test_restaurant_expenses_display(client, auth, test_user, test_restaurant, t
     response = client.get(url_for("restaurants.restaurant_details", restaurant_id=test_restaurant.id))
 
     assert response.status_code == 200
-    assert b"Expense History" in response.data
+    response_text = response.data.decode("utf-8")
+    assert "Expense History" in response_text
     # Format the amount to match the template's display format (2 decimal places)
-    formatted_amount = f"{test_expense.amount:.2f}".encode()
-    assert formatted_amount in response.data, f"Expected {formatted_amount} in response"
-    assert test_expense.notes.encode() in response.data
+    formatted_amount = f"{test_expense.amount:.2f}"
+    assert formatted_amount in response_text, f"Expected {formatted_amount} in response"
+    assert test_expense.notes in response_text

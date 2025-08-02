@@ -2,27 +2,20 @@
  * Search component for restaurant search functionality
  */
 
+import GoogleMapsLoader from '../utils/google-maps-loader.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('restaurantSearchInput');
   const searchSuggestions = document.getElementById('searchSuggestions');
 
   if (!searchInput || !searchSuggestions) return;
 
-  // Initialize Google Maps API key if it's not already set
-  if (typeof google === 'undefined' || !google.maps) {
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${window.GOOGLE_MAPS_API_KEY}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    document.head.appendChild(script);
-  }
-
   // Initialize search suggestions
   let autocomplete;
 
-  function initAutocomplete () {
-    if (typeof google === 'undefined' || !google.maps.places) {
-      setTimeout(initAutocomplete, 100);
+  const initAutocomplete = () => {
+    if (typeof google === 'undefined' || !google.maps || !google.maps.places) {
+      console.warn('Google Maps API not available for autocomplete');
       return;
     }
 
@@ -39,12 +32,15 @@ document.addEventListener('DOMContentLoaded', () => {
       // Redirect to the add restaurant page with place details
       window.location.href = `/restaurants/add?place_id=${place.place_id}`;
     });
-  }
+  };
 
-  // Initialize when Google Maps API is loaded
-  if (typeof google !== 'undefined' && google.maps && google.maps.places) {
-    initAutocomplete();
+  // Load Google Maps API and initialize autocomplete
+  if (window.GOOGLE_MAPS_API_KEY) {
+    GoogleMapsLoader.loadApi(window.GOOGLE_MAPS_API_KEY, initAutocomplete, ['places'])
+      .catch(error => {
+        console.error('Failed to load Google Maps API:', error);
+      });
   } else {
-    window.initAutocomplete = initAutocomplete;
+    console.error('Google Maps API key not found. Please set window.GOOGLE_MAPS_API_KEY');
   }
 });

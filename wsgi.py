@@ -14,6 +14,7 @@ It supports:
 from __future__ import annotations
 
 # Standard library imports
+import base64
 import io
 import json
 import logging
@@ -21,12 +22,26 @@ import os
 import sys
 import traceback
 from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import awsgi
 
 # Third-party imports
 from flask import Flask
+from flask import Response as FlaskResponse
+from sqlalchemy import text
 
 # Local application imports
 from app import create_app
@@ -52,7 +67,7 @@ def _get_nested(dct: Dict[str, Any], *keys: str, default: Any = None) -> Any:
 
 def _process_headers(headers: Optional[Dict[str, str]]) -> Dict[str, str]:
     """Process and normalize HTTP headers."""
-    processed = {}
+    processed: Dict[str, str] = {}
     if not headers:
         return processed
 
@@ -65,20 +80,77 @@ def _process_headers(headers: Optional[Dict[str, str]]) -> Dict[str, str]:
 def _build_request_context(
     request_context: Dict[str, Any], headers: Dict[str, str], http_method: str, path: str
 ) -> Dict[str, Any]:
-    """Build v1.0 compatible request context."""
+    """Build v1.0 compatible request context from API Gateway events.
+
+    Handles both REST API (v1.0) and HTTP API (v2.0) event formats.
+
+    Args:
+        request_context: The request context from the API Gateway event
+        headers: The request headers
+        http_method: The HTTP method (GET, POST, etc.)
+        path: The request path
+
+    Returns:
+        dict: A v1.0 compatible request context
+    """
+    # Handle API Gateway v2.0 (HTTP API) format
+    if "http" in request_context:
+        return {
+            "httpMethod": http_method,
+            "path": path,
+            "resourcePath": path,
+            "requestId": request_context.get("requestId", ""),
+            "apiId": request_context.get("apiId", ""),
+            "domainName": request_context.get("domainName", ""),
+            "domainPrefix": request_context.get("domainPrefix", ""),
+            "extendedRequestId": request_context.get("extendedRequestId", ""),
+            "requestTime": request_context.get("time", ""),
+            "requestTimeEpoch": request_context.get("timeEpoch", 0),
+            "identity": {
+                "sourceIp": request_context.get("http", {}).get("sourceIp", ""),
+                "userAgent": headers.get("User-Agent", ""),
+                "user": request_context.get("authorizer", {}).get("principalId", ""),
+            },
+            "authorizer": request_context.get("authorizer", {}),
+            "protocol": request_context.get("http", {}).get("protocol", "HTTP/1.1"),
+            "stage": request_context.get("stage", "$default"),
+        }
+
+    # Handle API Gateway v1.0 (REST API) format
     return {
         "httpMethod": http_method,
         "path": path,
         "resourcePath": path,
-        "requestId": _get_nested(request_context, "requestId", default=""),
-        "apiId": _get_nested(request_context, "apiId", default=""),
-        "resourceId": _get_nested(request_context, "resourceId", default=""),
-        "accountId": _get_nested(request_context, "accountId", default=""),
-        "stage": _get_nested(request_context, "stage", default="$default"),
+        "requestId": request_context.get("requestId", ""),
+        "apiId": request_context.get("apiId", ""),
+        "resourceId": request_context.get("resourceId", ""),
+        "accountId": request_context.get("accountId", ""),
+        "stage": request_context.get("stage", "$default"),
+        "domainName": request_context.get("domainName", ""),
+        "domainPrefix": request_context.get("domainPrefix", ""),
+        "extendedRequestId": request_context.get("extendedRequestId", ""),
+        "requestTime": request_context.get("requestTime", ""),
+        "requestTimeEpoch": request_context.get("requestTimeEpoch", 0),
         "identity": {
             "sourceIp": _get_nested(request_context, "identity", "sourceIp", default=""),
-            "userAgent": headers.get("User-Agent", ""),
+            "user": _get_nested(request_context, "identity", "user", default=""),
+            "cognitoIdentityPoolId": _get_nested(request_context, "identity", "cognitoIdentityPoolId", default=None),
+            "cognitoIdentityId": _get_nested(request_context, "identity", "cognitoIdentityId", default=None),
+            "cognitoAuthenticationType": _get_nested(
+                request_context, "identity", "cognitoAuthenticationType", default=None
+            ),
+            "cognitoAuthenticationProvider": _get_nested(
+                request_context, "identity", "cognitoAuthenticationProvider", default=None
+            ),
+            "userArn": _get_nested(request_context, "identity", "userArn", default=None),
+            "userAgent": _get_nested(request_context, "identity", "userAgent", default=""),
+            "caller": _get_nested(request_context, "identity", "caller", default=None),
+            "accessKey": _get_nested(request_context, "identity", "accessKey", default=None),
         },
+        "authorizer": request_context.get("authorizer", {}),
+        "protocol": request_context.get("protocol", "HTTP/1.1"),
+        "apiKey": request_context.get("identity", {}).get("apiKey", None),
+        "apiKeyId": request_context.get("identity", {}).get("apiKeyId", None),
     }
 
 
@@ -235,7 +307,7 @@ def handle_database_operation(app, operation, **kwargs):
                             "status": "success",
                             "tables": tables,
                             "alembic_version": (
-                                db.session.execute("SELECT version_num FROM alembic_version").scalar()
+                                db.session.execute(text("SELECT version_num FROM alembic_version")).scalar()
                                 if "alembic_version" in tables
                                 else None
                             ),
@@ -433,7 +505,10 @@ def _create_error_response(error: Exception, status_code: int = 500, context: Op
 
 
 def _transform_v2_to_v1_event(event: Dict[str, Any]) -> Dict[str, Any]:
-    """Transform API Gateway v2.0 event to v1.0 format.
+    """Transform API Gateway v2.0 (HTTP API) event to v1.0 (REST API) format.
+
+    This function handles the conversion between the two API Gateway event formats
+    to maintain compatibility with existing application code.
 
     Args:
         event: API Gateway v2.0 event
@@ -593,21 +668,20 @@ def _handle_event(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 def _handle_awsgi_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handle AWSGI request processing.
 
+    This function processes incoming API Gateway events and converts them into
+    WSGI-compatible requests that can be handled by the Flask application.
+
     Args:
-        event: Lambda event object
+        event: Lambda event object from API Gateway
         context: Lambda context object
 
     Returns:
         dict: Response object for API Gateway
     """
-    # Get AWSGI response handler
-    handler = _get_awsgi_response()
-    if not handler:
-        error_msg = "AWSGI handler not available - awsgi package not found"
-        logger.error(error_msg)
-        return _handle_awsgi_error(context, error_msg)
-
     try:
+        # Get or create the Flask app instance
+        app = get_or_create_app()
+
         # Log request details for debugging
         logger.info(
             "Processing request: %s %s",
@@ -620,52 +694,79 @@ def _handle_awsgi_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]
             "REQUEST_METHOD": event.get("httpMethod", "GET"),
             "SCRIPT_NAME": "",
             "PATH_INFO": event.get("path", "/"),
-            "QUERY_STRING": event.get("queryStringParameters", ""),
+            "QUERY_STRING": (
+                "&".join(
+                    f"{k}={v}"
+                    for k, vs in event.get("queryStringParameters", {}).items()
+                    for v in ([vs] if isinstance(vs, str) else vs)
+                )
+                if event.get("queryStringParameters")
+                else ""
+            ),
             "CONTENT_TYPE": event.get("headers", {}).get("Content-Type", ""),
-            "CONTENT_LENGTH": str(len(event.get("body", ""))),
-            "SERVER_NAME": "localhost",
-            "SERVER_PORT": "80",
+            "CONTENT_LENGTH": str(len(event.get("body", "") or "")),
+            "SERVER_NAME": event.get("headers", {}).get("Host", "localhost"),
+            "SERVER_PORT": event.get("headers", {}).get("X-Forwarded-Port", "80"),
             "wsgi.version": (1, 0),
             "wsgi.url_scheme": "https" if event.get("isBase64Encoded", False) else "http",
-            "wsgi.input": io.BytesIO(event.get("body", "").encode("utf-8") if event.get("body") else b""),
+            "wsgi.input": io.BytesIO(
+                (event.get("body") or "").encode("utf-8")
+                if not event.get("isBase64Encoded", False)
+                else base64.b64decode(event["body"])
+            ),
             "wsgi.errors": sys.stderr,
             "wsgi.multithread": False,
             "wsgi.multiprocess": False,
             "wsgi.run_once": False,
+            "SERVER_PROTOCOL": "HTTP/1.1",
+            "REMOTE_ADDR": event.get("requestContext", {}).get("identity", {}).get("sourceIp", ""),
+            "HTTP_USER_AGENT": event.get("headers", {}).get("User-Agent", ""),
+            "HTTP_ACCEPT": event.get("headers", {}).get("Accept", "*/*"),
         }
 
-        # Add headers to environ
-        for key, value in event.get("headers", {}).items():
-            key = key.upper().replace("-", "_")
-            if key not in ("CONTENT_TYPE", "CONTENT_LENGTH"):
-                key = f"HTTP_{key}"
+        # Add all headers to the WSGI environment with HTTP_ prefix
+        for key, value in (event.get("headers") or {}).items():
+            if key.lower() == "content-length":
+                environ["CONTENT_LENGTH"] = value
+            elif key.lower() == "content-type":
+                environ["CONTENT_TYPE"] = value
+            else:
+                header_name = "HTTP_" + key.upper().replace("-", "_")
+                environ[header_name] = value
             environ[key] = value
 
         # Call the WSGI app using a list to store response data
         # Using a list to store the dict for modification in closure
-        response_data = [{}]
+        response_data: List[Dict[str, Any]] = [{"statusCode": 200, "headers": {}, "body": "", "isBase64Encoded": False}]
 
-        def start_response(status, response_headers, exc_info=None):
+        def start_response(
+            status: str, response_headers: List[Tuple[str, str]], exc_info: Optional[Any] = None
+        ) -> None:
             response_data[0]["statusCode"] = int(status.split()[0])
             response_data[0]["headers"] = dict(response_headers)
             return None
 
-        response_body = handler(app, environ, start_response)
+        # Use the Flask application's WSGI app to handle the request
+        response_body = app(environ, start_response)
         response_data[0]["body"] = "".join(
             chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk for chunk in response_body
         )
         response_data[0]["isBase64Encoded"] = False
-        response_data = response_data[0]  # Extract the dict from the list
+        # Extract the response data from the list
+        response = response_data[0]
 
         # Ensure the response has the required fields
-        if "statusCode" not in response_data:
-            response_data["statusCode"] = 500
-            response_data["body"] = json.dumps(
-                {"error": "Internal Server Error", "message": "No status code returned from application"}
-            )
-            response_data["headers"] = {"Content-Type": "application/json"}
+        if "statusCode" not in response:
+            response = {
+                "statusCode": 500,
+                "body": json.dumps(
+                    {"error": "Internal Server Error", "message": "No status code returned from application"}
+                ),
+                "headers": {"Content-Type": "application/json"},
+                "isBase64Encoded": False,
+            }
 
-        return response_data
+        return response
 
     except Exception as e:
         logger.error("Error processing request: %s", str(e), exc_info=True)
@@ -675,110 +776,207 @@ def _handle_awsgi_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]
 def _process_awsgi_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Process AWSGI request and return the response.
 
+    This function handles the request processing for both API Gateway v1.0 (REST API)
+    and v2.0 (HTTP API) events, normalizing them to a common format for the application.
+
     Args:
-        event: Lambda event object
+        event: Lambda event object from API Gateway
         context: Lambda context object
 
     Returns:
         dict: Response object for API Gateway
     """
+    # Get or create the Flask app instance
+    app = get_or_create_app()
+
+    # Process the request within the application context
+    with app.app_context():
+        try:
+            # Process the event based on its type
+            if "httpMethod" in event:
+                # This is an API Gateway v1.0 (REST API) event
+                return _handle_awsgi_request(event, context)
+            elif "requestContext" in event and "http" in event["requestContext"]:
+                # This is an API Gateway v2.0 (HTTP API) event - transform to v1.0 format
+                return _handle_awsgi_request(_transform_v2_to_v1_event(event), context)
+            else:
+                # Handle other event types (e.g., direct Lambda invocation)
+                return _handle_event(event, context)
+
+        except ImportError as e:
+            error_msg = f"Failed to import required dependencies: {str(e)}"
+            logger.exception(error_msg)
+            return {
+                "statusCode": 500,
+                "body": json.dumps(
+                    {
+                        "error": "Internal Server Error",
+                        "message": "Server configuration error",
+                        "request_id": context.aws_request_id if hasattr(context, "aws_request_id") else None,
+                    }
+                ),
+                "headers": {
+                    "Content-Type": "application/json",
+                    "X-Request-ID": context.aws_request_id if hasattr(context, "aws_request_id") else "unknown",
+                },
+                "isBase64Encoded": False,
+            }
+        except Exception as e:
+            logger.error("Error processing AWSGI request: %s", str(e), exc_info=True)
+            return _create_error_response(e, 500, context)
+
+
+# Global variable to store the app instance to enable reuse across Lambda invocations
+_APP_INSTANCE = None
+
+
+def get_or_create_app() -> Flask:
+    """Get or create the Flask application instance with proper configuration.
+
+    This function implements the singleton pattern to ensure we only create one
+    Flask app instance per Lambda container, which is important for performance.
+
+    Returns:
+        Flask: The configured Flask application instance
+
+    Raises:
+        RuntimeError: If application initialization fails
+    """
+    global _APP_INSTANCE
+
+    if _APP_INSTANCE is not None:
+        return _APP_INSTANCE
+
     try:
-        # Get the AWSGI handler
-        awsgi_handler = _get_awsgi_response()
-        if not awsgi_handler:
-            error_msg = "AWSGI handler not available - awsgi package not found"
-            logger.error(error_msg)
-            return _handle_awsgi_error(context, error_msg)
+        logger.info("Initializing Flask application...")
 
-        # Process the request using the AWSGI handler
-        response = awsgi_handler(app, event, context, base64_content_types={"image/png"})
+        # Determine the configuration to use
+        config_name = "production" if os.environ.get("AWS_EXECUTION_ENV") else None
+        logger.info(f"Using configuration: {config_name or 'default'}")
 
-        # Log successful response (without sensitive data)
-        logger.info(
-            "Request completed successfully",
-            extra={
-                "status_code": response.get("statusCode"),
-                "response_size": len(json.dumps(response.get("body", ""))),
-                "request_id": context.aws_request_id if context else None,
-            },
+        # Create the Flask application with the appropriate config
+        _APP_INSTANCE = create_app(config_name=config_name)
+
+        # Configure logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[logging.StreamHandler()],
         )
-        return response
 
-    except KeyError as e:
-        error_msg = f"Bad Request: Missing required field - {str(e)}"
-        logger.warning(
-            error_msg,
-            extra={
-                "error_type": "ValidationError",
-                "missing_field": str(e),
-                "request_id": context.aws_request_id if context else None,
-            },
-        )
-        return {
-            "statusCode": 400,
-            "body": json.dumps(
-                {
-                    "error": "Bad Request",
-                    "message": error_msg,
-                    "request_id": context.aws_request_id if context else None,
-                }
-            ),
-            "headers": {
-                "Content-Type": "application/json",
-                "X-Request-ID": context.aws_request_id if context else "unknown",
-            },
-            "isBase64Encoded": False,
-        }
-    except ImportError as e:
-        error_msg = f"Failed to import required dependencies: {str(e)}"
-        logger.exception(error_msg)
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "error": "Internal Server Error",
-                    "message": "Server configuration error",
-                    "request_id": context.aws_request_id if context else None,
-                }
-            ),
-            "headers": {
-                "Content-Type": "application/json",
-                "X-Request-ID": context.aws_request_id if context else "unknown",
-            },
-            "isBase64Encoded": False,
-        }
+        # Ensure we're in the application context for database initialization
+        with _APP_INSTANCE.app_context():
+            # Initialize the database with the app
+            from app.database import init_database
+
+            init_database(_APP_INSTANCE)
+
+            # Run any pending migrations on cold start if configured
+            _run_cold_start_migrations(_APP_INSTANCE)
+
+            logger.info("Successfully initialized Flask application and database")
+
+        return _APP_INSTANCE
+
     except Exception as e:
-        logger.error("Error processing AWSGI request: %s", str(e), exc_info=True)
-        return _create_error_response(e, 500, context)
+        error_msg = f"Failed to initialize application: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        raise RuntimeError(error_msg) from e
 
 
 def lambda_handler(event: dict, context: object) -> dict:
-    """AWS Lambda handler for the Flask application."""
-    processed: dict[str, Any] = preprocess_event(event)
-    return awsgi.response(app, processed, context)
+    """AWS Lambda handler for the Flask application.
+
+    This is the main entry point for AWS Lambda. It handles:
+    - API Gateway v1.0 (REST API) events
+    - API Gateway v2.0 (HTTP API) events
+    - Application Load Balancer (ALB) events
+    - Direct Lambda invocations
+
+    Args:
+        event: The Lambda event
+        context: The Lambda context
+
+    Returns:
+        dict: Response in the format expected by the invoker
+    """
+    try:
+        # Get or create the Flask app instance
+        get_or_create_app()
+
+        # Preprocess the event to normalize it
+        processed = preprocess_event(event)
+
+        # Log the processed event (redacting sensitive data)
+        _log_event(processed)
+
+        # Process the event using the appropriate handler
+        if "httpMethod" in processed:
+            # This is an API Gateway event
+            return _process_awsgi_request(processed, context)
+        elif "http" in processed.get("requestContext", {}):
+            # This is an API Gateway v2.0 event that wasn't transformed yet
+            return _process_awsgi_request(_transform_v2_to_v1_event(processed), context)
+        else:
+            # Handle other event types (ALB, direct invocation, etc.)
+            return _handle_event(processed, context)
+
+    except Exception as e:
+        logger.error("Error in lambda_handler: %s", str(e), exc_info=True)
+        return _create_error_response(e, 500, context)
 
 
 def preprocess_event(event: dict) -> dict:
-    """Preprocess the Lambda event to handle different formats."""
+    """Preprocess the Lambda event to handle different formats.
+
+    Handles both API Gateway v1.0 (REST API) and v2.0 (HTTP API) events,
+    as well as ALB events and direct Lambda invocations.
+
+    Args:
+        event: The incoming Lambda event
+
+    Returns:
+        dict: Normalized event in API Gateway v1.0 format
+    """
+    # If this is an ALB event, return it as-is
     if "requestContext" in event and "elb" in event["requestContext"]:
-        # This is an ALB event
         return event
 
-    # This is a direct Lambda invocation (e.g., from API Gateway)
-    response_data: Dict[str, Any] = {
-        "method": event.get("httpMethod", "GET"),
+    # Check if this is an API Gateway v2.0 (HTTP API) event
+    if "version" in event and event["version"] == "2.0":
+        return _transform_v2_to_v1_event(event)
+
+    # For API Gateway v1.0 (REST API) or direct Lambda invocations
+    # Ensure all required fields are present with appropriate defaults
+    processed_event = {
+        "httpMethod": event.get("httpMethod", "GET"),
         "path": event.get("path", "/"),
-        "headers": event.get("headers", {}),
-        "queryStringParameters": event.get("queryStringParameters", {}),
+        "resource": event.get("resource", event.get("path", "/")),
+        "headers": {k.lower(): v for k, v in event.get("headers", {}).items()},
+        "queryStringParameters": event.get("queryStringParameters") or {},
+        "pathParameters": event.get("pathParameters") or {},
+        "stageVariables": event.get("stageVariables") or {},
+        "requestContext": event.get("requestContext", {}),
         "body": event.get("body", ""),
         "isBase64Encoded": event.get("isBase64Encoded", False),
     }
-    if response_data["body"] is None:
-        response_data["body"] = ""
-    if isinstance(response_data["body"], dict):
-        response_data["body"] = json.dumps(response_data["body"])
 
-    return response_data
+    # Ensure body is a string
+    if processed_event["body"] is None:
+        processed_event["body"] = ""
+    elif isinstance(processed_event["body"], (dict, list)):
+        processed_event["body"] = json.dumps(processed_event["body"])
+
+    # Ensure requestContext has required fields
+    if not processed_event["requestContext"]:
+        processed_event["requestContext"] = {
+            "resourcePath": processed_event["path"],
+            "httpMethod": processed_event["httpMethod"],
+            "requestId": event.get("requestContext", {}).get("requestId", ""),
+            "stage": event.get("requestContext", {}).get("stage", "$default"),
+        }
+
+    return processed_event
 
 
 def main():
