@@ -181,7 +181,7 @@
       restaurant &&
       restaurant.geometry?.location &&
       restaurant.geometry.location.lat &&
-      restaurant.geometry.location.lng
+      restaurant.geometry.location.lng,
     );
 
     if (validResults.length === 0) {
@@ -200,43 +200,43 @@
           userPosition.lat,
           userPosition.lng,
           lat,
-          lng
+          lng,
         );
       });
       validResults.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
     }
 
     const generateResultsHTML = (restaurants) => {
-        const searchSummary = `
+      const searchSummary = `
             <div class="search-summary mb-2 text-muted">
                 Found ${restaurants.length} ${restaurants.length === 1 ? 'restaurant' : 'restaurants'}
             </div>`;
 
-        const resultsList = restaurants.map((restaurant, index) => {
-            const { name, geometry, vicinity, formatted_address, opening_hours, rating,
-                    user_ratings_total, price_level, place_id } = restaurant;
-            const { lat, lng } = geometry.location;
+      const resultsList = restaurants.map((restaurant, index) => {
+        const { name, geometry, vicinity, formatted_address, opening_hours, rating,
+          user_ratings_total, price_level, place_id } = restaurant;
+        const { lat, lng } = geometry.location;
 
-            const distance = restaurant.distance ?
-                (restaurant.distance < 1000 ?
-                    `${Math.round(restaurant.distance)}m` :
-                    `${(restaurant.distance / 1000).toFixed(1)}km`) :
-                '';
+        const distance = restaurant.distance ?
+          (restaurant.distance < 1000 ?
+            `${Math.round(restaurant.distance)}m` :
+            `${(restaurant.distance / 1000).toFixed(1)}km`) :
+          '';
 
-            const ratingStars = rating ?
-                `★${rating.toFixed(1)}${user_ratings_total ? ` (${user_ratings_total})` : ''}` :
-                'Not rated';
+        const ratingStars = rating ?
+          `★${rating.toFixed(1)}${user_ratings_total ? ` (${user_ratings_total})` : ''}` :
+          'Not rated';
 
-            const priceIndicator = price_level ?
-                '• ' + '💲'.repeat(Math.min(price_level, 4)) : '';
+        const priceIndicator = price_level ?
+          `• ${'💲'.repeat(Math.min(price_level, 4))}` : '';
 
-            const isOpenNow = opening_hours?.open_now !== undefined
-                ? (opening_hours.open_now
-                    ? '<span class="badge bg-success">Open Now</span>'
-                    : '<span class="badge bg-danger">Closed</span>')
-                : '';
+        const isOpenNow = opening_hours?.open_now !== undefined
+          ? (opening_hours.open_now
+            ? '<span class="badge bg-success">Open Now</span>'
+            : '<span class="badge bg-danger">Closed</span>')
+          : '';
 
-            return `
+        return `
                 <div class="list-group-item list-group-item-action restaurant-item"
                      data-place-id="${place_id || index}"
                      data-lat="${lat}"
@@ -265,126 +265,126 @@
                         </button>
                     </div>
                 </div>`;
-        }).join('');
+      }).join('');
 
-        return `
+      return `
             ${searchSummary}
             <div class="search-results-list" style="max-height: 70vh; overflow-y: auto;">
                 <div class="list-group list-group-flush">
                     ${resultsList}
                 </div>
             </div>`;
-    }
+    };
 
     const createMarkers = (restaurants) => {
-        const newMarkers = [];
+      const newMarkers = [];
 
-        restaurants.forEach((restaurant) => {
-            if (!restaurant.geometry?.location) return;
+      restaurants.forEach((restaurant) => {
+        if (!restaurant.geometry?.location) return;
 
-            const { lat, lng } = restaurant.geometry.location;
-            const marker = L.marker([lat, lng], {
-                title: restaurant.name,
-                alt: restaurant.name || 'Restaurant',
-                riseOnHover: true,
-                customId: restaurant.place_id || `restaurant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            });
-
-            const distance = restaurant.distance ?
-                (restaurant.distance < 1000 ?
-                    `${Math.round(restaurant.distance)}m` :
-                    `${(restaurant.distance / 1000).toFixed(1)}km`) :
-                '';
-
-            const popupContent = createPopupContent(restaurant, distance);
-            marker.bindPopup(popupContent, {
-                maxWidth: 300,
-                minWidth: 200,
-                className: 'restaurant-popup',
-            });
-
-            marker.addTo(map);
-            newMarkers.push(marker);
-
-            const item = document.querySelector(`.restaurant-item[data-place-id="${restaurant.place_id}"]`);
-            if (item) {
-                marker.on('mouseover', () => {
-                    item.classList.add('bg-light');
-                    item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                });
-
-                marker.on('mouseout', () => {
-                    item.classList.remove('bg-light');
-                });
-
-                item.addEventListener('mouseenter', () => {
-                    marker.openPopup();
-                });
-
-                item.addEventListener('mouseleave', () => {
-                    marker.closePopup();
-                });
-            }
+        const { lat, lng } = restaurant.geometry.location;
+        const marker = L.marker([lat, lng], {
+          title: restaurant.name,
+          alt: restaurant.name || 'Restaurant',
+          riseOnHover: true,
+          customId: restaurant.place_id || `restaurant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         });
 
-        if (markerCluster) {
-            markerCluster.clearLayers();
-            markerCluster.addLayers(newMarkers);
-        }
+        const distance = restaurant.distance ?
+          (restaurant.distance < 1000 ?
+            `${Math.round(restaurant.distance)}m` :
+            `${(restaurant.distance / 1000).toFixed(1)}km`) :
+          '';
 
-        markers = newMarkers;
-    }
+        const popupContent = createPopupContent(restaurant, distance);
+        marker.bindPopup(popupContent, {
+          maxWidth: 300,
+          minWidth: 200,
+          className: 'restaurant-popup',
+        });
+
+        marker.addTo(map);
+        newMarkers.push(marker);
+
+        const item = document.querySelector(`.restaurant-item[data-place-id="${restaurant.place_id}"]`);
+        if (item) {
+          marker.on('mouseover', () => {
+            item.classList.add('bg-light');
+            item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          });
+
+          marker.on('mouseout', () => {
+            item.classList.remove('bg-light');
+          });
+
+          item.addEventListener('mouseenter', () => {
+            marker.openPopup();
+          });
+
+          item.addEventListener('mouseleave', () => {
+            marker.closePopup();
+          });
+        }
+      });
+
+      if (markerCluster) {
+        markerCluster.clearLayers();
+        markerCluster.addLayers(newMarkers);
+      }
+
+      markers = newMarkers;
+    };
 
     const setupResultItemInteractions = () => {
-        document.querySelectorAll('.restaurant-item').forEach((item) => {
-            item.addEventListener('click', function (e) {
-                if (e.target.closest('.add-restaurant')) {
-                    return;
-                }
+      document.querySelectorAll('.restaurant-item').forEach((item) => {
+        item.addEventListener('click', function (e) {
+          if (e.target.closest('.add-restaurant')) {
+            return;
+          }
 
-                const lat = parseFloat(this.dataset.lat);
-                const lng = parseFloat(this.dataset.lng);
-                const placeId = this.dataset.placeId;
+          const lat = parseFloat(this.dataset.lat);
+          const lng = parseFloat(this.dataset.lng);
+          const { placeId } = this.dataset;
 
-                if (isNaN(lat) || isNaN(lng)) {
-                    console.error('Invalid coordinates for restaurant item');
-                    return;
-                }
+          if (isNaN(lat) || isNaN(lng)) {
+            console.error('Invalid coordinates for restaurant item');
+            return;
+          }
 
-                const marker = markers.find((m) =>
-                    m.options.customId === placeId ||
-                    (m.getLatLng().lat === lat && m.getLatLng().lng === lng)
-                );
+          const marker = markers.find((m) =>
+            m.options.customId === placeId ||
+                    (m.getLatLng().lat === lat && m.getLatLng().lng === lng),
+          );
 
-                if (marker) {
-                    map.setView(marker.getLatLng(), map.getZoom(), {
-                        animate: true,
-                        duration: 0.5,
-                    });
-
-                    marker.openPopup();
-
-                    document.querySelectorAll('.restaurant-item').forEach((el) => {
-                        el.classList.remove('active');
-                    });
-                    this.classList.add('active');
-                }
+          if (marker) {
+            map.setView(marker.getLatLng(), map.getZoom(), {
+              animate: true,
+              duration: 0.5,
             });
-        });
 
-        document.querySelectorAll('.add-restaurant').forEach((button) => {
-            const newButton = button.cloneNode(true);
-            button.parentNode.replaceChild(newButton, button);
+            marker.openPopup();
 
-            newButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const { placeId } = newButton.dataset;
-                if (placeId) {
-                    addRestaurant(placeId);
-                }
+            document.querySelectorAll('.restaurant-item').forEach((el) => {
+              el.classList.remove('active');
             });
+            this.classList.add('active');
+          }
         });
-    }
+      });
+
+      document.querySelectorAll('.add-restaurant').forEach((button) => {
+        const newButton = button.cloneNode(true);
+        button.parentNode.replaceChild(newButton, button);
+
+        newButton.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const { placeId } = newButton.dataset;
+          if (placeId) {
+            addRestaurant(placeId);
+          }
+        });
+      });
+    };
 
     resultsContainer.innerHTML = generateResultsHTML(validResults);
     createMarkers(validResults);
@@ -591,7 +591,7 @@
     }
   };
 
-// ... (rest of the file)
+  // ... (rest of the file)
 
   const initMap = async () => {
     updateStatus('Initializing map...', 'info');
@@ -608,7 +608,8 @@
         maxZoom: MAX_ZOOM,
       });
 
-      const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      // Initialize the map tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: MAX_ZOOM,
         minZoom: MIN_ZOOM,

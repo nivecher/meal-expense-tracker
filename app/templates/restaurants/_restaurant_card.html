@@ -3,13 +3,12 @@
         {% if restaurant.photo_url %}
             <img src="{{ restaurant.photo_url }}"
                  class="card-img-top"
-                 alt="{{ restaurant.name }}"
-                 style="height: 160px;
-                        object-fit: cover">
+                 alt="Photo of {{ restaurant.name }}"
+                 width="300"
+                 height="160">
         {% else %}
-            <div class="bg-light d-flex align-items-center justify-content-center"
-                 style="height: 160px">
-                <i class="fas fa-utensils fa-4x text-muted"></i>
+            <div class="restaurant-placeholder">
+                <i class="fas fa-utensils"></i>
             </div>
         {% endif %}
         <div class="card-body">
@@ -62,15 +61,15 @@
                         <i class="fas fa-map-marked-alt me-1"></i> View on Map
                     </a>
                 {% endif %}
-                {% elif restaurant.address %}
-                    <a href="https://www.google.com/maps/search/?api=1&query={{ restaurant.address|urlencode }}+{{ restaurant.city|urlencode }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-map-marked-alt me-1"></i> View on Map
-                    </a>
-                {% endif %}
-            </div>
+            {% elif restaurant.address %}
+                <a href="https://www.google.com/maps/search/?api=1&query={{ restaurant.address|urlencode }}+{{ restaurant.city|urlencode }}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-map-marked-alt me-1"></i> View on Map
+                </a>
+            {% endif %}
         </div>
     </div>
+</div>
 </div>

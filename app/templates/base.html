@@ -48,6 +48,8 @@
               rel="stylesheet">
         <link href="{{ url_for('static', filename='css/main.css') }}"
               rel="stylesheet">
+        <link href="{{ url_for('static', filename='css/components/search.css') }}"
+              rel="stylesheet">
         <link href="{{ url_for('static', filename='css/forms.css') }}"
               rel="stylesheet">
         <link href="{{ url_for('static', filename='css/utilities.css') }}"
@@ -82,7 +84,7 @@
                         <li class="breadcrumb-item">
                             <a href="{{ url_for("main.index") }}">Home</a>
                         </li>
-                    {% endblock %}
+                    {% endblock breadcrumb %}
                 </ol>
             </nav>
         </div>
@@ -107,7 +109,7 @@
             <div class="container">
                 <div class="row align-items-center">
                     <div class="col-md-6">
-                        <p class="mb-0">© 2025 Meal Expense Tracker. All rights reserved.</p>
+                        <p class="mb-0">2025 Meal Expense Tracker. All rights reserved.</p>
                     </div>
                     <div class="col-md-6 text-md-end">
                         <a href="{{ url_for("main.about") }}"
@@ -146,8 +148,17 @@
         <script type="module"
                 src="{{ url_for('static', filename='js/config.js') }}"
                 defer></script>
-        <!-- Load Google Maps Auth as a regular script -->
-        <script src="{{ url_for('static', filename='js/utils/google-maps-auth.js') }}"
+        <!-- Load Google Maps Auth as a module -->
+        <script type="module">
+            // Make GoogleMapsAuth globally available
+            import {
+                GoogleMapsAuth
+            } from "{{ url_for('static', filename='js/utils/google-maps-auth.js') }}";
+            window.GoogleMapsAuth = GoogleMapsAuth;
+        </script>
+        <!-- Load other utility modules -->
+        <script type="module"
+                src="{{ url_for('static', filename='js/utils/logger.js') }}"
                 defer></script>
         <script type="module"
                 src="{{ url_for('static', filename='js/utils/module-loader.js') }}"
@@ -166,15 +177,28 @@
         {% block extra_js %}
         {% endblock extra_js %}
         <!-- Initialize page modules -->
-        <script src="{{ url_for('static', filename='js/pages/restaurant-search-init.js') }}"
-                defer></script>
+        <script type="module">
+            import {
+                initRestaurantSearch
+            } from "{{ url_for('static', filename='js/pages/restaurant-search-init.js') }}";
+            document.addEventListener('DOMContentLoaded', () => {
+                initRestaurantSearch();
+            });
+        </script>
         <!-- Table sort component -->
-        <script src="{{ url_for('static', filename='js/components/table-sort.js') }}"
-                type="module"></script>
-        <!-- Navbar components -->
-        <script src="{{ url_for('static', filename='js/components/avatar.js') }}"
+        <script type="module"
+                src="{{ url_for('static', filename='js/components/table-sort.js') }}"
                 defer></script>
-        <script src="{{ url_for('static', filename='js/components/navbar.js') }}"
+        <!-- Navbar components -->
+        <script type="module"
+                src="{{ url_for('static', filename='js/components/avatar.js') }}"
+                defer></script>
+        <script type="module"
+                src="{{ url_for('static', filename='js/components/navbar.js') }}"
+                defer></script>
+        <!-- Avatar fallback component -->
+        <script type="module"
+                src="{{ url_for('static', filename='js/components/avatar-fallback.js') }}"
                 defer></script>
     </body>
 </html>

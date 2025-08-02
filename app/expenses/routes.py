@@ -4,8 +4,6 @@
 from math import ceil
 from typing import Optional, Tuple
 
-# Third-party imports
-from flask_wtf import FlaskForm
 from flask import (
     abort,
     current_app,
@@ -19,6 +17,9 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from flask.wrappers import Response as FlaskResponse
 from flask_login import current_user, login_required
+
+# Third-party imports
+from flask_wtf import FlaskForm
 from sqlalchemy import desc, extract
 from werkzeug.wrappers import Response as WerkzeugResponse
 

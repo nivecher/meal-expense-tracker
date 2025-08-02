@@ -179,7 +179,7 @@
                     <tbody>
                         {% for restaurant in restaurants %}
                             {% set last_visit = restaurant.expenses|sort(attribute='date', reverse=true)|first if restaurant.expenses else None %}
-                            {% include 'restaurants/_restaurant_table_row.html' %}
+                            {% include "restaurants/_restaurant_table_row.html" %}
                         {% endfor %}
                     </tbody>
                 </table>
@@ -230,7 +230,7 @@
                             data-bs-dismiss="modal">
                         <i class="fas fa-times me-1"></i> Cancel
                     </button>
-                    <form id="deleteRestaurantForm" method="POST" action="">
+                    <form id="deleteRestaurantForm" method="post" action="">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger">
                             <i class="fas fa-trash me-1"></i> Delete Restaurant

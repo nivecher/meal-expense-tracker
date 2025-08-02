@@ -3,10 +3,14 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="description" content="" />
-        <meta name="author" content="" />
+        <meta name="description"
+              content="Meal Expense Tracker - Track and manage your dining expenses" />
+        <meta name="keywords"
+              content="meal expense tracker, food budget, dining expenses, expense management" />
+        <meta name="author" content="Meal Expense Tracker" />
         <title>
-            {% block title %}{% endblock %}
+            {% block title %}
+            {% endblock title %}
         - Meal Expense Tracker</title>
         <!-- Favicons -->
         <link rel="apple-touch-icon"
@@ -38,7 +42,8 @@
         <!-- Custom CSS -->
         <link rel="stylesheet"
               href="{{ url_for('static', filename='css/styles.css') }}" />
-        {% block styles %}{% endblock %}
+        {% block styles %}
+        {% endblock styles %}
     </head>
     <body class="d-flex flex-column min-vh-100">
         <main class="flex-grow-1">
@@ -56,11 +61,12 @@
                     {% endfor %}
                 {% endif %}
             {% endwith %}
-            {% block content %}{% endblock %}
+            {% block content %}
+            {% endblock content %}
         </main>
         <footer class="footer mt-auto py-3 bg-light">
             <div class="container text-center">
-                <span class="text-muted">&copy; {{ now.year }} Meal Expense Tracker. All rights reserved.</span>
+                <span class="text-muted">© {{ now.year }} Meal Expense Tracker. All rights reserved.</span>
             </div>
         </footer>
         <!-- Bootstrap JS Bundle with Popper -->
@@ -69,6 +75,7 @@
                 crossorigin="anonymous"></script>
         <!-- Custom JS -->
         <script src="{{ url_for('static', filename='js/main.js') }}" type="module"></script>
-        {% block scripts %}{% endblock %}
+        {% block scripts %}
+        {% endblock scripts %}
     </body>
 </html>

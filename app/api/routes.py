@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import Tuple, cast
 
-from flask import Response, jsonify, request, current_app
+import googlemaps
+from flask import Response, current_app, jsonify, request
 from flask_login import current_user, login_required
 from marshmallow import ValidationError
-import googlemaps
-from typing import List, Dict, Any, Optional
 
 from app.auth.models import User
 

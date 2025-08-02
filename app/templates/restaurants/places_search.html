@@ -6,7 +6,7 @@
     {{ super() }}
     <link rel="stylesheet"
           href="{{ url_for('static', filename='css/pages/restaurant-search.css') }}">
-{% endblock %}
+{% endblock styles %}
 {% block content %}
     <!-- Add CSRF token meta tag for AJAX requests -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -38,7 +38,7 @@
                 </div>
                 <!-- Hidden form for adding a restaurant -->
                 <form id="add-restaurant-form"
-                      method="POST"
+                      method="post"
                       action="{{ url_for("restaurants.add_restaurant") }}"
                       class="d-none">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -61,27 +61,32 @@
              id="successModal"
              tabindex="-1"
              aria-labelledby="successModalLabel"
-             aria-hidden="true">
+             aria-hidden="true"
+             role="dialog"
+             aria-modal="false">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title" id="successModalLabel">Success!</h5>
+                        <h1 class="modal-title h5" id="successModalLabel">Success!</h1>
                         <button type="button"
                                 class="btn-close"
                                 data-bs-dismiss="modal"
                                 aria-label="Close"></button>
                     </div>
                     <div class="modal-body text-center py-4">
-                        <div class="mb-3">
+                        <div class="mb-3" aria-hidden="true">
                             <i class="fas fa-check-circle fa-4x text-success"></i>
                         </div>
-                        <h5>Restaurant Added Successfully</h5>
+                        <h2 class="h5">Restaurant Added Successfully</h2>
                         <p class="mb-0" id="success-message">The restaurant has been added to your list.</p>
                     </div>
                     <div class="modal-footer">
                         <a href="{{ url_for("restaurants.list_restaurants") }}"
                            class="btn btn-outline-secondary">View All Restaurants</a>
-                        <button type="button" class="btn btn-success" data-bs-dismiss="modal">Continue Searching</button>
+                        <button type="button"
+                                class="btn btn-success"
+                                data-bs-dismiss="modal"
+                                autofocus>Continue Searching</button>
                     </div>
                 </div>
             </div>
@@ -91,28 +96,30 @@
              id="errorModal"
              tabindex="-1"
              aria-labelledby="errorModalLabel"
-             aria-hidden="true">
+             aria-hidden="true"
+             role="alertdialog"
+             aria-modal="false">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-danger text-white">
-                        <h5 class="modal-title" id="errorModalLabel">Error</h5>
+                        <h1 class="modal-title h5" id="errorModalLabel">Error</h1>
                         <button type="button"
                                 class="btn-close"
                                 data-bs-dismiss="modal"
                                 aria-label="Close"></button>
                     </div>
                     <div class="modal-body text-center py-4">
-                        <div class="mb-3">
+                        <div class="mb-3" aria-hidden="true">
                             <i class="fas fa-exclamation-circle fa-4x text-danger"></i>
                         </div>
-                        <h5>Something Went Wrong</h5>
-                        <p class="mb-0" id="error-message">An error occurred while processing your request.</p>
+                        <h2 class="h5">Error Adding Restaurant</h2>
+                        <p class="mb-0" id="error-message">An error occurred while adding the restaurant.</p>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="button" class="btn btn-primary" id="retry-button">
-                            <i class="fas fa-sync-alt me-1"></i> Try Again
-                        </button>
+                        <button type="button"
+                                class="btn btn-danger"
+                                data-bs-dismiss="modal"
+                                autofocus>Close</button>
                     </div>
                 </div>
             </div>
@@ -151,7 +158,7 @@
             </div>
         </div>
     </div>
-{% endblock %}
+{% endblock content %}
 {% block scripts %}
     {{ super() }}
     <script>
@@ -160,4 +167,4 @@
     </script>
     <script type="module"
             src="{{ url_for('static', filename='js/pages/restaurant-places-search.js') }}"></script>
-{% endblock %}
+{% endblock scripts %}

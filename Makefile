@@ -189,7 +189,7 @@ lint-html:
 lint-js:
 	@if [ -d "app/static/js" ]; then \
 		echo "\n\033[1m=== Running JavaScript Linter ===\033[0m"; \
-		npx eslint app/static/js --ext .js; \
+		npx eslint --config eslint.config.js "app/static/js/**/*.js"; \
 	fi
 
 ## CSS linter

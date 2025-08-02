@@ -16,4 +16,6 @@ Flask SQLAlchemy 2.0 syntax should be used.
 
 Google Places New API should be used.
 
+Avoid putting embedded JavaScript in html templates.  Include js files instead.
+
 Terraform code shall follow Anton Babenko's best practices defined here: https://github.com/antonbabenko

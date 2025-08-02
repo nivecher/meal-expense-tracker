@@ -139,6 +139,215 @@ def generate_password(length: int = 16, max_attempts: int = 10) -> str:
     raise RuntimeError("Failed to generate a valid password after maximum attempts")
 
 
+# Type aliases for better readability
+FieldValidator = Dict[str, Any]
+FieldValidators = Dict[str, FieldValidator]
+SecretDict = Dict[str, Any]
+
+# Constants for field validation
+REQUIRED_FIELDS: FieldValidators = {
+    "db_host": {
+        "required": True,
+        "type": str,
+        "validator": lambda x: len(x.strip()) > 0,
+        "error": "Database host cannot be empty",
+    },
+    "db_port": {
+        "required": True,
+        "type": (int, str),
+        "validator": lambda x: 1 <= int(x) <= 65535,
+        "error": "Port must be between 1 and 65535",
+        "converter": int,
+    },
+    "db_name": {
+        "required": True,
+        "type": str,
+        "validator": lambda x: len(x.strip()) > 0,
+        "error": "Database name cannot be empty",
+    },
+    "db_user": {
+        "required": True,
+        "type": str,
+        "validator": lambda x: len(x.strip()) > 0,
+        "error": "Database user cannot be empty",
+    },
+    "db_password": {
+        "required": True,
+        "type": str,
+        "validator": lambda x: len(x) >= 12,
+        "error": "Password must be at least 12 characters long",
+    },
+}
+
+
+def _validate_secret_arn(arn: str) -> None:
+    """Validate the secret ARN.
+
+    Args:
+        arn: The Amazon Resource Name to validate
+
+    Raises:
+        ValueError: If the ARN is empty or invalid
+    """
+    if not arn:
+        raise ValueError("Secret ARN cannot be empty")
+
+
+def _validate_stage(stage: str) -> None:
+    """Validate the secret stage.
+
+    Args:
+        stage: The secret stage to validate
+
+    Raises:
+        ValueError: If the stage is not 'AWSCURRENT' or 'AWSPENDING'
+    """
+    if stage not in ("AWSCURRENT", "AWSPENDING"):
+        raise ValueError("Stage must be either 'AWSCURRENT' or 'AWSPENDING'")
+
+
+def _prepare_request_params(arn: str, stage: str, token: Optional[str] = None) -> Dict[str, Any]:
+    """Prepare the request parameters for AWS Secrets Manager.
+
+    Args:
+        arn: The secret ARN
+        stage: The secret stage
+        token: Optional version ID or staging label
+
+    Returns:
+        Dictionary of request parameters
+
+    Raises:
+        ValueError: If the token is invalid
+    """
+    params: Dict[str, Any] = {"SecretId": arn}
+
+    if token:
+        if not isinstance(token, str):
+            raise ValueError("Token must be a string")
+        params["VersionId"] = token
+    else:
+        params["VersionStage"] = stage
+
+    return params
+
+
+def _parse_secret_response(response: Dict[str, Any], arn: str) -> Dict[str, Any]:
+    """Parse and validate the secret response from AWS.
+
+    Args:
+        response: The response from AWS Secrets Manager
+        arn: The secret ARN for error messages
+
+    Returns:
+        The parsed secret dictionary
+
+    Raises:
+        ValueError: If the secret is invalid or malformed
+    """
+    if "SecretString" not in response:
+        raise ValueError("Secret value is not a string")
+
+    try:
+        secret = json.loads(response["SecretString"])
+    except json.JSONDecodeError as e:
+        logger.error("Secret %s does not contain valid JSON: %s", arn, str(e))
+        raise ValueError(f"Secret {arn} does not contain valid JSON") from e
+
+    if not isinstance(secret, dict):
+        raise ValueError("Secret value must be a JSON object")
+
+    return secret
+
+
+def _validate_field_value(field: str, value: Any, validator: FieldValidator) -> Any:
+    """Validate and convert a single field value.
+
+    Args:
+        field: The field name
+        value: The field value to validate
+        validator: The validation rules
+
+    Returns:
+        The validated and converted value
+
+    Raises:
+        ValueError: If the value is invalid
+    """
+    # Check type
+    expected_types = validator["type"]
+    if not isinstance(expected_types, tuple):
+        expected_types = (expected_types,)
+
+    if not any(isinstance(value, t) for t in expected_types):
+        type_names = [t.__name__ for t in expected_types]
+        raise ValueError(f"Field '{field}' must be one of: {', '.join(type_names)}")
+
+    # Convert value if needed
+    if "converter" in validator:
+        try:
+            value = validator["converter"](value)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid value for field '{field}': {e}")
+
+    # Validate value
+    if not validator["validator"](value):
+        raise ValueError(f"Invalid value for field '{field}': {validator['error']}")
+
+    return value
+
+
+def _validate_secret_fields(secret: Dict[str, Any], validators: FieldValidators) -> SecretDict:
+    """Validate all fields in the secret against the validators.
+
+    Args:
+        secret: The secret dictionary to validate
+        validators: The validation rules
+
+    Returns:
+        A new dictionary with validated and converted values
+
+    Raises:
+        ValueError: If any validation fails
+    """
+    result: SecretDict = {}
+
+    for field, validator in validators.items():
+        if field not in secret and validator["required"]:
+            raise ValueError(f"Missing required field: {field}")
+
+        if field in secret:
+            result[field] = _validate_field_value(field, secret[field], validator)
+
+    return result
+
+
+def _handle_aws_error(error: Exception, arn: str) -> None:
+    """Handle AWS client errors and convert to appropriate exceptions.
+
+    Args:
+        error: The exception from the AWS client
+        arn: The secret ARN for error messages
+
+    Raises:
+        ValueError: With appropriate error message based on the AWS error
+    """
+    error_msg = str(error).lower()
+
+    if "not found" in error_msg:
+        logger.error("Secret not found: %s", arn)
+        raise ValueError(f"Secret not found: {arn}") from error
+    elif "invalid request" in error_msg:
+        logger.error("Invalid request for secret %s: %s", arn, str(error))
+        raise ValueError(f"Invalid request for secret {arn}: {error}") from error
+    elif "invalid parameter" in error_msg:
+        logger.error("Invalid parameter for secret %s: %s", arn, str(error))
+        raise ValueError(f"Invalid parameter for secret {arn}: {error}") from error
+    else:
+        logger.exception("Unexpected error retrieving secret %s", arn)
+        raise ValueError(f"Error retrieving secret {arn}: {str(error)}") from error
+
+
 def get_secret_dict(service_client: Any, arn: str, stage: str, token: Optional[str] = None) -> Dict[str, Any]:
     """Get and validate the secret value as a dictionary.
 
@@ -162,122 +371,20 @@ def get_secret_dict(service_client: Any, arn: str, stage: str, token: Optional[s
         json.JSONDecodeError: If the secret value is not valid JSON
     """
     # Validate input parameters
-    if not arn:
-        raise ValueError("Secret ARN cannot be empty")
+    _validate_secret_arn(arn)
+    _validate_stage(stage)
 
-    if stage not in ("AWSCURRENT", "AWSPENDING"):
-        raise ValueError("Stage must be either 'AWSCURRENT' or 'AWSPENDING'")
-
-    # Define required fields and their validation functions
-    field_validators = {
-        "db_host": {
-            "required": True,
-            "type": str,
-            "validator": lambda x: len(x.strip()) > 0,
-            "error": "Database host cannot be empty",
-        },
-        "db_port": {
-            "required": True,
-            "type": (int, str),
-            "validator": lambda x: 1 <= int(x) <= 65535,
-            "error": "Port must be between 1 and 65535",
-            "converter": int,
-        },
-        "db_name": {
-            "required": True,
-            "type": str,
-            "validator": lambda x: len(x.strip()) > 0,
-            "error": "Database name cannot be empty",
-        },
-        "db_user": {
-            "required": True,
-            "type": str,
-            "validator": lambda x: len(x.strip()) > 0,
-            "error": "Database user cannot be empty",
-        },
-        "db_password": {
-            "required": True,
-            "type": str,
-            "validator": lambda x: len(x) >= 12,  # Enforce minimum password length
-            "error": "Password must be at least 12 characters long",
-        },
-    }
-
-    # Prepare the request parameters
-    request_params: Dict[str, Any] = {"SecretId": arn}
-
-    # Only use VersionStage with AWSCURRENT or AWSPENDING
-    if token:
-        if not isinstance(token, str):
-            raise ValueError("Token must be a string")
-        request_params["VersionId"] = token
-    else:
-        request_params["VersionStage"] = stage
+    # Prepare and make the request
+    request_params = _prepare_request_params(arn, stage, token)
 
     try:
-        # Get the secret value
         logger.info("Retrieving secret %s (stage: %s)", arn, stage)
         response = service_client.get_secret_value(**request_params)
 
-        if "SecretString" not in response:
-            raise ValueError("Secret value is not a string")
-
-        # Parse the secret string as JSON
-        secret = json.loads(response["SecretString"])
-
-        if not isinstance(secret, dict):
-            raise ValueError("Secret value must be a JSON object")
-
-        # Validate and convert fields
-        result: Dict[str, Any] = {}
-
-        for field, validator in field_validators.items():
-            if field not in secret and validator["required"]:
-                raise ValueError(f"Missing required field: {field}")
-
-            if field in secret:
-                value = secret[field]
-
-                # Check type
-                expected_types = validator["type"]
-                if not isinstance(expected_types, tuple):
-                    expected_types = (expected_types,)
-
-                if not any(isinstance(value, t) for t in expected_types):
-                    type_names = [t.__name__ for t in expected_types]
-                    raise ValueError(f"Field '{field}' must be one of the following types: " f"{', '.join(type_names)}")
-
-                # Convert value if needed
-                if "converter" in validator:
-                    try:
-                        value = validator["converter"](value)
-                    except (ValueError, TypeError) as e:
-                        raise ValueError(f"Invalid value for field '{field}': {e}")
-
-                # Validate value
-                if not validator["validator"](value):
-                    raise ValueError(f"Invalid value for field '{field}': {validator['error']}")
-
-                result[field] = value
-
-        return result
-
-    except json.JSONDecodeError as e:
-        logger.error("Secret %s does not contain valid JSON: %s", arn, str(e))
-        raise ValueError(f"Secret {arn} does not contain valid JSON") from e
+        # Parse and validate the response
+        secret = _parse_secret_response(response, arn)
+        return _validate_secret_fields(secret, REQUIRED_FIELDS)
 
     except Exception as e:
-        # Handle AWS client exceptions generically since we can't import boto3 in tests
-        error_msg = str(e).lower()
-        if "not found" in error_msg:
-            logger.error("Secret not found: %s", arn)
-            raise ValueError(f"Secret not found: {arn}") from e
-        elif "invalid request" in error_msg:
-            logger.error("Invalid request for secret %s: %s", arn, str(e))
-            raise ValueError(f"Invalid request for secret {arn}: {e}") from e
-        elif "invalid parameter" in error_msg:
-            logger.error("Invalid parameter for secret %s: %s", arn, str(e))
-            raise ValueError(f"Invalid parameter for secret {arn}: {e}") from e
-        else:
-            logger.exception("Unexpected error retrieving secret %s", arn)
-            raise ValueError(f"Error retrieving secret {arn}: {str(e)}") from e
+        _handle_aws_error(e, arn)
+        raise ValueError(f"Error retrieving secret {arn}: {str(e)}") from e

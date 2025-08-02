@@ -6,22 +6,22 @@
 /**
  * Initialize error page functionality
  */
-function initErrorPage() {
-    // Add click handler for back button
-    const backButton = document.querySelector('.btn-error-back');
-    if (backButton) {
-        backButton.addEventListener('click', () => {
-            window.history.back();
-        });
-    }
+function initErrorPage () {
+  // Add click handler for back button
+  const backButton = document.querySelector('.btn-error-back');
+  if (backButton) {
+    backButton.addEventListener('click', () => {
+      window.history.back();
+    });
+  }
 }
 
 // Initialize when the DOM is fully loaded
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initErrorPage);
+  document.addEventListener('DOMContentLoaded', initErrorPage);
 } else {
-    // DOMContentLoaded has already fired
-    initErrorPage();
+  // DOMContentLoaded has already fired
+  initErrorPage();
 }
 
 // Export for testing

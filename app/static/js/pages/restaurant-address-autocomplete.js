@@ -5,6 +5,8 @@
  * @module restaurantAddressAutocomplete
  */
 
+import GoogleMapsLoader from '../utils/google-maps-loader.js';
+
 const restaurantAddressAutocomplete = (() => {
   // Module state
   const state = {
@@ -18,21 +20,34 @@ const restaurantAddressAutocomplete = (() => {
       city: null,
       state: null,
       postalCode: null,
-      country: null
-    }
+      country: null,
+    },
   };
 
   /**
    * Initialize the address autocomplete functionality
    * @public
    */
-  function init() {
+  async function init () {
     try {
       cacheElements();
-      setupEventListeners();
-      console.log('Restaurant address autocomplete initialized');
+
+      // Only proceed if we have the required elements
+      if (!state.autocompleteInput) return;
+
+      // Load Google Maps API first
+      try {
+        const google = await GoogleMapsLoader.loadApi(window.GOOGLE_MAPS_API_KEY, ['places', 'geocoding']);
+        window.google = google;
+        setupEventListeners();
+        console.log('Restaurant address autocomplete initialized with Google Maps API');
+      } catch (error) {
+        console.error('Failed to load Google Maps API:', error);
+        showError('Failed to load address autocomplete. Please refresh the page and try again.');
+      }
     } catch (error) {
       console.error('Error initializing address autocomplete:', error);
+      showError('An error occurred while initializing address autocomplete.');
     }
   }
 
@@ -40,7 +55,7 @@ const restaurantAddressAutocomplete = (() => {
    * Cache DOM elements
    * @private
    */
-  function cacheElements() {
+  function cacheElements () {
     state.autocompleteInput = document.getElementById('address-autocomplete');
     if (!state.autocompleteInput) return;
 
@@ -54,7 +69,7 @@ const restaurantAddressAutocomplete = (() => {
       city: document.getElementById(state.autocompleteInput.dataset.cityField || 'city'),
       state: document.getElementById(state.autocompleteInput.dataset.stateField || 'state'),
       postalCode: document.getElementById(state.autocompleteInput.dataset.postalCodeField || 'postal_code'),
-      country: document.getElementById(state.autocompleteInput.dataset.countryField || 'country')
+      country: document.getElementById(state.autocompleteInput.dataset.countryField || 'country'),
     };
   }
 
@@ -62,7 +77,7 @@ const restaurantAddressAutocomplete = (() => {
    * Set up event listeners
    * @private
    */
-  function setupEventListeners() {
+  function setupEventListeners () {
     if (!state.autocompleteInput) return;
 
     // Input event for address autocomplete
@@ -82,9 +97,9 @@ const restaurantAddressAutocomplete = (() => {
   /**
    * Handle address input for autocomplete
    * @private
-   * @param {Event} event - The input event
+   * @param {Event} _event - The input event (unused)
    */
-  async function handleAddressInput(event) {
+  async function handleAddressInput (_event) {
     const query = state.autocompleteInput.value.trim();
     state.selectedPlaceId = null;
 
@@ -123,7 +138,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {Array} suggestions - Array of address suggestions
    */
-  function renderSuggestions(suggestions) {
+  function renderSuggestions (suggestions) {
     if (!state.suggestionsDiv) return;
 
     if (!suggestions || suggestions.length === 0) {
@@ -137,7 +152,7 @@ const restaurantAddressAutocomplete = (() => {
 
     const suggestionsHTML = `
       <div class="list-group">
-        ${suggestions.map(suggestion => `
+        ${suggestions.map((suggestion) => `
           <div class="list-group-item list-group-item-action"
                data-place-id="${suggestion.place_id}">
             ${escapeHtml(suggestion.description)}
@@ -154,12 +169,12 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {Event} event - The click event
    */
-  async function handleSuggestionClick(event) {
+  async function handleSuggestionClick (event) {
     try {
       const suggestion = event.target.closest('.suggestion-item');
       if (!suggestion) return;
 
-      const placeId = suggestion.dataset.placeId;
+      const { placeId } = suggestion.dataset;
       const description = suggestion.textContent.trim();
 
       if (placeId && state.autocompleteInput) {
@@ -189,7 +204,7 @@ const restaurantAddressAutocomplete = (() => {
    * Handle update address button click
    * @private
    */
-  async function handleUpdateAddress() {
+  async function handleUpdateAddress () {
     // If no place is selected but we have an input value, try to find a place ID
     if (!state.selectedPlaceId && state.autocompleteInput && state.autocompleteInput.value.trim()) {
       const query = state.autocompleteInput.value.trim();
@@ -233,20 +248,20 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {Object} data - Place details data from Google Places API
    */
-  function updateFormFields(data) {
-    const { address_components: components, name, formatted_address, geometry } = data;
+  function updateFormFields (data) {
+    const { address_components: components, name, geometry } = data;
     const address = {
       streetNumber: '',
       route: '',
       city: '',
       state: '',
       postalCode: '',
-      country: ''
+      country: '',
     };
 
     // Parse address components
     if (components && Array.isArray(components)) {
-      components.forEach(component => {
+      components.forEach((component) => {
         const types = component.types || [];
         if (types.includes('street_number')) {
           address.streetNumber = component.long_name || '';
@@ -317,7 +332,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {string} message - Loading message
    */
-  function showLoading(message) {
+  function showLoading (message) {
     if (!state.validIndicator) return;
     state.validIndicator.innerHTML = `
       <div class="text-info">
@@ -332,7 +347,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {string} message - Success message
    */
-  function showSuccess(message) {
+  function showSuccess (message) {
     if (!state.validIndicator) return;
     state.validIndicator.innerHTML = `
       <div class="text-success">
@@ -347,7 +362,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {string} message - Error message
    */
-  function showError(message) {
+  function showError (message) {
     if (!state.validIndicator) return;
     state.validIndicator.innerHTML = `
       <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -364,7 +379,7 @@ const restaurantAddressAutocomplete = (() => {
    * @param {string} unsafe - Unsafe string
    * @returns {string} Escaped string
    */
-  function escapeHtml(unsafe) {
+  function escapeHtml (unsafe) {
     if (typeof unsafe !== 'string') return '';
     return unsafe
       .replace(/&/g, '&amp;')
@@ -376,17 +391,9 @@ const restaurantAddressAutocomplete = (() => {
 
   // Public API
   return {
-    init
+    init,
   };
 })();
 
-// Initialize when DOM is loaded
-if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      restaurantAddressAutocomplete.init();
-    });
-  } else {
-    restaurantAddressAutocomplete.init();
-  }
-}
+// Export the public API
+export const { init } = restaurantAddressAutocomplete;

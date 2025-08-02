@@ -180,16 +180,66 @@ pytest --cov=app --cov-report=term-missing
 
 ### Linting and Formatting
 
-   ```bash
-   # Run flake8
-   flake8 app tests
+#### Python
 
-   # Run black
-   black app tests
+```bash
+# Run flake8
+flake8 app tests
 
-   # Run isort
-   isort app tests
+# Run black
+black app tests
+
+# Run isort
+isort app tests
 ```
+
+#### JavaScript
+
+The project uses ESLint for JavaScript linting with the following configuration:
+
+- **ESLint Version**: 9.32.0+
+- **Configuration File**: `eslint.config.js`
+- **Rules**: Custom rules for different environments and file types
+
+##### Running JavaScript Linter
+
+```bash
+# Lint all JavaScript files
+yarn lint:js
+# or
+make lint-js
+
+# Lint and fix auto-fixable issues
+yarn lint:js:fix
+# or
+make lint-js-fix
+```
+
+##### Linting Modes
+
+- **Development Mode** (`NODE_ENV=development`):
+  - Console statements are allowed
+  - Unused variables are warned about
+  - More lenient rules for development
+
+- **Production Mode** (default):
+  - Console statements are treated as errors
+  - Stricter rules for production code
+
+##### Configuration Highlights
+
+- Uses modern ESLint flat config format
+- Environment-specific rules for different file types
+- Custom rules for test files, components, and utilities
+- Integration with Makefile for consistent development workflow
+
+##### Ignored Files
+
+- `node_modules/`
+- `dist/`
+- `build/`
+- `coverage/`
+- Test files (`*.test.js`, `*-test.js`) have special rules
 
 ## 🗄️ Database Management
 

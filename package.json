@@ -2,13 +2,15 @@
   "name": "meal-expense-tracker",
   "version": "1.0.0",
   "description": "Meal Expense Tracker Application",
+  "type": "module",
   "scripts": {
-    "lint:js": "eslint app/static/js --ext .js"
+    "lint:js": "eslint --config eslint.config.js \"app/static/js/**/*.js\"",
+    "lint:fix": "eslint --config eslint.config.js --fix \"app/static/js/**/*.js\""
   },
   "devDependencies": {
-    "eslint": "^8.0.0",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.25.0"
+    "@eslint/js": "^9.32.0",
+    "eslint": "^9.32.0",
+    "globals": "^15.0.0"
   },
   "dependencies": {
     "jscpd": "^4.0.5"

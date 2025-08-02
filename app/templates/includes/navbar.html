@@ -138,11 +138,12 @@
                             <div class="user-info" role="none">
                                 <div class="d-flex align-items-center">
                                     <img src="{{ current_user.avatar_url or url_for('static', filename='img/default-avatar.svg') }}"
-                                         alt=""
+                                         alt="User Avatar"
                                          class="user-avatar me-3"
+                                         width="32"
+                                         height="32"
                                          data-avatar
-                                         data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
-                                         onerror="this.onerror=null; this.src=this.dataset.defaultSrc">
+                                         data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}">
                                     <div>
                                         <div class="user-name">{{ current_user.username }}</div>
                                         <div class="user-email">{{ current_user.email }}</div>

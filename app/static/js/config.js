@@ -6,50 +6,50 @@
 
 // Default configuration
 const defaultConfig = {
-    // Base URL for static files
-    staticBaseUrl: '',
+  // Base URL for static files
+  staticBaseUrl: '',
 
-    // Application settings
-    app: {
-        debug: false,
-        env: 'production',
-        version: '1.0.0'
-    }
+  // Application settings
+  app: {
+    debug: false,
+    env: 'production',
+    version: '1.0.0',
+  },
 };
 
 // Initialize configuration
 const config = {
-    ...defaultConfig,
+  ...defaultConfig,
 
-    /**
+  /**
      * Initialize the configuration from data attributes
      * @returns {Object} The configuration object
      */
-    init() {
-        try {
-            // Find the config element
-            const configEl = document.getElementById('app-config');
-            if (configEl && configEl.dataset.appConfig) {
-                // Parse the JSON configuration
-                const userConfig = JSON.parse(configEl.dataset.appConfig);
+  init () {
+    try {
+      // Find the config element
+      const configEl = document.getElementById('app-config');
+      if (configEl && configEl.dataset.appConfig) {
+        // Parse the JSON configuration
+        const userConfig = JSON.parse(configEl.dataset.appConfig);
 
-                // Merge with defaults
-                Object.assign(this, {
-                    ...this,
-                    ...userConfig,
-                    app: {
-                        ...defaultConfig.app,
-                        ...(userConfig.app || {})
-                    }
-                });
-            }
+        // Merge with defaults
+        Object.assign(this, {
+          ...this,
+          ...userConfig,
+          app: {
+            ...defaultConfig.app,
+            ...(userConfig.app || {}),
+          },
+        });
+      }
 
-            return this;
-        } catch (error) {
-            console.error('Error initializing application configuration:', error);
-            return this;
-        }
+      return this;
+    } catch (error) {
+      console.error('Error initializing application configuration:', error);
+      return this;
     }
+  },
 }.init();
 
 // Export the configuration

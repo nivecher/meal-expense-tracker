@@ -49,3 +49,50 @@
 .card-warning {
     border-top: 3px solid var(--warning-color);
 }
+
+/* Restaurant card specific styles */
+.restaurant-card .card-img-top {
+    height: 160px;
+    object-fit: cover;
+}
+
+.restaurant-card .restaurant-placeholder {
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bs-light);
+}
+
+.restaurant-card .restaurant-placeholder i {
+    color: var(--bs-gray-400);
+    font-size: 3rem;
+}
+
+.restaurant-card .restaurant-meta {
+    color: var(--bs-gray-700);
+    font-size: 0.9rem;
+}
+
+.restaurant-card .restaurant-stats {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.75rem;
+}
+
+.restaurant-card .stat-item {
+    text-align: center;
+}
+
+.restaurant-card .stat-value {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--bs-primary);
+}
+
+.restaurant-card .stat-label {
+    font-size: 0.75rem;
+    color: var(--bs-gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}

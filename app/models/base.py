@@ -12,7 +12,6 @@ from sqlalchemy.sql import func
 from typing_extensions import TypeAlias
 
 from ..extensions import db as _db
-from flask_sqlalchemy import SQLAlchemy
 
 # Type variable for model classes
 ModelType = TypeVar("ModelType", bound="BaseModel")
