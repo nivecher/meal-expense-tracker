@@ -8,9 +8,11 @@ Avoid deprecated features and APIs.  Proactively ensure latest (stable) services
 
 Python code shall be formatted based on black and flake8 rules so that it passes linting.
 
-Python code shall be typed and checked using mypy.
+Python code shall always use type hints and be checked using mypy.
 
 Python Flask blueprint standards should be followed.
+
+Always log python exception strings using the logger.
 
 Flask SQLAlchemy 2.0 syntax should be used.
 

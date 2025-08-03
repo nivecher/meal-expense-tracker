@@ -19,10 +19,12 @@ from flask_login import current_user, login_required
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+# Import Expense model here to avoid circular imports
 from app.extensions import db
 from app.restaurants import services
 from app.restaurants.forms import RestaurantForm
 from app.restaurants.models import Restaurant
+from app.restaurants.services.expense_stats import calculate_expense_stats
 
 from . import bp
 
@@ -148,8 +150,15 @@ def restaurant_details(restaurant_id):
     # Load expenses for the restaurant
     expenses = sorted(restaurant.expenses, key=lambda x: x.date, reverse=True)
 
+    # Calculate expense statistics
+    expense_stats = calculate_expense_stats(restaurant_id, current_user.id)
+
     return render_template(
-        "restaurants/detail.html", restaurant=restaurant, expenses=expenses, form=RestaurantForm(obj=restaurant)
+        "restaurants/detail.html",
+        restaurant=restaurant,
+        expenses=expenses,
+        expense_stats=expense_stats,
+        form=RestaurantForm(obj=restaurant),
     )
 
 

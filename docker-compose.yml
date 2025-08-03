@@ -5,25 +5,49 @@ services:
       context: .
       target: development
     ports:
-      - "5001:5001"
+      - "8000:5000"
     volumes:
       - .:/app
       - app_instance:/app/instance
     environment:
+      # Flask configuration
       - FLASK_APP=wsgi:app
       - FLASK_ENV=development
-      - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5433/meal_expenses
-      - PYTHONUNBUFFERED=1
       - FLASK_DEBUG=1
+      - PYTHONUNBUFFERED=1
+      
+      # Database configuration
+      - DATABASE_URL=postgresql+psycopg2://${DB_USERNAME:-mealuser}:${DB_PASSWORD:-mealpassword}@db:${DB_PORT:-5433}/${DB_NAME:-meal_expenses}
+      - DB_ENGINE=postgresql
+      - DB_HOST=db
+      - DB_PORT=${DB_PORT:-5433}
+      - DB_NAME=${DB_NAME:-meal_expenses}
+      - DB_USERNAME=${DB_USERNAME:-mealuser}
+      - DB_PASSWORD=${DB_PASSWORD:-mealpassword}
+      
+      # Admin user configuration (override in production!)
+      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
+      - DEFAULT_ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL:-admin@example.com}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-admin123}
+      
+      # Security settings (override in production!)
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-me}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-secret-key-change-me}
+      
+      # CORS settings for development
+      - CORS_ORIGINS=*
+      
     depends_on:
       db:
         condition: service_healthy
-    command: flask run --host=0.0.0.0 --port=5001
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+    # Entrypoint script will handle database initialization before starting the app
+    command: gunicorn --bind 0.0.0.0:5000 --worker-class gevent --workers 4 --timeout 120 wsgi:app
 
   # AWS Lambda emulation for local testing
   lambda:

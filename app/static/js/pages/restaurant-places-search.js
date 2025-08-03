@@ -4,15 +4,13 @@
  * Initializes the Google Places search component for finding restaurants
  */
 
-// GoogleMapsAuth is available globally from google-maps-auth.js
+// Import required modules
 import RestaurantSearch from '../components/restaurant-search.js';
 import { googlePlacesService } from '../services/google-places.js';
-
-// Get the GoogleMapsAuth from the global scope
-const { GoogleMapsAuth } = window;
+import GoogleMapsLoader from '../utils/google-maps-loader.js';
 
 // Initialize the page when the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // Get modal elements
   const successModal = document.getElementById('successModal');
   const errorModal = document.getElementById('errorModal');
@@ -103,46 +101,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // Get the loading indicator element
     const loadingIndicator = document.getElementById('loading-indicator');
 
-    // Initialize Google Maps API with error handling
-    GoogleMapsAuth.init(apiKey, (error) => {
-      if (error) {
-        console.error('Failed to initialize Google Maps:', error);
-        handleSearchError(`Failed to load Google Maps: ${error.message}`);
-        return;
-      }
+    // Initialize Google Maps API with retry and error handling
+    try {
+      await GoogleMapsLoader.loadApiWithRetry(
+        apiKey,
+        () => {
+          console.log('Google Maps API loaded, initializing search component...');
 
-      // Google Maps API is loaded, initialize the search component
-      console.log('Google Maps API loaded, initializing search component...');
+          // Ensure the Google Maps API is fully loaded
+          if (!window.google || !window.google.maps || !window.google.maps.places) {
+            throw new Error('Google Maps API is not fully loaded');
+          }
 
-      try {
-        // Ensure the Google Maps API is fully loaded
-        if (!window.google || !window.google.maps || !window.google.maps.places) {
-          throw new Error('Google Maps API is not fully loaded');
-        }
+          // Update the googlePlacesService with the API key
+          googlePlacesService.apiKey = apiKey;
 
-        // Update the googlePlacesService with the API key
-        googlePlacesService.apiKey = apiKey;
+          const restaurantSearch = new RestaurantSearch({
+            container: searchContainer,
+            onSelect: handleRestaurantSelect,
+            onError: handleSearchError,
+          });
 
-        const restaurantSearch = new RestaurantSearch({
-          container: searchContainer,
-          onSelect: handleRestaurantSelect,
-          onError: handleSearchError,
-        });
+          // Make the search component available globally for debugging
+          window.restaurantSearch = restaurantSearch;
 
-        // Make the search component available globally for debugging
-        window.restaurantSearch = restaurantSearch;
+          console.log('Restaurant search component initialized successfully');
 
-        console.log('Restaurant search component initialized successfully');
-
-        // Hide loading indicator if it was shown
-        if (loadingIndicator) {
-          loadingIndicator.classList.add('d-none');
-        }
-      } catch (error) {
-        console.error('Error initializing restaurant search:', error);
-        handleSearchError(`Failed to initialize restaurant search: ${error.message}`);
-      }
-    });
+          // Hide loading indicator if it was shown
+          if (loadingIndicator) {
+            loadingIndicator.classList.add('d-none');
+          }
+        },
+        ['places', 'geocoding'], // Required libraries
+        3, // maxRetries
+        1000, // retryDelay
+      );
+    } catch (error) {
+      console.error('Error initializing Google Maps API:', error);
+      handleSearchError(`Failed to load Google Maps: ${error.message}`);
+      return;
+    }
   } catch (error) {
     console.error('Error initializing Google Maps:', error);
     handleSearchError(`Failed to initialize Google Maps: ${error.message}`);
@@ -246,17 +244,59 @@ async function handleRestaurantSelect (restaurant) {
     const checkResult = await checkResponse.json();
 
     if (checkResult.exists) {
-      // Restaurant exists, show a message with a link to view it
-      const existingModal = new bootstrap.Modal(document.getElementById('existingRestaurantModal'));
-      const modalTitle = document.getElementById('existingRestaurantModalLabel');
-      const modalBody = document.getElementById('existingRestaurantModalBody');
-      const viewButton = document.getElementById('viewExistingRestaurantBtn');
+      // Find the clicked restaurant card in the search results
+      const restaurantCards = document.querySelectorAll('.restaurant-card');
+      restaurantCards.forEach(card => {
+        const cardPlaceId = card.getAttribute('data-place-id');
+        if (cardPlaceId === restaurantData.google_place_id) {
+          // Update the button to show "View" instead of "Add"
+          const button = card.querySelector('.add-restaurant-btn');
+          if (button) {
+            button.innerHTML = '<i class="fas fa-eye me-1"></i> View Restaurant';
+            button.classList.remove('btn-primary');
+            button.classList.add('btn-outline-primary');
+            button.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.location.href = `/restaurants/${checkResult.restaurant_id}`;
+            };
 
-      if (modalTitle) modalTitle.textContent = 'Restaurant Already Exists';
-      if (modalBody) modalBody.textContent = `"${checkResult.restaurant_name}" is already in your restaurants.`;
-      if (viewButton) viewButton.href = `/restaurants/${checkResult.restaurant_id}`;
+            // Add a small info message
+            const infoText = document.createElement('small');
+            infoText.className = 'text-muted d-block mt-1';
+            infoText.textContent = 'Already in your restaurants';
+            button.parentNode.insertBefore(infoText, button.nextSibling);
+          }
+        }
+      });
 
-      existingModal.show();
+      // Show a toast notification
+      const toastContainer = document.getElementById('toastContainer');
+      if (toastContainer) {
+        const toast = document.createElement('div');
+        toast.className = 'toast align-items-center text-white bg-info border-0';
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        toast.innerHTML = `
+          <div class="d-flex">
+            <div class="toast-body">
+              <i class="fas fa-info-circle me-2"></i>
+              "${checkResult.restaurant_name}" is already in your restaurants.
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+          </div>
+        `;
+        toastContainer.appendChild(toast);
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+
+        // Remove the toast after it's hidden
+        toast.addEventListener('hidden.bs.toast', () => {
+          toast.remove();
+        });
+      }
+
       return;
     }
 

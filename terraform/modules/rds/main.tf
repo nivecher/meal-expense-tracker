@@ -72,13 +72,12 @@ resource "aws_db_instance" "main" {
   iam_database_authentication_enabled = true # Enable IAM database authentication
 
   # Monitoring - enable performance insights with a 7-day retention period
-  performance_insights_enabled          = true
+  performance_insights_enabled          = var.db_performance_insights_enabled
   performance_insights_kms_key_id       = var.db_kms_key_arn
-  performance_insights_retention_period = 7
+  performance_insights_retention_period = var.db_performance_insights_enabled ? 7 : 0
 
-  # Enable enhanced monitoring with a 60-second interval
-  monitoring_interval = 60
-  monitoring_role_arn = aws_iam_role.rds_enhanced_monitoring.arn
+  # Disable enhanced monitoring
+  monitoring_interval = 0 # free tier eligible
 
   # Parameter group
   parameter_group_name = aws_db_parameter_group.main.name

@@ -60,7 +60,8 @@ class LambdaTester:
             # Parse the response
             response_payload = json.loads(response["Payload"].read().decode("utf-8"))
 
-            print(f"\n{'='*50}")
+            separator = "=" * 50
+            print(f"\n{separator}")
             print(f"Operation: {operation}")
             print(f"Status Code: {response_payload.get('statusCode', 'N/A')}")
 
@@ -70,7 +71,7 @@ class LambdaTester:
             except (json.JSONDecodeError, AttributeError):
                 print(f"Raw Response: {response_payload}")
 
-            print(f"{'='*50}\n")
+            print(f"{separator}\n")
 
             return response_payload
 

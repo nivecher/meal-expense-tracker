@@ -16,7 +16,7 @@ from app.restaurants.models import Restaurant
 
 def prepare_expense_form(
     user_id: int, form: Optional[FlaskForm] = None
-) -> Tuple[ExpenseForm, List[Category], List[Restaurant]]:
+) -> Tuple[ExpenseForm, List[Category], List["Restaurant"]]:
     """Prepare the expense form with categories and restaurants.
 
     Args:

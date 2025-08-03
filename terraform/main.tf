@@ -105,7 +105,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
     }
 
     noncurrent_version_expiration {
-      noncurrent_days = 30
+      noncurrent_days = 7
     }
   }
 

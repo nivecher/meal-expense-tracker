@@ -41,6 +41,16 @@
               height="180">
         <link rel="manifest"
               href="{{ url_for('static', filename='img/favicons/site.webmanifest') }}">
+        <!-- Google Maps API Configuration -->
+        <script type="text/javascript">
+            // Make Google Maps API key and Map ID available globally
+            window.GOOGLE_MAPS_API_KEY = '{{ config.get("GOOGLE_MAPS_API_KEY", "") }}';
+            window.GOOGLE_MAPS_MAP_ID = '{{ config.get("GOOGLE_MAPS_MAP_ID", "") }}';
+            console.log('Google Maps API Key:', window.GOOGLE_MAPS_API_KEY ? 'Key loaded' : 'No API key found');
+            if (window.GOOGLE_MAPS_MAP_ID) {
+                console.log('Google Maps Map ID loaded');
+            }
+        </script>
         <!-- Styles -->
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
               rel="stylesheet">
@@ -77,31 +87,23 @@
     <body>
         {% include "includes/navbar.html" %}
         <!-- Breadcrumb Navigation -->
-        <div class="container mt-3">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
+        <div class="container mt-2 mb-2">
+            <nav aria-label="breadcrumb" class="small">
+                <ol class="breadcrumb mb-1 py-1 px-2 bg-light rounded">
                     {% block breadcrumb %}
                         <li class="breadcrumb-item">
-                            <a href="{{ url_for("main.index") }}">Home</a>
+                            <a href="{{ url_for("main.index") }}" class="text-decoration-none">
+                                <i class="fas fa-home me-1"></i>Home
+                            </a>
                         </li>
                     {% endblock breadcrumb %}
                 </ol>
             </nav>
         </div>
         <main class="container py-4">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show">
-                            {{ message }}
-                            <button type="button"
-                                    class="btn-close"
-                                    data-bs-dismiss="alert"
-                                    aria-label="Close"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
+            <!-- Toast Container -->
+            <div id="toast-container"
+                 class="toast-container position-fixed bottom-0 end-0 p-3"></div>
             {% block content %}
             {% endblock content %}
         </main>
@@ -151,9 +153,7 @@
         <!-- Load Google Maps Auth as a module -->
         <script type="module">
             // Make GoogleMapsAuth globally available
-            import {
-                GoogleMapsAuth
-            } from "{{ url_for('static', filename='js/utils/google-maps-auth.js') }}";
+            import GoogleMapsAuth from "{{ url_for('static', filename='js/utils/google-maps-auth.js') }}";
             window.GoogleMapsAuth = GoogleMapsAuth;
         </script>
         <!-- Load other utility modules -->
@@ -176,29 +176,53 @@
         {% endblock scripts %}
         {% block extra_js %}
         {% endblock extra_js %}
-        <!-- Initialize page modules -->
-        <script type="module">
-            import {
-                initRestaurantSearch
-            } from "{{ url_for('static', filename='js/pages/restaurant-search-init.js') }}";
-            document.addEventListener('DOMContentLoaded', () => {
-                initRestaurantSearch();
-            });
-        </script>
-        <!-- Table sort component -->
-        <script type="module"
-                src="{{ url_for('static', filename='js/components/table-sort.js') }}"
-                defer></script>
-        <!-- Navbar components -->
-        <script type="module"
-                src="{{ url_for('static', filename='js/components/avatar.js') }}"
-                defer></script>
-        <script type="module"
-                src="{{ url_for('static', filename='js/components/navbar.js') }}"
-                defer></script>
-        <!-- Avatar fallback component -->
-        <script type="module"
-                src="{{ url_for('static', filename='js/components/avatar-fallback.js') }}"
-                defer></script>
-    </body>
+        <!-- Flash messages container (data will be read by JavaScript) -->
+        <div id="flash-messages" data-messages='{ {%- for category, message in get_flashed_messages(with_categories=true) -%} "{{ loop.index0 }}": {"type": "{{ category|e }}", "message": "{{ message|e }}"}
+            {% if not loop.last %},{% endif %}
+        {%- endfor -%} }'></div>
+    <script type="module">
+        import {
+            initFlashMessages
+        } from "{{ url_for('static', filename='js/utils/flash-messages.js') }}";
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const flashContainer = document.getElementById('flash-messages');
+            if (flashContainer) {
+                const messagesData = flashContainer.dataset.messages || '{}';
+                try {
+                    const messages = Object.values(JSON.parse(messagesData));
+                    if (messages.length > 0) {
+                        initFlashMessages(messages);
+                    }
+                } catch (error) {
+                    console.error('Error parsing flash messages:', error);
+                }
+            }
+        });
+    </script>
+    <!-- Initialize page modules -->
+    <script type="module">
+        import {
+            initRestaurantSearch
+        } from "{{ url_for('static', filename='js/pages/restaurant-search-init.js') }}";
+        document.addEventListener('DOMContentLoaded', () => {
+            initRestaurantSearch();
+        });
+    </script>
+    <!-- Table sort component -->
+    <script type="module"
+            src="{{ url_for('static', filename='js/components/table-sort.js') }}"
+            defer></script>
+    <!-- Navbar components -->
+    <script type="module"
+            src="{{ url_for('static', filename='js/components/avatar.js') }}"
+            defer></script>
+    <script type="module"
+            src="{{ url_for('static', filename='js/components/navbar.js') }}"
+            defer></script>
+    <!-- Avatar fallback component -->
+    <script type="module"
+            src="{{ url_for('static', filename='js/components/avatar-fallback.js') }}"
+            defer></script>
+</body>
 </html>

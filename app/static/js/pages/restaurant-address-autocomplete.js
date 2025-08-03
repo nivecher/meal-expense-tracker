@@ -46,24 +46,25 @@ const restaurantAddressAutocomplete = (() => {
         return;
       }
 
-      // Load Google Maps API first
+      // Load Google Maps API with retry logic
       try {
-        logger.debug('Initializing Google Maps API...');
-        const google = await GoogleMapsLoader.loadApi(
+        logger.debug('Initializing Google Maps API with retry...');
+        await GoogleMapsLoader.loadApiWithRetry(
           window.GOOGLE_MAPS_API_KEY,
-          (g) => {
+          (google) => {
             logger.debug('Google Maps API loaded successfully in callback');
-            window.google = g;
+            window.google = google;
             setupEventListeners();
           },
-          ['places', 'geocoding']
+          ['places', 'geocoding'],
+          3,  // max retries
+          1000, // retry delay in ms
         );
 
-        // If we get here, the API is loaded and callbacks have been called
         logger.info('Restaurant address autocomplete initialized with Google Maps API');
       } catch (error) {
-        logger.error('Failed to load Google Maps API:', error);
-        showError('Failed to load address autocomplete. Please refresh the page and try again.');
+        logger.error('Failed to load Google Maps API after retries:', error);
+        showError('Failed to load address autocomplete. Please check your connection and refresh the page.');
       }
     } catch (error) {
       logger.error('Error initializing address autocomplete:', error);

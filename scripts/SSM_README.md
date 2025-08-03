@@ -6,7 +6,6 @@ This document explains how to manage Google API keys using AWS SSM Parameter Sto
 
 Google API keys are stored securely in AWS SSM Parameter Store with the following naming convention:
 - `/meal-expense-tracker/{environment}/google/maps-api-key`
-- `/meal-expense-tracker/{environment}/google/places-api-key`
 
 ## Prerequisites
 
@@ -35,10 +34,10 @@ pip install boto3
 ./scripts/setup_google_ssm_parameters.py --api-key "your-api-key" --both
 
 # Set different keys for Maps and Places
-./scripts/setup_google_ssm_parameters.py --maps-api-key "maps-key" --places-api-key "places-key" --both
+./scripts/setup_google_ssm_parameters.py --maps-api-key "maps-key"
 
 # Set only Maps API key
-./scripts/setup_google_ssm_parameters.py --api-key "your-api-key" --maps
+./scripts/setup_google_ssm_parameters.py --maps-api-key "maps-key" --maps
 
 # Set only Places API key
 ./scripts/setup_google_ssm_parameters.py --api-key "your-api-key" --places
@@ -51,7 +50,6 @@ pip install boto3
 
 - `--api-key`: API key to use for both Maps and Places
 - `--maps-api-key`: API key for Google Maps only
-- `--places-api-key`: API key for Google Places only
 - `--both`: Set both Maps and Places API keys
 - `--maps`: Set only Maps API key
 - `--places`: Set only Places API key

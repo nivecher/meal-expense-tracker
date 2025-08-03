@@ -20,7 +20,10 @@ def get_gmaps_client():
     """Initialize and return Google Maps client."""
     global gmaps
     if gmaps is None and current_app.config.get("GOOGLE_MAPS_API_KEY"):
-        gmaps = googlemaps.Client(key=current_app.config["GOOGLE_MAPS_API_KEY"])
+        gmaps = googlemaps.Client(
+            key=current_app.config["GOOGLE_MAPS_API_KEY"],
+            map_id=current_app.config["GOOGLE_MAPS_MAP_ID"],
+        )
     return gmaps
 
 

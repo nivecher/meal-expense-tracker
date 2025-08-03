@@ -50,3 +50,9 @@ variable "rotation_days" {
   type        = number
   default     = 30
 }
+
+variable "enable_xray_tracing" {
+  description = "Enable X-Ray tracing for the Lambda function"
+  type        = bool
+  default     = false # free tier
+}

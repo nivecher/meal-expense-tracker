@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 
-def init_default_data():
+def init_default_data() -> None:
     """Initialize default data in the database."""
     from app.auth.models import User
     from app.database import db
@@ -59,7 +59,7 @@ def init_default_data():
         raise
 
 
-def init_db(drop_all=False):
+def init_db(drop_all: bool = False) -> bool:
     """Initialize the database with all models.
 
     Args:
@@ -94,7 +94,7 @@ def init_db(drop_all=False):
         return False
 
 
-def main():
+def main() -> None:
     """Main entry point for the database initialization script."""
     parser = argparse.ArgumentParser(description="Initialize the database.")
     parser.add_argument("--reset", action="store_true", help="Drop all tables before creating them")

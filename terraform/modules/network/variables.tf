@@ -31,7 +31,7 @@ variable "enable_flow_logs" {
 variable "flow_logs_retention_in_days" {
   description = "Number of days to retain VPC Flow Logs in CloudWatch"
   type        = number
-  default     = 30
+  default     = 7
 }
 
 variable "logs_kms_key_arn" {

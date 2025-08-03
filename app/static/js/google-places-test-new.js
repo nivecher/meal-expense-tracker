@@ -5,6 +5,9 @@
  * the Google Places API integration.
  */
 
+import GoogleMapsLoader from './utils/google-maps-loader.js';
+import { logger } from './utils/logger.js';
+
 class GooglePlacesTest {
   constructor () {
     this.map = null;
@@ -43,24 +46,24 @@ class GooglePlacesTest {
         throw new Error('No API key returned from server');
       }
 
-      // Check if Google Maps API is already loaded
-      if (window.google && window.google.maps) {
-        await this.initMap();
-      } else {
-        // Load the Google Maps JavaScript API with the Places library
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&callback=initGoogleMaps`;
-        script.async = true;
-        script.defer = true;
-        script.onerror = () => {
-          this.showError('Failed to load Google Maps API');
-        };
-
-        // Define the initGoogleMaps function in the global scope
-        window.initGoogleMaps = () => this.initMap();
-
-        document.head.appendChild(script);
-      }
+      // Use the GoogleMapsLoader to load the API
+      await GoogleMapsLoader.loadApiWithRetry(
+        apiKey,
+        async () => {
+          try {
+            // API is loaded, initialize the map
+            await this.initMap();
+            // Set up event listeners after map is initialized
+            this.setupEventListeners();
+          } catch (error) {
+            logger.error('Error initializing map:', error);
+            this.showError('Failed to initialize map');
+          }
+        },
+        ['places', 'marker'],
+        3,  // max retries
+        1000, // retry delay in ms
+      );
     } catch (error) {
       console.error('Error initializing Google Maps:', error);
       this.showError(`Error initializing Google Maps: ${error.message}`);

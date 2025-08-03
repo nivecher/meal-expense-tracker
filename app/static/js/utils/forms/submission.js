@@ -4,6 +4,7 @@
  */
 
 import { resetFormValidation } from './validation.js';
+import { apiRequest } from './api.js';
 
 /**
  * Set loading state for a form
@@ -80,25 +81,45 @@ const handleFormSubmissionResponse = (result, form) => {
  * @param {HTMLFormElement} form - The form being submitted
  * @returns {Promise<void>}
  */
+/**
+ * Get the CSRF token from the meta tag
+ * @returns {string} The CSRF token
+ */
+/**
+ * Handle AJAX form submission
+ * @param {HTMLFormElement} form - The form being submitted
+ * @returns {Promise<void>}
+ */
 const handleAjaxFormSubmit = async (form) => {
-  const requestOptions = {
-    method: form.getAttribute('method') || 'POST',
-    body: new FormData(form),
-    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-  };
+  const formData = new FormData(form);
+  const method = (form.getAttribute('method') || 'POST').toUpperCase();
+  const url = form.getAttribute('action') || window.location.pathname;
 
   try {
     setFormLoading(form, true);
-    const response = await fetch(
-      form.getAttribute('action') || window.location.href,
-      requestOptions,
-    );
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // Convert FormData to plain object for JSON requests
+    let body = formData;
+    const contentType = form.getAttribute('enctype') || form.enctype;
+
+    if (contentType === 'application/json' || !(body instanceof FormData)) {
+      const data = {};
+      formData.forEach((value, key) => {
+        data[key] = value;
+      });
+      body = data;
     }
 
-    const result = await response.json();
+    // Use our API utility to handle the request
+    const result = await apiRequest(url, {
+      method,
+      body: method === 'GET' ? undefined : body,
+      params: method === 'GET' ? Object.fromEntries(formData.entries()) : undefined,
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
     handleFormSubmissionResponse(result, form);
   } catch (error) {
     handleFormSubmissionError(error);

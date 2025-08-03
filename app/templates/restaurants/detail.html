@@ -4,11 +4,15 @@
     {% if restaurant %}{{ restaurant.name }} -{% endif %}
     Restaurant Details - Meal Expense Tracker
 {% endblock title %}
+{% block extra_css %}
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/pages/restaurant-detail.css') }}">
+{% endblock %}
 {% block content %}
     {% if restaurant %}
-        <div class="container-fluid py-4">
+        <div class="container-fluid py-4 restaurant-detail-container">
             <!-- Header Section -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="restaurant-detail-header">
                 <div>
                     <h1 class="h3 mb-1">
                         <span id="restaurant-name">{{ restaurant.name }}</span>
@@ -32,21 +36,25 @@
                         {% endif %}
                     </div>
                 </div>
-                <div class="btn-group">
+                <div class="action-buttons">
                     {% if not is_edit %}
-                        <button type="button" class="btn btn-outline-primary" id="edit-btn">
+                        <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
+                           class="btn btn-outline-primary"
+                           id="edit-btn">
                             <i class="fas fa-edit me-1"></i>Edit
-                        </button>
+                        </a>
                     {% else %}
-                        <button type="button" class="btn btn-outline-secondary" id="cancel-edit">
+                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                           class="btn btn-outline-secondary"
+                           id="cancel-edit">
                             <i class="fas fa-times me-1"></i>Cancel
-                        </button>
+                        </a>
                         <button type="submit" form="restaurant-form" class="btn btn-primary">
                             <i class="fas fa-save me-1"></i>Save Changes
                         </button>
                     {% endif %}
                     <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
-                       class="btn btn-primary {{ 'ms-2' if is_edit else '' }}">
+                       class="btn btn-primary">
                         <i class="fas fa-plus me-1"></i>Add Expense
                     </a>
                 </div>
@@ -55,16 +63,16 @@
                   method="post"
                   action="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">
                 {{ form.hidden_tag() }}
-                <div class="row g-4">
+                <div class="restaurant-detail-main">
                     <!-- Left Column - Restaurant Details -->
-                    <div class="col-lg-4">
+                    <div class="restaurant-details">
                         <div class="card shadow-sm h-100">
-                            <div class="card-body">
+                            <div class="card-body p-3">
                                 <!-- View/Edit Mode Toggle -->
                                 <div id="view-mode" class="{{ 'd-none' if is_edit else '' }}">
                                     <!-- Basic Info -->
-                                    <div class="mb-4">
-                                        <h5 class="text-muted mb-3 border-bottom pb-2">
+                                    <div class="mb-3">
+                                        <h5 class="text-muted mb-2 border-bottom pb-2">
                                             <i class="fas fa-info-circle me-2"></i>Basic Information
                                         </h5>
                                         {% if restaurant.description %}<p class="mb-3">{{ restaurant.description }}</p>{% endif %}
@@ -220,19 +228,127 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Right Column - Expense Summary -->
+                    <div class="expense-summary">
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-white border-bottom-0">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-pie me-2 text-primary"></i>Expense Summary
+                                </h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="list-group list-group-flush">
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span>Total Spent</span>
+                                            <span class="fw-bold">${{ "%.2f"|format(expense_stats.total_amount) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span>Avg. per Visit</span>
+                                            <span class="fw-bold">${{ "%.2f"|format(expense_stats.avg_per_visit) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span>Total Visits</span>
+                                            <span class="badge bg-primary rounded-pill">{{ expense_stats.visit_count }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span>Last Visit</span>
+                                            <span class="text-muted small">{{ expense_stats.last_visit.strftime("%b %d, %Y") if expense_stats.last_visit else 'N/A' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Recent Transactions -->
+                        <div class="recent-transactions">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-receipt me-2 text-primary"></i>Recent Expenses
+                                    </h5>
+                                    <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                       class="btn btn-sm btn-outline-primary btn-sm">
+                                        <i class="fas fa-plus"></i>
+                                    </a>
+                                </div>
+                                <div class="card-body p-0">
+                                    {% if expenses %}
+                                        <div class="list-group list-group-flush">
+                                            {% for expense in expenses[:5] %}
+                                                <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+                                                   class="list-group-item list-group-item-action border-0">
+                                                    <div class="d-flex w-100 justify-content-between">
+                                                        <h6 class="mb-1">${{ "%.2f"|format(expense.amount) }}</h6>
+                                                        <small class="text-muted">{{ expense.date.strftime("%b %d") }}</small>
+                                                    </div>
+                                                    <p class="mb-1 text-muted small">{{ expense.notes|truncate(30) if expense.notes else 'No notes' }}</p>
+                                                </a>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="card-footer bg-white border-top-0 text-center">
+                                            <a href="{{ url_for('expenses.list_expenses', restaurant_id=restaurant.id) }}"
+                                               class="btn btn-sm btn-link">
+                                                View All Expenses <i class="fas fa-arrow-right ms-1"></i>
+                                            </a>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center p-4">
+                                            <div class="text-muted mb-2">
+                                                <i class="fas fa-receipt fa-2x"></i>
+                                            </div>
+                                            <p class="mb-0">No expenses yet</p>
+                                            <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                               class="btn btn-sm btn-outline-primary mt-2">
+                                                <i class="fas fa-plus me-1"></i> Add First Expense
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <!-- Right Column - Expenses -->
-                <div class="col-lg-8">
-                    <div class="card shadow-sm h-100">
-                        <div class="card-header bg-white">
+                <!-- Full-width Expense History Section -->
+                <div class="expense-history" id="expense-history">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white py-2">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">
                                     <i class="fas fa-receipt me-2 text-primary"></i>Expense History
                                 </h5>
-                                <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
-                                   class="btn btn-sm btn-primary">
-                                    <i class="fas fa-plus me-1"></i>Add Expense
-                                </a>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            type="button"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#filterExpenseModal">
+                                        <i class="fas fa-filter me-1"></i>Filter
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                            type="button"
+                                            id="expenseHistoryDropdown"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false">
+                                        <i class="fas fa-download me-1"></i>Export
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end"
+                                        aria-labelledby="expenseHistoryDropdown">
+                                        <li>
+                                            <a class="dropdown-item" href="#"><i class="fas fa-file-csv me-2"></i>CSV</a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="#"><i class="fas fa-file-excel me-2"></i>Excel</a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="#"><i class="fas fa-file-pdf me-2"></i>PDF</a>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -347,70 +463,159 @@
                         </div>
                     </div>
                 </div>
-            </form>
-        </div>
-        <!-- Delete Modals -->
-        {% for expense in expenses %}
-            <div class="modal fade"
-                 id="deleteModal{{ expense.id }}"
-                 tabindex="-1"
-                 aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Confirm Deletion</h5>
-                            <button type="button"
-                                    class="btn-close"
-                                    data-bs-dismiss="modal"
-                                    aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p>Are you sure you want to delete the expense from {{ expense.date.strftime("%b %d, %Y") }}?</p>
-                            <p class="mb-0">
-                                <strong>Amount:</strong> ${{ "%.2f"|format(expense.amount) }}
-                            </p>
-                            {% if expense.notes %}
-                                <p class="mb-0">
-                                    <strong>Notes:</strong> {{ expense.notes|truncate(50) }}
-                                </p>
-                            {% endif %}
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button"
-                                    class="btn btn-outline-secondary"
-                                    data-bs-dismiss="modal">
-                                <i class="fas fa-times me-1"></i>Cancel
-                            </button>
-                            <form action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}"
-                                  method="post"
-                                  class="d-inline">
-                                <button type="submit" class="btn btn-danger">
-                                    <i class="fas fa-trash-alt me-1"></i>Delete Expense
-                                </button>
-                            </form>
-                        </div>
+            </div>
+            <!-- Map View Section -->
+            {% if restaurant.google_place_id or (restaurant.latitude and restaurant.longitude) %}
+                <div class="map-container"
+                     id="map-container"
+                     data-google-place-id="{{ restaurant.google_place_id }}"
+                     data-lat="{{ restaurant.latitude }}"
+                     data-lng="{{ restaurant.longitude }}"
+                     data-name="{{ restaurant.name }}">
+                    <div class="text-muted">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading map...
+                    </div>
+                </div>
+            {% endif %}
+        </form>
+        <!-- Filter Expense Modal -->
+        <div class="modal fade"
+             id="filterExpenseModal"
+             tabindex="-1"
+             aria-labelledby="filterExpenseModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="filterExpenseModalLabel">Filter Expenses</h5>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="expense-filter-form">
+                            <div class="mb-3">
+                                <label for="date-range" class="form-label">Date Range</label>
+                                <select class="form-select" id="date-range">
+                                    <option value="all" selected>All Time</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">This Week</option>
+                                    <option value="month">This Month</option>
+                                    <option value="year">This Year</option>
+                                    <option value="custom">Custom Range</option>
+                                </select>
+                            </div>
+                            <div class="mb-3 d-none" id="custom-date-range">
+                                <div class="row">
+                                    <div class="col">
+                                        <label for="start-date" class="form-label">Start Date</label>
+                                        <input type="date" class="form-control" id="start-date">
+                                    </div>
+                                    <div class="col">
+                                        <label for="end-date" class="form-label">End Date</label>
+                                        <input type="date" class="form-control" id="end-date">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="min-amount" class="form-label">Minimum Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number"
+                                           class="form-control"
+                                           id="min-amount"
+                                           min="0"
+                                           step="0.01"
+                                           placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="max-amount" class="form-label">Maximum Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number"
+                                           class="form-control"
+                                           id="max-amount"
+                                           min="0"
+                                           step="0.01"
+                                           placeholder="No limit">
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="apply-filters">Apply Filters</button>
                     </div>
                 </div>
             </div>
-        {% endfor %}
-    {% else %}
-        <div class="alert alert-info" role="alert">
-            <h2 class="h4 alert-heading">Restaurant Not Found</h2>
-            <p class="mb-0">
-                The requested restaurant could not be found. It may have been removed or the link might be incorrect.
-            </p>
-            <hr>
-            <a href="{{ url_for("restaurants.list_restaurants") }}"
-               class="btn btn-primary">
-                <i class="fas fa-arrow-left me-1"></i>Back to Restaurants
-            </a>
         </div>
-    {% endif %}
+    </div>
+    <!-- Delete Modals -->
+    {% for expense in expenses %}
+        <div class="modal fade"
+             id="deleteModal{{ expense.id }}"
+             tabindex="-1"
+             aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirm Deletion</h5>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete the expense from {{ expense.date.strftime("%b %d, %Y") }}?</p>
+                        <p class="mb-0">
+                            <strong>Amount:</strong> ${{ "%.2f"|format(expense.amount) }}
+                        </p>
+                        {% if expense.notes %}
+                            <p class="mb-0">
+                                <strong>Notes:</strong> {{ expense.notes|truncate(50) }}
+                            </p>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </button>
+                        <form action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}"
+                              method="post"
+                              class="d-inline">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash-alt me-1"></i>Delete Expense
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="alert alert-info" role="alert">
+        <h2 class="h4 alert-heading">Restaurant Not Found</h2>
+        <p class="mb-0">
+            The requested restaurant could not be found. It may have been removed or the link might be incorrect.
+        </p>
+        <hr>
+        <a href="{{ url_for("restaurants.list_restaurants") }}"
+           class="btn btn-primary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Restaurants
+        </a>
+    </div>
+{% endif %}
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <script src="{{ url_for('static', filename='js/restaurant-details.js') }}"
-            defer></script>
+    <script type="module"
+            src="{{ url_for('static', filename='js/restaurant-details.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const editBtn = document.getElementById('edit-btn');

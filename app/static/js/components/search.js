@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load Google Maps API and initialize autocomplete
   if (window.GOOGLE_MAPS_API_KEY) {
     GoogleMapsLoader.loadApi(window.GOOGLE_MAPS_API_KEY, initAutocomplete, ['places'])
-      .catch(error => {
+      .catch((error) => {
         console.error('Failed to load Google Maps API:', error);
       });
   } else {

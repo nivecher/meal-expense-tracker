@@ -2,8 +2,26 @@
  * Google Places API Test Page
  *
  * This script initializes the Google Maps and Places API for the test page.
- * It fetches the API key from the backend and initializes the map and places service.
+ * It uses the API key provided in the window.GOOGLE_MAPS_API_KEY variable.
  */
+
+// Import the GooglePlacesService from the services directory
+import { googlePlacesService } from './services/google-places.js';
+import { logger } from './utils/logger.js';
+import GoogleMapsLoader from './utils/google-maps-loader.js';
+
+// Error display element
+const errorElement = document.getElementById('error-message');
+
+// Check if we have the API key
+if (!window.GOOGLE_MAPS_API_KEY) {
+  const errorMsg = 'Google Maps API key not found. Please check your configuration.';
+  console.error(errorMsg);
+  if (errorElement) {
+    errorElement.textContent = errorMsg;
+  }
+  throw new Error(errorMsg);
+}
 
 class GooglePlacesTest {
   constructor () {
@@ -26,78 +44,159 @@ class GooglePlacesTest {
   }
 
   /**
-     * Initialize the Google Maps and Places API
-     * @returns {Promise<void>}
-     */
-  async init () {
+   * Initialize the Google Maps and Places API
+   * @returns {Promise<boolean>} True if initialization was successful
+   */
+  async init() {
     try {
-      // Get the API key from our backend
-      const response = await fetch('/api/config/google-maps-key');
-      const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.error);
+      // Show loading state
+      if (errorElement) {
+        errorElement.textContent = 'Initializing Google Maps...';
+        errorElement.className = 'info-message';
       }
 
-      const { apiKey } = data;
-      if (!apiKey) {
-        throw new Error('No API key returned from server');
-      }
-
-      // Bind initializeMap to the window with proper 'this' context
-      window.initializeMap = this.initMap.bind(this);
-
-      // Check if Google Maps API is already loaded
-      if (window.google?.maps) {
-        await this.initMap();
-      } else {
-        // Load the Google Maps JavaScript API with the Places library
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&callback=initializeMap`;
-        script.async = true;
-        script.defer = true;
-        script.onerror = () => {
-          this.showError('Failed to load Google Maps API');
-        };
-
-        document.head.appendChild(script);
-      }
-    } catch (error) {
-      console.error('Error initializing Google Maps:', error);
-      this.showError(`Error initializing Google Maps: ${error.message}`);
-    }
-  }
-
-  /**
-     * Initialize the map and set up event listeners
-     * @returns {Promise<void>}
-     */
-  async initMap () {
-    try {
-      const mapElement = document.getElementById('map');
-      if (!mapElement) {
-        throw new Error('Map element not found');
-      }
+      // Initialize the Google Places Service
+      await googlePlacesService.init(window.GOOGLE_MAPS_API_KEY);
 
       // Initialize the map
-      const { Map } = await google.maps.importLibrary('maps');
-
-      this.map = new Map(mapElement, {
-        center: { lat: 40.7128, lng: -74.0060 }, // Default to NYC
-        zoom: 12,
-        mapId: 'DEMO_MAP_ID',
-      });
-
-      // Initialize info window
-      this.infoWindow = new google.maps.InfoWindow();
+      await this.initMap();
 
       // Set up event listeners
       this.setupEventListeners();
 
-      console.log('Google Maps and Places API initialized successfully');
+      // Clear any loading/error messages
+      if (errorElement) {
+        errorElement.textContent = '';
+        errorElement.className = '';
+      }
+
+      console.log('Google Places Test initialized successfully');
+      return true;
+
     } catch (error) {
-      console.error('Error initializing map:', error);
-      this.showError(`Error initializing map: ${error.message}`);
+      const errorMessage = `Error initializing Google Places Test: ${error.message}`;
+      console.error(errorMessage, error);
+
+      if (errorElement) {
+        errorElement.className = 'error-message';
+        errorElement.textContent = `Failed to initialize: ${error.message}`;
+      }
+
+      return false;
+    }
+  }
+
+  /**
+   * Try to get the user's current location using the Geolocation API
+   * @private
+   * @returns {Promise<void>}
+   */
+  async getCurrentLocation() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        logger.info('Geolocation is not supported by this browser');
+        resolve();
+        return;
+      }
+
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      };
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const pos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+
+          // Center the map on the user's location
+          if (this.map) {
+            this.map.setCenter(pos);
+            this.map.setZoom(14);
+
+            // Optionally search for nearby places
+            this.searchNearby(pos).catch(error => {
+              logger.error('Error searching nearby places:', error);
+            });
+          }
+
+          resolve();
+        },
+        (error) => {
+          const errorMessage = 'Unable to retrieve your location';
+          logger.warn(errorMessage, { error });
+          resolve(); // Resolve anyway to continue initialization
+        },
+        options
+      );
+    });
+  }
+
+  /**
+   * Initialize the map
+   * @private
+   * @returns {Promise<boolean>} True if map initialization was successful
+   */
+  async initMap() {
+    const mapElement = document.getElementById('map');
+    if (!mapElement) {
+      throw new Error('Map container element not found');
+    }
+
+    try {
+      // Default to New York if no location is set
+      const defaultLocation = { lat: 40.7128, lng: -74.0060 };
+
+      // Create a new map centered on the default location
+      this.map = new google.maps.Map(mapElement, {
+        center: defaultLocation,
+        zoom: 12,
+        mapTypeControl: true,
+        streetViewControl: true,
+        fullscreenControl: true,
+        mapTypeControlOptions: {
+          style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+          position: google.maps.ControlPosition.TOP_RIGHT
+        },
+        zoomControl: true,
+        zoomControlOptions: {
+          position: google.maps.ControlPosition.RIGHT_CENTER
+        },
+        // Add gesture handling to prevent map dragging on mobile when scrolling
+        gestureHandling: 'auto'
+      });
+
+      // Create a new Places service
+      this.placesService = new google.maps.places.PlacesService(this.map);
+
+      // Create a new info window for place details
+      // Create a new info window
+      this.infoWindow = new google.maps.InfoWindow();
+
+      // Add a click listener to close the info window when clicking the map
+      this.map.addListener('click', () => {
+        if (this.infoWindow) {
+          this.infoWindow.close();
+        }
+      });
+
+      // Try to get the user's current location
+      this.getCurrentLocation();
+
+      logger.info('Map initialized successfully');
+      return true;
+
+    } catch (error) {
+      const errorMessage = 'Failed to initialize map';
+      console.error(`${errorMessage}:`, error);
+      this.showError('Failed to initialize the map. Please try again.');
+      if (logger) {
+        logger.error(errorMessage, { error });
+      }
+      return false;
     }
   }
 
@@ -122,12 +221,14 @@ class GooglePlacesTest {
   }
 
   /**
-     * Handle search button click
-     * @returns {Promise<void>}
-     */
-  async handleSearch () {
+   * Handle search button click
+   * @returns {Promise<void>}
+   */
+  async handleSearch() {
     const locationInput = document.getElementById('location-input');
+    const keywordInput = document.getElementById('keyword-input');
     const location = locationInput?.value?.trim();
+    const keyword = keywordInput?.value?.trim();
 
     if (!location) {
       this.showError('Please enter a location');
@@ -135,151 +236,79 @@ class GooglePlacesTest {
     }
 
     try {
+      // Show loading state
+      this.showLoading(true);
+
       // Use the Geocoding API to get coordinates for the location
       const geocoder = new google.maps.Geocoder();
       const geocodeResult = await this.geocodeAddress(geocoder, location);
 
-      if (!geocodeResult) {
+      if (!geocodeResult || !geocodeResult.geometry || !geocodeResult.geometry.location) {
         this.showError('Could not find the specified location');
         return;
       }
 
-      // Center the map on the location
-      const { location: latLng, viewport } = geocodeResult.geometry;
-      this.map.setCenter(latLng);
+      // Center the map on the searched location
+      this.map.setCenter(geocodeResult.geometry.location);
+      this.map.setZoom(14);
 
-      if (viewport) {
-        this.map.fitBounds(viewport);
-      } else {
-        this.map.setZoom(14);
-      }
-
-      // Search for restaurants near the location
-      await this.searchNearby(latLng);
+      // Search for nearby restaurants
+      await this.searchNearby(geocodeResult.geometry.location, keyword);
 
     } catch (error) {
-      console.error('Error searching location:', error);
-      this.showError(`Error searching location: ${error.message}`);
+      console.error('Error handling search:', error);
+      this.showError(`Error performing search: ${error.message}`);
+    } finally {
+      // Hide loading state
+      this.showLoading(false);
     }
   }
 
   /**
-     * Geocode an address to get its coordinates
-     * @param {google.maps.Geocoder} geocoder - The Geocoder instance
-     * @param {string} address - The address to geocode
-     * @returns {Promise<google.maps.GeocoderResult>}
-     */
-  geocodeAddress (geocoder, address) {
-    return new Promise((resolve, reject) => {
-      geocoder.geocode({ address }, (results, status) => {
-        if (status === 'OK' && results?.[0]) {
-          resolve(results[0]);
-        } else {
-          reject(new Error(`Geocode was not successful: ${status}`));
-        }
-      });
-    });
-  }
-
-  /**
-     * Search for restaurants near a location
-     * @param {google.maps.LatLng} location - The location to search around
-     * @returns {Promise<Array>} - Array of nearby places
-     */
-  async searchNearby (location) {
-    this.clearMarkers();
-
+   * Search for restaurants near a location
+   * @param {Object} location - The location to search near
+   * @param {string} [keyword] - Optional keyword to search for
+   * @returns {Promise<Array>} - Array of restaurant results
+   */
+  async searchNearby(location, keyword) {
     try {
-      const { Place } = await google.maps.importLibrary('places');
+      // Clear any existing markers
+      this.clearMarkers();
 
-      // Create a search request
-      const request = {
-        query: 'restaurant',
-        location,
-        radius: 1000, // 1km radius
-        fields: [
-          'displayName',
-          'formattedAddress',
-          'location',
-          'rating',
-          'userRatingCount',
-          'priceLevel',
-          'types',
-          'photos',
-          'regularOpeningHours',
-          'businessStatus',
-          'websiteURI',
-          'nationalPhoneNumber',
-          'googleMapsURI',
-          'addressComponents',
-          'iconBackgroundColor',
-          'primaryType',
-          'utcOffsetMinutes',
-          'viewport',
-        ],
-      };
+      // Show loading state
+      this.showLoading(true);
 
-      // Use the new Place.searchByText method
-      const { places } = await Place.searchByText(request);
-
-      if (!places || places.length === 0) {
-        showError('No restaurants found in this area');
-        return [];
-      }
-
-      // Get additional details for each place
-      const placesWithDetails = await Promise.all(
-        places.map(async (place) => {
-          try {
-            // Fetch additional details
-            const response = await place.fetchFields({
-              fields: [
-                'displayName',
-                'formattedAddress',
-                'location',
-                'rating',
-                'userRatingCount',
-                'priceLevel',
-                'types',
-                'photos',
-                'regularOpeningHours',
-                'businessStatus',
-                'websiteURI',
-                'nationalPhoneNumber',
-                'googleMapsURI',
-                'addressComponents',
-                'iconBackgroundColor',
-                'primaryType',
-                'utcOffsetMinutes',
-                'viewport',
-              ],
-            });
-
-            const placeDetails = response.place || response;
-            return placeDetails;
-          } catch (error) {
-            console.error('Error fetching place details:', error);
-            return place; // Return basic place info if details fail
-          }
-        }),
+      // Use the GooglePlacesService to search for nearby restaurants
+      const { results, status } = await googlePlacesService.searchNearby(
+        {
+          lat: location.lat(),
+          lng: location.lng()
+        },
+        {
+          keyword: keyword || '',
+          radius: 5000, // 5km radius
+          maxResults: 20
+        }
       );
 
-      // Filter out any null results
-      const validPlaces = placesWithDetails.filter((place) => place);
+      if (status === 'OK' && results && results.length > 0) {
+        // Add markers for each result
+        results.forEach(place => {
+          this.createMarker(place);
+        });
 
-      // Create markers for each place
-      validPlaces.forEach((place) => {
-        createMarker(place);
-      });
+        // Display the results in the UI
+        this.displayResults(results);
 
-      // Display the results
-      displayResults(validPlaces);
-
-      return validPlaces;
+        // Return the results
+        return results;
+      } else {
+        throw new Error('No results found');
+      }
 
     } catch (error) {
       console.error('Error searching nearby:', error);
-      showError(`Error searching for restaurants: ${error.message}`);
+      this.showError(`Error searching for restaurants: ${error.message}`);
       throw error;
     }
   }
@@ -503,10 +532,21 @@ class GooglePlacesTest {
   }
 
   /**
-     * Geocode an address
-     * @param {string} address - The address to geocode
-     * @returns {Promise<google.maps.GeocoderResult>} - The geocoding result
-     */
+   * Show or hide the loading indicator
+   * @param {boolean} isLoading - Whether to show the loading indicator
+   */
+  showLoading(isLoading) {
+    const loadingElement = document.getElementById('loading-indicator');
+    if (loadingElement) {
+      loadingElement.style.display = isLoading ? 'block' : 'none';
+    }
+  }
+
+  /**
+   * Geocode an address
+   * @param {string} address - The address to geocode
+   * @returns {Promise<google.maps.GeocoderResult>} - The geocoding result
+   */
   async geocodeAddress (address) {
     try {
       const geocoder = new google.maps.Geocoder();
@@ -535,13 +575,40 @@ class GooglePlacesTest {
   }
 }
 
-// Initialize the application when the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', () => {
-  // Create a new instance of the GooglePlacesTest controller
-  const app = new GooglePlacesTest();
+// Initialize the application when the Google Maps API is ready
+window.initGooglePlacesTest = async function() {
+  try {
+    // Create a new instance of the GooglePlacesTest controller
+    const app = new GooglePlacesTest();
 
-  // Initialize the application
-  app.init().catch((error) => {
+    // Initialize the application
+    const initialized = await app.init();
+
+    if (!initialized) {
+      throw new Error('Failed to initialize Google Places Test');
+    }
+
+    // Store the app instance on the window for debugging if needed
+    window.googlePlacesTest = app;
+
+  } catch (error) {
     console.error('Failed to initialize application:', error);
+    if (errorElement) {
+      errorElement.className = 'error-message';
+      errorElement.textContent = `Failed to initialize: ${error.message}. Please check the console for details.`;
+    }
+  }
+};
+
+// Initialize the application when the DOM is fully loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.google && window.google.maps) {
+      window.initGooglePlacesTest();
+    }
   });
-});
+} else {
+  if (window.google && window.google.maps) {
+    window.initGooglePlacesTest();
+  }
+}

@@ -5,7 +5,11 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 data "aws_ssm_parameter" "google_maps_api_key" {
-  name = "/${var.app_name}/${var.environment}/google/maps-api-key"
+  name = "/${var.app_name}/${var.environment}/google/maps/api-key"
+}
+
+data "aws_ssm_parameter" "google_maps_map_id" {
+  name = "/${var.app_name}/${var.environment}/google/maps/map-id"
 }
 
 # Note: DB_URL will be constructed at runtime in the Lambda function using the secret
@@ -252,6 +256,7 @@ resource "aws_lambda_function" "main" {
 
       # Google API keys: pass actual values in non-prod, SSM paths in prod
       GOOGLE_MAPS_API_KEY = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_api_key.value : "ssm:${data.aws_ssm_parameter.google_maps_api_key.name}"
+      GOOGLE_MAPS_MAP_ID = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_map_id.value : "ssm:${data.aws_ssm_parameter.google_maps_map_id.name}"
 
       # Database URL: construct in non-prod, use secret in prod
       DATABASE_URL = var.environment != "prod" ? "postgresql+psycopg2://${var.db_username}:${var.db_password}@${var.db_host}:${var.db_port}/${var.db_name}" : null

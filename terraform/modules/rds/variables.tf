@@ -20,6 +20,12 @@ variable "db_subnet_group_name" {
   type        = string
 }
 
+variable "db_performance_insights_enabled" {
+  description = "Enable performance insights for the RDS instance"
+  type        = bool
+  default     = false # free tier eligible
+}
+
 # Network Configuration
 variable "vpc_cidr" {
   description = "The CIDR block of the VPC"

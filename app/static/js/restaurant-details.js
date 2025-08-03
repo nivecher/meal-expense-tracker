@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 /**
  * Initialize Bootstrap tooltips
  */
-function initializeTooltips () {
+function initializeTooltips() {
   const tooltipTriggerList = [].slice.call(
     document.querySelectorAll('[data-bs-toggle="tooltip"]'),
   );
@@ -32,7 +32,7 @@ function initializeTooltips () {
 /**
  * Initialize map if container exists
  */
-function initializeMap () {
+function initializeMap() {
   const mapContainer = document.getElementById('map-container');
   if (!mapContainer) return;
 
@@ -52,32 +52,36 @@ function initializeMap () {
       try {
         const location = { lat, lng };
 
-        // Create a new map centered at the restaurant location
-        map = new google.maps.Map(mapContainer, {
+        const mapOptions = {
           zoom: 15,
           center: location,
           mapTypeId: 'roadmap',
-          styles: [
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }]
-            }
-          ]
-        });
+          ...(window.GOOGLE_MAPS_MAP_ID && { mapId: window.GOOGLE_MAPS_MAP_ID }),
+          ...(!window.GOOGLE_MAPS_MAP_ID && {
+            styles: [
+              {
+                featureType: 'poi',
+                elementType: 'labels',
+                stylers: [{ visibility: 'off' }],
+              },
+            ]
+          })
+        };
 
-        // Add a marker for the restaurant
-        new google.maps.Marker({
+        // Create a new map centered at the restaurant location
+        map = new google.maps.Map(mapContainer, mapOptions);
+
+        // Add a marker for the restaurant using AdvancedMarkerElement
+        new google.maps.marker.AdvancedMarkerElement({
           position: location,
-          map: map,
+          map,
           title: name,
-          animation: google.maps.Animation.DROP
         });
       } catch (error) {
         console.error('Error initializing Google Maps:', error);
         showMapPlaceholder(mapContainer, 'Error loading map');
       }
-    }, ['maps']).catch(error => {
+    }, ['maps']).catch((error) => {
       console.error('Failed to load Google Maps API:', error);
       showMapPlaceholder(mapContainer, 'Failed to load map');
     });
@@ -108,7 +112,7 @@ function showMapPlaceholder(container, message) {
 /**
  * Set up the edit mode toggle functionality
  */
-function setupEditModeToggle () {
+function setupEditModeToggle() {
   const editToggle = document.getElementById('edit-toggle');
   const viewMode = document.getElementById('view-mode');
   const editForm = document.getElementById('edit-form');
@@ -139,7 +143,7 @@ function setupEditModeToggle () {
  * @param {number} amount - The amount to format
  * @returns {string} Formatted currency string
  */
-function formatCurrency (amount) {
+function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -153,7 +157,7 @@ function formatCurrency (amount) {
  * @param {string} dateString - ISO date string
  * @returns {string} Formatted date string
  */
-function formatDate (dateString) {
+function formatDate(dateString) {
   const options = { year: 'numeric', month: 'short', day: 'numeric' };
   return new Date(dateString).toLocaleDateString(undefined, options);
 }

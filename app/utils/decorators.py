@@ -5,8 +5,9 @@ from functools import wraps
 from typing import Any, Callable, TypeVar, cast
 
 # Third-party imports
-from flask import flash, jsonify, redirect, request, url_for
+from flask import current_app, flash, jsonify, redirect, request, url_for
 from flask.typing import ResponseReturnValue
+from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 
 # Type variable for function type
@@ -30,8 +31,6 @@ def db_transaction(
     def decorator(func: F) -> F:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> ResponseReturnValue:
-            from flask import current_app
-
             from app.extensions import db
 
             try:
@@ -59,3 +58,35 @@ def db_transaction(
         return cast(F, wrapper)
 
     return decorator
+
+
+def admin_required(func: F) -> F:
+    """Decorator to ensure the current user is an admin.
+
+    This decorator should be used after the @login_required decorator.
+    """
+
+    @wraps(func)
+    def decorated_view(*args: Any, **kwargs: Any) -> ResponseReturnValue:
+        if not current_user.is_admin:
+            flash("You do not have permission to access this page.", "danger")
+            return redirect(url_for("main.index"))
+        return func(*args, **kwargs)
+
+    return cast(F, decorated_view)
+
+
+def confirm_required(func: F) -> F:
+    """Decorator to ensure the current user has confirmed their email.
+
+    This decorator should be used after the @login_required decorator.
+    """
+
+    @wraps(func)
+    def decorated_view(*args: Any, **kwargs: Any) -> ResponseReturnValue:
+        if not current_user.confirmed:
+            flash("Please confirm your account to access this page.", "warning")
+            return redirect(url_for("auth.unconfirmed"))
+        return func(*args, **kwargs)
+
+    return cast(F, decorated_view)

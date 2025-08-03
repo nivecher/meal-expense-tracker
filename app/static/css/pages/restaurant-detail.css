@@ -1,0 +1,291 @@
+/* ==========================================================================
+   Restaurant Detail Page
+   ========================================================================== */
+
+/**
+ * Base container and layout
+ */
+.restaurant-detail-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.restaurant-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+}
+
+.restaurant-detail-main {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+/**
+ * Left column - Restaurant details
+ */
+.restaurant-details {
+    background: var(--card-bg);
+    border-radius: var(--card-border-radius);
+    box-shadow: var(--card-shadow);
+    padding: 1.5rem;
+    height: 100%;
+    overflow: hidden;
+}
+
+/**
+ * Right column - Expense summary and recent transactions
+ */
+.expense-summary {
+    position: sticky;
+    top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+}
+
+/**
+ * Card components
+ */
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--card-border-radius);
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    padding: 1rem 1.25rem;
+    font-weight: 600;
+    color: var(--heading-color);
+    background-color: var(--card-header-bg, #fff);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+.card-footer {
+    background-color: transparent;
+    border-top: 1px solid var(--border-color);
+    padding: 1rem 1.25rem;
+}
+
+/**
+ * List group styles
+ */
+.list-group {
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.list-group-item {
+    padding: 0.75rem 1.25rem;
+    border: 1px solid var(--border-color);
+    border-width: 0 0 1px 0;
+    background-color: var(--card-bg);
+    transition: background-color 0.15s ease;
+}
+
+.list-group-item:first-child {
+    border-top-width: 0;
+}
+
+.list-group-item:last-child {
+    border-bottom-width: 0;
+}
+
+.list-group-item-action {
+    color: var(--text-color);
+    text-decoration: none;
+}
+
+.list-group-item-action:hover,
+.list-group-item-action:focus {
+    background-color: var(--gray-50);
+    color: var(--primary);
+    z-index: 1;
+}
+
+/**
+ * Summary statistics
+ */
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: var(--gray-50);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    text-align: center;
+    border-left: 4px solid var(--primary);
+}
+
+.stat-card h5 {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin: 0 0 0.5rem;
+}
+
+.stat-card .stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--heading-color);
+    line-height: 1.2;
+}
+
+/**
+ * Recent transactions
+ */
+.recent-transactions .transaction-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.recent-transactions .transaction-item:last-child {
+    border-bottom: none;
+}
+
+.recent-transactions .transaction-amount {
+    font-weight: 600;
+    color: var(--heading-color);
+}
+
+.recent-transactions .transaction-date {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+.recent-transactions .transaction-notes {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/**
+ * Map container
+ */
+.map-container {
+    height: 300px;
+    background: var(--gray-100);
+    border-radius: var(--border-radius);
+    margin: 1.5rem 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.map-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    padding: 1.5rem;
+    text-align: center;
+}
+
+/**
+ * Action buttons
+ */
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+/**
+ * Loading state
+ */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1.5rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.loading-state .spinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+}
+
+/**
+ * Responsive adjustments
+ */
+@media (max-width: 991.98px) {
+    .restaurant-detail-main {
+        grid-template-columns: 1fr;
+    }
+
+    .expense-summary {
+        position: static;
+        max-height: none;
+    }
+
+    .summary-stats {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 767.98px) {
+    .summary-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .action-buttons {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .action-buttons .btn {
+        width: 100%;
+    }
+}
+
+/**
+ * Animations
+ */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+}

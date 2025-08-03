@@ -1,3 +1,5 @@
+import { get, post } from '../utils/api.js';
+
 (() => {
   'use strict';
 
@@ -25,8 +27,6 @@
   const zoomOutBtn = document.getElementById('zoomOut');
   const resultsContainer = document.getElementById('search-results');
   const resultsCount = document.getElementById('results-count');
-
-  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
   const DEFAULT_ZOOM = 15;
   const MIN_ZOOM = 2;
@@ -110,35 +110,28 @@
     return { distance: distanceInKm.toFixed(2), unit: 'km' };
   };
 
+  /**
+   * Add a restaurant to the user's list
+   * @param {string} placeId - The Google Places ID of the restaurant
+   * @returns {Promise<Object>} The added restaurant data
+   */
   const addRestaurant = async (placeId) => {
     if (!placeId) {
       updateStatus('Error: Missing place ID', 'danger');
-      return;
+      throw new Error('Missing place ID');
     }
 
     updateStatus('Adding restaurant to your list...', 'info');
 
     try {
-      const response = await fetch('/restaurants/api/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': csrfToken,
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ place_id: placeId }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        updateStatus('Restaurant added successfully!', 'success');
-      } else {
-        throw new Error(data.error || 'Failed to add restaurant');
-      }
+      const result = await post('/restaurants/api/add', { place_id: placeId });
+      updateStatus('Restaurant added successfully!', 'success');
+      return result;
     } catch (error) {
       console.error('Error adding restaurant:', error);
-      updateStatus(error.message || 'Failed to add restaurant. Please try again.', 'danger');
+      const errorMessage = error.message || 'Failed to add restaurant. Please try again.';
+      updateStatus(errorMessage, 'danger');
+      throw error;
     }
   };
 
@@ -400,9 +393,13 @@
     }
   };
 
+  /**
+   * Search for nearby restaurants based on user's location and search criteria
+   * @returns {Promise<void>}
+   */
   const searchNearbyRestaurants = async () => {
     if (!userPosition) {
-      updateStatus('Could not search for restaurants without your location.', 'warning');
+      updateStatus('Please allow location access to search for nearby restaurants.', 'warning');
       return;
     }
 
@@ -412,11 +409,13 @@
 
     if (currentRequest) {
       currentRequest.abort();
+      currentRequest = null;
     }
 
     updateSearchArea(userPosition, radiusInMeters);
     updateStatus('Searching for nearby restaurants...', 'info');
 
+    // Show loading state
     if (resultsContainer) {
       resultsContainer.innerHTML = `
         <div class="search-loading">
@@ -427,39 +426,31 @@
         </div>`;
     }
 
+    // Set up abort controller for the request
     const controller = new AbortController();
-    const { signal } = controller;
     currentRequest = controller;
 
     try {
-      const params = new URLSearchParams({
+      // Prepare search parameters
+      const params = {
         lat: userPosition.lat,
         lng: userPosition.lng,
         radius: radiusInMeters,
-      });
+      };
 
       if (keyword) {
-        params.append('keyword', encodeURIComponent(keyword));
+        params.keyword = keyword;
       }
 
-      const response = await fetch(`/api/places/search?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': csrfToken,
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        signal,
+      // Use our API utility to make the request
+      const data = await get('/api/places/search', params, {
+        signal: controller.signal,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      // Display the search results
       displaySearchResults(data.results || [], userPosition);
 
+      // Update status and result count
       const resultCount = data.results ? data.results.length : 0;
       updateStatus(`Found ${resultCount} restaurant${resultCount !== 1 ? 's' : ''}`, 'success');
 
@@ -467,23 +458,33 @@
         resultsCount.textContent = resultCount;
       }
     } catch (error) {
+      // Handle aborted requests
       if (error.name === 'AbortError') {
-        console.log('Request was aborted');
+        console.log('Search was cancelled');
         return;
       }
 
       console.error('Error searching for restaurants:', error);
-      updateStatus(`Error: ${error.message}`, 'danger');
 
+      // Show user-friendly error message
+      const errorMessage = error.message || 'An error occurred while searching for restaurants.';
+      updateStatus(`Error: ${errorMessage}`, 'danger');
+
+      // Update UI with error state
       if (resultsContainer) {
         resultsContainer.innerHTML = `
-            <div class="alert alert-danger m-3">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                Failed to load restaurants. ${error.message || 'Please try again.'}
-            </div>`;
+          <div class="alert alert-danger m-3">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Failed to load restaurants. ${errorMessage}
+          </div>`;
       }
     } finally {
-      currentRequest = null;
+      // Clean up
+      if (currentRequest === controller) {
+        currentRequest = null;
+      }
+
+      // Trigger map load event if available
       if (map) {
         map.fire('load');
       }

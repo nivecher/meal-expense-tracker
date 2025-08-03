@@ -192,15 +192,38 @@ package_layer() {
 
   # Install psycopg2-binary with platform-specific wheel
   if grep -q "psycopg2-binary" requirements.txt; then
-    echo -e "${GREEN}[*] Installing psycopg2-binary with platform-specific wheel...${NC}"
-    pip install --platform manylinux2014_x86_64 \
+    PSYCOPG2_VERSION=$(grep 'psycopg2-binary' requirements.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+
+    echo "Installing psycopg2-binary ${PSYCOPG2_VERSION} for Python ${PYTHON_VERSION}"
+
+    # Remove any existing psycopg2 installations to avoid conflicts
+    rm -rf "${package_dir}/psycopg2"*
+    rm -rf "${package_dir}/psycopg2_binary"*
+
+    # Install with explicit platform for Lambda compatibility
+    pip install --platform manylinux2014_aarch64 \
       --implementation cp \
       --python-version "${PYTHON_VERSION}" \
       --only-binary=:all: \
       --target "${package_dir}" \
       --no-cache-dir \
       --upgrade \
-      "psycopg2-binary==$(grep 'psycopg2-binary' requirements.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+      "psycopg2-binary==${PSYCOPG2_VERSION}" ||
+      {
+        echo "Failed to install psycopg2-binary with platform wheel, falling back to direct installation"
+        pip install --target "${package_dir}" \
+          --no-cache-dir \
+          --upgrade \
+          "psycopg2-binary==${PSYCOPG2_VERSION}"
+      }
+
+    # Verify the installation
+    if [ -d "${package_dir}/psycopg2" ]; then
+      echo "Successfully installed psycopg2-binary ${PSYCOPG2_VERSION}"
+    else
+      echo "Error: Failed to install psycopg2-binary"
+      exit 1
+    fi
   fi
 
   # Deactivate and remove the virtual environment

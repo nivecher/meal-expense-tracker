@@ -36,11 +36,11 @@ def test_operation(operation, **kwargs):
     # Parse and display the result
     try:
         body = json.loads(result["body"])
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"Operation: {operation}")
         print(f"Status Code: {result['statusCode']}")
         print(f"Response: {json.dumps(body, indent=2)}")
-        print(f"{'='*50}\n")
+        print(f"{'=' * 50}\n")
         return body.get("status") == "success"
     except Exception as e:
         print(f"Error processing result: {e}")

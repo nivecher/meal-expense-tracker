@@ -1,7 +1,7 @@
 # DynamoDB table for Flask session storage
 resource "aws_dynamodb_table" "sessions" {
   name         = var.table_name
-  billing_mode = "PAY_PER_REQUEST"
+  billing_mode = "PROVISIONED"
   hash_key     = "id"
   range_key    = "expires"
 

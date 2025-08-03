@@ -2,6 +2,7 @@ from flask_wtf import FlaskForm
 from wtforms import (
     BooleanField,
     DecimalField,
+    FileField,
     SelectField,
     StringField,
     SubmitField,
@@ -72,3 +73,50 @@ class RestaurantForm(FlaskForm):
 
     # Form submission
     submit = SubmitField("Save Restaurant")
+
+
+class RestaurantSearchForm(FlaskForm):
+    """Form for searching restaurants."""
+
+    query = StringField("Search", validators=[Optional(), Length(max=100)])
+    location = StringField("Location", validators=[Optional(), Length(max=100)])
+    cuisine = StringField("Cuisine", validators=[Optional(), Length(max=50)])
+    price_range = SelectField(
+        "Price Range",
+        choices=[
+            ("", "Any"),
+            ("$", "$"),
+            ("$$", "$$"),
+            ("$$$", "$$$"),
+            ("$$$$", "$$$$"),
+        ],
+        validators=[Optional()],
+    )
+    min_rating = SelectField(
+        "Minimum Rating",
+        choices=[
+            ("", "Any"),
+            ("1", "1+ Stars"),
+            ("2", "2+ Stars"),
+            ("3", "3+ Stars"),
+            ("4", "4+ Stars"),
+        ],
+        validators=[Optional()],
+    )
+    submit = SubmitField("Search")
+
+
+class RestaurantImportForm(FlaskForm):
+    """Form for importing restaurants from external sources."""
+
+    file = FileField("CSV/JSON File", validators=[DataRequired()])
+    source = SelectField(
+        "Source",
+        choices=[
+            ("google", "Google Places"),
+            ("yelp", "Yelp"),
+            ("manual", "Manual CSV"),
+        ],
+        validators=[DataRequired()],
+    )
+    submit = SubmitField("Import")

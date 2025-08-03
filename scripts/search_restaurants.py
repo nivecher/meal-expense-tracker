@@ -28,6 +28,60 @@ DEFAULT_RADIUS = 5000  # 5km in meters
 DEFAULT_MAX_RESULTS = 10
 
 
+def _make_places_api_request(params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Make a request to the Google Places API.
+
+    Args:
+        params: Query parameters for the API request
+
+    Returns:
+        Parsed JSON response or None if request fails
+    """
+    try:
+        url = f"{PLACES_API_BASE_URL}?{urlencode(params)}"
+        response = urlopen(Request(url, headers={"User-Agent": "Mozilla/5.0"}))
+        return json.loads(response.read().decode())
+    except HTTPError as e:
+        print(f"HTTP Error: {e.code} - {e.reason}")
+    except Exception as e:
+        print(f"Error making API request: {str(e)}")
+    return None
+
+
+def _process_places_response(
+    data: Dict[str, Any], all_results: List[Dict[str, Any]], max_results: int
+) -> Optional[str]:
+    """Process the API response and update results.
+
+    Args:
+        data: API response data
+        all_results: List to store processed results
+        max_results: Maximum number of results to collect
+
+    Returns:
+        Next page token if available, None otherwise
+    """
+    if data.get("status") != "OK":
+        print(f"Error from Google Places API: {data.get('status', 'Unknown error')}")
+        if data.get("status") == "OVER_QUERY_LIMIT":
+            print("You may have exceeded your API quota.")
+        return None
+
+    for place in data.get("results", []):
+        if place_id := place.get("place_id"):
+            if place_details := get_place_details(place_id):
+                all_results.append(place_details)
+                if len(all_results) >= max_results:
+                    return None
+
+    return data.get("next_page_token")
+
+
+def _get_next_page_params(next_page_token: str) -> Dict[str, str]:
+    """Get parameters for the next page request."""
+    return {"pagetoken": next_page_token, "key": GOOGLE_MAPS_API_KEY}
+
+
 def get_nearby_places(
     location: str,
     radius: int = DEFAULT_RADIUS,
@@ -72,35 +126,15 @@ def get_nearby_places(
 
     try:
         while len(all_results) < max_results:
-            if next_page_token:
-                params["pagetoken"] = next_page_token
-                # Must be a new request with no other parameters except key and pagetoken
-                current_params = {"pagetoken": next_page_token, "key": GOOGLE_MAPS_API_KEY}
-                next_page_token = None
-            else:
-                current_params = params
+            current_params = _get_next_page_params(next_page_token) if next_page_token else params
+            data = _make_places_api_request(current_params)
 
-            url = f"{PLACES_API_BASE_URL}?{urlencode(current_params)}"
-            response = urlopen(Request(url, headers={"User-Agent": "Mozilla/5.0"}))
-            data = json.loads(response.read().decode())
-
-            if data.get("status") != "OK":
-                print(f"Error from Google Places API: {data.get('status', 'Unknown error')}")
-                if data.get("status") == "OVER_QUERY_LIMIT":
-                    print("You may have exceeded your API quota.")
+            if not data:
                 break
 
-            for place in data.get("results", []):
-                place_id = place.get("place_id")
-                if place_id:
-                    place_details = get_place_details(place_id)
-                    if place_details:
-                        all_results.append(place_details)
-                        if len(all_results) >= max_results:
-                            break
+            next_page_token = _process_places_response(data, all_results, max_results)
 
-            next_page_token = data.get("next_page_token")
-            if not next_page_token:
+            if not next_page_token or len(all_results) >= max_results:
                 break
 
             # Wait before making the next request (required by Google's API)
@@ -108,10 +142,8 @@ def get_nearby_places(
 
             time.sleep(2)
 
-    except HTTPError as e:
-        print(f"HTTP Error: {e.code} - {e.reason}")
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Unexpected error: {str(e)}")
 
     return all_results[:max_results]
 
@@ -170,7 +202,7 @@ def format_restaurant(restaurant: Dict[str, Any]) -> str:
         opening_hours = restaurant["opening_hours"]["weekday_text"]
 
     result = [
-        f"\n{'='*80}",
+        f"\n{'=' * 80}",
         f"Name: {name}",
         f"Address: {address}",
         f"Phone: {phone}",

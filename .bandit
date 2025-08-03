@@ -1,0 +1,14 @@
+# Bandit configuration file
+# See: https://bandit.readthedocs.io/en/latest/config.html
+
+# Target directory to scan
+targets: .
+
+# Recursively scan directories
+recursive: true
+
+# Skip these tests
+skips:
+  - B404  # import_subprocess - subprocess module is needed for secret rotation
+  - B603  # subprocess_without_shell_equals_true - shell=False is used
+  - B105  # hardcoded_password_string - These are just user messages, not actual passwords

@@ -126,7 +126,7 @@ export class RestaurantSearch {
     // Default to a central location if geolocation fails
     const defaultLocation = {
       lat: 40.7128, // Default to New York City
-      lng: -74.0060
+      lng: -74.0060,
     };
 
     // If we already have a location, use it
@@ -160,8 +160,8 @@ export class RestaurantSearch {
       const position = await Promise.race([
         getPosition(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Location request timed out')), 10000)
-        )
+          setTimeout(() => reject(new Error('Location request timed out')), 10000),
+        ),
       ]);
 
       this.currentLocation = {
@@ -177,11 +177,11 @@ export class RestaurantSearch {
       // Provide appropriate error message
       let errorMessage = 'Using default location. You can still search manually.';
       if (error.code === error.PERMISSION_DENIED) {
-        errorMessage = 'Location access was denied. ' + errorMessage;
+        errorMessage = `Location access was denied. ${errorMessage}`;
       } else if (error.code === error.TIMEOUT) {
-        errorMessage = 'Location request timed out. ' + errorMessage;
+        errorMessage = `Location request timed out. ${errorMessage}`;
       } else if (error.code === error.POSITION_UNAVAILABLE) {
-        errorMessage = 'Location information is unavailable. ' + errorMessage;
+        errorMessage = `Location information is unavailable. ${errorMessage}`;
       }
 
       this.onError(errorMessage);
@@ -197,10 +197,9 @@ export class RestaurantSearch {
     if (this.isLoading) return;
 
     // Get search input values
-    const searchInput = this.container.querySelector('.search-input');
+    const searchInput = this.elements.searchInput;
     const query = searchInput ? searchInput.value.trim() : '';
-    const radiusSelect = this.container.querySelector('.radius-select');
-    const radius = radiusSelect ? parseInt(radiusSelect.value, 10) : 5000; // Default to 5km
+    const radius = this.elements.radiusSlider ? parseInt(this.elements.radiusSlider.value, 10) : 5000; // Default to 5km
 
     // If we don't have a location yet, try to get it
     if (!this.currentLocation) {
@@ -211,7 +210,7 @@ export class RestaurantSearch {
         if (!this.currentLocation) {
           this.currentLocation = {
             lat: 40.7128,
-            lng: -74.0060
+            lng: -74.0060,
           };
         }
       } catch (error) {
@@ -234,17 +233,35 @@ export class RestaurantSearch {
         await googlePlacesService.init();
       }
 
-      console.log('Searching with location:', this.currentLocation);
+      console.log('Searching with query:', query || '(no query, using location)');
+      console.log('Current location:', this.currentLocation);
+
       try {
-        console.log('Searching for restaurants...');
-        const response = await googlePlacesService.searchNearby(
-          this.currentLocation,
-          {
-            keyword: query || 'restaurant',
-            radius: radius,
-            maxResults: 20,
-          }
-        );
+        let response;
+
+        if (query) {
+          // Text-based search with location bias
+          console.log('Performing text-based search with location bias...');
+          response = await googlePlacesService.searchNearby(
+            this.currentLocation,
+            {
+              keyword: query,
+              radius: 50000, // Wider radius for text search
+              maxResults: 20,
+            }
+          );
+        } else {
+          // Location-based search (no query)
+          console.log('Performing location-based search...');
+          response = await googlePlacesService.searchNearby(
+            this.currentLocation,
+            {
+              keyword: 'restaurant',
+              radius: radius,
+              maxResults: 20,
+            }
+          );
+        }
 
         console.log('Search response:', response);
 
@@ -256,7 +273,7 @@ export class RestaurantSearch {
           return;
         }
 
-        const results = response.results;
+        const { results } = response;
 
         if (results.length === 0) {
           console.log('No restaurants found for the given criteria');
@@ -288,7 +305,7 @@ export class RestaurantSearch {
    */
   displayResults (results) {
     console.log('Displaying results:', results);
-    const resultsContainer = this.elements.resultsContainer;
+    const { resultsContainer } = this.elements;
 
     // Clear previous results and errors
     resultsContainer.innerHTML = '';
@@ -333,82 +350,86 @@ export class RestaurantSearch {
         // Create restaurant card
         const col = document.createElement('div');
         col.className = 'col-md-6 col-lg-4 mb-4';
-        col.dataset.placeId = placeId;
 
-        // Create card HTML
-        col.innerHTML = `
-          <div class="card h-100 restaurant-card">
-            ${photoUrl ? `
-              <img src="${photoUrl}"
-                   class="card-img-top"
-                   alt="${name}"
-                   style="height: 200px; object-fit: cover;">
-            ` : `
-              <div class="card-img-top bg-light d-flex align-items-center justify-content-center"
-                   style="height: 200px;">
-                <i class="fas fa-utensils fa-4x text-muted"></i>
-              </div>
-            `}
+        // Create card element
+        const card = document.createElement('div');
+        card.className = 'card h-100 restaurant-card';
+        card.setAttribute('data-place-id', placeId);
 
-            <div class="card-body d-flex flex-column">
-              <h5 class="card-title">${name}</h5>
-
-              ${rating !== 'N/A' ? `
-                <div class="d-flex align-items-center mb-2">
-                  <div class="text-warning me-2">
-                    ${this.renderRating(rating)}
-                  </div>
-                  <span class="text-muted small">
-                    (${userRatingsTotal} ${userRatingsTotal === 1 ? 'review' : 'reviews'})
-                  </span>
-                </div>
-              ` : ''}
-
-              ${priceLevel > 0 ? `
-                <div class="mb-2">
-                  <span class="badge bg-light text-dark">${'$'.repeat(priceLevel)}</span>
-                </div>
-              ` : ''}
-
-              <p class="card-text text-muted small flex-grow-1">
-                <i class="fas fa-map-marker-alt me-1"></i> ${address}
-              </p>
-
-              <button class="btn btn-primary btn-sm mt-2 select-restaurant"
-                      data-place-id="${placeId}">
-                <i class="fas fa-plus me-1"></i> Add to List
-              </button>
+        // Build card content
+        const cardContent = `
+          ${photoUrl ? `
+            <img src="${photoUrl}"
+                 class="card-img-top"
+                 alt="${name}"
+                 style="height: 200px; object-fit: cover;">
+          ` : `
+            <div class="card-img-top bg-light d-flex align-items-center justify-content-center"
+                 style="height: 200px;">
+              <i class="fas fa-utensils fa-4x text-muted"></i>
             </div>
+          `}
+
+          <div class="card-body d-flex flex-column">
+            <h5 class="card-title">${name}</h5>
+
+            ${rating !== 'N/A' ? `
+              <div class="d-flex align-items-center mb-2">
+                <div class="text-warning me-2">
+                  ${this.renderRating(rating)}
+                </div>
+                <span class="text-muted small">
+                  (${userRatingsTotal} ${userRatingsTotal === 1 ? 'review' : 'reviews'})
+                </span>
+              </div>
+            ` : ''}
+
+            ${priceLevel > 0 ? `
+              <div class="mb-2">
+                <span class="badge bg-light text-dark">${'$'.repeat(priceLevel)}</span>
+              </div>
+            ` : ''}
+
+            <p class="card-text text-muted small flex-grow-1">
+              <i class="fas fa-map-marker-alt me-1"></i> ${address}
+            </p>
+
+            <button class="btn btn-primary btn-sm mt-2 add-restaurant-btn"
+                    data-place-id="${placeId}">
+              <i class="fas fa-plus me-1"></i> Add to List
+            </button>
           </div>
         `;
 
-        // Add click handler for the select button
-        const selectButton = col.querySelector('.select-restaurant');
-        if (selectButton) {
-          selectButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.onSelect(restaurant);
+        // Set the card content and append to column
+        card.innerHTML = cardContent;
+        col.appendChild(card);
+
+        // Add click handler for the add restaurant button
+        const addButton = card.querySelector('.add-restaurant-btn');
+        if (addButton) {
+          addButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.selectRestaurant(placeId);
           });
         }
 
+        // Add click handler for the entire card
+        card.addEventListener('click', (e) => {
+          // Don't trigger if the click was on a button or link
+          if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A' || e.target.closest('button, a')) {
+            return;
+          }
+          // Trigger the restaurant selection
+          this.selectRestaurant(placeId);
+        });
+
         // Add column to row
         row.appendChild(col);
-      });
+      }); // End of forEach
 
       // Add row to results container
       resultsContainer.appendChild(row);
-
-      // Add event listeners to the select buttons
-      resultsContainer.querySelectorAll('.select-restaurant').forEach(button => {
-        button.addEventListener('click', (e) => {
-          e.preventDefault();
-          const placeId = e.currentTarget.dataset.placeId;
-          const restaurant = results.find(r => (r.place_id || r.id) === placeId);
-          if (restaurant && typeof this.onSelect === 'function') {
-            this.onSelect(restaurant);
-          }
-        });
-      });
 
     } catch (error) {
       console.error('Error displaying results:', error);
@@ -425,7 +446,7 @@ export class RestaurantSearch {
    * @param {Object} restaurant - Restaurant object from Google Places API
    * @returns {string} Formatted address string
    */
-  formatAddress(restaurant) {
+  formatAddress (restaurant) {
     if (!restaurant) return 'Address not available';
 
     // Use formatted address if available
@@ -435,7 +456,7 @@ export class RestaurantSearch {
     // Try to construct address from components if available
     if (restaurant.address_components) {
       return restaurant.address_components
-        .map(component => component.long_name)
+        .map((component) => component.long_name)
         .join(', ');
     }
 
@@ -451,7 +472,7 @@ export class RestaurantSearch {
    * @param {Object} restaurant - Restaurant object from Google Places API
    * @returns {string|null} Photo URL or null if not available
    */
-  getPhotoUrl(restaurant) {
+  getPhotoUrl (restaurant) {
     if (!restaurant || !restaurant.photos || restaurant.photos.length === 0) {
       return null;
     }
@@ -538,7 +559,7 @@ export class RestaurantSearch {
    * @param {Array<Object>} results - Array of restaurant objects from Google Places API
    */
   displayResults (results) {
-    const resultsContainer = this.elements.resultsContainer;
+    const { resultsContainer } = this.elements;
 
     // Clear previous results
     resultsContainer.innerHTML = '';
@@ -561,7 +582,7 @@ export class RestaurantSearch {
       row.className = 'row g-3';
 
       // Add each restaurant card to the row
-      results.forEach(restaurant => {
+      results.forEach((restaurant) => {
         if (restaurant) {
           row.insertAdjacentHTML('beforeend', this.renderRestaurantCard(restaurant));
         }
@@ -571,11 +592,11 @@ export class RestaurantSearch {
       resultsContainer.appendChild(row);
 
       // Add event listeners to the select buttons
-      resultsContainer.querySelectorAll('.select-restaurant').forEach(button => {
+      resultsContainer.querySelectorAll('.select-restaurant').forEach((button) => {
         button.addEventListener('click', (e) => {
           e.preventDefault();
-          const restaurantId = e.currentTarget.dataset.restaurantId;
-          const restaurant = results.find(r => (r.place_id || r.id) === restaurantId);
+          const { restaurantId } = e.currentTarget.dataset;
+          const restaurant = results.find((r) => (r.place_id || r.id) === restaurantId);
           if (restaurant) {
             this.onSelect(restaurant);
           }

@@ -17,6 +17,7 @@ exclude =
     */dist,
     */*.egg-info,
     */migrations,
+    node_modules,
     # Exclude the virtual environment
     venv/*,
     # But include our scripts and terraform directories
@@ -29,9 +30,8 @@ exclude =
 # E501: Line too long (handled by Black)
 # F401: Module imported but unused (allow for __init__.py and type checking)
 # F403: 'from module import *' used; unable to detect undefined names
-# F405: Name may be undefined, or defined from star imports: module
+# F405: Name may be undefined, or defined from star imports
 # F811: Redefinition of unused name
-# E266: Too many leading '#' for block comment (allow for section headers)
 # W504: Line break after binary operator (conflicts with Black)
 # W292: No newline at end of file (handled by pre-commit)
 # E402: Module level import not at top of file (false positives with isort)
@@ -43,29 +43,35 @@ exclude =
 # E743: Ambiguous function definition
 # E999: SyntaxError (handled by Python itself)
 # I100: Import statements are in the wrong order
+# I101: Imported names are in the wrong order
 # I201: Missing newline before sections or imports
+# I202: Additional newline in a group of imports
 
 ignore =
-    E203,
-    E266,
-    W503,
-    E501,
-    F401,
-    F403,
-    F405,
-    F811,
-    W504,
-    W292,
-    E402,
-    E712,
-    E721,
-    E722,
-    E741,
-    E742,
-    E743,
-    E999,
-    I100,
-    I201
+    # Basic flake8 errors
+    E203, E266, W503, E501, F401, F403, F405, F811, W504, W292,
+    E402, E712, E721, E722, E741, E742, E743, E999, I100, I101,
+    I201, I202, D100, D101, D102, D103, D104, D105, D107, D200,
+    D202, D205, D400, D401, ANN001, ANN002, ANN003, ANN101, ANN102,
+    ANN201, ANN202, ANN204, ANN401,
+
+    # flake8-bugbear
+    B011, B014, B902, B950, B019,
+
+    # flake8-builtins (A001, A002, A003)
+    A001, A002, A003,
+
+    # flake8-absolute-import (ABS101)
+    ABS101,
+
+    # flake8-typing-imports (TYP001, TYP002, TYP003)
+    TYP001, TYP002, TYP003,
+
+    # flake8-docstrings (D1, D2, D3, D4)
+    D1, D2, D3, D4,
+
+    # pep8-naming (N8**)
+    N8
 
 # Per-file specific ignores
 per-file-ignores =

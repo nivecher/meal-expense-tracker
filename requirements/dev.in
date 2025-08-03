@@ -1,16 +1,26 @@
-# Tools
-beautifulsoup4>=4.12.0,<5.0.0  # For HTML parsing in tests
-pre-commit>=4.0.0,<5.0.0
-pyproject-hooks>=1.2.0,<2.0.0
-rich>=13.0.0,<14.0.0
-ruamel-yaml>=0.18.14,<0.19.0
-ruamel-yaml-clib>=0.2.12,<0.2.13
-s3transfer>=0.13.0,<0.14.0
-six>=1.17.0,<1.18.0
-snowballstemmer>=3.0.1,<4.0.0
-stevedore>=5.4.1,<6.0.0
+# Core Python type stubs
+types-python-dateutil>=2.8.0
+types-pytz>=2024.1.0
+types-PyYAML>=6.0.12
+types-jsonschema>=4.24.0
+types-setuptools>=80.0.0
+types-requests>=2.31.0
+types-simplejson>=3.17.0
+types-toml==0.10.8.20240310
 
-# Type Stubs
+# Web and API Framework type stubs
+types-WTForms==3.2.1.20250602
+types-Flask-Migrate==4.1.0.20250112
+
+# Database type stubs
+types-psycopg2==2.9.21.20250718
+
+# HTML/XML type stubs
+types-beautifulsoup4==4.12.0.20250516
+types-html5lib==1.1.11.20250708
+
+# Web and API
+types-urllib3>=1.26.0
 types-Flask>=1.1.6,<2.0.0
 types-Flask-SQLAlchemy>=2.5.9,<3.0.0
 types-Werkzeug>=1.0.0,<2.0.0  # Latest compatible version
@@ -28,11 +38,23 @@ types-PyYAML>=6.0.12,<7.0.0
 types-jsonschema>=4.24.0,<5.0.0
 types-setuptools>=80.0.0,<81.0.0
 
+# Tools
+beautifulsoup4>=4.12.0,<5.0.0  # For HTML parsing in tests
+pre-commit>=4.0.0,<5.0.0
+pyproject-hooks>=1.2.0,<2.0.0
+rich>=13.0.0,<14.0.0
+ruamel-yaml>=0.18.14,<0.19.0
+ruamel-yaml-clib>=0.2.12,<0.2.13
+s3transfer>=0.13.0,<0.14.0
+six>=1.17.0,<1.18.0
+snowballstemmer>=3.0.1,<4.0.0
+stevedore>=5.4.1,<6.0.0
+
 # Linting & Formatting
 autoflake>=1.7.0,<2.0.0
 black>=24.0.0,<25.0.0  # Downgraded for safety compatibility
 djlint>=1.19.0,<2.0.0  # HTML template linter - using 1.19.0 as it's the latest available
-flake8>=7.0.0,<8.0.0
+flake8>=7.3.0,<8.0.0
 isort>=5.12.0,<6.0.0
 mypy>=1.0.0,<2.0.0
 mypy-extensions>=1.0.0,<2.0.0

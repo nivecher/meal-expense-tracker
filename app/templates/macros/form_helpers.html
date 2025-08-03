@@ -1,0 +1,78 @@
+{# Form field rendering macro #}
+{% macro render_field(field, label_visible=true, class_='', placeholder='') -%}
+    <div class="form-group{% if field.errors %} has-error{% endif %}">
+        {% if field.type != 'HiddenField' and label_visible %}{{ field.label(class_='form-label') }}{% endif %}
+        {{ field(class_=class_ + ' form-control', placeholder=placeholder or '') }}
+        {% if field.errors %}
+            {% for error in field.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+        {% endif %}
+    </div>
+{%- endmacro %}
+{# Render a form group with custom classes #}
+{% macro render_form_group(field, label_visible=true, group_class='', input_class='') -%}
+    <div class="form-group {{ group_class }}
+                {% if field.errors %}has-error{% endif %}">
+        {% if field.type != 'HiddenField' and label_visible %}{{ field.label(class_='form-label') }}{% endif %}
+        {{ field(class_='form-control ' + input_class) }}
+        {% if field.errors %}
+            {% for error in field.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+        {% endif %}
+    </div>
+{%- endmacro %}
+{# Render a checkbox field #}
+{% macro render_checkbox_field(field, label_visible=true) -%}
+    <div class="form-check">
+        {{ field(type='checkbox', class_='form-check-input') }}
+        {% if label_visible %}{{ field.label(class_='form-check-label') }}{% endif %}
+        {% if field.errors %}
+            {% for error in field.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+        {% endif %}
+    </div>
+{%- endmacro %}
+{# Render a form field with addon #}
+{% macro render_field_addon(field, addon_text, addon_position='prepend', label_visible=true) -%}
+    <div class="form-group{% if field.errors %} has-error{% endif %}">
+        {% if label_visible %}{{ field.label(class_='form-label') }}{% endif %}
+        <div class="input-group">
+            {% if addon_position == 'prepend' %}<span class="input-group-text">{{ addon_text }}</span>{% endif %}
+            {{ field(class_='form-control') }}
+            {% if addon_position == 'append' %}<span class="input-group-text">{{ addon_text }}</span>{% endif %}
+        </div>
+        {% if field.errors %}
+            {% for error in field.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+        {% endif %}
+    </div>
+{%- endmacro %}
+{# Render a form field with help text #}
+{% macro render_field_with_help(field, help_text, label_visible=true) -%}
+    <div class="form-group{% if field.errors %} has-error{% endif %}">
+        {% if label_visible %}{{ field.label(class_='form-label') }}{% endif %}
+        {{ field(class_='form-control') }}
+        <small class="form-text text-muted">{{ help_text }}</small>
+        {% if field.errors %}
+            {% for error in field.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+        {% endif %}
+    </div>
+{%- endmacro %}
+{# Render a form field with a custom wrapper class #}
+{% macro render_field_with_class(field, wrapper_class='', label_visible=true) -%}
+    <div class="form-group {{ wrapper_class }}
+                {% if field.errors %}has-error{% endif %}">
+        {% if field.type != 'HiddenField' and label_visible %}{{ field.label(class_='form-label') }}{% endif %}
+        {{ field(class_='form-control') }}
+        {% if field.errors %}
+            {% for error in field.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+        {% endif %}
+    </div>
+{%- endmacro %}
+{# Render a form field with custom attributes #}
+{% macro render_field_with_attrs(field, attrs={}, label_visible=true) -%}
+    <div class="form-group{% if field.errors %} has-error{% endif %}">
+        {% if field.type != 'HiddenField' and label_visible %}{{ field.label(class_='form-label') }}{% endif %}
+        {% set field_class = attrs.pop('class', '') %}
+        {{ field(class_='form-control ' + field_class, **attrs) }}
+        {% if field.errors %}
+            {% for error in field.errors %}<span class="help-block">{{ error }}</span>{% endfor %}
+        {% endif %}
+    </div>
+{%- endmacro %}

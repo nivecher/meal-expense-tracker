@@ -19,6 +19,7 @@
 # Application settings
 APP_NAME = meal-expense-tracker
 PORT = 5001
+DOCKER_PORT = 8000
 PYTHON = python3.13
 PIP = pip3
 
@@ -35,6 +36,7 @@ DOCKER_COMPOSE_DEV = $(DOCKER_COMPOSE) -f docker-compose.dev.yml
 CONTAINER_NAME = $(APP_NAME)-app
 IMAGE_NAME = $(APP_NAME)
 VOLUME_NAME = $(APP_NAME)-db
+TARGET_PLATFORM ?= linux/amd64
 
 # Terraform settings
 ENV ?= dev
@@ -291,20 +293,39 @@ db-downgrade:
 # Docker
 # =======================
 
-## Build Docker image
+## Build Docker image for production
 .PHONY: docker-build
 docker-build:
-	docker build -t $(IMAGE_NAME) .
+	docker build \
+		--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
+		-t $(IMAGE_NAME):latest \
+		--target production \
+		.
 
-## Run application in Docker
+## Build Docker image for development
+.PHONY: docker-build-dev
+docker-build-dev:
+	docker build \
+		--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
+		-t $(IMAGE_NAME):dev \
+		--target development \
+		.
+
+## Run application in Docker (development)
 .PHONY: docker-run
-docker-run:
+docker-run: docker-build-dev
+	@if [ "$(shell docker ps -q -f name=^$(CONTAINER_NAME)$$)" ]; then \
+		echo "Container $(CONTAINER_NAME) is already running. Stopping and removing..."; \
+		docker stop $(CONTAINER_NAME) >/dev/null 2>&1 || true; \
+		docker rm $(CONTAINER_NAME) >/dev/null 2>&1 || true; \
+	fi
 	docker run -d \
-		-p $(PORT):$(PORT) \
+		-p $(DOCKER_PORT):5000 \
+		-v $(PWD):/app \
 		-v $(VOLUME_NAME):/app/instance \
 		--env-file .env \
 		--name $(CONTAINER_NAME) \
-		$(IMAGE_NAME)
+		$(IMAGE_NAME):dev
 
 ## Stop running containers
 .PHONY: docker-stop

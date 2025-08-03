@@ -102,11 +102,21 @@ resource "aws_apigatewayv2_api" "main" {
   # CORS configuration
   cors_configuration {
     allow_credentials = false
-    allow_headers     = ["Content-Type", "X-Amz-Date", "Authorization", "X-Api-Key"]
-    allow_methods     = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allow_origins     = var.environment == "dev" ? ["*"] : ["https://${var.domain_name}"]
-    expose_headers    = ["Content-Length"]
-    max_age           = 3600
+    allow_headers = [
+      "Content-Type",
+      "X-Amz-Date",
+      "Authorization",
+      "X-Api-Key",
+      "X-CSRF-Token",
+      "X-Requested-With"
+    ]
+    allow_methods  = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_origins  = var.environment == "dev" ? ["*"] : ["https://${var.domain_name}"]
+    expose_headers = [
+      "Content-Length",
+      "X-CSRF-Token"
+    ]
+    max_age        = 3600
   }
 
   tags = merge({
@@ -154,7 +164,7 @@ resource "aws_apigatewayv2_stage" "main" {
 # CloudWatch Log Group for API Gateway
 resource "aws_cloudwatch_log_group" "api_gw" {
   name              = "/aws/api-gateway/${var.app_name}-${var.environment}"
-  retention_in_days = 30
+  retention_in_days = 7
   kms_key_id        = var.logs_kms_key_arn
 
   tags = merge({

@@ -68,12 +68,46 @@
         <p>Search results will appear here...</p>
     </div>
 
-    <!-- Load the Google Maps JavaScript API with Places library -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap" async defer></script>
+    <!-- Load our Google Maps Loader utility -->
+    <script src="/static/js/utils/google-maps-loader.js"></script>
+    <script src="/static/js/utils/logger.js"></script>
 
     <script>
         // This function will be called when the Google Maps API is loaded
-        function initMap() {
+        async function initMap() {
+            try {
+                // Get the API key from our backend
+                const response = await fetch('/api/config/google-maps-key');
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                const { apiKey } = data;
+                if (!apiKey) {
+                    throw new Error('No API key returned from server');
+                }
+
+                // Use the GoogleMapsLoader to load the API
+                await GoogleMapsLoader.loadApiWithRetry(
+                    apiKey,
+                    () => {
+                        // API is loaded, initialize the map
+                        initializeMap();
+                    },
+                    ['places'],
+                    3,  // max retries
+                    1000 // retry delay in ms
+                );
+            } catch (error) {
+                console.error('Error initializing Google Maps:', error);
+                document.getElementById('results').innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        // Function to initialize the map after the API is loaded
+        function initializeMap() {
             console.log('Google Maps API loaded');
 
             // Initialize the map centered on New York

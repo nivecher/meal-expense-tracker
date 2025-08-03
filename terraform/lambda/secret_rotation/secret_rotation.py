@@ -521,6 +521,71 @@ def _get_secret_value(service_client: Any, request_params: Dict[str, Any]) -> Di
         raise ValueError(f"Invalid parameter for secret {request_params['SecretId']}: {e}") from e
 
 
+def _validate_secret_parameters(arn: str, stage: str, token: Optional[str]) -> None:
+    """Validate the input parameters for secret retrieval.
+
+    Args:
+        arn: The Amazon Resource Name (ARN) or friendly name of the secret
+        stage: The secret stage ('AWSCURRENT' or 'AWSPENDING')
+        token: The version ID or staging label (optional)
+
+    Raises:
+        ValueError: If any parameter is invalid
+    """
+    if not arn:
+        raise ValueError("Secret ARN cannot be empty")
+
+    if stage not in ("AWSCURRENT", "AWSPENDING"):
+        raise ValueError("Stage must be either 'AWSCURRENT' or 'AWSPENDING'")
+
+    if token is not None and not isinstance(token, str):
+        raise ValueError("Token must be a string or None")
+
+
+def _prepare_secret_request_params(arn: str, stage: str, token: Optional[str]) -> Dict[str, Any]:
+    """Prepare the request parameters for retrieving a secret.
+
+    Args:
+        arn: The secret ARN or name
+        stage: The secret stage
+        token: Optional version token
+
+    Returns:
+        Dictionary of request parameters
+    """
+    request_params: Dict[str, Any] = {"SecretId": arn}
+    if token:
+        request_params["VersionId"] = token
+    else:
+        request_params["VersionStage"] = stage
+    return request_params
+
+
+def _process_secret_fields(secret: Dict[str, Any]) -> Dict[str, Any]:
+    """Process and validate all fields in the secret.
+
+    Args:
+        secret: The raw secret dictionary
+
+    Returns:
+        Processed secret dictionary with validated fields
+
+    Raises:
+        ValueError: If required fields are missing or invalid
+    """
+    field_validators = _get_field_validators()
+    result: Dict[str, Any] = {}
+
+    for field, validator in field_validators.items():
+        if field not in secret and validator["required"]:
+            raise ValueError(f"Missing required field: {field}")
+
+        if field in secret:
+            result[field] = _process_secret_field(field, secret[field], validator)
+
+    return result
+
+
 def get_secret_dict(service_client: Any, arn: str, stage: str, token: Optional[str] = None) -> Dict[str, Any]:
     """Get and validate the secret value as a dictionary.
 
@@ -542,38 +607,14 @@ def get_secret_dict(service_client: Any, arn: str, stage: str, token: Optional[s
                   invalid values
         json.JSONDecodeError: If the secret value is not valid JSON
     """
-    # Validate input parameters
-    if not arn:
-        raise ValueError("Secret ARN cannot be empty")
-
-    if stage not in ("AWSCURRENT", "AWSPENDING"):
-        raise ValueError("Stage must be either 'AWSCURRENT' or 'AWSPENDING'")
-
-    # Prepare the request parameters
-    request_params: Dict[str, Any] = {"SecretId": arn}
-    if token:
-        if not isinstance(token, str):
-            raise ValueError("Token must be a string")
-        request_params["VersionId"] = token
-    else:
-        request_params["VersionStage"] = stage
-
+    _validate_secret_parameters(arn, stage, token)
+    request_params = _prepare_secret_request_params(arn, stage, token)
     logger.info("Retrieving secret %s (stage: %s)", arn, stage)
 
     try:
         secret = _get_secret_value(service_client, request_params)
         secret = _validate_secret_structure(secret)
-        field_validators = _get_field_validators()
-        result: Dict[str, Any] = {}
-
-        for field, validator in field_validators.items():
-            if field not in secret and validator["required"]:
-                raise ValueError(f"Missing required field: {field}")
-
-            if field in secret:
-                result[field] = _process_secret_field(field, secret[field], validator)
-
-        return result
+        return _process_secret_fields(secret)
 
     except json.JSONDecodeError as e:
         logger.error("Secret %s does not contain valid JSON: %s", arn, str(e))

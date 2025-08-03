@@ -111,6 +111,3 @@ output "lambda_combined_policy_arn" {
   description = "The ARN of the combined IAM policy for Lambda functions"
   value       = aws_iam_policy.lambda_combined.arn
 }
-
-# Note: AWS X-Ray policy attachment has been moved to the Lambda module
-# where the IAM role is managed.

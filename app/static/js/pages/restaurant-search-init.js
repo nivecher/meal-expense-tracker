@@ -5,8 +5,8 @@
  * Google Places Autocomplete for location-based searches.
  */
 
-// Import GoogleMapsAuth
-import { GoogleMapsAuth } from '../utils/google-maps-auth.js';
+// Import GoogleMapsLoader for async loading of Google Maps API
+import GoogleMapsLoader from '../utils/google-maps-loader.js';
 
 // Track initialization status
 let isInitialized = false;
@@ -20,45 +20,53 @@ async function initRestaurantSearch () {
   if (isInitialized) return;
 
   try {
-    // Check if GoogleMapsAuth is available
-    if (!window.GoogleMapsAuth || typeof window.GoogleMapsAuth.init !== 'function') {
-      console.error('Google Maps utility not loaded');
-      return;
-    }
-
-    // Initialize Google Places Autocomplete for restaurant search
-    initRestaurantAutocomplete();
+    // Get DOM elements
     const searchForm = document.getElementById('restaurantSearchForm');
     const searchInput = document.getElementById('restaurantSearch');
     const locationInput = document.getElementById('locationSearch');
 
     if (!searchForm || !searchInput) return;
 
-    // Initialize Google Places Autocomplete if location input exists
-    if (locationInput && window.google && window.google.maps && window.google.maps.places) {
-      initPlacesAutocomplete(locationInput);
-    } else if (locationInput) {
-      // Load Google Maps API if not already loaded
-      const configElement = document.getElementById('app-config');
-      if (configElement) {
-        try {
-          const config = JSON.parse(configElement.dataset.appConfig);
-          const apiKey = (config.googleMaps && config.googleMaps.apiKey) || window.GOOGLE_MAPS_API_KEY;
+    // Initialize Google Places Autocomplete for restaurant search
+    initRestaurantAutocomplete();
 
-          if (apiKey) {
-            window.GoogleMapsAuth.init(apiKey, (error) => {
-              if (error) {
-                console.error('Error initializing Google Maps:', error);
-                return;
-              }
-              initPlacesAutocomplete(locationInput);
-            });
-          } else {
-            console.error('Google Maps API key not found');
-          }
-        } catch (e) {
-          console.error('Error initializing Google Maps:', e);
+    // Initialize Google Places Autocomplete if location input exists
+    if (locationInput) {
+      try {
+        // Get API key from config
+        const configElement = document.getElementById('app-config');
+        if (!configElement) {
+          throw new Error('App config element not found');
         }
+
+        const config = JSON.parse(configElement.dataset.appConfig);
+        const apiKey = (config.googleMaps && config.googleMaps.apiKey) || window.GOOGLE_MAPS_API_KEY;
+
+        if (!apiKey) {
+          throw new Error('Google Maps API key not found in config');
+        }
+
+        // Load Google Maps API with retry logic
+        await GoogleMapsLoader.loadApiWithRetry(
+          apiKey,
+          () => {
+            if (window.google && window.google.maps && window.google.maps.places) {
+              initPlacesAutocomplete(locationInput);
+            } else {
+              throw new Error('Google Maps API loaded but required components not available');
+            }
+          },
+          ['places', 'geocoding'], // Required libraries
+          3, // maxRetries
+          1000, // retryDelay
+        );
+      } catch (error) {
+        console.error('Error initializing Google Maps:', error);
+        // Show error to user if needed
+        const errorElement = document.createElement('div');
+        errorElement.className = 'alert alert-warning mt-3';
+        errorElement.textContent = 'Failed to load location services. Please refresh the page to try again.';
+        searchForm.appendChild(errorElement);
       }
     }
 
@@ -306,7 +314,14 @@ export { initRestaurantSearch };
 
 // Initialize when the DOM is fully loaded
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initRestaurantSearch);
+  document.addEventListener('DOMContentLoaded', () => {
+    initRestaurantSearch().catch((error) => {
+      console.error('Error initializing restaurant search:', error);
+    });
+  });
 } else {
-  initRestaurantSearch();
+  // DOM already loaded, initialize immediately
+  initRestaurantSearch().catch((error) => {
+    console.error('Error initializing restaurant search:', error);
+  });
 }

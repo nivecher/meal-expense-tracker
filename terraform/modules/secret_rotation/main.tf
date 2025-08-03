@@ -122,7 +122,7 @@ resource "aws_lambda_function" "secret_rotation" {
 
   # Enable X-Ray tracing
   tracing_config {
-    mode = "Active"
+    mode = var.enable_xray_tracing ? "Active" : "PassThrough"
   }
 
   vpc_config {

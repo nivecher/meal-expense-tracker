@@ -19,7 +19,7 @@ const LOG_LEVELS = {
 const isDevelopment = window.location.hostname === 'localhost' ||
                      window.location.hostname === '127.0.0.1' ||
                      window.location.hostname === '' ||
-                     window.location.port === '5001'; // Default Flask port
+                     window.location.port === '5000'; // Default Flask port
 
 /**
  * Base logger function that handles all logging

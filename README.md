@@ -23,6 +23,32 @@ A modern web application that helps you track dining expenses, analyze spending 
   - Budget tracking
   - Exportable reports
 
+## 🛠️ Command Line Interface (CLI)
+
+The application provides several useful CLI commands for administration and maintenance:
+
+### Admin User Management
+
+#### Reset Admin Password
+
+Reset the password for an admin user:
+
+```bash
+flask reset-admin-password --email admin@example.com
+```
+
+You will be prompted to enter and confirm the new password. The password will be securely hashed before being stored in the database.
+
+**Options:**
+- `--email`: Email of the admin user (required)
+- `--password`: New password (if not provided, you'll be prompted)
+
+Example:
+```bash
+flask reset-admin-password --email admin@example.com
+# You'll be prompted to enter and confirm the new password
+```
+
 ## 📦 Version Management
 
 This project uses [setuptools_scm](https://github.com/pypa/setuptools_scm/) for automatic version management based on Git tags.
@@ -324,6 +350,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
    SECRET_KEY=your-secret-key
    SQLALCHEMY_DATABASE_URI=sqlite:///instance/meals_expenses.db
    GOOGLE_MAPS_API_KEY=your-google-api-key
+   GOOGLE_MAPS_MAP_ID=your-google-map-id
    ```
 
 2. **Install dependencies** using pip-tools:

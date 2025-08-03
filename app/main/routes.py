@@ -85,6 +85,7 @@ def contact():
     return render_template("main/contact.html", form=form)
 
 
+# TODO test code
 @bp.route("/test/static/<path:filename>")
 def test_static(filename):
     """Test route to verify static file serving.
@@ -133,6 +134,7 @@ def index():
     return redirect(url_for("expenses.list_expenses"))
 
 
+# TODO debug (remove)
 @bp.route("/api/config/google-maps-key")
 def get_google_maps_key():
     """Return the Google Maps API key.
@@ -146,12 +148,61 @@ def get_google_maps_key():
     return jsonify({"apiKey": key})
 
 
+# TODO debug (remove)
+@bp.route("/api/config/google-maps-id")
+def get_google_maps_id():
+    """Return the Google Maps Map ID.
+
+    Returns:
+        JSON response containing the Google Maps Map ID or an error message
+    """
+    key = current_app.config.get("GOOGLE_MAPS_MAP_ID")
+    if not key:
+        return jsonify({"error": "Google Maps Map ID not configured"}), 500
+    return jsonify({"mapId": key})
+
+
+# TODO test code
+@bp.route("/test/mime-test")
+def mime_test():
+    """Test MIME type for JavaScript files.
+
+    This route returns a simple HTML page that tests the MIME type of a JavaScript file.
+    """
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>MIME Type Test</title>
+        <script type="module">
+            import('/static/js/test-module.js')
+                .then(module => {
+                    console.log('Module loaded successfully');
+                    module.testModule();
+                })
+                .catch(error => {
+                    console.error('Error loading module:', error);
+                    document.body.innerHTML += `<p>Error: ${error.message}</p>`;
+                });
+        </script>
+    </head>
+    <body>
+        <h1>MIME Type Test</h1>
+        <p>Check the browser console for test results.</p>
+    </body>
+    </html>
+    """
+
+
 @bp.route("/test/google-places")
 @login_required
 def google_places_test():
-    """Render the Google Places API test page.
+    """Test page for Google Places API integration.
+
+    This page provides a testing interface for the Google Places API functionality.
+    It allows users to search for places and view the results on a map.
 
     Returns:
-        Rendered Google Places test page template
+        str: Rendered template for the Google Places test page.
     """
-    return render_template("test/google_places_test.html")
+    return render_template("test/google_places_test.html", title="Google Places Test")
