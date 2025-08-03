@@ -814,13 +814,13 @@ requirements: check-pip-tools
 .PHONY: dev-setup
 dev-setup: check-pip-tools requirements
 	@echo "Setting up development environment..."
-	pip install -r requirements.txt -r requirements-dev.txt
+	pip install -c constraints.txt -r requirements.txt -r requirements-dev.txt
 
 # Install production dependencies
 .PHONY: prod-setup
 prod-setup: check-pip-tools requirements
 	@echo "Setting up production environment..."
-	pip install -r requirements-prod.txt
+	pip install -c constraints.txt -r requirements-prod.txt
 
 # Check for security vulnerabilities
 .PHONY: security-check
@@ -844,7 +844,7 @@ clean-requirements:
 	@# Create a temporary file in the same directory as the target to avoid cross-device links
 	@TMP_FILE=$$(mktemp -p . .tmp_XXXXXXXXXX) && \
 	trap 'rm -f "$$TMP_FILE"' EXIT && \
-	pip-compile --upgrade -o "$$TMP_FILE" $< && \
+	pip-compile --upgrade -c constraints.txt -o "$$TMP_FILE" $< && \
 	mv "$$TMP_FILE" $@ || { rm -f "$$TMP_FILE"; exit 1; }
 
 # Check if pip-tools is installed

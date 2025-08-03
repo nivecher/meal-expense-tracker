@@ -26,7 +26,7 @@ const PAGE_MODULES = {
  * Sets up tooltips, popovers, and other UI elements that are used across the application.
  * @returns {void}
  */
-function initUI () {
+function initUI() {
   try {
     // Initialize tooltips
     const tooltipTriggerList = Array.from(
@@ -55,7 +55,7 @@ function initUI () {
 
     // Add smooth scrolling for anchor links
     document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-      anchor.addEventListener('click', function (e) {
+      anchor.addEventListener('click', function(e) {
         e.preventDefault();
         const targetId = this.getAttribute('href');
         const target = document.querySelector(targetId);
@@ -78,7 +78,7 @@ function initUI () {
  * @async
  * @returns {Promise<void>}
  */
-async function loadPageModule () {
+async function loadPageModule() {
   const currentPath = window.location.pathname;
   const modulePath = PAGE_MODULES[currentPath];
 
@@ -103,7 +103,7 @@ async function loadPageModule () {
  * @async
  * @returns {Promise<void>}
  */
-async function init () {
+async function init() {
   try {
     initUI();
     await loadPageModule();
@@ -127,7 +127,7 @@ async function init () {
 
     // Add loading state to buttons with data-loading attribute
     document.querySelectorAll('[data-loading]').forEach((button) => {
-      button.addEventListener('click', function () {
+      button.addEventListener('click', function() {
         this.setAttribute('data-text', this.innerHTML);
         this.disabled = true;
         this.innerHTML = `

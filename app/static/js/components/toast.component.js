@@ -3,7 +3,7 @@
  */
 
 // Use an IIFE to prevent global scope pollution
-(function () {
+(function() {
   // Initialize toast container if it doesn't exist
   let toastContainer = document.getElementById('toast-container');
   if (!toastContainer) {
@@ -20,7 +20,7 @@
  * @param {string} type - The type of toast (success, error, warning, info)
  * @param {number} [duration=5000] - Duration in milliseconds
  */
-  function showToast (message, type = 'info', duration = 5000) {
+  function showToast(message, type = 'info', duration = 5000) {
     // Create toast element
     const toast = document.createElement('div');
     toast.className = `toast align-items-center text-bg-${type} border-0 show`;
@@ -63,7 +63,7 @@
  * Get appropriate icon for toast type
  * @private
  */
-  function getToastIcon (type) {
+  function getToastIcon(type) {
     const icons = {
       success: 'fa-check-circle',
       error: 'fa-times-circle',

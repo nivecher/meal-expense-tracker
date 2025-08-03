@@ -25,7 +25,7 @@ const config = {
      * Initialize the configuration from data attributes
      * @returns {Object} The configuration object
      */
-  init () {
+  init() {
     try {
       // Find the config element
       const configEl = document.getElementById('app-config');

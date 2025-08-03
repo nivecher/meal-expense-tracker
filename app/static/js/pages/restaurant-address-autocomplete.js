@@ -29,7 +29,7 @@ const restaurantAddressAutocomplete = (() => {
    * Initialize the address autocomplete functionality
    * @public
    */
-  async function init () {
+  async function init() {
     try {
       cacheElements();
 
@@ -51,7 +51,7 @@ const restaurantAddressAutocomplete = (() => {
         logger.debug('Initializing Google Maps API with retry...');
         await GoogleMapsLoader.loadApiWithRetry(
           window.GOOGLE_MAPS_API_KEY,
-          (google) => {
+          async(google) => {
             logger.debug('Google Maps API loaded successfully in callback');
             window.google = google;
             setupEventListeners();
@@ -76,7 +76,7 @@ const restaurantAddressAutocomplete = (() => {
    * Cache DOM elements
    * @private
    */
-  function cacheElements () {
+  function cacheElements() {
     state.autocompleteInput = document.getElementById('address-autocomplete');
     if (!state.autocompleteInput) return;
 
@@ -98,7 +98,7 @@ const restaurantAddressAutocomplete = (() => {
    * Set up event listeners
    * @private
    */
-  function setupEventListeners () {
+  function setupEventListeners() {
     if (!state.autocompleteInput) return;
 
     // Input event for address autocomplete
@@ -120,7 +120,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {Event} _event - The input event (unused)
    */
-  async function handleAddressInput (_event) {
+  async function handleAddressInput(_event) {
     const query = state.autocompleteInput.value.trim();
     state.selectedPlaceId = null;
 
@@ -159,7 +159,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {Array} suggestions - Array of address suggestions
    */
-  function renderSuggestions (suggestions) {
+  function renderSuggestions(suggestions) {
     if (!state.suggestionsDiv) return;
 
     if (!suggestions || suggestions.length === 0) {
@@ -190,7 +190,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {Event} event - The click event
    */
-  async function handleSuggestionClick (event) {
+  async function handleSuggestionClick(event) {
     try {
       const suggestion = event.target.closest('.suggestion-item');
       if (!suggestion) return;
@@ -225,7 +225,7 @@ const restaurantAddressAutocomplete = (() => {
    * Handle update address button click
    * @private
    */
-  async function handleUpdateAddress () {
+  async function handleUpdateAddress() {
     // If no place is selected but we have an input value, try to find a place ID
     if (!state.selectedPlaceId && state.autocompleteInput && state.autocompleteInput.value.trim()) {
       const query = state.autocompleteInput.value.trim();
@@ -269,7 +269,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {Object} data - Place details data from Google Places API
    */
-  function updateFormFields (data) {
+  function updateFormFields(data) {
     const { address_components: components, name, geometry } = data;
     const address = {
       streetNumber: '',
@@ -353,7 +353,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {string} message - Loading message
    */
-  function showLoading (message) {
+  function showLoading(message) {
     if (!state.validIndicator) return;
     state.validIndicator.innerHTML = `
       <div class="text-info">
@@ -368,7 +368,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {string} message - Success message
    */
-  function showSuccess (message) {
+  function showSuccess(message) {
     if (!state.validIndicator) return;
     state.validIndicator.innerHTML = `
       <div class="text-success">
@@ -383,7 +383,7 @@ const restaurantAddressAutocomplete = (() => {
    * @private
    * @param {string} message - Error message
    */
-  function showError (message) {
+  function showError(message) {
     if (!state.validIndicator) return;
     state.validIndicator.innerHTML = `
       <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -400,7 +400,7 @@ const restaurantAddressAutocomplete = (() => {
    * @param {string} unsafe - Unsafe string
    * @returns {string} Escaped string
    */
-  function escapeHtml (unsafe) {
+  function escapeHtml(unsafe) {
     if (typeof unsafe !== 'string') return '';
     return unsafe
       .replace(/&/g, '&amp;')

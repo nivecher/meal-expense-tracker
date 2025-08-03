@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {HTMLElement} input - The input element to show the error for
      * @param {string} message - The error message to display
      */
-  function showError (input, message) {
+  function showError(input, message) {
     // Add error class to input
     input.classList.add('is-invalid');
 
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
   /**
      * Clear all validation errors from the form
      */
-  function clearValidationErrors () {
+  function clearValidationErrors() {
     // Remove error classes
     const invalidInputs = form.querySelectorAll('.is-invalid');
     invalidInputs.forEach((input) => {

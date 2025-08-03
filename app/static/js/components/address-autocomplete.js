@@ -18,7 +18,7 @@ export class AddressAutocomplete {
       placeId: 'google_place_id',
       latId: 'latitude',
       lngId: 'longitude',
-      ...options
+      ...options,
     };
 
     this.autocomplete = null;
@@ -43,7 +43,7 @@ export class AddressAutocomplete {
     this.autocomplete = new google.maps.places.Autocomplete(input, {
       types: ['address'],
       componentRestrictions: { country: 'us' },
-      fields: ['address_components', 'geometry', 'name', 'place_id', 'formatted_address']
+      fields: ['address_components', 'geometry', 'name', 'place_id', 'formatted_address', 'photos', 'price_level'],
     });
 
     // When a place is selected
@@ -74,7 +74,7 @@ export class AddressAutocomplete {
     if (!this.place.geometry) {
       // User entered the name of a Place that was not suggested and
       // pressed the Enter key, or the Place Details request failed.
-      console.log("No details available for input: '" + this.place.name + "'");
+      console.log(`No details available for input: '${this.place.name}'`);
       return;
     }
 
@@ -95,7 +95,7 @@ export class AddressAutocomplete {
       locality: '', // city
       administrative_area_level_1: '', // state
       country: '',
-      postal_code: ''
+      postal_code: '',
     };
 
     // Extract address components

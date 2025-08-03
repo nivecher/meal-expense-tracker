@@ -4,13 +4,13 @@ from typing import Optional
 
 from flask import Flask, jsonify
 from flask.typing import ResponseReturnValue
+from flask_cors import CORS
 
 from config import config
 
 from .extensions import jwt
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Initialize logger
 logger = logging.getLogger(__name__)
 
 __all__ = ["create_app", "jwt"]
@@ -28,15 +28,18 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     """
     if config_name is None:
         config_name = os.environ.get("FLASK_CONFIG", "default")
+    app = Flask(__name__)
+    app.config.from_object(config[config_name])
+
+    # Configure logging based on the DEBUG setting
+    log_level = logging.DEBUG if app.debug else logging.INFO
+    logger.setLevel(log_level)
 
     # Debug template loading
     logger.debug(f"Using configuration: {config_name}")
     logger.debug(f"Current working directory: {os.getcwd()}")
     logger.debug(f"Template folder: {os.path.abspath('app/templates')}")
     logger.debug(f"Static folder: {os.path.abspath('app/static')}")
-
-    app = Flask(__name__)
-    app.config.from_object(config[config_name])
 
     # Initialize all extensions
     from .extensions import init_app as init_extensions
@@ -99,5 +102,25 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     for rule in app.url_map.iter_rules():
         methods = list(rule.methods - {"OPTIONS", "HEAD"})
         logger.debug(f"  {rule.endpoint}: {rule.rule} {methods}")
+
+    # Get CORS configuration from environment
+    cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+    cors_methods = os.getenv("CORS_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(",")
+    cors_allow_headers = os.getenv("CORS_ALLOW_HEADERS", "Content-Type,X-CSRF-Token,X-Requested-With").split(",")
+    cors_expose_headers = os.getenv("CORS_EXPOSE_HEADERS", "Content-Length,X-CSRF-Token").split(",")
+
+    # Configure CORS
+    CORS(
+        app,
+        resources={
+            r"/*": {
+                "origins": cors_origins,
+                "methods": cors_methods,
+                "allow_headers": cors_allow_headers,
+                "expose_headers": cors_expose_headers,
+                "supports_credentials": False,
+            }
+        },
+    )
 
     return app

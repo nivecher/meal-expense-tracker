@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Too Many Requests (429) - Meal Expense Tracker{% endblock %}
+{% block title %}
+    Too Many Requests (429) - Meal Expense Tracker
+{% endblock title %}
 {% block content %}
     <div class="error-container">
         <div class="error-content">
@@ -48,9 +50,9 @@
             </div>
         </div>
     </div>
-{% endblock %}
+{% endblock content %}
 {% block styles %}
     {{ super() }}
     <link rel="stylesheet"
           href="{{ url_for('static', filename='css/pages/error.css') }}">
-{% endblock %}
+{% endblock styles %}

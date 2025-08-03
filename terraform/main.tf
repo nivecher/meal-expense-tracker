@@ -446,6 +446,7 @@ module "lambda" {
   # Basic configuration
   app_name    = var.app_name
   environment = var.environment
+  server_name = local.api_domain_name
   aws_region  = var.aws_region
 
   # VPC configuration

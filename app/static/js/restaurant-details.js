@@ -64,8 +64,8 @@ function initializeMap() {
                 elementType: 'labels',
                 stylers: [{ visibility: 'off' }],
               },
-            ]
-          })
+            ],
+          }),
         };
 
         // Create a new map centered at the restaurant location

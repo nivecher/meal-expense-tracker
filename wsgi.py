@@ -655,9 +655,11 @@ def _handle_awsgi_request(environ: Dict[str, Any], context: Any) -> Dict[str, An
     Returns:
         dict: Response object for API Gateway
     """
-    app = get_or_create_app()
 
     try:
+
+        app = get_or_create_app()  # TODO is this needed here?
+
         # Log request details for debugging
         logger.info(
             "Processing %s request for %s",
@@ -1088,22 +1090,22 @@ def main() -> None:
 
     This is the entry point for local development using `python wsgi.py`
     """
+    # Get the Flask app instance first to ensure config is loaded
+    app = get_or_create_app()
+
     # Configure host and port from environment or use defaults
     host = os.environ.get("FLASK_RUN_HOST", "0.0.0.0")
     port = int(os.environ.get("FLASK_RUN_PORT", "5000"))
 
-    # Set debug mode based on environment
-    debug = os.environ.get("FLASK_ENV") == "development"
-
     # Suppress Werkzeug logs below WARNING level
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
-    # Log startup information
+    # Log startup information using the app's logger
     logger.info("Starting local development server at http://%s:%s", host, port)
-    logger.info("Debug mode: %s", "on" if debug else "off")
+    logger.info("Debug mode: %s", "on" if app.debug else "off")
 
-    # Run the application
-    app.run(host=host, port=port, debug=debug, use_reloader=debug)
+    # Run the application with reloader disabled to prevent duplicate logs
+    app.run(host=host, port=port, debug=app.debug, use_reloader=False)
 
 
 if __name__ == "__main__":

@@ -256,10 +256,20 @@ resource "aws_lambda_function" "main" {
 
       # Google API keys: pass actual values in non-prod, SSM paths in prod
       GOOGLE_MAPS_API_KEY = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_api_key.value : "ssm:${data.aws_ssm_parameter.google_maps_api_key.name}"
-      GOOGLE_MAPS_MAP_ID = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_map_id.value : "ssm:${data.aws_ssm_parameter.google_maps_map_id.name}"
+      GOOGLE_MAPS_MAP_ID  = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_map_id.value : "ssm:${data.aws_ssm_parameter.google_maps_map_id.name}"
 
       # Database URL: construct in non-prod, use secret in prod
       DATABASE_URL = var.environment != "prod" ? "postgresql+psycopg2://${var.db_username}:${var.db_password}@${var.db_host}:${var.db_port}/${var.db_name}" : null
+
+      # Server name
+      SERVER_NAME = var.server_name
+
+      # CORS Configuration
+      CORS_ORIGINS        = var.environment == "prod" ? "https://${var.server_name}" : "*"
+      CORS_METHODS        = "GET,POST,PUT,DELETE,OPTIONS,HEAD"
+      CORS_HEADERS        = "Content-Type,Authorization,X-CSRF-Token,X-Requested-With"
+      CORS_EXPOSE_HEADERS = "Content-Length,X-CSRF-Token"
+      CORS_MAX_AGE        = "600" # 10 minutes
 
       # Application configuration
       ENVIRONMENT             = var.environment

@@ -3,7 +3,7 @@
  * Handles mobile menu toggle and dropdown interactions
  */
 class NavbarManager {
-  constructor () {
+  constructor() {
     this.navbar = document.querySelector('.navbar');
     this.navbarToggler = this.navbar?.querySelector('.navbar-toggler');
     this.navbarCollapse = this.navbar?.querySelector('.navbar-collapse');
@@ -13,7 +13,7 @@ class NavbarManager {
     this.init();
   }
 
-  init () {
+  init() {
     document.addEventListener('DOMContentLoaded', () => {
       this.setupEventListeners();
       this.setupDropdowns();
@@ -21,7 +21,7 @@ class NavbarManager {
     });
   }
 
-  setupEventListeners () {
+  setupEventListeners() {
     // Mobile menu toggle
     if (this.navbarToggler && this.navbarCollapse) {
       this.navbarToggler.addEventListener('click', (e) => {
@@ -47,7 +47,7 @@ class NavbarManager {
     });
   }
 
-  setupDropdowns () {
+  setupDropdowns() {
     // Find all dropdown toggles in the navbar
     this.dropdownToggles = Array.from(
       this.navbar?.querySelectorAll('.dropdown-toggle') || [],
@@ -70,7 +70,7 @@ class NavbarManager {
     });
   }
 
-  setupResizeObserver () {
+  setupResizeObserver() {
     // Handle responsive behavior
     const resizeObserver = new ResizeObserver((entries) => {
       const { width } = entries[0].contentRect;
@@ -94,7 +94,7 @@ class NavbarManager {
     }
   }
 
-  toggleMobileMenu () {
+  toggleMobileMenu() {
     if (this.navbarCollapse.classList.contains('show')) {
       this.closeMobileMenu();
     } else {
@@ -102,7 +102,7 @@ class NavbarManager {
     }
   }
 
-  openMobileMenu () {
+  openMobileMenu() {
     if (!this.navbarCollapse) return;
 
     this.navbarCollapse.classList.add('show');
@@ -115,7 +115,7 @@ class NavbarManager {
     this.navbar.dispatchEvent(new CustomEvent('mobileMenuOpened'));
   }
 
-  closeMobileMenu () {
+  closeMobileMenu() {
     if (!this.navbarCollapse) return;
 
     this.navbarCollapse.classList.remove('show');
@@ -133,11 +133,11 @@ class NavbarManager {
     this.navbar.dispatchEvent(new CustomEvent('mobileMenuClosed'));
   }
 
-  isMobileMenuOpen () {
+  isMobileMenuOpen() {
     return this.navbarCollapse?.classList.contains('show');
   }
 
-  toggleDropdown (toggle) {
+  toggleDropdown(toggle) {
     const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
 
     // Close all other dropdowns first
@@ -155,7 +155,7 @@ class NavbarManager {
     }
   }
 
-  openDropdown (toggle) {
+  openDropdown(toggle) {
     const dropdownMenu = toggle.nextElementSibling;
     if (!dropdownMenu || !dropdownMenu.classList.contains('dropdown-menu')) return;
 
@@ -168,7 +168,7 @@ class NavbarManager {
     }));
   }
 
-  closeDropdown (toggle) {
+  closeDropdown(toggle) {
     const dropdownMenu = toggle?.nextElementSibling;
     if (!dropdownMenu || !dropdownMenu.classList.contains('dropdown-menu')) return;
 

@@ -45,7 +45,7 @@ const setupFormValidation = (form) => {
  * @param {Event} event - The form submit event
  * @returns {Promise<void>}
  */
-const handleFormSubmit = async (event) => {
+const handleFormSubmit = async(event) => {
   const form = event.target.closest('form');
   if (!form) {
     return;

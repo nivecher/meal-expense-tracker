@@ -98,25 +98,49 @@ resource "aws_route53_record" "api" {
 resource "aws_apigatewayv2_api" "main" {
   name          = "${var.app_name}-${var.environment}"
   protocol_type = "HTTP"
+  description   = "API Gateway for ${var.app_name} ${var.environment} environment"
 
-  # CORS configuration
+  # Secure CORS configuration
   cors_configuration {
-    allow_credentials = false
+    # Only allow specific origins
+    allow_origins = var.environment == "dev" ? [
+      "http://localhost:5000",  # Local development
+      "http://127.0.0.1:5000",
+      "http://localhost:5001",
+      "http://127.0.0.1:5001",
+      "https://${var.domain_name}"  # Production domain
+    ] : [
+      "https://${var.domain_name}"  # Only production domain in non-dev
+    ]
+
+    # Only allow necessary HTTP methods
+    allow_methods = [
+      "GET",
+      "POST",
+      "PUT",
+      "DELETE",
+      "OPTIONS"
+    ]
+
+    # Only allow necessary headers
     allow_headers = [
       "Content-Type",
-      "X-Amz-Date",
       "Authorization",
-      "X-Api-Key",
       "X-CSRF-Token",
       "X-Requested-With"
     ]
-    allow_methods  = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    allow_origins  = var.environment == "dev" ? ["*"] : ["https://${var.domain_name}"]
+
+    # Only expose necessary headers to the client
     expose_headers = [
       "Content-Length",
       "X-CSRF-Token"
     ]
-    max_age        = 3600
+
+    # Allow credentials if needed (for cookies, authorization headers)
+    allow_credentials = false  # Set to true if using cookies/sessions
+
+    # Cache preflight requests for 1 hour
+    max_age = 3600
   }
 
   tags = merge({
@@ -150,8 +174,8 @@ resource "aws_apigatewayv2_stage" "main" {
 
   default_route_settings {
     detailed_metrics_enabled = true
-    throttling_burst_limit   = 100
-    throttling_rate_limit    = 100
+    throttling_burst_limit   = 1000
+    throttling_rate_limit    = 500
   }
 
   tags = merge({
@@ -222,7 +246,7 @@ resource "aws_apigatewayv2_route" "proxy" {
   route_key = "ANY /{proxy+}"
 
   # Set target to integration ID if lambda_invoke_arn is provided, otherwise null
-  target = var.lambda_invoke_arn != null ? "integrations/${aws_apigatewayv2_integration.lambda.id}" : null
+  target = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 
   # Depend on the integration being created first
   depends_on = [aws_apigatewayv2_integration.lambda]

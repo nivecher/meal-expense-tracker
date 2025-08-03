@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize alert close buttons
   const alertCloseButtons = document.querySelectorAll('.alert .btn-close');
   alertCloseButtons.forEach((button) => {
-    button.addEventListener('click', function () {
+    button.addEventListener('click', function() {
       const alert = this.closest('.alert');
       if (alert) {
         alert.classList.remove('show');
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize clipboard for code examples
   const copyButtons = document.querySelectorAll('.btn-copy');
   copyButtons.forEach((button) => {
-    button.addEventListener('click', function () {
+    button.addEventListener('click', function() {
       const codeBlock = this.closest('pre');
       const code = codeBlock.querySelector('code').innerText;
 

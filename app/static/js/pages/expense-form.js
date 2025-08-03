@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const restaurantSelect = document.getElementById('restaurant_id');
 
   // Function to update category based on restaurant type
-  function updateCategory (restaurantId) {
+  function updateCategory(restaurantId) {
     if (categoryManuallyChanged || !categorySelect) return;
     if (!restaurantId) return;
 
@@ -19,14 +19,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle restaurant change
   if (restaurantSelect) {
-    restaurantSelect.addEventListener('change', function () {
+    restaurantSelect.addEventListener('change', function() {
       updateCategory(this.value);
     });
   }
 
   // Track manual category changes
   if (categorySelect) {
-    categorySelect.addEventListener('change', function () {
+    categorySelect.addEventListener('change', function() {
       categoryManuallyChanged = this.value !== '';
     });
   }

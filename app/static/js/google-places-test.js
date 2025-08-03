@@ -24,7 +24,7 @@ if (!window.GOOGLE_MAPS_API_KEY) {
 }
 
 class GooglePlacesTest {
-  constructor () {
+  constructor() {
     this.map = null;
     this.markers = [];
     this.infoWindow = null;
@@ -102,14 +102,14 @@ class GooglePlacesTest {
       const options = {
         enableHighAccuracy: true,
         timeout: 5000,
-        maximumAge: 0
+        maximumAge: 0,
       };
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const pos = {
             lat: position.coords.latitude,
-            lng: position.coords.longitude
+            lng: position.coords.longitude,
           };
 
           // Center the map on the user's location
@@ -118,7 +118,7 @@ class GooglePlacesTest {
             this.map.setZoom(14);
 
             // Optionally search for nearby places
-            this.searchNearby(pos).catch(error => {
+            this.searchNearby(pos).catch((error) => {
               logger.error('Error searching nearby places:', error);
             });
           }
@@ -130,7 +130,7 @@ class GooglePlacesTest {
           logger.warn(errorMessage, { error });
           resolve(); // Resolve anyway to continue initialization
         },
-        options
+        options,
       );
     });
   }
@@ -159,14 +159,14 @@ class GooglePlacesTest {
         fullscreenControl: true,
         mapTypeControlOptions: {
           style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-          position: google.maps.ControlPosition.TOP_RIGHT
+          position: google.maps.ControlPosition.TOP_RIGHT,
         },
         zoomControl: true,
         zoomControlOptions: {
-          position: google.maps.ControlPosition.RIGHT_CENTER
+          position: google.maps.ControlPosition.RIGHT_CENTER,
         },
         // Add gesture handling to prevent map dragging on mobile when scrolling
-        gestureHandling: 'auto'
+        gestureHandling: 'auto',
       });
 
       // Create a new Places service
@@ -203,7 +203,7 @@ class GooglePlacesTest {
   /**
      * Set up event listeners for the map and UI elements
      */
-  setupEventListeners () {
+  setupEventListeners() {
     const searchButton = document.getElementById('search-button');
     const locationInput = document.getElementById('location-input');
 
@@ -282,18 +282,18 @@ class GooglePlacesTest {
       const { results, status } = await googlePlacesService.searchNearby(
         {
           lat: location.lat(),
-          lng: location.lng()
+          lng: location.lng(),
         },
         {
           keyword: keyword || '',
           radius: 5000, // 5km radius
-          maxResults: 20
-        }
+          maxResults: 20,
+        },
       );
 
       if (status === 'OK' && results && results.length > 0) {
         // Add markers for each result
-        results.forEach(place => {
+        results.forEach((place) => {
           this.createMarker(place);
         });
 
@@ -302,9 +302,8 @@ class GooglePlacesTest {
 
         // Return the results
         return results;
-      } else {
-        throw new Error('No results found');
       }
+      throw new Error('No results found');
 
     } catch (error) {
       console.error('Error searching nearby:', error);
@@ -318,7 +317,7 @@ class GooglePlacesTest {
      * @param {Object} place - The place to create a marker for
      * @returns {google.maps.Marker} The created marker
      */
-  createMarker (place) {
+  createMarker(place) {
     if (!place.geometry?.location) return null;
 
     const marker = new google.maps.Marker({
@@ -340,7 +339,7 @@ class GooglePlacesTest {
   /**
      * Show details for a place in the info window
      */
-  showPlaceDetails (place) {
+  showPlaceDetails(place) {
     let content = `<div class="place-details">
         <h3>${place.name || 'No name'}</h3>`;
 
@@ -380,7 +379,7 @@ class GooglePlacesTest {
      * Display search results in the results container
      * @param {Array} places - Array of place objects to display
      */
-  displayResults (places) {
+  displayResults(places) {
     const resultsContainer = document.getElementById('results');
 
     if (!resultsContainer) {
@@ -440,7 +439,7 @@ class GooglePlacesTest {
   /**
      * Clear all markers from the map
      */
-  clearMarkers () {
+  clearMarkers() {
     this.markers.forEach((marker) => marker.setMap(null));
     this.markers = [];
   }
@@ -449,7 +448,7 @@ class GooglePlacesTest {
      * Show an error message to the user
      * @param {string} message - The error message to display
      */
-  showError (message) {
+  showError(message) {
     const errorContainer = document.getElementById('error-message');
     if (errorContainer) {
       errorContainer.textContent = message;
@@ -463,7 +462,7 @@ class GooglePlacesTest {
      * Display search results in the results container
      * @param {Array} places - Array of place objects to display
      */
-  displayResults (places) {
+  displayResults(places) {
     const resultsContainer = document.getElementById('results');
 
     if (!resultsContainer) {
@@ -516,7 +515,7 @@ class GooglePlacesTest {
      * Show an error message to the user
      * @param {string} message - The error message to display
      */
-  showError (message) {
+  showError(message) {
     const errorContainer = document.getElementById('error-message');
     if (errorContainer) {
       errorContainer.textContent = message;
@@ -547,7 +546,7 @@ class GooglePlacesTest {
    * @param {string} address - The address to geocode
    * @returns {Promise<google.maps.GeocoderResult>} - The geocoding result
    */
-  async geocodeAddress (address) {
+  async geocodeAddress(address) {
     try {
       const geocoder = new google.maps.Geocoder();
       const response = await new Promise((resolve, reject) => {

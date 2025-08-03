@@ -8,7 +8,7 @@ export class TableSort {
      * Initialize table sorting
      * @param {string} tableSelector - CSS selector for the table
      */
-  constructor (tableSelector) {
+  constructor(tableSelector) {
     this.table = document.querySelector(tableSelector);
     if (!this.table) return;
 
@@ -26,7 +26,7 @@ export class TableSort {
   /**
      * Initialize event listeners for sortable headers
      */
-  init () {
+  init() {
     this.headers.forEach((header, index) => {
       if (header.dataset.sort === 'true') {
         header.style.cursor = 'pointer';
@@ -55,7 +55,7 @@ export class TableSort {
      * Sort table by column
      * @param {number} columnIndex - Index of the column to sort by
      */
-  sortByColumn (columnIndex) {
+  sortByColumn(columnIndex) {
     const header = this.headers[columnIndex];
     const sortType = header.dataset.sortType || 'text';
 
@@ -107,7 +107,7 @@ export class TableSort {
      * @param {string} type - The data type (text, number, currency, date)
      * @returns {*} The processed cell value
      */
-  getCellValue (cell, type) {
+  getCellValue(cell, type) {
     const value = cell.textContent.trim();
 
     switch (type) {
@@ -127,7 +127,7 @@ export class TableSort {
   /**
      * Update the table with sorted rows
      */
-  updateTable () {
+  updateTable() {
     // Remove existing rows
     while (this.tbody.firstChild) {
       this.tbody.removeChild(this.tbody.firstChild);
@@ -140,7 +140,7 @@ export class TableSort {
   /**
      * Update sort indicators on column headers
      */
-  updateSortIndicators () {
+  updateSortIndicators() {
     this.headers.forEach((header, index) => {
       const indicator = header.querySelector('.sort-indicator');
       if (!indicator) return;

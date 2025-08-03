@@ -132,7 +132,7 @@ export default [
       'semi': ['error', 'always'],
       'quotes': ['error', 'single', { avoidEscape: true }],
       'object-curly-spacing': ['error', 'always'],
-      'space-before-function-paren': ['error', 'always'],
+      'space-before-function-paren': ['error', 'never'],
       'arrow-parens': ['error', 'always'],
       'no-multiple-empty-lines': ['error', { max: 1, maxEOF: 1 }],
     },

@@ -23,6 +23,11 @@ variable "environment" {
   type        = string
 }
 
+variable "server_name" {
+  description = "The server name for the application (e.g., meal-expense-tracker-dev.us-west-2.elb.amazonaws.com)"
+  type        = string
+}
+
 variable "aws_region" {
   description = "The AWS region where resources will be created"
   type        = string

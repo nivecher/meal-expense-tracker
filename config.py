@@ -20,7 +20,7 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration."""
 
-    DEBUG = True
+    DEBUG = os.environ.get("FLASK_DEBUG") == "1"
     SQLALCHEMY_DATABASE_URI = os.environ.get("DEV_DATABASE_URL") or "sqlite:///" + os.path.join(
         os.path.abspath(os.path.dirname(__file__)), "instance/app-dev.db"
     )
@@ -31,7 +31,7 @@ class TestingConfig(Config):
     """Testing configuration."""
 
     TESTING = True
-    DEBUG = True
+    DEBUG = os.environ.get("FLASK_DEBUG") == "1"
     SQLALCHEMY_DATABASE_URI = os.environ.get("TEST_DATABASE_URL") or "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
     # Disable rate limiting in tests

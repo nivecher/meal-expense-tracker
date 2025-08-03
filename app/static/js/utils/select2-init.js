@@ -6,7 +6,7 @@
 /**
  * Initialize all Select2 elements on the page
  */
-function initSelect2 () {
+function initSelect2() {
   if (window.jQuery && window.jQuery.fn.select2) {
     $('select.select2').select2({
       theme: 'bootstrap-5',

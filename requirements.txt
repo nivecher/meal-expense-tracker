@@ -18,7 +18,7 @@ botocore==1.40.1
     # via
     #   boto3
     #   s3transfer
-certifi==2025.7.14
+certifi==2025.8.3
     # via requests
 charset-normalizer==3.4.2
     # via requests
@@ -33,12 +33,15 @@ email-validator==2.2.0
 flask==3.1.1
     # via
     #   -r requirements/base.in
+    #   flask-cors
     #   flask-jwt-extended
     #   flask-limiter
     #   flask-login
     #   flask-migrate
     #   flask-sqlalchemy
     #   flask-wtf
+flask-cors==4.0.2
+    # via -r requirements/base.in
 flask-jwt-extended==4.7.1
     # via -r requirements/base.in
 flask-limiter==3.12

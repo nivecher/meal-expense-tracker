@@ -10,19 +10,28 @@ from app.auth.models import User
 from app.extensions import db
 
 
+@click.group("user")
+def user_cli():
+    """User management commands."""
+
+
 def register_commands(app):
     """Register CLI commands with the application."""
-    app.cli.add_command(reset_admin_password)
-    app.cli.add_command(list_users)
-    app.cli.add_command(create_user)
-    app.cli.add_command(update_user)
+    # Register the user command group
+    app.cli.add_command(user_cli)
+
+    # Add commands to the user group
+    user_cli.add_command(list_users)
+    user_cli.add_command(create_user)
+    user_cli.add_command(update_user)
+    user_cli.add_command(reset_admin_password)
 
 
-@click.command("reset-admin-password")
+@click.command("reset-password")
 @click.option(
     "--email",
-    prompt="Admin email",
-    help="Email of the admin user to reset password for",
+    prompt="User email",
+    help="Email of the user to reset password for",
 )
 @click.option(
     "--password",
@@ -54,18 +63,40 @@ def reset_admin_password(email: str, password: str) -> None:
         db.session.rollback()
 
 
-@click.command("list-users")
+def _count_user_objects(user) -> dict[str, int]:
+    """Count related objects for a user.
+
+    Args:
+        user: The User instance
+
+    Returns:
+        dict: Counts of related objects by type
+    """
+    return {
+        "expenses": user.expenses.count(),
+        "restaurants": user.restaurants.count(),
+        "categories": user.categories.count(),
+    }
+
+
+@click.command("list")
 @click.option(
     "--admin-only",
     is_flag=True,
     help="Show only admin users",
 )
+@click.option(
+    "--objects",
+    is_flag=True,
+    help="Show count of related objects (expenses, restaurants, categories)",
+)
 @with_appcontext
-def list_users(admin_only: bool) -> None:
+def list_users(admin_only: bool, objects: bool) -> None:
     """List all users in the system.
 
     Args:
         admin_only: If True, only show admin users
+        objects: If True, show count of related objects
     """
     query = select(User)
     if admin_only:
@@ -79,20 +110,30 @@ def list_users(admin_only: bool) -> None:
 
     # Prepare and display the table
     headers = ["ID", "Email", "Username", "Admin", "Active"]
-    # headers = ["ID", "Email", "Username", "Admin", "Active", "Last Login"]
-    rows = []
+    if objects:
+        headers.extend(["Expenses", "Restaurants", "Categories"])
 
+    rows = []
     for user in users:
-        rows.append(
-            [
-                str(user.id),
-                user.email,
-                user.username or "-",
-                "✓" if user.is_admin else "",
-                "✓" if user.is_active else "✗",
-                # user.last_login_at.strftime("%Y-%m-%d %H:%M") if user.last_login_at else "Never"
-            ]
-        )
+        row = [
+            str(user.id),
+            user.email,
+            user.username or "-",
+            "✓" if user.is_admin else "",
+            "✓" if user.is_active else "✗",
+        ]
+
+        if objects:
+            counts = _count_user_objects(user)
+            row.extend(
+                [
+                    str(counts["expenses"]),
+                    str(counts["restaurants"]),
+                    str(counts["categories"]),
+                ]
+            )
+
+        rows.append(row)
 
     # Calculate column widths
     col_widths = [max(len(str(row[i])) for row in [headers] + rows) for i in range(len(headers))]
@@ -104,10 +145,22 @@ def list_users(admin_only: bool) -> None:
     for row in rows:
         click.echo(" " + " | ".join(str(cell).ljust(w) for cell, w in zip(row, col_widths)))
 
-    click.echo(f"\nTotal users: {len(users)}" + (" (admin only)" if admin_only else ""))
+    # Print summary
+    summary = f"\nTotal users: {len(users)}" + (" (admin only)" if admin_only else "")
+    if objects:
+        total_counts = {
+            "expenses": sum(int(row[5]) for row in rows),
+            "restaurants": sum(int(row[6]) for row in rows),
+            "categories": sum(int(row[7]) for row in rows),
+        }
+        summary += f"\nTotal objects: {total_counts['expenses']} expenses, "
+        summary += f"{total_counts['restaurants']} restaurants, "
+        summary += f"{total_counts['categories']} categories"
+
+    click.echo(summary)
 
 
-@click.command("create-user")
+@click.command("create")
 @click.option(
     "--username",
     prompt=True,
@@ -137,7 +190,7 @@ def list_users(admin_only: bool) -> None:
     help="Set account active status (default: active)",
 )
 @with_appcontext
-def create_user(username: str, email: str, password: str, admin: bool, active: bool) -> None:
+def create_user(username: str, email: str, password: str, admin: bool, active: bool = True) -> None:
     """Create a new user account.
 
     Args:
@@ -186,34 +239,6 @@ def create_user(username: str, email: str, password: str, admin: bool, active: b
         click.echo(f"An unexpected error occurred: {str(e)}", err=True)
 
 
-@click.command("update-user")
-@click.argument("user_identifier")
-@click.option(
-    "--username",
-    help="New username for the user",
-)
-@click.option(
-    "--email",
-    help="New email address for the user",
-)
-@click.option(
-    "--password",
-    help="New password for the user (will be prompted if not provided)",
-    is_flag=True,
-)
-@click.option(
-    "--admin/--no-admin",
-    is_flag=True,
-    default=None,
-    help="Set or remove admin privileges",
-)
-@click.option(
-    "--active/--inactive",
-    is_flag=True,
-    default=None,
-    help="Set account active status",
-)
-@with_appcontext
 def _find_user_by_identifier(identifier: str) -> User | None:
     """Find a user by ID, username, or email.
 
@@ -280,6 +305,7 @@ def _update_user_email(user: User, new_email: str, changes: list[str]) -> bool:
         return False
 
     changes.append(f"email to '{new_email}'")
+    # Only update the email field, leave other fields unchanged
     user.email = new_email
     return True
 
@@ -299,29 +325,50 @@ def _update_user_password(user: User, changes: list[str]) -> bool:
         click.echo("Error: Password must be at least 8 characters long", err=True)
         return False
 
+    if not click.confirm("Are you sure you want to update the password?"):
+        click.echo("Password update cancelled.")
+        return False
+
     user.set_password(new_password)
     changes.append("password")
     return True
 
 
-def _update_user_status(user: User, is_admin: bool | None, is_active: bool | None, changes: list[str]) -> None:
-    """Update user's admin and active status.
+def _update_user_admin_status(user: User, is_admin: bool, changes: list[str]) -> bool:
+    """Update user's admin status.
 
     Args:
         user: User object to update
-        is_admin: New admin status (None to keep current)
-        is_active: New active status (None to keep current)
+        is_admin: New admin status
         changes: List to track changes made
+
+    Returns:
+        bool: True if update was successful, False otherwise
     """
-    if is_admin is not None and is_admin != user.is_admin:
+    if is_admin != user.is_admin:
         user.is_admin = is_admin
         status = "granted" if is_admin else "revoked"
         changes.append(f"admin privileges {status}")
+    return True
 
-    if is_active is not None and is_active != user.is_active:
+
+def _update_user_active_status(user: User, is_active: bool, changes: list[str]) -> bool:
+    """Update user's active status.
+
+    Args:
+        user: User object to update
+        is_active: New active status
+        changes: List to track changes made
+
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+
+    if is_active != user.is_active:
         user.is_active = is_active
         status = "activated" if is_active else "deactivated"
         changes.append(f"account {status}")
+    return True
 
 
 def _confirm_and_apply_changes(user: User, changes: list[str]) -> bool:
@@ -340,7 +387,7 @@ def _confirm_and_apply_changes(user: User, changes: list[str]) -> bool:
         click.echo("No changes specified. Use --help to see available options.")
         return False
 
-    click.echo(f"The following changes will be made to user '{user.username}' (ID: {user.id}):")
+    click.echo(f"The following changes will be made to user '{user.username}':")
     for change in changes:
         click.echo(f"  - {change}")
 
@@ -350,7 +397,7 @@ def _confirm_and_apply_changes(user: User, changes: list[str]) -> bool:
 
     try:
         db.session.commit()
-        click.echo(f"Successfully updated user: {user.username} (ID: {user.id})")
+        click.echo(f"Successfully updated user: {user.username} " f"(ID: {user.id}, Email: {user.email})")
         return True
     except IntegrityError as e:
         db.session.rollback()
@@ -362,46 +409,67 @@ def _confirm_and_apply_changes(user: User, changes: list[str]) -> bool:
     return False
 
 
+@click.command("update")
+@click.argument("user_identifier")
+@click.option("--username", help="New username")
+@click.option("--email", help="New email address")
+@click.option(
+    "--password",
+    is_flag=True,
+    help="Set to update password (will prompt for new password)",
+)
+@click.option(
+    "--admin/--no-admin",
+    default=None,
+    help="Set or remove admin privileges",
+)
+@click.option(
+    "--active/--inactive",
+    default=True,
+    help="Activate or deactivate the account",
+)
+@with_appcontext
 def update_user(
     user_identifier: str,
-    username: str | None,
-    email: str | None,
-    password: bool,
-    admin: bool | None,
-    active: bool | None,
+    username: str | None = None,
+    email: str | None = None,
+    password: bool = False,
+    admin: bool | None = None,
+    active: bool | None = None,
 ) -> None:
     """Update an existing user's account information.
 
     The user can be identified by their ID, username, or email address.
     Only specified fields will be updated.
-
-    Args:
-        user_identifier: ID, username, or email of the user to update
-        username: New username (if provided)
-        email: New email (if provided)
-        password: Whether to update the password (will prompt for new password)
-        admin: Whether to make the user an admin
-        active: Whether the account should be active
     """
     # Find the user
     user = _find_user_by_identifier(user_identifier)
     if not user:
         click.echo(f"Error: No user found with identifier: {user_identifier}", err=True)
         return
-
     changes = []
+
+    click.echo(f"Updating user: {user.username} " f"(ID: {user.id}, Email: {user.email})")
+
+    # Check if any changes are requested
+    if not any([username, email, password, admin is not None, active is not None]):
+        click.echo(
+            "Error: No changes specified. Use --help to see available options.",
+            err=True,
+        )
+        return
 
     # Update user attributes
     if username and not _update_user_username(user, username, changes):
         return
-
     if email and not _update_user_email(user, email, changes):
         return
-
     if password and not _update_user_password(user, changes):
         return
-
-    _update_user_status(user, admin, active, changes)
+    if admin is not None and not _update_user_admin_status(user, admin, changes):
+        return
+    if active is not None and not _update_user_active_status(user, active, changes):
+        return
 
     # Apply changes if any were made
     _confirm_and_apply_changes(user, changes)

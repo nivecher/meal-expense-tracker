@@ -1,16 +1,16 @@
 // Handle avatar image loading and error states
 class AvatarManager {
-  constructor () {
+  constructor() {
     this.avatars = [];
     this.defaultAvatar = '/static/img/default-avatar.png';
     this.init();
   }
 
-  init () {
+  init() {
     document.addEventListener('DOMContentLoaded', () => this.setupAvatars());
   }
 
-  setupAvatars () {
+  setupAvatars() {
     this.avatars = Array.from(document.querySelectorAll('[data-avatar]'));
 
     this.avatars.forEach((avatar) => {
@@ -30,7 +30,7 @@ class AvatarManager {
     });
   }
 
-  handleLoad (img) {
+  handleLoad(img) {
     img.classList.remove('avatar-loading');
     img.classList.add('avatar-loaded');
 
@@ -40,7 +40,7 @@ class AvatarManager {
     }, 10);
   }
 
-  handleError (img) {
+  handleError(img) {
     const defaultSrc = img.dataset.defaultSrc || this.defaultAvatar;
 
     // Only try to recover once to prevent loops

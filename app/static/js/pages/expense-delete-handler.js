@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
  * Handle click on delete button
  * @param {Event} event - The click event
  */
-function handleDeleteClick (event) {
+function handleDeleteClick(event) {
   event.preventDefault();
 
   const button = event.currentTarget;
@@ -37,7 +37,7 @@ function handleDeleteClick (event) {
  * Handle delete form submission
  * @param {Event} event - The form submission event
  */
-function handleDeleteSubmit (event) {
+function handleDeleteSubmit(event) {
   event.preventDefault();
 
   const form = event.target;
@@ -50,7 +50,7 @@ function handleDeleteSubmit (event) {
  * Submit delete request via Fetch API
  * @param {string} expenseId - The ID of the expense to delete
  */
-async function submitDeleteRequest (expenseId) {
+async function submitDeleteRequest(expenseId) {
   const url = `/expenses/${expenseId}/delete`;
   const form = document.getElementById('deleteExpenseForm');
   const formData = form ? new FormData(form) : new FormData();
@@ -111,7 +111,7 @@ async function submitDeleteRequest (expenseId) {
  * @param {string} message - The message to display
  * @param {string} type - The alert type (e.g., 'success', 'danger')
  */
-function showAlert (message, type = 'info') {
+function showAlert(message, type = 'info') {
   // Create alert element
   const alertDiv = document.createElement('div');
   alertDiv.className = `alert alert-${type} alert-dismissible fade show`;

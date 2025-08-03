@@ -3,7 +3,7 @@
  * Handles avatar image loading errors by falling back to a default image
  */
 
-export function initAvatarFallback () {
+export function initAvatarFallback() {
   document.addEventListener('DOMContentLoaded', () => {
     const avatarImages = document.querySelectorAll('img[data-avatar]');
 

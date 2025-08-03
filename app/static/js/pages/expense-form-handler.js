@@ -5,7 +5,7 @@
 /**
  * Initialize the expense form
  */
-function initializeExpenseForm () {
+function initializeExpenseForm() {
   const form = document.getElementById('expenseForm');
   if (!form) return;
 
@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', initializeExpenseForm);
  * @param {FormData} formData - The form data to validate
  * @returns {Object|null} Validation errors or null if valid
  */
-function validateFormData (formData) {
+function validateFormData(formData) {
   const errors = {};
   const requiredFields = ['amount', 'restaurant_id', 'date'];
 
@@ -79,7 +79,7 @@ function validateFormData (formData) {
   return Object.keys(errors).length === 0 ? null : errors;
 }
 
-async function handleFormSubmit (event) {
+async function handleFormSubmit(event) {
   event.preventDefault();
   console.log('Form submission started');
 
@@ -205,7 +205,7 @@ async function handleFormSubmit (event) {
  * @param {HTMLFormElement} form - The form element
  * @param {Object} errors - Object containing error messages
  */
-function showFormErrors (form, errors) {
+function showFormErrors(form, errors) {
   console.log('Showing form errors:', errors);
 
   // Clear previous errors

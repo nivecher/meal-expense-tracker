@@ -11,7 +11,7 @@ const AppConfig = {
   },
 
   // Initialize configuration
-  init () {
+  init() {
     // Configuration will be set from the base template
     if (window.APP_CONFIG) {
       Object.assign(this, window.APP_CONFIG);

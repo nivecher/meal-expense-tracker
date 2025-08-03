@@ -90,7 +90,7 @@ const handleFormSubmissionResponse = (result, form) => {
  * @param {HTMLFormElement} form - The form being submitted
  * @returns {Promise<void>}
  */
-const handleAjaxFormSubmit = async (form) => {
+const handleAjaxFormSubmit = async(form) => {
   const formData = new FormData(form);
   const method = (form.getAttribute('method') || 'POST').toUpperCase();
   const url = form.getAttribute('action') || window.location.pathname;

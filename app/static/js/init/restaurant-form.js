@@ -4,7 +4,7 @@
  */
 
 // Initialize the restaurant form when the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', async() => {
   try {
     // Import and initialize the restaurant form module
     const module = await import('/static/js/pages/restaurant-form.js');
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
  * Show an error message to the user
  * @param {string} message - The error message to display
  */
-function showError (message) {
+function showError(message) {
   const errorContainer = document.getElementById('error-container');
   if (errorContainer) {
     errorContainer.textContent = message;

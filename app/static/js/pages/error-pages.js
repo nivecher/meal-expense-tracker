@@ -6,7 +6,7 @@
 /**
  * Initialize error page functionality
  */
-function initErrorPage () {
+function initErrorPage() {
   // Add click handler for back button
   const backButton = document.querySelector('.btn-error-back');
   if (backButton) {
