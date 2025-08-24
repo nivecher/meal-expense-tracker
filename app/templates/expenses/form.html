@@ -58,6 +58,4 @@
 {% block scripts %}
     {{ super() }}
     {{ expense_scripts() }}
-    <script type="module"
-            src="{{ url_for('static', filename='js/pages/expense-form-handler.js') }}"></script>
 {% endblock scripts %}

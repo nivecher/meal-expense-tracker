@@ -1,16 +1,17 @@
 {% extends "base.html" %}
 {% block title %}
-    Bad Request - Meal Expense Tracker
+    {{ status_code }} - Error - Meal Expense Tracker
 {% endblock title %}
 {% block content %}
     <div class="container mt-5">
         <div class="row justify-content-center">
             <div class="col-md-8 text-center">
                 <div class="error-template">
-                    <h1 class="display-1 text-danger">400</h1>
-                    <h2 class="display-4">Bad Request</h2>
+                    <h1 class="display-1 text-danger">{{ status_code }}</h1>
+                    <h2 class="display-4">An Error Occurred</h2>
                     <div class="error-details mb-4">
-                        The server could not understand your request. Please check the URL or form data and try again.
+                        <p class="lead">{{ message }}</p>
+                        <p>We're sorry, but something went wrong. Please try again later or contact support if the problem persists.</p>
                     </div>
                     <div class="error-actions">
                         <a href="{{ url_for("main.index") }}"

@@ -13,6 +13,16 @@
             <i class="fas fa-utensils text-primary me-2"></i>My Restaurants
         </h1>
         <div class="d-flex gap-2">
+            <!-- Primary Actions -->
+            <a href="{{ url_for("restaurants.add_restaurant") }}"
+               class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Add Restaurant
+            </a>
+            <a href="{{ url_for("restaurants.google_places_search") }}"
+               class="btn btn-outline-primary">
+                <i class="fas fa-search-location me-1"></i> Find Restaurants
+            </a>
+            <!-- Secondary Actions -->
             <div class="dropdown">
                 <button class="btn btn-outline-secondary dropdown-toggle"
                         type="button"
@@ -34,41 +44,12 @@
                             <i class="fas fa-file-code me-1"></i> Export as JSON
                         </a>
                     </li>
-                    <li>
-                        <hr class="dropdown-divider">
-                    </li>
-                    <li>
-                        <a class="dropdown-item"
-                           href="{{ url_for("restaurants.google_places_search") }}">
-                            <i class="fas fa-search-location me-1"></i> Find Restaurants
-                        </a>
-                    </li>
                 </ul>
             </div>
             <a href="{{ url_for("restaurants.import_restaurants") }}"
-               class="btn btn-outline-primary">
+               class="btn btn-outline-secondary">
                 <i class="fas fa-upload me-1"></i> Import
             </a>
-            <div class="btn-group">
-                <a href="{{ url_for("restaurants.add_restaurant") }}"
-                   class="btn btn-primary">
-                    <i class="fas fa-plus me-1"></i> Add Restaurant
-                </a>
-                <button type="button"
-                        class="btn btn-primary dropdown-toggle dropdown-toggle-split"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false">
-                    <span class="visually-hidden">Toggle Dropdown</span>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li>
-                        <a class="dropdown-item"
-                           href="{{ url_for("restaurants.google_places_search") }}">
-                            <i class="fas fa-search-location me-1"></i> Find with Google
-                        </a>
-                    </li>
-                </ul>
-            </div>
         </div>
     </div>
     <!-- View Toggle -->

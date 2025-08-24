@@ -15,11 +15,11 @@
                             {{ form.hidden_tag() }}
                             <div class="mb-3">
                                 {{ form.username.label(class="form-label") }}
-                                {{ form.username(class="form-control") }}
+                                {{ form.username(class="form-control", autocomplete="username") }}
                             </div>
                             <div class="mb-3">
                                 {{ form.password.label(class="form-label") }}
-                                {{ form.password(class="form-control") }}
+                                {{ form.password(class="form-control", autocomplete="current-password") }}
                             </div>
                             <div class="mb-3 form-check">
                                 {{ form.remember_me(class="form-check-input") }}

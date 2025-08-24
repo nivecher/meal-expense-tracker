@@ -79,7 +79,10 @@ class Config:
     def _configure_development_session(self) -> None:
         """Configure development session settings with filesystem."""
         self.SESSION_TYPE = "filesystem"
-        self.SESSION_FILE_DIR = "/tmp/flask_session"
+        # Use tempfile for secure temporary directory
+        import tempfile
+
+        self.SESSION_FILE_DIR = tempfile.mkdtemp(prefix="flask_session_")
         self.SESSION_FILE_THRESHOLD = 100
 
 
