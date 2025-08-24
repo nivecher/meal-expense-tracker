@@ -1,0 +1,148 @@
+# UI/UX Specifications and Design Requirements
+
+## Design System
+
+### Color Palette
+- **Primary**: #2563eb (Blue) - Main actions, links, highlights
+- **Secondary**: #64748b (Slate) - Secondary actions, borders
+- **Success**: #059669 (Green) - Success messages, positive actions
+- **Warning**: #d97706 (Amber) - Warnings, alerts
+- **Error**: #dc2626 (Red) - Error messages, destructive actions
+- **Background**: #ffffff (White) - Main background
+- **Surface**: #f8fafc (Light gray) - Card backgrounds, secondary surfaces
+- **Text**: #1e293b (Dark slate) - Primary text
+- **Text Secondary**: #64748b (Slate) - Secondary text, labels
+
+### Typography
+- **Font Family**: Inter (Primary), system fonts (Fallback)
+- **Heading 1**: 2.25rem (36px), font-weight: 700
+- **Heading 2**: 1.875rem (30px), font-weight: 600
+- **Heading 3**: 1.5rem (24px), font-weight: 600
+- **Body**: 1rem (16px), font-weight: 400
+- **Small**: 0.875rem (14px), font-weight: 400
+- **Caption**: 0.75rem (12px), font-weight: 400
+
+### Spacing Scale
+- **xs**: 0.25rem (4px)
+- **sm**: 0.5rem (8px)
+- **md**: 1rem (16px)
+- **lg**: 1.5rem (24px)
+- **xl**: 2rem (32px)
+- **2xl**: 3rem (48px)
+
+## Component Specifications
+
+### Buttons
+- **Primary Button**: Blue background, white text, rounded corners
+- **Secondary Button**: White background, blue border and text
+- **Danger Button**: Red background, white text
+- **Button Sizes**: Small (32px), Medium (40px), Large (48px)
+- **Hover States**: Slight opacity change, subtle shadow
+
+### Forms
+- **Input Fields**: 40px height, rounded borders, focus states
+- **Labels**: Above inputs, required field indicators
+- **Validation**: Real-time feedback, error messages below fields
+- **Submit Buttons**: Full width, disabled state when invalid
+
+### Cards
+- **Background**: White with subtle shadow
+- **Border Radius**: 8px
+- **Padding**: 16px (24px for larger cards)
+- **Hover Effects**: Subtle shadow increase
+
+## Layout Structure
+
+### Navigation
+- **Header**: Fixed top, 64px height, logo + navigation + user menu
+- **Sidebar**: Collapsible, 240px width when expanded
+- **Main Content**: Responsive grid, max-width 1200px
+- **Footer**: Minimal, links and copyright
+
+### Responsive Breakpoints
+- **Mobile**: < 768px (Single column, stacked navigation)
+- **Tablet**: 768px - 1024px (Two column layout)
+- **Desktop**: > 1024px (Full layout with sidebar)
+
+### Grid System
+- **Columns**: 12-column grid system
+- **Gutters**: 16px between columns
+- **Margins**: 16px on mobile, 24px on desktop
+
+## Page-Specific Requirements
+
+### Dashboard
+- **Layout**: Grid of cards showing key metrics
+- **Components**: Spending summary, recent expenses, quick actions
+- **Charts**: Bar charts for spending by category, line charts for trends
+- **Actions**: Quick expense entry, view all expenses
+
+### Expense Entry Form
+- **Layout**: Single column form with logical grouping
+- **Progressive Disclosure**: Show advanced options on demand
+- **Auto-save**: Save draft every 30 seconds
+- **Validation**: Real-time feedback, clear error messages
+
+### Expense List
+- **Layout**: Table with sortable columns
+- **Filters**: Date range, category, restaurant, amount
+- **Search**: Global search across all fields
+- **Pagination**: 20 items per page, infinite scroll option
+
+### Restaurant Search
+- **Layout**: Search bar + results grid
+- **Search**: Autocomplete with recent searches
+- **Results**: Card layout with key information
+- **Actions**: Add to favorites, view details, select
+
+## Accessibility Requirements
+
+### WCAG 2.1 AA Compliance
+- **Color Contrast**: Minimum 4.5:1 for normal text
+- **Keyboard Navigation**: Full functionality without mouse
+- **Screen Reader**: Proper ARIA labels and landmarks
+- **Focus Management**: Visible focus indicators
+
+### Mobile Accessibility
+- **Touch Targets**: Minimum 44px × 44px
+- **Gesture Support**: Swipe, pinch, tap gestures
+- **Orientation**: Support for portrait and landscape
+- **Offline**: Basic functionality without internet
+
+## Performance Requirements
+
+### Loading States
+- **Skeleton Screens**: Show content structure while loading
+- **Progressive Loading**: Load critical content first
+- **Lazy Loading**: Images and non-critical content
+- **Caching**: Cache static assets and API responses
+
+### Animation Guidelines
+- **Duration**: 150ms for micro-interactions, 300ms for page transitions
+- **Easing**: Smooth, natural motion curves
+- **Reduced Motion**: Respect user preferences
+- **Performance**: 60fps animations, no layout thrashing
+
+## User Experience Patterns
+
+### Error Handling
+- **User-Friendly Messages**: Clear, actionable error text
+- **Recovery Options**: Suggest solutions or alternatives
+- **Graceful Degradation**: Functionality continues with reduced features
+- **Logging**: Track errors for debugging
+
+### Success Feedback
+- **Confirmation Messages**: Clear success indicators
+- **Progress Indicators**: Show completion status
+- **Celebration**: Subtle animations for achievements
+- **Next Steps**: Guide users to next actions
+
+### Data Management
+- **Auto-save**: Prevent data loss
+- **Undo/Redo**: Allow users to correct mistakes
+- **Bulk Actions**: Efficient management of multiple items
+- **Export Options**: Data portability in multiple formats
+description:
+globs:
+alwaysApply: false
+---

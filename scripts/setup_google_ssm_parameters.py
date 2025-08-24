@@ -22,7 +22,7 @@ dotenv_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=dotenv_path)
 
 
-def get_parameter_value(parameter_name, region, profile=None, with_decryption=True):
+def get_parameter_value(parameter_name: str, region: str, profile: str = None, with_decryption: bool = True) -> str:
     """
     Get the current value of an SSM parameter.
 

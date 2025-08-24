@@ -262,14 +262,6 @@ export default [
       }],
     },
   },
-  // UI Demo file (temporary development file)
-  {
-    files: ['app/static/js/ui-demo.js'],
-    rules: {
-      'no-console': 'off',
-      'no-unused-vars': 'off',
-    },
-  },
   // Ignore patterns
   {
     ignores: [

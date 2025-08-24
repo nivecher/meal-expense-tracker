@@ -1,27 +1,36 @@
 # 🍽️ Meal Expense Tracker
 
-A modern web application that helps you track dining expenses, analyze spending patterns, and maintain a history of your culinary experiences.
+A modern web application that helps you track dining expenses, analyze spending patterns, and maintain a history of
+your culinary experiences.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Terraform](https://img.shields.io/badge/terraform-%235835CC.svg?style=flat&logo=terraform&logoColor=white)](https://www.terraform.io/)
 
 ## ✨ Features
 
 - **Expense Tracking**
-  - Log dining expenses with photos and receipts
-  - Categorize by meal type and restaurant
-  - Track spending patterns over time
+- Log dining expenses with photos and receipts
+- Categorize by meal type and restaurant
+- Track spending patterns over time
 
 - **Restaurant Management**
+
   - Save favorite dining spots
   - Rate and review restaurants
   - Track visit history
 
 - **Insights & Reporting**
+
   - Visual spending analytics
   - Budget tracking
   - Exportable reports
+
+- **Google Maps Integration**
+  - Smart API detection for modern and legacy Google Maps APIs
+  - Restaurant search and autocomplete functionality
+  - Automatic fallback to ensure compatibility
+  - No deprecation warnings
 
 ## 🛠️ Command Line Interface (CLI)
 
@@ -35,23 +44,30 @@ Reset the password for an admin user:
 
 ```bash
 flask reset-admin-password --email admin@example.com
+
 ```
 
-You will be prompted to enter and confirm the new password. The password will be securely hashed before being stored in the database.
+You will be prompted to enter and confirm the new password. The password will be securely hashed before being stored in
+the database.
 
 **Options:**
+
 - `--email`: Email of the admin user (required)
 - `--password`: New password (if not provided, you'll be prompted)
 
 Example:
+
 ```bash
+
 flask reset-admin-password --email admin@example.com
-# You'll be prompted to enter and confirm the new password
+## You'll be prompted to enter and confirm the new password
+
 ```
 
 ## 📦 Version Management
 
-This project uses [setuptools_scm](https://github.com/pypa/setuptools_scm/) for automatic version management based on Git tags.
+This project uses [setuptools_scm](https://github.com/pypa/setuptools_scm/) for automatic version management based on
+Git tags.
 
 ### How Versioning Works
 
@@ -66,65 +82,67 @@ This project uses [setuptools_scm](https://github.com/pypa/setuptools_scm/) for 
 1. Update the version by creating a new Git tag:
 
    ```bash
-   # For a new release (e.g., 1.2.3)
+
+   ## For a new release (e.g., 1.2.3)
    git tag -a v1.2.3 -m "Release v1.2.3"
    git push origin v1.2.3
+
    ```
 
-2. The next build will automatically use this version
+1. The next build will automatically use this version
 
 ## 🌍 Environment Configuration
 
-The application supports different environment configurations using `.env` files following the `dev`, `test`, and `prod` naming convention.
+The application supports different environment configurations using `.env` files following the `dev`, `test`, and
+`prod` naming convention.
 
 ### Available Environments
 
-1. **Development** (`.env.dev`)
-   - Default environment for local development
-   - Debug mode enabled
-   - Uses SQLite database by default
-   - Run with: `python scripts/run.py dev` or just `python scripts/run.py`
+1. **Development** (`.env` or `.env.local`)
 
-2. **Testing** (`.env.test`)
-   - Used for running tests
-   - Uses a separate test database
-   - Debug mode disabled
-   - Run with: `python scripts/run.py test`
+- Default environment for local development
+  - Debug mode enabled
+  - Uses SQLite database by default
+  - Run with: `flask run`
 
-3. **Production** (`.env.prod`)
-   - Used in production environments
-   - Debug mode disabled
-   - Uses PostgreSQL/MySQL database
-   - Run with: `python scripts/run.py prod`
+1. **Testing** (`.env.test` optional)
+
+- Used for running tests
+  - Uses a separate test database
+  - Debug mode disabled
+
+1. **Production** (`.env.prod` managed by deployment)
+
+- Used in production environments
+  - Debug mode disabled
+  - Uses PostgreSQL/MySQL database
 
 ### Setting Up Environments
 
 1. Copy the example environment file for each environment you need:
 
    ```bash
-   # For development
-   cp env.example .env.dev
 
-   # For testing
-   cp env.example .env.test
+   ## For development
+   cp .env.example .env
 
-   # For production
-   cp env.example .env.prod
+   ## For testing
+   cp .env.example .env.test
+
+   ## For production
+   cp .env.example .env.prod
+
    ```
 
-2. Edit each `.env` file with the appropriate configuration values for that environment.
+1. Edit each `.env` file with the appropriate configuration values for that environment.
 
-3. Run the application with the desired environment:
+1. Run the application with the desired environment:
 
    ```bash
-   # For development (default)
-   python scripts/run.py dev
 
-   # For testing
-   python scripts/run.py test
+   ## For development (default)
+   flask run
 
-   # For production
-   python scripts/run.py prod
    ```
 
 ### Environment Variables
@@ -152,10 +170,10 @@ You can check the current version in several ways:
 1. From the command line:
 
    ```bash
-   python -c "from app import version; print(version['app'])"
+   python -c "from app._version import __version__; print(__version__)"
    ```
 
-2. From within the application, the version is available at the `/health` endpoint
+1. From within the application, the version is available at the `/health` endpoint
 
 ## 🚀 Quick Start
 
@@ -171,37 +189,47 @@ You can check the current version in several ways:
 1. Clone the repository:
 
    ```bash
+
    git clone https://github.com/yourusername/meal-expense-tracker.git
    cd meal-expense-tracker
+
    ```
 
-2. **Run the setup script**
+1. **Run the setup script**
 
    ```bash
+
    chmod +x scripts/setup-local-dev.sh
    ./scripts/setup-local-dev.sh
+
    ```
 
-3. Initialize the database:
+1. Initialize the database:
 
    ```bash
+
    flask db upgrade
+
    ```
 
-4. Run the development server:
+1. Run the development server:
 
    ```bash
+
    flask run
+
    ```
 
 ### Running Tests
 
 ```bash
-# Run all tests
+
+## Run all tests
 pytest
 
-# Run tests with coverage report
+## Run tests with coverage report
 pytest --cov=app --cov-report=term-missing
+
 ```
 
 ### Linting and Formatting
@@ -209,14 +237,16 @@ pytest --cov=app --cov-report=term-missing
 #### Python
 
 ```bash
-# Run flake8
+
+## Run flake8
 flake8 app tests
 
-# Run black
+## Run black
 black app tests
 
-# Run isort
+## Run isort
 isort app tests
+
 ```
 
 #### JavaScript
@@ -230,23 +260,25 @@ The project uses ESLint for JavaScript linting with the following configuration:
 ##### Running JavaScript Linter
 
 ```bash
-# Lint all JavaScript files
+
+## Lint all JavaScript files
 yarn lint:js
-# or
+## or
 make lint-js
 
-# Lint and fix auto-fixable issues
+## Lint and fix auto-fixable issues
 yarn lint:js:fix
-# or
+## or (2)
 make lint-js-fix
+
 ```
 
 ##### Linting Modes
 
 - **Development Mode** (`NODE_ENV=development`):
-  - Console statements are allowed
-  - Unused variables are warned about
-  - More lenient rules for development
+- Console statements are allowed
+- Unused variables are warned about
+- More lenient rules for development
 
 - **Production Mode** (default):
   - Console statements are treated as errors
@@ -274,26 +306,28 @@ The application includes a utility script for database initialization and manage
 ### Initializing the Database
 
 ```bash
-# Basic initialization (development environment)
+
+## Basic initialization (development environment)
 python init_db.py
 
-# Initialize for a specific environment
+## Initialize for a specific environment
 python init_db.py --env=testing
 
-# Reset database (drops all tables and recreates them)
+## Reset database (drops all tables and recreates them)
 python init_db.py --reset
 
-# Run database migrations after initialization
+## Run database migrations after initialization
 python init_db.py --migrate
 
-# Combine options (reset and migrate)
+## Combine options (reset and migrate)
 python init_db.py --reset --migrate
+
 ```
 
 ### Available Options
 
 - `--env`: Environment to use (default: development)
-  - Choices: development, testing, production
+- Choices: development, testing, production
 - `--reset`: Drop all tables before creating them
 - `--migrate`: Run database migrations after initialization
 
@@ -305,7 +339,8 @@ python init_db.py --reset --migrate
 
 ### Environment Configuration
 
-The script respects the application's environment configuration, ensuring proper database connection settings for each environment.
+The script respects the application's environment configuration, ensuring proper database connection settings for each
+environment.
 
 ## 📚 Documentation
 
@@ -319,17 +354,19 @@ The script respects the application's environment configuration, ensuring proper
 ### Code Quality
 
 ```bash
-# Run linters
+
+## Run linters
 make lint
 
-# Format code
+## Format code
 make format
 
-# Run tests
+## Run tests
 make test
 
-# Run tests with coverage
+## Run tests with coverage
 make test-cov
+
 ```
 
 ### Pre-commit Hooks
@@ -345,19 +382,25 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 1. **Create a `.env` file** with these variables:
 
    ```env
+
    FLASK_APP=wsgi:app
    FLASK_ENV=development
    SECRET_KEY=your-secret-key
    SQLALCHEMY_DATABASE_URI=sqlite:///instance/meals_expenses.db
    GOOGLE_MAPS_API_KEY=your-google-api-key
    GOOGLE_MAPS_MAP_ID=your-google-map-id
+
+   > **Note**: For Google Maps API integration details, see [Google Maps API Guide](docs/GOOGLE_MAPS_API.md)
+
    ```
 
-2. **Install dependencies** using pip-tools:
+1. **Install dependencies** using pip-tools:
 
    ```bash
+
    pip install pip-tools
    pip-sync requirements.txt requirements-dev.txt
+
    ```
 
 ### 📦 Requirements Management
@@ -375,35 +418,43 @@ To update the requirements:
 2. Run the following command to compile the requirements:
 
    ```bash
+
    make requirements
+
    ```
 
 3. Install the updated requirements:
 
    ```bash
+
    pip-sync requirements.txt requirements-dev.txt
+
    ```
 
 4. **Run the development server**:
 
    ```bash
+
    make run
+
    ```
 
 ### Common Development Tasks
 
 ```bash
-# Run tests
+
+## Run tests (2)
 make test
 
-# Run linters
+## Run linters (2)
 make lint
 
-# Format code
+## Format code (2)
 make format
 
-# Check for security issues
+## Check for security issues
 make security-check
+
 ```
 
 ## 📦 Packaging
@@ -419,20 +470,22 @@ make security-check
 We provide a unified script to package both the application and its dependencies:
 
 ```bash
-# Package both application and dependencies layer (default)
+
+## Package both application and dependencies layer (default)
 ./scripts/package.sh
 
-# Or package just the application
+## Or package just the application
 ./scripts/package.sh --app
 
-# Or just the dependencies layer
+## Or just the dependencies layer
 ./scripts/package.sh --layer
+
 ```
 
 This will create the following files:
 
 - `dist/app.zip` - The application package
-- `dist/layers/python-dependencies.zip` - The dependencies layer
+- `dist/layers/Python-dependencies.zip` - The dependencies layer
 
 ## 🚀 AWS Lambda Deployment
 
@@ -448,22 +501,33 @@ This will create the following files:
 1. **Package the Application**
 
    ```bash
-   # Create the deployment package
+
+   ## Create the deployment package
    make package-lambda
+
    ```
 
    This will create:
-   - `dist/app.zip` - The application package
-   - `dist/layers/python-dependencies.zip` - The dependencies layer
 
-2. **Deploy to Lambda**
+- `dist/app.zip` - The application package
+  - `dist/layers/Python-dependencies.zip` - The dependencies layer
+
+1. **Deploy to Lambda**
 
    ```bash
-   # Deploy the ZIP package to Lambda
+
+   ## Deploy the ZIP package to Lambda
    aws lambda update-function-code \
-     --function-name your-lambda-function-name \
-     --zip-file fileb://dist/app.zip
    ```
+
+```
+
+  --function-name your-lambda-function-name \
+--zip-file fileb://dist/app.zip
+
+```
+
+````
 
 ### Lambda Environment Variables
 
@@ -480,19 +544,22 @@ Make sure to set the following environment variables in your Lambda function:
 After deployment, you can test your Lambda function:
 
 ```bash
-# Invoke the function directly
-aws lambda invoke \
-  --function-name $LAMBDA_FUNCTION_NAME \
-  --payload '{"httpMethod": "GET", "path": "/health"}' \
-  response.json
 
-# View the response
+## Invoke the function directly
+aws lambda invoke \
+--function-name $LAMBDA_FUNCTION_NAME \
+--payload '{"httpMethod": "GET", "path": "/health"}' \
+response.json
+
+## View the response
 cat response.json
-```
+
+````
 
 ### CI/CD Integration
 
-For automated deployments, you can integrate this into your CI/CD pipeline. The repository includes a GitHub Actions workflow that can be configured to build and deploy the container image on push to specific branches.
+For automated deployments, you can integrate this into your CI/CD pipeline. The repository includes a GitHub Actions
+workflow that can be configured to build and deploy the container image on push to specific branches.
 
 ### Troubleshooting
 

@@ -42,4 +42,4 @@ def nl2br_filter(s):
 
 
 # Import routes after blueprint creation to avoid circular imports
-from . import routes  # noqa: E402
+from . import routes, services  # noqa: E402

@@ -35,4 +35,4 @@ def init_default_categories():
 
 
 # Import routes after blueprint creation to avoid circular imports
-from . import routes  # noqa: E402
+from . import routes, services  # noqa: E402

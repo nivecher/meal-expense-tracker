@@ -5,6 +5,7 @@ set -e
 DEFAULT_FUNCTION="meal-expense-tracker"
 FUNCTION_NAME=""
 ENVIRONMENT="dev"
+ARCHITECTURE="arm64" # Default to ARM64
 
 # Logging functions
 log() {
@@ -18,6 +19,7 @@ usage() {
   echo "Options:"
   echo "  -f, --function NAME  Lambda function name (default: $DEFAULT_FUNCTION)"
   echo "  -e, --env ENV       Environment: dev|staging|prod (default: dev)"
+  echo "  -a, --arch ARCH     Architecture: arm64|x86_64 (default: arm64)"
   echo "  -h, --help          Show this help message"
   exit 0
 }
@@ -32,6 +34,18 @@ while [[ $# -gt 0 ]]; do
   -e | --env)
     ENVIRONMENT="$2"
     shift 2
+    ;;
+  -a | --arch)
+    ARCHITECTURE="$2"
+    shift 2
+    ;;
+  --arm64)
+    ARCHITECTURE="arm64"
+    shift
+    ;;
+  --x86_64)
+    ARCHITECTURE="x86_64"
+    shift
     ;;
   -h | --help)
     usage
@@ -56,21 +70,36 @@ S3_BUCKET="meal-expense-tracker-${ENVIRONMENT}-deployment-${ACCOUNT_ID}"
 
 # Package Lambda
 package() {
-  log "Packaging Lambda function..."
-  make package-lambda
+  log "Packaging Lambda function for $ARCHITECTURE..."
+  ./scripts/package.sh --"$ARCHITECTURE"
 }
 
 # Upload to S3
 upload() {
   log "Uploading to S3 bucket: $S3_BUCKET"
 
-  local app_key="${ENVIRONMENT}/app-${TIMESTAMP}.zip"
-  log "Uploading package to s3://${S3_BUCKET}/${app_key}"
+  local app_key="${ENVIRONMENT}/app/${ARCHITECTURE}/app-${TIMESTAMP}.zip"
+  local layer_key="${ENVIRONMENT}/layers/${ARCHITECTURE}/python-dependencies-${TIMESTAMP}.zip"
+  local latest_app_key="${ENVIRONMENT}/app/${ARCHITECTURE}/app-${ARCHITECTURE}.zip"
+  local latest_layer_key="${ENVIRONMENT}/layers/${ARCHITECTURE}/python-dependencies-${ARCHITECTURE}.zip"
 
-  if ! aws s3 cp dist/app.zip "s3://${S3_BUCKET}/${app_key}"; then
-    log "Failed to upload package to S3"
+  # Upload application package
+  log "Uploading application package to s3://${S3_BUCKET}/${app_key}"
+  if ! aws s3 cp "dist/${ARCHITECTURE}/app-${ARCHITECTURE}.zip" "s3://${S3_BUCKET}/${app_key}"; then
+    log "Failed to upload application package to S3"
     return 1
   fi
+
+  # Upload layer package
+  log "Uploading layer package to s3://${S3_BUCKET}/${layer_key}"
+  if ! aws s3 cp "dist/${ARCHITECTURE}/layers/python-dependencies-${ARCHITECTURE}-latest.zip" "s3://${S3_BUCKET}/${layer_key}"; then
+    log "Failed to upload layer package to S3"
+    return 1
+  fi
+
+  # Copy to latest versions
+  aws s3 cp "s3://${S3_BUCKET}/${app_key}" "s3://${S3_BUCKET}/${latest_app_key}" --copy-props none
+  aws s3 cp "s3://${S3_BUCKET}/${layer_key}" "s3://${S3_BUCKET}/${latest_layer_key}" --copy-props none
 
   # Set the S3 key for Lambda update
   S3_KEY="$app_key"
@@ -78,15 +107,24 @@ upload() {
 
 # Update Lambda
 update_lambda() {
-  log "Updating Lambda function: $FUNCTION_NAME"
+  log "Updating Lambda function: $FUNCTION_NAME with architecture: $ARCHITECTURE"
 
+  # First update the function code
   if ! aws lambda update-function-code \
     --function-name "$FUNCTION_NAME" \
     --s3-bucket "$S3_BUCKET" \
-    --s3-key "$S3_KEY"; then
+    --s3-key "${ENVIRONMENT}/app/${ARCHITECTURE}/app-${ARCHITECTURE}.zip"; then
 
-    log "Failed to update Lambda function"
+    log "Failed to update Lambda function code"
     return 1
+  fi
+
+  # Then update the function configuration with the correct architecture
+  if ! aws lambda update-function-configuration \
+    --function-name "$FUNCTION_NAME" \
+    --architectures "$ARCHITECTURE"; then
+
+    log "Warning: Failed to update Lambda function architecture. Continuing..."
   fi
 }
 

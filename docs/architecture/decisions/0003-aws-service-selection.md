@@ -1,51 +1,57 @@
 # ADR 0003: AWS Service Selection
 
-* Status: Accepted
-* Deciders: Engineering Team
-* Date: 2024-06-08
+- Status: Accepted
+- Deciders: Engineering Team
+- Date: 2024-06-08
 
 ## Context and Problem Statement
 
-We needed to select appropriate AWS services for our application's backend infrastructure, considering factors like scalability, cost, maintenance overhead, and team expertise.
+We needed to select appropriate AWS services for our application's backend infrastructure, considering factors like
+scalability, cost, maintenance overhead, and team expertise.
 
 ## Decision Drivers
 
-* **Scalability**: Handle variable loads
-* **Cost-effectiveness**: Minimize operational costs
-* **Maintainability**: Reduce operational overhead
-* **Security**: Ensure data protection and compliance
-* **Performance**: Meet application response time requirements
+- **Scalability**: Handle variable loads
+- **Cost-effectiveness**: Minimize operational costs
+- **Maintainability**: Reduce operational overhead
+- **Security**: Ensure data protection and compliance
+- **Performance**: Meet application response time requirements
 
 ## Considered Options
 
 For each component, we considered the following options:
 
 1. **Compute**:
-   - AWS Lambda
-   - Amazon ECS
-   - Amazon EC2
-   - AWS App Runner
 
-2. **Database**:
-   - Amazon RDS (PostgreSQL)
-   - Amazon DynamoDB
-   - Amazon Aurora
-   - Self-managed PostgreSQL on EC2
+- AWS Lambda
+  - Amazon ECS
+  - Amazon EC2
+  - AWS App Runner
 
-3. **API Gateway**:
-   - Amazon API Gateway (HTTP API)
-   - Amazon API Gateway (REST API)
-   - Application Load Balancer
-   - Self-maned API server
+1. **Database**:
 
-4. **Storage**:
-   - Amazon S3
-   - Amazon EBS
-   - Amazon EFS
+- Amazon RDS (PostgreSQL)
+  - Amazon DynamoDB
+  - Amazon Aurora
+  - Self-managed PostgreSQL on EC2
+
+1. **API Gateway**:
+
+- Amazon API Gateway (HTTP API)
+  - Amazon API Gateway (REST API)
+  - Application Load Balancer
+  - Self-maned API server
+
+1. **Storage**:
+
+- Amazon S3
+  - Amazon EBS
+  - Amazon EFS
 
 ## Decision Outcome
 
 ### Compute: AWS Lambda
+
 - **Why**: Serverless architecture for cost efficiency and automatic scaling
 - **Details**:
   - Pay-per-use pricing model
@@ -53,6 +59,7 @@ For each component, we considered the following options:
   - Integrated with API Gateway
 
 ### Database: Amazon RDS (PostgreSQL)
+
 - **Why**: Managed relational database with PostgreSQL compatibility
 - **Details**:
   - Managed backups and updates
@@ -60,6 +67,7 @@ For each component, we considered the following options:
   - Point-in-time recovery
 
 ### API: Amazon API Gateway (HTTP API)
+
 - **Why**: Lightweight, low-latency API layer
 - **Details**:
   - Lower cost than REST API
@@ -67,6 +75,7 @@ For each component, we considered the following options:
   - Automatic scaling
 
 ### Storage: Amazon S3
+
 - **Why**: Highly durable object storage
 - **Details**:
   - Versioning support
@@ -91,11 +100,13 @@ For each component, we considered the following options:
 ### Compute Alternatives
 
 **Amazon ECS**
+
 - ✅ More control over runtime environment
 - ❌ Higher operational overhead
 - ❌ More expensive for variable workloads
 
 **Amazon EC2**
+
 - ✅ Full control
 - ❌ Requires manual scaling
 - ❌ Higher maintenance
@@ -103,11 +114,13 @@ For each component, we considered the following options:
 ### Database Alternatives
 
 **DynamoDB**
+
 - ✅ Serverless NoSQL
 - ❌ Not ideal for complex queries
 - ❌ Limited transaction support
 
 **Aurora**
+
 - ✅ High performance
 - ❌ Higher cost
 - ❌ Overkill for current needs

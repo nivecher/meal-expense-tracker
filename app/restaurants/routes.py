@@ -21,10 +21,10 @@ from sqlalchemy.orm import joinedload
 
 # Import Expense model here to avoid circular imports
 from app.extensions import db
-from app.restaurants import services
+from app.restaurants import bp, services
 from app.restaurants.forms import RestaurantForm
 from app.restaurants.models import Restaurant
-from app.restaurants.services.expense_stats import calculate_expense_stats
+from app.restaurants.services import calculate_expense_stats
 
 from . import bp
 

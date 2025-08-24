@@ -19,6 +19,11 @@ output "invoke_arn" {
   value       = aws_lambda_function.main.invoke_arn
 }
 
+output "iam_role_arn" {
+  description = "The ARN of the IAM role used by the Lambda function"
+  value       = aws_iam_role.lambda_role.arn
+}
+
 output "name" {
   description = "The name of the Lambda function"
   value       = aws_lambda_function.main.function_name
@@ -44,6 +49,12 @@ output "role_arn" {
 output "log_group_name" {
   description = "The name of the CloudWatch Log Group for the Lambda function"
   value       = aws_cloudwatch_log_group.lambda.name
+}
+
+output "app_secret_key_arn" {
+  description = "The ARN of the SSM parameter containing the application secret key"
+  value       = data.aws_ssm_parameter.app_secret_key.arn
+  sensitive   = true
 }
 
 output "lambda_role_name" {

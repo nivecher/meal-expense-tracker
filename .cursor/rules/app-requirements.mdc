@@ -1,0 +1,100 @@
+# Application Requirements and Specifications
+
+## Core Application Purpose
+The Meal Expense Tracker is a web application that allows users to:
+- Track meal expenses with detailed categorization
+- Manage restaurant information and preferences
+- Generate expense reports and analytics
+- Integrate with Google Maps for location services
+- Support multiple users with role-based access
+
+## User Roles and Permissions
+
+### Regular Users
+- Create and manage personal expense records
+- Add and edit restaurant information
+- View personal expense history and reports
+- Set personal preferences and categories
+
+### Administrators
+- Manage all users and their permissions
+- View system-wide analytics and reports
+- Manage restaurant database and categories
+- Configure system settings and integrations
+
+## Core Features and Requirements
+
+### Expense Management
+- **Expense Entry**: Date, amount, restaurant, category, notes
+- **Categorization**: Food type, meal type (breakfast, lunch, dinner, snack)
+- **Attachments**: Receipt images, notes, tags
+- **Validation**: Required fields, amount validation, date validation
+
+### Restaurant Management
+- **Restaurant Database**: Name, address, cuisine type, rating
+- **Google Maps Integration**: Location services, place search, autocomplete
+- **User Preferences**: Favorite restaurants, dietary restrictions
+- **Verification**: Restaurant verification status, user reviews
+
+### Reporting and Analytics
+- **Personal Reports**: Monthly/weekly summaries, category breakdowns
+- **Trend Analysis**: Spending patterns, restaurant preferences
+- **Export Functionality**: CSV, PDF reports
+- **Data Visualization**: Charts and graphs for insights
+
+### User Experience
+- **Responsive Design**: Mobile and desktop compatibility
+- **Intuitive Interface**: Easy expense entry and management
+- **Search and Filter**: Find expenses and restaurants quickly
+- **Notifications**: Reminders for expense entry, budget alerts
+
+## Technical Requirements
+
+### Performance
+- Page load times under 2 seconds
+- Support for 1000+ expense records per user
+- Efficient database queries with proper indexing
+- Responsive UI with smooth interactions
+
+### Data Management
+- Secure user data storage and encryption
+- Regular automated backups
+- Data retention policies (7 years for tax purposes)
+- GDPR compliance for data handling
+
+### Integration Requirements
+- Google Maps API for location services
+- Email notifications for important events
+- Export functionality for data portability
+- API endpoints for future mobile app integration
+
+## Business Rules
+
+### Expense Validation
+- Amounts must be positive numbers
+- Dates cannot be in the future
+- Restaurant must exist in database
+- Categories must be predefined
+
+### User Management
+- Email addresses must be unique
+- Passwords must meet security requirements
+- Account lockout after failed login attempts
+- Session timeout after inactivity
+
+### Data Integrity
+- Expenses cannot be deleted, only marked as void
+- Restaurant information requires verification
+- Category changes affect historical data
+- User preferences persist across sessions
+
+## Success Criteria
+- Users can enter expenses in under 30 seconds
+- Restaurant search returns results in under 1 second
+- Reports generate in under 5 seconds
+- 99.9% uptime for production system
+- User satisfaction score above 4.5/5.0
+description:
+globs:
+alwaysApply: false
+---

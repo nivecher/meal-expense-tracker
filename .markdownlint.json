@@ -1,17 +1,117 @@
 {
   "default": true,
+  "MD001": false,
+  "MD003": {
+    "style": "atx"
+  },
+  "MD004": {
+    "style": "dash"
+  },
+  "MD007": false,
+  "MD009": false,
+  "MD010": false,
+  "MD011": false,
+  "MD012": false,
   "MD013": {
-    "line_length": 120,
-    "tables": false,
-    "code_blocks": false
+    "line_length": 200,
+    "ignore_code_blocks": true,
+    "tables": false
   },
+  "MD014": false,
+  "MD018": false,
+  "MD019": false,
+  "MD022": false,
+  "MD023": false,
   "MD024": {
-    "siblings_only": true
+    "allow_different_nesting": true
   },
+  "MD025": {
+    "level": 1,
+    "front_matter_title": ""
+  },
+  "MD026": false,
+  "MD027": false,
+  "MD028": false,
+  "MD029": {
+    "style": "one_or_ordered"
+  },
+  "MD030": {
+    "ul_single": 1,
+    "ol_single": 1,
+    "ul_multi": 1,
+    "ol_multi": 1
+  },
+  "MD031": false,
+  "MD032": false,
   "MD033": {
-    "allowed_elements": ["details", "summary", "div", "kbd"]
+    "allowed_elements": [
+      "details",
+      "summary",
+      "div",
+      "kbd",
+      "br",
+      "hr",
+      "a",
+      "img",
+      "code",
+      "pre",
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "th",
+      "td"
+    ]
   },
   "MD034": false,
+  "MD035": {
+    "style": "---"
+  },
+  "MD036": false,
+  "MD037": false,
+  "MD038": false,
+  "MD039": false,
+  "MD040": false,
   "MD041": false,
-  "MD045": false
+  "MD042": false,
+  "MD043": false,
+  "MD044": {
+    "code_blocks": false,
+    "names": [
+      "JavaScript",
+      "TypeScript",
+      "Python",
+      "Flask",
+      "SQLAlchemy",
+      "AWS",
+      "GitHub",
+      "Node.js",
+      "npm",
+      "yarn",
+      "pip",
+      "Docker",
+      "Terraform",
+      "CloudFormation",
+      "CI/CD",
+      "OpenAPI",
+      "Swagger",
+      "PEP 8",
+      "BEM",
+      "OWASP",
+      "TDD",
+      "REST",
+      "API",
+      "JWT",
+      "CSRF"
+    ],
+    "ignore_code_blocks": true
+  },
+  "MD045": false,
+  "MD046": {
+    "style": "consistent"
+  },
+  "MD047": false,
+  "MD048": {
+    "style": "consistent"
+  }
 }

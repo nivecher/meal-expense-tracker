@@ -3,8 +3,7 @@ from __future__ import annotations
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
-from app.api import services
-from app.auth import bp
+from app.auth import bp, services
 from app.auth.models import User
 from app.extensions import db
 

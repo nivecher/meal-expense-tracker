@@ -1,6 +1,7 @@
 # Coding Guidelines for Meal Expense Tracker
 
 ## Table of Contents
+
 1. [TIGER Principles](#tiger-principles)
 2. [Technology Stack](#technology-stack)
 3. [Python/Flask Guidelines](#pythonflask-guidelines)
@@ -13,6 +14,7 @@
 ## TIGER Principles
 
 ### T - Testable
+
 - Write code that is easy to test in isolation
 - Follow the Arrange-Act-Assert pattern in tests
 - Use dependency injection for external services
@@ -23,6 +25,7 @@
 - Test edge cases and error conditions
 
 ### I - Incremental
+
 - Make small, focused changes
 - Each commit should be a single logical change
 - Use feature flags for large feature rollouts
@@ -32,6 +35,7 @@
 - Refactor in small, safe steps
 
 ### G - Goal-oriented
+
 - Each function/method should have a single responsibility
 - Code should be written to solve specific business problems
 - Avoid premature optimization
@@ -41,6 +45,7 @@
 - Remove unused code and dead features
 
 ### E - Explicit
+
 - Make dependencies explicit
 - Use clear, descriptive names for variables, functions, and classes
 - Avoid magic numbers and strings - use named constants
@@ -50,6 +55,7 @@
 - Prefer explicit over implicit behavior
 
 ### R - Responsibility-focused
+
 - Follow the Single Responsibility Principle
 - Group related functionality together
 - Separate concerns between layers (presentation, business logic, data access)
@@ -61,6 +67,7 @@
 ## Technology Stack
 
 ### Backend
+
 - Python 3.13
 - Flask 3.1.1
 - SQLAlchemy 2.0
@@ -68,6 +75,7 @@
 - Gunicorn for production WSGI server
 
 ### Frontend
+
 - Modern JavaScript (ES6+)
 - HTML5 / CSS3
 - Bootstrap 5 for styling
@@ -75,6 +83,7 @@
 - Webpack for asset bundling
 
 ### Infrastructure
+
 - AWS (EC2, RDS, S3, Lambda)
 - Terraform for infrastructure as code
 - Docker for containerization
@@ -83,6 +92,7 @@
 ## Python/Flask Guidelines
 
 ### Project Structure
+
 ```
 app/
   ├── api/              # API endpoints and resources
@@ -93,9 +103,11 @@ app/
   ├── static/           # Static files (JS, CSS, images)
   ├── templates/        # Jinja2 templates
   └── utils/            # Utility functions and helpers
+
 ```
 
 ### Code Style
+
 - Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/)
 - Use type hints for all function signatures
 - Maximum line length: 120 characters (Black default)
@@ -106,6 +118,7 @@ app/
 - Use `UPPER_CASE` for constants
 
 ### Best Practices
+
 - Keep route handlers thin
 - Move business logic to service layer
 - Use SQLAlchemy for database operations
@@ -117,7 +130,8 @@ app/
 
 ## JavaScript Guidelines
 
-### Code Style
+### Code Style (2)
+
 - Use ES6+ syntax
 - Use `camelCase` for variables and functions
 - Use `PascalCase` for React components
@@ -126,7 +140,8 @@ app/
 - Use destructuring for objects and arrays
 - Use arrow functions for callbacks
 
-### Best Practices
+### Best Practices (2)
+
 - No inline JavaScript in HTML files
 - Use modules for code organization
 - Keep DOM manipulation separate from business logic
@@ -138,6 +153,7 @@ app/
 ## Testing Guidelines
 
 ### Unit Tests
+
 - Test one thing per test case
 - Use descriptive test names
 - Follow Arrange-Act-Assert pattern
@@ -146,12 +162,14 @@ app/
 - Test edge cases and error conditions
 
 ### Integration Tests
+
 - Test API endpoints
 - Test database interactions
 - Test authentication and authorization
 - Test error responses
 
 ### Test Coverage
+
 - Aim for 80%+ test coverage
 - Cover all business logic
 - Test error conditions
@@ -160,6 +178,7 @@ app/
 ## Security Guidelines
 
 ### Authentication & Authorization
+
 - Use secure password hashing (bcrypt)
 - Implement proper session management
 - Use CSRF protection
@@ -167,6 +186,9 @@ app/
 - Use secure HTTP headers
 
 ### Data Protection
+
+<!-- markdownlint-disable MD044 -->
+
 - Use HTTPS everywhere
 - Sanitize all user inputs
 - Use parameterized queries
@@ -174,6 +196,7 @@ app/
 - Implement proper access controls
 
 ### Dependencies
+
 - Keep dependencies up to date
 - Use dependency scanning
 - Pin dependency versions
@@ -182,12 +205,14 @@ app/
 ## Git Workflow
 
 ### Branching Strategy
+
 - Use feature branches
 - Follow semantic versioning
 - Use meaningful branch names
 - Keep branches up to date with main
 
 ### Commit Messages
+
 - Use present tense
 - Start with a capital letter
 - Keep the first line under 50 characters
@@ -195,6 +220,7 @@ app/
 - Reference issue numbers when applicable
 
 ### Code Review
+
 - Review your own code first
 - Be constructive in feedback
 - Keep PRs small and focused
@@ -203,18 +229,21 @@ app/
 ## Documentation
 
 ### Code Comments
+
 - Document why, not what
 - Keep comments up to date
 - Remove commented-out code
 - Use docstrings for public APIs
 
 ### API Documentation
+
 - Document all endpoints
 - Include request/response examples
 - Document error responses
 - Keep documentation up to date
 
 ### Project Documentation
+
 - Keep README up to date
 - Document setup and deployment
 - Document environment variables
@@ -223,6 +252,7 @@ app/
 ## Code Quality Tools
 
 ### Python
+
 - Black for code formatting
 - isort for import sorting
 - flake8 for linting
@@ -230,6 +260,7 @@ app/
 - bandit for security scanning
 
 ### JavaScript
+
 - ESLint for linting
 - Prettier for code formatting
 - Jest for testing
@@ -237,13 +268,15 @@ app/
 
 ## Performance Guidelines
 
-### Backend
+### Backend (2)
+
 - Optimize database queries
 - Use caching where appropriate
 - Implement pagination for large datasets
 - Use asynchronous processing for long-running tasks
 
-### Frontend
+### Frontend (2)
+
 - Minimize bundle size
 - Lazy load components
 - Optimize images
@@ -251,13 +284,15 @@ app/
 
 ## Error Handling
 
-### Backend
+### Backend (3)
+
 - Use appropriate HTTP status codes
 - Provide meaningful error messages
 - Log errors with context
 - Implement proper exception handling
 
-### Frontend
+### Frontend (3)
+
 - Handle API errors gracefully
 - Show user-friendly error messages
 - Implement retry logic for failed requests
@@ -265,13 +300,15 @@ app/
 
 ## Monitoring and Logging
 
-### Backend
+### Backend (4)
+
 - Use structured logging
 - Include request IDs in logs
 - Log errors with stack traces
 - Monitor application metrics
 
-### Frontend
+### Frontend (4)
+
 - Log JavaScript errors
 - Track user interactions
 - Monitor performance metrics
@@ -280,16 +317,19 @@ app/
 ## Deployment
 
 ### Development
+
 - Use local development environment
 - Keep environment variables in .env file
 - Document setup process
 
 ### Staging
+
 - Mirror production environment
 - Test all features before production
 - Use feature flags for gradual rollouts
 
 ### Production
+
 - Use blue-green deployments
 - Monitor application health
 - Implement rollback procedures
@@ -309,4 +349,5 @@ app/
 [Specify your license here]
 
 ---
-*Last updated: July 17, 2025*
+
+_Last updated: July 17, 2025_

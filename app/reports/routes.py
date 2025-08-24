@@ -3,16 +3,17 @@
 from flask import render_template
 from flask_login import current_user, login_required
 
-from app.api.services import get_expenses_for_user, get_restaurants_for_user
+from app.expenses import services as expense_services
 from app.reports import bp
+from app.restaurants import services as restaurant_services
 
 
 @bp.route("/")
 @login_required
 def index():
     """Show the reports dashboard."""
-    expenses = get_expenses_for_user(current_user.id)
-    restaurants = get_restaurants_for_user(current_user.id)
+    expenses = expense_services.get_expenses_for_user(current_user.id)
+    restaurants = restaurant_services.get_restaurants_for_user(current_user.id)
     return render_template("reports/index.html", expenses=expenses, restaurants=restaurants)
 
 

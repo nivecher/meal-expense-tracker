@@ -18,15 +18,12 @@
 
 # Application settings
 APP_NAME = meal-expense-tracker
-PORT = 5001
 DOCKER_PORT = 8000
 PYTHON = python3.13
 PIP = pip3
 
 # Python settings
 PYTHONPATH = $(shell pwd)
-FLASK_APP = wsgi:app
-FLASK_ENV = development
 PYTEST_OPTS = -v --cov=app --cov-report=term-missing --cov-report=html
 TEST_PATH = tests/
 
@@ -54,30 +51,7 @@ export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 export PYTHONPATH
 
-# Docker settings
-CONTAINER_NAME = $(APP_NAME)-app
-IMAGE_NAME = $(APP_NAME)
-VOLUME_NAME = $(APP_NAME)-db
-
-# Terraform settings
-ENV ?= dev
-TF_ENV ?= $(ENV)
-TF_CMD = cd terraform && make ENV=$(TF_ENV)
-TF_PARALLELISM ?= 30
-TF_ARGS ?= -parallelism=$(TF_PARALLELISM) -refresh=true
-
-# GitHub settings
-GITHUB_ORG ?= nivecher
-REPO_NAME ?= meal-expense-tracker
-
-# Python settings
-PYTHONPATH = $(shell pwd)
-FLASK_APP = wsgi:app
-FLASK_ENV = development
-
-# Enable BuildKit for better build performance and features
-export DOCKER_BUILDKIT=1
-export PYTHONPATH
+## (deduplicated; see definitions above)
 
 # =======================
 # Virtual Environment
@@ -164,7 +138,7 @@ setup:
 ## Run the application locally
 .PHONY: run
 run:
-	FLASK_APP=$(FLASK_APP) FLASK_ENV=$(FLASK_ENV) flask run --port $(PORT)
+	flask run
 
 ## Run linters
 .PHONY: lint lint-all lint-python lint-html lint-js lint-css
@@ -625,7 +599,7 @@ package-layer:
 		echo "\033[1;31m❌ Failed to create Lambda layer package\033[0m"; \
 		exit 1; \
 	fi
-	@echo "\033[1;32m✅ Lambda layer package created at dist/layers/python-dependencies.zip\033[0m"
+	@echo "\033[1;32m✅ Lambda layer package created at dist/layers/python-dependencies-latest.zip\033[0m"
 
 .PHONY: deploy
 ## Deploy the Lambda function and run migrations

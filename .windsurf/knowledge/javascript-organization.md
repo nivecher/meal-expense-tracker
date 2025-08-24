@@ -2,65 +2,104 @@
 
 ## Rule: External JavaScript Files
 
-All JavaScript code should be placed in dedicated .js files and included via script tags in HTML templates. No inline JavaScript or HTML event handlers should be used in HTML files.
+All JavaScript code should be placed in dedicated .js files and included via script tags in HTML templates. No inline
+JavaScript or HTML event handlers should be used in HTML files.
 
 ### Requirements
 
 1. **File Organization**
-   - Place all JavaScript in dedicated .js files under `/app/static/js/`
-   - Organize by feature/component (e.g., `restaurant-form.js`, `user-preferences.js`)
 
-2. **Event Handling**
-   - Use `addEventListener()` instead of HTML event attributes (`onclick`, `onsubmit`, etc.)
-   - Example:
-     ```javascript
-     // Good
-     document.getElementById('myButton').addEventListener('click', handleClick);
+- Place all JavaScript in dedicated .js files under `/app/static/js/`
+  - Organize by feature/component (e.g., `restaurant-form.js`, `user-preferences.js`)
 
-     // Bad
-     <button onclick="handleClick()">Click me</button>
-     ```
+1. **Event Handling**
 
-3. **Initialization**
-   - Use a main initialization function in each JS file
-   - Call this function when the DOM is fully loaded
-   - Example:
-     ```javascript
-     function initRestaurantForm() {
-       // Initialize form handlers
-       document.getElementById('restaurantForm')
-         .addEventListener('submit', handleFormSubmit);
-     }
+- Use `addEventListener()` instead of HTML event attributes (`onclick`, `onsubmit`, etc.)
+  - Example:
 
-     // Initialize when DOM is ready
-     document.addEventListener('DOMContentLoaded', initRestaurantForm);
-     ```
+````
 
-4. **Data Attributes**
-   - Use `data-*` attributes to pass data from HTML to JavaScript
-   - Example:
-     ```html
-     <div data-restaurant-id="123" data-is-verified="true">...</div>
-     ```
-     ```javascript
-     const element = document.querySelector('[data-restaurant-id]');
-     const restaurantId = element.dataset.restaurantId;
-     const isVerified = element.dataset.isVerified === 'true';
-     ```
+```javascript
 
-5. **HTML Template Example**
+// Good
+document.getElementById('myButton').addEventListener('click', handleClick);
+
+````
+
+```
+
+// Bad
+<button onclick="handleClick()">Click me</button>
+
+```
+
+```
+
+1. **Initialization**
+
+- Use a main initialization function in each JS file
+  - Call this function when the DOM is fully loaded
+  - Example:
+
+```
+
+```javascript
+function initRestaurantForm() {
+  // Initialize form handlers
+  document.getElementById('restaurantForm').addEventListener('submit', handleFormSubmit);
+}
+```
+
+```
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', initRestaurantForm);
+
+```
+
+```
+
+1. **Data Attributes**
+
+- Use `data-*` attributes to pass data from HTML to JavaScript
+  - Example:
+
+```
+
+```html
+<div data-restaurant-id="123" data-is-verified="true">...</div>
+```
+
+```javascript
+const element = document.querySelector('[data-restaurant-id]');
+const restaurantId = element.dataset.restaurantId;
+const isVerified = element.dataset.isVerified === 'true';
+```
+
+````
+
+1. **HTML Template Example**
+
    ```html
+
    <!-- Good -->
    <script src="{{ url_for('static', filename='js/pages/restaurant-form.js') }}"></script>
 
    <!-- Bad -->
    <script>
-     function handleClick() {
-       // Inline JavaScript
-     }
+
+````
+
+function handleClick() {
+// Inline JavaScript
+}
+
+```
+
    </script>
    <button onclick="handleClick()">Click me</button>
-   ```
+
+```
 
 ### Benefits
 

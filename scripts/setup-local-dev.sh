@@ -196,6 +196,59 @@ install_trivy() {
   fi
 }
 
+# Function to install ARM64 cross-compilation tools
+# In the install_arm64_toolchain function
+install_arm64_toolchain() {
+  section "Installing ARM64 Cross-Compilation Tools"
+
+  # Check if we're on a supported platform
+  if [[ "$OSTYPE" != "linux-gnu"* ]]; then
+    echo -e "${YELLOW}Cross-compilation tools are only automatically installed on Linux.${NC}"
+    echo -e "${YELLOW}For other platforms, please install the appropriate cross-compilation tools.${NC}"
+    return 0
+  fi
+
+  # Check if we're on a Debian-based system
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "Installing ARM64 cross-compilation tools for Debian/Ubuntu..."
+
+    # Install cross-compilation tools
+    install_packages \
+      gcc-aarch64-linux-gnu \
+      g++-aarch64-linux-gnu \
+      aarch64-linux-gnu-libc6-dev \
+      python3.13-dev \
+      python3.13-venv \
+      python3.13-distutils
+
+    # Install QEMU for ARM64 emulation
+    echo "Installing QEMU for ARM64 emulation..."
+    install_packages qemu-user-static
+
+    # Verify installation
+    if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
+      echo -e "${GREEN}ARM64 cross-compilation tools installed successfully!${NC}"
+      echo -e "  GCC: $(aarch64-linux-gnu-gcc --version | head -n1)"
+
+      if command -v qemu-aarch64-static >/dev/null 2>&1; then
+        echo -e "${GREEN}QEMU for ARM64 installed successfully!${NC}"
+        echo -e "  QEMU: $(qemu-aarch64-static --version | head -n1)"
+      else
+        echo -e "${YELLOW}Warning: Failed to verify QEMU installation.${NC}"
+        return 1
+      fi
+    else
+      echo -e "${YELLOW}Failed to verify ARM64 cross-compilation tools installation.${NC}"
+      return 1
+    fi
+  else
+    echo -e "${YELLOW}Unsupported package manager. Please install ARM64 cross-compilation tools manually.${NC}"
+    echo -e "  Required packages: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user-static"
+    echo -e "  Also ensure Python development headers are installed for cross-compilation"
+    return 1
+  fi
+}
+
 # Function to install and configure AWS CLI
 install_aws_cli() {
   section "Setting up AWS CLI"
@@ -273,6 +326,9 @@ else
   echo -e "${YELLOW}Unsupported system. Please install dependencies manually.${NC}"
   exit 1
 fi
+
+# Install ARM64 cross-compilation tools
+install_arm64_toolchain
 
 # Install Python requirements
 install_python_requirements

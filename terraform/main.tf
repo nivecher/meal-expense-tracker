@@ -7,8 +7,16 @@ data "aws_caller_identity" "current" {}
 # Get the current AWS region
 data "aws_region" "current" {}
 
-# Generate a random password for Flask secret key
-resource "random_password" "flask_secret_key" {
+# Get current public IP for RDS access
+data "http" "my_ip" {
+  url = "https://ifconfig.me/ip"
+  request_headers = {
+    Accept = "text/plain"
+  }
+}
+
+# Generate a random password for application secret key if not provided
+resource "random_password" "app_secret_key" {
   length           = 50
   special          = true
   override_special = "!@#$%^&*()_+-=[]{}|;:,.<>?"
@@ -17,6 +25,37 @@ resource "random_password" "flask_secret_key" {
   min_special      = 5
   min_upper        = 5
 }
+
+# Get the application secret key from variable or generate a random one
+locals {
+  app_secret_key = random_password.app_secret_key.result
+}
+
+# Store the application secret key in SSM Parameter Store with KMS encryption
+resource "aws_ssm_parameter" "app_secret_key" {
+  name        = "/${var.app_name}/${var.environment}/app/secret_key"
+  description = "Application secret key for ${var.app_name} in ${var.environment}"
+  type        = "SecureString"
+  value       = local.app_secret_key
+  tier        = "Advanced"
+  key_id      = aws_kms_key.main.arn
+  data_type   = "text"
+  overwrite   = true
+
+  tags = merge({
+    Name        = "${var.app_name}-${var.environment}-app-secret-key"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }, var.tags)
+
+  lifecycle {
+    ignore_changes = [
+      # Ignore changes to value to prevent accidental overwrites
+      value,
+    ]
+  }
+}
+
 
 data "aws_vpc" "selected" {
   id = module.network.vpc_id
@@ -238,6 +277,7 @@ module "network" {
   # VPC Flow Logs configuration
   enable_flow_logs            = true
   flow_logs_retention_in_days = var.environment == "prod" ? 30 : 7
+  enable_nat_gateway          = var.environment != "prod"
 
   tags = local.tags
 }
@@ -370,8 +410,6 @@ module "rds" {
   vpc_cidr             = var.vpc_cidr
   db_subnet_group_name = module.network.database_subnet_group_name
 
-  # Security configuration
-  lambda_security_group_id = module.lambda.security_group_id
 
   # Use the main KMS key for encryption
   db_kms_key_arn = aws_kms_key.main.arn
@@ -400,7 +438,7 @@ module "secret_rotation" {
   rds_security_group_id = module.rds.db_security_group_id
 
   # Lambda configuration
-  lambda_package_path = "${path.module}/../dist/secret_rotation.zip"
+  lambda_package_path = "${path.module}/../dist/${var.lambda_architecture}/secret_rotation-${var.lambda_architecture}.zip"
   lambda_runtime      = "python3.13"
   rotation_days       = 30
 }
@@ -449,6 +487,9 @@ module "lambda" {
   server_name = local.api_domain_name
   aws_region  = var.aws_region
 
+  # SSM Parameter for secret key
+  app_secret_key_arn = aws_ssm_parameter.app_secret_key.arn
+
   # VPC configuration
   vpc_id     = module.network.vpc_id
   vpc_cidr   = module.network.vpc_cidr_block
@@ -459,17 +500,18 @@ module "lambda" {
 
   # Lambda package
   s3_bucket      = aws_s3_bucket.lambda_deployment.bucket
-  s3_key         = "${var.environment}/app/latest/app.zip"
-  app_local_path = "${path.module}/../dist/app.zip"
+  s3_key         = "${var.environment}/app/${var.lambda_architecture}/app-${var.lambda_architecture}.zip"
+  app_local_path = "${path.module}/../dist/${var.lambda_architecture}/app-${var.lambda_architecture}.zip"
 
   # Layer configuration
   layer_s3_bucket     = aws_s3_bucket.lambda_deployment.bucket
-  layer_s3_key        = "${var.environment}/layers/latest/python-dependencies.zip"
-  layer_local_path    = "${path.module}/../dist/layers/python-dependencies.zip"
+  layer_s3_key        = "${var.environment}/layers/${var.lambda_architecture}/python-dependencies-${var.lambda_architecture}.zip"
+  layer_local_path    = "${path.module}/../dist/${var.lambda_architecture}/layers/python-dependencies-${var.lambda_architecture}-latest.zip"
   architectures       = [var.lambda_architecture]
   compatible_runtimes = ["python3.13"]
 
   # Database configuration
+  db_protocol          = "postgresql" # TODO use psycopg2
   db_secret_arn        = module.rds.db_secret_arn
   db_security_group_id = module.rds.db_security_group_id
   db_username          = module.rds.db_username
@@ -477,6 +519,10 @@ module "lambda" {
   db_host              = module.rds.db_host
   db_port              = module.rds.db_port
   db_name              = module.rds.db_name
+
+  # Session configuration
+  session_type       = "dynamodb"
+  session_table_name = "${var.app_name}-${var.environment}-sessions"
 
   # API Gateway integration
   api_gateway_execution_arn = module.api_gateway.api_execution_arn
@@ -501,7 +547,10 @@ module "lambda" {
 
   # Extra environment variables
   extra_environment_variables = {
-    SESSION_DYNAMODB_TABLE = module.dynamodb.table_name
+    SESSION_TYPE            = "dynamodb"
+    SESSION_DYNAMODB_TABLE  = module.dynamodb.table_name
+    SESSION_DYNAMODB_REGION = var.aws_region
+    SESSION_TABLE_NAME      = module.dynamodb.table_name
   }
 
   # Tags
@@ -512,19 +561,13 @@ module "lambda" {
   })
 }
 
-# DynamoDB Table for Session Storage
+# DynamoDB table for session storage
 module "dynamodb" {
   source = "./modules/dynamodb"
 
-  # Basic configuration
   table_name                 = "${var.app_name}-${var.environment}-sessions"
   environment                = var.environment
   kms_key_arn                = aws_kms_key.main.arn
-  lambda_execution_role_name = module.lambda.lambda_role_name
-
-  tags = merge(local.tags, {
-    Name        = "${var.app_name}-${var.environment}-sessions"
-    Environment = var.environment
-    ManagedBy   = "terraform"
-  })
+  lambda_execution_role_name = "${var.app_name}-${var.environment}-lambda-role"
+  tags                       = local.tags
 }

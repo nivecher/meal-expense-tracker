@@ -15,16 +15,17 @@ To set up the Google Maps API key in AWS Secrets Manager, use the `setup_google_
 ### Usage
 
 ```bash
-# Basic usage
+## Basic usage
 ./scripts/setup_google_maps_secret.py --api-key "YOUR_GOOGLE_MAPS_API_KEY"
 
-# With custom AWS profile and region
+## With custom AWS profile and region
 ./scripts/setup_google_maps_secret.py \
   --api-key "YOUR_GOOGLE_MAPS_API_KEY" \
   --profile your-aws-profile \
   --region us-east-1 \
   --app-name meal-expense-tracker \
   --environment dev
+
 ```
 
 ### Options
@@ -37,7 +38,8 @@ To set up the Google Maps API key in AWS Secrets Manager, use the `setup_google_
 
 ### What the Script Does
 
-1. Creates or updates a secret in AWS Secrets Manager with the name format: `{app_name}/{environment}/google/maps-api-key`
+1. Creates or updates a secret in AWS Secrets Manager with the name format:
+   `{app_name}/{environment}/google/maps-api-key`
 2. Stores the Google Maps API key as the secret value
 3. Tags the secret with appropriate metadata
 4. Outputs the secret ARN that you need to add to your Terraform configuration
@@ -47,8 +49,10 @@ To set up the Google Maps API key in AWS Secrets Manager, use the `setup_google_
 After running the script, update your Terraform configuration with the secret ARN:
 
 ```hcl
-# In your environment's variables file (e.g., dev.tfvars)
+
+## In your environment's variables file (e.g., dev.tfvars)
 google_maps_api_key_secret_arn = "arn:aws:secretsmanager:region:account-id:secret:your-secret-name-xxxxxx"
+
 ```
 
 ### Security Notes

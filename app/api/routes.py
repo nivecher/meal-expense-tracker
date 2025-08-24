@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple, cast
+from typing import Any, Tuple, cast
 
 import googlemaps
 from flask import Response, current_app, jsonify, request
@@ -8,8 +8,11 @@ from flask_login import current_user, login_required
 from marshmallow import ValidationError
 
 from app.auth.models import User
+from app.categories import services as category_services
+from app.expenses import services as expense_services
+from app.restaurants import services as restaurant_services
 
-from . import bp, services
+from . import bp
 from .schemas import CategorySchema, ExpenseSchema, RestaurantSchema
 
 # Initialize Google Maps client
@@ -27,6 +30,7 @@ def get_gmaps_client():
     return gmaps
 
 
+# Schema instances
 expense_schema = ExpenseSchema()
 expenses_schema = ExpenseSchema(many=True)
 restaurant_schema = RestaurantSchema()
@@ -35,40 +39,57 @@ category_schema = CategorySchema()
 categories_schema = CategorySchema(many=True)
 
 
+def _get_current_user() -> User:
+    """Get the current authenticated user with proper typing."""
+    return cast(User, current_user._get_current_object())
+
+
+def _create_api_response(
+    data: Any = None, message: str = "Success", status: str = "success", code: int = 200
+) -> Tuple[Response, int]:
+    """Create a standardized API response."""
+    response_data = {"status": status, "message": message}
+    if data is not None:
+        response_data["data"] = data
+    return jsonify(response_data), code
+
+
+def _handle_validation_error(error: ValidationError) -> Tuple[Response, int]:
+    """Handle validation errors consistently."""
+    return jsonify({"status": "error", "message": "Validation failed", "errors": error.messages}), 400
+
+
+def _handle_service_error(error: Exception, operation: str) -> Tuple[Response, int]:
+    """Handle service layer errors consistently."""
+    current_app.logger.error(f"Error in {operation}: {str(error)}", exc_info=True)
+    return jsonify({"status": "error", "message": f"Failed to {operation}", "error": str(error)}), 500
+
+
+# Health Check
 @bp.route("/health")
 def health_check() -> Response:
     """API Health Check"""
     return jsonify({"status": "healthy"})
 
 
+# Google Places API endpoints
 @bp.route("/address-autocomplete")
 @login_required
 def address_autocomplete() -> Response:
-    """
-    Get address autocomplete suggestions from Google Places API.
-
-    Query parameters:
-        query: The search query string
-        language: (optional) Language code for results (default: 'en')
-
-    Returns:
-        JSON array of address suggestions with place_id and description
-    """
+    """Get address autocomplete suggestions from Google Places API."""
     query = request.args.get("query")
     if not query:
-        return jsonify({"error": "Missing required parameter: query"}), 400
+        return jsonify({"status": "error", "message": "Missing required parameter: query"}), 400
 
     language = request.args.get("language", "en")
 
     try:
         gmaps = get_gmaps_client()
         if not gmaps:
-            return jsonify({"error": "Google Maps API not configured"}), 500
+            return jsonify({"status": "error", "message": "Google Maps API not configured"}), 500
 
-        # Get place predictions
         predictions = gmaps.places_autocomplete(input_text=query, language=language)
 
-        # Format the response
         suggestions = [
             {
                 "place_id": pred["place_id"],
@@ -79,38 +100,27 @@ def address_autocomplete() -> Response:
             for pred in predictions
         ]
 
-        return jsonify(suggestions)
+        return _create_api_response(data=suggestions, message="Address suggestions retrieved successfully")
 
     except Exception as e:
-        current_app.logger.error(f"Error in address autocomplete: {str(e)}")
-        return jsonify({"error": "Failed to fetch address suggestions"}), 500
+        return _handle_service_error(e, "fetch address suggestions")
 
 
 @bp.route("/place-details")
 @login_required
 def place_details() -> Response:
-    """
-    Get detailed information about a place from Google Places API.
-
-    Query parameters:
-        place_id: The Google Place ID
-        language: (optional) Language code for results (default: 'en')
-
-    Returns:
-        JSON object with place details
-    """
+    """Get detailed information about a place from Google Places API."""
     place_id = request.args.get("place_id")
     if not place_id:
-        return jsonify({"error": "Missing required parameter: place_id"}), 400
+        return jsonify({"status": "error", "message": "Missing required parameter: place_id"}), 400
 
     language = request.args.get("language", "en")
 
     try:
         gmaps = get_gmaps_client()
         if not gmaps:
-            return jsonify({"error": "Google Maps API not configured"}), 500
+            return jsonify({"status": "error", "message": "Google Maps API not configured"}), 500
 
-        # Get place details with valid field names
         place = gmaps.place(
             place_id=place_id,
             language=language,
@@ -118,9 +128,8 @@ def place_details() -> Response:
         )
 
         if not place or "result" not in place:
-            return jsonify({"error": "Place not found"}), 404
+            return jsonify({"status": "error", "message": "Place not found"}), 404
 
-        # Format the response with the full address components array
         result = {
             "name": place["result"].get("name", ""),
             "formatted_address": place["result"].get("formatted_address", ""),
@@ -128,173 +137,278 @@ def place_details() -> Response:
             "address_components": place["result"].get("address_component", []),
         }
 
-        return jsonify(result)
+        return _create_api_response(data=result, message="Place details retrieved successfully")
 
     except Exception as e:
-        current_app.logger.error(f"Error fetching place details: {str(e)}")
-        return jsonify({"error": "Failed to fetch place details"}), 500
+        return _handle_service_error(e, "fetch place details")
 
 
+# Generic CRUD operations for expenses
 @bp.route("/expenses", methods=["GET"])
 @login_required
 def get_expenses() -> Response:
     """Get all expenses for the current user."""
-    user = cast(User, current_user._get_current_object())
-    expenses = services.get_expenses_for_user(user.id)
-    return jsonify(expenses_schema.dump(expenses))
+    try:
+        user = _get_current_user()
+        expenses = expense_services.get_expenses_for_user(user.id)
+        return _create_api_response(data=expenses_schema.dump(expenses), message="Expenses retrieved successfully")
+    except Exception as e:
+        return _handle_service_error(e, "retrieve expenses")
 
 
 @bp.route("/expenses", methods=["POST"])
 @login_required
-def create_expense() -> tuple[Response, int]:
+def create_expense() -> Tuple[Response, int]:
     """Create a new expense."""
-    user = cast(User, current_user._get_current_object())
     try:
+        user = _get_current_user()
         data = expense_schema.load(request.get_json())
-    except ValidationError as err:
-        return jsonify(err.messages), 400
-    expense = services.create_expense_for_user(user.id, data)
-    return jsonify(expense_schema.dump(expense)), 201
+        expense = expense_services.create_expense_for_user(user.id, data)
+        return _create_api_response(data=expense_schema.dump(expense), message="Expense created successfully", code=201)
+    except ValidationError as e:
+        return _handle_validation_error(e)
+    except Exception as e:
+        return _handle_service_error(e, "create expense")
 
 
 @bp.route("/expenses/<int:expense_id>", methods=["GET"])
 @login_required
 def get_expense(expense_id: int) -> Response:
     """Get a single expense."""
-    user = cast(User, current_user._get_current_object())
-    expense = services.get_expense_by_id_for_user(expense_id, user.id)
-    return jsonify(expense_schema.dump(expense))
+    try:
+        user = _get_current_user()
+        expense = expense_services.get_expense_by_id_for_user(expense_id, user.id)
+        if not expense:
+            return jsonify({"status": "error", "message": "Expense not found"}), 404
+        return _create_api_response(data=expense_schema.dump(expense), message="Expense retrieved successfully")
+    except Exception as e:
+        return _handle_service_error(e, "retrieve expense")
 
 
 @bp.route("/expenses/<int:expense_id>", methods=["PUT"])
 @login_required
 def update_expense(expense_id: int) -> Tuple[Response, int]:
     """Update an expense."""
-    user = cast(User, current_user._get_current_object())
-    expense = services.get_expense_by_id_for_user(expense_id, user.id)
     try:
+        user = _get_current_user()
+        expense = expense_services.get_expense_by_id_for_user(expense_id, user.id)
+        if not expense:
+            return jsonify({"status": "error", "message": "Expense not found"}), 404
+
         data = expense_schema.load(request.get_json())
-    except ValidationError as err:
-        return jsonify(err.messages), 400
-    updated_expense = services.update_expense_for_user(expense, data)
-    return jsonify(expense_schema.dump(updated_expense)), 200
+        updated_expense = expense_services.update_expense_for_user(expense, data)
+        return _create_api_response(data=expense_schema.dump(updated_expense), message="Expense updated successfully")
+    except ValidationError as e:
+        return _handle_validation_error(e)
+    except Exception as e:
+        return _handle_service_error(e, "update expense")
 
 
 @bp.route("/expenses/<int:expense_id>", methods=["DELETE"])
 @login_required
 def delete_expense(expense_id: int) -> Tuple[Response, int]:
     """Delete an expense."""
-    user = cast(User, current_user._get_current_object())
-    expense = services.get_expense_by_id_for_user(expense_id, user.id)
-    services.delete_expense_for_user(expense)
-    return jsonify({}), 204
+    try:
+        user = _get_current_user()
+        expense = expense_services.get_expense_by_id_for_user(expense_id, user.id)
+        if not expense:
+            return jsonify({"status": "error", "message": "Expense not found"}), 404
+
+        expense_services.delete_expense_for_user(expense)
+        return _create_api_response(message="Expense deleted successfully", code=204)
+    except Exception as e:
+        return _handle_service_error(e, "delete expense")
 
 
+# Generic CRUD operations for restaurants
 @bp.route("/restaurants", methods=["GET"])
 @login_required
 def get_restaurants() -> Response:
     """Get all restaurants for the current user."""
-    user = cast(User, current_user._get_current_object())
-    restaurants = services.get_restaurants_for_user(user.id)
-    return jsonify(restaurants_schema.dump(restaurants))
+    try:
+        user = _get_current_user()
+        restaurants = restaurant_services.get_restaurants_for_user(user.id)
+        return _create_api_response(
+            data=restaurants_schema.dump(restaurants), message="Restaurants retrieved successfully"
+        )
+    except Exception as e:
+        return _handle_service_error(e, "retrieve restaurants")
 
 
 @bp.route("/restaurants", methods=["POST"])
 @login_required
-def create_restaurant() -> tuple[Response, int]:
+def create_restaurant() -> Tuple[Response, int]:
     """Create a new restaurant."""
-    user = cast(User, current_user._get_current_object())
     try:
+        user = _get_current_user()
         data = restaurant_schema.load(request.get_json())
-    except ValidationError as err:
-        return jsonify(err.messages), 400
-    restaurant = services.create_restaurant_for_user(user.id, data)
-    return jsonify(restaurant_schema.dump(restaurant)), 201
+        restaurant = restaurant_services.create_restaurant_for_user(user.id, data)
+        return _create_api_response(
+            data=restaurant_schema.dump(restaurant), message="Restaurant created successfully", code=201
+        )
+    except ValidationError as e:
+        return _handle_validation_error(e)
+    except Exception as e:
+        return _handle_service_error(e, "create restaurant")
 
 
 @bp.route("/restaurants/<int:restaurant_id>", methods=["GET"])
 @login_required
 def get_restaurant(restaurant_id: int) -> Response:
     """Get a single restaurant."""
-    user = cast(User, current_user._get_current_object())
-    restaurant = services.get_restaurant_for_user(restaurant_id, user.id)
-    return jsonify(restaurant_schema.dump(restaurant))
+    try:
+        user = _get_current_user()
+        restaurant = restaurant_services.get_restaurant_for_user(restaurant_id, user.id)
+        if not restaurant:
+            return jsonify({"status": "error", "message": "Restaurant not found"}), 404
+        return _create_api_response(
+            data=restaurant_schema.dump(restaurant), message="Restaurant retrieved successfully"
+        )
+    except Exception as e:
+        return _handle_service_error(e, "retrieve restaurant")
 
 
 @bp.route("/restaurants/<int:restaurant_id>", methods=["PUT"])
 @login_required
-def update_restaurant(restaurant_id: int) -> tuple[Response, int]:
+def update_restaurant(restaurant_id: int) -> Tuple[Response, int]:
     """Update a restaurant."""
-    user = cast(User, current_user._get_current_object())
-    restaurant = services.get_restaurant_for_user(restaurant_id, user.id)
     try:
+        user = _get_current_user()
+        restaurant = restaurant_services.get_restaurant_for_user(restaurant_id, user.id)
+        if not restaurant:
+            return jsonify({"status": "error", "message": "Restaurant not found"}), 404
+
         data = restaurant_schema.load(request.get_json())
-    except ValidationError as err:
-        return jsonify(err.messages), 400
-    updated_restaurant = services.update_restaurant_for_user(restaurant, data)
-    return jsonify(restaurant_schema.dump(updated_restaurant)), 200
+        updated_restaurant = restaurant_services.update_restaurant_for_user(restaurant, data)
+        return _create_api_response(
+            data=restaurant_schema.dump(updated_restaurant), message="Restaurant updated successfully"
+        )
+    except ValidationError as e:
+        return _handle_validation_error(e)
+    except Exception as e:
+        return _handle_service_error(e, "update restaurant")
 
 
 @bp.route("/restaurants/<int:restaurant_id>", methods=["DELETE"])
 @login_required
-def delete_restaurant(restaurant_id: int) -> tuple[Response, int]:
+def delete_restaurant(restaurant_id: int) -> Tuple[Response, int]:
     """Delete a restaurant."""
-    user = cast(User, current_user._get_current_object())
-    restaurant = services.get_restaurant_for_user(restaurant_id, user.id)
-    services.delete_restaurant_for_user(restaurant)
-    return jsonify({}), 204
+    try:
+        user = _get_current_user()
+        restaurant = restaurant_services.get_restaurant_for_user(restaurant_id, user.id)
+        if not restaurant:
+            return jsonify({"status": "error", "message": "Restaurant not found"}), 404
+
+        restaurant_services.delete_restaurant_for_user(restaurant)
+        return _create_api_response(message="Restaurant deleted successfully", code=204)
+    except Exception as e:
+        return _handle_service_error(e, "delete restaurant")
 
 
+@bp.route("/restaurants/check", methods=["GET"])
+@login_required
+def check_restaurant_exists() -> Response:
+    """Check if a restaurant already exists for the current user by Google Place ID."""
+    place_id = request.args.get("place_id")
+    if not place_id:
+        return jsonify({"status": "error", "message": "Missing place_id parameter"}), 400
+
+    try:
+        user = _get_current_user()
+        from app.restaurants.models import Restaurant
+
+        existing_restaurant = Restaurant.query.filter_by(google_place_id=place_id, user_id=user.id).first()
+
+        result = {
+            "exists": bool(existing_restaurant),
+            "restaurant_id": existing_restaurant.id if existing_restaurant else None,
+            "name": existing_restaurant.name if existing_restaurant else None,
+        }
+
+        return _create_api_response(data=result, message="Restaurant check completed successfully")
+
+    except Exception as e:
+        return _handle_service_error(e, "check restaurant existence")
+
+
+# Generic CRUD operations for categories
 @bp.route("/categories", methods=["GET"])
 @login_required
 def get_categories() -> Response:
     """Get all categories for the current user."""
-    user = cast(User, current_user._get_current_object())
-    categories = services.get_categories_for_user(user.id)
-    return jsonify(categories_schema.dump(categories))
+    try:
+        user = _get_current_user()
+        categories = category_services.get_categories_for_user(user.id)
+        return _create_api_response(
+            data=categories_schema.dump(categories), message="Categories retrieved successfully"
+        )
+    except Exception as e:
+        return _handle_service_error(e, "retrieve categories")
 
 
 @bp.route("/categories", methods=["POST"])
 @login_required
-def create_category() -> tuple[Response, int]:
+def create_category() -> Tuple[Response, int]:
     """Create a new category."""
-    user = cast(User, current_user._get_current_object())
     try:
+        user = _get_current_user()
         data = category_schema.load(request.get_json())
-    except ValidationError as err:
-        return jsonify(err.messages), 400
-    category = services.create_category_for_user(user.id, data)
-    return jsonify(category_schema.dump(category)), 201
+        category = category_services.create_category_for_user(user.id, data)
+        return _create_api_response(
+            data=category_schema.dump(category), message="Category created successfully", code=201
+        )
+    except ValidationError as e:
+        return _handle_validation_error(e)
+    except Exception as e:
+        return _handle_service_error(e, "create category")
 
 
 @bp.route("/categories/<int:category_id>", methods=["GET"])
 @login_required
 def get_category(category_id: int) -> Response:
     """Get a single category."""
-    user = cast(User, current_user._get_current_object())
-    category = services.get_category_by_id_for_user(category_id, user.id)
-    return jsonify(category_schema.dump(category))
+    try:
+        user = _get_current_user()
+        category = category_services.get_category_by_id_for_user(category_id, user.id)
+        if not category:
+            return jsonify({"status": "error", "message": "Category not found"}), 404
+        return _create_api_response(data=category_schema.dump(category), message="Category retrieved successfully")
+    except Exception as e:
+        return _handle_service_error(e, "retrieve category")
 
 
 @bp.route("/categories/<int:category_id>", methods=["PUT"])
 @login_required
-def update_category(category_id: int) -> tuple[Response, int]:
+def update_category(category_id: int) -> Tuple[Response, int]:
     """Update a category."""
-    user = cast(User, current_user._get_current_object())
-    category = services.get_category_by_id_for_user(category_id, user.id)
     try:
+        user = _get_current_user()
+        category = category_services.get_category_by_id_for_user(category_id, user.id)
+        if not category:
+            return jsonify({"status": "error", "message": "Category not found"}), 404
+
         data = category_schema.load(request.get_json())
-    except ValidationError as err:
-        return jsonify(err.messages), 400
-    updated_category = services.update_category_for_user(category, data)
-    return jsonify(category_schema.dump(updated_category)), 200
+        updated_category = category_services.update_category_for_user(category, data)
+        return _create_api_response(
+            data=category_schema.dump(updated_category), message="Category updated successfully"
+        )
+    except ValidationError as e:
+        return _handle_validation_error(e)
+    except Exception as e:
+        return _handle_service_error(e, "update category")
 
 
 @bp.route("/categories/<int:category_id>", methods=["DELETE"])
 @login_required
-def delete_category(category_id: int) -> tuple[Response, int]:
+def delete_category(category_id: int) -> Tuple[Response, int]:
     """Delete a category."""
-    user = cast(User, current_user._get_current_object())
-    category = services.get_category_by_id_for_user(category_id, user.id)
-    services.delete_category_for_user(category)
-    return jsonify({}), 204
+    try:
+        user = _get_current_user()
+        category = category_services.get_category_by_id_for_user(category_id, user.id)
+        if not category:
+            return jsonify({"status": "error", "message": "Category not found"}), 404
+
+        category_services.delete_category_for_user(category)
+        return _create_api_response(message="Category deleted successfully", code=204)
+    except Exception as e:
+        return _handle_service_error(e, "delete category")

@@ -1,0 +1,4 @@
+# Ignore .windsurf directory
+.windsurf/**
+node_modules/**
+venv/**

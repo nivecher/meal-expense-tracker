@@ -150,7 +150,10 @@ def _execute_migrations():
         current_app.logger.info(f"Current database revision before upgrade: {current_rev}")
 
         # Get the latest revision available
-        head = os.popen("flask db heads").read().strip()
+        import subprocess
+
+        result = subprocess.run(["flask", "db", "heads"], capture_output=True, text=True, check=True)
+        head = result.stdout.strip()
         current_app.logger.info(f"Latest available migration: {head}")
 
         # Run the upgrade
@@ -220,7 +223,10 @@ def _handle_migration_success(initial_rev):
         current_app.logger.info("Database is already at the latest revision.")
 
     # Verify all migrations were applied
-    head = os.popen("flask db heads").read().strip()
+    import subprocess
+
+    result = subprocess.run(["flask", "db", "heads"], capture_output=True, text=True, check=True)
+    head = result.stdout.strip()
     if final_rev != head:
         current_app.logger.warning(
             f"Database is at revision {final_rev} but the latest is {head}. "

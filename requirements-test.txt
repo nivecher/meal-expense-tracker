@@ -63,7 +63,6 @@ markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 mccabe==0.7.0
 mdurl==0.1.2
--e git+https://github.com/nivecher/meal-expense-tracker.git@6c2a8912ee6e5c2f0649b6d4d2f70a310a390ad4#egg=meal_expense_tracker
 msgspec==0.19.0
 mypy==1.16.1
 mypy_extensions==1.1.0

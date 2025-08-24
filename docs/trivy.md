@@ -1,6 +1,7 @@
 # Trivy Integration
 
-This project uses [Trivy](https://aquasecurity.github.io/trivy/) for comprehensive security scanning of Terraform configurations and other artifacts to detect potential security issues.
+This project uses [Trivy](https://aquasecurity.github.io/trivy/) for comprehensive security scanning of Terraform
+configurations and other artifacts to detect potential security issues.
 
 ## Installation
 
@@ -13,11 +14,13 @@ brew install aquasecurity/trivy/trivy
 ### Linux
 
 Using Homebrew:
+
 ```bash
 brew install aquasecurity/trivy/trivy
 ```
 
 Or using the official installation script:
+
 ```bash
 curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 ```
@@ -33,7 +36,7 @@ choco install trivy
 ### Run Trivy Manually
 
 ```bash
-# From the project root
+## From the project root
 cd terraform
 trivy config .
 ```
@@ -44,27 +47,26 @@ Trivy supports multiple output formats:
 
 ```bash
 trivy config -f json .          # JSON output
-trivy config -f template --template "{{ range .Results }}{{ .Target }}:{{ range .Vulnerabilities }} [{{ .VulnerabilityID }}]{{ end }}{{ "\n" }}{{ end }}" .  # Custom template
+trivy config -f template --template "{{ range .Results }}{{ .Target }}:{{ range .Vulnerabilities }} [{{
+.VulnerabilityID }}]{{ end }}{{ "\n" }}{{ end }}" . # Custom template
 ```
 
 ### Ignoring Issues
 
 You can ignore specific checks by creating a `.trivyignore` file in your project root:
 
-```
-# Acceptable Risk: This is a false positive
+## Acceptable Risk: This is a false positive
+
 CVE-2023-1234
 
-# This is a test environment
+## This is a test environment
+
 AVD-AWS-0123
-```
 
-Or inline in your Terraform files:
-
-```hcl
+```T
 #trivy:ignore:AVD-AWS-0123
 resource "aws_s3_bucket" "example" {
-  # ...
+  ## ...
 }
 ```
 
@@ -72,7 +74,8 @@ resource "aws_s3_bucket" "example" {
 
 ### Pre-commit Hooks
 
-Trivy is integrated into the project's pre-commit hooks. It will automatically run on every commit that includes `.tf` files.
+Trivy is integrated into the project's pre-commit hooks. It will automatically run on every commit that includes `.tf`
+files.
 
 ### Skip Trivy in Pre-commit
 
@@ -91,27 +94,54 @@ name: Security Scan
 
 on:
   push:
-    branches: [ main ]
+```
+
+branches: [ main ]
+
+```
+
   pull_request:
-    branches: [ main ]
+
+```
+
+branches: [ main ]
+
+```
 
 jobs:
   security-scan:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
 
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'config'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
+```
 
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: 'trivy-results.sarif'
+runs-on: ubuntu-latest
+steps:
+
+- uses: actions/checkout@v3
+
+```
+
+```
+
+- name: Run Trivy vulnerability scanner
+
+uses: aquasecurity/trivy-action@master
+with:
+scan-type: 'config'
+format: 'sarif'
+output: 'trivy-results.sarif'
+
+```
+
+```
+
+- name: Upload Trivy scan results to GitHub Security tab
+
+uses: GitHub/codeql-action/upload-sarif@v2
+with:
+sarif_file: 'trivy-results.sarif'
+
+```
+
 ```
 
 ## Resources

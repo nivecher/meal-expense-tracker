@@ -26,7 +26,7 @@ zip-safe = false
 
 [tool.black]
 line-length = 120
-target-version = [ "py312",]
+target-version = [ "py313",]
 include = "\\.pyi?$"
 
 [tool.isort]
@@ -83,37 +83,7 @@ module = [
 ]
 ignore_errors = true
 
-[bandit]
-# Skip these tests
-skips = [
-    "B101",  # Assert statement
-    "B311",  # Standard pseudo-random generators
-    "B404",  # Subprocess without shell=True
-]
-
-# Only run these tests (empty = all)
-tests = []
-
-# Files/directories to exclude
-exclude_dirs = [
-    "tests/",
-    "venv/",
-    ".venv/",
-    "migrations/",
-    "node_modules/"
-]
-
-# Output format (default: "") - can be "csv", "custom", "html", "json", "txt", "xml", "yaml"
-output_format = ""
-
-# Output file (default: "")
-output_file = ""
-
-# Verbose output (default: False)
-verbose = false
-
-# Debug output (default: False)
-debug = false
+## Bandit config consolidated to .bandit and pre-commit
 
 [tool.djlint.extend]
 rules = [ "H025", "H006", "H007",]

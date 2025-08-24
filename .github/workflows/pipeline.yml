@@ -4,7 +4,7 @@ name: CI/CD Pipeline
 env:
   # Application settings
   APP_NAME: meal-expense-tracker
-  PYTHON_VERSION: '3.11'  # Using 3.11 as the latest stable version
+  PYTHON_VERSION: '3.11' # Using 3.11 as the latest stable version
   PYTHONPATH: ${{ github.workspace }}
   FLASK_APP: wsgi:app
   FLASK_ENV: test
@@ -27,8 +27,8 @@ permissions:
   actions: read
   checks: write
   statuses: write
-  security-events: write  # Required for CodeQL
-  packages: read  # Required for package caching
+  security-events: write # Required for CodeQL
+  packages: read # Required for package caching
 
 on:
   push:
@@ -120,7 +120,7 @@ jobs:
           fi
 
       - name: Run linters and type checks
-        if: matrix.python-version == '3.11'  # Only run linters once
+        if: matrix.python-version == '3.11' # Only run linters once
         run: |
           # Install development dependencies
           poetry install --no-interaction --with dev
@@ -133,7 +133,7 @@ jobs:
           poetry run detect-secrets audit .secrets.baseline --report --fail
 
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.11'  # Only upload coverage once
+        if: matrix.python-version == '3.11' # Only upload coverage once
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml

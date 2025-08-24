@@ -1,42 +1,20 @@
 # AWS provider configuration is handled by the root module
-# IAM Role for RDS Enhanced Monitoring
-resource "aws_iam_role" "rds_enhanced_monitoring" {
-  name = "${var.app_name}-${var.environment}-rds-monitoring-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "monitoring.rds.amazonaws.com"
-      }
-    }]
-  })
-
-  tags = merge({
-    Name        = "${var.app_name}-${var.environment}-rds-monitoring-role"
-    Environment = var.environment
-    ManagedBy   = "terraform"
-  }, var.tags)
-}
-
-# Attach the AWS managed policy for RDS enhanced monitoring
-resource "aws_iam_role_policy_attachment" "rds_enhanced_monitoring" {
-  role       = aws_iam_role.rds_enhanced_monitoring.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
-}
+# Note: Removing enhanced monitoring to stay within free tier
+# as it incurs additional costs when enabled
 
 # RDS Instance with cost-optimized settings
 resource "aws_db_instance" "main" {
   # Basic configuration - optimized for free tier
   identifier            = "${var.app_name}-${var.environment}"
-  allocated_storage     = var.db_allocated_storage
-  max_allocated_storage = 100 # Allow storage to grow to 100GB
-  storage_type          = "gp2"
+  instance_class        = "db.t3.micro"  # Free tier eligible
+  allocated_storage     = 20             # Free tier eligible (20GB)
+  max_allocated_storage = 20             # Match allocated storage to prevent scaling
+  storage_type          = "gp2"          # Free tier eligible
+  storage_encrypted     = true
+  kms_key_id            = var.db_kms_key_arn
   engine                = "postgres"
-  engine_version        = "14.18"
-  instance_class        = "db.t3.micro" # Free tier eligible
+  engine_version        = "14.18"        # Latest free tier eligible version
+  parameter_group_name  = aws_db_parameter_group.main.name
 
   # Database credentials
   # Ensure db_name and username start with a letter and contain only alphanumeric characters
@@ -47,40 +25,25 @@ resource "aws_db_instance" "main" {
   # Network configuration
   db_subnet_group_name   = var.db_subnet_group_name
   vpc_security_group_ids = [aws_security_group.rds.id]
-  publicly_accessible    = false  # Keep database private
-  network_type           = "IPV4" # Explicitly disable public access
+  publicly_accessible    = var.db_publicly_accessible
+  network_type           = "IPV4"
+  multi_az               = false  # Disable Multi-AZ for free tier
 
   # Backup & maintenance
-  backup_retention_period = 7                     # Keep backups for 7 days
+  backup_retention_period = 7                     # Keep backups for 7 days (free tier)
   backup_window           = "03:00-04:00"         # 1-hour backup window
   maintenance_window      = "tue:04:00-tue:05:00" # 1-hour maintenance window after backup
-  copy_tags_to_snapshot   = false
+  copy_tags_to_snapshot   = true
   apply_immediately       = true
-
-  # Enable automated backups
-  backup_target = "region" # Store backups in the same region as the DB instance
-
-  # Performance & cost optimization
-  multi_az          = var.environment == "prod" # Enable Multi-AZ in prod
-  storage_encrypted = true                      # Encryption at rest is free
+  skip_final_snapshot     = true  # Skip final snapshot to avoid costs (not recommended for production)
+  deletion_protection     = false # Disable deletion protection to avoid manual steps when deleting
 
   # Security
-  skip_final_snapshot                 = var.environment != "prod" # Don't keep final snapshot in non-prod
-  deletion_protection                 = true                      # Enable deletion protection in all environments
-  delete_automated_backups            = var.environment != "prod"
-  kms_key_id                          = var.db_kms_key_arn
   iam_database_authentication_enabled = true # Enable IAM database authentication
 
-  # Monitoring - enable performance insights with a 7-day retention period
-  performance_insights_enabled          = var.db_performance_insights_enabled
-  performance_insights_kms_key_id       = var.db_kms_key_arn
-  performance_insights_retention_period = var.db_performance_insights_enabled ? 7 : 0
-
-  # Disable enhanced monitoring
-  monitoring_interval = 0 # free tier eligible
-
-  # Parameter group
-  parameter_group_name = aws_db_parameter_group.main.name
+  # Monitoring - disable performance insights for free tier
+  performance_insights_enabled = false
+  monitoring_interval = 0 # Disable enhanced monitoring for free tier
 
   tags = merge({
     Name        = "${var.app_name}-${var.environment}-db"

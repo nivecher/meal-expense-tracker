@@ -2,4 +2,3 @@
 
 # Production-specific dependencies
 gevent>=24.0.0,<25.0.0
-Flask-Session>=0.8.0,<0.9.0

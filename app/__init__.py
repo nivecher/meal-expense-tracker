@@ -6,7 +6,7 @@ from flask import Flask, jsonify
 from flask.typing import ResponseReturnValue
 from flask_cors import CORS
 
-from config import config
+from config import get_config
 
 from .extensions import jwt
 
@@ -20,33 +20,79 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     """Create and configure the Flask application.
 
     Args:
-        config_name: The name of the configuration to use. If None, defaults to
-            the value of the FLASK_CONFIG environment variable, or 'default' if not set.
-
+        config_name: This parameter is kept for backward compatibility but not used.
+                    The configuration is determined by FLASK_ENV environment variable.
     Returns:
-        The configured Flask application instance.
+        Flask: The configured Flask application instance.
     """
-    if config_name is None:
-        config_name = os.environ.get("FLASK_CONFIG", "default")
-    app = Flask(__name__)
-    app.config.from_object(config[config_name])
+    # Get the appropriate configuration based on FLASK_ENV
+    config = get_config()
 
-    # Configure logging based on the DEBUG setting
+    # Create the Flask application
+    app = Flask(__name__)
+
+    # Load configuration from config object
+    app.config.from_object(config)
+
+    # Register service worker route with proper headers
+    @app.route("/service-worker.js")
+    def service_worker():
+        response = app.send_static_file("js/service-worker.js")
+        response.headers["Service-Worker-Allowed"] = "/"
+        response.headers["Content-Type"] = "application/javascript"
+        return response
+
+    # Ensure required config values are set
+    if not app.config.get("SQLALCHEMY_DATABASE_URI"):
+        raise ValueError("SQLALCHEMY_DATABASE_URI is not configured")
+
+    # Set default SQLAlchemy config if not set
+    app.config.setdefault("SQLALCHEMY_TRACK_MODIFICATIONS", False)
+
+    # Configure logging
     log_level = logging.DEBUG if app.debug else logging.INFO
     logger.setLevel(log_level)
 
-    # Debug template loading
-    logger.debug(f"Using configuration: {config_name}")
-    logger.debug(f"Current working directory: {os.getcwd()}")
-    logger.debug(f"Template folder: {os.path.abspath('app/templates')}")
-    logger.debug(f"Static folder: {os.path.abspath('app/static')}")
+    # Log app configuration
+    logger.debug("Application configuration:")
+    logger.debug(f"- ENV: {app.config.get('ENV', 'Not set')}")
+    logger.debug(f"- DEBUG: {app.debug}")
+    logger.debug(f"- DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI', 'Not set')}")
 
     # Initialize all extensions
+    from .database import init_database
     from .extensions import init_app as init_extensions
 
+    # Initialize extensions
     init_extensions(app)
 
+    # Initialize the database
+    init_database(app)
+
     # Configure JWT settings
+    _configure_jwt_handlers(app)
+
+    # Register blueprints
+    _register_blueprints(app)
+
+    # Register error handlers
+    from .errors import init_app as init_errors
+
+    init_errors(app)
+    logger.debug("Registered error handlers")
+
+    # Configure CORS
+    _configure_cors(app)
+
+    # Log registered routes
+    _log_registered_routes(app)
+
+    return app
+
+
+def _configure_jwt_handlers(app: Flask) -> None:
+    """Configure JWT error handlers."""
+
     @jwt.invalid_token_loader
     def invalid_token_callback(error: str) -> ResponseReturnValue:
         return jsonify({"status": "error", "message": "Invalid or expired token", "error": str(error)}), 401
@@ -55,59 +101,46 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     def missing_token_callback(error: str) -> ResponseReturnValue:
         return jsonify({"status": "error", "message": "Missing authorization token", "error": str(error)}), 401
 
-    # Register blueprints
+
+def _register_blueprints(app: Flask) -> None:
+    """Register all application blueprints."""
     logger.debug("Registering blueprints...")
 
+    # Main blueprint
     from .main import bp as main_bp
 
     app.register_blueprint(main_bp)
-    logger.debug(f"Registered blueprint: {main_bp.name} " f"at {main_bp.url_prefix or '/'}")
+    logger.debug(f"Registered blueprint: {main_bp.name} at {main_bp.url_prefix or '/'}")
 
-    # Import and initialize auth blueprint
+    # Auth blueprint
     from .auth import bp as auth_bp
     from .auth import init_app as init_auth
 
-    # Initialize auth blueprint (which will register itself)
     init_auth(app)
     logger.debug(f"Registered blueprint: {auth_bp.name} at /auth")
 
-    from .restaurants import bp as restaurants_bp
+    # Feature blueprints
+    blueprints = [
+        ("restaurants", "/restaurants"),
+        ("expenses", "/expenses"),
+        ("api", "/api/v1"),
+        ("reports", "/reports"),
+    ]
 
-    app.register_blueprint(restaurants_bp, url_prefix="/restaurants")
-    logger.debug(f"Registered blueprint: {restaurants_bp.name} " "at /restaurants")
+    for name, url_prefix in blueprints:
+        module = __import__(f"app.{name}", fromlist=["bp"])
+        bp = getattr(module, "bp")
+        app.register_blueprint(bp, url_prefix=url_prefix)
+        logger.debug(f"Registered blueprint: {bp.name} at {url_prefix}")
 
-    from .expenses import bp as expenses_bp
 
-    app.register_blueprint(expenses_bp, url_prefix="/expenses")
-    logger.debug(f"Registered blueprint: {expenses_bp.name} at /expenses")
-
-    from .api import bp as api_bp
-
-    app.register_blueprint(api_bp, url_prefix="/api/v1")
-    logger.debug(f"Registered blueprint: {api_bp.name} at /api/v1")
-
-    from .reports import bp as reports_bp
-
-    app.register_blueprint(reports_bp, url_prefix="/reports")
-    logger.debug(f"Registered blueprint: {reports_bp.name} at /reports")
-
-    # Register error handlers
-    from .errors import init_app as init_errors
-
-    init_errors(app)
-    logger.debug("Registered error handlers")
-
-    # Log registered routes
-    logger.debug("Registered routes:")
-    for rule in app.url_map.iter_rules():
-        methods = list(rule.methods - {"OPTIONS", "HEAD"})
-        logger.debug(f"  {rule.endpoint}: {rule.rule} {methods}")
-
+def _configure_cors(app: Flask) -> None:
+    """Configure CORS settings."""
     # Get CORS configuration from environment
     cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
     cors_methods = os.getenv("CORS_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(",")
-    cors_allow_headers = os.getenv("CORS_ALLOW_HEADERS", "Content-Type,X-CSRF-Token,X-Requested-With").split(",")
-    cors_expose_headers = os.getenv("CORS_EXPOSE_HEADERS", "Content-Length,X-CSRF-Token").split(",")
+    cors_allow_headers = os.getenv("CORS_ALLOW_HEADERS", "Content-Type,X-CSRFToken,X-Requested-With").split(",")
+    cors_expose_headers = os.getenv("CORS_EXPOSE_HEADERS", "Content-Length,X-CSRFToken").split(",")
 
     # Configure CORS
     CORS(
@@ -123,4 +156,10 @@ def create_app(config_name: Optional[str] = None) -> Flask:
         },
     )
 
-    return app
+
+def _log_registered_routes(app: Flask) -> None:
+    """Log all registered routes for debugging."""
+    logger.debug("Registered routes:")
+    for rule in app.url_map.iter_rules():
+        methods = list(rule.methods - {"OPTIONS", "HEAD"})
+        logger.debug(f"  {rule.endpoint}: {rule.rule} {methods}")

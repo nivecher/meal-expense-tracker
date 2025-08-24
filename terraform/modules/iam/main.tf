@@ -97,6 +97,25 @@ resource "aws_iam_policy" "lambda_combined" {
         Resource = [
           "arn:aws:ssm:${var.region}:${var.account_id}:parameter/${var.app_name}/${var.environment}/google/*"
         ]
+      },
+      # DynamoDB access for session management
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "dynamodb:BatchGetItem",
+          "dynamodb:BatchWriteItem",
+          "dynamodb:ConditionCheckItem"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.app_name}-${var.environment}-sessions",
+          "arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.app_name}-${var.environment}-sessions/index/*"
+        ]
       }
     ]
   })

@@ -6,7 +6,9 @@ from flask import request
 from flask_login import current_user, login_required
 from marshmallow import ValidationError
 
-from . import bp, services
+from app.profile import services
+
+from . import bp
 from .schemas import PasswordChangeSchema, UserSchema
 
 user_schema = UserSchema()

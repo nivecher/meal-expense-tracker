@@ -3,6 +3,7 @@
 This document outlines the technology choices and architecture decisions for the Meal Expense Tracker application.
 
 ## Table of Contents
+
 - [Core Technologies](#core-technologies)
 - [Infrastructure](#infrastructure)
 - [Development Tools](#development-tools)
@@ -14,9 +15,10 @@ This document outlines the technology choices and architecture decisions for the
 ## Core Technologies
 
 ### Backend
+
 - **Language**: [Python 3.13](https://www.python.org/)
-  - Type hints and modern Python features
-  - Async/await support for I/O-bound operations
+- Type hints and modern Python features
+- Async/await support for I/O-bound operations
 
 - **Serverless Framework**: AWS Lambda
 
@@ -28,8 +30,9 @@ This document outlines the technology choices and architecture decisions for the
 - **Code Quality**: Black, isort, Flake8, Mypy
 
 ### AWS Lambda Integration
+
 - **Runtime**: Python 3.13
-- **WSGI Adapter**: aws-wsgi
+- **WSGI Adapter**: AWS-wsgi
 - **Handler**: Lambda-compatible entry point
 - **Layers**: Custom runtime dependencies
 - **Environment**: Configuration via Lambda environment variables
@@ -38,6 +41,7 @@ This document outlines the technology choices and architecture decisions for the
 ## Infrastructure
 
 ### AWS Services
+
 - **Compute**: AWS Lambda
 - **API**: API Gateway HTTP API
 - **Storage**:
@@ -54,6 +58,7 @@ This document outlines the technology choices and architecture decisions for the
   - CloudWatch Alarms
 
 ### Local Development
+
 - LocalStack for AWS service emulation
 - Docker Compose for local services
 - SQLite for local development database
@@ -61,37 +66,43 @@ This document outlines the technology choices and architecture decisions for the
 ## CI/CD Pipeline
 
 ### GitHub Actions Workflows
+
 1. **PR Validation**
-   - Code linting (Python, Terraform)
-   - Unit and integration tests
-   - Security scanning (Trivy, Bandit)
-   - Terraform plan validation
-   - Test coverage reporting
 
-2. **Deployment**
-   - Build and package Flask application
-   - Upload deployment package to S3
-   - Update Lambda function
-   - Run database migrations
-   - Update API Gateway configuration
-   - Run integration tests
-   - Notify on success/failure
+- Code linting (Python, Terraform)
+  - Unit and integration tests
+  - Security scanning (Trivy, Bandit)
+  - Terraform plan validation
+  - Test coverage reporting
 
-3. **Environment Promotion**
-   - Manual approval gates
-   - Environment-specific configuration
-   - Zero-downtime deployments
-   - Automated rollback on failure
+1. **Deployment**
 
-4. **Infrastructure**
-   - Terraform plan/apply
-   - Drift detection
-   - Cost estimation
-   - Security scanning
+- Build and package Flask application
+  - Upload deployment package to S3
+  - Update Lambda function
+  - Run database migrations
+  - Update API Gateway configuration
+  - Run integration tests
+  - Notify on success/failure
+
+1. **Environment Promotion**
+
+- Manual approval gates
+  - Environment-specific configuration
+  - Zero-downtime deployments
+  - Automated rollback on failure
+
+1. **Infrastructure**
+
+- Terraform plan/apply
+  - Drift detection
+  - Cost estimation
+  - Security scanning
 
 ## Development Tools
 
-### Local Development
+### Local Development (2)
+
 - **Local Stack**: Docker Compose for local AWS services
 - **Database**: Local PostgreSQL container
 - **Testing**:
@@ -100,17 +111,20 @@ This document outlines the technology choices and architecture decisions for the
   - HTTPretty for HTTP mocking
 
 ### Code Quality
+
 - **Linting**:
-  - Flake8 (Python)
-  - ShellCheck (Shell scripts)
-  - TFLint (Terraform)
+- Flake8 (Python)
+- ShellCheck (Shell scripts)
+- TFLint (Terraform)
 
 - **Formatting**:
+
   - Black (Python)
   - shfmt (Shell)
   - Terraform fmt
 
 - **Type Checking**:
+
   - Mypy (Python)
 
 - **Security**:
@@ -119,14 +133,16 @@ This document outlines the technology choices and architecture decisions for the
   - GitLeaks for secret detection
 
 ### AWS Development
+
 - **AWS SAM CLI** for local Lambda testing
 - **AWS CLI** for service interaction
 - **AWS Vault** for credential management
 - **LocalStack** for offline development
 
 ### Testing
+
 - **Unit/Integration**:
-  - pytest (Python)
+- pytest (Python)
 
 - **Coverage**:
   - pytest-cov
@@ -134,12 +150,14 @@ This document outlines the technology choices and architecture decisions for the
   - Minimum coverage requirements
 
 ### Documentation
+
 - **API**:
-  - Swagger/OpenAPI
-  - Interactive API documentation
-  - Request/response examples
+- Swagger/OpenAPI
+- Interactive API documentation
+- Request/response examples
 
 - **Architecture**:
+
   - C4 Model
   - System context diagrams
   - Component diagrams
@@ -150,12 +168,14 @@ This document outlines the technology choices and architecture decisions for the
   - Design documents
 
 ### Version Control
+
 - **Hosting**: GitHub
-  - Code hosting
-  - Issue tracking
-  - Project management
+- Code hosting
+- Issue tracking
+- Project management
 
 - **Branching Strategy**:
+
   - GitHub Flow
   - Feature branches
   - Protected main branch
@@ -169,12 +189,14 @@ This document outlines the technology choices and architecture decisions for the
 ## Deployment
 
 ### Environments
+
 - **Development**
-  - Local development
-  - Feature environments (per-PR)
-  - Cloud-based development
+- Local development
+- Feature environments (per-PR)
+- Cloud-based development
 
 - **Staging**
+
   - Mirrors production
   - Integration testing
   - Performance testing
@@ -185,59 +207,69 @@ This document outlines the technology choices and architecture decisions for the
   - Canary releases (future)
 
 ### Deployment Process
+
 1. **Code Review**
-   - Pull request creation
-   - Automated checks
-   - Code review approval
 
-2. **Testing**
-   - Unit tests
-   - Integration tests
-   - Security scans
+- Pull request creation
+  - Automated checks
+  - Code review approval
 
-3. **Staging Deployment**
-   - Terraform plan review
-   - Automated deployment
-   - Smoke tests
-   - Integration verification
+1. **Testing**
 
-4. **Verification**
-   - Manual testing
-   - Stakeholder review
-   - Performance validation
+- Unit tests
+  - Integration tests
+  - Security scans
 
-5. **Production Deployment**
-   - Change approval
-   - Automated deployment
-   - Health checks
-   - Monitoring verification
+1. **Staging Deployment**
 
-6. **Post-Deployment**
-   - Smoke tests
-   - Monitoring setup
-   - Rollback plan
-   - Documentation update
+- Terraform plan review
+  - Automated deployment
+  - Smoke tests
+  - Integration verification
+
+1. **Verification**
+
+- Manual testing
+  - Stakeholder review
+  - Performance validation
+
+1. **Production Deployment**
+
+- Change approval
+  - Automated deployment
+  - Health checks
+  - Monitoring verification
+
+1. **Post-Deployment**
+
+- Smoke tests
+  - Monitoring setup
+  - Rollback plan
+  - Documentation update
 
 ## Monitoring and Operations
 
 ### Logging
+
 - AWS CloudWatch Logs
-  - Centralized log collection
-  - Log groups and streams
-  - Retention policies
+- Centralized log collection
+- Log groups and streams
+- Retention policies
 - **Log Retention**
   - Development: 7 days
   - Staging: 30 days
   - Production: 1 year
 
 ### Metrics
+
 - **Application Metrics**
-  - Request/response times
-  - Error rates
-  - Business metrics
-  - Custom CloudWatch metrics
+- Request/response times
+- Error rates
+- Business metrics
+- Custom CloudWatch metrics
 
 - **Infrastructure Metrics**
+
   - CPU/Memory usage
   - Disk I/O
   - Network throughput
@@ -249,12 +281,14 @@ This document outlines the technology choices and architecture decisions for the
   - Conversion rates
 
 ### Alerting
+
 - **Critical Alerts**
-  - PagerDuty integration
-  - 24/7 on-call rotation
-  - Escalation policies
+- PagerDuty integration
+- 24/7 on-call rotation
+- Escalation policies
 
 - **Non-critical Alerts**
+
   - Email notifications
   - Slack channels
   - Daily digest
@@ -267,13 +301,15 @@ This document outlines the technology choices and architecture decisions for the
 ## Security
 
 ### Data Protection
-- **Encryption at Rest**
-  - AWS KMS for encryption
-  - EBS volume encryption
-  - S3 server-side encryption
-  - RDS encryption
+
+- **Encryption at REST**
+- AWS KMS for encryption
+- EBS volume encryption
+- S3 server-side encryption
+- RDS encryption
 
 - **Encryption in Transit**
+
   - TLS 1.2+ required
   - HSTS headers
   - Certificate management
@@ -286,11 +322,12 @@ This document outlines the technology choices and architecture decisions for the
   - Access logging
 
 ### Access Control
+
 - **AWS IAM**
-  - Least privilege principle
-  - Role-based access
-  - Temporary credentials
-  - Multi-factor authentication
+- Least privilege principle
+- Role-based access
+- Temporary credentials
+- Multi-factor authentication
 
 - **Application RBAC**
   - Role definitions
@@ -299,11 +336,12 @@ This document outlines the technology choices and architecture decisions for the
   - Session management
 
 ### Compliance
+
 - **Standards**
-  - AWS Well-Architected Framework
-  - OWASP Top 10
-  - CIS Benchmarks
-  - GDPR compliance
+- AWS Well-Architected Framework
+- OWASP Top 10
+- CIS Benchmarks
+- GDPR compliance
 
 - **Auditing**
   - AWS Config rules
@@ -313,13 +351,15 @@ This document outlines the technology choices and architecture decisions for the
 
 ## Future Considerations
 
-### Infrastructure
+### Infrastructure (2)
+
 - **Kubernetes Migration**
-  - EKS cluster setup
-  - Helm charts
-  - Service mesh (Linkerd/Istio)
+- EKS cluster setup
+- Helm charts
+- Service mesh (Linkerd/Istio)
 
 - **Multi-region**
+
   - Active-active deployment
   - Global database strategy
   - Data replication
@@ -330,10 +370,11 @@ This document outlines the technology choices and architecture decisions for the
   - Edge-optimized services
 
 ### Application
+
 - **Microservices**
-  - Service decomposition
-  - Event-driven architecture
-  - gRPC for service communication
+- Service decomposition
+- Event-driven architecture
+- gRPC for service communication
 
 - **Performance**
   - Caching strategy
@@ -341,10 +382,11 @@ This document outlines the technology choices and architecture decisions for the
   - Asynchronous processing
 
 ### Developer Experience
+
 - **Local Development**
-  - Dev containers
-  - Telepresence
-  - Improved tooling
+- Dev containers
+- Telepresence
+- Improved tooling
 
 - **Testing**
   - Contract testing
@@ -352,25 +394,27 @@ This document outlines the technology choices and architecture decisions for the
   - Performance benchmarking
 
 ### Business Features
+
 - **Mobile App**
-  - React Native
-  - Offline support
-  - Push notifications
+- React Native
+- Offline support
+- Push notifications
 
 - **Advanced Analytics**
   - Data warehouse
   - Business intelligence
   - Predictive analytics
 
-### Security
+### Security (2)
+
 - **Zero Trust**
-  - BeyondCorp model
-  - Service mesh mTLS
-  - Fine-grained access control
+- BeyondCorp model
+- Service mesh mTLS
+- Fine-grained access control
 
 - **Compliance**
   - SOC 2 Type II
   - HIPAA readiness
   - Industry certifications
 
-*Last Updated: June 13, 2025*
+_Last Updated: June 13, 2025_

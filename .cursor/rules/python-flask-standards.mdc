@@ -1,0 +1,72 @@
+# Python and Flask Development Standards
+
+## Code Style and Formatting
+- Follow PEP 8 standards
+- Use Black for code formatting (120 character line length)
+- Use isort for import sorting
+- Use flake8 for linting
+- Maximum line length: 120 characters (Black default)
+- Use double quotes for strings
+- Use absolute imports
+- Use `snake_case` for variables and functions
+- Use `PascalCase` for classes
+- Use `UPPER_CASE` for constants
+
+## Type Hints and Validation
+- Always use type hints for all function signatures
+- Use mypy for type checking
+- Use Pydantic for data validation
+- Make type contracts explicit
+- Avoid `Any` type when possible
+
+## Flask Architecture
+- Follow Flask blueprint standards
+- Keep route handlers thin
+- Move business logic to service layer
+- Use SQLAlchemy 2.0 syntax
+- Implement proper error handling
+- Use logging appropriately
+- Follow RESTful API design principles
+- Use environment variables for configuration
+- Implement proper input validation
+
+## Project Structure
+```
+app/
+  ├── api/              # API endpoints and resources
+  ├── auth/             # Authentication and user management
+  ├── expenses/         # Expense tracking functionality
+  ├── restaurants/      # Restaurant management
+  ├── services/         # Business logic and services
+  ├── static/           # Static files (JS, CSS, images)
+  ├── templates/        # Jinja2 templates
+  └── utils/            # Utility functions and helpers
+```
+
+## Best Practices
+- Always log Python exception strings using the logger
+- Use dependency injection for external services
+- Keep business logic pure and side-effect free when possible
+- Use test doubles (mocks, stubs, fakes) for external dependencies
+- Write unit tests for all public methods and functions
+- Use SQLAlchemy for database operations
+- Implement proper error handling with appropriate HTTP status codes
+- Provide meaningful error messages
+- Log errors with context
+- Implement proper exception handling
+
+## Testing
+- Follow Arrange-Act-Assert pattern in tests
+- Test one thing per test case
+- Use descriptive test names
+- Use fixtures for test data
+- Mock external dependencies
+- Test edge cases and error conditions
+- Aim for 80%+ test coverage
+- Cover all business logic
+- Test error conditions
+- Test edge cases
+description:
+globs:
+alwaysApply: false
+---

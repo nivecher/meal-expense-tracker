@@ -37,8 +37,8 @@ def prepare_expense_form(
     categories: List[Category] = Category.query.order_by(Category.name).all()
     restaurants: List[Restaurant] = Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()
 
-    form.category_id.choices = [("", "Select a category (optional)")] + [(str(c.id), c.name) for c in categories]
-    form.restaurant_id.choices = [("", "Select a restaurant")] + [(str(r.id), r.name) for r in restaurants]
+    form.category_id.choices = [(None, "Select a category (optional)")] + [(c.id, c.name) for c in categories]
+    form.restaurant_id.choices = [(None, "Select a restaurant")] + [(r.id, r.name) for r in restaurants]
 
     if not form.date.data:
         form.date.data = datetime.now(timezone.utc).date()
@@ -78,6 +78,9 @@ def _process_date(date_value: Any) -> Tuple[Optional[date], Optional[str]]:
     try:
         if isinstance(date_value, str):
             return datetime.strptime(date_value, "%Y-%m-%d").date(), None
+        # Accept native date objects
+        if isinstance(date_value, date):
+            return date_value, None
         if hasattr(date_value, "date"):
             return date_value.date(), None
         return None, "Invalid date format"
@@ -230,6 +233,88 @@ def get_expense_by_id_for_user(expense_id: int, user_id: int) -> Optional[Expens
         The expense if found and belongs to the user, None otherwise
     """
     return get_expense_by_id(expense_id, user_id)
+
+
+def get_expenses_for_user(user_id: int) -> List[Expense]:
+    """
+    Get all expenses for a specific user.
+
+    Args:
+        user_id: ID of the current user
+
+    Returns:
+        List of expenses belonging to the user
+    """
+    return Expense.query.filter_by(user_id=user_id).order_by(Expense.date.desc()).all()
+
+
+def create_expense_for_user(user_id: int, data: Dict[str, Any]) -> Expense:
+    """
+    Create a new expense for a user from API data.
+
+    Args:
+        user_id: ID of the current user
+        data: Dictionary containing expense data
+
+    Returns:
+        The created expense
+    """
+    # Create a new expense object
+    expense = Expense(
+        user_id=user_id,
+        amount=data.get("amount"),
+        date=data.get("date"),
+        description=data.get("description"),
+        category_id=data.get("category_id"),
+        restaurant_id=data.get("restaurant_id"),
+        notes=data.get("notes"),
+    )
+
+    db.session.add(expense)
+    db.session.commit()
+
+    return expense
+
+
+def update_expense_for_user(expense: Expense, data: Dict[str, Any]) -> Expense:
+    """
+    Update an existing expense for a user from API data.
+
+    Args:
+        expense: The expense to update
+        data: Dictionary containing updated expense data
+
+    Returns:
+        The updated expense
+    """
+    # Update expense fields
+    if "amount" in data:
+        expense.amount = data["amount"]
+    if "date" in data:
+        expense.date = data["date"]
+    if "description" in data:
+        expense.description = data["description"]
+    if "category_id" in data:
+        expense.category_id = data["category_id"]
+    if "restaurant_id" in data:
+        expense.restaurant_id = data["restaurant_id"]
+    if "notes" in data:
+        expense.notes = data["notes"]
+
+    db.session.commit()
+
+    return expense
+
+
+def delete_expense_for_user(expense: Expense) -> None:
+    """
+    Delete an expense for a user.
+
+    Args:
+        expense: The expense to delete
+    """
+    db.session.delete(expense)
+    db.session.commit()
 
 
 def get_filter_options(user_id: int) -> Dict[str, Any]:

@@ -12,6 +12,17 @@ data "aws_ssm_parameter" "google_maps_map_id" {
   name = "/${var.app_name}/${var.environment}/google/maps/map-id"
 }
 
+# Get the application secret key from SSM Parameter Store using the provided ARN
+data "aws_ssm_parameter" "app_secret_key" {
+  name = "/${var.app_name}/${var.environment}/app/secret_key"
+
+  # Ensure the parameter exists before trying to access it
+  # This will cause Terraform to fail early if the parameter doesn't exist
+  depends_on = [
+    var.app_secret_key_arn
+  ]
+}
+
 # Note: DB_URL will be constructed at runtime in the Lambda function using the secret
 
 # S3 Object for Lambda Layer Package
@@ -180,6 +191,34 @@ resource "aws_iam_role_policy" "lambda_policy" {
           var.db_secret_arn
         ]
       },
+      # SSM Parameter Store access for application configuration
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath"
+        ]
+        Resource = [
+          "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.app_name}/${var.environment}/*"
+        ]
+      },
+      # KMS decryption for SSM parameters
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:DescribeKey"
+        ]
+        Resource = [
+          "arn:aws:kms:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:key/*"
+        ],
+        Condition = {
+          StringLike = {
+            "kms:RequestAlias" = "alias/aws/ssm"
+          }
+        }
+      },
 
     ]
   })
@@ -221,6 +260,8 @@ locals {
 
   # Add OpenTelemetry layer if enabled
   all_layers = var.enable_otel_tracing ? concat(local.base_layers, [local.otel_layer_arn]) : local.base_layers
+
+  db_url = "${var.db_protocol}://${var.db_username}:${var.db_password}@${var.db_host}:${var.db_port}/${var.db_name}"
 }
 
 # Lambda Function
@@ -249,37 +290,48 @@ resource "aws_lambda_function" "main" {
 
   # Environment variables including enhanced monitoring
   environment {
-    variables = merge({
-      # Database configuration
-      DB_SECRET_ARN  = var.db_secret_arn
-      RUN_MIGRATIONS = var.run_migrations ? "true" : "false"
+    variables = merge(
+      {
+        # Standard environment variables
+        ENVIRONMENT = var.environment
+        APP_NAME    = var.app_name
+        LOG_LEVEL   = var.log_level
 
-      # Google API keys: pass actual values in non-prod, SSM paths in prod
-      GOOGLE_MAPS_API_KEY = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_api_key.value : "ssm:${data.aws_ssm_parameter.google_maps_api_key.name}"
-      GOOGLE_MAPS_MAP_ID  = var.environment != "prod" ? data.aws_ssm_parameter.google_maps_map_id.value : "ssm:${data.aws_ssm_parameter.google_maps_map_id.name}"
+        # Application secret key from SSM Parameter Store
+        SECRET_KEY = data.aws_ssm_parameter.app_secret_key.value
 
-      # Database URL: construct in non-prod, use secret in prod
-      DATABASE_URL = var.environment != "prod" ? "postgresql+psycopg2://${var.db_username}:${var.db_password}@${var.db_host}:${var.db_port}/${var.db_name}" : null
+        # Google Maps configuration
+        GOOGLE_MAPS_API_KEY = data.aws_ssm_parameter.google_maps_api_key.value
+        GOOGLE_MAPS_MAP_ID  = data.aws_ssm_parameter.google_maps_map_id.value
 
-      # Server name
-      SERVER_NAME = var.server_name
+        # Database configuration will be set at runtime via the secret
 
-      # CORS Configuration
-      CORS_ORIGINS        = var.environment == "prod" ? "https://${var.server_name}" : "*"
-      CORS_METHODS        = "GET,POST,PUT,DELETE,OPTIONS,HEAD"
-      CORS_HEADERS        = "Content-Type,Authorization,X-CSRF-Token,X-Requested-With"
-      CORS_EXPOSE_HEADERS = "Content-Length,X-CSRF-Token"
-      CORS_MAX_AGE        = "600" # 10 minutes
+        # CORS configuration
+        CORS_ORIGINS        = var.environment == "prod" ? "https://${var.server_name}" : "*"
+        CORS_METHODS        = "GET,POST,PUT,DELETE,OPTIONS,HEAD"
+        CORS_HEADERS        = "Content-Type,Authorization,X-CSRF-Token,X-Requested-With"
+        CORS_EXPOSE_HEADERS = "Content-Length,X-CSRF-Token"
+        CORS_MAX_AGE        = "600" # 10 minutes
 
-      # Application configuration
-      ENVIRONMENT             = var.environment
-      FLASK_ENV               = var.environment == "prod" ? "production" : "development"
-      AWS_LAMBDA_EXEC_WRAPPER = var.enable_otel_tracing ? "/opt/otel-instrument" : ""
-      LOG_LEVEL               = var.log_level
-      ENABLE_AWS_SERVICES     = "true"
+        # Application configuration
+        FLASK_ENV           = "production"
+        ENABLE_AWS_SERVICES = "true"
+        DATABASE_URL        = local.db_url
 
-      # Note: DB_URL will be constructed at runtime in the Lambda function for prod
-    }, var.extra_environment_variables)
+        # X-Ray tracing is enabled via IAM permissions and X-Ray daemon
+        # _X_AMZN_TRACE_ID is automatically set by Lambda when X-Ray tracing is enabled
+
+        # OpenTelemetry configuration
+        OPENTELEMETRY_COLLECTOR_CONFIG_FILE = var.enable_otel_tracing ? "/var/task/opentelemetry-collector-config.yaml" : ""
+        AWS_LAMBDA_EXEC_WRAPPER            = var.enable_otel_tracing ? "/opt/otel-handler" : ""
+
+        # Set Python path to include the layer
+        PYTHONPATH = "/opt/python:/opt/python/lib/python3.13/site-packages"
+
+        # Note: DB_URL will be constructed at runtime in the Lambda function for prod
+      },
+      var.extra_environment_variables
+    )
   }
 
   # VPC configuration if VPC ID is provided

@@ -19,15 +19,18 @@ class ExpenseForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         # Pop custom kwargs before calling parent __init__
-        category_choices = kwargs.pop("category_choices", [("", "Select a category (optional)")])
-        restaurant_choices = kwargs.pop("restaurant_choices", [("", "Select a restaurant")])
+        category_choices = kwargs.pop("category_choices", [(None, "Select a category (optional)")])
+        restaurant_choices = kwargs.pop("restaurant_choices", [(None, "Select a restaurant")])
         restaurant_id = kwargs.pop("restaurant_id", None)
 
         super().__init__(*args, **kwargs)
 
         # Set default restaurant if provided
-        if restaurant_id:
-            self.restaurant_id.data = str(restaurant_id)
+        if restaurant_id is not None:
+            try:
+                self.restaurant_id.data = int(restaurant_id)
+            except (ValueError, TypeError):
+                self.restaurant_id.data = None
 
         # Set choices for the select fields
         self.category_id.choices = category_choices
@@ -70,13 +73,13 @@ class ExpenseForm(FlaskForm):
     # Category and Restaurant
     category_id = SelectField(
         "Category",
-        coerce=lambda x: int(x) if x and str(x).isdigit() else None,
+        coerce=lambda x: int(x) if x not in (None, "") and str(x).isdigit() else None,
         validators=[Optional()],
         render_kw={"class": "form-select"},
     )
     restaurant_id = SelectField(
         "Restaurant",
-        coerce=lambda x: int(x) if x and str(x).isdigit() else None,
+        coerce=lambda x: int(x) if x not in (None, "") and str(x).isdigit() else None,
         validators=[Optional()],
         render_kw={"class": "form-select"},
     )

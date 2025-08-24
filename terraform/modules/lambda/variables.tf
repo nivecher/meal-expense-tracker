@@ -38,7 +38,7 @@ variable "aws_region" {
 variable "handler" {
   description = "The function entrypoint in your code"
   type        = string
-  default     = "wsgi.lambda_handler"
+  default     = "lambda_handler.lambda_handler"
 }
 
 variable "runtime" {
@@ -80,7 +80,7 @@ variable "extra_environment_variables" {
 variable "architectures" {
   description = "Instruction set architecture for your Lambda function"
   type        = list(string)
-  default     = ["x86_64"]
+  default     = ["arm64", "x86_64"]
 }
 
 # Deployment Package
@@ -141,7 +141,7 @@ variable "compatible_runtimes" {
 variable "compatible_architectures" {
   description = "List of compatible architectures for the Lambda layer"
   type        = list(string)
-  default     = ["x86_64"]
+  default     = ["arm64", "x86_64"]
 }
 
 variable "s3_key" {
@@ -167,12 +167,11 @@ variable "db_secret_arn" {
   description = "ARN of the Secrets Manager secret containing the database credentials"
   type        = string
   default     = ""
-}
 
-variable "db_security_group_id" {
-  description = "The security group ID of the RDS instance"
-  type        = string
-  default     = ""
+  validation {
+    condition     = can(regex("^arn:aws:secretsmanager:", var.db_secret_arn)) || var.db_secret_arn == ""
+    error_message = "The db_secret_arn must be a valid AWS Secrets Manager ARN or an empty string."
+  }
 }
 
 variable "db_username" {
@@ -185,6 +184,27 @@ variable "db_password" {
   description = "Database password for direct connection in non-prod environments."
   type        = string
   default     = null
+}
+
+variable "db_security_group_id" {
+  description = "The security group ID of the RDS instance that the Lambda function needs to access"
+  type        = string
+
+  validation {
+    condition     = can(regex("^sg-", var.db_security_group_id)) || var.db_security_group_id == ""
+    error_message = "The db_security_group_id must be a valid security group ID starting with 'sg-' or an empty string."
+  }
+}
+
+variable "app_secret_key_arn" {
+  description = "The ARN of the SSM parameter containing the application secret key"
+  type        = string
+}
+
+variable "db_protocol" {
+  description = "Database protocol for direct connection in non-prod environments."
+  type        = string
+  default     = "postgresql"
 }
 
 variable "db_host" {
@@ -203,6 +223,23 @@ variable "db_name" {
   description = "Database name for direct connection in non-prod environments."
   type        = string
   default     = null
+}
+
+variable "session_type" {
+  description = "The type of session storage to use (e.g., 'dynamodb', 'filesystem')"
+  type        = string
+  default     = "dynamodb"
+
+  validation {
+    condition     = contains(["dynamodb", "dynamodb-boto3", "redis", "memcached"], var.session_type)
+    error_message = "Session type must be one of: dynamodb, redis, memcached"
+  }
+}
+
+variable "session_table_name" {
+  description = "The name of the DynamoDB table to use for session storage"
+  type        = string
+  default     = "flask_sessions"
 }
 
 # API Gateway Integration

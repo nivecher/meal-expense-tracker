@@ -28,6 +28,7 @@ from app.expenses import bp
 from app.expenses import services as expense_services
 from app.expenses.forms import ExpenseForm
 from app.expenses.models import Category, Expense
+from app.extensions import db
 from app.restaurants.models import Restaurant
 from app.utils.decorators import db_transaction
 from app.utils.messages import FlashMessages
@@ -47,9 +48,42 @@ def _get_form_choices(
     Returns:
         Tuple of (category_choices, restaurant_choices)
     """
-    categories = [(str(c.id), c.name) for c in Category.query.filter_by(user_id=user_id).all()]
-    restaurants = [(str(r.id), r.name) for r in Restaurant.query.filter_by(user_id=user_id).all()]
+    # Ensure the user has baseline categories to choose from
+    _ensure_default_categories_for_user(user_id)
+    categories = [(c.id, c.name) for c in Category.query.filter_by(user_id=user_id).order_by(Category.name).all()]
+    restaurants = [(r.id, r.name) for r in Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()]
     return categories, restaurants
+
+
+def _ensure_default_categories_for_user(user_id: int) -> None:
+    """Create baseline categories for a user if they have none."""
+    existing_names = {c.name for c in Category.query.filter_by(user_id=user_id).all()}
+    default_categories = [
+        {"name": "Food", "description": "General food expenses"},
+        {"name": "Drinks", "description": "Beverages and drinks"},
+        {"name": "Groceries", "description": "Grocery shopping"},
+        {"name": "Dining Out", "description": "Restaurant and takeout"},
+        {"name": "Transportation", "description": "Transportation costs"},
+        {"name": "Utilities", "description": "Bills and utilities"},
+        {"name": "Entertainment", "description": "Movies, events, etc."},
+        {"name": "Other", "description": "Miscellaneous expenses"},
+    ]
+
+    created_any = False
+    for cat in default_categories:
+        if cat["name"] not in existing_names:
+            db.session.add(
+                Category(
+                    user_id=user_id,
+                    name=cat["name"],
+                    description=cat.get("description"),
+                    is_default=True,
+                )
+            )
+            created_any = True
+
+    if created_any:
+        db.session.commit()
 
 
 def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
@@ -63,11 +97,16 @@ def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     restaurant_id = request.args.get("restaurant_id")
 
+    # Normalize restaurant_id to int/None to match SelectField coerce
+    try:
+        normalized_restaurant_id = int(restaurant_id) if restaurant_id and str(restaurant_id).isdigit() else None
+    except (ValueError, TypeError):
+        normalized_restaurant_id = None
+
     form = ExpenseForm(
-        category_choices=[("", "Select a category (optional)")] + categories,
-        restaurant_choices=[("", "Select a restaurant (optional)")] + restaurants,
-        restaurant_id=restaurant_id,
-        meta={"csrf": False},
+        category_choices=[(None, "Select a category (optional)")] + categories,
+        restaurant_choices=[(None, "Select a restaurant (optional)")] + restaurants,
+        restaurant_id=normalized_restaurant_id,
     )
     return form, is_ajax
 
@@ -171,10 +210,9 @@ def add_expense() -> ResponseReturnValue:
         # Create form with submitted data
         form = ExpenseForm(
             data=request.form.to_dict(),
-            category_choices=form.category_choices,
-            restaurant_choices=form.restaurant_choices,
-            restaurant_id=form.restaurant_id,
-            meta={"csrf": False},
+            category_choices=form.category_id.choices,
+            restaurant_choices=form.restaurant_id.choices,
+            restaurant_id=form.restaurant_id.data,
         )
 
         # Validate form
@@ -332,9 +370,8 @@ def _handle_expense_not_found() -> ResponseReturnValue:
 def _init_expense_form(categories: list[tuple[str, str]], restaurants: list[tuple[str, str]]) -> ExpenseForm:
     """Initialize an expense form with the given choices."""
     return ExpenseForm(
-        category_choices=[("", "Select a category (optional)")] + categories,
-        restaurant_choices=[("", "Select a restaurant")] + restaurants,
-        meta={"csrf": False},
+        category_choices=[(None, "Select a category (optional)")] + categories,
+        restaurant_choices=[(None, "Select a restaurant (optional)")] + restaurants,
     )
 
 
@@ -342,9 +379,9 @@ def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
     """Populate the expense form with existing expense data."""
     form.process(obj=expense)
     if expense.category_id:
-        form.category_id.data = str(expense.category_id)
+        form.category_id.data = expense.category_id
     if expense.restaurant_id:
-        form.restaurant_id.data = str(expense.restaurant_id)
+        form.restaurant_id.data = expense.restaurant_id
     if expense.meal_type:
         form.meal_type.data = expense.meal_type
 
@@ -375,9 +412,8 @@ def _reinitialize_form_with_data(
     form_data = request.form.to_dict()
     return ExpenseForm(
         data=form_data,
-        category_choices=[("", "Select a category (optional)")] + categories,
-        restaurant_choices=[("", "Select a restaurant")] + restaurants,
-        meta={"csrf": False},
+        category_choices=[(None, "Select a category (optional)")] + categories,
+        restaurant_choices=[(None, "Select a restaurant (optional)")] + restaurants,
     )
 
 
@@ -386,7 +422,7 @@ def _handle_update_error(error: str, is_ajax: bool) -> ResponseReturnValue:
     if is_ajax:
         return {"success": False, "message": error, "errors": {"_error": [error]}}, 400
     flash(error, "error")
-    return None
+    return render_template("expenses/form.html", form=ExpenseForm(), is_edit=True), 400
 
 
 def _handle_update_success(expense_id: int, is_ajax: bool) -> ResponseReturnValue:
@@ -405,7 +441,7 @@ def _handle_validation_errors(form: ExpenseForm, is_ajax: bool) -> ResponseRetur
     """Handle form validation errors."""
     if is_ajax and form.errors:
         return {"success": False, "errors": form.errors}, 400
-    return None
+    return render_template("expenses/form.html", form=form, is_edit=True), 400
 
 
 def _render_expense_form(
@@ -416,8 +452,8 @@ def _render_expense_form(
         form.amount.data = str(expense.amount) if expense.amount else ""
         form.date.data = expense.date
         form.notes.data = expense.notes or ""
-        form.category_id.data = str(expense.category_id) if expense.category_id else ""
-        form.restaurant_id.data = str(expense.restaurant_id) if expense.restaurant_id else ""
+        form.category_id.data = expense.category_id if expense.category_id else None
+        form.restaurant_id.data = expense.restaurant_id if expense.restaurant_id else None
         form.meal_type.data = expense.meal_type or ""
 
     return render_template(

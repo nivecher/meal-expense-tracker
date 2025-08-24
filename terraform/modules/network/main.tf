@@ -189,12 +189,12 @@ resource "aws_route_table_association" "public" {
 }
 
 resource "aws_route_table_association" "private" {
-  for_each       = toset(var.enable_nat_gateway ? aws_subnet.private[*].id : [])
-  subnet_id      = each.value
+  count          = length(aws_subnet.private)
+  subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
 
-# Database Subnet Group
+# Database Subnet Group (Private)
 resource "aws_db_subnet_group" "main" {
   name       = "${var.app_name}-${var.environment}-db-subnet-group"
   subnet_ids = aws_subnet.private[*].id
@@ -203,6 +203,16 @@ resource "aws_db_subnet_group" "main" {
     Name = "${var.app_name}-${var.environment}-db-subnet-group"
   }, var.tags)
 }
+
+# # Public Database Subnet Group (for development/testing)
+# resource "aws_db_subnet_group" "public" {
+#   name       = "${var.app_name}-${var.environment}-db-public-subnet-group"
+#   subnet_ids = aws_subnet.public[*].id
+
+#   tags = merge({
+#     Name = "${var.app_name}-${var.environment}-db-public-subnet-group"
+#   }, var.tags)
+# }
 
 # VPC Endpoints
 resource "aws_vpc_endpoint" "s3" {

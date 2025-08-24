@@ -4,7 +4,7 @@ import csv
 import io
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import func, select
 from werkzeug.datastructures import FileStorage
 
 from app.expenses.models import Expense
@@ -378,6 +378,105 @@ def export_restaurants_for_user(user_id: int) -> List[Dict[str, Any]]:
     ]
 
 
+def get_restaurants_for_user(user_id: int) -> List[Restaurant]:
+    """
+    Get all restaurants for a specific user.
+
+    Args:
+        user_id: ID of the current user
+
+    Returns:
+        List of restaurants belonging to the user
+    """
+    return Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()
+
+
+def create_restaurant_for_user(user_id: int, data: Dict[str, Any]) -> Restaurant:
+    """
+    Create a new restaurant for a user from API data.
+
+    Args:
+        user_id: ID of the current user
+        data: Dictionary containing restaurant data
+
+    Returns:
+        The created restaurant
+    """
+    # Create a new restaurant object
+    restaurant = Restaurant(
+        user_id=user_id,
+        name=data.get("name"),
+        type=data.get("type"),
+        description=data.get("description"),
+        address=data.get("address"),
+        address2=data.get("address2"),
+        city=data.get("city"),
+        state=data.get("state"),
+        postal_code=data.get("postal_code"),
+        country=data.get("country"),
+        phone=data.get("phone"),
+        email=data.get("email"),
+        website=data.get("website"),
+        google_place_id=data.get("google_place_id"),
+        latitude=data.get("latitude"),
+        longitude=data.get("longitude"),
+        cuisine=data.get("cuisine"),
+        price_range=data.get("price_range"),
+        rating=data.get("rating"),
+        is_chain=data.get("is_chain", False),
+        notes=data.get("notes"),
+    )
+
+    db.session.add(restaurant)
+    db.session.commit()
+
+    return restaurant
+
+
+def update_restaurant_for_user(restaurant: Restaurant, data: Dict[str, Any]) -> Restaurant:
+    """
+    Update an existing restaurant for a user from API data.
+
+    Args:
+        restaurant: The restaurant to update
+        data: Dictionary containing updated restaurant data
+
+    Returns:
+        The updated restaurant
+    """
+    # Update restaurant fields using a loop to reduce complexity
+    updateable_fields = [
+        "name",
+        "type",
+        "description",
+        "address",
+        "address2",
+        "city",
+        "state",
+        "postal_code",
+        "country",
+        "phone",
+        "email",
+        "website",
+        "google_place_id",
+        "latitude",
+        "longitude",
+        "cuisine",
+        "price_range",
+        "rating",
+        "is_chain",
+        "notes",
+    ]
+
+    for field in updateable_fields:
+        if field in data:
+            setattr(restaurant, field, data[field])
+
+    db.session.commit()
+
+    return restaurant
+
+
 def get_restaurant_for_user(restaurant_id: int, user_id: int) -> Optional[Restaurant]:
     """Get a restaurant by ID if it belongs to the user."""
     return db.session.scalar(select(Restaurant).where(Restaurant.id == restaurant_id, Restaurant.user_id == user_id))
@@ -398,14 +497,66 @@ def delete_restaurant_by_id(restaurant_id: int, user_id: int) -> Tuple[bool, str
         if not restaurant:
             return False, "Restaurant not found or you don't have permission to delete it."
 
-        has_expenses = db.session.scalar(select(exists().where(Expense.restaurant_id == restaurant_id)))
-        if has_expenses:
-            return False, "Cannot delete a restaurant with associated expenses. Please delete the expenses first."
+        # Check if restaurant has expenses
+        expenses = db.session.scalars(
+            select(Expense).where(Expense.restaurant_id == restaurant_id, Expense.user_id == user_id)
+        ).all()
+        expense_count = len(expenses)
 
-        db.session.delete(restaurant)
-        db.session.commit()
-        return True, "Restaurant deleted successfully."
+        if expense_count > 0:
+            # Delete all associated expenses first
+            for expense in expenses:
+                db.session.delete(expense)
+
+            # Then delete the restaurant
+            db.session.delete(restaurant)
+            db.session.commit()
+
+            if expense_count == 1:
+                return True, "Restaurant and 1 associated expense deleted successfully."
+            else:
+                return True, f"Restaurant and {expense_count} associated expenses deleted successfully."
+        else:
+            # No expenses, just delete the restaurant
+            db.session.delete(restaurant)
+            db.session.commit()
+            return True, "Restaurant deleted successfully."
 
     except Exception as e:
         db.session.rollback()
         raise e
+
+
+# TODO consider consolidating logic with get_restaurants_with_stats
+def calculate_expense_stats(restaurant_id: int, user_id: int) -> Dict[str, Any]:
+    """Calculate expense statistics for a restaurant.
+
+    Args:
+        restaurant_id: The ID of the restaurant
+        user_id: The ID of the user (for security)
+
+    Returns:
+        Dictionary containing expense statistics with the following keys:
+        - visit_count: int - Number of visits to the restaurant
+        - total_amount: float - Total amount spent at the restaurant
+        - avg_per_visit: float - Average amount spent per visit
+        - last_visit: Optional[datetime] - Date of the last visit, or None if no visits
+    """
+    stats = db.session.execute(
+        select(
+            func.count(Expense.id).label("visit_count"),
+            func.sum(Expense.amount).label("total_amount"),
+            func.max(Expense.date).label("last_visit"),
+        ).where(Expense.restaurant_id == restaurant_id, Expense.user_id == user_id)
+    ).first()
+
+    avg_per_visit = 0.0
+    if stats and stats.visit_count > 0 and stats.total_amount is not None:
+        avg_per_visit = float(stats.total_amount) / stats.visit_count
+
+    return {
+        "visit_count": stats.visit_count if stats else 0,
+        "total_amount": float(stats.total_amount) if stats and stats.total_amount else 0.0,
+        "avg_per_visit": avg_per_visit,
+        "last_visit": stats.last_visit if stats else None,
+    }

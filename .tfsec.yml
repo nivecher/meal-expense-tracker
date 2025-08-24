@@ -19,7 +19,6 @@ include:
   - general
   - aws
   - terraform
-
 # Custom severity overrides for specific checks
 # severity_overrides:
 #   AWS017: LOW  # Consider S3 access logging as low severity

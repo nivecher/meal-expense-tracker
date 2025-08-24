@@ -20,11 +20,12 @@ This document provides detailed instructions for setting up and working with the
 Run the setup script to configure your development environment:
 
 ```bash
-# Make the script executable
+## Make the script executable
 chmod +x scripts/setup-dev.sh
 
-# Run the setup script
+## Run the setup script
 ./scripts/setup-dev.sh
+
 ```
 
 This script will:
@@ -42,134 +43,164 @@ This script will:
 If you prefer to set up manually:
 
 1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/meal-expense-tracker.git
-   cd meal-expense-tracker
-   ```
 
-2. **Python Environment**
-   ```bash
-   # Create and activate virtual environment
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+```bash
 
-   # Install dependencies
-   pip install -r requirements-dev.txt
-   ```
+git clone https://github.com/yourusername/meal-expense-tracker.git
+cd meal-expense-tracker
 
-2. **Database Setup**
-   ```bash
-   # Start PostgreSQL container
-   docker-compose -f docker-compose.dev.yml up -d postgres
+```
 
-   # Run migrations
-   alembic upgrade head
-   ```
+1. **Python Environment**
 
-3. **AWS SAM CLI Setup**
-   ```bash
-   # Install AWS SAM CLI (Linux)
-   pip install --user aws-sam-cli
+```bash
 
-   # Verify installation
-   sam --version
-   ```
+## Create and activate virtual environment
+Python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-4. **LocalStack (Optional, for AWS service emulation)**
-   ```bash
-   # Install LocalStack
-   pip install localstack
+## Install dependencies
+pip install -r requirements-dev.txt
 
-   # Start LocalStack
-   localstack start -d
-   ```
+```
 
-5. **Configure AWS credentials**
-   ```bash
-   aws configure
-   # Follow prompts to enter AWS credentials
-   ```
+1. **Database Setup**
+
+```bash
+
+## Start PostgreSQL container
+docker-compose -f docker-compose.yml up -d postgres
+
+## Run migrations
+alembic upgrade head
+
+```
+
+1. **AWS SAM CLI Setup (optional)**
+
+```bash
+
+## Install AWS SAM CLI (Linux)
+pip install --user aws-sam-cli
+
+## Verify installation
+sam --version
+
+```
+
+1. **LocalStack (Optional, for AWS service emulation)**
+
+```bash
+
+## Install LocalStack
+pip install localstack
+
+## Start LocalStack
+localstack start -d
+
+```
+
+1. **Configure AWS credentials**
+
+```bash
+
+aws configure
+## Follow prompts to enter AWS credentials
+
+```
 
 ## Running the Application
 
 ### Local Development with Flask
 
 ```bash
-# Activate virtual environment
+
+## Activate virtual environment
 source venv/bin/activate
 
-# Set environment variables
+## Set environment variables
 export FLASK_APP=wsgi:app
 export FLASK_ENV=development
 
-# Start Flask development server
+## Start Flask development server
 flask run
+
 ```
 
-### Local Testing with SAM CLI
+### Local Testing with SAM CLI (optional)
 
 ```bash
-# Start API Gateway and Lambda locally
+
+## Start API Gateway and Lambda locally
 sam local start-api --template template.yaml
 
-# Invoke a specific Lambda function
+## Invoke a specific Lambda function
 sam local invoke "FunctionName" -e events/event.json
+
 ```
 
 ### Using Docker Compose
 
 ```bash
-# Start all services
-docker-compose -f docker-compose.dev.yml up -d
 
-# View logs
-docker-compose -f docker-compose.dev.yml logs -f
+## Start all services
+docker-compose -f docker-compose.yml up -d
+
+## View logs
+docker-compose -f docker-compose.yml logs -f
+
 ```
 
 ## Deployment
 
-### Build and Package
+### Build and Package (optional)
 
 ```bash
-# Build deployment package
+
+## Build deployment package
 sam build
 
-# Package for deployment
+## Package for deployment
 sam package \
   --output-template-file packaged.yaml \
   --s3-bucket your-deployment-bucket
+
 ```
 
-### Deploy to AWS
+### Deploy to AWS (optional)
 
 ```bash
-# Deploy to development environment
+
+## Deploy to development environment
 sam deploy \
   --template-file packaged.yaml \
   --stack-name meal-expense-tracker-dev \
   --capabilities CAPABILITY_IAM \
   --region us-east-1
 
-# Deploy to production
+## Deploy to production
 sam deploy \
   --template-file packaged.yaml \
   --stack-name meal-expense-tracker-prod \
   --capabilities CAPABILITY_IAM \
   --region us-east-1
+
 ```
 
 ### Infrastructure Deployment
 
 ```bash
-# Initialize Terraform
+
+## Initialize Terraform
 cd terraform
 terraform init
 
-# Plan changes
+## Plan changes
 terraform plan
 
-# Apply changes
+## Apply changes
 terraform apply
+
 ```
 
 ## Infrastructure Management
@@ -177,38 +208,45 @@ terraform apply
 ### Terraform Commands
 
 ```bash
-# Initialize Terraform
+
+## Initialize Terraform (2)
 make tf-init
 
-# Plan infrastructure changes
+## Plan infrastructure changes
 make tf-plan
 
-# Apply infrastructure changes
+## Apply infrastructure changes
 make tf-apply
 
-# Destroy infrastructure
+## Destroy infrastructure
 make tf-destroy
+
 ```
 
 ### Running Tests
 
 ```bash
-# Run all tests
+
+## Run all tests
 pytest
 
-# Run a specific test file
+## Run a specific test file
 pytest tests/test_models.py
 
-# Run with coverage report
+## Run with coverage report
 pytest --cov=app --cov-report=term-missing
+
 ```
 
 ### Test Coverage
 
 To generate an HTML coverage report:
+
 ```bash
+
 pytest --cov=app --cov-report=html
 open htmlcov/index.html  # View the report
+
 ```
 
 ## 🐛 Debugging
@@ -219,24 +257,20 @@ Add this to your `.vscode/launch.json` for debugging:
 
 ```json
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python: Flask",
-            "type": "python",
-            "request": "launch",
-            "module": "flask",
-            "env": {
-                "FLASK_APP": "wsgi:app",
-                "FLASK_ENV": "development"
-            },
-            "args": [
-                "run",
-                "--no-debugger",
-                "--no-reload"
-            ]
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Flask",
+      "type": "python",
+      "request": "launch",
+      "module": "flask",
+      "env": {
+        "FLASK_APP": "wsgi:app",
+        "FLASK_ENV": "development"
+      },
+      "args": ["run", "--no-debugger", "--no-reload"]
+    }
+  ]
 }
 ```
 

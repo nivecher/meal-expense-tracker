@@ -4,28 +4,35 @@ resource "aws_security_group" "rds" {
   description = "Security group for RDS instance"
   vpc_id      = var.vpc_id
 
-  # Inbound rule: Allow PostgreSQL access from within VPC
-  ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-    description = "Allow PostgreSQL access from within VPC"
+  # Allow PostgreSQL access from the current IP
+  dynamic "ingress" {
+    for_each = var.current_ip != "" ? [1] : []
+
+    content {
+      from_port   = 5432
+      to_port     = 5432
+      protocol    = "tcp"
+      cidr_blocks = ["${var.current_ip}/32"]
+      description = "Allow PostgreSQL access from current IP"
+    }
+  }
+
+  # Allow PostgreSQL access from the VPC
+  dynamic "ingress" {
+    for_each = var.vpc_cidr != "" ? [1] : []
+
+    content {
+      from_port   = 5432
+      to_port     = 5432
+      protocol    = "tcp"
+      cidr_blocks = [var.vpc_cidr]
+      description = "Allow PostgreSQL access from VPC"
+    }
   }
 
   # Inbound rule: Allow PostgreSQL access from Lambda security group if provided
-  dynamic "ingress" {
-    for_each = var.lambda_security_group_id != null ? [1] : []
-
-
-    content {
-      from_port       = 5432
-      to_port         = 5432
-      protocol        = "tcp"
-      security_groups = [var.lambda_security_group_id]
-      description     = "Allow PostgreSQL access from Lambda security group"
-    }
-  }
+  # This is now managed by the Lambda module's security group rules
+  # to avoid circular dependencies
 
   # Restrict outbound traffic to only necessary destinations
   egress {

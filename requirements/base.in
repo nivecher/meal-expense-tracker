@@ -4,10 +4,11 @@ toml>=0.10.2,<1.0.0
 python-dotenv==1.1.1,<2.0.0
 Flask-WTF>=1.2.2,<2.0.0
 email-validator>=2.1.0,<3.0.0
+click==8.1.7  # Pinned to avoid yanked version
 
 # Security
 Flask-Login>=0.6.3,<0.7.0
-Flask-Limiter>=3.12.0,<4.0.0
+Flask-Limiter==3.5.0  # Pinned to stable version
 Flask-JWT-Extended>=4.5.0,<5.0.0
 Flask-Cors>=4.0.2,<5.0.0
 
@@ -21,6 +22,11 @@ SQLAlchemy>=2.0.0,<3.0.0
 # AWS
 boto3>=1.38.46,<2.0.0
 requests>=2.32.4,<3.0.0
+mypy-boto3-dynamodb>=1.28.0,<2.0.0  # Required for Flask-Session DynamoDB support
+
+# Session Management
+Flask-Session==0.8.0  # Latest stable version with proper DynamoDB support
+cachelib>=0.9.0,<1.0.0  # Required by Flask-Session
 
 # WSGI Server
 gunicorn>=23.0.0,<24.0.0
@@ -32,3 +38,6 @@ marshmallow
 
 # Google Maps
 googlemaps>=4.2.0,<5.0.0
+
+# Message serialization
+msgspec>=0.18.0,<1.0.0

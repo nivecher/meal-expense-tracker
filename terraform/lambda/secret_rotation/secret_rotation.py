@@ -25,6 +25,7 @@ from typing import Any, Dict, Optional
 import boto3
 import botocore
 import psycopg2
+from botocore.client import BaseClient
 
 # Configure logging
 logger = logging.getLogger()
@@ -36,7 +37,7 @@ MAX_RETRIES = 3
 RETRY_DELAY = 1  # seconds
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handle the Lambda function invocation from AWS Secrets Manager.
 
     This function processes the secret rotation request by delegating to the
@@ -195,7 +196,7 @@ def generate_password(length: int = 16, max_attempts: int = 10) -> str:
     raise RuntimeError("Failed to generate a valid password after maximum attempts")
 
 
-def create_secret(service_client, arn, token):
+def create_secret(service_client: BaseClient, arn: str, token: str) -> None:
     """Create a new secret with a generated password.
 
     Args:
@@ -240,7 +241,7 @@ def create_secret(service_client, arn, token):
         raise ValueError(f"Failed to create secret: {e}") from e
 
 
-def set_secret(service_client, arn, token):
+def set_secret(service_client: BaseClient, arn: str, token: str) -> None:
     """Set the new secret in the database.
 
     Args:
@@ -294,7 +295,7 @@ def set_secret(service_client, arn, token):
         raise
 
 
-def test_secret(service_client, arn, token):
+def test_secret(service_client: BaseClient, arn: str, token: str) -> None:
     """Test the new secret by connecting to the database.
 
     Args:
@@ -336,7 +337,7 @@ def test_secret(service_client, arn, token):
         raise
 
 
-def finish_secret(service_client, arn, token):
+def finish_secret(service_client: BaseClient, arn: str, token: str) -> None:
     """Finish the rotation by marking the new secret as current.
 
     Args:
@@ -361,7 +362,7 @@ def finish_secret(service_client, arn, token):
         raise ValueError(error_msg) from e
 
 
-def _get_pending_version(service_client, arn, token):
+def _get_pending_version(service_client: BaseClient, arn: str, token: str) -> Optional[str]:
     """Get the pending version ID for the secret.
 
     Args:
@@ -383,7 +384,7 @@ def _get_pending_version(service_client, arn, token):
     return None
 
 
-def _update_secret_stage(service_client, arn, token, pending_version):
+def _update_secret_stage(service_client: BaseClient, arn: str, token: str, pending_version: str) -> None:
     """Update the secret version stage.
 
     Args:

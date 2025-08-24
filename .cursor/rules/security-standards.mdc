@@ -1,0 +1,89 @@
+# Security Standards and Best Practices
+
+## Authentication & Authorization
+- Use secure password hashing (bcrypt)
+- Implement proper session management
+- Use CSRF protection
+- Implement rate limiting
+- Use secure HTTP headers
+- Use JWT tokens with proper expiration
+- Implement multi-factor authentication where possible
+
+## Data Protection
+- Use HTTPS everywhere
+- Sanitize all user inputs
+- Use parameterized queries
+- Encrypt sensitive data at rest
+- Implement proper access controls
+- Use AWS KMS for encryption
+- Enable EBS volume encryption
+- Use S3 server-side encryption
+- Enable RDS encryption
+
+## Input Validation
+- Validate all user inputs
+- Use whitelist validation where possible
+- Sanitize HTML content
+- Prevent SQL injection attacks
+- Prevent XSS attacks
+- Use proper content type validation
+
+## Dependencies
+- Keep dependencies up to date
+- Use dependency scanning tools (Trivy, Bandit)
+- Pin dependency versions
+- Review third-party code
+- Use Snyk or similar tools for vulnerability scanning
+- Regularly audit dependencies
+
+## API Security
+- Implement proper authentication for all endpoints
+- Use HTTPS for all API calls
+- Implement rate limiting
+- Use proper HTTP status codes
+- Validate request payloads
+- Implement proper error handling without information leakage
+
+## Database Security
+- Use least privilege database users
+- Encrypt database connections
+- Use parameterized queries
+- Implement proper backup encryption
+- Use database connection pooling
+- Implement proper logging and monitoring
+
+## Infrastructure Security
+- Use security groups and network ACLs
+- Implement proper IAM policies
+- Use VPC for network isolation
+- Enable CloudTrail logging
+- Use AWS Config for compliance monitoring
+- Implement proper key rotation
+
+## Monitoring and Logging
+- Log all security events
+- Monitor for suspicious activity
+- Use centralized logging
+- Implement proper log retention
+- Monitor access patterns
+- Set up security alerts
+
+## Compliance
+- Follow OWASP Top 10 guidelines
+- Implement CIS benchmarks
+- Follow AWS Well-Architected Framework
+- Implement GDPR compliance measures
+- Regular security assessments
+- Penetration testing
+
+## Incident Response
+- Have incident response plan
+- Document security procedures
+- Regular security training
+- Incident reporting procedures
+- Post-incident reviews
+- Security metrics tracking
+description:
+globs:
+alwaysApply: false
+---

@@ -1,6 +1,7 @@
 # System Architecture
 
-This document outlines the high-level architecture of the Meal Expense Tracker application. For detailed technology choices and implementation details, see [TECHNOLOGY.md](TECHNOLOGY.md).
+This document outlines the high-level architecture of the Meal Expense Tracker application. For detailed technology
+choices and implementation details, see [TECHNOLOGY.md](TECHNOLOGY.md).
 
 ## 🏗 High-Level Architecture
 
@@ -21,11 +22,12 @@ graph TD
 ### 1. Backend
 
 - **Flask Application**
-  - WSGI-based web framework
-  - RESTful API endpoints
-  - Request/response handling
+- WSGI-based web framework
+- RESTful API endpoints
+- Request/response handling
 
 - **AWS Lambda Integration**
+
   - Serverless execution environment
   - WSGI adapter for Flask
   - Environment-based configuration
@@ -57,19 +59,22 @@ graph TD
 ## 🔄 Data Flow
 
 1. **User Authentication**
-   - Secure JWT-based authentication
-   - Role-based access control
-   - Session management
 
-2. **Expense Management**
-   - CRUD operations for expenses
-   - Data validation and sanitization
-   - Real-time updates via WebSockets (future)
+- Secure JWT-based authentication
+  - Role-based access control
+  - Session management
 
-3. **Reporting**
-   - Data aggregation
-   - Report generation
-   - Export functionality
+1. **Expense Management**
+
+- CRUD operations for expenses
+  - Data validation and sanitization
+  - Real-time updates via WebSockets (future)
+
+1. **Reporting**
+
+- Data aggregation
+  - Report generation
+  - Export functionality
 
 ## 🛡️ Security
 

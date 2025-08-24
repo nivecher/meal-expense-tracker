@@ -23,31 +23,28 @@ resource "aws_security_group_rule" "lambda_egress_https" {
   from_port         = 443
   to_port           = 443
   protocol          = "tcp"
-  cidr_blocks       = [var.vpc_cidr]
+  cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.lambda.id
-  description       = "Allow HTTPS outbound traffic within VPC"
+  description       = "Allow HTTPS outbound traffic"
 }
 
-# Allow DNS (UDP) for service discovery within VPC
-resource "aws_security_group_rule" "lambda_egress_dns_udp" {
+# Allow Lambda to make DNS queries
+resource "aws_security_group_rule" "egress_dns_udp" {
   type              = "egress"
   from_port         = 53
   to_port           = 53
   protocol          = "udp"
-  cidr_blocks       = [var.vpc_cidr]
+  cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.lambda.id
-  description       = "Allow DNS (UDP) outbound within VPC"
+  description       = "Allow DNS (UDP) outbound"
 }
 
-# Allow DNS (TCP) for larger DNS responses within VPC
-resource "aws_security_group_rule" "lambda_egress_dns_tcp" {
+resource "aws_security_group_rule" "egress_dns_tcp" {
   type              = "egress"
   from_port         = 53
   to_port           = 53
   protocol          = "tcp"
-  cidr_blocks       = [var.vpc_cidr]
+  cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.lambda.id
   description       = "Allow DNS (TCP) outbound for large DNS responses"
 }
-
-# Allow Lambda to access RDS using security group reference

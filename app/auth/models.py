@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+from flask.typing import ResponseReturnValue
 from flask_login import UserMixin
-from sqlalchemy import event
-from sqlalchemy.orm import Mapped, relationship
+from sqlalchemy import Connection, event
+from sqlalchemy.orm import Mapped, Mapper, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.extensions import db
+from app.extensions import LoginManager, db
 from app.models.base import BaseModel
 
 if TYPE_CHECKING:
@@ -111,7 +112,7 @@ class User(BaseModel, UserMixin):
         Note:
             Returns False if the user has no password set
         """
-        if not self.password_hash or not password:
+        if not password or not self.password_hash:
             return False
 
         return check_password_hash(self.password_hash, password)
@@ -154,7 +155,7 @@ class User(BaseModel, UserMixin):
 
 @event.listens_for(User, "before_insert")
 @event.listens_for(User, "before_update")
-def validate_user(mapper, connection, target):
+def validate_user(mapper: Mapper, connection: Connection, target: User) -> None:
     """Validate user data before insert/update."""
     # Ensure username is lowercase
     if target.username:
@@ -165,7 +166,7 @@ def validate_user(mapper, connection, target):
         target.email = target.email.lower().strip()
 
 
-def init_login_manager(login_manager) -> None:
+def init_login_manager(login_manager: LoginManager) -> None:
     """Initialize the login manager with the user loader.
 
     This function sets up the user loader callback that Flask-Login uses
@@ -200,7 +201,7 @@ def init_login_manager(login_manager) -> None:
         return None
 
     @login_manager.unauthorized_handler
-    def unauthorized():
+    def unauthorized() -> ResponseReturnValue:
         """Handle unauthorized access attempts.
 
         Returns:

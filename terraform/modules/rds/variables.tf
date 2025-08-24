@@ -43,6 +43,12 @@ variable "db_kms_key_arn" {
   default     = null
 }
 
+variable "db_publicly_accessible" {
+  description = "Whether the RDS instance should be publicly accessible"
+  type        = bool
+  default     = true # TODO temporary!!!
+}
+
 # VPC Endpoint Configuration
 variable "secrets_manager_prefix_list_id" {
   description = "The prefix list ID for the Secrets Manager VPC endpoint"
@@ -56,13 +62,26 @@ variable "cloudwatch_logs_prefix_list_id" {
   default     = ""
 }
 
-variable "lambda_security_group_id" {
-  description = "The security group ID of the Lambda function that needs to access the database"
+variable "lambda_iam_role_arn" {
+  description = "The ARN of the IAM role that will be allowed to connect to RDS"
   type        = string
   default     = null
 }
 
+# Network Access
+variable "current_ip" {
+  description = "The current public IP address for RDS access"
+  type        = string
+  default     = ""
+}
+
 # Tags
+variable "admin_cidr_blocks" {
+  description = "List of CIDR blocks that should have admin access to the RDS instance"
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)

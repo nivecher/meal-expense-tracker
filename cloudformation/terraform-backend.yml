@@ -1,4 +1,6 @@
+---
 AWSTemplateFormatVersion: '2010-09-09'
+
 Description: 'CloudFormation template for Terraform backend resources (S3 bucket, DynamoDB table, and KMS keys)'
 
 Parameters:
@@ -10,7 +12,7 @@ Parameters:
     ConstraintDescription: Must contain only alphanumeric characters and hyphens
 
 Conditions:
-  IsProd: !Equals [!Ref EnvironmentName, 'prod']
+  IsProd: !Equals [!Ref EnvironmentName, prod]
 
 Resources:
   # Single KMS Key for all backend resources
@@ -87,7 +89,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub "meal-expense-tracker-tfstate-${AWS::AccountId}"
+      BucketName: !Sub 'meal-expense-tracker-tfstate-${AWS::AccountId}'
       VersioningConfiguration:
         Status: Enabled
       BucketEncryption:
@@ -160,7 +162,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      TableName: !Sub "meal-expense-tracker-tflock"
+      TableName: !Sub 'meal-expense-tracker-tflock'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: LockID
@@ -180,29 +182,29 @@ Outputs:
     Description: Name of the S3 bucket for Terraform state
     Value: !Ref TerraformStateBucket
     Export:
-      Name: !Sub "${AWS::StackName}-StateBucketName"
+      Name: !Sub '${AWS::StackName}-StateBucketName'
 
   StateLockTableName:
     Description: Name of the DynamoDB table for state locking
     Value: !Ref TerraformStateLockTable
     Export:
-      Name: !Sub "${AWS::StackName}-StateLockTableName"
+      Name: !Sub '${AWS::StackName}-StateLockTableName'
 
   StateBucketArn:
     Description: ARN of the S3 bucket for Terraform state
     Value: !GetAtt TerraformStateBucket.Arn
     Export:
-      Name: !Sub "${AWS::StackName}-StateBucketArn"
+      Name: !Sub '${AWS::StackName}-StateBucketArn'
 
   BackendKmsKeyArn:
     Description: ARN of the KMS key used for all backend resources
     Value: !GetAtt BackendKmsKey.Arn
     Export:
-      Name: !Sub "${AWS::StackName}-BackendKmsKeyArn"
+      Name: !Sub '${AWS::StackName}-BackendKmsKeyArn'
 
   AccessLogsBucketName:
     Description: Name of the S3 bucket for access logs (if created)
     Condition: IsProd
     Value: !If [IsProd, !Ref AccessLogsBucket, !Ref 'AWS::NoValue']
     Export:
-      Name: !Sub "${AWS::StackName}-AccessLogsBucketName"
+      Name: !Sub '${AWS::StackName}-AccessLogsBucketName'
