@@ -107,16 +107,7 @@ class RestaurantSearchForm(FlaskForm):
 
 
 class RestaurantImportForm(FlaskForm):
-    """Form for importing restaurants from external sources."""
+    """Form for importing restaurants from CSV files."""
 
-    file = FileField("CSV/JSON File", validators=[DataRequired()])
-    source = SelectField(
-        "Source",
-        choices=[
-            ("google", "Google Places"),
-            ("yelp", "Yelp"),
-            ("manual", "Manual CSV"),
-        ],
-        validators=[DataRequired()],
-    )
+    file = FileField("CSV File", validators=[DataRequired()])
     submit = SubmitField("Import")

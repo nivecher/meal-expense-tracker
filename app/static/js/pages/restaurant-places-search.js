@@ -8,6 +8,7 @@
 import RestaurantSearch from '../components/restaurant-search.js';
 import { googlePlacesService } from '../services/google-places.js';
 import GoogleMapsLoader from '../utils/google-maps-loader.js';
+import { initializeModalAccessibility } from '../utils/modal-accessibility.js';
 
 // Initialize the page when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', async () => {
@@ -15,72 +16,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const successModal = document.getElementById('successModal');
   const errorModal = document.getElementById('errorModal');
 
-  // Store the element that had focus before the modal opened
-  let focusedElementBeforeModal = null;
-
-  // Set up event listeners for modals
+  // Initialize modal accessibility
   if (successModal) {
-    const modalInstance = new bootstrap.Modal(successModal);
-
-    // When modal is about to be shown
-    successModal.addEventListener('show.bs.modal', () => {
-      // Store the current focused element
-      focusedElementBeforeModal = document.activeElement;
-
-      // Update ARIA attributes when modal is shown
-      successModal.setAttribute('aria-hidden', 'false');
-      successModal.setAttribute('aria-modal', 'true');
-
-      // Remove the inert attribute to make modal content accessible
-      successModal.removeAttribute('inert');
-    });
-
-    // When modal is fully hidden
-    successModal.addEventListener('hidden.bs.modal', () => {
-      // Reset ARIA attributes when modal is hidden
-      successModal.setAttribute('aria-hidden', 'true');
-      successModal.setAttribute('aria-modal', 'false');
-
-      // Add inert attribute to prevent interaction when hidden
-      successModal.setAttribute('inert', 'true');
-
-      // Return focus to the element that had focus before the modal opened
-      if (focusedElementBeforeModal && focusedElementBeforeModal.focus) {
-        focusedElementBeforeModal.focus();
-      }
-    });
+    initializeModalAccessibility(successModal);
   }
 
   if (errorModal) {
-    const modalInstance = new bootstrap.Modal(errorModal);
-
-    // When modal is about to be shown
-    errorModal.addEventListener('show.bs.modal', () => {
-      // Store the current focused element
-      focusedElementBeforeModal = document.activeElement;
-
-      // Update ARIA attributes when modal is shown
-      errorModal.setAttribute('aria-hidden', 'false');
-      errorModal.setAttribute('aria-modal', 'true');
-
-      // Remove the inert attribute to make modal content accessible
-      errorModal.removeAttribute('inert');
-    });
-
-    // When modal is fully hidden
-    errorModal.addEventListener('hidden.bs.modal', () => {
-      // Reset ARIA attributes when modal is hidden
-      errorModal.setAttribute('aria-hidden', 'true');
-      errorModal.setAttribute('aria-modal', 'false');
-
-      // Add inert attribute to prevent interaction when hidden
-      errorModal.setAttribute('inert', 'true');
-
-      // Return focus to the element that had focus before the modal opened
-      if (focusedElementBeforeModal && focusedElementBeforeModal.focus) {
-        focusedElementBeforeModal.focus();
-      }
-    });
+    initializeModalAccessibility(errorModal);
   }
 
   // Check if we're on the places search page

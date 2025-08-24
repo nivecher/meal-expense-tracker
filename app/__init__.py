@@ -1,9 +1,8 @@
 import logging
 import os
-from typing import Optional
+from typing import Optional, Union
 
 from flask import Flask, jsonify
-from flask.typing import ResponseReturnValue
 from flask_cors import CORS
 
 from config import get_config
@@ -81,6 +80,14 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     init_errors(app)
     logger.debug("Registered error handlers")
 
+    # Initialize template filters
+    from .template_filters import init_app as init_template_filters
+    from .utils.filters import init_app as init_utils_filters
+
+    init_template_filters(app)
+    init_utils_filters(app)
+    logger.debug("Template filters initialized")
+
     # Configure CORS
     _configure_cors(app)
 
@@ -94,11 +101,11 @@ def _configure_jwt_handlers(app: Flask) -> None:
     """Configure JWT error handlers."""
 
     @jwt.invalid_token_loader
-    def invalid_token_callback(error: str) -> ResponseReturnValue:
+    def invalid_token_callback(error: str) -> Union[str, tuple]:
         return jsonify({"status": "error", "message": "Invalid or expired token", "error": str(error)}), 401
 
     @jwt.unauthorized_loader
-    def missing_token_callback(error: str) -> ResponseReturnValue:
+    def missing_token_callback(error: str) -> Union[str, tuple]:
         return jsonify({"status": "error", "message": "Missing authorization token", "error": str(error)}), 401
 
 

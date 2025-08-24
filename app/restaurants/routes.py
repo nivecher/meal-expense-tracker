@@ -26,8 +26,6 @@ from app.restaurants.forms import RestaurantForm
 from app.restaurants.models import Restaurant
 from app.restaurants.services import calculate_expense_stats
 
-from . import bp
-
 
 @bp.route("/")
 @login_required
@@ -275,15 +273,19 @@ def _validate_import_file(file):
 
 def _parse_import_file(file):
     """Parse the uploaded file and return the data."""
-    if file.filename.lower().endswith(".json"):
-        data = json.load(file)
-        if not isinstance(data, list):
-            flash("Invalid JSON format. Expected an array of restaurants.", "error")
-            return None
-        return data
-
-    # Parse CSV file
     try:
+        if file.filename.lower().endswith(".json"):
+            # Reset file pointer to beginning
+            file.seek(0)
+            data = json.load(file)
+            if not isinstance(data, list):
+                flash("Invalid JSON format. Expected an array of restaurants.", "error")
+                return None
+            return data
+
+        # Parse CSV file
+        # Reset file pointer to beginning
+        file.seek(0)
         csv_data = file.read().decode("utf-8")
         reader = csv.DictReader(io.StringIO(csv_data))
         return list(reader)
@@ -293,49 +295,63 @@ def _parse_import_file(file):
             "error",
         )
         return None
+    except Exception as e:
+        flash(f"Error parsing file: {str(e)}", "error")
+        return None
 
 
 @bp.route("/import", methods=["GET", "POST"])
 @login_required
 def import_restaurants():
     """Handle restaurant import from file upload."""
-    if request.method == "POST":
-        if "file" not in request.files:
-            flash("No file part", "error")
-            return redirect(request.url)
+    from app.restaurants.forms import RestaurantImportForm
 
-        file = request.files["file"]
-        if file.filename == "":
-            flash("No selected file", "error")
-            return redirect(request.url)
+    form = RestaurantImportForm()
 
-        try:
-            # Validate file
-            _validate_import_file(file)
+    if request.method == "POST" and form.validate_on_submit():
+        file = form.file.data
+        current_app.logger.info(f"Import request received for file: {file.filename if file else 'None'}")
 
-            # Parse the file
-            data = _parse_import_file(file)
+        if file and file.filename:
+            try:
+                # Validate file
+                current_app.logger.info("Validating file...")
+                if not _validate_import_file(file):
+                    current_app.logger.warning("File validation failed")
+                    return render_template("restaurants/import.html", form=form)
 
-            # Process and save restaurants
-            success, message = services.import_restaurants_from_csv(data, current_user.id)
-            # Extract the number of imported restaurants from the message
-            added = message.count("imported")
-            # This is a simple approximation, adjust as needed
-            skipped = message.count("skipped")
+                current_app.logger.info("File validation passed")
 
-            flash(
-                f"Successfully imported {added} restaurants. {skipped} duplicates skipped.",
-                "success",
-            )
-            return redirect(url_for("restaurants.list_restaurants"))
+                # Process and save restaurants
+                current_app.logger.info("Processing restaurants...")
+                success, message = services.import_restaurants_from_csv(file, current_user.id)
+                current_app.logger.info(f"Import result: success={success}, message={message}")
 
-        except ValueError as e:
-            flash(str(e), "error")
-        except Exception as e:
-            current_app.logger.error("Error importing restaurants: %s", str(e), exc_info=True)
-            flash("An error occurred while importing restaurants.", "error")
+                if success:
+                    # Extract the number of imported restaurants from the message
+                    added = message.count("imported")
+                    # This is a simple approximation, adjust as needed
+                    skipped = message.count("skipped")
 
-    return render_template("restaurants/import.html")
+                    flash(
+                        f"Successfully imported {added} restaurants. {skipped} duplicates skipped.",
+                        "success",
+                    )
+                    return redirect(url_for("restaurants.list_restaurants"))
+                else:
+                    flash(f"Import failed: {message}", "error")
+
+            except ValueError as e:
+                current_app.logger.error("ValueError during import: %s", str(e))
+                flash(str(e), "error")
+            except Exception as e:
+                current_app.logger.error("Error importing restaurants: %s", str(e), exc_info=True)
+                flash("An error occurred while importing restaurants.", "error")
+        else:
+            current_app.logger.warning("No file selected for import")
+            flash("No file selected", "error")
+
+    return render_template("restaurants/import.html", form=form)
 
 
 @bp.route("/google-places", methods=["GET", "POST"])

@@ -41,7 +41,7 @@
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <form id="contactForm" method="post" action="{{ url_for("main.contact") }}">
+                                <form id="contactForm" method="post" action="{{ url_for('main.contact') }}">
                                     {{ form.hidden_tag() }}
                                     <div class="mb-3">
                                         {{ form.name.label(class="form-label") }}

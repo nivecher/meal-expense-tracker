@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import { initializeModalAccessibility } from './modal-accessibility.js';
 
 /**
  * Shows a toast notification
@@ -150,7 +151,6 @@ function showConfirmDialog ({
     modal.id = modalId;
     modal.tabIndex = '-1';
     modal.setAttribute('aria-labelledby', `${modalId}-label`);
-    modal.setAttribute('aria-hidden', 'true');
 
     // Modal content
     modal.innerHTML = `
@@ -176,6 +176,23 @@ function showConfirmDialog ({
 
     // Initialize modal
     const modalInstance = new bootstrap.Modal(modal);
+
+    // Initialize accessibility using the utility
+    if (typeof initializeModalAccessibility === 'function') {
+      initializeModalAccessibility(modal);
+    } else {
+      // Fallback accessibility handling
+      modal.addEventListener('show.bs.modal', () => {
+        modal.setAttribute('aria-hidden', 'false');
+        modal.setAttribute('aria-modal', 'true');
+      });
+
+      modal.addEventListener('hidden.bs.modal', () => {
+        modal.setAttribute('aria-hidden', 'true');
+        modal.setAttribute('aria-modal', 'false');
+      });
+    }
+
     modalInstance.show();
 
     // Handle confirm button click

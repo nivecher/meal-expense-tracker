@@ -14,24 +14,24 @@
         </h1>
         <div class="d-flex gap-2">
             <!-- Primary Actions -->
-            <a href="{{ url_for("restaurants.add_restaurant") }}"
+            <a href="{{ url_for('restaurants.add_restaurant') }}"
                class="btn btn-primary">
                 <i class="fas fa-plus me-1"></i> Add Restaurant
             </a>
-            <a href="{{ url_for("restaurants.google_places_search") }}"
+            <a href="{{ url_for('restaurants.google_places_search') }}"
                class="btn btn-outline-primary">
                 <i class="fas fa-search-location me-1"></i> Find Restaurants
             </a>
-            <!-- Secondary Actions -->
+            <!-- Data Management Dropdown -->
             <div class="dropdown">
                 <button class="btn btn-outline-secondary dropdown-toggle"
                         type="button"
-                        id="exportDropdown"
+                        id="dataManagementDropdown"
                         data-bs-toggle="dropdown"
                         aria-expanded="false">
-                    <i class="fas fa-download me-1"></i> Export
+                    <i class="fas fa-database me-1"></i> Data Management
                 </button>
-                <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+                <ul class="dropdown-menu" aria-labelledby="dataManagementDropdown">
                     <li>
                         <a class="dropdown-item"
                            href="{{ url_for('restaurants.export_restaurants', format='csv') }}">
@@ -44,12 +44,17 @@
                             <i class="fas fa-file-code me-1"></i> Export as JSON
                         </a>
                     </li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    <li>
+                        <a class="dropdown-item"
+                           href="{{ url_for('restaurants.import_restaurants') }}">
+                            <i class="fas fa-file-import me-1"></i> Import Restaurants
+                        </a>
+                    </li>
                 </ul>
             </div>
-            <a href="{{ url_for("restaurants.import_restaurants") }}"
-               class="btn btn-outline-secondary">
-                <i class="fas fa-upload me-1"></i> Import
-            </a>
         </div>
     </div>
     <!-- View Toggle -->
@@ -125,11 +130,16 @@
                                 </p>
                             {% endif %}
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                                <span class="text-muted small">
-                                    {% set expense_count = restaurant.expenses|length %}
-                                    <i class="fas fa-receipt me-1"></i>
-                                    {{ expense_count }} {{ 'expense' if expense_count == 1 else 'expenses' }}
-                                </span>
+                                <div class="d-flex gap-3">
+                                    <span class="text-muted small">
+                                        <i class="fas fa-receipt me-1"></i>
+                                        {{ restaurant.visit_count }} {{ 'expense' if restaurant.visit_count == 1 else 'expenses' }}
+                                    </span>
+                                    <span class="text-muted small">
+                                        <i class="fas fa-dollar-sign me-1"></i>
+                                        ${{ "%.2f"|format(restaurant.total_spent) if restaurant.total_spent is defined else '0.00' }}
+                                    </span>
+                                </div>
                                 <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
                                    class="btn btn-sm btn-outline-primary"
                                    data-bs-toggle="tooltip"
@@ -137,6 +147,12 @@
                                     <i class="fas fa-plus"></i>
                                 </a>
                             </div>
+                            {% if restaurant.last_visit %}
+                                <div class="mt-2 text-muted small">
+                                    <i class="far fa-calendar-alt me-1"></i>
+                                    Last visited {{ restaurant.last_visit|time_ago }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -159,7 +175,7 @@
                     </thead>
                     <tbody>
                         {% for restaurant in restaurants %}
-                            {% set last_visit = restaurant.expenses|sort(attribute='date', reverse=true)|first if restaurant.expenses else None %}
+                            {% set last_visit = restaurant.last_visit %}
                             {% include "restaurants/_restaurant_table_row.html" %}
                         {% endfor %}
                     </tbody>
@@ -172,7 +188,7 @@
                 <i class="fas fa-utensils fa-4x text-muted mb-3"></i>
                 <h3>No restaurants found</h3>
                 <p class="text-muted">You haven't added any restaurants yet.</p>
-                <a href="{{ url_for("restaurants.add_restaurant") }}"
+                <a href="{{ url_for('restaurants.add_restaurant') }}"
                    class="btn btn-primary mt-2">
                     <i class="fas fa-plus me-1"></i> Add Your First Restaurant
                 </a>
@@ -183,8 +199,7 @@
     <div class="modal fade"
          id="deleteRestaurantModal"
          tabindex="-1"
-         aria-labelledby="deleteRestaurantModalLabel"
-         aria-hidden="true">
+         aria-labelledby="deleteRestaurantModalLabel">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-danger text-white">

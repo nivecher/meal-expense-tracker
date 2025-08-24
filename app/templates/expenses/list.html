@@ -13,7 +13,7 @@
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="h3 mb-0">Expenses</h1>
-            <a href="{{ url_for("expenses.add_expense") }}" class="btn btn-primary">
+            <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
                 <i class="fas fa-plus me-1"></i> Add Expense
             </a>
         </div>
@@ -113,8 +113,7 @@
                         <div class="modal fade"
                              id="deleteModal{{ expense.id }}"
                              tabindex="-1"
-                             aria-labelledby="deleteModalLabel{{ expense.id }}"
-                             aria-hidden="true">
+                             aria-labelledby="deleteModalLabel{{ expense.id }}">
                             <div class="modal-dialog">
                                 <div class="modal-content">
                                     <div class="modal-header">
@@ -158,7 +157,7 @@
                         <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
                         <h4>No expenses found</h4>
                         <p class="text-muted">Get started by adding your first expense.</p>
-                        <a href="{{ url_for("expenses.add_expense") }}"
+                        <a href="{{ url_for('expenses.add_expense') }}"
                            class="btn btn-primary mt-2">
                             <i class="fas fa-plus me-1"></i> Add Expense
                         </a>

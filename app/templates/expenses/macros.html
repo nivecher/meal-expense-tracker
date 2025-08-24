@@ -19,7 +19,7 @@
                 ) }}
                 {% if form.restaurant_id.errors %}<div class="invalid-feedback">{{ form.restaurant_id.errors[0] }}</div>{% endif %}
                 <div class="form-text">
-                    <a href="{{ url_for("restaurants.add_restaurant") }}" target="_blank">Add a new restaurant</a>
+                    <a href="{{ url_for('restaurants.add_restaurant') }}" target="_blank">Add a new restaurant</a>
                 </div>
             </div>
             <div class="col-md-6">
@@ -72,7 +72,7 @@
                 <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
                    class="btn btn-secondary">Cancel</a>
             {% else %}
-                <a href="{{ url_for("main.index") }}" class="btn btn-secondary">Cancel</a>
+                <a href="{{ url_for('main.index') }}" class="btn btn-secondary">Cancel</a>
             {% endif %}
             <button type="submit" class="btn btn-primary">{{ 'Update' if is_edit else 'Add' }} Expense</button>
         </div>

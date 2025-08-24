@@ -92,7 +92,7 @@
                 <ol class="breadcrumb mb-1 py-1 px-2 bg-light rounded">
                     {% block breadcrumb %}
                         <li class="breadcrumb-item">
-                            <a href="{{ url_for("main.index") }}" class="text-decoration-none">
+                            <a href="{{ url_for('main.index') }}" class="text-decoration-none">
                                 <i class="fas fa-home me-1"></i>Home
                             </a>
                         </li>
@@ -114,16 +114,16 @@
                         <p class="mb-0">2025 Meal Expense Tracker. All rights reserved.</p>
                     </div>
                     <div class="col-md-6 text-md-end">
-                        <a href="{{ url_for("main.about") }}"
+                        <a href="{{ url_for('main.about') }}"
                            class="text-muted me-3"
                            title="About Us">About</a>
-                        <a href="{{ url_for("main.terms") }}"
+                        <a href="{{ url_for('main.terms') }}"
                            class="text-muted me-3"
                            title="Terms of Service">Terms</a>
-                        <a href="{{ url_for("main.privacy") }}"
+                        <a href="{{ url_for('main.privacy') }}"
                            class="text-muted me-3"
                            title="Privacy Policy">Privacy</a>
-                        <a href="{{ url_for("main.contact") }}"
+                        <a href="{{ url_for('main.contact') }}"
                            class="text-muted"
                            title="Contact Us">Contact</a>
                     </div>

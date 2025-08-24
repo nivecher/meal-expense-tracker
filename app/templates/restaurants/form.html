@@ -77,7 +77,7 @@
                                 <i class="fas fa-utensils me-2 text-primary"></i>
                                 {{ 'Edit' if is_edit else 'Add New' }} Restaurant
                             </h1>
-                            <a href="{{ url_for("restaurants.list_restaurants") }}"
+                            <a href="{{ url_for('restaurants.list_restaurants') }}"
                                class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-arrow-left me-1"></i> Back to List
                             </a>
@@ -190,77 +190,73 @@
                                             id="city",
                                             placeholder="City"
                                             ) }}
-                                            {% for error in form.city.errors %}
-                                                <div class="invalid-feedback">{{ error }}</div>
-                                                {%
-                                                endfor %}
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label for="state" class="form-label">State/Province</label>
-                                                {{ form.state(class_="form-control" + (" is-invalid" if form.state.errors else "") ,
-                                                id="state",
-                                                placeholder="State/Province"
-                                                ) }}
-                                                {% for error in form.state.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label for="postal_code" class="form-label">Postal Code</label>
-                                                {{ form.postal_code(class_="form-control" + (" is-invalid" if
-                                                                                                form.postal_code.errors else "") ,
-                                                id="postal_code",
-                                                placeholder="Postal code"
-                                                ) }}
-                                                {% for error in form.postal_code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="country" class="form-label">Country</label>
-                                                {{ form.country(class_="form-control" + (" is-invalid" if form.country.errors else
-                                                                                                "") ,
-                                                id="country",
-                                                placeholder="Country"
-                                                ) }}
-                                                {% for error in form.country.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="phone" class="form-label">Phone Number</label>
-                                                {{ form.phone(class_="form-control" + (" is-invalid" if form.phone.errors else "") ,
-                                                placeholder="Phone number") }}
-                                                {% for error in form.phone.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="website" class="form-label">Website</label>
-                                                {{ form.website(class_="form-control" + (" is-invalid" if form.website.errors else
-                                                                                                "") , placeholder="https://example.com") }}
-                                                {% for error in form.website.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            </div>
-                                            {% if form.google_place_id.data %}
-                                                <div class="col-12 mt-2">
-                                                    <a href="https://www.google.com/maps/place/?q=place_id:{{ form.google_place_id.data }}"
-                                                       target="_blank"
-                                                       class="btn btn-sm btn-outline-primary">
-                                                        <i class="fas fa-map-marker-alt me-1"></i> View on Google Maps
-                                                    </a>
-                                                </div>
-                                            {% endif %}
+                                            {% for error in form.city.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
+                                        <div class="col-md-3">
+                                            <label for="state" class="form-label">State/Province</label>
+                                            {{ form.state(class_="form-control" + (" is-invalid" if form.state.errors else "") ,
+                                            id="state",
+                                            placeholder="State/Province"
+                                            ) }}
+                                            {% for error in form.state.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="postal_code" class="form-label">Postal Code</label>
+                                            {{ form.postal_code(class_="form-control" + (" is-invalid" if
+                                                                                        form.postal_code.errors else "") ,
+                                            id="postal_code",
+                                            placeholder="Postal code"
+                                            ) }}
+                                            {% for error in form.postal_code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="country" class="form-label">Country</label>
+                                            {{ form.country(class_="form-control" + (" is-invalid" if form.country.errors else
+                                                                                        "") ,
+                                            id="country",
+                                            placeholder="Country"
+                                            ) }}
+                                            {% for error in form.country.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="phone" class="form-label">Phone Number</label>
+                                            {{ form.phone(class_="form-control" + (" is-invalid" if form.phone.errors else "") ,
+                                            placeholder="Phone number") }}
+                                            {% for error in form.phone.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="website" class="form-label">Website</label>
+                                            {{ form.website(class_="form-control" + (" is-invalid" if form.website.errors else
+                                                                                        "") , placeholder="https://example.com") }}
+                                            {% for error in form.website.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
+                                        {% if form.google_place_id.data %}
+                                            <div class="col-12 mt-2">
+                                                <a href="https://www.google.com/maps/place/?q=place_id:{{ form.google_place_id.data }}"
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-map-marker-alt me-1"></i> View on Google Maps
+                                                </a>
+                                            </div>
+                                        {% endif %}
                                     </div>
-                                    <!-- Form Actions -->
-                                    <div class="d-flex justify-content-between mt-5 pt-3 border-top">
-                                        <div>
-                                            <a href="{{ url_for("restaurants.list_restaurants") }}"
-                                               class="btn btn-outline-secondary">
-                                                <i class="fas fa-arrow-left me-1"></i> Back to List
-                                            </a>
-                                        </div>
-                                        <div>
-                                            <button type="submit" class="btn btn-primary">
-                                                <i class="fas fa-save me-1"></i>
-                                                {{ 'Update' if is_edit else 'Save' }} Restaurant
-                                            </button>
-                                        </div>
+                                </div>
+                                <!-- Form Actions -->
+                                <div class="d-flex justify-content-between mt-5 pt-3 border-top">
+                                    <div>
+                                        <a href="{{ url_for('restaurants.list_restaurants') }}"
+                                           class="btn btn-outline-secondary">
+                                            <i class="fas fa-arrow-left me-1"></i> Back to List
+                                        </a>
                                     </div>
-                                </form>
-                            </div>
+                                    <div>
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save me-1"></i>
+                                            {{ 'Update' if is_edit else 'Save' }} Restaurant
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -274,24 +270,26 @@
             </div>
             <!-- Error Container -->
             <div id="errorContainer" class="alert alert-danger d-none" role="alert"></div>
-        {% endblock content %}
-        {% block scripts %}
-            {{ super() }}
-            <!-- Google Maps API Configuration -->
-            <script>
-                // Initialize the Google Maps API key
-                window.GOOGLE_MAPS_API_KEY = '{{ config.GOOGLE_MAPS_API_KEY or "" }}';
+        </div>
+    </div>
+{% endblock content %}
+{% block scripts %}
+    {{ super() }}
+    <!-- Google Maps API Configuration -->
+    <script>
+        // Initialize the Google Maps API key
+        window.GOOGLE_MAPS_API_KEY = '{{ config.GOOGLE_MAPS_API_KEY or "" }}';
 
-                // Handle any potential errors with Google Maps loading
-                window.gm_authFailure = function() {
-                    console.error('Google Maps failed to load');
-                    const errorElement = document.getElementById('address-error');
-                    if (errorElement) {
-                        errorElement.textContent = 'Failed to load Google Maps. Please try refreshing the page.';
-                        errorElement.classList.remove('d-none');
-                    }
-                };
-            </script>
-            <script type="module"
-                    src="{{ url_for('static', filename='js/pages/restaurant-form.js') }}"></script>
-        {% endblock scripts %}
+        // Handle any potential errors with Google Maps loading
+        window.gm_authFailure = function() {
+            console.error('Google Maps failed to load');
+            const errorElement = document.getElementById('address-error');
+            if (errorElement) {
+                errorElement.textContent = 'Failed to load Google Maps. Please try refreshing the page.';
+                errorElement.classList.remove('d-none');
+            }
+        };
+    </script>
+    <script type="module"
+            src="{{ url_for('static', filename='js/pages/restaurant-form.js') }}"></script>
+{% endblock scripts %}

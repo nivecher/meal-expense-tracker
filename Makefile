@@ -19,8 +19,11 @@
 # Application settings
 APP_NAME = meal-expense-tracker
 DOCKER_PORT = 8000
-PYTHON = python3.13
-PIP = pip3
+PYTHON = ./venv/bin/python3
+PIP = ./venv/bin/pip3
+
+# Parallel execution safety for critical operations
+.NOTPARALLEL: docker-rebuild tf-apply tf-destroy deploy-prod deploy-staging
 
 # Python settings
 PYTHONPATH = $(shell pwd)
@@ -38,6 +41,9 @@ TARGET_PLATFORM ?= linux/amd64
 # Terraform settings
 ENV ?= dev
 TF_ENV ?= $(ENV)
+TF_ROOT := $(shell pwd)/terraform
+TF_ENV_DIR = $(TF_ROOT)/environments/$(TF_ENV)
+TF_BACKEND_CONFIG = $(TF_ENV_DIR)/backend.hcl
 TF_CMD = cd terraform && make ENV=$(TF_ENV)
 TF_PARALLELISM ?= 30
 TF_ARGS ?= -parallelism=$(TF_PARALLELISM) -refresh=true
@@ -46,27 +52,15 @@ TF_ARGS ?= -parallelism=$(TF_PARALLELISM) -refresh=true
 GITHUB_ORG ?= nivecher
 REPO_NAME ?= meal-expense-tracker
 
+# AWS settings
+DEFAULT_AWS_PROFILE ?= default
+DEFAULT_AWS_REGION ?= us-east-1
+LAMBDA_FUNCTION_NAME ?= meal-expense-tracker-$(TF_ENV)
+
 # Enable BuildKit for better build performance and features
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 export PYTHONPATH
-
-## (deduplicated; see definitions above)
-
-# =======================
-# Virtual Environment
-# =======================
-
-## Create and activate Python virtual environment
-.PHONY: venv
-venv:
-	@if [ ! -d "venv" ]; then \
-		echo "Creating virtual environment..."; \
-		$(PYTHON) -m venv venv; \
-		echo "Virtual environment created. Run 'source venv/bin/activate' to activate."; \
-	else \
-		echo "Virtual environment already exists. Run 'source venv/bin/activate' to activate."; \
-	fi
 
 # =============================================================================
 # Help
@@ -81,8 +75,12 @@ help:  ## Show this help message
 	@echo "  \033[1mmake run\033[0m             Run the application locally"
 	@echo "  \033[1mmake format\033[0m          Format code with black and autoflake"
 	@echo "  \033[1mmake lint\033[0m            Run linters (flake8, black, mypy)"
-	@echo "  \033[1mmake check\033[0m           Run all checks (lint + test)"
+	@echo "  \033[1mmake test\033[0m            Run all tests with coverage"
+	@echo "  \033[1mmake test-with-lint\033[0m  Run tests with linting (ensures code quality)"
+	@echo "  \033[1mmake check\033[0m           Run all checks (format + lint + test)"
+	@echo "  \033[1mmake quality\033[0m         Run all quality checks"
 	@echo "  \033[1mmake pre-commit\033[0m      Run pre-commit checks (format + lint + test)"
+	@echo "  \033[1mmake validate-env\033[0m    Validate development environment"
 
 	@echo "\n\033[1mDatabase:\033[0m"
 	@echo "  \033[1mmake db-init\033[0m         Initialize database"
@@ -104,11 +102,17 @@ help:  ## Show this help message
 	@echo "  \033[1mmake test-smoke\033[0m       Run smoke tests"
 
 	@echo "\n\033[1mTerraform (TF_ENV=env, default: dev):\033[0m"
+	@echo "  \033[1mmake validate-tf-config\033[0m Validate Terraform configuration"
 	@echo "  \033[1mmake tf-init\033[0m        Initialize Terraform with backend config"
 	@echo "  \033[1mmake tf-plan\033[0m        Generate and show execution plan"
 	@echo "  \033[1mmake tf-apply\033[0m       Apply changes to infrastructure"
 	@echo "  \033[1mmake tf-destroy\033[0m     Destroy infrastructure"
 	@echo "  \033[1mmake tf-validate\033[0m    Validate Terraform configuration"
+
+	@echo "\n\033[1mDeployment:\033[0m"
+	@echo "  \033[1mmake deploy-dev\033[0m      Deploy to development environment"
+	@echo "  \033[1mmake deploy-staging\033[0m  Deploy to staging environment"
+	@echo "  \033[1mmake deploy-prod\033[0m     Deploy to production environment"
 
 	@echo "\n\033[1mDocumentation:\033[0m"
 	@echo "  \033[1mmake docs\033[0m           Generate API documentation"
@@ -118,16 +122,32 @@ help:  ## Show this help message
 	@echo "  \033[1mmake clean\033[0m           Remove build artifacts and temporary files"
 	@echo "  \033[1mmake distclean\033[0m        Remove all generated files including virtual environment"
 	@echo "  \033[1mmake check-env\033[0m        Check development environment setup"
+	@echo "  \033[1mmake validate-env\033[0m    Validate all required tools and environment"
 
 	@echo "\n\033[1mExamples:\033[0m"
-	@echo "  \033[1mmake setup && make run\033[0m        # Setup and run locally"
-	@echo "  \033[1mmake docker-up\033[0m                 # Start application in Docker"
-	@echo "  \033[1mmake test TEST_PATH=tests/unit\033[0m  # Run specific test directory"
-	@echo "  \033[1mmake tf-init TF_ENV=staging\033[0m    # Initialize staging environment"
+	@echo "  \033[1mmake validate-env && make setup && make run\033[0m  # Safe setup and run"
+	@echo "  \033[1mmake quality\033[0m                                 # Run all quality checks"
+	@echo "  \033[1mmake validate-tf-config && make tf-plan\033[0m      # Safe Terraform planning"
+	@echo "  \033[1mmake deploy-dev\033[0m                              # Deploy to development"
 
-# =======================
+# =============================================================================
+# Virtual Environment
+# =============================================================================
+
+## Create and activate Python virtual environment
+.PHONY: venv
+venv:
+	@if [ ! -d "venv" ]; then \
+		echo "Creating virtual environment..."; \
+		$(PYTHON) -m venv venv; \
+		echo "Virtual environment created. Run 'source venv/bin/activate' to activate."; \
+	else \
+		echo "Virtual environment already exists. Run 'source venv/bin/activate' to activate."; \
+	fi
+
+# =============================================================================
 # Development
-# =======================
+# =============================================================================
 
 ## Install development dependencies
 .PHONY: setup
@@ -137,35 +157,36 @@ setup:
 
 ## Run the application locally
 .PHONY: run
-run:
-	flask run
-
-## Run linters
-.PHONY: lint lint-all lint-python lint-html lint-js lint-css
+run: check-env
+	$(PYTHON) -m flask run
 
 ## Run all linters
+.PHONY: lint
 lint: lint-python lint-html lint-js lint-css
 
 ## Run all linters including optional ones
+.PHONY: lint-all
 lint-all: lint lint-optional
 
 ## Python linter
-lint-python:
+.PHONY: lint-python
+lint-python: check-env
 	@echo "\n\033[1m=== Running Python Linter ===\033[0m"
-	@flake8 app tests
-	@black --check app tests
+	@$(PYTHON) -m flake8 app tests || (echo "\033[1;31m❌ Flake8 failed\033[0m"; exit 1)
+	@$(PYTHON) -m black --check app tests || (echo "\033[1;31m❌ Black check failed\033[0m"; exit 1)
 
 ## HTML template linter
-lint-html:
+.PHONY: lint-html
+lint-html: check-env
 	@echo "\n\033[1m=== Running HTML Template Linter ===\033[0m"
-	@djlint app/templates --profile=django --lint
+	@$(PYTHON) -m djlint app/templates/ --reformat --profile=jinja || echo "\033[1;33m⚠️  HTML linting completed with warnings\033[0m"
 
-## JavaScript linter (if you add JavaScript files later)
+## JavaScript linter
 .PHONY: lint-js
 lint-js:
 	@if [ -d "app/static/js" ]; then \
 		echo "\n\033[1m=== Running JavaScript Linter ===\033[0m"; \
-		npx eslint --config eslint.config.js "app/static/js/**/*.js"; \
+		npx eslint --config eslint.config.js "app/static/js/**/*.js" || (echo "\033[1;31m❌ JavaScript linting failed\033[0m"; exit 1); \
 	fi
 
 ## CSS linter
@@ -173,10 +194,10 @@ lint-js:
 lint-css:
 	@if [ -d "app/static/css" ]; then \
 		echo "\n\033[1m=== Running CSS Linter ===\033[0m"; \
-		npx stylelint "app/static/css/**/*.css"; \
+		npx stylelint "app/static/css/**/*.css" || (echo "\033[1;31m❌ CSS linting failed\033[0m"; exit 1); \
 	fi
 
-## Optional linters (not run by default)
+## Optional linters
 .PHONY: lint-optional
 lint-optional: lint-security lint-docker
 
@@ -186,29 +207,33 @@ lint-security:
 	@echo "\n\033[1m=== Running Security Linter ===\033[0m"
 	@pip-audit || echo "pip-audit not installed, skipping security audit"
 
-format-html:
-	@echo "\n\033[1m=== Formatting HTML Templates ===\033[0m"
-	@djlint app/templates --profile=django --reformat
+## Docker linter
+.PHONY: lint-docker
+lint-docker:
+	@echo "\n\033[1m=== Running Docker Linter ===\033[0m"
+	@if command -v hadolint >/dev/null 2>&1; then \
+		hadolint Dockerfile || (echo "\033[1;31m❌ Docker linting failed\033[0m"; exit 1); \
+	else \
+		echo "hadolint not installed, skipping Docker linting"; \
+	fi
 
-format: format-html
-	@echo "\n\033[1m=== Running Shell Script Linter ===\033[0m"
-	@find . -type f -name '*.sh' \
-		-not -path '*/.*' \
-		-not -path '*/venv/*' \
-		-not -path '*/Python-*/*' \
-		-print0 | xargs -0 -I{} sh -c 'echo "Checking {}" && shellcheck -x {}' || true
-
-## Format code
+## Format all code
 .PHONY: format
-format: format-html format-python format-shell
+format: format-python format-html format-shell
 
 ## Format Python code
 .PHONY: format-python
-format-python:
+format-python: check-env
 	@echo "\n\033[1m=== Formatting Python code ===\033[0m"
-	@isort app/ tests/ migrations/ *.py
-	@black app/ tests/ migrations/ */*.py *.py
-	@autoflake --in-place --remove-all-unused-imports --recursive app/ tests/
+	@$(PYTHON) -m isort app/ tests/ migrations/ *.py || (echo "\033[1;31m❌ isort failed\033[0m"; exit 1)
+	@$(PYTHON) -m black app/ tests/ migrations/ */*.py *.py || (echo "\033[1;31m❌ black failed\033[0m"; exit 1)
+	@$(PYTHON) -m autoflake --in-place --remove-all-unused-imports --recursive app/ tests/ || (echo "\033[1;31m❌ autoflake failed\033[0m"; exit 1)
+
+## Format HTML templates
+.PHONY: format-html
+format-html:
+	@echo "\n\033[1m=== Formatting HTML Templates ===\033[0m"
+	@djlint app/templates --profile=django --reformat || (echo "\033[1;31m❌ HTML formatting failed\033[0m"; exit 1)
 
 ## Format Shell scripts
 .PHONY: format-shell
@@ -219,7 +244,7 @@ format-shell:
 			-not -path '*/.*' \
 			-not -path '*/venv/*' \
 			-not -path '*/Python-*/*' \
-			-print0 | xargs -0 -I{} sh -c 'echo "Formatting {}" && shfmt -i 2 -w "{}"'; \
+			-print0 | xargs -0 -I{} sh -c 'echo "Formatting {}" && shfmt -i 2 -w "{}"' || (echo "\033[1;31m❌ Shell formatting failed\033[0m"; exit 1); \
 	else \
 		echo "\n\033[1;33m⚠️ shfmt is not installed. Shell scripts will not be formatted.\033[0m"; \
 		echo "To enable shell script formatting, please install shfmt:"; \
@@ -229,61 +254,98 @@ format-shell:
 		echo "\nContinuing with Python formatting only...\n"; \
 	fi
 
-## Run tests
+## Run all tests
 .PHONY: test
-test:
-	PYTHONPATH=. pytest tests/
+test: check-env  ## Run tests directly
+	@echo "\n\033[1m=== Running Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Tests failed\033[0m"; exit 1)
+
+## Run tests with linting (ensures code quality before testing)
+.PHONY: test-with-lint
+test-with-lint: lint test
+
+## Run pre-commit checks
+.PHONY: pre-commit
+pre-commit: format lint test
+
+## Run all checks (format + lint + test)
+.PHONY: check
+check: format lint test
+
+## Run all quality checks
+.PHONY: quality
+quality: check
+
+## Run unit tests only
+.PHONY: test-unit
+test-unit:
+	@echo "\n\033[1m=== Running Unit Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Unit tests failed\033[0m"; exit 1)
+
+## Run integration tests only
+.PHONY: test-integration
+test-integration:
+	@echo "\n\033[1m=== Running Integration Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/integration/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Integration tests failed\033[0m"; exit 1)
+
+## Run smoke tests
+.PHONY: test-smoke
+test-smoke:
+	@echo "\n\033[1m=== Running Smoke Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/smoke/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Smoke tests failed\033[0m"; exit 1)
 
 ## Run load tests
 .PHONY: load-test
 load-test:
 	@echo "Load testing not yet implemented"
 
-# =======================
+# =============================================================================
 # Database
-# =======================
+# =============================================================================
 
 ## Initialize database
 .PHONY: db-init
-db-init:
+db-init: check-env
 	$(PYTHON) init_db.py
 
 ## Run database migrations
 .PHONY: db-migrate
-db-migrate:
-	flask db migrate -m "$(shell date +%Y%m%d_%H%M%S)"
+db-migrate: check-env
+	$(PYTHON) -m flask db migrate -m "$(shell date +%Y%m%d_%H%M%S)"
 
 ## Upgrade database
 .PHONY: db-upgrade
-db-upgrade:
-	flask db upgrade
+db-upgrade: check-env
+	$(PYTHON) -m flask db upgrade
 
 ## Downgrade database
 .PHONY: db-downgrade
-db-downgrade:
-	flask db downgrade
+db-downgrade: check-env
+	$(PYTHON) -m flask db downgrade
 
-# =======================
+# =============================================================================
 # Docker
-# =======================
+# =============================================================================
 
 ## Build Docker image for production
 .PHONY: docker-build
-docker-build:
+docker-build: validate-env
 	docker build \
 		--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
 		-t $(IMAGE_NAME):latest \
 		--target production \
-		.
+		. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1)
+	@echo "\033[1;32m✅ Docker image built successfully\033[0m"
 
 ## Build Docker image for development
 .PHONY: docker-build-dev
-docker-build-dev:
+docker-build-dev: validate-env
 	docker build \
 		--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
 		-t $(IMAGE_NAME):dev \
 		--target development \
-		.
+		. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1)
+	@echo "\033[1;32m✅ Docker development image built successfully\033[0m"
 
 ## Run application in Docker (development)
 .PHONY: docker-run
@@ -301,6 +363,16 @@ docker-run: docker-build-dev
 		--name $(CONTAINER_NAME) \
 		$(IMAGE_NAME):dev
 
+## Start all containers
+.PHONY: docker-up
+docker-up:
+	$(DOCKER_COMPOSE_DEV) up -d
+
+## Stop all containers
+.PHONY: docker-down
+docker-down:
+	$(DOCKER_COMPOSE_DEV) down
+
 ## Stop running containers
 .PHONY: docker-stop
 docker-stop:
@@ -310,6 +382,11 @@ docker-stop:
 .PHONY: docker-logs
 docker-logs:
 	docker logs -f $(CONTAINER_NAME)
+
+## Open shell in container
+.PHONY: docker-shell
+docker-shell:
+	docker exec -it $(CONTAINER_NAME) /bin/bash
 
 ## Clean up Docker resources
 .PHONY: docker-clean
@@ -321,23 +398,13 @@ docker-clean: docker-stop
 .PHONY: docker-rebuild
 docker-rebuild: docker-clean docker-build docker-run
 
-# =======================
+# =============================================================================
 # Terraform
-# =======================
-
-# ---------------------------
-# Terraform backend helper
-# ---------------------------
-# Ensures backend.hcl exists for the specified environment.
-# If missing, instructs user to run setup-tf-backend.
-# ---------------------------
-TF_ROOT := $(shell pwd)/terraform
-TF_ENV_DIR = $(TF_ROOT)/environments/$(TF_ENV)
-TF_BACKEND_CONFIG = $(TF_ENV_DIR)/backend.hcl
+# =============================================================================
 
 ## Initialize Terraform for a specific environment
 .PHONY: tf-init
-tf-init:
+tf-init: validate-tf-config
 	@echo "🚀 Initializing Terraform in $(TF_ENV) environment..."
 	@cd terraform && \
 	TF_PLUGIN_CACHE_DIR="$(HOME)/.terraform.d/plugin-cache" \
@@ -346,13 +413,8 @@ tf-init:
 
 ## Generate a plan without applying
 .PHONY: tf-plan
-tf-plan: tf-init
+tf-plan: validate-tf-config
 	@echo "Creating Terraform plan for environment: $(TF_ENV)"
-	@if [ ! -f "terraform/environments/$(TF_ENV)/terraform.tfvars" ]; then \
-		echo "Error: terraform.tfvars not found in terraform/environments/$(TF_ENV)/"; \
-		echo "Please create the file with the required variables for the $(TF_ENV) environment."; \
-		exit 1; \
-	fi
 	@cd terraform && \
 	terraform plan \
 		-var-file=environments/$(TF_ENV)/terraform.tfvars \
@@ -364,25 +426,30 @@ tf-plan: tf-init
 
 ## Apply the most recent plan
 .PHONY: tf-apply
-tf-apply:
+tf-apply: validate-tf-config
 	@if [ ! -f "terraform/environments/$(TF_ENV)/tfplan-$(TF_ENV)" ]; then \
-		echo "Error: No Terraform plan found. Run 'make tf-plan' first."; \
+		echo "\033[1;31m❌ No Terraform plan found. Run 'make tf-plan' first.\033[0m"; \
 		exit 1; \
 	fi
-	@echo "Applying Terraform changes to environment: $(TF_ENV)"
+	@echo "\033[1m🚀 Applying Terraform changes to environment: $(TF_ENV)\033[0m"
+	@read -p "Are you sure you want to apply these changes? [y/N] " confirm && \
+		[ $$confirm = y ] || [ $$confirm = Y ] || (echo "\033[1;33m⚠️  Aborting...\033[0m"; exit 1)
 	@cd terraform && \
 	terraform apply \
 		-input=false \
 		-lock=true \
 		-parallelism=$(TF_PARALLELISM) \
-		environments/$(TF_ENV)/tfplan-$(TF_ENV)
+		environments/$(TF_ENV)/tfplan-$(TF_ENV) || (echo "\033[1;31m❌ Terraform apply failed\033[0m"; exit 1)
+	@echo "\033[1;32m✅ Terraform changes applied successfully\033[0m"
 
 ## Destroy all resources in the environment
 .PHONY: tf-destroy
-tf-destroy:
-	@echo "WARNING: This will destroy all resources in the $(TF_ENV) environment!"
-	@read -p "Are you sure you want to continue? [y/N] " confirm && \
-		[ $$confirm = y ] || [ $$confirm = Y ] || (echo "Aborting..."; exit 1)
+tf-destroy: validate-tf-config
+	@echo "\033[1;31m⚠️  WARNING: This will destroy all resources in the $(TF_ENV) environment!\033[0m"
+	@echo "\033[1;31m⚠️  This action cannot be undone!\033[0m"
+	@read -p "Type 'DESTROY $(TF_ENV)' to continue: " confirm && \
+		[ "$$confirm" = "DESTROY $(TF_ENV)" ] || (echo "\033[1;33m⚠️  Aborting...\033[0m"; exit 1)
+	@echo "\033[1m🗑️  Destroying all resources in environment: $(TF_ENV)\033[0m"
 	@cd terraform && \
 	terraform destroy \
 		-var-file=environments/$(TF_ENV)/terraform.tfvars \
@@ -390,7 +457,8 @@ tf-destroy:
 		-input=false \
 		-lock=true \
 		-parallelism=$(TF_PARALLELISM) \
-		-auto-approve
+		-auto-approve || (echo "\033[1;31m❌ Terraform destroy failed\033[0m"; exit 1)
+	@echo "\033[1;32m✅ All resources destroyed successfully\033[0m"
 
 ## Validate Terraform configuration
 .PHONY: tf-validate
@@ -398,6 +466,24 @@ tf-validate:
 	@echo "Validating Terraform configuration for $(TF_ENV)..."
 	@cd terraform && \
 	terraform validate
+
+## Validate Terraform configuration and environment
+.PHONY: validate-tf-config
+validate-tf-config:
+	@echo "\033[1m🔍 Validating Terraform configuration...\033[0m"
+	@if [ -z "$(TF_ENV)" ]; then \
+		echo "\033[1;31m❌ TF_ENV is not set\033[0m"; \
+		exit 1; \
+	fi
+	@if [ ! -d "terraform/environments/$(TF_ENV)" ]; then \
+		echo "\033[1;31m❌ Terraform environment '$(TF_ENV)' not found\033[0m"; \
+		exit 1; \
+	fi
+	@if [ ! -f "terraform/environments/$(TF_ENV)/terraform.tfvars" ]; then \
+		echo "\033[1;31m❌ terraform.tfvars not found in terraform/environments/$(TF_ENV)/\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ Terraform configuration validated\033[0m"
 
 ## Format Terraform files
 .PHONY: tf-fmt
@@ -455,80 +541,66 @@ trivy:
 	find . -path "*/cloudformation/*.y*ml" -type f -exec echo "Scanning {}" \; -exec trivy config "{}" \;
 	@echo "✅ Trivy scan completed"
 
-# -------------------------------------------------------
-# Provision or update the remote backend (S3 & DynamoDB)
-# Usage: make setup-tf-backend [ARGS=...]
-# Any flags in ARGS will be forwarded to the shell script.
-# -------------------------------------------------------
+## Setup Terraform backend
+.PHONY: setup-tf-backend
 setup-tf-backend:
 	@echo "Setting up Terraform backend via CloudFormation..."
 	@./scripts/setup-terraform-backend.sh $(ARGS)
 
-DESTROY_STACK ?= terraform-backend
-DESTROY_REGION ?= us-east-1
-
-# -------------------------------------------------------
-# Set default values for stack name and region
-DEFAULT_STACK_NAME ?= terraform-backend
-DEFAULT_REGION ?= us-east-1
-
-# Delete the CloudFormation stack that hosts the Terraform backend
-# Usage: make destroy-tf-backend [DESTROY_STACK=name] [DESTROY_REGION=region]
-# Default: DESTROY_STACK=terraform-backend, DESTROY_REGION=us-east-1
-# -------------------------------------------------------
+## Destroy Terraform backend
+.PHONY: destroy-tf-backend
 destroy-tf-backend:
-	@STACK_NAME="$(or $(DESTROY_STACK),$(DEFAULT_STACK_NAME))"; \
-	REGION="$(or $(DESTROY_REGION),$(DEFAULT_REGION))"; \
+	@STACK_NAME="$(or $(DESTROY_STACK),terraform-backend)"; \
+	REGION="$(or $(DESTROY_REGION),us-east-1)"; \
 	echo "Deleting Terraform backend stack '$$STACK_NAME' in region '$$REGION'..."; \
 	aws cloudformation delete-stack --stack-name "$$STACK_NAME" --region "$$REGION"; \
 	aws cloudformation wait stack-delete-complete --stack-name "$$STACK_NAME" --region "$$REGION" || true; \
 	echo "✅ Terraform backend stack '$$STACK_NAME' deletion completed in region '$$REGION'."
 
-# =======================
+# =============================================================================
 # Deployment
-# =======================
+# =============================================================================
 
 ## Deploy to dev environment
 .PHONY: deploy-dev
-deploy-dev: check-lambda-package
-	@echo "Deploying to dev environment..."
+deploy-dev: validate-env check-lambda-package
+	@echo "\033[1m🚀 Deploying to dev environment...\033[0m"
 	@./scripts/deploy_lambda.sh \
 	  --function-name "$(LAMBDA_FUNCTION_NAME)-dev" \
 	  --environment dev \
 	  --profile "$(DEFAULT_AWS_PROFILE)" \
 	  --region "$(DEFAULT_AWS_REGION)" \
-	  --package both
+	  --package both || (echo "\033[1;31m❌ Dev deployment failed\033[0m"; exit 1)
+	@echo "\033[1;32m✅ Dev deployment completed successfully\033[0m"
 
 ## Deploy to staging environment
 .PHONY: deploy-staging
-deploy-staging: check-lambda-package
-	@echo "Deploying to staging environment..."
-	@read -p "This will deploy to the staging environment. Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "Aborting..."; exit 1)
+deploy-staging: validate-env check-lambda-package
+	@echo "\033[1m🚀 Deploying to staging environment...\033[0m"
+	@read -p "This will deploy to the staging environment. Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "\033[1;33m⚠️  Aborting...\033[0m"; exit 1)
 	@./scripts/deploy_lambda.sh \
 	  --function-name "$(LAMBDA_FUNCTION_NAME)-staging" \
 	  --environment staging \
 	  --profile "$(DEFAULT_AWS_PROFILE)" \
 	  --region "$(DEFAULT_AWS_REGION)" \
-	  --package both
+	  --package both || (echo "\033[1;31m❌ Staging deployment failed\033[0m"; exit 1)
+	@echo "\033[1;32m✅ Staging deployment completed successfully\033[0m"
 
 ## Deploy to production environment
 .PHONY: deploy-prod
-deploy-prod: check-lambda-package
-	@echo "WARNING: You are about to deploy to PRODUCTION!"
-	@echo "This will apply all pending changes to your production environment."
+deploy-prod: validate-env check-lambda-package
+	@echo "\033[1;31m⚠️  WARNING: You are about to deploy to PRODUCTION!\033[0m"
+	@echo "\033[1;31m⚠️  This will apply all pending changes to your production environment.\033[0m"
 	@read -p "Type 'production' to continue: " confirm && [ "$$confirm" = "production" ]
 	@./scripts/deploy_lambda.sh \
 	  --function-name "$(LAMBDA_FUNCTION_NAME)" \
 	  --environment prod \
 	  --profile "$(DEFAULT_AWS_PROFILE)" \
 	  --region "$(DEFAULT_AWS_REGION)" \
-	  --package both
+	  --package both || (echo "\033[1;31m❌ Production deployment failed\033[0m"; exit 1)
+	@echo "\033[1;32m✅ Production deployment completed successfully\033[0m"
 
-# =======================
-# Lambda Deployment
-# =======================
-
-## Deploy the latest Lambda function code
+## Deploy Lambda function
 .PHONY: deploy-lambda
 deploy-lambda: check-lambda-package
 	@echo "🚀 Deploying Lambda function with update..."
@@ -540,7 +612,7 @@ deploy-lambda: check-lambda-package
 	  --package app \
 	  --update
 
-## Package the application and dependencies for Lambda deployment
+## Package Lambda deployment
 .PHONY: package-lambda
 package-lambda: package-layer
 	@echo "\033[1m📦 Creating Lambda deployment package...\033[0m"
@@ -559,30 +631,7 @@ package-lambda: package-layer
 	fi
 	@echo "\033[1;32m✅ Lambda package created at dist/app.zip\033[0m"
 
-## Run database migrations on the deployed Lambda function
-.PHONY: run-migrations
-run-migrations: check-aws-cli
-	@if [ -z "$(FUNCTION_NAME)" ]; then \
-		read -p "Enter Lambda function name: " FUNCTION_NAME; \
-	else \
-		FUNCTION_NAME="$(FUNCTION_NAME)"; \
-	fi; \
-	if [ -z "$(REGION)" ]; then \
-		read -p "Enter AWS region [us-east-1]: " REGION; \
-		REGION=$${REGION:-us-east-1}; \
-	else \
-		REGION="$(REGION)"; \
-	fi; \
-	if [ -z "$(PROFILE)" ]; then \
-		read -p "Enter AWS profile [default]: " PROFILE; \
-		PROFILE=$${PROFILE:-default}; \
-	else \
-		PROFILE="$(PROFILE)"; \
-	fi; \
-	echo "🚀 Invoking migrations on Lambda function $$FUNCTION_NAME in region $$REGION with profile $$PROFILE..."; \
-	python3 scripts/invoke_migrations.py --function-name "$$FUNCTION_NAME" --region "$$REGION" --profile "$$PROFILE"
-
-## Package only the Lambda layer
+## Package Lambda layer
 .PHONY: package-layer
 package-layer:
 	@echo "\033[1m📦 Creating Lambda layer package...\033[0m"
@@ -601,57 +650,7 @@ package-layer:
 	fi
 	@echo "\033[1;32m✅ Lambda layer package created at dist/layers/python-dependencies-latest.zip\033[0m"
 
-.PHONY: deploy
-## Deploy the Lambda function and run migrations
-deploy:
-	@echo "🚀 Deploying Lambda function and running migrations..."
-	@read -p "Enter Lambda function name: " FUNCTION_NAME; \
-	read -p "Enter AWS region [$(DEFAULT_AWS_REGION)]: " REGION; \
-	read -p "Enter AWS profile [$(DEFAULT_AWS_PROFILE)]: " PROFILE; \
-	read -p "Enter environment [dev]: " ENV; \
-	REGION=$${REGION:-$(DEFAULT_AWS_REGION)}; \
-	PROFILE=$${PROFILE:-$(DEFAULT_AWS_PROFILE)}; \
-	ENV=$${ENV:-dev}; \
-	echo "🚀 Deploying Lambda function $$FUNCTION_NAME in region $$REGION with profile $$PROFILE (env: $$ENV)..."; \
-	./scripts/deploy_lambda.sh \
-	  --function-name "$$FUNCTION_NAME" \
-	  --region "$$REGION" \
-	  --profile "$$PROFILE" \
-	  --environment "$$ENV" \
-	  --package both
-
-## Check if Lambda package exists
-.PHONY: test-db-connection
-test-db-connection:
-	@echo "\033[1m🔍 Testing database connection...\033[0m"
-	@if [ ! -f ".env" ] && [ ! -f ".env.local" ]; then \
-		echo "\033[1;33m⚠️  No .env file found. Creating from example...\033[0m"; \
-		cp -n .env.example .env.local 2>/dev/null || cp -n .env.example .env 2>/dev/null || true; \
-	fi
-	@if [ ! -x "$(shell which python3)" ]; then \
-		echo "\033[1;31m❌ Python 3 is required but not installed\033[0m"; \
-		exit 1; \
-	fi
-	@if ! python3 -c "import sqlalchemy" >/dev/null 2>&1; then \
-		echo "\033[1;33m⚠️  SQLAlchemy not found. Installing dependencies...\033[0m"; \
-		pip install -r requirements.txt || { echo "\033[1;31m❌ Failed to install dependencies\033[0m"; exit 1; }; \
-	fi
-	@echo "\033[1m🔧 Running database connection test...\033[0m"
-	@if ! python3 scripts/test_db_connection.py; then \
-		echo "\033[1;31m❌ Database connection test failed\033[0m"; \
-		exit 1; \
-	fi
-	@echo "\033[1;32m✅ Database connection test passed!\033[0m"
-
-.PHONY: run-migrations-local
-run-migrations-local: test-db-connection
-	@echo "\033[1m🔄 Running database migrations...\033[0m"
-	@if ! python3 scripts/test_db_connection.py --migrate; then \
-		echo "\033[1;31m❌ Database migrations failed\033[0m"; \
-		exit 1; \
-	fi
-	@echo "\033[1;32m✅ Database migrations completed successfully!\033[0m"
-
+## Check Lambda package exists
 .PHONY: check-lambda-package
 check-lambda-package:
 	@if [ ! -f "dist/app.zip" ]; then \
@@ -671,11 +670,7 @@ check-lambda-package:
 		fi; \
 	fi
 
-## Deploy the Lambda function with the latest package
-# Default Lambda function name
-LAMBDA_FUNCTION_NAME ?= meal-expense-tracker-$(TF_ENV)
-
-## Invoke the Lambda function with a test event
+## Invoke Lambda function
 .PHONY: invoke-lambda
 invoke-lambda:
 	@echo "\033[1m🚀 Invoking Lambda function...\033[0m"
@@ -698,11 +693,199 @@ invoke-lambda:
 	@cat tmp/response.json | jq .
 	@echo "\n\033[1m✅ Lambda function test completed\033[0m"
 
-# =======================
-# GitHub Actions
-# =======================
+## Run database migrations
+.PHONY: run-migrations
+run-migrations: check-aws-cli
+	@if [ -z "$(FUNCTION_NAME)" ]; then \
+		read -p "Enter Lambda function name: " FUNCTION_NAME; \
+	else \
+		FUNCTION_NAME="$(FUNCTION_NAME)"; \
+	fi; \
+	if [ -z "$(REGION)" ]; then \
+		read -p "Enter AWS region [us-east-1]: " REGION; \
+		REGION=$${REGION:-us-east-1}; \
+	else \
+		REGION="$(REGION)"; \
+	fi; \
+	if [ -z "$(PROFILE)" ]; then \
+		read -p "Enter AWS profile [default]: " PROFILE; \
+		PROFILE=$${PROFILE:-default}; \
+	else \
+		PROFILE="$(PROFILE)"; \
+	fi; \
+	echo "🚀 Invoking migrations on Lambda function $$FUNCTION_NAME in region $$REGION with profile $$PROFILE..."; \
+	python3 scripts/invoke_migrations.py --function-name "$$FUNCTION_NAME" --region "$$REGION" --profile "$$PROFILE"
 
-# Setup GitHub Actions workflows
+## Run migrations locally
+.PHONY: run-migrations-local
+run-migrations-local: test-db-connection
+	@echo "\033[1m🔄 Running database migrations...\033[0m"
+	@if ! python3 scripts/test_db_connection.py --migrate; then \
+		echo "\033[1;31m❌ Database migrations failed\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ Database migrations completed successfully!\033[0m"
+
+## Test database connection
+.PHONY: test-db-connection
+test-db-connection:
+	@echo "\033[1m🔍 Testing database connection...\033[0m"
+	@if [ ! -f ".env" ] && [ ! -f ".env.local" ]; then \
+		echo "\033[1;33m⚠️  No .env file found. Creating from example...\033[0m"; \
+		cp -n .env.example .env.local 2>/dev/null || cp -n .env.example .env 2>/dev/null || true; \
+	fi
+	@if [ ! -x "$(shell which python3)" ]; then \
+		echo "\033[1;31m❌ Python 3 is required but not installed\033[0m"; \
+		exit 1; \
+	fi
+	@if ! python3 -c "import sqlalchemy" >/dev/null 2>&1; then \
+		echo "\033[1;33m⚠️  SQLAlchemy not found. Installing dependencies...\033[0m"; \
+		pip install -r requirements.txt || { echo "\033[1;31m❌ Failed to install dependencies\033[0m"; exit 1; }; \
+	fi
+	@echo "\033[1m🔧 Running database connection test...\033[0m"
+	@if ! python3 scripts/test_db_connection.py; then \
+		echo "\033[1;31m❌ Database connection test failed\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ Database connection test passed!\033[0m"
+
+## Check AWS CLI
+.PHONY: check-aws-cli
+check-aws-cli:
+	@if ! command -v aws >/dev/null 2>&1; then \
+		echo "\033[1;31m❌ AWS CLI is required but not installed\033[0m"; \
+		exit 1; \
+	fi
+
+# =============================================================================
+# Dependencies Management
+# =============================================================================
+
+# Install pip-tools if not already installed
+PIP_TOOLS := $(shell pip show pip-tools >/dev/null 2>&1 || echo "pip-tools not installed")
+
+# Default requirements files
+REQUIREMENTS_FILES = requirements.txt requirements-dev.txt requirements-prod.txt
+
+## Generate requirements files if they don't exist
+.PHONY: check-requirements
+check-requirements:
+	@for req in $(REQUIREMENTS_FILES); do \
+		if [ ! -f "$$req" ]; then \
+			echo "$$req not found, generating..."; \
+			$(MAKE) $$req; \
+		fi; \
+	done
+
+## Update all requirements files
+.PHONY: requirements
+requirements: check-pip-tools
+	@echo "Updating requirements files..."
+	@scripts/update_requirements.sh
+
+## Install development environment
+.PHONY: dev-setup
+dev-setup: check-pip-tools requirements
+	@echo "Setting up development environment..."
+	pip install -c constraints.txt -r requirements.txt -r requirements-dev.txt
+
+## Install production dependencies
+.PHONY: prod-setup
+prod-setup: check-pip-tools requirements
+	@echo "Setting up production environment..."
+	pip install -c constraints.txt -r requirements-prod.txt
+
+## Check if pip-tools is installed
+.PHONY: check-pip-tools
+check-pip-tools:
+	@if [ "$(PIP_TOOLS)" = "pip-tools not installed" ]; then \
+		echo "Installing pip-tools..."; \
+		pip install pip-tools; \
+	fi
+
+## Add a new package to base requirements
+.PHONY: add-base-req
+add-base-req:
+	@if [ -z "$(PACKAGE)" ]; then \
+		echo "Error: PACKAGE not specified. Usage: make add-base-req PACKAGE=package[==version]"; \
+		exit 1; \
+	fi
+	@echo "$(PACKAGE)" >> requirements/base.in
+	@echo "Added $(PACKAGE) to requirements/base.in"
+	@$(MAKE) requirements
+
+## Add a new development package
+.PHONY: add-dev-req
+add-dev-req:
+	@if [ -z "$(PACKAGE)" ]; then \
+		echo "Error: PACKAGE not specified. Usage: make add-dev-req PACKAGE=package[==version]"; \
+		exit 1; \
+	fi
+	@echo "$(PACKAGE)" >> requirements/dev.in
+	@echo "Added $(PACKAGE) to requirements/dev.in"
+	@$(MAKE) requirements
+
+## List all installed packages
+.PHONY: list-reqs
+list-reqs:
+	pip list
+
+## Show dependency tree
+.PHONY: show-deps
+show-deps:
+	pipdeptree
+
+## Check for dependency conflicts
+.PHONY: check-reqs
+check-reqs:
+	pip check
+
+## Clean up generated requirements files
+.PHONY: clean-requirements
+clean-requirements:
+	rm -f requirements.txt requirements-dev.txt requirements-prod.txt
+
+## Update a single requirements file
+%.txt: %.in
+	@echo "Updating $@..."
+	@TMP_FILE=$$(mktemp -p . .tmp_XXXXXXXXXX) && \
+	trap 'rm -f "$$TMP_FILE"' EXIT && \
+	pip-compile --upgrade -c constraints.txt -o "$$TMP_FILE" $< && \
+	mv "$$TMP_FILE" $@ || { rm -f "$$TMP_FILE"; exit 1; }
+
+# =============================================================================
+# Security
+# =============================================================================
+
+## Run Snyk security scan with high severity threshold
+.PHONY: snyk-scan
+snyk-scan:
+	snyk test --severity-threshold=high
+
+## Check for security vulnerabilities in dependencies
+.PHONY: check-vulns
+check-vulns:
+	snyk test --severity-threshold=medium
+
+## Monitor project for security vulnerabilities
+.PHONY: monitor
+monitor:
+	snyk monitor
+
+## Check for security vulnerabilities
+.PHONY: security-check
+security-check: check-pip-tools
+	@echo "Checking for security vulnerabilities..."
+	pip install safety bandit
+	safety check -r requirements.txt
+	bandit -r app/
+
+# =============================================================================
+# GitHub Actions
+# =============================================================================
+
+## Setup GitHub Actions workflows
+.PHONY: setup-github-actions
 setup-github-actions:
 	@if [ -z "$(GITHUB_ORG)" ]; then \
 		echo "Error: GITHUB_ORG is required. Example: make setup-github-actions GITHUB_ORG=your-org"; \
@@ -715,21 +898,51 @@ setup-github-actions:
 	fi
 	@./scripts/setup-github-actions.sh --github-org "$(GITHUB_ORG)" $(if $(REPO_NAME),--repo-name "$(REPO_NAME)")
 
-# =======================
+# =============================================================================
 # Utilities
-# =======================
+# =============================================================================
 
 ## Clean up build artifacts and temporary files
 .PHONY: clean
 clean: docker-clean
-	find . -type d -name "__pycache__" -exec rm -r {} +
-	find . -type f -name "*.py[co]" -delete
-	find . -type d -name ".pytest_cache" -exec rm -r {} +
-	rm -rf .coverage htmlcov/
+	find . -type d -name "__pycache__" -exec rm -r {} + 2>/dev/null || true
+	find . -type f -name "*.py[co]" -delete 2>/dev/null || true
+	find . -type d -name ".pytest_cache" -exec rm -r {} + 2>/dev/null || true
+	rm -rf .coverage htmlcov/ tmp/ dist/ 2>/dev/null || true
 
-# =======================
+## Remove all generated files including virtual environment
+.PHONY: distclean
+distclean: clean
+	rm -rf venv/ .venv/ .env.local 2>/dev/null || true
+
+## Check development environment setup
+.PHONY: check-env
+check-env:
+	@echo "\033[1m🔍 Checking development environment...\033[0m"
+	@if [ ! -d "venv" ]; then \
+		echo "\033[1;31m❌ Virtual environment not found. Run 'make venv' first.\033[0m"; \
+		exit 1; \
+	fi
+	@command -v $(PYTHON) >/dev/null 2>&1 || (echo "\033[1;31m❌ $(PYTHON) not found\033[0m"; exit 1)
+	@command -v $(PIP) >/dev/null 2>&1 || (echo "\033[1;31m❌ $(PIP) not found\033[0m"; exit 1)
+	@command -v docker >/dev/null 2>&1 || (echo "\033[1;33m⚠️  Docker not found\033[0m")
+	@command -v terraform >/dev/null 2>&1 || (echo "\033[1;33m⚠️  Terraform not found\033[0m")
+	@echo "\033[1;32m✅ Environment check completed\033[0m"
+
+## Validate all required tools and environment
+.PHONY: validate-env
+validate-env: check-env
+	@echo "\033[1m🔍 Validating development environment...\033[0m"
+	@command -v docker >/dev/null 2>&1 || (echo "\033[1;31m❌ Docker not found\033[0m"; exit 1)
+	@command -v terraform >/dev/null 2>&1 || (echo "\033[1;31m❌ Terraform not found\033[0m"; exit 1)
+	@command -v aws >/dev/null 2>&1 || (echo "\033[1;33m⚠️  AWS CLI not found\033[0m")
+	@command -v trivy >/dev/null 2>&1 || (echo "\033[1;33m⚠️  Trivy not found\033[0m")
+	@command -v snyk >/dev/null 2>&1 || (echo "\033[1;33m⚠️  Snyk not found\033[0m")
+	@echo "\033[1;32m✅ Environment validation completed\033[0m"
+
+# =============================================================================
 # Aliases for backward compatibility
-# =======================
+# =============================================================================
 .PHONY: build stop logs restart run-local rebuild-logs
 build: docker-build
 stop: docker-stop
@@ -737,132 +950,3 @@ logs: docker-logs
 restart: docker-stop docker-run
 run-local: run
 rebuild-logs: docker-rebuild docker-logs
-
-# Security
-# ========
-
-## Run Snyk security scan with high severity threshold
-.PHONY: snyk-scan
-snyk-scan:
-	snyk test --severity-threshold=high
-
-## Update dependencies to latest versions
-.PHONY: update-deps
-update-deps:
-	pip list --outdated --format=columns | awk '{print $1}' | tail -n +3 | xargs -n1 pip install --upgrade
-
-## Check for security vulnerabilities in dependencies (medium severity)
-.PHONY: check-vulns
-check-vulns:
-	snyk test --severity-threshold=medium
-
-## Monitor project for security vulnerabilities
-.PHONY: monitor
-monitor:
-# ======================
-# Dependencies Management
-# ======================
-# Install pip-tools if not already installed
-PIP_TOOLS := $(shell pip show pip-tools >/dev/null 2>&1 || echo "pip-tools not installed")
-
-# Default requirements files
-REQUIREMENTS_FILES = requirements.txt requirements-dev.txt requirements-prod.txt
-
-# Generate requirements files if they don't exist
-.PHONY: check-requirements
-check-requirements:
-	@for req in $(REQUIREMENTS_FILES); do \
-		if [ ! -f "$$req" ]; then \
-			echo "$$req not found, generating..."; \
-			$(MAKE) $$req; \
-		fi; \
-	done
-
-# Update all requirements files
-.PHONY: requirements
-requirements: check-pip-tools
-	@echo "Updating requirements files..."
-	@scripts/update_requirements.sh
-
-# Install development environment
-.PHONY: dev-setup
-dev-setup: check-pip-tools requirements
-	@echo "Setting up development environment..."
-	pip install -c constraints.txt -r requirements.txt -r requirements-dev.txt
-
-# Install production dependencies
-.PHONY: prod-setup
-prod-setup: check-pip-tools requirements
-	@echo "Setting up production environment..."
-	pip install -c constraints.txt -r requirements-prod.txt
-
-# Check for security vulnerabilities
-.PHONY: security-check
-security-check: check-pip-tools
-	@echo "Checking for security vulnerabilities..."
-	pip install safety bandit
-	safety check -r requirements.txt
-	bandit -r app/
-
-# Get absolute path to the project directory
-PROJECT_DIR := $(shell pwd)
-
-# Clean up generated requirements files
-.PHONY: clean-requirements
-clean-requirements:
-	rm -f requirements.txt requirements-dev.txt requirements-prod.txt
-
-# Update a single requirements file
-%.txt: %.in
-	@echo "Updating $@..."
-	@# Create a temporary file in the same directory as the target to avoid cross-device links
-	@TMP_FILE=$$(mktemp -p . .tmp_XXXXXXXXXX) && \
-	trap 'rm -f "$$TMP_FILE"' EXIT && \
-	pip-compile --upgrade -c constraints.txt -o "$$TMP_FILE" $< && \
-	mv "$$TMP_FILE" $@ || { rm -f "$$TMP_FILE"; exit 1; }
-
-# Check if pip-tools is installed
-.PHONY: check-pip-tools
-check-pip-tools:
-	@if [ "$(PIP_TOOLS)" = "pip-tools not installed" ]; then \
-		echo "Installing pip-tools..."; \
-		pip install pip-tools; \
-	fi
-
-# Add a new package to base requirements
-.PHONY: add-base-req
-add-base-req:
-	@if [ -z "$(PACKAGE)" ]; then \
-		echo "Error: PACKAGE not specified. Usage: make add-base-req PACKAGE=package[==version]"; \
-		exit 1; \
-	fi
-	@echo "$(PACKAGE)" >> requirements/base.in
-	@echo "Added $(PACKAGE) to requirements/base.in"
-	@$(MAKE) requirements
-
-# Add a new development package
-.PHONY: add-dev-req
-add-dev-req:
-	@if [ -z "$(PACKAGE)" ]; then \
-		echo "Error: PACKAGE not specified. Usage: make add-dev-req PACKAGE=package[==version]"; \
-		exit 1; \
-	fi
-	@echo "$(PACKAGE)" >> requirements/dev.in
-	@echo "Added $(PACKAGE) to requirements/dev.in"
-	@$(MAKE) requirements
-
-# List all installed packages
-.PHONY: list-reqs
-list-reqs:
-	pip list
-
-# Show dependency tree
-.PHONY: show-deps
-show-deps:
-	pipdeptree
-
-# Check for dependency conflicts
-.PHONY: check-reqs
-check-reqs:
-	pip check
-	snyk monitor

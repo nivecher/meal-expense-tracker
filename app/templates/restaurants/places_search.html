@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 {% block title %}
-    Find Restaurants - {{ super() }}
+    Search for Restaurants - Meal Expense Tracker
 {% endblock title %}
+{% block extra_css %}
+    <style>
+        .toast-container {
+            z-index: 11;
+        }
+    </style>
+{% endblock extra_css %}
 {% block styles %}
     {{ super() }}
     <link rel="stylesheet"
@@ -17,7 +24,7 @@
                     <h1 class="h4 mb-0">
                         <i class="fas fa-search-location text-primary me-2"></i>Find Restaurants
                     </h1>
-                    <a href="{{ url_for("restaurants.list_restaurants") }}"
+                    <a href="{{ url_for('restaurants.list_restaurants') }}"
                        class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-1"></i> Back to My Restaurants
                     </a>
@@ -36,16 +43,15 @@
                         <p class="mt-3">Searching for restaurants...</p>
                     </div>
                 </div>
-
                 <!-- Toast container for notifications -->
-                <div id="toastContainer" class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+                <div id="toastContainer"
+                     class="position-fixed bottom-0 end-0 p-3 toast-container">
                     <!-- Toasts will be inserted here by JavaScript -->
                 </div>
-
                 <!-- Hidden form for adding a restaurant -->
                 <form id="add-restaurant-form"
                       method="post"
-                      action="{{ url_for("restaurants.add_restaurant") }}"
+                      action="{{ url_for('restaurants.add_restaurant') }}"
                       class="d-none">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="name" id="restaurant-name">
@@ -67,9 +73,7 @@
              id="successModal"
              tabindex="-1"
              aria-labelledby="successModalLabel"
-             aria-hidden="true"
-             role="dialog"
-             aria-modal="false">
+             role="dialog">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-success text-white">
@@ -87,7 +91,7 @@
                         <p class="mb-0" id="success-message">The restaurant has been added to your list.</p>
                     </div>
                     <div class="modal-footer">
-                        <a href="{{ url_for("restaurants.list_restaurants") }}"
+                        <a href="{{ url_for('restaurants.list_restaurants') }}"
                            class="btn btn-outline-secondary">View Restaurant</a>
                         <button type="button"
                                 class="btn btn-success"
@@ -102,9 +106,7 @@
              id="errorModal"
              tabindex="-1"
              aria-labelledby="errorModalLabel"
-             aria-hidden="true"
-             role="alertdialog"
-             aria-modal="false">
+             role="alertdialog">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-danger text-white">
@@ -134,8 +136,7 @@
         <div class="modal fade"
              id="existingRestaurantModal"
              tabindex="-1"
-             aria-labelledby="existingRestaurantModalLabel"
-             aria-hidden="true">
+             aria-labelledby="existingRestaurantModalLabel">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-warning text-dark">

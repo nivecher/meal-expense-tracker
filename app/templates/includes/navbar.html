@@ -3,7 +3,7 @@
     <div class="container">
         <!-- Brand -->
         <a class="navbar-brand"
-           href="{{ url_for("main.index") }}"
+           href="{{ url_for('main.index') }}"
            aria-label="Meal Expense Tracker Home">
             <i class="fas fa-utensils" aria-hidden="true"></i>
             <span>Meal Expense Tracker</span>
@@ -24,7 +24,7 @@
                 <li class="nav-item">
                     <a class="nav-link
                               {% if request.endpoint == 'main.index' %}active{% endif %}"
-                       href="{{ url_for("main.index") }}"
+                       href="{{ url_for('main.index') }}"
                        aria-current="{% if request.endpoint == 'main.index' %}
                                          page
                                      {% else %}
@@ -46,30 +46,46 @@
                         <span>Restaurants</span>
                     </a>
                     <ul class="dropdown-menu" aria-labelledby="restaurantsDropdown">
+                        <!-- Primary Actions (matching list page) -->
                         <li>
                             <a class="dropdown-item
-                                      {% if request.endpoint == 'restaurants.list_restaurants' %}active{% endif %}"
-                               href="{{ url_for("restaurants.list_restaurants") }}">
-                                <i class="fas fa-list" aria-hidden="true"></i>
-                                <span>View All</span>
+                                      {% if request.endpoint == 'restaurants.add_restaurant' %}active{% endif %}"
+                               href="{{ url_for('restaurants.add_restaurant') }}">
+                                <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                                <span>Add Restaurant</span>
                             </a>
                         </li>
                         <li>
                             <a class="dropdown-item"
-                               href="{{ url_for("restaurants.google_places_search") }}">
+                               href="{{ url_for('restaurants.google_places_search') }}">
                                 <i class="fas fa-search-location" aria-hidden="true"></i>
                                 <span>Find Restaurants</span>
                             </a>
                         </li>
                         <li>
-                            <hr class="dropdown-divider">
+                            <a class="dropdown-item
+                                      {% if request.endpoint == 'restaurants.list_restaurants' %}active{% endif %}"
+                               href="{{ url_for('restaurants.list_restaurants') }}">
+                                <i class="fas fa-list" aria-hidden="true"></i>
+                                <span>View All</span>
+                            </a>
                         </li>
                         <li>
-                            <a class="dropdown-item
-                                      {% if request.endpoint == 'restaurants.add_restaurant' %}active{% endif %}"
-                               href="{{ url_for("restaurants.add_restaurant") }}">
-                                <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                                <span>Add New</span>
+                            <hr class="dropdown-divider">
+                        </li>
+                        <!-- Data Management Options -->
+                        <li>
+                            <a class="dropdown-item"
+                               href="{{ url_for('restaurants.export_restaurants', format='csv') }}">
+                                <i class="fas fa-file-csv" aria-hidden="true"></i>
+                                <span>Export as CSV</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item"
+                               href="{{ url_for('restaurants.export_restaurants', format='json') }}">
+                                <i class="fas fa-file-code" aria-hidden="true"></i>
+                                <span>Export as JSON</span>
                             </a>
                         </li>
                         <li>
@@ -78,9 +94,9 @@
                         <li>
                             <a class="dropdown-item
                                       {% if request.endpoint == 'restaurants.import_restaurants' %}active{% endif %}"
-                               href="{{ url_for("restaurants.import_restaurants") }}">
+                               href="{{ url_for('restaurants.import_restaurants') }}">
                                 <i class="fas fa-file-import" aria-hidden="true"></i>
-                                <span>Import</span>
+                                <span>Import Restaurants</span>
                             </a>
                         </li>
                     </ul>
@@ -88,7 +104,7 @@
                 <li class="nav-item">
                     <a class="nav-link
                               {% if request.endpoint and 'reports' in request.endpoint %}active{% endif %}"
-                       href="{{ url_for("reports.index") }}">
+                       href="{{ url_for('reports.index') }}">
                         <i class="fas fa-chart-line" aria-hidden="true"></i>
                         <span>Reports</span>
                     </a>
@@ -98,7 +114,7 @@
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item d-flex align-items-center">
                     <a class="btn btn-primary btn-sm"
-                       href="{{ url_for("expenses.add_expense") }}"
+                       href="{{ url_for('expenses.add_expense') }}"
                        title="Add New Expense">
                         <i class="fas fa-plus me-1"></i> Add Expense
                     </a>
@@ -145,7 +161,7 @@
                             <div class="dropdown-divider"></div>
                             <!-- Menu Items -->
                             <div class="px-2">
-                                <a href="{{ url_for("auth.change_password") }}" class="dropdown-item">
+                                <a href="{{ url_for('auth.change_password') }}" class="dropdown-item">
                                     <i class="fas fa-lock"></i>
                                     <span>Change Password</span>
                                 </a>
@@ -156,7 +172,7 @@
                                     <i class="fas fa-question-circle"></i>
                                     <span>Help</span>
                                 </a>
-                                <a href="{{ url_for("auth.logout") }}" class="dropdown-item text-danger">
+                                <a href="{{ url_for('auth.logout') }}" class="dropdown-item text-danger">
                                     <i class="fas fa-sign-out-alt"></i>
                                     <span>Logout</span>
                                 </a>
@@ -167,13 +183,13 @@
                     <div class="d-flex gap-2">
                         <li class="nav-item">
                             <a class="btn btn-outline-primary btn-sm"
-                               href="{{ url_for("auth.login") }}">
+                               href="{{ url_for('auth.login') }}">
                                 <i class="fas fa-sign-in-alt me-1"></i>
                                 <span>Login</span>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-primary btn-sm" href="{{ url_for("auth.register") }}">
+                            <a class="btn btn-primary btn-sm" href="{{ url_for('auth.register') }}">
                                 <i class="fas fa-user-plus me-1"></i>
                                 <span>Register</span>
                             </a>

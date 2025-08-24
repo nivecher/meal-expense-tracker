@@ -1,8 +1,8 @@
-"""Initial database schema
+"""empty message
 
-Revision ID: e8227f2f5667
+Revision ID: 48d643ab3aa0
 Revises:
-Create Date: 2025-07-17 23:22:15.183695
+Create Date: 2025-08-24 14:54:34.294753
 
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "e8227f2f5667"
+revision = "48d643ab3aa0"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -22,30 +22,10 @@ def upgrade():
         "user",
         sa.Column("id", sa.Integer(), nullable=False, comment="Primary key for the user"),
         sa.Column("username", sa.String(length=64), nullable=False, comment="Unique username"),
-        sa.Column(
-            "email",
-            sa.String(length=120),
-            nullable=False,
-            comment="User's email address",
-        ),
-        sa.Column(
-            "password_hash",
-            sa.String(length=256),
-            nullable=True,
-            comment="Hashed password",
-        ),
-        sa.Column(
-            "is_active",
-            sa.Boolean(),
-            nullable=False,
-            comment="Whether the user account is active",
-        ),
-        sa.Column(
-            "is_admin",
-            sa.Boolean(),
-            nullable=False,
-            comment="Whether the user has admin privileges",
-        ),
+        sa.Column("email", sa.String(length=120), nullable=False, comment="User's email address"),
+        sa.Column("password_hash", sa.String(length=256), nullable=True, comment="Hashed password"),
+        sa.Column("is_active", sa.Boolean(), nullable=False, comment="Whether the user account is active"),
+        sa.Column("is_admin", sa.Boolean(), nullable=False, comment="Whether the user has admin privileges"),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -68,42 +48,14 @@ def upgrade():
 
     op.create_table(
         "category",
+        sa.Column("name", sa.String(length=100), nullable=False, comment="Name of the category (unique per user)"),
+        sa.Column("description", sa.Text(), nullable=True, comment="Description of the category"),
         sa.Column(
-            "name",
-            sa.String(length=100),
-            nullable=False,
-            comment="Name of the category (unique per user)",
+            "color", sa.String(length=20), nullable=False, comment="Hex color code for the category (e.g., #6c757d)"
         ),
-        sa.Column(
-            "description",
-            sa.Text(),
-            nullable=True,
-            comment="Description of the category",
-        ),
-        sa.Column(
-            "color",
-            sa.String(length=20),
-            nullable=False,
-            comment="Hex color code for the category (e.g., #6c757d)",
-        ),
-        sa.Column(
-            "icon",
-            sa.String(length=50),
-            nullable=True,
-            comment="Icon identifier from the icon library",
-        ),
-        sa.Column(
-            "is_default",
-            sa.Boolean(),
-            nullable=False,
-            comment="Whether this is a default category",
-        ),
-        sa.Column(
-            "user_id",
-            sa.Integer(),
-            nullable=False,
-            comment="Reference to the user who owns this category",
-        ),
+        sa.Column("icon", sa.String(length=50), nullable=True, comment="Icon identifier from the icon library"),
+        sa.Column("is_default", sa.Boolean(), nullable=False, comment="Whether this is a default category"),
+        sa.Column("user_id", sa.Integer(), nullable=False, comment="Reference to the user who owns this category"),
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column(
             "created_at",
@@ -130,60 +82,28 @@ def upgrade():
 
     op.create_table(
         "restaurant",
-        sa.Column(
-            "name",
-            sa.String(length=100),
-            nullable=False,
-            comment="Name of the restaurant",
-        ),
-        sa.Column(
-            "type",
-            sa.String(length=50),
-            nullable=True,
-            comment="Type of cuisine or restaurant style",
-        ),
-        sa.Column(
-            "description",
-            sa.Text(),
-            nullable=True,
-            comment="Detailed description of the restaurant",
-        ),
+        sa.Column("name", sa.String(length=100), nullable=False, comment="Name of the restaurant"),
+        sa.Column("type", sa.String(length=50), nullable=True, comment="Type of cuisine or restaurant style"),
+        sa.Column("description", sa.Text(), nullable=True, comment="Detailed description of the restaurant"),
         sa.Column("address", sa.String(length=200), nullable=True, comment="Street address"),
         sa.Column("city", sa.String(length=100), nullable=True, comment="City"),
         sa.Column("state", sa.String(length=100), nullable=True, comment="State/Province"),
-        sa.Column(
-            "postal_code",
-            sa.String(length=20),
-            nullable=True,
-            comment="ZIP/Postal code",
-        ),
+        sa.Column("postal_code", sa.String(length=20), nullable=True, comment="ZIP/Postal code"),
         sa.Column("country", sa.String(length=100), nullable=True, comment="Country"),
         sa.Column("latitude", sa.Float(), nullable=True, comment="Geographic latitude"),
         sa.Column("longitude", sa.Float(), nullable=True, comment="Geographic longitude"),
         sa.Column("phone", sa.String(length=20), nullable=True, comment="Contact phone number"),
-        sa.Column(
-            "website",
-            sa.String(length=200),
-            nullable=True,
-            comment="Restaurant website URL",
-        ),
+        sa.Column("website", sa.String(length=200), nullable=True, comment="Restaurant website URL"),
         sa.Column("email", sa.String(length=100), nullable=True, comment="Contact email"),
+        sa.Column(
+            "google_place_id", sa.String(length=255), nullable=True, comment="Google Place ID for the restaurant"
+        ),
         sa.Column("price_range", sa.SmallInteger(), nullable=True, comment="Price range (1-5)"),
         sa.Column("cuisine", sa.String(length=100), nullable=True, comment="Type of cuisine"),
-        sa.Column(
-            "is_chain",
-            sa.Boolean(),
-            nullable=False,
-            comment="Whether it's a chain restaurant",
-        ),
+        sa.Column("is_chain", sa.Boolean(), nullable=False, comment="Whether it's a chain restaurant"),
         sa.Column("rating", sa.Float(), nullable=True, comment="Average rating (1-5)"),
         sa.Column("notes", sa.Text(), nullable=True, comment="Additional notes"),
-        sa.Column(
-            "user_id",
-            sa.Integer(),
-            nullable=False,
-            comment="Reference to the user who added this restaurant",
-        ),
+        sa.Column("user_id", sa.Integer(), nullable=False, comment="Reference to the user who added this restaurant"),
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column(
             "created_at",
@@ -206,6 +126,7 @@ def upgrade():
     )
     with op.batch_alter_table("restaurant", schema=None) as batch_op:
         batch_op.create_index(batch_op.f("ix_restaurant_cuisine"), ["cuisine"], unique=False)
+        batch_op.create_index(batch_op.f("ix_restaurant_google_place_id"), ["google_place_id"], unique=False)
         batch_op.create_index(batch_op.f("ix_restaurant_user_id"), ["user_id"], unique=False)
 
     op.create_table(
@@ -216,54 +137,23 @@ def upgrade():
             nullable=False,
             comment="Amount of the expense (stored with 2 decimal places)",
         ),
+        sa.Column("notes", sa.Text(), nullable=True, comment="Additional notes about the expense"),
         sa.Column(
-            "notes",
-            sa.Text(),
-            nullable=True,
-            comment="Additional notes about the expense",
+            "meal_type", sa.String(length=50), nullable=True, comment="Type of meal (e.g., breakfast, lunch, dinner)"
         ),
         sa.Column(
-            "meal_type",
-            sa.String(length=50),
-            nullable=True,
-            comment="Type of meal (e.g., breakfast, lunch, dinner)",
+            "date", sa.DateTime(timezone=True), nullable=False, comment="Date and time when the expense occurred"
         ),
-        sa.Column(
-            "date",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            comment="Date and time when the expense occurred",
-        ),
-        sa.Column(
-            "receipt_image",
-            sa.String(length=255),
-            nullable=True,
-            comment="Path to the receipt image file",
-        ),
-        sa.Column(
-            "receipt_verified",
-            sa.Boolean(),
-            nullable=False,
-            comment="Whether the receipt has been verified",
-        ),
-        sa.Column(
-            "user_id",
-            sa.Integer(),
-            nullable=False,
-            comment="Reference to the user who made this expense",
-        ),
+        sa.Column("receipt_image", sa.String(length=255), nullable=True, comment="Path to the receipt image file"),
+        sa.Column("receipt_verified", sa.Boolean(), nullable=False, comment="Whether the receipt has been verified"),
+        sa.Column("user_id", sa.Integer(), nullable=False, comment="Reference to the user who made this expense"),
         sa.Column(
             "restaurant_id",
             sa.Integer(),
             nullable=True,
             comment="Reference to the restaurant where the expense occurred",
         ),
-        sa.Column(
-            "category_id",
-            sa.Integer(),
-            nullable=True,
-            comment="Reference to the expense category",
-        ),
+        sa.Column("category_id", sa.Integer(), nullable=True, comment="Reference to the expense category"),
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column(
             "created_at",
@@ -307,6 +197,7 @@ def downgrade():
     op.drop_table("expense")
     with op.batch_alter_table("restaurant", schema=None) as batch_op:
         batch_op.drop_index(batch_op.f("ix_restaurant_user_id"))
+        batch_op.drop_index(batch_op.f("ix_restaurant_google_place_id"))
         batch_op.drop_index(batch_op.f("ix_restaurant_cuisine"))
 
     op.drop_table("restaurant")

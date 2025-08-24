@@ -23,9 +23,7 @@
                         {% endwith %}
                         <div class="mb-4">
                             <h3 class="h5 mb-3">Instructions</h3>
-                            <p>
-                                Upload a CSV or JSON file containing restaurant information. The file must include the following required fields:
-                            </p>
+                            <p>Upload a CSV file containing restaurant information. The file must include the following required fields:</p>
                             <h4 class="h6 mt-3">Required Fields:</h4>
                             <div class="alert alert-info">
                                 <i class="fas fa-info-circle me-2"></i>
@@ -65,7 +63,7 @@
                             </ul>
                             <div class="alert alert-info mt-3">
                                 <i class="fas fa-download me-2"></i>
-                                <a href="{{ url_for("restaurants.export_restaurants") }}"
+                                <a href="{{ url_for('restaurants.export_restaurants') }}"
                                    class="alert-link">Download sample CSV file</a>
                             </div>
                         </div>
@@ -74,17 +72,28 @@
                               id="import-form"
                               class="needs-validation"
                               novalidate>
+                            {{ form.hidden_tag() }}
                             <div class="mb-3">
-                                <label for="file" class="form-label">Select file (CSV or JSON)</label>
-                                <input type="file"
-                                       class="form-control"
-                                       id="file"
-                                       name="file"
-                                       accept=".csv,.json"
-                                       required>
-                                <div class="invalid-feedback">Please select a file to upload.</div>
-                                <div class="form-text">Maximum file size: 5MB</div>
+                                <label for="file" class="form-label">Select CSV file</label>
+                                {{ form.file(class_="form-control", accept=".csv") }}
+                                <div class="invalid-feedback">Please select a CSV file to upload.</div>
+                                <div class="form-text">Maximum file size: 5MB. Only CSV files are supported.</div>
                             </div>
+                            <!-- Show form validation errors -->
+                            {% if form.errors %}
+                                <div class="alert alert-danger">
+                                    <h5 class="alert-heading">Form Validation Errors</h5>
+                                    <ul class="mb-0">
+                                        {% for field, errors in form.errors.items() %}
+                                            {% for error in errors %}
+                                                <li>
+                                                    <strong>{{ field }}:</strong> {{ error }}
+                                                </li>
+                                            {% endfor %}
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endif %}
                             {% if errors %}
                                 <div class="alert alert-danger">
                                     <h5 class="alert-heading">Import Errors</h5>
@@ -94,10 +103,8 @@
                                 </div>
                             {% endif %}
                             <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-upload me-1"></i> Upload File
-                                </button>
-                                <a href="{{ url_for("restaurants.list_restaurants") }}"
+                                {{ form.submit(class_="btn btn-primary") }}
+                                <a href="{{ url_for('restaurants.list_restaurants') }}"
                                    class="btn btn-outline-secondary">
                                     <i class="fas fa-times me-1"></i> Cancel
                                 </a>

@@ -7,7 +7,7 @@
 {% block extra_css %}
     <link rel="stylesheet"
           href="{{ url_for('static', filename='css/pages/restaurant-detail.css') }}">
-{% endblock %}
+{% endblock extra_css %}
 {% block content %}
     {% if restaurant %}
         <div class="container-fluid py-4 restaurant-detail-container">
@@ -464,26 +464,25 @@
                     </div>
                 </div>
             </div>
-            <!-- Map View Section -->
-            {% if restaurant.google_place_id or (restaurant.latitude and restaurant.longitude) %}
-                <div class="map-container"
-                     id="map-container"
-                     data-google-place-id="{{ restaurant.google_place_id }}"
-                     data-lat="{{ restaurant.latitude }}"
-                     data-lng="{{ restaurant.longitude }}"
-                     data-name="{{ restaurant.name }}">
-                    <div class="text-muted">
-                        <i class="fas fa-spinner fa-spin me-2"></i>Loading map...
-                    </div>
-                </div>
-            {% endif %}
         </form>
+        <!-- Map View Section -->
+        {% if restaurant.google_place_id or (restaurant.latitude and restaurant.longitude) %}
+            <div class="map-container"
+                 id="map-container"
+                 data-google-place-id="{{ restaurant.google_place_id }}"
+                 data-lat="{{ restaurant.latitude }}"
+                 data-lng="{{ restaurant.longitude }}"
+                 data-name="{{ restaurant.name }}">
+                <div class="text-muted">
+                    <i class="fas fa-spinner fa-spin me-2"></i>Loading map...
+                </div>
+            </div>
+        {% endif %}
         <!-- Filter Expense Modal -->
         <div class="modal fade"
              id="filterExpenseModal"
              tabindex="-1"
-             aria-labelledby="filterExpenseModalLabel"
-             aria-hidden="true">
+             aria-labelledby="filterExpenseModalLabel">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -558,8 +557,7 @@
     {% for expense in expenses %}
         <div class="modal fade"
              id="deleteModal{{ expense.id }}"
-             tabindex="-1"
-             aria-hidden="true">
+             tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -589,6 +587,7 @@
                         <form action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}"
                               method="post"
                               class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger">
                                 <i class="fas fa-trash-alt me-1"></i>Delete Expense
                             </button>
@@ -605,7 +604,7 @@
             The requested restaurant could not be found. It may have been removed or the link might be incorrect.
         </p>
         <hr>
-        <a href="{{ url_for("restaurants.list_restaurants") }}"
+        <a href="{{ url_for('restaurants.list_restaurants') }}"
            class="btn btn-primary">
             <i class="fas fa-arrow-left me-1"></i>Back to Restaurants
         </a>
