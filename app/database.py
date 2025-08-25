@@ -92,7 +92,7 @@ def _get_database_uri(app: Optional[Flask] = None) -> str:
     # Fall back to SQLite in development
     instance_path = os.path.join(os.path.dirname(__file__), "..", "instance")
     os.makedirs(instance_path, exist_ok=True)
-    db_path = os.path.join(instance_path, "meal_expense_tracker.db")
+    db_path = os.path.join(instance_path, f"app-{os.getenv('FLASK_ENV', 'development')}.db")
 
     if os.path.exists(os.path.dirname(db_path)):
         return f"sqlite:///{db_path}?check_same_thread=False&timeout=30"
