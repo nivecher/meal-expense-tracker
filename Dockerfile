@@ -4,7 +4,7 @@
 # Build arguments for platform specification
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
-FROM python:3.13-slim AS builder
+FROM --platform=linux/amd64 python:3.13-slim AS builder
 
 # Install build dependencies for psycopg2-binary and other Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -37,7 +37,7 @@ RUN pip install --upgrade pip wheel \
 # ============================================
 # Stage 2: Development - For local development
 # ============================================
-FROM python:3.13-slim AS development
+FROM --platform=linux/amd64 python:3.13-slim AS development
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -120,7 +120,7 @@ CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-class", "gevent", "--worker
 # Stage 3: Production - For Lambda deployment
 # ============================================
 # Note: AWS Lambda requires linux/amd64 for Python 3.13
-FROM public.ecr.aws/lambda/python:3.13 AS production
+FROM --platform=linux/amd64 public.ecr.aws/lambda/python:3.13 AS production
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \

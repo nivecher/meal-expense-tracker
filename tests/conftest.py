@@ -11,7 +11,7 @@ from typing import Generator, Optional, TypeVar
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient, FlaskCliRunner
-from sqlalchemy.orm import Session, scoped_session, sessionmaker
+from sqlalchemy.orm import Session
 
 # Add the project root to the Python path first to avoid import issues
 project_root = str(Path(__file__).parent.parent)
@@ -128,30 +128,20 @@ def client(app: Flask) -> Generator[FlaskClient, None, None]:
     This fixture provides a test client that can be used to make requests
     to the application for testing purposes, with proper database session handling.
     """
+    # The app context is already pushed in the app fixture, so we don't need to create another one
     with app.test_client() as client:
-        with app.app_context():
-            # Create all tables if they don't exist
-            db.create_all()
+        # Create all tables if they don't exist
+        db.create_all()
 
-            # Start a new transaction
-            connection = db.engine.connect()
-            transaction = connection.begin()
+        # Start a new transaction for this test
+        db.session.begin_nested()
 
-            # Create a new scoped session for the test
-            db.session = db.create_scoped_session(options={"bind": connection, "binds": {}})
-
-            # Bind the session to the current app context
-            db.session.begin_nested()
-
-            try:
-                yield client
-            finally:
-                # Clean up the session and transaction
-                db.session.rollback()
-                db.session.close()
-                transaction.rollback()
-                connection.close()
-                db.session.remove()
+        try:
+            yield client
+        finally:
+            # Clean up the session
+            db.session.rollback()
+            db.session.remove()
 
 
 @pytest.fixture
@@ -168,49 +158,35 @@ def runner(app: Flask) -> FlaskCliRunner:
 
 
 @pytest.fixture
-def _db(app: Flask) -> Generator[scoped_session, None, None]:
+def _db(app: Flask) -> Generator[Session, None, None]:
     """Provide a transactional scope around tests.
 
     This fixture is used by Flask-SQLAlchemy to ensure each test runs in a transaction
     that's rolled back at the end of the test.
     """
     # Create all tables if they don't exist
-    with app.app_context():
-        db.create_all()
+    db.create_all()
 
-    # Create a new connection and transaction
-    connection = db.engine.connect()
-    transaction = connection.begin()
-
-    # Create a scoped session bound to the transaction
-    session_factory = sessionmaker(bind=connection)
-    session = scoped_session(session_factory)
-
-    # Override the default session with our scoped session
-    db.session = session
+    # In Flask-SQLAlchemy v3, we use the session directly
+    # The session is already bound to the app context
+    db.session.begin_nested()
 
     try:
-        yield session
+        yield db.session
     finally:
-        # Clean up the session and transaction
-        session.rollback()
-        session.close()
-        transaction.rollback()
-        connection.close()
-        session.remove()
-
-        # Reset the session
-        db.session = db.create_scoped_session()
+        # Clean up the session
+        db.session.rollback()
+        db.session.remove()
 
 
 @pytest.fixture
-def session(_db: scoped_session) -> Session:
+def session(_db: Session) -> Session:
     """Create a new database session for testing.
 
     This fixture provides a session that's bound to the current test's transaction.
     All database operations will be rolled back after the test completes.
     """
-    return _db()
+    return _db
 
 
 class AuthActions:

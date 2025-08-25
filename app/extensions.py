@@ -3,11 +3,9 @@
 This module initializes and configures all Flask extensions used in the application.
 """
 
-from typing import Any, Optional, cast
+from typing import Any, Optional, Union, cast
 
-import boto3
 from flask import Flask, request, url_for
-from flask.typing import ResponseReturnValue
 from flask.wrappers import Response
 from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
@@ -41,48 +39,16 @@ migrate = Migrate()
 flask_session = Session()
 
 
-def _configure_dynamodb_session(app: Flask) -> None:
-    """Configure DynamoDB session storage for Flask-Session."""
-    if app.config.get("SESSION_TYPE") != "dynamodb":
-        return
+def _log_session_config(app: Flask) -> None:
+    """Log session configuration for debugging - Single responsibility."""
+    session_type = app.config.get("SESSION_TYPE", "default")
+    app.logger.info("Session backend: %s", session_type)
 
-    try:
-        table_name = app.config.get("SESSION_DYNAMODB_TABLE")
+    if session_type == "dynamodb":
+        table = app.config.get("SESSION_DYNAMODB_TABLE")
         region = app.config.get("SESSION_DYNAMODB_REGION")
-        endpoint_url = app.config.get("SESSION_DYNAMODB_ENDPOINT_URL")
-
-        app.logger.info("DynamoDB Session Configuration:")
-        app.logger.info("  Table: %s", table_name)
-        app.logger.info("  Region: %s", region)
-        app.logger.info("  Endpoint URL: %s", endpoint_url or "None (AWS default)")
-
-        # Test AWS credentials and connectivity
-        session = boto3.Session()
-        app.logger.info("  AWS Profile: %s", session.profile_name or "default")
-        app.logger.info("  AWS Region from session: %s", session.region_name or "not set")
-
-    except Exception as e:
-        app.logger.error("Error configuring DynamoDB session: %s", str(e))
-        app.logger.exception("Full exception details:")
-
-
-def _configure_session_fallback(app: Flask) -> None:
-    """Configure fallback session storage if DynamoDB fails."""
-    if app.config.get("SESSION_TYPE") == "dynamodb":
-        app.logger.warning("Falling back to filesystem sessions due to DynamoDB error")
-        app.config["SESSION_TYPE"] = "filesystem"
-        # Use tempfile.gettempdir() for secure temporary directory
-        import tempfile
-
-        app.config["SESSION_FILE_DIR"] = tempfile.mkdtemp(prefix="flask_session_")
-        app.config["SESSION_FILE_THRESHOLD"] = 100
-
-        try:
-            flask_session.init_app(app)
-            app.logger.info("Successfully fell back to filesystem sessions")
-        except Exception as fallback_error:
-            app.logger.error("Fallback to filesystem sessions also failed: %s", str(fallback_error))
-            raise
+        endpoint = app.config.get("SESSION_DYNAMODB_ENDPOINT_URL")
+        app.logger.info("  Table: %s, Region: %s, Endpoint: %s", table, region, endpoint or "AWS default")
 
 
 def _configure_csrf_handlers(app: Flask) -> None:
@@ -128,16 +94,9 @@ def init_app(app: Flask) -> None:
     csrf.init_app(app)
     migrate.init_app(app, db)
 
-    # Configure DynamoDB session if needed
-    _configure_dynamodb_session(app)
-
-    # Initialize Flask-Session with error handling
-    try:
-        flask_session.init_app(app)
-        app.logger.info("Flask-Session initialized successfully")
-    except Exception as e:
-        app.logger.error("Failed to initialize Flask-Session: %s", str(e))
-        _configure_session_fallback(app)
+    # Initialize Flask-Session
+    flask_session.init_app(app)
+    _log_session_config(app)
 
     # Initialize rate limiter
     limiter.init_app(app)
@@ -163,7 +122,7 @@ def init_app(app: Flask) -> None:
 
 
 @login_manager.unauthorized_handler
-def unauthorized() -> ResponseReturnValue:
+def unauthorized() -> Union[Response, str]:
     """Handle unauthorized requests.
 
     For API requests, return a 401 JSON response.

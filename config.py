@@ -64,24 +64,26 @@ class Config:
     def _configure_session(self) -> None:
         """Configure session settings based on environment."""
         if os.getenv("FLASK_ENV") == "production":
-            self._configure_production_session()
+            self._setup_dynamodb_session()
         else:
-            self._configure_development_session()
+            self._setup_filesystem_session()
 
-    def _configure_production_session(self) -> None:
-        """Configure production session settings with DynamoDB."""
+    def _setup_dynamodb_session(self) -> None:
+        """Setup DynamoDB session configuration."""
         self.SESSION_TYPE = "dynamodb"
         self.SESSION_DYNAMODB_TABLE = os.getenv("SESSION_TABLE_NAME", "flask_sessions")
         self.SESSION_DYNAMODB_REGION = os.getenv("AWS_REGION", "us-east-1")
-        self.SESSION_DYNAMODB_ENDPOINT_URL = os.getenv("SESSION_DYNAMODB_ENDPOINT")
         self.SESSION_USE_SIGNER = True
 
-    def _configure_development_session(self) -> None:
-        """Configure development session settings with filesystem."""
-        self.SESSION_TYPE = "filesystem"
-        # Use tempfile for secure temporary directory
+        # Only set endpoint for testing/LocalStack
+        if endpoint := os.getenv("SESSION_DYNAMODB_ENDPOINT"):
+            self.SESSION_DYNAMODB_ENDPOINT_URL = endpoint
+
+    def _setup_filesystem_session(self) -> None:
+        """Setup filesystem session configuration."""
         import tempfile
 
+        self.SESSION_TYPE = "filesystem"
         self.SESSION_FILE_DIR = tempfile.mkdtemp(prefix="flask_session_")
         self.SESSION_FILE_THRESHOLD = 100
 

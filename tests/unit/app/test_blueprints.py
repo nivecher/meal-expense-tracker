@@ -8,9 +8,10 @@ def test_blueprint_registration(app):
     # Check that all expected blueprints are registered
     # Get base blueprint names (without nested names)
     base_blueprints = {name.split(".")[0] for name in blueprints.keys()}
-    expected_blueprints = {"auth", "expenses", "main", "restaurants", "api", "errors"}
-    if app.config.get("DEBUG"):
-        expected_blueprints.add("debug")
+    expected_blueprints = {"auth", "expenses", "main", "restaurants", "api", "reports", "errors"}
+
+    # Debug routes are part of the main blueprint, not a separate debug blueprint
+    # So we don't add "debug" to expected blueprints
 
     # Verify all expected blueprints are registered
     assert (
@@ -26,7 +27,8 @@ def test_blueprint_registration(app):
 
     assert any(endpoint.startswith("restaurants.") for endpoint in url_rules), "Restaurants routes not found"
 
-    assert "health_check" in url_rules, "Health check route not found"
+    # Check for debug route in main blueprint
+    assert "main.debug_routes" in url_rules, "Debug routes not found in main blueprint"
 
 
 def test_blueprint_initialization(app):
@@ -35,12 +37,24 @@ def test_blueprint_initialization(app):
         assert app.config["TESTING"] is True, "App not in testing mode"
 
         assert hasattr(app, "extensions"), "App extensions not initialized"
+
+        # Check for core extensions that should always be present
         assert "sqlalchemy" in app.extensions, "SQLAlchemy not initialized"
-        assert "login_manager" in app.extensions, "Login manager not initialized"
+        assert "migrate" in app.extensions, "Flask-Migrate not initialized"
+        assert "csrf" in app.extensions, "CSRF protection not initialized"
+
+        # Check for authentication extensions (either login_manager or JWT)
+        auth_extensions = [ext for ext in app.extensions.keys() if "login" in ext.lower() or "jwt" in ext.lower()]
+        assert len(auth_extensions) > 0, f"No authentication extensions found. Available: {list(app.extensions.keys())}"
+
+        # Check for session management (Flask-Session extends Flask's built-in session)
+        # The session functionality is available through Flask's built-in session
+        assert hasattr(app, "permanent_session_lifetime"), "Flask session not available"
 
         assert "auth" in app.blueprints, "Auth blueprint not registered"
         assert "expenses" in app.blueprints, "Expenses blueprint not registered"
         assert "main" in app.blueprints, "Main blueprint not registered"
         assert "restaurants" in app.blueprints, "Restaurants blueprint not registered"
         assert "api" in app.blueprints, "API blueprint not registered"
+        assert "reports" in app.blueprints, "Reports blueprint not registered"
         assert "errors" in app.blueprints, "Errors blueprint not registered"

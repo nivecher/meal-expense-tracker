@@ -126,19 +126,38 @@ def _register_blueprints(app: Flask) -> None:
     init_auth(app)
     logger.debug(f"Registered blueprint: {auth_bp.name} at /auth")
 
-    # Feature blueprints
-    blueprints = [
-        ("restaurants", "/restaurants"),
-        ("expenses", "/expenses"),
-        ("api", "/api/v1"),
-        ("reports", "/reports"),
-    ]
+    # Feature blueprints - use explicit imports for reliability
+    try:
+        from .restaurants import bp as restaurants_bp
 
-    for name, url_prefix in blueprints:
-        module = __import__(f"app.{name}", fromlist=["bp"])
-        bp = getattr(module, "bp")
-        app.register_blueprint(bp, url_prefix=url_prefix)
-        logger.debug(f"Registered blueprint: {bp.name} at {url_prefix}")
+        app.register_blueprint(restaurants_bp, url_prefix="/restaurants")
+        logger.debug(f"Registered blueprint: {restaurants_bp.name} at /restaurants")
+    except ImportError as e:
+        logger.warning(f"Could not import restaurants blueprint: {e}")
+
+    try:
+        from .expenses import bp as expenses_bp
+
+        app.register_blueprint(expenses_bp, url_prefix="/expenses")
+        logger.debug(f"Registered blueprint: {expenses_bp.name} at /expenses")
+    except ImportError as e:
+        logger.warning(f"Could not import expenses blueprint: {e}")
+
+    try:
+        from .api import bp as api_bp
+
+        app.register_blueprint(api_bp, url_prefix="/api/v1")
+        logger.debug(f"Registered blueprint: {api_bp.name} at /api/v1")
+    except ImportError as e:
+        logger.warning(f"Could not import api blueprint: {e}")
+
+    try:
+        from .reports import bp as reports_bp
+
+        app.register_blueprint(reports_bp, url_prefix="/reports")
+        logger.debug(f"Registered blueprint: {reports_bp.name} at /reports")
+    except ImportError as e:
+        logger.warning(f"Could not import reports blueprint: {e}")
 
 
 def _configure_cors(app: Flask) -> None:

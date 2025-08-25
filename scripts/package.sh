@@ -208,6 +208,18 @@ package_layer() {
     return 1
   fi
 
+  # Check if buildx is available for cross-platform builds
+  if ! docker buildx version &>/dev/null; then
+    echo -e "${YELLOW}[*] BuildKit/buildx not available, using legacy Docker build for current platform only${NC}"
+    ARCHITECTURE="$(uname -m)"
+    if [ "$ARCHITECTURE" = "x86_64" ]; then
+      ARCHITECTURE="amd64"
+    elif [ "$ARCHITECTURE" = "aarch64" ]; then
+      ARCHITECTURE="arm64"
+    fi
+    echo -e "${YELLOW}[*] Detected architecture: ${ARCHITECTURE}${NC}"
+  fi
+
   echo -e "${YELLOW}[*] Building ARM64 compatible layer using Docker...${NC}"
 
   # Create a temporary directory for the build context
@@ -259,13 +271,27 @@ EOL
 
   # Build the Docker image with architecture tag and platform
   local image_name="lambda-layer-builder:${ARCHITECTURE}-${PYTHON_VERSION}"
-  if ! docker build \
-    --platform "linux/${ARCHITECTURE}" \
-    --build-arg PYTHON_VERSION="${PYTHON_VERSION}" \
-    -t "${image_name}" \
-    "${docker_build_dir}"; then
-    echo -e "${RED}[!] Failed to build Docker image${NC}"
-    return 1
+
+  # Use buildx if available, otherwise use legacy build
+  if docker buildx version &>/dev/null; then
+    echo -e "${YELLOW}[*] Using BuildKit for cross-platform build${NC}"
+    if ! docker build \
+      --platform "linux/${ARCHITECTURE}" \
+      --build-arg PYTHON_VERSION="${PYTHON_VERSION}" \
+      -t "${image_name}" \
+      "${docker_build_dir}"; then
+      echo -e "${RED}[!] Failed to build Docker image${NC}"
+      return 1
+    fi
+  else
+    echo -e "${YELLOW}[*] Using legacy Docker build${NC}"
+    if ! docker build \
+      --build-arg PYTHON_VERSION="${PYTHON_VERSION}" \
+      -t "${image_name}" \
+      "${docker_build_dir}"; then
+      echo -e "${RED}[!] Failed to build Docker image${NC}"
+      return 1
+    fi
   fi
 
   # Create the output directory with correct permissions
@@ -273,13 +299,25 @@ EOL
   chmod 777 "${layer_dir}" # Ensure Docker can write to this directory
 
   # Run the container to create the layer with current user's UID/GID
-  if ! docker run --rm \
-    -v "${layer_dir}:/output" \
-    -u "$(id -u):$(id -g)" \
-    --platform "linux/${ARCHITECTURE}" \
-    "${image_name}"; then
-    echo -e "${RED}[!] Failed to build layer in Docker container${NC}"
-    return 1
+  if docker buildx version &>/dev/null; then
+    # Use platform flag if buildx is available
+    if ! docker run --rm \
+      -v "${layer_dir}:/output" \
+      -u "$(id -u):$(id -g)" \
+      --platform "linux/${ARCHITECTURE}" \
+      "${image_name}"; then
+      echo -e "${RED}[!] Failed to build layer in Docker container${NC}"
+      return 1
+    fi
+  else
+    # Skip platform flag for legacy Docker
+    if ! docker run --rm \
+      -v "${layer_dir}:/output" \
+      -u "$(id -u):$(id -g)" \
+      "${image_name}"; then
+      echo -e "${RED}[!] Failed to build layer in Docker container${NC}"
+      return 1
+    fi
   fi
 
   # Fix permissions on the output files

@@ -57,9 +57,14 @@ DEFAULT_AWS_PROFILE ?= default
 DEFAULT_AWS_REGION ?= us-east-1
 LAMBDA_FUNCTION_NAME ?= meal-expense-tracker-$(TF_ENV)
 
-# Enable BuildKit for better build performance and features
+# TODO deal with this
+# Enable BuildKit for better build performance and features (only if buildx is available)
+ifneq ($(shell docker buildx version 2>/dev/null),)
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
+else
+$(warning BuildKit/buildx not available, using legacy Docker build)
+endif
 export PYTHONPATH
 
 # =============================================================================
@@ -100,6 +105,18 @@ help:  ## Show this help message
 	@echo "  \033[1mmake test-unit\033[0m        Run only unit tests"
 	@echo "  \033[1mmake test-integration\033[0m Run only integration tests"
 	@echo "  \033[1mmake test-smoke\033[0m       Run smoke tests"
+	@echo "  \033[1mmake load-test\033[0m        Run load tests"
+	@echo "  \033[1mmake test-app\033[0m         Run app-level tests"
+	@echo "  \033[1mmake test-auth\033[0m        Run authentication tests"
+	@echo "  \033[1mmake test-expenses\033[0m    Run expense tests"
+	@echo "  \033[1mmake test-restaurants\033[0m Run restaurant tests"
+	@echo "  \033[1mmake test-categories\033[0m  Run category tests"
+	@echo "  \033[1mmake test-profile\033[0m     Run profile tests"
+	@echo "  \033[1mmake test-main\033[0m        Run main blueprint tests"
+	@echo "  \033[1mmake test-security\033[0m    Run security tests"
+	@echo "  \033[1mmake test-models\033[0m      Run model tests"
+	@echo "  \033[1mmake test-utils\033[0m       Run utility tests"
+	@echo "  \033[1mmake test-frontend\033[0m    Run frontend tests"
 
 	@echo "\n\033[1mTerraform (TF_ENV=env, default: dev):\033[0m"
 	@echo "  \033[1mmake validate-tf-config\033[0m Validate Terraform configuration"
@@ -123,6 +140,26 @@ help:  ## Show this help message
 	@echo "  \033[1mmake distclean\033[0m        Remove all generated files including virtual environment"
 	@echo "  \033[1mmake check-env\033[0m        Check development environment setup"
 	@echo "  \033[1mmake validate-env\033[0m    Validate all required tools and environment"
+
+	@echo "\n\033[1mPerformance & Caching:\033[0m"
+	@echo "  \033[1mmake cache-clear\033[0m     Clear all caches (Python, pytest, mypy)"
+	@echo "  \033[1mmake deps-check\033[0m      Check for outdated dependencies"
+	@echo "  \033[1mmake deps-update\033[0m     Update development dependencies"
+	@echo "  \033[1mmake deps-resolve\033[0m    Resolve dependency conflicts"
+
+	@echo "\n\033[1mHealth & Monitoring:\033[0m"
+	@echo "  \033[1mmake health-check\033[0m    Check application health"
+	@echo "  \033[1mmake system-check\033[0m    Check system resources"
+	@echo "  \033[1mmake system-validate\033[0m Full system validation"
+
+	@echo "\n\033[1mError Recovery:\033[0m"
+	@echo "  \033[1mmake auto-fix\033[0m        Automatic fixes for common issues"
+	@echo "  \033[1mmake rollback\033[0m        Show rollback options for deployments"
+
+	@echo "\n\033[1mWorkflow:\033[0m"
+	@echo "  \033[1mmake dev-setup\033[0m       Complete development setup"
+	@echo "  \033[1mmake dev-cycle\033[0m       Quick development cycle (format + lint + test)"
+	@echo "  \033[1mmake dev-status\033[0m      Show development environment status"
 
 	@echo "\n\033[1mExamples:\033[0m"
 	@echo "  \033[1mmake validate-env && make setup && make run\033[0m  # Safe setup and run"
@@ -297,7 +334,85 @@ test-smoke:
 ## Run load tests
 .PHONY: load-test
 load-test:
-	@echo "Load testing not yet implemented"
+	@echo "\n\033[1m=== Running Load Tests ===\033[0m"
+	@if [ -f "tests/load/locustfile.py" ]; then \
+		$(PYTHON) -m locust -f tests/load/locustfile.py --headless --users 10 --spawn-rate 2 --run-time 30s || (echo "\033[1;31m❌ Load tests failed\033[0m"; exit 1); \
+	else \
+		echo "\033[1;33m⚠️  Load tests not yet implemented\033[0m"; \
+	fi
+
+## Run specific test categories
+.PHONY: test-app test-auth test-expenses test-restaurants test-categories test-profile test-main test-security test-models test-utils
+
+## Run app-level tests
+.PHONY: test-app
+test-app:
+	@echo "\n\033[1m=== Running App-Level Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/app/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ App tests failed\033[0m"; exit 1)
+
+## Run authentication tests
+.PHONY: test-auth
+test-auth:
+	@echo "\n\033[1m=== Running Authentication Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/auth/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Auth tests failed\033[0m"; exit 1)
+
+## Run expense tests
+.PHONY: test-expenses
+test-expenses:
+	@echo "\n\033[1m=== Running Expense Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/expenses/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Expense tests failed\033[0m"; exit 1)
+
+## Run restaurant tests
+.PHONY: test-restaurants
+test-restaurants:
+	@echo "\n\033[1m=== Running Restaurant Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/restaurants/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Restaurant tests failed\033[0m"; exit 1)
+
+## Run category tests
+.PHONY: test-categories
+test-categories:
+	@echo "\n\033[1m=== Running Category Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/categories/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Category tests failed\033[0m"; exit 1)
+
+## Run profile tests
+.PHONY: test-profile
+test-profile:
+	@echo "\n\033[1m=== Running Profile Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/profile/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Profile tests failed\033[0m"; exit 1)
+
+## Run main blueprint tests
+.PHONY: test-main
+test-main:
+	@echo "\n\033[1m=== Running Main Blueprint Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/main/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Main tests failed\033[0m"; exit 1)
+
+## Run security tests
+.PHONY: test-security
+test-security:
+	@echo "\n\033[1m=== Running Security Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/security/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Security tests failed\033[0m"; exit 1)
+
+## Run model tests
+.PHONY: test-models
+test-models:
+	@echo "\n\033[1m=== Running Model Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/models/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Model tests failed\033[0m"; exit 1)
+
+## Run utility tests
+.PHONY: test-utils
+test-utils:
+	@echo "\n\033[1m=== Running Utility Tests ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/utils/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Utility tests failed\033[0m"; exit 1)
+
+## Run frontend tests
+.PHONY: test-frontend
+test-frontend:
+	@echo "\n\033[1m=== Running Frontend Tests ===\033[0m"
+	@if [ -d "tests/frontend" ]; then \
+		PYTHONPATH=. $(PYTHON) -m pytest tests/frontend/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Frontend tests failed\033[0m"; exit 1); \
+	else \
+		echo "\033[1;33m⚠️  Frontend tests not found\033[0m"; \
+	fi
 
 # =============================================================================
 # Database
@@ -327,24 +442,58 @@ db-downgrade: check-env
 # Docker
 # =============================================================================
 
+## Check Docker BuildKit availability
+.PHONY: check-docker-buildkit
+check-docker-buildkit:
+	@if command -v docker >/dev/null 2>&1; then \
+		if docker buildx version >/dev/null 2>&1; then \
+			echo "BuildKit available"; \
+		else \
+			echo "BuildKit not available"; \
+		fi; \
+	else \
+		echo "\033[1;31m❌ Docker not found\033[0m"; \
+		exit 1; \
+	fi
+
 ## Build Docker image for production
 .PHONY: docker-build
 docker-build: validate-env
-	docker build \
-		--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
-		-t $(IMAGE_NAME):latest \
-		--target production \
-		. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1)
+	@if docker buildx version >/dev/null 2>&1; then \
+		echo "\033[1;32m✅ Using BuildKit for multi-stage build\033[0m"; \
+		docker build \
+			--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
+			-t $(IMAGE_NAME):latest \
+			--target production \
+			. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1); \
+	else \
+		echo "\033[1;33m⚠️  BuildKit not available, using legacy build\033[0m"; \
+		docker build \
+			--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
+			-t $(IMAGE_NAME):latest \
+			-f Dockerfile.legacy \
+			. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1); \
+	fi
 	@echo "\033[1;32m✅ Docker image built successfully\033[0m"
 
 ## Build Docker image for development
 .PHONY: docker-build-dev
 docker-build-dev: validate-env
-	docker build \
-		--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
-		-t $(IMAGE_NAME):dev \
-		--target development \
-		. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1)
+	@if docker buildx version >/dev/null 2>&1; then \
+		echo "\033[1;32m✅ Using BuildKit for multi-stage build\033[0m"; \
+		docker build \
+			--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
+			-t $(IMAGE_NAME):dev \
+			--target development \
+			. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1); \
+	else \
+		echo "\033[1;33m⚠️  BuildKit not available, using legacy build\033[0m"; \
+		docker build \
+			--build-arg TARGETPLATFORM=$(TARGET_PLATFORM) \
+			-t $(IMAGE_NAME):dev \
+			-f Dockerfile.legacy-dev \
+			. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1); \
+	fi
 	@echo "\033[1;32m✅ Docker development image built successfully\033[0m"
 
 ## Run application in Docker (development)
@@ -950,3 +1099,141 @@ logs: docker-logs
 restart: docker-stop docker-run
 run-local: run
 rebuild-logs: docker-rebuild docker-logs
+
+# =============================================================================
+# Performance & Caching
+# =============================================================================
+
+## Clear all caches for fresh start
+.PHONY: cache-clear
+cache-clear:
+	@echo "\n\033[1m=== Clearing Caches ===\033[0m"
+	@echo "Removing Python cache files..."
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	@find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name ".coverage" -delete 2>/dev/null || true
+	@find . -type d -name ".mypy_cache" -exec rm -rf {} + 2>/dev/null || true
+	@echo "✅ Caches cleared"
+
+## Check dependency freshness
+.PHONY: deps-check
+deps-check: check-env
+	@echo "\n\033[1m=== Checking Dependencies ===\033[0m"
+	@echo "Checking for outdated packages..."
+	@$(PIP) list --outdated || echo "✅ All dependencies are up to date"
+
+## Install/update development dependencies
+.PHONY: deps-update
+deps-update: check-env
+	@echo "\n\033[1m=== Updating Dependencies ===\033[0m"
+	@$(PIP) install --upgrade pip setuptools wheel
+	@$(PIP) install -r requirements/dev.txt --upgrade
+	@echo "✅ Dependencies updated"
+
+# =============================================================================
+# Health Checks & Monitoring
+# =============================================================================
+
+## Application health checks
+.PHONY: health-check
+health-check: check-env
+	@echo "\n\033[1m=== Application Health Check ===\033[0m"
+	@echo "Checking application imports..."
+	@$(PYTHON) -c "import app; print('✅ App imports successfully')" || (echo "❌ App import failed"; exit 1)
+	@$(PYTHON) -c "from app import create_app; app = create_app(); print('✅ App factory works')" || (echo "❌ App factory failed"; exit 1)
+	@$(PYTHON) -c "from app.database import db; print('✅ Database connection available')" || (echo "❌ Database connection failed"; exit 1)
+	@echo "✅ Application health check passed"
+
+## System resource checks
+.PHONY: system-check
+system-check:
+	@echo "\n\033[1m=== System Resource Check ===\033[0m"
+	@echo "Memory usage:"
+	@free -h | grep Mem | awk '{print "  " $$3 "/" $$2 " (" $$5 " used)"}' || echo "  Unable to check memory"
+	@echo "Disk usage:"
+	@df -h . | tail -1 | awk '{print "  " $$5 " used on " $$1}' || echo "  Unable to check disk"
+	@echo "Python version:"
+	@$(PYTHON) --version || echo "  Unable to check Python version"
+	@echo "✅ System check completed"
+
+## Full system validation
+.PHONY: system-validate
+system-validate: system-check health-check
+	@echo "\n\033[1m=== System Validation ===\033[0m"
+	@echo "✅ System validation completed successfully"
+
+# =============================================================================
+# Enhanced Error Handling & Recovery
+# =============================================================================
+
+## Automatic fixes for common issues
+.PHONY: auto-fix
+auto-fix: check-env
+	@echo "\n\033[1m=== Automatic Fixes ===\033[0m"
+	@echo "Upgrading pip and setuptools..."
+	@$(PYTHON) -m pip install --upgrade pip setuptools wheel || echo "⚠️  Could not upgrade pip"
+	@echo "Checking for dependency conflicts..."
+	@$(PYTHON) -m pip check || echo "⚠️  Dependency conflicts found"
+	@echo "Reinstalling development dependencies..."
+	@$(PYTHON) -m pip install -r requirements/dev.txt --force-reinstall || echo "⚠️  Could not reinstall dev deps"
+	@echo "Clearing caches..."
+	@$(MAKE) cache-clear
+	@echo "✅ Automatic fixes completed"
+
+## Rollback capability for deployments
+.PHONY: rollback
+rollback:
+	@echo "\n\033[1;33m⚠️  Rollback Options ===\033[0m"
+	@echo "Recent commits:"
+	@git log --oneline -10 || echo "  Not a git repository"
+	@echo ""
+	@echo "To rollback:"
+	@echo "  1. Check recent commits: git log --oneline"
+	@echo "  2. Rollback to specific commit: git checkout <commit-hash>"
+	@echo "  3. Or rollback last commit: git reset --hard HEAD~1"
+	@echo "  4. Force push if needed: git push --force-with-lease origin <branch>"
+	@echo ""
+	@echo "⚠️  WARNING: Rollback will lose uncommitted changes!"
+
+## Dependency conflict resolution
+.PHONY: deps-resolve
+deps-resolve: check-env
+	@echo "\n\033[1m=== Resolving Dependencies ===\033[0m"
+	@echo "Checking for conflicts..."
+	@$(PYTHON) -m pip check || echo "⚠️  Conflicts found, attempting resolution..."
+	@$(PYTHON) -m pip install --upgrade --force-reinstall -r requirements/dev.txt || echo "❌ Resolution failed"
+	@echo "✅ Dependency resolution completed"
+
+# =============================================================================
+# Development Workflow Enhancements
+# =============================================================================
+
+## Complete development setup
+.PHONY: dev-setup
+dev-setup: setup check-env health-check
+	@echo "\n\033[1m=== Development Setup Complete ===\033[0m"
+	@echo "✅ Development environment ready!"
+	@echo "Next steps:"
+	@echo "  - make run          # Start the application"
+	@echo "  - make test         # Run tests"
+	@echo "  - make quality      # Run full quality checks"
+
+## Quick development cycle
+.PHONY: dev-cycle
+dev-cycle: format lint test
+	@echo "\n\033[1m=== Development Cycle ===\033[0m"
+	@echo "✅ Development cycle completed successfully!"
+	@echo "Ready for commit!"
+
+## Development status check
+.PHONY: dev-status
+dev-status: check-env
+	@echo "\n\033[1m=== Development Status ===\033[0m"
+	@echo "✅ Environment: OK"
+	@echo "🐍 Python: $(shell $(PYTHON) --version)"
+	@echo "📦 Dependencies: $(shell $(PIP) list | wc -l) packages"
+	@echo "🧪 Tests: $(shell find tests/ -name "*.py" | wc -l) test files"
+	@echo "📁 App modules: $(shell find app/ -name "*.py" | wc -l) Python files"
+	@echo "🌐 Templates: $(shell find app/templates -name "*.html" | wc -l) HTML files"
