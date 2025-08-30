@@ -57,7 +57,19 @@
         <div class="row mb-3">
             <div class="col-md-6">
                 {{ form.category_id.label(class="form-label") }}
-                {{ form.category_id(class="form-select" + (' is-invalid' if form.category_id.errors else '') ) }}
+                <select name="{{ form.category_id.name }}"
+                        id="{{ form.category_id.id }}"
+                        class="form-select{{ ' is-invalid' if form.category_id.errors else '' }}"
+                        data-category-select>
+                    {% for choice in form.category_id.choices %}
+                        <option value="{{ choice[0] if choice[0] is not none else '' }}"
+                                {% if form.category_id.data == choice[0] %}selected{% endif %}
+                                {% if choice[0] is not none %}
+                                    {% set cat_data = categories | selectattr('id', 'equalto', choice[0]) | first %}
+                                    {% if cat_data %}data-color="{{ cat_data.color }}" data-icon="{{ cat_data.icon if cat_data.icon else '' }}"{% endif %}
+                                {% endif %}>{{ choice[1] }}</option>
+                    {% endfor %}
+                </select>
                 {% if form.category_id.errors %}<div class="invalid-feedback">{{ form.category_id.errors[0] }}</div>{% endif %}
             </div>
             <div class="col-md-6">
@@ -85,4 +97,27 @@
     <!-- Category and restaurant type handling -->
     <script type="module"
             src="{{ url_for('static', filename='js/pages/expense-form.js') }}"></script>
+    <!-- Category dropdown enhancement -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const categorySelect = document.querySelector('[data-category-select]');
+            if (categorySelect) {
+                function updateCategoryStyle() {
+                    const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+                    if (selectedOption && selectedOption.dataset.color) {
+                        categorySelect.style.backgroundColor = selectedOption.dataset.color + '20';
+                        categorySelect.style.borderColor = selectedOption.dataset.color + '40';
+                        categorySelect.style.color = selectedOption.dataset.color;
+                    } else {
+                        categorySelect.style.backgroundColor = '';
+                        categorySelect.style.borderColor = '';
+                        categorySelect.style.color = '';
+                    }
+                }
+
+                categorySelect.addEventListener('change', updateCategoryStyle);
+                updateCategoryStyle(); // Set initial style
+            }
+        });
+    </script>
 {% endmacro %}

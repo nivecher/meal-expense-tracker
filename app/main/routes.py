@@ -174,3 +174,17 @@ def google_places_test():
         str: Rendered template for the Google Places test page.
     """
     return render_template("test/google_places_test.html", title="Google Places Test")
+
+
+@bp.route("/sticky-tables-demo")
+@login_required
+def sticky_tables_demo():
+    """Demo page for sticky table headers and frozen columns."""
+    return render_template("components/sticky_table_examples.html")
+
+
+@bp.route("/error-handling-demo")
+@login_required
+def error_handling_demo():
+    """Demo page for enhanced restaurant error handling."""
+    return render_template("test/error-handling-demo.html")

@@ -125,7 +125,19 @@ class RestaurantFormManager {
       }
     } catch (error) {
       logger.error('Form submission error:', error);
-      showErrorToast(error.message || 'Failed to save restaurant');
+
+      // Enhanced error message for users
+      let userMessage = error.message || 'Failed to save restaurant';
+
+      if (userMessage.includes('Google Place ID')) {
+        userMessage = 'This restaurant already exists in your list. Please search for the existing restaurant instead.';
+      } else if (userMessage.includes('already exists')) {
+        userMessage = 'A similar restaurant already exists. Please check your existing restaurants or modify the details to make it unique.';
+      } else if (userMessage.includes('Failed to save')) {
+        userMessage = 'Unable to save the restaurant. Please check your internet connection and try again.';
+      }
+
+      showErrorToast(userMessage);
     } finally {
       hideFormLoading(form);
       this.state.isSubmitting = false;

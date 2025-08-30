@@ -101,7 +101,7 @@ function cache_form_elements(form) {
   return {
     form,
     submitButton: form.querySelector('button[type="submit"]'),
-    alertContainer: document.getElementById('alert-container')
+    alertContainer: document.getElementById('alert-container'),
   };
 }
 
@@ -115,7 +115,7 @@ function validate_form_data(form_data) {
   const validation_errors = validateFormData(form_data);
   return {
     isValid: !validation_errors,
-    errors: validation_errors
+    errors: validation_errors,
   };
 }
 
@@ -123,103 +123,6 @@ function handle_validation_errors(form, errors, form_data) {
   console.error('Client-side validation failed:', errors);
   console.log('Form data being validated:', Object.fromEntries(form_data.entries()));
   showFormErrors(form, errors);
-}
-
-  try {
-    // Show loading state
-    if (submitButton) {
-      submitButton.disabled = true;
-      submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
-    }
-
-    // Log the form data
-    console.log('Submitting form data:', Object.fromEntries(formData.entries()));
-
-    // Get CSRF token from the form
-    const csrfToken = document.querySelector('input[name="csrf_token"]')?.value;
-
-    // Ensure all form data is properly formatted
-    const formDataObj = {};
-    for (const [key, value] of formData.entries()) {
-      formDataObj[key] = value;
-    }
-
-    // Add CSRF token if not already in form
-    if (csrfToken && !formData.has('csrf_token')) {
-      formData.append('csrf_token', csrfToken);
-      formDataObj.csrf_token = csrfToken;
-    }
-
-    // Log the form data being sent
-    console.log('Form data being sent:', formDataObj);
-
-    // Log the request details
-    console.log('Sending request to:', form.action);
-    console.log('Request method:', 'POST');
-    console.log('Request headers:', {
-      'X-Requested-With': 'XMLHttpRequest',
-      Accept: 'application/json',
-    });
-
-    const response = await fetch(form.action, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        Accept: 'application/json',
-        'X-CSRF-Token': csrfToken,
-      },
-      credentials: 'same-origin',  // Important for including cookies
-    });
-
-    // Get response as text first to handle both JSON and non-JSON responses
-    const responseText = await response.text();
-    let data;
-
-    try {
-      data = responseText ? JSON.parse(responseText) : {};
-      console.log('Server response:', data);
-    } catch (_e) {
-      console.error('Failed to parse JSON response:', responseText);
-      throw new Error(`Invalid server response: ${responseText.substring(0, 100)}...`);
-    }
-
-    if (response.ok) {
-      // Success - redirect to the provided URL or default to expenses list
-      const redirectUrl = data.redirect || data.redirect_url || '/expenses';
-      console.log('Form submitted successfully, redirecting to:', redirectUrl);
-      window.location.href = redirectUrl;
-      return;
-    }
-
-    // Handle error response
-    console.error('Form submission failed with status:', response.status);
-
-    // Show validation errors if available
-    if (data.errors) {
-      console.error('Form validation errors:', JSON.stringify(data.errors, null, 2));
-      showFormErrors(form, data.errors);
-    } else if (data.message) {
-      console.error('Server error:', data.message);
-      showFormErrors(form, { _error: [data.message] });
-    } else {
-      console.error('No error details provided in response');
-      showFormErrors(form, {
-        _error: [`An error occurred (${response.status}): ${response.statusText || 'Unknown error'}`],
-      });
-    }
-  } catch (error) {
-    console.error('Error submitting form:', error);
-    showFormErrors(form, {
-      _error: ['A network error occurred. Please check your connection and try again.'],
-    });
-  } finally {
-    // Reset button state
-    if (submitButton) {
-      submitButton.disabled = false;
-      submitButton.innerHTML = originalButtonText;
-    }
-  }
 }
 
 /**
@@ -392,7 +295,7 @@ function handle_successful_submission(result) {
 
   show_success_alert(result);
 
-  const redirect_url = result.redirect_url || `/expenses/${result.expense.id}`;
+  const redirect_url = result.redirect || result.redirect_url || '/expenses';
   console.log('Form submitted successfully, redirecting to:', redirect_url);
   window.location.href = redirect_url;
 }
@@ -400,9 +303,10 @@ function handle_successful_submission(result) {
 function show_success_alert(result) {
   const alert_container = document.getElementById('alert-container');
   if (alert_container) {
+    const message = result.message || 'Expense added successfully!';
     alert_container.innerHTML = `
       <div class="alert alert-success alert-dismissible fade show" role="alert">
-        Expense added successfully! <a href="/expenses/${result.expense.id}">View expense</a>
+        ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     `;

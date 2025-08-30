@@ -22,7 +22,7 @@ SQLAlchemy>=2.0.0,<3.0.0
 # AWS
 boto3>=1.38.46,<2.0.0
 requests>=2.32.4,<3.0.0
-mypy-boto3-dynamodb>=1.28.0,<2.0.0  # Required for Flask-Session DynamoDB support
+mypy-boto3-dynamodb>=1.40.0,<2.0.0  # Required for Flask-Session DynamoDB support
 
 # Session Management
 Flask-Session==0.8.0  # Latest stable version with proper DynamoDB support

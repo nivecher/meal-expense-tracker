@@ -8,8 +8,8 @@ const defaults = {
   app: {
     debug: false,
     env: 'production',
-    version: '1.0.0'
-  }
+    version: '1.0.0',
+  },
 };
 
 // Load config from DOM
@@ -21,7 +21,7 @@ function loadConfig() {
       return {
         ...defaults,
         ...userConfig,
-        app: { ...defaults.app, ...(userConfig.app || {}) }
+        app: { ...defaults.app, ...(userConfig.app || {}) },
       };
     }
   } catch (error) {

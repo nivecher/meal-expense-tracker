@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Sticky Table Examples - Meal Expense Tracker</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/components/table.css') }}" />
+    </head>
+    <body>
+        <div class="container mt-4">
+            <h1 class="mb-4">Sticky Table Header Examples</h1>
+            <!-- Navigation Tabs -->
+            <ul class="nav nav-tabs mb-4" id="tableExampleTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button
+                        class="nav-link active"
+                        id="sticky-header-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#sticky-header"
+                        type="button"
+                        role="tab"
+                        >Sticky Headers Only</button
+                    >
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button
+                        class="nav-link"
+                        id="frozen-columns-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#frozen-columns"
+                        type="button"
+                        role="tab"
+                        >Frozen First Column</button
+                    >
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button
+                        class="nav-link"
+                        id="sticky-frozen-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#sticky-frozen"
+                        type="button"
+                        role="tab"
+                        >Both Sticky & Frozen</button
+                    >
+                </li>
+            </ul>
+            <!-- Tab Content -->
+            <div class="tab-content" id="tableExampleTabsContent">
+                <!-- Sticky Headers Only -->
+                <div class="tab-pane fade show active" id="sticky-header" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Sticky Headers - Vertical Scrolling</h5>
+                            <small class="text-muted"
+                                >Headers remain visible when scrolling down through many rows</small
+                            >
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-sticky-header">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Restaurant</th>
+                                            <th>Meal Type</th>
+                                            <th>Category</th>
+                                            <th>Amount</th>
+                                            <th>Notes</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for i in range(50) %}
+                                        <tr>
+                                            <td>2024-01-{{ '%02d'|format((i % 31) + 1) }}</td>
+                                            <td>Restaurant {{ i + 1 }}</td>
+                                            <td>{{ ['Breakfast', 'Lunch', 'Dinner', 'Snack'][i % 4] }}</td>
+                                            <td>{{ ['Fast Food', 'Fine Dining', 'Casual', 'Coffee'][i % 4] }}</td>
+                                            <td>${{ "%.2f"|format((i * 3.75 + 12.50) ) }}</td>
+                                            <td>Sample note for expense {{ i + 1 }}</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary">Edit</button>
+                                                <button class="btn btn-sm btn-outline-danger ms-1">Delete</button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Frozen First Column -->
+                <div class="tab-pane fade" id="frozen-columns" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Frozen First Column - Horizontal Scrolling</h5>
+                            <small class="text-muted"
+                                >First column stays fixed when scrolling horizontally through wide data</small
+                            >
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-frozen-columns">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="min-width: 150px">Restaurant Name</th>
+                                            <th style="min-width: 120px">Location</th>
+                                            <th style="min-width: 100px">Cuisine Type</th>
+                                            <th style="min-width: 120px">Average Cost</th>
+                                            <th style="min-width: 100px">Visit Count</th>
+                                            <th style="min-width: 100px">Last Visit</th>
+                                            <th style="min-width: 120px">Total Spent</th>
+                                            <th style="min-width: 100px">Rating</th>
+                                            <th style="min-width: 150px">Favorite Dishes</th>
+                                            <th style="min-width: 200px">Notes</th>
+                                            <th style="min-width: 120px">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for i in range(20) %}
+                                        <tr>
+                                            <td
+                                                >{{ ['The Golden Spoon', 'Pasta Palace', 'Burger Barn', 'Sushi Central',
+                                                'Pizza Corner'][i % 5] }}</td
+                                            >
+                                            <td
+                                                >{{ ['Downtown', 'Mall Area', 'Uptown', 'Food Court', 'Strip Mall'][i %
+                                                5] }} Blvd</td
+                                            >
+                                            <td
+                                                >{{ ['Italian', 'American', 'Japanese', 'Mexican', 'Chinese'][i % 5]
+                                                }}</td
+                                            >
+                                            <td>${{ "%.2f"|format((i * 2.50 + 15.00) ) }}</td>
+                                            <td>{{ i + 3 }} visits</td>
+                                            <td>2024-01-{{ '%02d'|format((i % 28) + 1) }}</td>
+                                            <td>${{ "%.2f"|format((i * 47.25 + 125.00) ) }}</td>
+                                            <td
+                                                >{{ ["⭐⭐⭐⭐⭐", "⭐⭐⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐⭐", "⭐⭐⭐⭐"][i %
+                                                5] }}</td
+                                            >
+                                            <td>
+                                                {{ ['Carbonara, Tiramisu', 'Classic Burger, Fries', 'Salmon Roll, Miso
+                                                Soup', 'Tacos, Guacamole', 'General Tso, Fried Rice'][i % 5] }}
+                                            </td>
+                                            <td>
+                                                {{ ['Great atmosphere, friendly staff', 'Quick service, good value',
+                                                'Fresh ingredients, authentic taste', 'Spicy food, large portions',
+                                                'Family-friendly, good for groups'][i % 5] }}
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary me-1">View</button>
+                                                <button class="btn btn-sm btn-outline-secondary">Edit</button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Both Sticky Headers and Frozen Columns -->
+                <div class="tab-pane fade" id="sticky-frozen" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Sticky Headers + Frozen First Column</h5>
+                            <small class="text-muted"
+                                >Headers stay visible vertically, first column stays fixed horizontally</small
+                            >
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-sticky-frozen">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th style="min-width: 150px">Expense Date</th>
+                                            <th style="min-width: 200px">Restaurant Name</th>
+                                            <th style="min-width: 150px">Full Address</th>
+                                            <th style="min-width: 120px">Meal Category</th>
+                                            <th style="min-width: 100px">Amount Paid</th>
+                                            <th style="min-width: 100px">Tax Amount</th>
+                                            <th style="min-width: 100px">Tip Amount</th>
+                                            <th style="min-width: 120px">Payment Method</th>
+                                            <th style="min-width: 150px">Dining Companions</th>
+                                            <th style="min-width: 200px">Detailed Notes</th>
+                                            <th style="min-width: 100px">Receipt Photo</th>
+                                            <th style="min-width: 120px">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for i in range(100) %}
+                                        <tr>
+                                            <td
+                                                >2024-{{ '%02d'|format((i % 12) + 1) }}-{{ '%02d'|format((i % 28) + 1)
+                                                }}</td
+                                            >
+                                            <td>
+                                                {{ ['The Golden Spoon Restaurant', 'Pasta Palace Ristorante', 'Burger
+                                                Barn & Grill', 'Sushi Central Authentic', 'Pizza Corner Family'][i % 5]
+                                                }}
+                                            </td>
+                                            <td>
+                                                {{ ['123 Main St, Downtown', '456 Oak Ave, Uptown', '789 Pine Rd,
+                                                Suburbs', '321 Elm Blvd, Mall Area', '654 Maple Dr, Food District'][i %
+                                                5] }}
+                                            </td>
+                                            <td
+                                                >{{ ['Breakfast', 'Lunch', 'Dinner', 'Late Night', 'Brunch'][i % 5]
+                                                }}</td
+                                            >
+                                            <td>${{ "%.2f"|format((i * 3.75 + 18.50) ) }}</td>
+                                            <td>${{ "%.2f"|format((i * 0.45 + 2.10) ) }}</td>
+                                            <td>${{ "%.2f"|format((i * 0.85 + 3.50) ) }}</td>
+                                            <td
+                                                >{{ ['Credit Card', 'Cash', 'Debit Card', 'Mobile Pay', 'Gift Card'][i %
+                                                5] }}</td
+                                            >
+                                            <td
+                                                >{{ ['Solo dining', 'With spouse', 'Family dinner', 'Business meeting',
+                                                'Friends group'][i % 5] }}</td
+                                            >
+                                            <td>
+                                                {{ ['Excellent service and food quality', 'Quick lunch during work
+                                                break', 'Celebration dinner, special occasion', 'Client meeting over
+                                                lunch', 'Weekend family outing'][i % 5] }}
+                                            </td>
+                                            <td>
+                                                {% if i % 3 == 0 %}
+                                                <span class="badge bg-success">✓ Uploaded</span>
+                                                {% else %}
+                                                <span class="badge bg-warning">Pending</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary">View</button>
+                                                    <button class="btn btn-outline-secondary">Edit</button>
+                                                    <button class="btn btn-outline-danger">Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Usage Instructions -->
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Implementation Guide</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>CSS Classes Available:</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6 class="text-primary">.table-sticky-header</h6>
+                                <p>
+                                    <small
+                                        >Headers remain visible during vertical scrolling. Best for tables with many
+                                        rows but few columns.</small
+                                    >
+                                </p>
+                                <pre><code>&lt;div class="table-sticky-header"&gt;
+  &lt;table class="table"&gt;...&lt;/table&gt;
+&lt;/div&gt;</code></pre>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-primary">.table-frozen-columns</h6>
+                                <p>
+                                    <small
+                                        >First column stays fixed during horizontal scrolling. Best for wide tables
+                                        where the first column is important for context.</small
+                                    >
+                                </p>
+                                <pre><code>&lt;div class="table-frozen-columns"&gt;
+  &lt;table class="table"&gt;...&lt;/table&gt;
+&lt;/div&gt;</code></pre>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-primary">.table-sticky-frozen</h6>
+                                <p>
+                                    <small
+                                        >Combines both sticky headers and frozen first column. Best for large data
+                                        tables with many rows and columns.</small
+                                    >
+                                </p>
+                                <pre><code>&lt;div class="table-sticky-frozen"&gt;
+  &lt;table class="table"&gt;...&lt;/table&gt;
+&lt;/div&gt;</code></pre>
+                            </div>
+                        </div>
+                        <h6 class="mt-4">Key Features:</h6>
+                        <ul>
+                            <li>
+                                <strong>Responsive Design:</strong> Adapts to different screen sizes with mobile
+                                optimizations
+                            </li>
+                            <li>
+                                <strong>Custom Scrollbars:</strong> Styled scrollbars for better visual experience
+                            </li>
+                            <li>
+                                <strong>Z-index Management:</strong> Proper layering ensures sticky elements display
+                                correctly
+                            </li>
+                            <li>
+                                <strong>Performance Optimized:</strong> Uses CSS transforms and GPU acceleration for
+                                smooth scrolling
+                            </li>
+                            <li>
+                                <strong>Accessibility:</strong> Maintains keyboard navigation and screen reader
+                                compatibility
+                            </li>
+                        </ul>
+                        <h6 class="mt-4">Browser Support:</h6>
+                        <p>
+                            <small
+                                >Compatible with all modern browsers. Uses <code>position: sticky</code> which is
+                                supported in Chrome 56+, Firefox 59+, Safari 13+, and Edge 16+.</small
+                            >
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+</html>

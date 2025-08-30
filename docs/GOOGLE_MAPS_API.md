@@ -37,10 +37,10 @@ if (this.useModernAPI) {
 **✅ Correct:**
 
 ```javascript
-import { googlePlacesService } from '../services/google-places.js';
+import { googlePlacesService } from "../services/google-places.js";
 
 // Search for places
-const results = await googlePlacesService.searchNearby('pizza', location);
+const results = await googlePlacesService.searchNearby("pizza", location);
 
 // Get place details
 const details = await googlePlacesService.getPlaceDetails(placeId);
@@ -65,9 +65,9 @@ await googlePlacesService.init();
 
 // Check which APIs are being used
 if (googlePlacesService.useModernAPI) {
-  console.log('Using modern Google Maps APIs');
+  console.log("Using modern Google Maps APIs");
 } else {
-  console.log('Using legacy Google Maps APIs');
+  console.log("Using legacy Google Maps APIs");
 }
 ```
 
@@ -78,12 +78,12 @@ try {
   const results = await googlePlacesService.searchNearby(query, location);
   // Process results
 } catch (error) {
-  if (error.message.includes('APIs not available')) {
+  if (error.message.includes("APIs not available")) {
     // Handle API availability issues
-    console.warn('Some Google Maps APIs not available');
+    console.warn("Some Google Maps APIs not available");
   } else {
     // Handle other errors
-    console.error('Search failed:', error);
+    console.error("Search failed:", error);
   }
 }
 ```
@@ -144,7 +144,7 @@ if (!googlePlacesService.initialized) {
 }
 
 // Check which APIs are available
-console.log('Modern APIs:', googlePlacesService.useModernAPI);
+console.log("Modern APIs:", googlePlacesService.useModernAPI);
 ```
 
 #### 2. Deprecation Warnings
@@ -158,15 +158,15 @@ console.log('Modern APIs:', googlePlacesService.useModernAPI);
 ```javascript
 // Check autocomplete type
 const autocomplete = googlePlacesService.createAutocomplete(inputElement);
-console.log('Autocomplete type:', autocomplete.constructor.name);
+console.log("Autocomplete type:", autocomplete.constructor.name);
 
 // Handle events appropriately
 if (autocomplete.addEventListener) {
   // Modern PlaceAutocompleteElement
-  autocomplete.addEventListener('gmp-placeselect', handler);
+  autocomplete.addEventListener("gmp-placeselect", handler);
 } else {
   // Legacy Autocomplete
-  autocomplete.addListener('place_changed', handler);
+  autocomplete.addListener("place_changed", handler);
 }
 ```
 

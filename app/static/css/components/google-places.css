@@ -1,22 +1,22 @@
 /* Google Places Search Styles */
-.google-places-search {
+.find-places-search {
     position: relative;
     margin-bottom: 1.5rem;
 }
 
-.google-places-search .form-control {
+.find-places-search .form-control {
     padding-right: 3rem;
-    border-radius: var(--google-places-radius);
-    border: 1px solid var(--google-places-border);
-    transition: var(--google-places-transition);
+    border-radius: var(--find-places-radius);
+    border: 1px solid var(--find-places-border);
+    transition: var(--find-places-transition);
 }
 
-.google-places-search .form-control:focus {
+.find-places-search .form-control:focus {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 0.25rem rgba(37, 99, 235, 0.1);
 }
 
-.google-places-search .btn {
+.find-places-search .btn {
     position: absolute;
     right: 0.5rem;
     top: 50%;
@@ -27,26 +27,26 @@
     padding: 0.25rem 0.5rem;
 }
 
-.google-places-search .btn:hover {
+.find-places-search .btn:hover {
     color: var(--primary-color);
     background: none;
 }
 
 /* Search Results */
-.google-places-results {
+.find-places-results {
     max-height: 400px;
     overflow-y: auto;
-    border: 1px solid var(--google-places-border);
-    border-radius: var(--google-places-radius);
+    border: 1px solid var(--find-places-border);
+    border-radius: var(--find-places-radius);
     margin: 1rem 0;
-    box-shadow: var(--google-places-shadow);
+    box-shadow: var(--find-places-shadow);
 }
 
 .place-result {
     padding: 1rem;
-    border-bottom: 1px solid var(--google-places-border);
+    border-bottom: 1px solid var(--find-places-border);
     cursor: pointer;
-    transition: var(--google-places-transition);
+    transition: var(--find-places-transition);
     background-color: white;
     display: flex;
     align-items: flex-start;
@@ -58,12 +58,12 @@
 }
 
 .place-result:hover {
-    background-color: var(--google-places-hover-bg);
+    background-color: var(--find-places-hover-bg);
 }
 
 .place-result.active,
 .place-result.selected {
-    background-color: var(--google-places-selected-bg);
+    background-color: var(--find-places-selected-bg);
     border-left: 3px solid var(--primary-color);
 }
 
@@ -118,7 +118,7 @@
 }
 
 /* Loading State */
-.google-places-loading {
+.find-places-loading {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -127,7 +127,7 @@
     color: var(--gray-600);
 }
 
-.google-places-loading .spinner-border {
+.find-places-loading .spinner-border {
     width: 2rem;
     height: 2rem;
     margin-bottom: 1rem;
@@ -135,7 +135,7 @@
 }
 
 /* Error State */
-.google-places-error {
+.find-places-error {
     margin: 1rem 0;
     animation: fadeIn 0.3s ease-in-out;
 }
@@ -148,7 +148,7 @@
 /* Selected Restaurant Button */
 #useSelectedPlace {
     margin-top: 1rem;
-    transition: var(--google-places-transition);
+    transition: var(--find-places-transition);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -167,7 +167,7 @@
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
-    .google-places-results {
+    .find-places-results {
         max-height: 300px;
     }
 

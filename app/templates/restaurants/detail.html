@@ -8,153 +8,190 @@
     <link rel="stylesheet"
           href="{{ url_for('static', filename='css/pages/restaurant-detail.css') }}">
 {% endblock extra_css %}
+{% block breadcrumb %}
+{% endblock breadcrumb %}
 {% block content %}
     {% if restaurant %}
-        <div class="container-fluid py-4 restaurant-detail-container">
-            <!-- Header Section -->
-            <div class="restaurant-detail-header">
-                <div>
-                    <h1 class="h3 mb-1">
-                        <span id="restaurant-name">{{ restaurant.name }}</span>
-                        {% if restaurant.rating %}
-                            <span class="badge bg-warning text-dark ms-2">
-                                <i class="fas fa-star"></i> {{ "%.1f"|format(restaurant.rating) }}
-                            </span>
-                        {% endif %}
-                    </h1>
-                    <div class="text-muted">
-                        <span class="me-3">{{ restaurant.type|title if restaurant.type else '' }}</span>
-                        {% if restaurant.cuisine %}
-                            <span class="badge bg-light text-dark border me-2">
-                                <i class="fas fa-utensils me-1"></i>{{ restaurant.cuisine }}
-                            </span>
-                        {% endif %}
-                        <!-- Price range removed - would show Google's dynamic price level when available -->
+        <!-- Breadcrumb Navigation -->
+        {% set breadcrumb_items = [
+                    {'url': url_for('main.index'), 'title': 'Dashboard'},
+                    {'url': url_for('restaurants.list_restaurants'), 'title': 'Restaurants'},
+                    {'title': restaurant.name}
+                ] %}
+        {% include 'includes/breadcrumb.html' %}
+        <div class="container py-4">
+            <!-- Header Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body p-4">
+                    <div class="row align-items-center">
+                        <div class="col-lg-8">
+                            <div class="mb-3">
+                                <h1 class="h3 mb-2" id="restaurant-name">{{ restaurant.name }}</h1>
+                                <div class="d-flex align-items-center flex-wrap gap-2">
+                                    {% if restaurant.type %}<span class="badge bg-light text-dark border">{{ restaurant.type|title }}</span>{% endif %}
+                                    {% if restaurant.cuisine %}
+                                        <span class="badge bg-primary text-white">
+                                            <i class="fas fa-globe-americas me-1"></i>{{ restaurant.cuisine }}
+                                        </span>
+                                    {% endif %}
+                                    {% if restaurant.rating %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="fas fa-star me-1"></i>{{ "%.1f"|format(restaurant.rating) }}/5.0
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if restaurant.description %}<p class="text-muted mb-0">{{ restaurant.description }}</p>{% endif %}
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                                <a href="{{ url_for('restaurants.list_restaurants') }}"
+                                   class="btn btn-outline-secondary"
+                                   id="back-to-list-btn">
+                                    <i class="fas fa-arrow-left me-1"></i>Back to List
+                                </a>
+                                {% if not is_edit %}
+                                    <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                       class="btn btn-success"
+                                       id="add-expense-here-btn">
+                                        <i class="fas fa-plus me-1"></i>Add Expense Here
+                                    </a>
+                                    <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
+                                       class="btn btn-outline-primary"
+                                       id="edit-btn">
+                                        <i class="fas fa-edit me-1"></i>Edit
+                                    </a>
+                                {% else %}
+                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                       class="btn btn-outline-secondary"
+                                       id="cancel-edit">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </a>
+                                    <button type="submit" form="restaurant-form" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Save Changes
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="action-buttons">
-                    {% if not is_edit %}
-                        <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
-                           class="btn btn-outline-primary"
-                           id="edit-btn">
-                            <i class="fas fa-edit me-1"></i>Edit
-                        </a>
-                    {% else %}
-                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                           class="btn btn-outline-secondary"
-                           id="cancel-edit">
-                            <i class="fas fa-times me-1"></i>Cancel
-                        </a>
-                        <button type="submit" form="restaurant-form" class="btn btn-primary">
-                            <i class="fas fa-save me-1"></i>Save Changes
-                        </button>
-                    {% endif %}
-                    <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
-                       class="btn btn-primary">
-                        <i class="fas fa-plus me-1"></i>Add Expense
-                    </a>
                 </div>
             </div>
             <form id="restaurant-form"
                   method="post"
                   action="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">
                 {{ form.hidden_tag() }}
-                <div class="restaurant-detail-main">
-                    <!-- Left Column - Restaurant Details -->
-                    <div class="restaurant-details">
-                        <div class="card shadow-sm h-100">
-                            <div class="card-body p-3">
-                                <!-- View/Edit Mode Toggle -->
-                                <div id="view-mode" class="{{ 'd-none' if is_edit else '' }}">
-                                    <!-- Basic Info -->
-                                    <div class="mb-3">
-                                        <h5 class="text-muted mb-2 border-bottom pb-2">
-                                            <i class="fas fa-info-circle me-2"></i>Basic Information
-                                        </h5>
-                                        {% if restaurant.description %}<p class="mb-3">{{ restaurant.description }}</p>{% endif %}
-                                        <ul class="list-unstyled">
-                                            {% if restaurant.type %}
-                                                <li class="mb-2">
-                                                    <i class="fas fa-utensils me-2 text-muted"></i>
-                                                    <strong>Type:</strong> {{ restaurant.type|title }}
-                                                </li>
-                                            {% endif %}
-                                            {% if restaurant.cuisine %}
-                                                <li class="mb-2">
-                                                    <i class="fas fa-globe-americas me-2 text-muted"></i>
-                                                    <strong>Cuisine:</strong> {{ restaurant.cuisine }}
-                                                </li>
-                                            {% endif %}
-                                            <!-- Price range removed - would show Google's dynamic price level when available -->
-                                            {% if restaurant.is_chain is not none %}
-                                                <li class="mb-2">
-                                                    <i class="fas fa-store me-2 text-muted"></i>
-                                                    <strong>Chain:</strong> {{ 'Yes' if restaurant.is_chain else 'No' }}
-                                                </li>
-                                            {% endif %}
-                                        </ul>
-                                    </div>
-                                    <!-- Personal Rating -->
-                                    {% if restaurant.rating %}
-                                        <div class="mb-4">
-                                            <h5 class="text-muted mb-3 border-bottom pb-2">
-                                                <i class="fas fa-star me-2"></i>Your Rating
-                                            </h5>
-                                            <div class="d-flex align-items-center">
-                                                <span class="badge bg-warning text-dark fs-6 me-3">
-                                                    <i class="fas fa-star"></i> {{ "%.1f"|format(restaurant.rating) }}/5.0
-                                                </span>
-                                                <small class="text-muted">Personal rating</small>
+                <!-- Main Content -->
+                <div class="row g-4">
+                    <!-- Left Column - Restaurant Information -->
+                    <div class="col-lg-8">
+                        <div id="view-mode" class="{{ 'd-none' if is_edit else '' }}">
+                            <!-- Contact, Location & Details Card -->
+                            <div class="card shadow-sm mb-4">
+                                <div class="card-header bg-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-info-circle me-2 text-primary"></i>Restaurant Information
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <!-- Restaurant Details -->
+                                        <div class="col-md-4">
+                                            <h6 class="text-muted mb-3">Details</h6>
+                                            <div class="list-group list-group-flush">
+                                                {% if restaurant.type %}
+                                                    <div class="list-group-item px-0 py-2 border-0">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <span class="text-muted">Type</span>
+                                                            <span class="fw-medium">{{ restaurant.type|title }}</span>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                                {% if restaurant.cuisine %}
+                                                    <div class="list-group-item px-0 py-2 border-0">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <span class="text-muted">Cuisine</span>
+                                                            <span class="fw-medium">{{ restaurant.cuisine }}</span>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                                {% if restaurant.is_chain is not none %}
+                                                    <div class="list-group-item px-0 py-2 border-0">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <span class="text-muted">Chain</span>
+                                                            <span class="fw-medium">{{ 'Yes' if restaurant.is_chain else 'No' }}</span>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                                {% if restaurant.rating %}
+                                                    <div class="list-group-item px-0 py-2 border-0">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <span class="text-muted">Your Rating</span>
+                                                            <span class="badge bg-warning text-dark">
+                                                                <i class="fas fa-star me-1"></i>{{ "%.1f"|format(restaurant.rating) }}/5.0
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
                                             </div>
                                         </div>
-                                    {% endif %}
-                                    <!-- Contact Information -->
-                                    {% if restaurant.phone or restaurant.website or restaurant.email %}
-                                        <div class="mb-4">
-                                            <h5 class="text-muted mb-3 border-bottom pb-2">
-                                                <i class="fas fa-address-card me-2"></i>Contact
-                                            </h5>
-                                            <ul class="list-unstyled">
-                                                {% if restaurant.phone %}
-                                                    <li class="mb-2">
-                                                        <i class="fas fa-phone me-2 text-muted"></i>
-                                                        <a href="tel:{{ restaurant.phone }}" class="text-decoration-none">{{ restaurant.phone }}</a>
-                                                    </li>
-                                                {% endif %}
-                                                {% if restaurant.website %}
-                                                    <li class="mb-2">
-                                                        <i class="fas fa-globe me-2 text-muted"></i>
-                                                        <a href="{{ restaurant.website }}"
-                                                           target="_blank"
-                                                           rel="noopener noreferrer"
-                                                           class="text-decoration-none">
-                                                            {{ restaurant.website|truncate(30) }}
-                                                        </a>
-                                                    </li>
-                                                {% endif %}
-                                                {% if restaurant.email %}
-                                                    <li class="mb-2">
-                                                        <i class="fas fa-envelope me-2 text-muted"></i>
-                                                        <a href="mailto:{{ restaurant.email }}" class="text-decoration-none">{{ restaurant.email }}</a>
-                                                    </li>
-                                                {% endif %}
-                                            </ul>
-                                        </div>
-                                    {% endif %}
-                                    <!-- Location -->
-                                    {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %}
-                                        <div class="mb-4">
-                                            <h5 class="text-muted mb-3 border-bottom pb-2">
-                                                <i class="fas fa-map-marker-alt me-2"></i>Location
-                                            </h5>
-                                            <address class="mb-3">
-                                                {% if restaurant.address %}<div>{{ restaurant.address }}</div>{% endif %}
-                                                {% if restaurant.city or restaurant.state or restaurant.postal_code %}
-                                                    <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
-                                                {% endif %}
-                                                {% if restaurant.country %}<div>{{ restaurant.country }}</div>{% endif %}
+                                        <!-- Contact Information -->
+                                        {% if restaurant.phone or restaurant.website or restaurant.email %}
+                                            <div class="col-md-4">
+                                                <h6 class="text-muted mb-3">Contact</h6>
+                                                <div class="list-group list-group-flush">
+                                                    {% if restaurant.phone %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-phone text-muted me-3"></i>
+                                                                <a href="tel:{{ restaurant.phone }}" class="text-decoration-none">{{ restaurant.phone }}</a>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if restaurant.website %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-globe text-muted me-3"></i>
+                                                                <a href="{{ restaurant.website }}"
+                                                                   target="_blank"
+                                                                   rel="noopener noreferrer"
+                                                                   class="text-decoration-none">
+                                                                    {{ restaurant.website|truncate(25) }}
+                                                                    <i class="fas fa-external-link-alt ms-1 small"></i>
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if restaurant.email %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-envelope text-muted me-3"></i>
+                                                                <a href="mailto:{{ restaurant.email }}" class="text-decoration-none">{{ restaurant.email|truncate(25) }}</a>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="col-md-4">
+                                                <!-- Empty column if no contact info -->
+                                            </div>
+                                        {% endif %}
+                                        <!-- Location Information -->
+                                        {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %}
+                                            <div class="col-md-4">
+                                                <h6 class="text-muted mb-3">Location</h6>
+                                                <div class="d-flex align-items-start">
+                                                    <i class="fas fa-map-marker-alt text-muted me-3 mt-1"></i>
+                                                    <address class="mb-0">
+                                                        {% if restaurant.address %}<div>{{ restaurant.address }}</div>{% endif %}
+                                                        {% if restaurant.city or restaurant.state or restaurant.postal_code %}
+                                                            <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
+                                                        {% endif %}
+                                                        {% if restaurant.country %}<div>{{ restaurant.country }}</div>{% endif %}
+                                                    </address>
+                                                </div>
                                                 {% if restaurant.google_place_id %}
-                                                    <div class="mt-2">
+                                                    <div class="mt-3">
                                                         <a href="https://www.google.com/maps/place/?q=place_id:{{ restaurant.google_place_id }}"
                                                            target="_blank"
                                                            rel="noopener noreferrer"
@@ -163,547 +200,540 @@
                                                         </a>
                                                     </div>
                                                 {% endif %}
-                                            </address>
-                                            {% if restaurant.google_place_id %}
-                                                <div class="map-container mb-3 rounded overflow-hidden"
-                                                     id="map-container"
-                                                     data-google-place-id="{{ restaurant.google_place_id }}"
-                                                     data-name="{{ restaurant.name }}">
-                                                    <!-- Map will be initialized here using Google Place ID -->
-                                                    <div class="ratio ratio-16x9 bg-light">
-                                                        <div class="d-flex align-items-center justify-content-center h-100">
-                                                            <div class="text-center">
-                                                                <div class="spinner-border text-primary" role="status">
-                                                                    <span class="visually-hidden">Loading map...</span>
-                                                                </div>
-                                                                <p class="mt-2 mb-0">Loading map...</p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                    {% endif %}
-                                    <!-- Data Completeness Indicator -->
-                                    <div class="mb-4">
-                                        <h5 class="text-muted mb-3 border-bottom pb-2">
-                                            <i class="fas fa-clipboard-check me-2"></i>Profile Completeness
-                                        </h5>
-                                        {% set fields_total = 13 %}
-                                        {% set fields_filled = 1 %}  <!-- name is always required -->
-                                        {% if restaurant.type %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.description %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.address %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.city %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.state %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.postal_code %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.country %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.phone %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.website %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.email %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.cuisine %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% if restaurant.rating %}
-                                            {% set fields_filled = fields_filled + 1 %}
-                                        {% endif %}
-                                        {% set completeness_percent = (fields_filled / fields_total * 100)|round|int %}
-                                        <div class="d-flex align-items-center">
-                                            <div class="progress flex-grow-1 me-3" style="height: 8px;">
-                                                <div class="progress-bar
-                                                            {% if completeness_percent >= 80 %}
-                                                                bg-success
-                                                            {% elif completeness_percent >= 60 %}
-                                                                bg-warning
-                                                            {% else %}
-                                                                bg-danger
-                                                            {% endif %}"
-                                                     role="progressbar"
-                                                     aria-valuenow="{{ completeness_percent }}"
-                                                     aria-valuemin="0"
-                                                     aria-valuemax="100"
-                                                     data-width="{{ completeness_percent }}"></div>
-                                            </div>
-                                            <span class="badge
-                                                         {% if completeness_percent >= 80 %}
-                                                             bg-success
-                                                         {% elif completeness_percent >= 60 %}
-                                                             bg-warning text-dark
-                                                         {% else %}
-                                                             bg-danger
-                                                         {% endif %}">{{ completeness_percent }}%</span>
-                                        </div>
-                                        <small class="text-muted">{{ fields_filled }} of {{ fields_total }} fields completed</small>
-                                    </div>
-                                    <!-- Notes -->
-                                    {% if restaurant.notes %}
-                                        <div class="mb-4">
-                                            <h5 class="text-muted mb-3 border-bottom pb-2">
-                                                <i class="fas fa-sticky-note me-2"></i>Notes
-                                            </h5>
-                                            <div class="p-3 bg-light rounded">{{ restaurant.notes|urlize|nl2br }}</div>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                <!-- Edit Mode -->
-                                <div id="edit-mode" class="{{ 'd-none' if not is_edit else '' }}">
-                                    <div class="mb-4">
-                                        <h5 class="text-muted mb-3 border-bottom pb-2">
-                                            <i class="fas fa-edit me-2"></i>Edit Restaurant Details
-                                        </h5>
-                                        <div class="mb-3">{{ render_field(form.name) }}</div>
-                                        <div class="mb-3">{{ render_field(form.type) }}</div>
-                                        <div class="mb-3">{{ render_field(form.cuisine) }}</div>
-                                        <div class="mb-3">{{ render_field(form.rating) }}</div>
-                                        <div class="mb-3">{{ render_field(form.is_chain) }}</div>
-                                        <div class="mb-3">{{ render_field(form.description) }}</div>
-                                    </div>
-                                    <div class="mb-4">
-                                        <h5 class="text-muted mb-3 border-bottom pb-2">
-                                            <i class="fas fa-address-card me-2"></i>Contact Information
-                                        </h5>
-                                        <div class="mb-3">{{ render_field(form.phone) }}</div>
-                                        <div class="mb-3">{{ render_field(form.email) }}</div>
-                                        <div class="mb-3">{{ render_field(form.website) }}</div>
-                                    </div>
-                                    <div class="mb-4">
-                                        <h5 class="text-muted mb-3 border-bottom pb-2">
-                                            <i class="fas fa-map-marker-alt me-2"></i>Location
-                                        </h5>
-                                        <div class="mb-3">{{ render_field(form.address) }}</div>
-                                        <div class="mb-3">{{ render_field(form.city) }}</div>
-                                        <div class="row">
-                                            <div class="col-md-6">{{ render_field(form.state) }}</div>
-                                            <div class="col-md-6">{{ render_field(form.postal_code) }}</div>
-                                        </div>
-                                        <div class="mb-3">{{ render_field(form.country) }}</div>
-                                    </div>
-                                    <div class="mb-4">
-                                        <h5 class="text-muted mb-3 border-bottom pb-2">
-                                            <i class="fas fa-sticky-note me-2"></i>Additional Information
-                                        </h5>
-                                        <div class="mb-3">{{ render_field(form.notes) }}</div>
-                                        {% if restaurant.google_place_id %}
-                                            <div class="mb-3">
-                                                <label class="form-label">Google Place ID</label>
-                                                <div class="input-group">
-                                                    <input type="text"
-                                                           class="form-control bg-light"
-                                                           value="{{ restaurant.google_place_id }}"
-                                                           readonly>
-                                                    <button class="btn btn-outline-secondary"
-                                                            type="button"
-                                                            onclick="navigator.clipboard.writeText('{{ restaurant.google_place_id }}')"
-                                                            data-bs-toggle="tooltip"
-                                                            title="Copy to clipboard">
-                                                        <i class="fas fa-copy"></i>
-                                                    </button>
-                                                </div>
-                                                <div class="form-text">Used for Google Maps integration (read-only)</div>
                                             </div>
                                         {% endif %}
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                    <!-- Right Column - Expense Summary -->
-                    <div class="expense-summary">
-                        <div class="card border-0 shadow-sm mb-4">
-                            <div class="card-header bg-white border-bottom-0">
-                                <h5 class="mb-0">
-                                    <i class="fas fa-chart-pie me-2 text-primary"></i>Expense Summary
-                                </h5>
-                            </div>
-                            <div class="card-body p-0">
-                                <div class="list-group list-group-flush">
-                                    <div class="list-group-item">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span>Total Spent</span>
-                                            <span class="fw-bold">${{ "%.2f"|format(expense_stats.total_amount) }}</span>
-                                        </div>
+                            <!-- Notes Card -->
+                            {% if restaurant.notes %}
+                                <div class="card shadow-sm mb-4">
+                                    <div class="card-header bg-white">
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-sticky-note me-2 text-primary"></i>Notes
+                                        </h5>
                                     </div>
-                                    <div class="list-group-item">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span>Avg. per Visit</span>
-                                            <span class="fw-bold">${{ "%.2f"|format(expense_stats.avg_per_visit) }}</span>
-                                        </div>
+                                    <div class="card-body">
+                                        <p class="mb-0">{{ restaurant.notes }}</p>
                                     </div>
-                                    <div class="list-group-item">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span>Total Visits</span>
-                                            <span class="badge bg-primary rounded-pill">{{ expense_stats.visit_count }}</span>
-                                        </div>
-                                    </div>
-                                    <div class="list-group-item">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <span>Last Visit</span>
-                                            <span class="text-muted small">{{ expense_stats.last_visit.strftime("%b %d, %Y") if expense_stats.last_visit else 'N/A' }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Recent Transactions -->
-                        <div class="recent-transactions">
-                            <div class="card border-0 shadow-sm">
-                                <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0">
-                                        <i class="fas fa-receipt me-2 text-primary"></i>Recent Expenses
-                                    </h5>
-                                    <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
-                                       class="btn btn-sm btn-outline-primary btn-sm">
-                                        <i class="fas fa-plus"></i>
-                                    </a>
-                                </div>
-                                <div class="card-body p-0">
-                                    {% if expenses %}
-                                        <div class="list-group list-group-flush">
-                                            {% for expense in expenses[:5] %}
-                                                <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
-                                                   class="list-group-item list-group-item-action border-0">
-                                                    <div class="d-flex w-100 justify-content-between">
-                                                        <h6 class="mb-1">${{ "%.2f"|format(expense.amount) }}</h6>
-                                                        <small class="text-muted">{{ expense.date.strftime("%b %d") }}</small>
-                                                    </div>
-                                                    <p class="mb-1 text-muted small">{{ expense.notes|truncate(30) if expense.notes else 'No notes' }}</p>
-                                                </a>
-                                            {% endfor %}
-                                        </div>
-                                        <div class="card-footer bg-white border-top-0 text-center">
-                                            <a href="{{ url_for('expenses.list_expenses', restaurant_id=restaurant.id) }}"
-                                               class="btn btn-sm btn-link">
-                                                View All Expenses <i class="fas fa-arrow-right ms-1"></i>
-                                            </a>
-                                        </div>
-                                    {% else %}
-                                        <div class="text-center p-4">
-                                            <div class="text-muted mb-2">
-                                                <i class="fas fa-receipt fa-2x"></i>
-                                            </div>
-                                            <p class="mb-0">No expenses yet</p>
-                                            <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
-                                               class="btn btn-sm btn-outline-primary mt-2">
-                                                <i class="fas fa-plus me-1"></i> Add First Expense
-                                            </a>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <!-- Full-width Expense History Section -->
-                <div class="expense-history" id="expense-history">
-                    <div class="card shadow-sm">
-                        <div class="card-header bg-white py-2">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">
-                                    <i class="fas fa-receipt me-2 text-primary"></i>Expense History
-                                </h5>
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-outline-secondary"
-                                            type="button"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#filterExpenseModal">
-                                        <i class="fas fa-filter me-1"></i>Filter
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
-                                            type="button"
-                                            id="expenseHistoryDropdown"
-                                            data-bs-toggle="dropdown"
-                                            aria-expanded="false">
-                                        <i class="fas fa-download me-1"></i>Export
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end"
-                                        aria-labelledby="expenseHistoryDropdown">
-                                        <li>
-                                            <a class="dropdown-item" href="#"><i class="fas fa-file-csv me-2"></i>CSV</a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="#"><i class="fas fa-file-excel me-2"></i>Excel</a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="#"><i class="fas fa-file-pdf me-2"></i>PDF</a>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-body p-0">
-                            {% if expenses %}
-                                <!-- Summary Stats -->
-                                <div class="p-3 border-bottom bg-light">
-                                    <div class="row g-3">
-                                        <div class="col-md-4">
-                                            <div class="p-2 bg-white rounded border text-center">
-                                                <div class="text-muted small mb-1">Total Expenses</div>
-                                                <div class="h5 mb-0 fw-bold text-primary">${{ "%.2f"|format(expenses|sum(attribute='amount') ) }}</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="p-2 bg-white rounded border text-center">
-                                                <div class="text-muted small mb-1">Total Visits</div>
-                                                <div class="h5 mb-0 fw-bold text-primary">{{ expenses|length }}</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="p-2 bg-white rounded border text-center">
-                                                <div class="text-muted small mb-1">Average per Visit</div>
-                                                <div class="h5 mb-0 fw-bold text-primary">
-                                                    ${{ "%.2f"|format(expenses|sum(attribute='amount') / (expenses|length or 1)) }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- Expenses Table -->
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle mb-0">
-                                        <thead class="bg-light">
-                                            <tr>
-                                                <th class="ps-3">Date</th>
-                                                <th>Amount</th>
-                                                <th>Category</th>
-                                                <th>Meal Type</th>
-                                                <th class="text-end pe-3">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for expense in expenses %}
-                                                <tr class="position-relative">
-                                                    <td class="ps-3">
-                                                        <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
-                                                           class="text-decoration-none d-block py-2">
-                                                            <div class="d-flex align-items-center">
-                                                                <i class="far fa-calendar-alt me-2 text-muted"></i>
-                                                                <span>{{ expense.date.strftime("%b %d, %Y") }}</span>
-                                                            </div>
-                                                        </a>
-                                                    </td>
-                                                    <td class="fw-bold">
-                                                        <div class="d-flex align-items-center">
-                                                            <i class="fas fa-dollar-sign text-muted me-1"></i>
-                                                            <span>{{ "%.2f"|format(expense.amount) }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <span class="badge bg-light text-dark border">
-                                                            <i class="fas fa-tag me-1 text-muted"></i>
-                                                            {{ expense.category.name|replace('_', ' ') |title if expense.category else 'N/A' }}
-                                                        </span>
-                                                    </td>
-                                                    <td>
-                                                        <span class="badge bg-light text-dark border">
-                                                            <i class="fas fa-utensils me-1 text-muted"></i>
-                                                            {{ expense.meal_type|replace('_', ' ') |title if expense.meal_type else 'N/A' }}
-                                                        </span>
-                                                    </td>
-                                                    <td class="text-end pe-3">
-                                                        <div class="btn-group btn-group-sm"
-                                                             role="group"
-                                                             aria-label="Expense actions">
-                                                            <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
-                                                               class="btn btn-outline-primary"
-                                                               data-bs-toggle="tooltip"
-                                                               data-bs-placement="top"
-                                                               title="Edit expense">
-                                                                <i class="far fa-edit"></i>
-                                                            </a>
-                                                            <button type="button"
-                                                                    class="btn btn-outline-danger"
-                                                                    data-bs-toggle="modal"
-                                                                    data-bs-target="#deleteModal{{ expense.id }}"
-                                                                    data-bs-placement="top"
-                                                                    title="Delete expense">
-                                                                <i class="far fa-trash-alt"></i>
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            {% else %}
-                                <!-- Empty State -->
-                                <div class="text-center p-5">
-                                    <div class="mb-4">
-                                        <i class="fas fa-receipt fa-4x text-light bg-primary rounded-circle p-4"></i>
-                                    </div>
-                                    <h4 class="text-muted mb-3">No Expenses Recorded Yet</h4>
-                                    <p class="text-muted mb-4">Start tracking your dining expenses to see detailed analytics and insights.</p>
-                                    <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
-                                       class="btn btn-primary px-4">
-                                        <i class="fas fa-plus me-2"></i>Add Your First Expense
-                                    </a>
                                 </div>
                             {% endif %}
                         </div>
                     </div>
-                </div>
-            </div>
-        </form>
-        <!-- Map View Section -->
-        {% if restaurant.google_place_id %}
-            <div class="map-container"
-                 id="map-container"
-                 data-google-place-id="{{ restaurant.google_place_id }}"
-                 data-name="{{ restaurant.name }}">
-                <div class="text-muted">
-                    <i class="fas fa-spinner fa-spin me-2"></i>Loading map...
-                </div>
-            </div>
-        {% endif %}
-        <!-- Filter Expense Modal -->
-        <div class="modal fade"
-             id="filterExpenseModal"
-             tabindex="-1"
-             aria-labelledby="filterExpenseModalLabel">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="filterExpenseModalLabel">Filter Expenses</h5>
-                        <button type="button"
-                                class="btn-close"
-                                data-bs-dismiss="modal"
-                                aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="expense-filter-form">
-                            <div class="mb-3">
-                                <label for="date-range" class="form-label">Date Range</label>
-                                <select class="form-select" id="date-range">
-                                    <option value="all" selected>All Time</option>
-                                    <option value="today">Today</option>
-                                    <option value="week">This Week</option>
-                                    <option value="month">This Month</option>
-                                    <option value="year">This Year</option>
-                                    <option value="custom">Custom Range</option>
-                                </select>
-                            </div>
-                            <div class="mb-3 d-none" id="custom-date-range">
-                                <div class="row">
-                                    <div class="col">
-                                        <label for="start-date" class="form-label">Start Date</label>
-                                        <input type="date" class="form-control" id="start-date">
-                                    </div>
-                                    <div class="col">
-                                        <label for="end-date" class="form-label">End Date</label>
-                                        <input type="date" class="form-control" id="end-date">
+                    <!-- Right Sidebar - Quick Stats & Actions -->
+                    <div class="col-lg-4">
+                        <div id="sidebar" class="{{ 'd-none' if is_edit else '' }}">
+                            <!-- Quick Stats Card -->
+                            <div class="card shadow-sm mb-4">
+                                <div class="card-header bg-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-chart-line me-2 text-primary"></i>Quick Stats
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-6">
+                                            <div class="text-center">
+                                                <div class="h4 mb-1 text-primary">{{ restaurant.expenses|length if restaurant.expenses else 0 }}</div>
+                                                <small class="text-muted">Visits</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="text-center">
+                                                {% set total_spent = restaurant.expenses|sum(attribute='amount') if restaurant.expenses else 0 %}
+                                                <div class="h4 mb-1 text-success">${{ "%.2f"|format(total_spent) }}</div>
+                                                <small class="text-muted">Total Spent</small>
+                                            </div>
+                                        </div>
+                                        {% if restaurant.expenses %}
+                                            <div class="col-6">
+                                                <div class="text-center">
+                                                    {% set avg_expense = (restaurant.expenses|sum(attribute='amount') / restaurant.expenses|length) %}
+                                                    <div class="h4 mb-1 text-info">${{ "%.2f"|format(avg_expense) }}</div>
+                                                    <small class="text-muted">Avg per Visit</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="text-center">
+                                                    {% set last_visit = restaurant.expenses|max(attribute='date') %}
+                                                    <div class="h4 mb-1 text-warning">{{ last_visit.date.strftime("%b %d") if last_visit else 'N/A' }}</div>
+                                                    <small class="text-muted">Last Visit</small>
+                                                </div>
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
-                            <div class="mb-3">
-                                <label for="min-amount" class="form-label">Minimum Amount</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">$</span>
-                                    <input type="number"
-                                           class="form-control"
-                                           id="min-amount"
-                                           min="0"
-                                           step="0.01"
-                                           placeholder="0.00">
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="max-amount" class="form-label">Maximum Amount</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">$</span>
-                                    <input type="number"
-                                           class="form-control"
-                                           id="max-amount"
-                                           min="0"
-                                           step="0.01"
-                                           placeholder="No limit">
-                                </div>
-                            </div>
-                        </form>
+                        </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button"
-                                class="btn btn-outline-secondary"
-                                data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="apply-filters">Apply Filters</button>
+                </div>
+                <!-- Edit Mode -->
+                <div id="edit-mode" class="{{ 'd-none' if not is_edit else '' }}">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-edit me-2 text-primary"></i>Edit Restaurant Details
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-4">
+                                <div class="mb-4">
+                                    <h5 class="text-muted mb-3 border-bottom pb-2">
+                                        <i class="fas fa-edit me-2"></i>Edit Restaurant Details
+                                    </h5>
+                                    <div class="mb-3">{{ render_field(form.name) }}</div>
+                                    <div class="mb-3">{{ render_field(form.type) }}</div>
+                                    <div class="mb-3">{{ render_field(form.cuisine) }}</div>
+                                    <div class="mb-3">{{ render_field(form.rating) }}</div>
+                                    <div class="mb-3">{{ render_field(form.is_chain) }}</div>
+                                    <div class="mb-3">{{ render_field(form.description) }}</div>
+                                </div>
+                                <div class="mb-4">
+                                    <h5 class="text-muted mb-3 border-bottom pb-2">
+                                        <i class="fas fa-address-card me-2"></i>Contact Information
+                                    </h5>
+                                    <div class="mb-3">{{ render_field(form.phone) }}</div>
+                                    <div class="mb-3">{{ render_field(form.email) }}</div>
+                                    <div class="mb-3">{{ render_field(form.website) }}</div>
+                                </div>
+                                <div class="mb-4">
+                                    <h5 class="text-muted mb-3 border-bottom pb-2">
+                                        <i class="fas fa-map-marker-alt me-2"></i>Location
+                                    </h5>
+                                    <div class="mb-3">{{ render_field(form.address) }}</div>
+                                    <div class="mb-3">{{ render_field(form.city) }}</div>
+                                    <div class="row">
+                                        <div class="col-md-6">{{ render_field(form.state) }}</div>
+                                        <div class="col-md-6">{{ render_field(form.postal_code) }}</div>
+                                    </div>
+                                    <div class="mb-3">{{ render_field(form.country) }}</div>
+                                </div>
+                                <div class="mb-4">
+                                    <h5 class="text-muted mb-3 border-bottom pb-2">
+                                        <i class="fas fa-sticky-note me-2"></i>Additional Information
+                                    </h5>
+                                    <div class="mb-3">{{ render_field(form.notes) }}</div>
+                                    {% if restaurant.google_place_id %}
+                                        <div class="mb-3">
+                                            <label class="form-label">Google Place ID</label>
+                                            <div class="input-group">
+                                                <input type="text"
+                                                       id="restaurant_google_place_id_display"
+                                                       name="restaurant_google_place_id_display"
+                                                       class="form-control bg-light"
+                                                       value="{{ restaurant.google_place_id }}"
+                                                       readonly
+                                                       aria-describedby="restaurant-google-place-id-help">
+                                                <button class="btn btn-outline-secondary"
+                                                        type="button"
+                                                        onclick="navigator.clipboard.writeText('{{ restaurant.google_place_id }}')"
+                                                        data-bs-toggle="tooltip"
+                                                        title="Copy to clipboard">
+                                                    <i class="fas fa-copy"></i>
+                                                </button>
+                                            </div>
+                                            <div class="form-text">Used for Google Maps integration (read-only)</div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Right Column - Expense Summary -->
+                <div class="expense-summary">
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white border-bottom-0">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-pie me-2 text-primary"></i>Expense Summary
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush">
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span>Total Spent</span>
+                                        <span class="fw-bold amount-right d-inline-block" style="min-width: 80px;">${{ "%.2f"|format(expense_stats.total_amount) }}</span>
+                                    </div>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span>Avg. per Visit</span>
+                                        <span class="fw-bold">${{ "%.2f"|format(expense_stats.avg_per_visit) }}</span>
+                                    </div>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span>Total Visits</span>
+                                        <span class="badge bg-primary rounded-pill">{{ expense_stats.visit_count }}</span>
+                                    </div>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span>Last Visit</span>
+                                        <span class="text-muted small">{{ expense_stats.last_visit.strftime("%b %d, %Y") if expense_stats.last_visit else 'N/A' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Recent Transactions -->
+                    <div class="recent-transactions">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-receipt me-2 text-primary"></i>Recent Expenses
+                                </h5>
+                                <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                   class="btn btn-sm btn-outline-primary btn-sm">
+                                    <i class="fas fa-plus"></i>
+                                </a>
+                            </div>
+                            <div class="card-body p-0">
+                                {% if expenses %}
+                                    <div class="list-group list-group-flush">
+                                        {% for expense in expenses[:5] %}
+                                            <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+                                               class="list-group-item list-group-item-action border-0">
+                                                <div class="d-flex w-100 justify-content-between">
+                                                    <h6 class="mb-1 amount-right">${{ "%.2f"|format(expense.amount) }}</h6>
+                                                    <small class="text-muted">{{ expense.date.strftime("%b %d") }}</small>
+                                                </div>
+                                                <p class="mb-1 text-muted small">{{ expense.notes|truncate(30) if expense.notes else 'No notes' }}</p>
+                                            </a>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="card-footer bg-white border-top-0 text-center">
+                                        <a href="{{ url_for('expenses.list_expenses', restaurant_id=restaurant.id) }}"
+                                           class="btn btn-sm btn-link">
+                                            View All Expenses <i class="fas fa-arrow-right ms-1"></i>
+                                        </a>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center p-4">
+                                        <div class="text-muted mb-2">
+                                            <i class="fas fa-receipt fa-2x"></i>
+                                        </div>
+                                        <p class="mb-0">No expenses yet</p>
+                                        <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                           class="btn btn-sm btn-outline-primary mt-2">
+                                            <i class="fas fa-plus me-1"></i> Add First Expense
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-    <!-- Delete Modals -->
-    {% for expense in expenses %}
-        <div class="modal fade" id="deleteModal{{ expense.id }}" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Confirm Deletion</h5>
-                        <button type="button"
-                                class="btn-close"
-                                data-bs-dismiss="modal"
-                                aria-label="Close"></button>
+            <!-- Full-width Expense History Section -->
+            <div class="expense-history" id="expense-history">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-receipt me-2 text-primary"></i>Expense History
+                            </h5>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        type="button"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#filterExpenseModal">
+                                    <i class="fas fa-filter me-1"></i>Filter
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                        type="button"
+                                        id="expenseHistoryDropdown"
+                                        data-bs-toggle="dropdown"
+                                        aria-expanded="false">
+                                    <i class="fas fa-download me-1"></i>Export
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end"
+                                    aria-labelledby="expenseHistoryDropdown">
+                                    <li>
+                                        <a class="dropdown-item" href="#"><i class="fas fa-file-csv me-2"></i>CSV</a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="#"><i class="fas fa-file-excel me-2"></i>Excel</a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="#"><i class="fas fa-file-pdf me-2"></i>PDF</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
-                    <div class="modal-body">
-                        <p>Are you sure you want to delete the expense from {{ expense.date.strftime("%b %d, %Y") }}?</p>
-                        <p class="mb-0">
-                            <strong>Amount:</strong> ${{ "%.2f"|format(expense.amount) }}
-                        </p>
-                        {% if expense.notes %}
-                            <p class="mb-0">
-                                <strong>Notes:</strong> {{ expense.notes|truncate(50) }}
-                            </p>
+                    <div class="card-body p-0">
+                        {% if expenses %}
+                            <!-- Summary Stats -->
+                            <div class="p-3 border-bottom bg-light">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <div class="p-2 bg-white rounded border text-center">
+                                            <div class="text-muted small mb-1">Total Expenses</div>
+                                            <div class="h5 mb-0 fw-bold text-primary amount-right">${{ "%.2f"|format(expenses|sum(attribute='amount') ) }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2 bg-white rounded border text-center">
+                                            <div class="text-muted small mb-1">Total Visits</div>
+                                            <div class="h5 mb-0 fw-bold text-primary">{{ expenses|length }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="p-2 bg-white rounded border text-center">
+                                            <div class="text-muted small mb-1">Average per Visit</div>
+                                            <div class="h5 mb-0 fw-bold text-primary">
+                                                <span class="amount-right d-inline-block" style="min-width: 80px;">${{ "%.2f"|format(expenses|sum(attribute='amount') / (expenses|length or 1)) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Expenses Table -->
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th class="ps-3">Date</th>
+                                            <th>Amount</th>
+                                            <th>Category</th>
+                                            <th>Meal Type</th>
+                                            <th class="text-end pe-3">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for expense in expenses %}
+                                            <tr class="position-relative">
+                                                <td class="ps-3">
+                                                    <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
+                                                       class="text-decoration-none d-block py-2">
+                                                        <div class="d-flex align-items-center">
+                                                            <i class="far fa-calendar-alt me-2 text-muted"></i>
+                                                            <span>{{ expense.date.strftime("%b %d, %Y") }}</span>
+                                                        </div>
+                                                    </a>
+                                                </td>
+                                                <td class="fw-bold">
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="fas fa-dollar-sign text-muted me-1"></i>
+                                                        <span class="amount-right">{{ "%.2f"|format(expense.amount) }}</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    {% if expense.category %}
+                                                        <span class="badge border d-flex align-items-center"
+                                                              style="--category-color: {{ expense.category.color }}; background-color: var(--category-color, #f8f9fa)20; color: var(--category-color, #495057); border-color: var(--category-color, #dee2e6)40 !important"
+                                                            {% if expense.category.icon %}<i class="fas fa-{{ expense.category.icon }} me-1"></i>{% endif %}
+                                                            {{ expense.category.name|replace('_', ' ') |title }}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="text-muted">N/A</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-light text-dark border">
+                                                        <i class="fas fa-utensils me-1 text-muted"></i>
+                                                        {{ expense.meal_type|replace('_', ' ') |title if expense.meal_type else 'N/A' }}
+                                                    </span>
+                                                </td>
+                                                <td class="text-end pe-3">
+                                                    <div class="btn-group btn-group-sm"
+                                                         role="group"
+                                                         aria-label="Expense actions">
+                                                        <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+                                                           class="btn btn-outline-primary"
+                                                           data-bs-toggle="tooltip"
+                                                           data-bs-placement="top"
+                                                           title="Edit expense">
+                                                            <i class="far fa-edit"></i>
+                                                        </a>
+                                                        <button type="button"
+                                                                class="btn btn-outline-danger"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#deleteModal{{ expense.id }}"
+                                                                data-bs-placement="top"
+                                                                title="Delete expense">
+                                                            <i class="far fa-trash-alt"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <!-- Empty State -->
+                            <div class="text-center p-5">
+                                <div class="mb-4">
+                                    <i class="fas fa-receipt fa-4x text-light bg-primary rounded-circle p-4"></i>
+                                </div>
+                                <h4 class="text-muted mb-3">No Expenses Recorded Yet</h4>
+                                <p class="text-muted mb-4">Start tracking your dining expenses to see detailed analytics and insights.</p>
+                                <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                   class="btn btn-primary px-4">
+                                    <i class="fas fa-plus me-2"></i>Add Your First Expense
+                                </a>
+                            </div>
                         {% endif %}
                     </div>
-                    <div class="modal-footer">
-                        <button type="button"
-                                class="btn btn-outline-secondary"
-                                data-bs-dismiss="modal">
-                            <i class="fas fa-times me-1"></i>Cancel
-                        </button>
-                        <form action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}"
-                              method="post"
-                              class="d-inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn-danger">
-                                <i class="fas fa-trash-alt me-1"></i>Delete Expense
-                            </button>
-                        </form>
-                    </div>
                 </div>
             </div>
         </div>
-    {% endfor %}
-{% else %}
-    <div class="alert alert-info" role="alert">
-        <h2 class="h4 alert-heading">Restaurant Not Found</h2>
-        <p class="mb-0">
-            The requested restaurant could not be found. It may have been removed or the link might be incorrect.
-        </p>
-        <hr>
-        <a href="{{ url_for('restaurants.list_restaurants') }}"
-           class="btn btn-primary">
-            <i class="fas fa-arrow-left me-1"></i>Back to Restaurants
-        </a>
+    </form>
+    <!-- Map View Section -->
+    {% if restaurant.google_place_id %}
+        <div class="map-container"
+             id="map-container"
+             data-google-place-id="{{ restaurant.google_place_id }}"
+             data-name="{{ restaurant.name }}">
+            <div class="text-muted">
+                <i class="fas fa-spinner fa-spin me-2"></i>Loading map...
+            </div>
+        </div>
+    {% endif %}
+    <!-- Filter Expense Modal -->
+    <div class="modal fade"
+         id="filterExpenseModal"
+         tabindex="-1"
+         aria-labelledby="filterExpenseModalLabel">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="filterExpenseModalLabel">Filter Expenses</h5>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="expense-filter-form">
+                        <div class="mb-3">
+                            <label for="date-range" class="form-label">Date Range</label>
+                            <select class="form-select" id="date-range" name="date_range">
+                                <option value="all" selected>All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                                <option value="year">This Year</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 d-none" id="custom-date-range">
+                            <div class="row">
+                                <div class="col">
+                                    <label for="start-date" class="form-label">Start Date</label>
+                                    <input type="date"
+                                           class="form-control"
+                                           id="start-date"
+                                           name="start_date"
+                                           autocomplete="bday">
+                                </div>
+                                <div class="col">
+                                    <label for="end-date" class="form-label">End Date</label>
+                                    <input type="date"
+                                           class="form-control"
+                                           id="end-date"
+                                           name="end_date"
+                                           autocomplete="bday">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="min-amount" class="form-label">Minimum Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number"
+                                       class="form-control"
+                                       id="min-amount"
+                                       name="min_amount"
+                                       min="0"
+                                       step="0.01"
+                                       placeholder="0.00"
+                                       autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="max-amount" class="form-label">Maximum Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number"
+                                       class="form-control"
+                                       id="max-amount"
+                                       name="max_amount"
+                                       min="0"
+                                       step="0.01"
+                                       placeholder="No limit"
+                                       autocomplete="off">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="apply-filters">Apply Filters</button>
+                </div>
+            </div>
+        </div>
     </div>
+</div>
+<!-- Delete Modals -->
+{% for expense in expenses %}
+    <div class="modal fade" id="deleteModal{{ expense.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Deletion</h5>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the expense from {{ expense.date.strftime("%b %d, %Y") }}?</p>
+                    <p class="mb-0">
+                        <strong>Amount:</strong> <span class="amount-right d-inline-block" style="min-width: 80px;">${{ "%.2f"|format(expense.amount) }}</span>
+                    </p>
+                    {% if expense.notes %}
+                        <p class="mb-0">
+                            <strong>Notes:</strong> {{ expense.notes|truncate(50) }}
+                        </p>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Cancel
+                    </button>
+                    <form action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}"
+                          method="post"
+                          class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash-alt me-1"></i>Delete Expense
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+{% else %}
+<div class="alert alert-info" role="alert">
+    <h2 class="h4 alert-heading">Restaurant Not Found</h2>
+    <p class="mb-0">
+        The requested restaurant could not be found. It may have been removed or the link might be incorrect.
+    </p>
+    <hr>
+    <a href="{{ url_for('restaurants.list_restaurants') }}"
+       class="btn btn-primary">
+        <i class="fas fa-arrow-left me-1"></i>Back to Restaurants
+    </a>
+</div>
 {% endif %}
 {% endblock content %}
 {% block scripts %}

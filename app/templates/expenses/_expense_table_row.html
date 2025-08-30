@@ -1,0 +1,81 @@
+<tr>
+    <td>
+        <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
+           class="text-decoration-none">{{ expense.date.strftime("%Y-%m-%d") }}</a>
+    </td>
+    <td>
+        {% if expense.category %}
+            <span class="badge border d-flex align-items-center compact-category-badge"
+                  style="background-color: #f8f9fa;
+                         color: #495057;
+                         border-color: #dee2e6;
+                         font-size: 0.75rem;
+                         padding: 0.25rem 0.5rem">
+                {% if expense.category.icon %}
+                    <i class="fas fa-{{ expense.category.icon }} me-1"
+                       style="font-size: 0.7rem;
+                              color: {{ expense.category.color }}"></i>
+                {% endif %}
+                {{ expense.category.name }}
+            </span>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if expense.restaurant %}
+            <span class="d-flex align-items-center">
+                <i class="fas fa-utensils me-2 text-muted"></i>
+                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
+                   class="text-decoration-none">{{ expense.restaurant.name }}</a>
+            </span>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td>
+        <div class="d-flex align-items-center">
+            {% if expense.meal_type %}
+                <span class="badge bg-light text-dark me-2">{{ expense.meal_type.title() }}</span>
+            {% else %}
+                <span class="text-muted me-2">Expense</span>
+            {% endif %}
+        </div>
+    </td>
+    <td class="fw-bold text-success amount-right">${{ "%.2f"|format(expense.amount) }}</td>
+    <td>
+        {% if expense.notes %}
+            <span class="text-muted small" title="{{ expense.notes }}">{{ expense.notes|truncate(50) }}</span>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td class="text-end">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
+               class="btn btn-sm btn-outline-primary"
+               data-bs-toggle="tooltip"
+               title="View Details">
+                <i class="fas fa-eye"></i>
+            </a>
+            <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+               class="btn btn-sm btn-outline-secondary"
+               data-bs-toggle="tooltip"
+               title="Edit">
+                <i class="fas fa-edit"></i>
+            </a>
+            <button type="button"
+                    class="btn btn-sm btn-outline-danger"
+                    data-bs-toggle="modal"
+                    data-bs-target="#deleteExpenseModal"
+                    data-expense-id="{{ expense.id }}"
+                    data-expense-description="{{ expense.meal_type.title() if expense.meal_type else 'Expense' }}"
+                    data-expense-amount="{{ "%.2f"|format(expense.amount) }}"
+                    data-expense-date="{{ expense.date.strftime('%b %d, %Y') }}"
+                    data-bs-toggle="tooltip"
+                    title="Delete">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    </td>
+</tr>

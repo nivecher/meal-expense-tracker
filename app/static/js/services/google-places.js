@@ -15,7 +15,7 @@ export class GooglePlacesService {
    */
   // No instance fields needed for static methods
 
-  constructor (apiKey = '', options = {}) {
+  constructor(apiKey = '', options = {}) {
     this.apiKey = apiKey;
     this.radius = options.radius || 5000;
     this.types = options.types || ['restaurant'];
@@ -37,7 +37,7 @@ export class GooglePlacesService {
    * Load the Google Maps Places library
    * @private
    */
-  async #loadPlacesLibrary () {
+  async #loadPlacesLibrary() {
     try {
       this.placesLib = await google.maps.importLibrary('places');
       return true;
@@ -53,7 +53,7 @@ export class GooglePlacesService {
    * @returns {Promise<boolean>} Resolves with true if initialization was successful
    * @throws {Error} If API key is missing or initialization fails
    */
-  async init (apiKey) {
+  async init(apiKey) {
     if (this.initialized && !apiKey) {
       return true;
     }
@@ -77,7 +77,7 @@ export class GooglePlacesService {
    * Get photo URL using v3 API method
    * @private
    */
-  static #getV3PhotoUrl (photo, maxWidth, maxHeight) {
+  static #getV3PhotoUrl(photo, maxWidth, maxHeight) {
     if (typeof photo.getUrl !== 'function') {
       return null;
     }
@@ -93,7 +93,7 @@ export class GooglePlacesService {
    * Get photo URL using v2 API method
    * @private
    */
-  static #getV2PhotoUrl (photoRef, maxWidth) {
+  static #getV2PhotoUrl(photoRef, maxWidth) {
     if (!window.google?.maps?.places?.PlacePhoto?.getUrl) {
       return null;
     }
@@ -112,7 +112,7 @@ export class GooglePlacesService {
    * Get photo URL using direct API call
    * @private
    */
-  #getDirectPhotoUrl (photoRef, maxWidth) {
+  #getDirectPhotoUrl(photoRef, maxWidth) {
     if (!photoRef || !this.apiKey) {
       return null;
     }
@@ -137,7 +137,7 @@ export class GooglePlacesService {
    * @param {number} [options.maxHeight=300] - Maximum height of the photo
    * @returns {string} - Photo URL or placeholder
    */
-  getPhotoUrl (photo, options = {}) {
+  getPhotoUrl(photo, options = {}) {
     if (!photo) {
       return 'https://via.placeholder.com/400x300?text=No+Image+Available';
     }
@@ -159,7 +159,7 @@ export class GooglePlacesService {
    * @private
    * @returns {string[]} - Array of field names
    */
-  static #getPlaceDetailFields () {
+  static #getPlaceDetailFields() {
     return [
       'id',
       'displayName',
@@ -188,7 +188,7 @@ export class GooglePlacesService {
    * @param {Object} place - The place to fetch details for
    * @returns {Promise<Object>} - The formatted place details
    */
-  async #fetchPlaceDetails (place) {
+  async #fetchPlaceDetails(place) {
     try {
       const response = await place.fetchFields({
         fields: GooglePlacesService.#getPlaceDetailFields(),
@@ -220,7 +220,7 @@ export class GooglePlacesService {
    * @returns {Promise<{results: Array, status: string}>} - Search results with status
    * @throws {Error} If the service fails to initialize or search
    */
-  async searchNearby (location, options = {}) {
+  async searchNearby(location, options = {}) {
     if (!this.initialized) {
       const initialized = await this.init();
       if (!initialized) {
@@ -277,7 +277,7 @@ export class GooglePlacesService {
    * @param {Object} place - Place object from Google Places API
    * @returns {string} - Extracted display name
    */
-  static #extractDisplayName (place) {
+  static #extractDisplayName(place) {
     if (!place) return 'Unknown';
     return (place.displayName && typeof place.displayName === 'object')
       ? place.displayName.text
@@ -288,7 +288,7 @@ export class GooglePlacesService {
    * Extract address from place object
    * @private
    */
-  static #extractAddress (place) {
+  static #extractAddress(place) {
     if (place.formattedAddress) return place.formattedAddress;
     if (place.formatted_address) return place.formatted_address;
     if (!place.address_components) return '';
@@ -313,7 +313,7 @@ export class GooglePlacesService {
    * Extract location from place object
    * @private
    */
-  static #extractLocation (place) {
+  static #extractLocation(place) {
     if (!place) return null;
 
     let lat;
@@ -340,7 +340,7 @@ export class GooglePlacesService {
    * Extract photos from place object
    * @private
    */
-  #extractPhotos (place) {
+  #extractPhotos(place) {
     const photos = [];
     if (!Array.isArray(place?.photos)) {
       return photos;
@@ -376,7 +376,7 @@ export class GooglePlacesService {
    * @param {Object} place - Place details from Google Places API
    * @returns {Object|null} - Formatted place details or null if invalid
    */
-  formatPlaceDetails (place) {
+  formatPlaceDetails(place) {
     if (!place) return null;
 
     // Extract basic information
@@ -423,7 +423,7 @@ export class GooglePlacesService {
    * @returns {Promise<Object>} - Resolves with place details
    * @throws {Error} If the service fails to initialize or fetch details
    */
-  async getPlaceDetails (placeId) {
+  async getPlaceDetails(placeId) {
     if (!this.initialized) {
       const initialized = await this.init();
       if (!initialized) {

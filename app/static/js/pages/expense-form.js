@@ -12,12 +12,12 @@ function cache_form_elements() {
   return {
     form: document.getElementById('expenseForm'),
     categorySelect: document.getElementById('category_id'),
-    restaurantSelect: document.getElementById('restaurant_id')
+    restaurantSelect: document.getElementById('restaurant_id'),
   };
 }
 
 function setup_expense_form_handlers(elements) {
-  const { categorySelect, restaurantSelect } = elements;
+  const { form, categorySelect, restaurantSelect } = elements;
 
   // Track if category was manually changed
   let categoryManuallyChanged = false;

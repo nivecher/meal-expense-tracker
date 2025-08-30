@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Cache directories
+.cache/
+.pytest_cache/
+__pycache__/
+
+# Version control
+.git/
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Static assets that shouldn't be reformatted
+app/static/js/vendor/
+app/static/css/vendor/
+*.min.js
+*.min.css
+
+# Documentation that has specific formatting
+README.md
+CHANGELOG.md
+docs/djlint-incident-report.md
+docs/quote-style-guide.md
+docs/formatting-rules.md
+
+# Configuration files with specific formatting requirements
+.github/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Complex Jinja2 templates that Prettier can't parse
+app/templates/expenses/_expense_table_row.html
+app/templates/expenses/macros.html
+app/templates/restaurants/detail.html
+app/templates/restaurants/form.html

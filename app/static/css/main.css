@@ -1,5 +1,6 @@
 /* Main CSS file for Meal Expense Tracker */
 @import url('../css/components/table.css');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
     /* Modern Color Palette */
@@ -19,13 +20,13 @@
     --warning-color: #f59e0b;      /* Amber */
     --danger-color: #ef4444;       /* Red */
 
-    /* Google Places Search */
-    --google-places-selected-bg: #f0f9ff;  /* Light blue background for selected items */
-    --google-places-hover-bg: #f8fafc;     /* Slightly darker on hover */
-    --google-places-border: #e2e8f0;        /* Border color for items */
-    --google-places-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); /* Shadow for dropdowns */
-    --google-places-radius: 0.5rem;         /* Border radius for UI elements */
-    --google-places-transition: all 0.2s ease-in-out; /* Smooth transitions */
+    /* Find Places Search */
+    --find-places-selected-bg: #f0f9ff;  /* Light blue background for selected items */
+    --find-places-hover-bg: #f8fafc;     /* Slightly darker on hover */
+    --find-places-border: #e2e8f0;        /* Border color for items */
+    --find-places-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); /* Shadow for dropdowns */
+    --find-places-radius: 0.5rem;         /* Border radius for UI elements */
+    --find-places-transition: all 0.2s ease-in-out; /* Smooth transitions */
     --info-color: #3b82f6;         /* Blue */
 
     /* Grayscale */
@@ -117,8 +118,6 @@
     --spacing-xl: 3rem;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 *,
 *::before,
 *::after {
@@ -129,6 +128,7 @@
 
 html {
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
 }
@@ -185,6 +185,7 @@ p {
     text-align: center;
     white-space: nowrap;
     vertical-align: middle;
+    -webkit-user-select: none;
     user-select: none;
     border: 1px solid transparent;
     padding: var(--btn-padding-y) var(--btn-padding-x);
@@ -1255,6 +1256,39 @@ footer {
 .toast.bg-warning {
     background-color: var(--warning-color) !important;
 }
+
+/* Utility classes for inline style replacement */
+.min-width-80 { min-width: 80px; }
+.min-width-100 { min-width: 100px; }
+.min-width-120 { min-width: 120px; }
+.min-width-150 { min-width: 150px; }
+.min-width-200 { min-width: 200px; }
+
+/* Category background utilities */
+.category-bg-light {
+    background-color: rgba(var(--category-color-rgb, 108, 117, 125), 0.125);
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Hidden utility */
+.visually-hidden-permanent { display: none !important; }
+
+/* Progress bar with CSS custom properties */
+.progress-category {
+    width: var(--progress-width, 0%);
+    background-color: rgba(var(--category-color-rgb, 108, 117, 125), 0.8);
+}
+
+/* Table cell min-widths for responsive tables */
+.table th.min-w-100 { min-width: 100px; }
+.table th.min-w-120 { min-width: 120px; }
+.table th.min-w-150 { min-width: 150px; }
+.table th.min-w-200 { min-width: 200px; }
+
+/* Row styling */
+.table-row-subtle { background-color: #f8f9fa; }
+.font-size-sm { font-size: 0.7rem; }
 
 .toast .btn-close {
     filter: invert(1) grayscale(100%) brightness(200%);

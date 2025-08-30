@@ -4,6 +4,7 @@
 @import 'components/navbar.css';
 @import 'components/cards.css';
 @import 'components/toasts.css';
+@import 'components/error-modals.css';
 @import 'pages/home.css';
 
 :root {
@@ -22,6 +23,8 @@ body {
   background-color: #f8f9fa;
   margin: 0;
   padding: 0;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .container {
@@ -35,8 +38,23 @@ body {
   z-index: 1080; /* Above modals */
 }
 
+/* CSS compatibility fixes */
+th {
+  text-align: -webkit-match-parent;
+  text-align: match-parent;
+  text-align: inherit;
+}
+
+/* Backdrop filter with vendor prefixes */
+.backdrop-blur {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
 /* Utility classes */
 .text-center { text-align: center; }
+.text-right { text-align: right; }
+.amount-right { text-align: right !important; }
 .mt-3 { margin-top: 1rem; }
 .mb-3 { margin-bottom: 1rem; }
 .py-3 { padding-top: 1rem; padding-bottom: 1rem; }

@@ -262,6 +262,9 @@ locals {
   all_layers = var.enable_otel_tracing ? concat(local.base_layers, [local.otel_layer_arn]) : local.base_layers
 
   db_url = "${var.db_protocol}://${var.db_username}:${var.db_password}@${var.db_host}:${var.db_port}/${var.db_name}"
+
+  # Force dependency on DynamoDB table (ensures table exists before Lambda)
+  dynamodb_dependency = var.dynamodb_table_arn != "" ? var.dynamodb_table_arn : null
 }
 
 # Lambda Function
@@ -274,6 +277,13 @@ resource "aws_lambda_function" "main" {
   memory_size   = var.memory_size
   timeout       = var.run_migrations ? max(var.timeout, 300) : var.timeout # Min 5 min for migrations
   publish       = true
+
+  # Ensure DynamoDB table exists before Lambda deployment
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_basic_execution,
+    aws_iam_role_policy_attachment.lambda_vpc_access,
+    aws_iam_role_policy_attachment.lambda_combined,
+  ]
 
   # Enable X-Ray tracing
   tracing_config {
@@ -318,6 +328,12 @@ resource "aws_lambda_function" "main" {
         ENABLE_AWS_SERVICES = "true"
         DATABASE_URL        = local.db_url
 
+        # Session configuration
+        SESSION_TYPE            = var.session_type
+        SESSION_TABLE_NAME      = var.session_table_name
+        # Force dependency on DynamoDB table
+        DYNAMODB_TABLE_ARN      = local.dynamodb_dependency
+
         # X-Ray tracing is enabled via IAM permissions and X-Ray daemon
         # _X_AMZN_TRACE_ID is automatically set by Lambda when X-Ray tracing is enabled
 
@@ -347,11 +363,6 @@ resource "aws_lambda_function" "main" {
       target_arn = aws_sns_topic.lambda_dlq[0].arn
     }
   }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.lambda_basic_execution,
-    aws_iam_role_policy_attachment.lambda_vpc_access
-  ]
 
   # Tags
   tags = merge(

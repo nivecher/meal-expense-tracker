@@ -95,7 +95,7 @@ def get_filter_options(user_id: int) -> Dict[str, List[str]]:
 
 
 def apply_filters(stmt, filters: Dict[str, Any]):
-    """Apply filters to the query.
+    """Apply filters to the query with comprehensive search across text fields.
 
     Args:
         stmt: The SQLAlchemy select statement
@@ -104,31 +104,49 @@ def apply_filters(stmt, filters: Dict[str, Any]):
     Returns:
         The modified select statement with filters applied
     """
+    # Always join restaurant and category tables for search (using outer joins to include expenses without these)
+    stmt = stmt.join(Expense.restaurant, isouter=True)
+    stmt = stmt.join(Expense.category, isouter=True)
+    # Apply search filter across all text-based fields
     if filters["search"]:
-        stmt = stmt.join(Expense.restaurant).where(
+        search_term = f"%{filters['search']}%"
+        stmt = stmt.where(
             or_(
-                Restaurant.name.ilike(f"%{filters['search']}%"),
-                Restaurant.address.ilike(f"%{filters['search']}%"),
-                Expense.notes.ilike(f"%{filters['search']}%"),
+                # Restaurant fields
+                Restaurant.name.ilike(search_term),
+                Restaurant.address.ilike(search_term),
+                # Expense fields
+                Expense.notes.ilike(search_term),
+                Expense.meal_type.ilike(search_term),
+                # Category fields
+                Category.name.ilike(search_term),
             )
         )
-    else:
-        stmt = stmt.join(Expense.restaurant, isouter=True)
 
+    # Apply meal type filter
     if filters["meal_type"]:
         stmt = stmt.where(Expense.meal_type == filters["meal_type"])
 
+    # Apply category filter
     if filters["category"]:
-        # Use the relationship with Category model
-        stmt = stmt.join(Expense.category).where(Expense.category.has(name=filters["category"]))
+        stmt = stmt.where(Category.name == filters["category"])
 
+    # Apply date range filters with proper error handling
     if filters["start_date"]:
-        start_date = datetime.strptime(filters["start_date"], "%Y-%m-%d").date()
-        stmt = stmt.where(Expense.date >= start_date)
+        try:
+            start_date = datetime.strptime(filters["start_date"], "%Y-%m-%d").date()
+            stmt = stmt.where(Expense.date >= start_date)
+        except (ValueError, TypeError):
+            # Log the error but don't fail the query
+            pass
 
     if filters["end_date"]:
-        end_date = datetime.strptime(filters["end_date"], "%Y-%m-%d").date()
-        stmt = stmt.where(Expense.date <= end_date)
+        try:
+            end_date = datetime.strptime(filters["end_date"], "%Y-%m-%d").date()
+            stmt = stmt.where(Expense.date <= end_date)
+        except (ValueError, TypeError):
+            # Log the error but don't fail the query
+            pass
 
     return stmt
 

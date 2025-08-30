@@ -46,6 +46,12 @@ class Restaurant(BaseModel):
             name="uix_restaurant_name_city_user",
             comment="Ensure unique restaurant per user by name and city",
         ),
+        UniqueConstraint(
+            "user_id",
+            "google_place_id",
+            name="uix_restaurant_google_place_id_user",
+            comment="Ensure unique Google Place ID per user (excludes NULL values)",
+        ),
         {"comment": "Restaurants where expenses were incurred"},
     )
 

@@ -14,7 +14,7 @@ export class RestaurantSearch {
      * @param {Function} options.onSelect - Callback when a restaurant is selected
      * @param {Function} options.onError - Error handler callback
      */
-  constructor (options) {
+  constructor(options) {
     this.container = options.container;
     this.onSelect = options.onSelect || (() => {});
     this.onError = options.onError || console.error;
@@ -28,7 +28,7 @@ export class RestaurantSearch {
   /**
      * Initialize the search component
      */
-  init () {
+  init() {
     this.render();
     this.bindEvents();
     this.getCurrentLocation();
@@ -37,7 +37,7 @@ export class RestaurantSearch {
   /**
      * Render the search UI
      */
-  render () {
+  render() {
     this.container.innerHTML = `
             <div class="card mb-4">
                 <div class="card-header">
@@ -47,27 +47,38 @@ export class RestaurantSearch {
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="input-group mb-3">
-                        <input type="text"
-                               class="form-control"
-                               id="search-query"
-                               placeholder="Search for restaurants..."
-                               autocomplete="off">
-                        <button class="btn btn-primary" id="search-button" type="button">
-                            <i class="fas fa-search"></i> Search
-                        </button>
+                    <div class="mb-3">
+                        <label for="search-query" class="form-label">Restaurant Search</label>
+                        <div class="input-group">
+                            <input type="text"
+                                   class="form-control"
+                                   id="search-query"
+                                   name="search_query"
+                                   placeholder="Search for restaurants..."
+                                   autocomplete="off"
+                                   aria-describedby="search-help">
+                            <button class="btn btn-primary" id="search-button" type="button" aria-describedby="search-help">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+                        <div id="search-help" class="form-text">Enter restaurant name, cuisine type, or location to find nearby restaurants</div>
                     </div>
 
-                    <div class="d-flex align-items-center mb-3">
-                        <label class="form-label mb-0 me-2">Search Radius:</label>
-                        <input type="range"
-                               class="form-range flex-grow-1 me-2"
-                               id="radius-slider"
-                               min="100"
-                               max="50000"
-                               step="100"
-                               value="5000">
-                        <span id="radius-value" class="text-muted small">5 km</span>
+                    <div class="mb-3">
+                        <label for="radius-slider" class="form-label">Search Radius</label>
+                        <div class="d-flex align-items-center">
+                            <input type="range"
+                                   class="form-range flex-grow-1 me-2"
+                                   id="radius-slider"
+                                   name="search_radius"
+                                   min="100"
+                                   max="50000"
+                                   step="100"
+                                   value="5000"
+                                   aria-describedby="radius-help">
+                            <span id="radius-value" class="text-muted small">5 km</span>
+                        </div>
+                        <div id="radius-help" class="form-text">Adjust the search radius to find restaurants within your preferred distance</div>
                     </div>
 
                     <div id="search-results" class="mt-3">
@@ -93,7 +104,7 @@ export class RestaurantSearch {
   /**
      * Bind event listeners
      */
-  bindEvents () {
+  bindEvents() {
     // Search button click
     this.elements.searchButton.addEventListener('click', () => this.handleSearch());
 
@@ -114,7 +125,7 @@ export class RestaurantSearch {
      * Update the radius display value
      * @param {number} radius - Radius in meters
      */
-  updateRadiusDisplay (radius) {
+  updateRadiusDisplay(radius) {
     const km = Math.round(radius / 100) / 10;
     this.elements.radiusValue.textContent = `${km} km`;
   }
@@ -122,7 +133,7 @@ export class RestaurantSearch {
   /**
    * Get the user's current location with fallback to default location
    */
-  async getCurrentLocation () {
+  async getCurrentLocation() {
     // Default to a central location if geolocation fails
     const defaultLocation = {
       lat: 40.7128, // Default to New York City
@@ -193,11 +204,11 @@ export class RestaurantSearch {
   /**
    * Handle search action
    */
-  async handleSearch () {
+  async handleSearch() {
     if (this.isLoading) return;
 
     // Get search input values
-    const searchInput = this.elements.searchInput;
+    const { searchInput } = this.elements;
     const query = searchInput ? searchInput.value.trim() : '';
     const radius = this.elements.radiusSlider ? parseInt(this.elements.radiusSlider.value, 10) : 5000; // Default to 5km
 
@@ -248,7 +259,7 @@ export class RestaurantSearch {
               keyword: query,
               radius: 50000, // Wider radius for text search
               maxResults: 20,
-            }
+            },
           );
         } else {
           // Location-based search (no query)
@@ -257,9 +268,9 @@ export class RestaurantSearch {
             this.currentLocation,
             {
               keyword: 'restaurant',
-              radius: radius,
+              radius,
               maxResults: 20,
-            }
+            },
           );
         }
 
@@ -303,7 +314,7 @@ export class RestaurantSearch {
    * Display search results in the UI
    * @param {Array<Object>} results - Array of restaurant objects from Google Places API
    */
-  displayResults (results) {
+  displayResults(results) {
     console.log('Displaying results:', results);
     const { resultsContainer } = this.elements;
 
@@ -446,7 +457,7 @@ export class RestaurantSearch {
    * @param {Object} restaurant - Restaurant object from Google Places API
    * @returns {string} Formatted address string
    */
-  formatAddress (restaurant) {
+  formatAddress(restaurant) {
     if (!restaurant) return 'Address not available';
 
     // Use formatted address if available
@@ -472,7 +483,7 @@ export class RestaurantSearch {
    * @param {Object} restaurant - Restaurant object from Google Places API
    * @returns {string|null} Photo URL or null if not available
    */
-  getPhotoUrl (restaurant) {
+  getPhotoUrl(restaurant) {
     if (!restaurant || !restaurant.photos || restaurant.photos.length === 0) {
       return null;
     }
@@ -501,7 +512,7 @@ export class RestaurantSearch {
    * @param {Object} restaurant - Restaurant data
    * @returns {string} HTML string for the restaurant card
    */
-  renderRestaurantCard (restaurant) {
+  renderRestaurantCard(restaurant) {
     const name = restaurant.displayName?.text || restaurant.name || 'Unnamed Restaurant';
     const address = this.formatAddress(restaurant);
     const rating = typeof restaurant.rating === 'number' ? restaurant.rating : 0;
@@ -558,7 +569,7 @@ export class RestaurantSearch {
    * Display search results in the UI
    * @param {Array<Object>} results - Array of restaurant objects from Google Places API
    */
-  displayResults (results) {
+  displayResults(results) {
     const { resultsContainer } = this.elements;
 
     // Clear previous results
@@ -620,7 +631,7 @@ export class RestaurantSearch {
      * @param {number} rating - Rating from 0 to 5
      * @returns {string} HTML string with star icons
      */
-  renderRating (rating) {
+  renderRating(rating) {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
     const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
@@ -645,7 +656,7 @@ export class RestaurantSearch {
      * Handle restaurant selection
      * @param {string} placeId - Google Place ID
      */
-  async selectRestaurant (placeId) {
+  async selectRestaurant(placeId) {
     try {
       this.setLoading(true);
       const details = await googlePlacesService.getPlaceDetails(placeId);
@@ -661,7 +672,7 @@ export class RestaurantSearch {
      * Set loading state
      * @param {boolean} isLoading - Whether the component is loading
      */
-  setLoading (isLoading) {
+  setLoading(isLoading) {
     this.isLoading = isLoading;
     this.elements.searchButton.disabled = isLoading;
     this.elements.searchInput.readOnly = isLoading;

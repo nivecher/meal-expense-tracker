@@ -1,35 +1,40 @@
-{% extends "base.html" %}
-{% block title %}
-    Reports - {{ super() }}
-{% endblock title %}
-{% block content %}
-    <div class="container mt-4">
-        <h1>
-            {% block page_title %}
-                Reports
-            {% endblock page_title %}
-        </h1>
-        <div class="row">
-            <div class="col-md-3">
-                <div class="list-group">
-                    <a href="{{ url_for('reports.index') }}"
-                       class="list-group-item list-group-item-action
-                              {% if request.endpoint == 'reports.index' %}active{% endif %}">Dashboard</a>
-                    <a href="{{ url_for('reports.expense_report') }}"
-                       class="list-group-item list-group-item-action
-                              {% if request.endpoint == 'reports.expense_report' %}active{% endif %}">Expense Report</a>
-                    <a href="{{ url_for('reports.restaurant_report') }}"
-                       class="list-group-item list-group-item-action
-                              {% if request.endpoint == 'reports.restaurant_report' %}active{% endif %}">Restaurant Report</a>
-                    <a href="{{ url_for('reports.analytics') }}"
-                       class="list-group-item list-group-item-action
-                              {% if request.endpoint == 'reports.analytics' %}active{% endif %}">Analytics</a>
-                </div>
-            </div>
-            <div class="col-md-9">
-                {% block reports_content %}
-                {% endblock reports_content %}
+{% extends "base.html" %} {% block title %} Reports - {{ super() }} {% endblock title %} {% block content %}
+<!-- Breadcrumb Navigation -->
+{% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'}, {'title': 'Reports'} ] %} {% include
+'includes/breadcrumb.html' %}
+<div class="container mt-4">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary btn-sm me-3" title="Back to Dashboard">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <h1 class="mb-0"> {% block page_title %} Reports {% endblock page_title %} </h1>
+    </div>
+    <div class="row">
+        <div class="col-md-3">
+            <div class="list-group">
+                <a
+                    href="{{ url_for('reports.index') }}"
+                    class="list-group-item list-group-item-action {% if request.endpoint == 'reports.index' %}active{% endif %}"
+                    >Dashboard</a
+                >
+                <a
+                    href="{{ url_for('reports.expense_report') }}"
+                    class="list-group-item list-group-item-action {% if request.endpoint == 'reports.expense_report' %}active{% endif %}"
+                    >Expense Report</a
+                >
+                <a
+                    href="{{ url_for('reports.restaurant_report') }}"
+                    class="list-group-item list-group-item-action {% if request.endpoint == 'reports.restaurant_report' %}active{% endif %}"
+                    >Restaurant Report</a
+                >
+                <a
+                    href="{{ url_for('reports.analytics') }}"
+                    class="list-group-item list-group-item-action {% if request.endpoint == 'reports.analytics' %}active{% endif %}"
+                    >Analytics</a
+                >
             </div>
         </div>
+        <div class="col-md-9"> {% block reports_content %} {% endblock reports_content %} </div>
     </div>
+</div>
 {% endblock content %}

@@ -63,21 +63,98 @@ class Config:
 
     def _configure_session(self) -> None:
         """Configure session settings based on environment."""
-        if os.getenv("FLASK_ENV") == "production":
+        # Use DynamoDB for all environments if SESSION_TYPE is explicitly set to dynamodb
+        # or if running in production
+        session_type = os.getenv("SESSION_TYPE", "").lower()
+        flask_env = os.getenv("FLASK_ENV", "development")
+
+        # For Lambda environments, use signed cookies instead of DynamoDB
+        # This avoids the CreateTable permission issue entirely
+        if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+            self._setup_signed_cookie_session()
+        elif session_type == "dynamodb" or flask_env == "production":
             self._setup_dynamodb_session()
         else:
             self._setup_filesystem_session()
 
     def _setup_dynamodb_session(self) -> None:
-        """Setup DynamoDB session configuration."""
+        """Setup DynamoDB session configuration with validation."""
         self.SESSION_TYPE = "dynamodb"
-        self.SESSION_DYNAMODB_TABLE = os.getenv("SESSION_TABLE_NAME", "flask_sessions")
-        self.SESSION_DYNAMODB_REGION = os.getenv("AWS_REGION", "us-east-1")
+
+        # Session table configuration with validation
+        table_name = os.getenv("SESSION_TABLE_NAME", "flask_sessions")
+        if not table_name or len(table_name.strip()) == 0:
+            raise ValueError("SESSION_TABLE_NAME cannot be empty when using DynamoDB sessions")
+        self.SESSION_DYNAMODB_TABLE = table_name.strip()
+
+        # AWS region configuration
+        region = os.getenv("AWS_REGION", "us-east-1")
+        if not region or len(region.strip()) == 0:
+            raise ValueError("AWS_REGION must be specified for DynamoDB sessions")
+        self.SESSION_DYNAMODB_REGION = region.strip()
+
+        # Explicitly configure DynamoDB to use AWS (not localhost)
+        # This prevents Flask-Session from defaulting to localhost:8000
+        import boto3
+        from botocore.config import Config
+
+        # Create DynamoDB resource with explicit AWS configuration
+        boto_config = Config(region_name=region.strip(), retries={"max_attempts": 3, "mode": "adaptive"})
+        # Optional endpoint for testing/LocalStack only
+        endpoint_url = os.getenv("SESSION_DYNAMODB_ENDPOINT")
+        if endpoint_url:
+            endpoint_url = endpoint_url.strip()
+            if endpoint_url:
+                self.SESSION_DYNAMODB_ENDPOINT_URL = endpoint_url
+                # For LocalStack/testing, create resource with custom endpoint
+                self.SESSION_DYNAMODB = boto3.resource(
+                    "dynamodb", endpoint_url=endpoint_url, region_name=region.strip(), config=boto_config
+                )
+            else:
+                # Production: use default AWS endpoints
+                self.SESSION_DYNAMODB = boto3.resource("dynamodb", region_name=region.strip(), config=boto_config)
+        else:
+            # Production: use default AWS endpoints (no localhost fallback)
+            self.SESSION_DYNAMODB = boto3.resource("dynamodb", region_name=region.strip(), config=boto_config)
+
+        # Security settings
+        self.SESSION_USE_SIGNER = True
+        self.SESSION_PERMANENT = True
+
+        # Key prefix for session isolation (optional)
+        if key_prefix := os.getenv("SESSION_KEY_PREFIX"):
+            self.SESSION_KEY_PREFIX = key_prefix.strip()
+
+        # DynamoDB-specific settings
+        # Note: Flask-Session will try to create table if it doesn't exist
+        # We ensure the table exists through Terraform before Lambda deployment
+
+        # Optional custom hash function (default is hashlib.sha1)
+        # self.SESSION_DYNAMODB_HASH_FUNCTION = "sha256"  # Uncomment for SHA-256
+
+    def _setup_signed_cookie_session(self) -> None:
+        """Setup signed cookie session configuration for Lambda environments.
+
+        Uses Flask's default session interface with signed cookies.
+        This is ideal for serverless environments as it requires no external storage.
+        """
+        # Use Flask's default signed cookie sessions
+        self.SESSION_TYPE = None  # This uses Flask's default SecureCookieSessionInterface
+
+        # Enhanced security settings for Lambda
+        self.SESSION_COOKIE_SECURE = True
+        self.SESSION_COOKIE_HTTPONLY = True
+        self.SESSION_COOKIE_SAMESITE = "Lax"
+        self.SESSION_PERMANENT = True
+        self.PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
+
+        # Enable session signing
         self.SESSION_USE_SIGNER = True
 
-        # Only set endpoint for testing/LocalStack
-        if endpoint := os.getenv("SESSION_DYNAMODB_ENDPOINT"):
-            self.SESSION_DYNAMODB_ENDPOINT_URL = endpoint
+        # Additional security for serverless
+        self.SESSION_COOKIE_NAME = "session"
+        self.SESSION_COOKIE_DOMAIN = None  # Let Flask handle this
+        self.SESSION_COOKIE_PATH = "/"
 
     def _setup_filesystem_session(self) -> None:
         """Setup filesystem session configuration."""
@@ -92,8 +169,9 @@ class DevelopmentConfig(Config):
     """Development configuration."""
 
     DEBUG: bool = True
-    SESSION_COOKIE_SECURE: bool = False
-    SESSION_COOKIE_HTTPONLY: bool = False
+    # Keep security features enabled even in development
+    SESSION_COOKIE_SECURE: bool = False  # Allow HTTP in development
+    SESSION_COOKIE_HTTPONLY: bool = True  # Always protect against XSS
 
 
 class TestingConfig(Config):

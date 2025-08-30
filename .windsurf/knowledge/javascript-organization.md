@@ -46,7 +46,9 @@ document.getElementById('myButton').addEventListener('click', handleClick);
 ```javascript
 function initRestaurantForm() {
   // Initialize form handlers
-  document.getElementById('restaurantForm').addEventListener('submit', handleFormSubmit);
+  document
+    .getElementById("restaurantForm")
+    .addEventListener("submit", handleFormSubmit);
 }
 ```
 
@@ -71,9 +73,9 @@ document.addEventListener('DOMContentLoaded', initRestaurantForm);
 ```
 
 ```javascript
-const element = document.querySelector('[data-restaurant-id]');
+const element = document.querySelector("[data-restaurant-id]");
 const restaurantId = element.dataset.restaurantId;
-const isVerified = element.dataset.isVerified === 'true';
+const isVerified = element.dataset.isVerified === "true";
 ```
 
 ````

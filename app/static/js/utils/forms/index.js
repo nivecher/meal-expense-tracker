@@ -7,7 +7,7 @@ import { handleAjaxFormSubmit, setFormLoading } from './submission.js';
 
 // Set up real-time validation
 function setupRealTimeValidation(form) {
-  form.querySelectorAll('input, select, textarea').forEach(input => {
+  form.querySelectorAll('input, select, textarea').forEach((input) => {
     input.addEventListener('input', () => validateField(input));
   });
 }
@@ -63,7 +63,7 @@ const FormUtils = {
   setupFormValidation,
   validateField,
   setFormLoading,
-  showFormValidationErrors
+  showFormValidationErrors,
 };
 
 // Auto-initialize

@@ -1,288 +1,313 @@
-{% extends "base.html" %}
-{% block title %}
-    Expense Statistics - Meal Expense Tracker
-{% endblock title %}
-{% block head_extra %}
-    {{ super() }}
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-{% endblock head_extra %}
-{% block styles %}
-    {{ super() }}
-    <style>
-        .stat-card {
-            border: 1px solid var(--bs-border-color);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            background: white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
+{% extends "base.html" %} {% block title %} Expense Statistics - Meal Expense Tracker {% endblock title %} {% block
+head_extra %} {{ super() }}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock head_extra %} {% block styles %} {{ super() }}
+<style>
+    .stat-card {
+        border: 1px solid var(--bs-border-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
 
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 600;
-            color: var(--bs-primary);
-            margin: 0.5rem 0;
-        }
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 600;
+        color: var(--bs-primary);
+        margin: 0.5rem 0;
+    }
 
-        .stat-label {
-            font-size: 0.875rem;
-            color: var(--bs-gray-600);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+    .stat-label {
+        font-size: 0.875rem;
+        color: var(--bs-gray-600);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 
-        .category-badge {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            margin: 0.25rem;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: white;
-        }
+    .category-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        margin: 0.25rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: white;
+    }
 
-        .time-period-selector {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-        }
+    .time-period-selector {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
 
-        .time-period-btn {
-            padding: 0.375rem 0.75rem;
-            border: 1px solid var(--bs-border-color);
-            background: white;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
+    .time-period-btn {
+        padding: 0.375rem 0.75rem;
+        border: 1px solid var(--bs-border-color);
+        background: white;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
 
-        .time-period-btn:hover {
-            background: var(--bs-light);
-        }
+    .time-period-btn:hover {
+        background: var(--bs-light);
+    }
 
-        .time-period-btn.active {
-            background: var(--bs-primary);
-            color: white;
-            border-color: var(--bs-primary);
-        }
+    .time-period-btn.active {
+        background: var(--bs-primary);
+        color: white;
+        border-color: var(--bs-primary);
+    }
 
-        .chart-container {
-            position: relative;
-            height: 300px;
-            margin: 2rem 0;
-        }
-    </style>
-{% endblock styles %}
-{% block content %}
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="h3 mb-0">Expense Statistics</h1>
-            <div class="time-period-selector">
-                <a href="{{ url_for('expenses.stats', days=7) }}"
-                   class="time-period-btn
-                          {% if days == 7 %}active{% endif %}">7 Days</a>
-                <a href="{{ url_for('expenses.stats', days=30) }}"
-                   class="time-period-btn
-                          {% if days == 30 %}active{% endif %}">30 Days</a>
-                <a href="{{ url_for('expenses.stats', days=90) }}"
-                   class="time-period-btn
-                          {% if days == 90 %}active{% endif %}">90 Days</a>
-                <a href="{{ url_for('expenses.stats', days=180) }}"
-                   class="time-period-btn
-                          {% if days == 180 %}active{% endif %}">6 Months</a>
-                <a href="{{ url_for('expenses.stats', days=365) }}"
-                   class="time-period-btn
-                          {% if days == 365 %}active{% endif %}">1 Year</a>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin: 2rem 0;
+    }
+</style>
+{% endblock styles %} {% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Expense Statistics</h1>
+        <div class="time-period-selector">
+            <a
+                href="{{ url_for('expenses.stats', days=7) }}"
+                class="time-period-btn {% if days == 7 %}active{% endif %}"
+                >7 Days</a
+            >
+            <a
+                href="{{ url_for('expenses.stats', days=30) }}"
+                class="time-period-btn {% if days == 30 %}active{% endif %}"
+                >30 Days</a
+            >
+            <a
+                href="{{ url_for('expenses.stats', days=90) }}"
+                class="time-period-btn {% if days == 90 %}active{% endif %}"
+                >90 Days</a
+            >
+            <a
+                href="{{ url_for('expenses.stats', days=180) }}"
+                class="time-period-btn {% if days == 180 %}active{% endif %}"
+                >6 Months</a
+            >
+            <a
+                href="{{ url_for('expenses.stats', days=365) }}"
+                class="time-period-btn {% if days == 365 %}active{% endif %}"
+                >1 Year</a
+            >
+        </div>
+    </div>
+    <!-- Summary Cards -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="stat-card text-center">
+                <div class="stat-label">Total Spent</div>
+                <div class="stat-value">${{ "%.2f"|format(total_spent|float) }}</div>
+                <div class="text-muted small">Last {{ days }} days</div>
             </div>
         </div>
-        <!-- Summary Cards -->
-        <div class="row">
-            <div class="col-md-4">
-                <div class="stat-card text-center">
-                    <div class="stat-label">Total Spent</div>
-                    <div class="stat-value">${{ "%.2f"|format(total_spent|float) }}</div>
-                    <div class="text-muted small">Last {{ days }} days</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="stat-card text-center">
-                    <div class="stat-label">Daily Average</div>
-                    <div class="stat-value">${{ "%.2f"|format((total_spent|float) / (days|int) if (days|int) > 0 else 0) }}</div>
-                    <div class="text-muted small">Over {{ days }} days</div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="stat-card text-center">
-                    <div class="stat-label">Top Category</div>
-                    <div class="stat-value">
-                        {% if category_spending %}
-                            {{ category_spending[0][0] }}
-                        {% else %}
-                            N/A
-                        {% endif %}
-                    </div>
-                    <div class="text-muted small">
-                        {% if category_spending %}
-                            ${{ "%.2f"|format(category_spending[0][1]) }}
-                        {% endif %}
-                    </div>
-                </div>
+        <div class="col-md-4">
+            <div class="stat-card text-center">
+                <div class="stat-label">Daily Average</div>
+                <div class="stat-value"
+                    >${{ "%.2f"|format((total_spent|float) / (days|int) if (days|int) > 0 else 0) }}</div
+                >
+                <div class="text-muted small">Over {{ days }} days</div>
             </div>
         </div>
-        <!-- Spending Chart -->
-        <div class="card mt-4">
-            <div class="card-body">
-                <h5 class="card-title mb-4">Daily Spending</h5>
-                <div class="chart-container">
-                    <canvas id="spendingChart"></canvas>
+        <div class="col-md-4">
+            <div class="stat-card text-center">
+                <div class="stat-label">Top Category</div>
+                <div class="stat-value">
+                    {% if category_spending %} {{ category_spending[0][0] }} {% else %} N/A {% endif %}
                 </div>
-            </div>
-        </div>
-        <!-- Category Breakdown -->
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title mb-4">Spending by Category</h5>
-                        {% if category_spending %}
-                            <div class="mb-3">
-                                {% for category, amount in category_spending %}
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <div class="d-flex align-items-center">
-                                            <div class="category-indicator me-2"
-                                                 style="display: inline-block;
-                                                        width: 12px;
-                                                        height: 12px;
-                                                        border-radius: 50%;
-                                                        background-color: {{ category.color if category and category.color else '#6c757d' }}">
-                                            </div>
-                                            <span>{{ category.name }}</span>
-                                        </div>
-                                        <span class="fw-medium">${{ "%.2f"|format(amount) }}</span>
-                                    </div>
-                                    <div class="progress mb-3 progress-sm">
-                                        <div class="progress-bar category-progress-bar bg-{{ category.color if category.color else 'secondary' }}"
-                                             role="progressbar"
-                                             style="--progress-width: {{ (amount / total_spending * 100) if total_spending > 0 else 0 }}%;
-                                                    width: var(--progress-width)"
-                                             aria-valuenow="{{ (amount / total_spending * 100) if total_spending > 0 else 0 }}"
-                                             aria-valuemin="0"
-                                             aria-valuemax="100"></div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="text-center text-muted py-4">
-                                <i class="fas fa-chart-pie fa-3x mb-2"></i>
-                                <p>No spending data available for the selected period.</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h5 class="card-title mb-4">Top Expenses</h5>
-                        {% if top_expenses %}
-                            <div class="list-group list-group-flush">
-                                {% for expense in top_expenses %}
-                                    <div class="list-group-item border-0 px-0">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <h6 class="mb-1">{{ expense.description }}</h6>
-                                                <small class="text-muted">
-                                                    {{ expense.date.strftime("%b %d, %Y") }}
-                                                    {% if expense.category %}• {{ expense.category.name }}{% endif %}
-                                                </small>
-                                            </div>
-                                            <span class="fw-bold text-
-                                                         {% if expense.amount < 0 %}
-                                                             danger
-                                                         {% else %}
-                                                             success
-                                                         {% endif %}">${{ "%.2f"|format(expense.amount|abs) }}</span>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="text-center text-muted py-4">
-                                <i class="fas fa-receipt fa-3x mb-2"></i>
-                                <p>No expense data available for the selected period.</p>
-                            </div>
-                        {% endif %}
-                    </div>
+                <div class="text-muted small">
+                    {% if category_spending %} ${{ "%.2f"|format(category_spending[0][1]) }} {% endif %}
                 </div>
             </div>
         </div>
     </div>
-{% endblock content %}
-{% block scripts %}
-    {{ super() }}
-    <script>
-        // Initialize spending chart
-        document.addEventListener('DOMContentLoaded', function() {
-            const ctx = document.getElementById('spendingChart').getContext('2d');
-            const chartData = {
-                labels: {
-                    {
-                        chart_data.labels | tojson | safe
-                    }
-                },
-                datasets: [{
-                    label: 'Daily Spending',
-                    data: {
-                        {
-                            chart_data.data | tojson | safe
-                        }
-                    },
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
+    <!-- Spending Chart -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title mb-4">Daily Spending</h5>
+            <div class="chart-container">
+                <canvas id="spendingChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Category Breakdown -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Spending by Category</h5>
+                    {% if category_spending %}
+                    <div class="mb-3">
+                        {% for category, amount in category_spending %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="d-flex align-items-center">
+                                <div
+                                    class="category-indicator me-2"
+                                    style="--category-color: {{ category.color if category and category.color else '#6c757d' }};
+                                                        display: inline-block;
+                                                        width: 12px;
+                                                        height: 12px;
+                                                        border-radius: 50%;
+                                                        background-color: var(--category-color)"></div>
+                                <span>{{ category.name }}</span>
+                            </div>
+                            <span class="fw-medium amount-right d-inline-block" style="min-width: 80px"
+                                >${{ "%.2f"|format(amount) }}</span
+                            >
+                        </div>
+                        <div class="progress mb-3 progress-sm">
+                            <div
+                                class="progress-bar category-progress-bar bg-{{ category.color if category.color else 'secondary' }}"
+                                role="progressbar"
+                                style="--progress-width: {{ (amount / total_spending * 100) if total_spending > 0 else 0 }}%;
+                                                    width: var(--progress-width)"
+                                aria-valuenow="{{ (amount / total_spending * 100) if total_spending > 0 else 0 }}"
+                                aria-valuemin="0"
+                                aria-valuemax="100"></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-chart-pie fa-3x mb-2"></i>
+                        <p>No spending data available for the selected period.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Top Expenses</h5>
+                    {% if top_expenses %}
+                    <div class="list-group list-group-flush">
+                        {% for expense in top_expenses %}
+                        <div class="list-group-item border-0 px-0">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ expense.description }}</h6>
+                                    <small class="text-muted">
+                                        {{ expense.date.strftime("%b %d, %Y") }} {% if expense.category %} •
+                                        <span
+                                            class="badge border d-inline-flex align-items-center"
+                                            style="--category-color: {{ expense.category.color }};
+                                                                     background-color: var(--category-color, #6c757d)20;
+                                                                     color: var(--category-color, #6c757d);
+                                                                     border-color: var(--category-color, #6c757d)40 !important;
+                                                                     font-size: 0.75em">
+                                            {% if expense.category.icon %}<i
+                                                class="fas fa-{{ expense.category.icon }} me-1"></i
+                                            >{% endif %} {{ expense.category.name }}
+                                        </span>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <span
+                                    class="fw-bold text- {% if expense.amount < 0 %} danger {% else %} success {% endif %} amount-right"
+                                    >${{ "%.2f"|format(expense.amount|abs) }}</span
+                                >
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-receipt fa-3x mb-2"></i>
+                        <p>No expense data available for the selected period.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %} {% block scripts %} {{ super() }}
+<script type="application/json" id="chart-data">
+    {
+        "labels": {
+            {
+                chart_data.labels | tojson | safe
+            }
+        },
+        "data": {
+            {
+                chart_data.data | tojson | safe
+            }
+        }
+    }
+</script>
+<script>
+    // Initialize spending chart
+    document.addEventListener("DOMContentLoaded", function () {
+        const ctx = document.getElementById("spendingChart").getContext("2d");
+
+        // Get chart data from JSON script tag
+        const chartDataElement = document.getElementById("chart-data");
+        const chartDataJson = JSON.parse(chartDataElement.textContent);
+        const chartLabels = chartDataJson.labels;
+        const chartDataValues = chartDataJson.data;
+
+        const chartData = {
+            labels: chartLabels,
+            datasets: [
+                {
+                    label: "Daily Spending",
+                    data: chartDataValues,
+                    backgroundColor: "rgba(54, 162, 235, 0.2)",
+                    borderColor: "rgba(54, 162, 235, 1)",
                     borderWidth: 1,
                     tension: 0.3,
-                    fill: true
-                }]
-            };
+                    fill: true,
+                },
+            ],
+        };
 
-            new Chart(ctx, {
-                type: 'line',
-                data: chartData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return '$' + context.parsed.y.toFixed(2);
-                                }
-                            }
-                        }
+        new Chart(ctx, {
+            type: "line",
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false,
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return '$' + value;
-                                }
-                            }
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return "$" + context.parsed.y.toFixed(2);
+                            },
                         },
-                        x: {
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 45
-                            }
-                        }
-                    }
-                }
-            });
+                    },
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function (value) {
+                                return "$" + value;
+                            },
+                        },
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                        },
+                    },
+                },
+            },
         });
-    </script>
+    });
+</script>
 {% endblock scripts %}

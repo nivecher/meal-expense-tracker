@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Enhanced Error Handling Demo - Meal Expense Tracker</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/components/error-modals.css') }}" />
+    </head>
+    <body>
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title mb-0">
+                                <i class="fas fa-bug me-2"></i>
+                                Enhanced Error Handling Demo
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-4">
+                                This demo shows the enhanced error handling for restaurant creation conflicts. Click the
+                                buttons below to simulate different error scenarios.
+                            </p>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card border-warning">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-warning">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                                Duplicate Google Place ID
+                                            </h6>
+                                            <p class="card-text small"
+                                                >Simulates adding a restaurant that already exists with the same Google
+                                                Place ID.</p
+                                            >
+                                            <button
+                                                class="btn btn-warning btn-sm"
+                                                onclick="simulateDuplicateGooglePlaceId()">
+                                                Test Duplicate Google Place ID
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card border-info">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-info">
+                                                <i class="fas fa-copy me-2"></i>
+                                                Duplicate Name/City
+                                            </h6>
+                                            <p class="card-text small"
+                                                >Simulates adding a restaurant with the same name and city.</p
+                                            >
+                                            <button class="btn btn-info btn-sm" onclick="simulateDuplicateNameCity()"
+                                                >Test Duplicate Name/City</button
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-3">
+                                <div class="col-md-6">
+                                    <div class="card border-danger">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-danger">
+                                                <i class="fas fa-times-circle me-2"></i>
+                                                Generic Error
+                                            </h6>
+                                            <p class="card-text small"
+                                                >Simulates a generic server error with enhanced messaging.</p
+                                            >
+                                            <button class="btn btn-danger btn-sm" onclick="simulateGenericError()"
+                                                >Test Generic Error</button
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card border-secondary">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-secondary">
+                                                <i class="fas fa-wifi me-2"></i>
+                                                Network Error
+                                            </h6>
+                                            <p class="card-text small">Simulates a network connectivity error.</p>
+                                            <button class="btn btn-secondary btn-sm" onclick="simulateNetworkError()"
+                                                >Test Network Error</button
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <hr class="my-4" />
+                            <div class="alert alert-info" role="alert">
+                                <h6 class="alert-heading">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    How It Works
+                                </h6>
+                                <ul class="mb-0">
+                                    <li>
+                                        <strong>Smart Error Detection:</strong> The system analyzes error responses and
+                                        shows contextual messages
+                                    </li>
+                                    <li>
+                                        <strong>Interactive Modals:</strong> Users get actionable options instead of
+                                        just error messages
+                                    </li>
+                                    <li>
+                                        <strong>Graceful Fallbacks:</strong> If specific handling fails, enhanced
+                                        generic messages are shown
+                                    </li>
+                                    <li>
+                                        <strong>User Guidance:</strong> Clear next steps help users resolve conflicts
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // Demo functions to simulate different error scenarios
+
+            function simulateDuplicateGooglePlaceId() {
+                const error = {
+                    code: "DUPLICATE_GOOGLE_PLACE_ID",
+                    message: "A restaurant with Google Place ID already exists",
+                    field: "google_place_id",
+                    google_place_id: "ChIJ07YUJJgETIYR7BC18R3_2HA",
+                    existing_restaurant: {
+                        id: 123,
+                        name: "The Golden Spoon",
+                        city: "New York",
+                        full_name: "The Golden Spoon - New York",
+                    },
+                };
+
+                handleDuplicateGooglePlaceIdError(error);
+            }
+
+            function simulateDuplicateNameCity() {
+                const error = {
+                    code: "DUPLICATE_RESTAURANT",
+                    message: "Restaurant already exists",
+                    field: "name",
+                    name: "Pizza Palace",
+                    city: "Chicago",
+                    existing_restaurant: {
+                        id: 456,
+                        name: "Pizza Palace",
+                        city: "Chicago",
+                        full_name: "Pizza Palace - Chicago",
+                    },
+                };
+
+                handleDuplicateRestaurantError(error);
+            }
+
+            function simulateGenericError() {
+                showToast(
+                    "Unable to save the restaurant. Please check your internet connection and try again.",
+                    "danger",
+                    5000
+                );
+            }
+
+            function simulateNetworkError() {
+                showToast("Connection failed. Please check your network and try again.", "warning", 5000);
+            }
+
+            // Modal handling functions (copied from restaurant-form.js for demo)
+            function handleDuplicateGooglePlaceIdError(error) {
+                const { existing_restaurant, google_place_id } = error;
+
+                showDuplicateRestaurantModal({
+                    title: "Restaurant Already Exists",
+                    message: `You already have "${existing_restaurant.full_name}" in your restaurants.`,
+                    details: `This restaurant has the same Google Place ID and cannot be added again.`,
+                    existing_restaurant,
+                    primaryAction: {
+                        label: "View Existing Restaurant",
+                        url: `/restaurants/${existing_restaurant.id}`,
+                    },
+                    secondaryAction: {
+                        label: "Add Expense",
+                        url: `/expenses/add?restaurant_id=${existing_restaurant.id}`,
+                    },
+                });
+            }
+
+            function handleDuplicateRestaurantError(error) {
+                const { existing_restaurant, name, city } = error;
+
+                showDuplicateRestaurantModal({
+                    title: "Similar Restaurant Found",
+                    message: `You already have a restaurant named "${name}"${city ? ` in ${city}` : ""}.`,
+                    details:
+                        "This might be the same restaurant. You can view the existing one or modify your input to make it unique.",
+                    existing_restaurant,
+                    primaryAction: {
+                        label: "View Existing Restaurant",
+                        url: `/restaurants/${existing_restaurant.id}`,
+                    },
+                    secondaryAction: {
+                        label: "Continue Adding",
+                        action: () =>
+                            showToast("Please modify the restaurant name or location to make it unique.", "warning"),
+                    },
+                });
+            }
+
+            function showDuplicateRestaurantModal(options) {
+                const { title, message, details, existing_restaurant, primaryAction, secondaryAction } = options;
+
+                const modalHtml = `
+                <div class="modal fade duplicate-restaurant-modal" id="duplicateRestaurantModal" tabindex="-1" aria-labelledby="duplicateRestaurantModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="duplicateRestaurantModalLabel">
+                                    <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                    ${title}
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-warning" role="alert">
+                                    <strong>${message}</strong>
+                                    <br><small class="text-muted">${details}</small>
+                                </div>
+
+                                <div class="card mt-3">
+                                    <div class="card-body">
+                                        <h6 class="card-title">
+                                            <i class="fas fa-utensils me-2"></i>
+                                            ${existing_restaurant.full_name}
+                                        </h6>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <a href="/restaurants/${existing_restaurant.id}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye me-1"></i>
+                                                View Details
+                                            </a>
+                                            <a href="/expenses/add?restaurant_id=${existing_restaurant.id}" class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-plus me-1"></i>
+                                                Add Expense
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                ${
+                                    secondaryAction
+                                        ? `
+                                    <button type="button" class="btn btn-warning" id="secondaryActionBtn">
+                                        ${secondaryAction.label}
+                                    </button>
+                                `
+                                        : ""
+                                }
+                                <button type="button" class="btn btn-primary" id="primaryActionBtn">
+                                    ${primaryAction.label}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+                // Remove existing modal if any
+                const existingModal = document.getElementById("duplicateRestaurantModal");
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                // Add modal to DOM
+                document.body.insertAdjacentHTML("beforeend", modalHtml);
+
+                const modalElement = document.getElementById("duplicateRestaurantModal");
+
+                // Add event listeners
+                const primaryBtn = modalElement.querySelector("#primaryActionBtn");
+                const secondaryBtn = modalElement.querySelector("#secondaryActionBtn");
+
+                if (primaryBtn) {
+                    primaryBtn.addEventListener("click", () => {
+                        if (primaryAction.url) {
+                            showToast("Would navigate to: " + primaryAction.url, "info");
+                        } else if (primaryAction.action) {
+                            primaryAction.action();
+                        }
+                    });
+                }
+
+                if (secondaryBtn && secondaryAction) {
+                    secondaryBtn.addEventListener("click", () => {
+                        if (secondaryAction.url) {
+                            showToast("Would navigate to: " + secondaryAction.url, "info");
+                        } else if (secondaryAction.action) {
+                            secondaryAction.action();
+                            const bsModal = bootstrap.Modal.getInstance(modalElement);
+                            if (bsModal) bsModal.hide();
+                        }
+                    });
+                }
+
+                // Show modal
+                const bsModal = new bootstrap.Modal(modalElement);
+                bsModal.show();
+
+                // Clean up modal after hiding
+                modalElement.addEventListener("hidden.bs.modal", () => {
+                    modalElement.remove();
+                });
+            }
+
+            // Toast function for demo
+            function showToast(message, type = "info", duration = 3000) {
+                const toastContainer = document.getElementById("toast-container") || createToastContainer();
+
+                const toastId = "toast-" + Date.now();
+                const toastHtml = `
+                <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true" id="${toastId}">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+
+                toastContainer.insertAdjacentHTML("beforeend", toastHtml);
+
+                const toastElement = document.getElementById(toastId);
+                const bsToast = new bootstrap.Toast(toastElement, {
+                    delay: duration,
+                });
+                bsToast.show();
+
+                toastElement.addEventListener("hidden.bs.toast", () => {
+                    toastElement.remove();
+                });
+            }
+
+            function createToastContainer() {
+                const container = document.createElement("div");
+                container.id = "toast-container";
+                container.className = "toast-container position-fixed top-0 end-0 p-3";
+                container.style.zIndex = "1080";
+                document.body.appendChild(container);
+                return container;
+            }
+        </script>
+    </body>
+</html>

@@ -19,29 +19,19 @@ logger = logging.getLogger(__name__)
 
 
 def init_default_data() -> None:
-    """Initialize default data in the database."""
+    """Initialize default data in the database.
+
+    Note: Categories are now user-specific and created automatically
+    when users add their first expense. This function only creates
+    the default admin user.
+    """
     from app.auth.models import User
     from app.database import db
-    from app.expenses.models import ExpenseCategory
+
+    # Note: Categories are now user-specific and created automatically when users add expenses
+    # This initialization only creates the admin user
 
     try:
-        # Add default expense categories
-        categories = [
-            "Food",
-            "Groceries",
-            "Transportation",
-            "Utilities",
-            "Entertainment",
-            "Shopping",
-            "Healthcare",
-            "Other",
-        ]
-
-        for name in categories:
-            if not db.session.query(ExpenseCategory).filter_by(name=name).first():
-                category = ExpenseCategory(name=name)
-                db.session.add(category)
-                logger.info("Added category: %s", name)
 
         # Add a default admin user if none exists
         if not db.session.query(User).filter_by(username="admin").first():

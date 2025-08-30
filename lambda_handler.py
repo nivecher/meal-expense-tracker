@@ -63,11 +63,119 @@ def get_or_create_app() -> Flask:
         try:
             _APP_INSTANCE = create_app()
             logger.info("Created new Flask application instance")
+
+            # Validate session configuration for Lambda environment
+            _validate_session_config(_APP_INSTANCE)
+
         except Exception as e:
             logger.exception("Failed to create Flask application")
             raise RuntimeError(f"Failed to initialize application: {str(e)}")
 
     return _APP_INSTANCE
+
+
+def _convert_apigw_v2_to_v1(event: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert API Gateway v2.0 event format to v1.0 format for awsgi compatibility.
+
+    Args:
+        event: API Gateway v2.0 event
+
+    Returns:
+        API Gateway v1.0 compatible event
+    """
+    request_context = event.get("requestContext", {})
+    http_context = request_context.get("http", {})
+
+    # Convert v2.0 event to v1.0 format
+    v1_event = {
+        "httpMethod": http_context.get("method", "GET"),
+        "path": event.get("rawPath", "/"),
+        "pathParameters": event.get("pathParameters"),
+        "queryStringParameters": event.get("queryStringParameters"),
+        "headers": event.get("headers", {}),
+        "body": event.get("body"),
+        "isBase64Encoded": event.get("isBase64Encoded", False),
+        "requestContext": {
+            "requestId": request_context.get("requestId", ""),
+            "stage": request_context.get("stage", ""),
+            "resourcePath": event.get("rawPath", "/"),
+            "httpMethod": http_context.get("method", "GET"),
+            "requestTime": request_context.get("time", ""),
+            "protocol": http_context.get("protocol", "HTTP/1.1"),
+            "resourceId": request_context.get("resourceId", ""),
+            "accountId": request_context.get("accountId", ""),
+            "apiId": request_context.get("apiId", ""),
+            "identity": request_context.get("identity", {}),
+        },
+        "multiValueHeaders": {},
+        "multiValueQueryStringParameters": {},
+    }
+
+    # Convert headers to multiValueHeaders format if needed
+    if isinstance(v1_event["headers"], dict):
+        v1_event["multiValueHeaders"] = {k: [v] for k, v in v1_event["headers"].items()}
+
+    # Convert query parameters to multiValue format if needed
+    if isinstance(v1_event["queryStringParameters"], dict):
+        v1_event["multiValueQueryStringParameters"] = {k: [v] for k, v in v1_event["queryStringParameters"].items()}
+
+    return v1_event
+
+
+def _validate_session_config(app: Flask) -> None:
+    """Validate session configuration for Lambda deployment.
+
+    Ensures that DynamoDB session configuration is properly set up
+    for the Lambda environment.
+
+    Args:
+        app: Flask application instance
+
+    Raises:
+        RuntimeError: If session configuration is invalid
+    """
+    session_type = app.config.get("SESSION_TYPE")
+
+    if session_type == "dynamodb":
+        required_configs = {
+            "SESSION_TABLE_NAME": os.environ.get("SESSION_TABLE_NAME"),
+            "AWS_REGION": os.environ.get("AWS_REGION"),
+        }
+
+        missing_configs = [key for key, value in required_configs.items() if not value]
+
+        if missing_configs:
+            error_msg = f"Missing required session environment variables for Lambda: {', '.join(missing_configs)}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        # Log session configuration for debugging
+        logger.info("Lambda session configuration validated:")
+        logger.info("  Type: %s", session_type)
+        logger.info("  Table: %s", required_configs["SESSION_TABLE_NAME"])
+        logger.info("  Region: %s", required_configs["AWS_REGION"])
+
+        # Test DynamoDB table existence in Lambda environment
+        try:
+            import boto3
+
+            dynamodb = boto3.resource("dynamodb", region_name=required_configs["AWS_REGION"])
+            table = dynamodb.Table(required_configs["SESSION_TABLE_NAME"])
+            table.load()  # This will fail if table doesn't exist
+            logger.info("DynamoDB session table verified: %s", required_configs["SESSION_TABLE_NAME"])
+        except Exception as e:
+            logger.error("DynamoDB session table validation failed: %s", str(e))
+            logger.error("Ensure the DynamoDB table exists before Lambda deployment")
+            # This is critical - raise the error to prevent Flask-Session from trying to create table
+            raise RuntimeError(f"DynamoDB session table '{required_configs['SESSION_TABLE_NAME']}' is not accessible")
+
+    elif session_type == "filesystem":
+        logger.warning("Using filesystem sessions in Lambda - this may cause issues with session persistence")
+    elif session_type is None:
+        logger.info("Using Flask's default signed cookie sessions (ideal for Lambda)")
+
+    else:
+        logger.info("Session configuration validated for type: %s", session_type)
 
 
 def handle_migration(app: Flask) -> Dict[str, Any]:
@@ -129,14 +237,14 @@ def handle_database_operation(operation: str, **kwargs: Any) -> ApiGatewayRespon
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Handle Lambda events from API Gateway v2.0 (HTTP API).
+    """Handle Lambda events from API Gateway v1.0 (REST API) or v2.0 (HTTP API).
 
     Args:
         event: The Lambda event
         context: The Lambda context object (not used but required by Lambda)
 
     Returns:
-        dict: Response in API Gateway v2.0 format
+        dict: Response in appropriate API Gateway format
     """
     _ = context  # Mark as unused
 
@@ -152,10 +260,19 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "isBase64Encoded": db_response["isBase64Encoded"],
         }
 
-    # Handle HTTP API v2.0 events
+    # Handle HTTP API events (both v1.0 and v2.0 formats)
     app = get_or_create_app()
 
     try:
+        # Convert API Gateway v2.0 format to v1.0 format if needed
+        # v2.0 uses 'requestContext.http.method' while v1.0 uses 'httpMethod'
+        if "httpMethod" not in event and "requestContext" in event:
+            http_context = event.get("requestContext", {})
+            if "http" in http_context:
+                # API Gateway v2.0 format - convert to v1.0
+                event = _convert_apigw_v2_to_v1(event)
+                logger.info("Converted API Gateway v2.0 event to v1.0 format")
+
         # Use awsgi for HTTP request handling
         response = awsgi.response(
             app, event, context, base64_content_types={"image/png", "image/jpg", "application/octet-stream"}

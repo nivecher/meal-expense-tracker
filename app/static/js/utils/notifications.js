@@ -62,16 +62,14 @@ function showToast(message, type = 'info', duration = 3000) {
   return bsToast;
 }
 
-
-
 // Show confirmation dialog
 function showConfirmDialog({
   title = 'Are you sure?',
   message = 'This action cannot be undone.',
   confirmText = 'Confirm',
-  cancelText = 'Cancel'
+  cancelText = 'Cancel',
 } = {}) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     if (!bootstrap?.Modal) {
       resolve(confirm(`${title}\n\n${message}`));
       return;
@@ -132,7 +130,7 @@ function showLoadingOverlay(message = 'Loading...') {
     hide() {
       overlay.remove();
       document.body.style.overflow = '';
-    }
+    },
   };
 }
 
@@ -150,7 +148,7 @@ export {
   showInfoToast,
   showWarningToast,
   showConfirmDialog,
-  showLoadingOverlay
+  showLoadingOverlay,
 };
 
 export default {
@@ -160,5 +158,5 @@ export default {
   showInfoToast,
   showWarningToast,
   showConfirmDialog,
-  showLoadingOverlay
+  showLoadingOverlay,
 };

@@ -1,62 +1,52 @@
-{% extends "base.html" %}
-{% block title %}
-    Too Many Requests (429) - Meal Expense Tracker
-{% endblock title %}
-{% block content %}
-    <div class="error-container">
-        <div class="error-content">
-            <h1 class="error-code">429</h1>
-            <h2 class="error-title">Too Many Requests</h2>
-            <div class="error-message">
-                <p>You've made too many requests in a short period of time.</p>
-                <div class="alert alert-warning mt-3">
-                    <div class="d-flex align-items-center mb-2">
-                        <i class="fas fa-hourglass-half me-2"></i>
-                        <strong>Rate Limit Exceeded</strong>
-                    </div>
-                    <div class="ms-4">
-                        {% if error.limit %}
-                            <div class="mb-1">
-                                <i class="fas fa-tachometer-alt me-2"></i>
-                                Limit: {{ error.limit }} requests per hour
-                            </div>
-                        {% endif %}
-                        {% if error.reset_time %}
-                            <div class="mb-1">
-                                <i class="far fa-clock me-2"></i>
-                                Try again in: <span class="fw-bold">{{ error.reset_time | default("a few minutes") }}</span>
-                            </div>
-                        {% endif %}
-                        {% if error.description %}
-                            <div class="mt-2 pt-2 border-top">
-                                <i class="fas fa-info-circle me-2"></i>
-                                {{ error.description }}
-                            </div>
-                        {% endif %}
-                    </div>
+{% extends "base.html" %} {% block title %} Too Many Requests (429) - Meal Expense Tracker {% endblock title %} {% block
+content %}
+<div class="error-container">
+    <div class="error-content">
+        <h1 class="error-code">429</h1>
+        <h2 class="error-title">Too Many Requests</h2>
+        <div class="error-message">
+            <p>You've made too many requests in a short period of time.</p>
+            <div class="alert alert-warning mt-3">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="fas fa-hourglass-half me-2"></i>
+                    <strong>Rate Limit Exceeded</strong>
                 </div>
-                <p class="mt-4">
-                    <i class="fas fa-lightbulb me-2"></i>
-                    Please wait before trying again or return to the home page.
-                </p>
+                <div class="ms-4">
+                    {% if error.limit %}
+                    <div class="mb-1">
+                        <i class="fas fa-tachometer-alt me-2"></i>
+                        Limit: {{ error.limit }} requests per hour
+                    </div>
+                    {% endif %} {% if error.reset_time %}
+                    <div class="mb-1">
+                        <i class="far fa-clock me-2"></i>
+                        Try again in: <span class="fw-bold">{{ error.reset_time | default("a few minutes") }}</span>
+                    </div>
+                    {% endif %} {% if error.description %}
+                    <div class="mt-2 pt-2 border-top">
+                        <i class="fas fa-info-circle me-2"></i>
+                        {{ error.description }}
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-            <div class="error-actions mt-4">
-                <a href="{{ url_for('main.index') }}" class="btn btn-primary">
-                    <i class="fas fa-home me-2"></i>Return Home
-                </a>
-                <button data-action="back" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-2"></i>Go Back
-                </button>
-            </div>
+            <p class="mt-4">
+                <i class="fas fa-lightbulb me-2"></i>
+                Please wait before trying again or return to the home page.
+            </p>
+        </div>
+        <div class="error-actions mt-4">
+            <a href="{{ url_for('main.index') }}" class="btn btn-primary">
+                <i class="fas fa-home me-2"></i>Return Home
+            </a>
+            <button data-action="back" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Go Back
+            </button>
         </div>
     </div>
-{% endblock content %}
-{% block scripts %}
-    <script src="{{ url_for('static', filename='js/pages/error-pages.js') }}"
-            type="module"></script>
-{% endblock scripts %}
-{% block styles %}
-    {{ super() }}
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='css/pages/error.css') }}">
+</div>
+{% endblock content %} {% block scripts %}
+<script src="{{ url_for('static', filename='js/pages/error-pages.js') }}" type="module"></script>
+{% endblock scripts %} {% block styles %} {{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/error.css') }}" />
 {% endblock styles %}

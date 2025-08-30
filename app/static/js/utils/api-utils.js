@@ -58,6 +58,17 @@ async function apiRequest(url, options = {}) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+
+      // For specific error codes that need structured handling, preserve the full structure
+      if (response.status === 409 && errorData.error) {
+        // This is likely a duplicate restaurant error - preserve structure for enhanced handling
+        const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        error.status = response.status;
+        error.data = errorData;
+        error.error = errorData.error; // Preserve the structured error for frontend handlers
+        throw error;
+      }
+
       const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
       error.status = response.status;
       error.data = errorData;
@@ -184,7 +195,7 @@ class SimpleServiceWorkerManager {
 
     // Add event delegation for buttons
     notification.addEventListener('click', (event) => {
-      const action = event.target.dataset.action;
+      const { action } = event.target.dataset;
       if (action === 'update-now') {
         window.location.reload();
       } else if (action === 'dismiss') {
@@ -397,7 +408,7 @@ export async function apiRequestWithRecovery(url, options = {}) {
       }
 
       // Handle JSON body
-      let body = options.body;
+      let { body } = options;
       if (body && typeof body === 'object' && !(body instanceof FormData)) {
         if (!headers.has('Content-Type')) {
           headers.set('Content-Type', 'application/json');
@@ -415,7 +426,7 @@ export async function apiRequestWithRecovery(url, options = {}) {
         ...options,
         headers,
         body,
-        signal: controller.signal
+        signal: controller.signal,
       };
 
       const response = await fetch(url, final_options);
@@ -461,10 +472,10 @@ export async function apiRequestWithRecovery(url, options = {}) {
         'Access denied',
         'Resource not found',
         'Validation error',
-        'No internet connection'
+        'No internet connection',
       ];
 
-      const is_non_retryable = non_retryable_errors.some(err => error.message.includes(err));
+      const is_non_retryable = non_retryable_errors.some((err) => error.message.includes(err));
 
       if (attempt === MAX_RETRIES || is_non_retryable) {
         // Provide user-friendly error messages
@@ -485,7 +496,7 @@ export async function apiRequestWithRecovery(url, options = {}) {
       const delay_ms = base_delay + jitter;
 
       console.log(`Retrying in ${Math.round(delay_ms)}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay_ms));
+      await new Promise((resolve) => setTimeout(resolve, delay_ms));
     }
   }
 }
@@ -506,7 +517,7 @@ function getCircuitBreakerState(key) {
   return {
     failure_count: 0,
     last_failure: 0,
-    is_open: false
+    is_open: false,
   };
 }
 
@@ -547,7 +558,7 @@ export async function apiRequestEnhanced(url, options = {}) {
     console.error('API request failed with recovery:', {
       url,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     // Re-throw for calling code to handle

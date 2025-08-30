@@ -31,7 +31,7 @@ function shouldLoadModule(moduleName) {
 
 // Initialize all modules found in the document
 function initModules() {
-  document.querySelectorAll('[data-module]').forEach(element => {
+  document.querySelectorAll('[data-module]').forEach((element) => {
     const moduleName = element.dataset.module;
     if (moduleName && shouldLoadModule(moduleName)) {
       element.setAttribute('data-module-initialized', 'true');

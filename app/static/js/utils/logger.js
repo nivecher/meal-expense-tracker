@@ -21,7 +21,7 @@ const logger = {
   warn: (...args) => log('warn', ...args),
   info: isDev ? (...args) => log('info', ...args) : () => {},
   debug: isDev ? (...args) => log('debug', ...args) : () => {},
-  log: isDev ? (...args) => log('log', ...args) : () => {}
+  log: isDev ? (...args) => log('log', ...args) : () => {},
 };
 
 export { logger };

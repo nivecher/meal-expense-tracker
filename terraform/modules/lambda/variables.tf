@@ -38,7 +38,7 @@ variable "aws_region" {
 variable "handler" {
   description = "The function entrypoint in your code"
   type        = string
-  default     = "lambda_handler.lambda_handler"
+  default     = "wsgi.lambda_handler"
 }
 
 variable "runtime" {
@@ -271,6 +271,12 @@ variable "kms_key_arn" {
 variable "lambda_combined_policy_arn" {
   description = "The ARN of the combined IAM policy to attach to the Lambda role"
   type        = string
+}
+
+variable "dynamodb_table_arn" {
+  description = "ARN of the DynamoDB table for sessions (ensures dependency)"
+  type        = string
+  default     = ""
 }
 
 # Tags

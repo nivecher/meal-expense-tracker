@@ -18,7 +18,7 @@ function cache_list_elements() {
     form: document.querySelector('form[method="get"]'),
     startDateInput: document.getElementById('start_date'),
     endDateInput: document.getElementById('end_date'),
-    searchInput: document.getElementById('search')
+    searchInput: document.getElementById('search'),
   };
 }
 

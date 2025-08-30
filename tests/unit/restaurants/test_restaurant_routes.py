@@ -263,12 +263,12 @@ def test_restaurant_search_page(client, auth):
     assert b"map" in response.data.lower()
 
 
-def test_google_places_search_page(client, auth):
-    """Test that the Google Places search page loads correctly."""
+def test_find_places_page(client, auth):
+    """Test that the Find Places search page loads correctly."""
     auth.login("testuser_1", "testpass")
 
-    # Test GET request to Google Places search page
-    response = client.get(url_for("restaurants.google_places_search"))
+    # Test GET request to Find Places search page
+    response = client.get(url_for("restaurants.find_places"))
     assert response.status_code == 200
     assert b"Find Restaurants" in response.data
 

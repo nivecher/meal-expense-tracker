@@ -68,7 +68,7 @@ function show_toast_message(message, type = 'info') {
     success: 'fas fa-check-circle text-success',
     error: 'fas fa-exclamation-triangle text-danger',
     warning: 'fas fa-info-circle text-warning',
-    info: 'fas fa-info-circle text-info'
+    info: 'fas fa-info-circle text-info',
   };
 
   const toast_html = `
@@ -124,5 +124,5 @@ export {
   // Aliases for compatibility
   show_success_message as showSuccess,
   show_error_message as showError,
-  show_warning_message as showWarning
+  show_warning_message as showWarning,
 };

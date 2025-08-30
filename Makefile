@@ -212,11 +212,21 @@ lint-python: check-env
 	@$(PYTHON) -m flake8 app tests || (echo "\033[1;31m❌ Flake8 failed\033[0m"; exit 1)
 	@$(PYTHON) -m black --check app tests || (echo "\033[1;31m❌ Black check failed\033[0m"; exit 1)
 
-## HTML template linter
+## HTML template linter using Prettier (limited Jinja2 support)
 .PHONY: lint-html
-lint-html: check-env
-	@echo "\n\033[1m=== Running HTML Template Linter ===\033[0m"
-	@$(PYTHON) -m djlint app/templates/ --reformat --profile=jinja || echo "\033[1;33m⚠️  HTML linting completed with warnings\033[0m"
+lint-html: check-node
+	@echo "\n\033[1m=== Running HTML Template Linter (Prettier - Limited Jinja2) ===\033[0m"
+	@echo "\033[1;33m⚠️  Note: Prettier has limited Jinja2 support. Use with caution.\033[0m"
+	@npx prettier --check "app/templates" 2>/dev/null || echo "\033[1;36mℹ️   Consider using djlint for Jinja2-heavy templates\033[0m"
+
+## HTML template formatter using Prettier (safe mode)
+.PHONY: format-html
+format-html: check-node
+	@echo "\n\033[1m=== Formatting HTML Templates (Prettier - Safe Mode) ===\033[0m"
+	@echo "\033[1;33m⚠️  Formatting simple templates only (Prettier can't handle complex Jinja2)\033[0m"
+	@npx prettier --write "app/templates" 2>/dev/null || true
+	@echo "\033[1;36mℹ️   For Jinja2-heavy templates, use manual formatting or djlint\033[0m"
+	@echo "\033[1;32m✅ Safe HTML formatting completed\033[0m"
 
 ## JavaScript linter
 .PHONY: lint-js
@@ -254,9 +264,19 @@ lint-docker:
 		echo "hadolint not installed, skipping Docker linting"; \
 	fi
 
-## Format all code
+## Format all code (Python, HTML templates, Shell scripts)
 .PHONY: format
-format: format-python format-html format-shell
+format: format-python format-shell
+
+## Format HTML templates with hybrid approach (Prettier + djlint)
+.PHONY: format-html-hybrid
+format-html-hybrid: check-node check-env
+	@echo "\n\033[1m=== Hybrid HTML Formatting (Prettier + djlint) ===\033[0m"
+	@echo "\033[1;36mℹ️  Step 1: Prettier for basic HTML structure...\033[0m"
+	@npx prettier --write "app/templates/errors/*.html" 2>/dev/null || true
+	@echo "\033[1;36mℹ️  Step 2: djlint for Jinja2 syntax validation...\033[0m"
+	@$(PYTHON) -m djlint app/templates/ --check --profile=jinja --quiet || echo "\033[1;33m⚠️  Some Jinja2 syntax issues found\033[0m"
+	@echo "\033[1;32m✅ Hybrid HTML formatting completed\033[0m"
 
 ## Format Python code
 .PHONY: format-python
@@ -267,10 +287,13 @@ format-python: check-env
 	@$(PYTHON) -m autoflake --in-place --remove-all-unused-imports --recursive app/ tests/ || (echo "\033[1;31m❌ autoflake failed\033[0m"; exit 1)
 
 ## Format HTML templates
-.PHONY: format-html
-format-html:
-	@echo "\n\033[1m=== Formatting HTML Templates ===\033[0m"
-	@djlint app/templates --profile=django --reformat || (echo "\033[1;31m❌ HTML formatting failed\033[0m"; exit 1)
+## DEPRECATED: djlint-based formatting (kept for reference)
+.PHONY: format-html-djlint-deprecated
+format-html-djlint-deprecated:
+	@echo "\033[1;31m🚨 DEPRECATED: djlint formatting is no longer used\033[0m"
+	@echo "\033[1;32m✅ Use 'make format-html' (Prettier) instead\033[0m"
+	@echo "\033[1;36mℹ️   Prettier is much more reliable and respectful of your code\033[0m"
+	@exit 1
 
 ## Format Shell scripts
 .PHONY: format-shell
@@ -1071,6 +1094,24 @@ check-env:
 	@if [ ! -d "venv" ]; then \
 		echo "\033[1;31m❌ Virtual environment not found. Run 'make venv' first.\033[0m"; \
 		exit 1; \
+	fi
+
+## Check Node.js environment for frontend tools
+.PHONY: check-node
+check-node:
+	@echo "\033[1m🔍 Checking Node.js environment...\033[0m"
+	@if ! command -v node >/dev/null 2>&1; then \
+		echo "\033[1;31m❌ Node.js not found. Please install Node.js 18+ first.\033[0m"; \
+		echo "\033[1;36mℹ️  Visit: https://nodejs.org/ or use: curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs\033[0m"; \
+		exit 1; \
+	fi
+	@if [ ! -f "package.json" ]; then \
+		echo "\033[1;31m❌ package.json not found.\033[0m"; \
+		exit 1; \
+	fi
+	@if [ ! -d "node_modules" ]; then \
+		echo "\033[1;33m⚠️  Node modules not installed. Installing...\033[0m"; \
+		npm install; \
 	fi
 	@command -v $(PYTHON) >/dev/null 2>&1 || (echo "\033[1;31m❌ $(PYTHON) not found\033[0m"; exit 1)
 	@command -v $(PIP) >/dev/null 2>&1 || (echo "\033[1;31m❌ $(PIP) not found\033[0m"; exit 1)

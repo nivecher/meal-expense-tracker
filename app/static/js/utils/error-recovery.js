@@ -13,7 +13,7 @@ export const ERROR_TYPES = {
   API_RESPONSE: 'api_response',
   PERMISSION: 'permission',
   TIMEOUT: 'timeout',
-  UNKNOWN: 'unknown'
+  UNKNOWN: 'unknown',
 };
 
 // Retry configuration with exponential backoff
@@ -21,7 +21,7 @@ const RETRY_CONFIG = {
   max_attempts: 3,
   initial_delay_ms: 1000,
   max_delay_ms: 10000,
-  backoff_multiplier: 2
+  backoff_multiplier: 2,
 };
 
 /**
@@ -59,8 +59,8 @@ export class RetryManager {
         ERROR_TYPES.TIMEOUT,
         {
           user_message: 'Service is temporarily unavailable. Please try again later.',
-          retry_after_ms: this.circuit_breaker_reset_time_ms
-        }
+          retry_after_ms: this.circuit_breaker_reset_time_ms,
+        },
       );
     }
 
@@ -98,8 +98,8 @@ export class RetryManager {
       {
         user_message: 'Operation failed. Please check your connection and try again.',
         original_error: last_error,
-        attempts_made: config.max_attempts
-      }
+        attempts_made: config.max_attempts,
+      },
     );
   }
 
@@ -138,7 +138,7 @@ export class RetryManager {
   }
 
   wait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
@@ -158,13 +158,13 @@ export class GoogleMapsRecovery {
   async initialize_with_fallback(api_key, libraries = ['places']) {
     try {
       return await retry_manager.retry_with_backoff(
-        async (attempt) => {
+        async(attempt) => {
           console.log(`Google Maps initialization attempt ${attempt}`);
 
           return await this.load_google_maps_api(api_key, libraries);
         },
         'google_maps_init',
-        { max_attempts: 3, initial_delay_ms: 2000 }
+        { max_attempts: 3, initial_delay_ms: 2000 },
       );
     } catch (error) {
       console.error('Google Maps initialization failed completely:', error);
@@ -179,8 +179,8 @@ export class GoogleMapsRecovery {
         ERROR_TYPES.GOOGLE_MAPS,
         {
           user_message: 'Map features are currently unavailable. You can still add restaurants manually.',
-          enable_manual_entry: true
-        }
+          enable_manual_entry: true,
+        },
       );
     }
   }
@@ -217,12 +217,12 @@ export class GoogleMapsRecovery {
   setup_fallback_geocoding() {
     // Provide basic geocoding fallback using Nominatim (OpenStreetMap)
     return {
-      geocode_address: async (address) => {
+      geocode_address: async(address) => {
         try {
           const encoded_address = encodeURIComponent(address);
           const response = await fetch(
             `https://nominatim.openstreetmap.org/search?format=json&q=${encoded_address}&limit=1`,
-            { timeout: 5000 }
+            { timeout: 5000 },
           );
 
           const data = await response.json();
@@ -230,7 +230,7 @@ export class GoogleMapsRecovery {
             return {
               lat: parseFloat(data[0].lat),
               lng: parseFloat(data[0].lon),
-              formatted_address: data[0].display_name
+              formatted_address: data[0].display_name,
             };
           }
 
@@ -241,7 +241,7 @@ export class GoogleMapsRecovery {
         }
       },
 
-      is_fallback: true
+      is_fallback: true,
     };
   }
 }
@@ -266,14 +266,14 @@ export class FormRecovery {
       }
 
       const result = await retry_manager.retry_with_backoff(
-        async (attempt) => {
+        async(attempt) => {
           console.log(`Form submission attempt ${attempt}`);
 
           if (!navigator.onLine) {
             throw new RecoverableError(
               'No internet connection',
               ERROR_TYPES.NETWORK,
-              { user_message: 'No internet connection. Form will be saved for later.' }
+              { user_message: 'No internet connection. Form will be saved for later.' },
             );
           }
 
@@ -282,10 +282,10 @@ export class FormRecovery {
             headers: {
               'Content-Type': 'application/json',
               'X-CSRFToken': this.get_csrf_token(),
-              ...options.headers
+              ...options.headers,
             },
             body: JSON.stringify(form_data),
-            signal: this.create_timeout_signal(options.timeout_ms || 10000)
+            signal: this.create_timeout_signal(options.timeout_ms || 10000),
           });
 
           if (!response.ok) {
@@ -296,15 +296,15 @@ export class FormRecovery {
               {
                 user_message: error_data.user_message || 'Server error. Please try again.',
                 status: response.status,
-                server_errors: error_data.errors
-              }
+                server_errors: error_data.errors,
+              },
             );
           }
 
           return await response.json();
         },
         `form_submit_${endpoint}`,
-        { max_attempts: 3, initial_delay_ms: 1000 }
+        { max_attempts: 3, initial_delay_ms: 1000 },
       );
 
       // Clear draft on successful submission
@@ -329,7 +329,7 @@ export class FormRecovery {
       drafts[submission_id] = {
         data: form_data,
         timestamp: Date.now(),
-        type: 'draft'
+        type: 'draft',
       };
       localStorage.setItem(this.offline_storage_key, JSON.stringify(drafts));
     } catch (error) {
@@ -342,9 +342,9 @@ export class FormRecovery {
       const stored_data = this.get_stored_drafts();
       stored_data[submission_id] = {
         data: form_data,
-        endpoint: endpoint,
+        endpoint,
         timestamp: Date.now(),
-        type: 'pending_submission'
+        type: 'pending_submission',
       };
       localStorage.setItem(this.offline_storage_key, JSON.stringify(stored_data));
     } catch (error) {
@@ -364,7 +364,7 @@ export class FormRecovery {
         await this.submit_with_recovery(
           submission_data.data,
           submission_data.endpoint,
-          { timeout_ms: 5000 }
+          { timeout_ms: 5000 },
         );
 
         showInfoToast('Offline form submitted successfully!');
@@ -437,7 +437,7 @@ export function initialize_error_recovery() {
     const error = new RecoverableError(
       event.error.message,
       ERROR_TYPES.UNKNOWN,
-      { user_message: 'An unexpected error occurred. Please refresh the page if problems persist.' }
+      { user_message: 'An unexpected error occurred. Please refresh the page if problems persist.' },
     );
 
     handle_error_with_recovery(error);
@@ -450,7 +450,7 @@ export function initialize_error_recovery() {
     const error = new RecoverableError(
       event.reason.message || 'Unknown promise rejection',
       ERROR_TYPES.UNKNOWN,
-      { user_message: 'An error occurred. Please try again.' }
+      { user_message: 'An error occurred. Please try again.' },
     );
 
     handle_error_with_recovery(error);
@@ -460,7 +460,7 @@ export function initialize_error_recovery() {
   return {
     google_maps_recovery,
     form_recovery,
-    retry_manager
+    retry_manager,
   };
 }
 

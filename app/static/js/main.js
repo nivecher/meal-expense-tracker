@@ -15,18 +15,18 @@ const pageModules = {
 // Initialize essential UI components directly
 function initUI() {
   // Bootstrap tooltips
-  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
     new bootstrap.Tooltip(el);
   });
 
   // Bootstrap popovers
-  document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
+  document.querySelectorAll('[data-bs-toggle="popover"]').forEach((el) => {
     new bootstrap.Popover(el, { html: true });
   });
 
   // Smooth scrolling for anchor links
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', e => {
+  document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+    anchor.addEventListener('click', (e) => {
       e.preventDefault();
       const target = document.querySelector(anchor.getAttribute('href'));
       target?.scrollIntoView({ behavior: 'smooth' });
@@ -53,12 +53,12 @@ async function init() {
   await loadPageModule();
 
   // Auto-dismiss alerts after 5 seconds
-  document.querySelectorAll('.alert-dismissible').forEach(alert => {
+  document.querySelectorAll('.alert-dismissible').forEach((alert) => {
     setTimeout(() => new bootstrap.Alert(alert).close(), 5000);
   });
 
   // Loading state for buttons
-  document.querySelectorAll('[data-loading]').forEach(button => {
+  document.querySelectorAll('[data-loading]').forEach((button) => {
     button.addEventListener('click', function() {
       const loadingText = this.dataset.loading;
       this.dataset.originalText = this.innerHTML;

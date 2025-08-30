@@ -123,7 +123,7 @@ function initialize_restaurant_map(map_container) {
    * @param {string} placeId - The Google Places ID of the restaurant
    * @returns {Promise<Object>} The added restaurant data
    */
-  const addRestaurant = async (placeId) => {
+  const addRestaurant = async(placeId) => {
     if (!placeId) {
       updateStatus('Error: Missing place ID', 'danger');
       throw new Error('Missing place ID');
@@ -338,7 +338,7 @@ function initialize_restaurant_map(map_container) {
 
     const setupResultItemInteractions = () => {
       document.querySelectorAll('.restaurant-item').forEach((item) => {
-        item.addEventListener('click', function (e) {
+        item.addEventListener('click', function(e) {
           if (e.target.closest('.add-restaurant')) {
             return;
           }
@@ -405,7 +405,7 @@ function initialize_restaurant_map(map_container) {
    * Search for nearby restaurants based on user's location and search criteria
    * @returns {Promise<void>}
    */
-  const searchNearbyRestaurants = async () => {
+  const searchNearbyRestaurants = async() => {
     if (!userPosition) {
       updateStatus('Please allow location access to search for nearby restaurants.', 'warning');
       return;
@@ -602,7 +602,7 @@ function initialize_restaurant_map(map_container) {
 
   // ... (rest of the file)
 
-  const initMap = async () => {
+  const initMap = async() => {
     updateStatus('Initializing map...', 'info');
 
     try {

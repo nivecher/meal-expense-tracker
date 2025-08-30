@@ -22,6 +22,10 @@ from sqlalchemy.orm import joinedload
 # Import Expense model here to avoid circular imports
 from app.extensions import db
 from app.restaurants import bp, services
+from app.restaurants.exceptions import (
+    DuplicateGooglePlaceIdError,
+    DuplicateRestaurantError,
+)
 from app.restaurants.forms import RestaurantForm
 from app.restaurants.models import Restaurant
 from app.restaurants.services import calculate_expense_stats
@@ -349,9 +353,9 @@ def import_restaurants():
     return render_template("restaurants/import.html", form=form)
 
 
-@bp.route("/google-places", methods=["GET", "POST"])
+@bp.route("/find-places", methods=["GET", "POST"])
 @login_required
-def google_places_search():
+def find_places():
     """Search for restaurants using Google Places API.
 
     This route renders a page where users can search for restaurants
@@ -472,6 +476,32 @@ def _create_restaurant_from_form(form):
         restaurant, is_new = create_restaurant(current_user.id, form)
         current_app.logger.info(f"Restaurant {'created' if is_new else 'updated'}: {restaurant.id}")
         return (restaurant, is_new), None
+    except DuplicateGooglePlaceIdError as e:
+        current_app.logger.warning(f"Duplicate Google Place ID: {e.google_place_id}")
+        return None, (
+            jsonify(
+                {
+                    "success": False,
+                    "error": e.to_dict(),
+                    "message": e.message,
+                    "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=e.existing_restaurant.id),
+                }
+            ),
+            409,
+        )
+    except DuplicateRestaurantError as e:
+        current_app.logger.warning(f"Duplicate restaurant: {e.name} in {e.city}")
+        return None, (
+            jsonify(
+                {
+                    "success": False,
+                    "error": e.to_dict(),
+                    "message": e.message,
+                    "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=e.existing_restaurant.id),
+                }
+            ),
+            409,
+        )
     except Exception as e:
         current_app.logger.error(f"Error creating restaurant: {str(e)}", exc_info=True)
         return None, (jsonify({"success": False, "message": "An error occurred while creating the restaurant"}), 500)
@@ -541,21 +571,25 @@ def add_from_google_places():
     data = validation_result["data"]
     csrf_token = validation_result["csrf_token"]
 
-    # Check if restaurant already exists by google_place_id
+    # Check if restaurant already exists by google_place_id using enhanced error handling
     if "google_place_id" in data and data["google_place_id"]:
         existing_restaurant = Restaurant.query.filter_by(
             google_place_id=data["google_place_id"], user_id=current_user.id
         ).first()
 
         if existing_restaurant:
-            return jsonify(
-                {
-                    "success": True,
-                    "exists": True,
-                    "restaurant_id": existing_restaurant.id,
-                    "restaurant_name": existing_restaurant.name,
-                    "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=existing_restaurant.id),
-                }
+            # Return error response to trigger enhanced frontend handling
+            error = DuplicateGooglePlaceIdError(data["google_place_id"], existing_restaurant)
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": error.to_dict(),
+                        "message": error.message,
+                        "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=existing_restaurant.id),
+                    }
+                ),
+                409,
             )
 
     # Prepare the form data

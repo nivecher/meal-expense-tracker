@@ -33,12 +33,43 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     # Load configuration from config object
     app.config.from_object(config)
 
+    # Configure static file headers
+    @app.after_request
+    def add_static_headers(response):
+        """Add cache-control and other headers for static files."""
+        if response.headers.get("Content-Type"):
+            content_type = response.headers.get("Content-Type")
+
+            # Cache static assets for longer periods with immutable directive
+            if any(ext in content_type for ext in ["css", "javascript", "image"]):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"  # 1 year, immutable
+            elif "html" in content_type:
+                response.headers["Cache-Control"] = "no-cache, no-store"
+            else:
+                response.headers["Cache-Control"] = "public, max-age=3600"  # 1 hour
+
+        # Security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+
+        # Remove deprecated headers if they exist
+        response.headers.pop("Pragma", None)
+
+        # Only add CSP for HTML responses to avoid unnecessary headers on static resources
+        if content_type and "html" in content_type:
+            response.headers["Content-Security-Policy"] = (
+                "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.jquery.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; connect-src 'self' https://maps.googleapis.com https://places.googleapis.com; object-src 'none'; base-uri 'self';"
+            )
+        # Remove deprecated X-XSS-Protection (modern browsers have built-in XSS protection)
+
+        return response
+
     # Register service worker route with proper headers
     @app.route("/service-worker.js")
     def service_worker():
         response = app.send_static_file("js/service-worker.js")
         response.headers["Service-Worker-Allowed"] = "/"
         response.headers["Content-Type"] = "application/javascript"
+        response.headers["Cache-Control"] = "no-cache, no-store"
         return response
 
     # Ensure required config values are set
@@ -90,6 +121,16 @@ def create_app(config_name: Optional[str] = None) -> Flask:
 
     # Configure CORS
     _configure_cors(app)
+
+    # Initialize CLI commands
+    from .auth.cli import register_commands as register_auth_commands
+    from .expenses.cli import register_commands as register_expenses_commands
+    from .restaurants.cli import register_commands as register_restaurant_commands
+
+    register_auth_commands(app)
+    register_expenses_commands(app)
+    register_restaurant_commands(app)
+    logger.debug("Initialized CLI commands")
 
     # Log registered routes
     _log_registered_routes(app)

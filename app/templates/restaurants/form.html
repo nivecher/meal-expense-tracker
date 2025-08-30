@@ -52,6 +52,13 @@
     </style>
 {% endblock styles %}
 {% block content %}
+    <!-- Breadcrumb Navigation -->
+    {% set breadcrumb_items = [
+            {'url': url_for('main.index'), 'title': 'Dashboard'},
+            {'url': url_for('restaurants.list_restaurants'), 'title': 'Restaurants'},
+            {'title': 'Edit Restaurant' if is_edit else 'Add Restaurant'}
+        ] %}
+    {% include 'includes/breadcrumb.html' %}
     <!-- Success/Error Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -234,9 +241,12 @@
                                                 <label class="form-label">Google Place ID</label>
                                                 <div class="input-group">
                                                     <input type="text"
+                                                           id="google_place_id_display"
+                                                           name="google_place_id_display"
                                                            class="form-control bg-light"
                                                            value="{{ form.google_place_id.data }}"
-                                                           readonly>
+                                                           readonly
+                                                           aria-describedby="google-place-id-help">
                                                     <button class="btn btn-outline-secondary"
                                                             type="button"
                                                             onclick="navigator.clipboard.writeText('{{ form.google_place_id.data }}')"
@@ -314,7 +324,8 @@
                 async
                 defer></script>
         <!-- Load simple restaurant autocomplete -->
-        <script src="{{ url_for('static', filename='js/utils/restaurant-autocomplete.js') }}"></script>
+        <script type="module"
+                src="{{ url_for('static', filename='js/utils/restaurant-autocomplete.js') }}"></script>
     {% endif %}
     <!-- Load restaurant form module -->
     <script type="module"

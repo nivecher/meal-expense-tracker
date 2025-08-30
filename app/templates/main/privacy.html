@@ -1,67 +1,69 @@
-{% extends "base.html" %}
-{% block title %}
-    Privacy Policy - {{ super() }}
-{% endblock title %}
-{% block content %}
-    <div class="container mt-4">
-        <div class="row">
-            <div class="col-lg-8 mx-auto">
-                <div class="card">
-                    <div class="card-header">
-                        <h1 class="h3 mb-0">Privacy Policy</h1>
-                    </div>
-                    <div class="card-body">
-                        <p class="text-muted">Last updated: {{ now.strftime("%B %d, %Y") }}</p>
-                        <p>
-                            At Meal Expense Tracker, we respect your privacy and are committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard your information when you use our Service.
-                        </p>
-                        <h2 class="h5 mt-4">1. Information We Collect</h2>
-                        <p>We collect several types of information from and about users of our Service, including:</p>
-                        <ul>
-                            <li>Personal identification information (name, email address, etc.)</li>
-                            <li>Transaction and expense data</li>
-                            <li>Usage data and analytics</li>
-                            <li>Device and connection information</li>
-                        </ul>
-                        <h2 class="h5 mt-4">2. How We Use Your Information</h2>
-                        <p>We use the information we collect for various purposes, including:</p>
-                        <ul>
-                            <li>To provide and maintain our Service</li>
-                            <li>To notify you about changes to our Service</li>
-                            <li>To allow you to participate in interactive features of our Service</li>
-                            <li>To provide customer support</li>
-                            <li>To gather analysis or valuable information to improve our Service</li>
-                            <li>To monitor the usage of our Service</li>
-                        </ul>
-                        <h2 class="h5 mt-4">3. Data Security</h2>
-                        <p>
-                            We implement appropriate technical and organizational measures to protect your personal data against unauthorized or unlawful processing, accidental loss, destruction, or damage.
-                        </p>
-                        <h2 class="h5 mt-4">4. Data Retention</h2>
-                        <p>
-                            We will retain your personal data only for as long as is necessary for the purposes set out in this Privacy Policy.
-                        </p>
-                        <h2 class="h5 mt-4">5. Your Data Protection Rights</h2>
-                        <p>You have the right to:</p>
-                        <ul>
-                            <li>Access, update, or delete your information</li>
-                            <li>Rectify inaccurate or incomplete information</li>
-                            <li>Object to our processing of your personal data</li>
-                            <li>Request restriction of processing your personal data</li>
-                            <li>Request data portability</li>
-                            <li>Withdraw consent</li>
-                        </ul>
-                        <h2 class="h5 mt-4">6. Changes to This Privacy Policy</h2>
-                        <p>
-                            We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.
-                        </p>
-                        <h2 class="h5 mt-4">7. Contact Us</h2>
-                        <p>
-                            If you have any questions about this Privacy Policy, please contact us at <a href="mailto:privacy@nivecher.com">privacy@nivecher.com</a>.
-                        </p>
-                    </div>
+{% extends "base.html" %} {% block title %} Privacy Policy - {{ super() }} {% endblock title %} {% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h1 class="h3 mb-0">Privacy Policy</h1>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Last updated: {{ now.strftime("%B %d, %Y") }}</p>
+                    <p>
+                        At Meal Expense Tracker, we respect your privacy and are committed to protecting your personal
+                        data. This Privacy Policy explains how we collect, use, and safeguard your information when you
+                        use our Service.
+                    </p>
+                    <h2 class="h5 mt-4">1. Information We Collect</h2>
+                    <p>We collect several types of information from and about users of our Service, including:</p>
+                    <ul>
+                        <li>Personal identification information (name, email address, etc.)</li>
+                        <li>Transaction and expense data</li>
+                        <li>Usage data and analytics</li>
+                        <li>Device and connection information</li>
+                    </ul>
+                    <h2 class="h5 mt-4">2. How We Use Your Information</h2>
+                    <p>We use the information we collect for various purposes, including:</p>
+                    <ul>
+                        <li>To provide and maintain our Service</li>
+                        <li>To notify you about changes to our Service</li>
+                        <li>To allow you to participate in interactive features of our Service</li>
+                        <li>To provide customer support</li>
+                        <li>To gather analysis or valuable information to improve our Service</li>
+                        <li>To monitor the usage of our Service</li>
+                    </ul>
+                    <h2 class="h5 mt-4">3. Data Security</h2>
+                    <p>
+                        We implement appropriate technical and organizational measures to protect your personal data
+                        against unauthorized or unlawful processing, accidental loss, destruction, or damage.
+                    </p>
+                    <h2 class="h5 mt-4">4. Data Retention</h2>
+                    <p>
+                        We will retain your personal data only for as long as is necessary for the purposes set out in
+                        this Privacy Policy.
+                    </p>
+                    <h2 class="h5 mt-4">5. Your Data Protection Rights</h2>
+                    <p>You have the right to:</p>
+                    <ul>
+                        <li>Access, update, or delete your information</li>
+                        <li>Rectify inaccurate or incomplete information</li>
+                        <li>Object to our processing of your personal data</li>
+                        <li>Request restriction of processing your personal data</li>
+                        <li>Request data portability</li>
+                        <li>Withdraw consent</li>
+                    </ul>
+                    <h2 class="h5 mt-4">6. Changes to This Privacy Policy</h2>
+                    <p>
+                        We may update our Privacy Policy from time to time. We will notify you of any changes by posting
+                        the new Privacy Policy on this page.
+                    </p>
+                    <h2 class="h5 mt-4">7. Contact Us</h2>
+                    <p>
+                        If you have any questions about this Privacy Policy, please contact us at
+                        <a href="mailto:privacy@nivecher.com">privacy@nivecher.com</a>.
+                    </p>
                 </div>
             </div>
         </div>
     </div>
+</div>
 {% endblock content %}

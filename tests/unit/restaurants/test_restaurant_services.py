@@ -3,7 +3,6 @@
 import io
 from unittest.mock import patch
 
-import pytest
 from werkzeug.datastructures import FileStorage
 
 from app.restaurants.services import create_restaurant
@@ -20,9 +19,8 @@ def test_get_restaurant_success(session, test_restaurant):
 
 def test_get_restaurant_not_found(session):
     """Test getting a non-existent restaurant."""
-    with pytest.raises(Exception) as exc_info:
-        get_restaurant(9999, 1)
-    assert "404" in str(exc_info.value)
+    restaurant = get_restaurant(9999, 1)
+    assert restaurant is None
 
 
 def test_create_restaurant_success(session, test_user):
@@ -30,6 +28,11 @@ def test_create_restaurant_success(session, test_user):
 
     # Create a mock form with required fields
     class MockForm:
+        def __init__(self):
+            self.name = type("MockField", (), {"data": "New Test Restaurant"})()
+            self.city = type("MockField", (), {"data": "Test City"})()
+            self.google_place_id = None  # No google_place_id for this test
+
         def populate_obj(self, obj):
             # Set all required fields on the restaurant object
             obj.name = "New Test Restaurant"
@@ -48,10 +51,11 @@ def test_create_restaurant_success(session, test_user):
     form_mock = MockForm()
 
     # Call the create_restaurant function
-    restaurant = create_restaurant(user_id=test_user.id, form=form_mock)
+    restaurant, is_new = create_restaurant(user_id=test_user.id, form=form_mock)
 
     # Verify the restaurant was created with the correct data
     assert restaurant is not None
+    assert is_new is True
     assert restaurant.name == "New Test Restaurant"
     assert restaurant.type == "restaurant"
     assert restaurant.description == "Test description"
@@ -69,7 +73,7 @@ def test_create_restaurant_success(session, test_user):
 
 def test_import_restaurants_from_csv_success(session, test_user):
     """Test importing restaurants from a valid CSV file."""
-    with patch("app.restaurants.services.services._process_csv_file") as mock_process_csv:
+    with patch("app.restaurants.services._process_csv_file") as mock_process_csv:
         # Mock the CSV processing to return test data
         mock_process_csv.return_value = (
             True,
@@ -108,7 +112,7 @@ Test Restaurant 1,Italian,123 Main St,Test City,TS,12345,123-456-7890,https://ex
 
 def test_import_restaurants_invalid_csv(session, test_user):
     """Test importing restaurants with invalid CSV data."""
-    with patch("app.restaurants.services.services._process_csv_file") as mock_process_csv:
+    with patch("app.restaurants.services._process_csv_file") as mock_process_csv:
         # Mock the CSV processing to return an error
         mock_process_csv.return_value = (False, "Missing required fields", None)
 
@@ -132,7 +136,7 @@ Test Restaurant 1,Test City
 
 def test_import_restaurants_missing_columns(session, test_user):
     """Test importing a CSV with missing required columns."""
-    with patch("app.restaurants.services.services._process_csv_file") as mock_process_csv:
+    with patch("app.restaurants.services._process_csv_file") as mock_process_csv:
         # Mock the CSV processing to return an error
         mock_process_csv.return_value = (
             False,
@@ -161,8 +165,8 @@ Test Restaurant 1,123 Main St,Test City,TS,12345,123-456-7890,https://example1.c
 def test_import_restaurants_duplicate_restaurant(session, test_restaurant, test_user):
     """Test importing a restaurant that already exists."""
     with (
-        patch("app.restaurants.services.services._process_csv_file") as mock_process_csv,
-        patch("app.restaurants.services.services._import_restaurants_from_reader") as mock_import,
+        patch("app.restaurants.services._process_csv_file") as mock_process_csv,
+        patch("app.restaurants.services._import_restaurants_from_reader") as mock_import,
     ):
 
         # Mock the CSV processing to return test data

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import flash, redirect, render_template, request, url_for
+from flask import flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.auth import bp, services
@@ -8,6 +8,51 @@ from app.auth.models import User
 from app.extensions import db
 
 from .forms import ChangePasswordForm, LoginForm, RegistrationForm
+
+
+def _handle_login_failure():
+    """Handle login failure for both AJAX and regular requests."""
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "Invalid username or password",
+                    "errors": {"form": ["Invalid username or password"]},
+                }
+            ),
+            400,
+        )
+
+    flash("Invalid username or password", "error")
+    return redirect(url_for("auth.login", next=request.args.get("next")))
+
+
+def _handle_login_success(user, next_page):
+    """Handle successful login for both AJAX and regular requests."""
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify(
+            {
+                "success": True,
+                "message": "Logged in successfully",
+                "redirect": next_page,
+                "user": {"id": user.id, "username": user.username, "email": user.email},
+            }
+        )
+
+    return redirect(next_page)
+
+
+def _handle_form_validation_errors(form):
+    """Handle form validation errors for AJAX requests."""
+    if request.method == "POST" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        errors = {}
+        if form.errors:
+            for field, error_list in form.errors.items():
+                errors[field] = error_list
+
+        return jsonify({"success": False, "message": "Please correct the errors below", "errors": errors}), 400
+    return None
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -29,8 +74,7 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
-            flash("Invalid username or password", "error")
-            return redirect(url_for("auth.login", next=request.args.get("next")))
+            return _handle_login_failure()
 
         login_user(user, remember=form.remember_me.data)
 
@@ -38,7 +82,13 @@ def login():
         next_page = request.args.get("next")
         if not next_page or not next_page.startswith("/"):
             next_page = url_for("main.index")
-        return redirect(next_page)
+
+        return _handle_login_success(user, next_page)
+
+    # Handle AJAX validation errors
+    validation_response = _handle_form_validation_errors(form)
+    if validation_response:
+        return validation_response
 
     from datetime import datetime, timezone
 

@@ -11,9 +11,10 @@ import { GoogleMapsLoader } from '../utils/google-maps.js';
 import { initializeModalAccessibility } from '../utils/modal-accessibility.js';
 import { getCSRFToken } from '../utils/csrf-token.js';
 import { show_success_message, show_error_message } from '../utils/ui-feedback.js';
+import { mapPlaceTypesToRestaurant } from '../utils/cuisine-formatter.js';
 
 // Initialize the page when the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', async() => {
   // Get modal elements (success modal removed - using toasts instead)
   const errorModal = document.getElementById('errorModal');
 
@@ -52,7 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Check if we're on the places search page
-  const searchContainer = document.getElementById('google-places-search');
+  const searchContainer = document.getElementById('find-places-search');
   if (!searchContainer) return;
 
   try {
@@ -163,49 +164,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Ultra-aggressive fix: Use MutationObserver to watch for aria-hidden changes
+  // Setup aria-hidden watcher with proper error handling
   const setupAriaHiddenWatcher = (modal, modalName) => {
-    if (!modal) return;
+    // Safety: Validate inputs
+    if (!modal || !modalName) {
+      console.warn(`setupAriaHiddenWatcher: Invalid parameters - modal: ${!!modal}, modalName: ${modalName}`);
+      return null;
+    }
 
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'aria-hidden') {
-          const isHidden = modal.getAttribute('aria-hidden') === 'true';
-          const hasFocusedChild = modal.contains(document.activeElement);
+    try {
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'aria-hidden') {
+            try {
+              const isHidden = modal.getAttribute('aria-hidden') === 'true';
+              const hasFocusedChild = modal.contains(document.activeElement);
 
-          console.log(`${modalName}: aria-hidden changed to ${isHidden}, has focused child: ${hasFocusedChild}`);
+              console.log(`${modalName}: aria-hidden changed to ${isHidden}, has focused child: ${hasFocusedChild}`);
 
-          if (isHidden && hasFocusedChild) {
-            // Remove focus immediately when aria-hidden is being set to true
-            document.activeElement.blur();
-            console.log(`${modalName}: Emergency focus removal due to aria-hidden conflict`);
-          } else if (!isHidden && modal.style.display !== 'none') {
-            // Set focus when aria-hidden is removed and modal is visible
-            setTimeout(() => {
-              const targetBtn = modal.querySelector('#continue-searching-btn, #error-close-btn');
-              if (targetBtn && document.activeElement !== targetBtn) {
-                // Remove tabindex to make it focusable, then focus
-                targetBtn.removeAttribute('tabindex');
-                targetBtn.focus();
-                console.log(`${modalName}: Focus set after aria-hidden removed (via MutationObserver)`);
+              if (isHidden && hasFocusedChild) {
+                // Safety: Check if activeElement exists before blurring
+                if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                  document.activeElement.blur();
+                  console.log(`${modalName}: Emergency focus removal due to aria-hidden conflict`);
+                }
+              } else if (!isHidden && modal.style.display !== 'none') {
+                // Set focus when aria-hidden is removed and modal is visible
+                setTimeout(() => {
+                  const targetBtn = modal.querySelector('#continue-searching-btn, #error-close-btn');
+                  if (targetBtn && document.activeElement !== targetBtn) {
+                    // Safety: Ensure element can receive focus
+                    targetBtn.removeAttribute('tabindex');
+                    if (typeof targetBtn.focus === 'function') {
+                      targetBtn.focus();
+                      console.log(`${modalName}: Focus set after aria-hidden removed (via MutationObserver)`);
+                    }
+                  }
+                }, 50);
               }
-            }, 50);
+            } catch (error) {
+              console.error(`${modalName}: Error in aria-hidden mutation handler:`, error);
+            }
           }
-        }
+        });
       });
-    });
 
-    observer.observe(modal, {
-      attributes: true,
-      attributeFilter: ['aria-hidden']
-    });
+      observer.observe(modal, {
+        attributes: true,
+        attributeFilter: ['aria-hidden'],
+      });
 
-    console.log(`${modalName}: MutationObserver setup for aria-hidden monitoring`);
-    return observer;
+      console.log(`${modalName}: MutationObserver setup for aria-hidden monitoring`);
+      return observer;
+
+    } catch (error) {
+      console.error(`${modalName}: Failed to setup MutationObserver:`, error);
+      return null;
+    }
   };
 
-  // Set up watcher for error modal (success modal removed)
-  setupAriaHiddenWatcher(errorModal, 'Error Modal');
+  // Set up watcher for error modal with safety check
+  if (errorModal) {
+    setupAriaHiddenWatcher(errorModal, 'Error Modal');
+  } else {
+    console.warn('Restaurant Places Search: Error modal not found, skipping aria-hidden watcher setup');
+  }
 });
 
 /**
@@ -279,7 +302,7 @@ function build_restaurant_submission_data(restaurant, address_components, google
     country: address_components.country || '',
     phone: restaurant.formatted_phone_number || restaurant.nationalPhoneNumber || '',
     website: restaurant.website || restaurant.websiteURI || '',
-    google_place_id: google_place_id,
+    google_place_id,
     // Note: coordinates, rating, price_level would be looked up dynamically from Google Places API
   };
 }
@@ -468,69 +491,9 @@ function populate_hidden_form(restaurant, address_components) {
   });
 }
 
+// Use centralized cuisine formatting utility
 function mapPlaceTypesToForm(types, primaryType) {
-  const result = { type: '', cuisine: '' };
-
-  if (!types || !Array.isArray(types)) {
-    console.log('No types array provided for place type mapping');
-    return result;
-  }
-
-  console.log('Mapping place types:', types, 'Primary type:', primaryType);
-
-  // Map type based on Google Places types
-  if (types.includes('bar') || types.includes('night_club')) {
-    result.type = 'bar';
-  } else if (types.includes('cafe') || types.includes('coffee_shop')) {
-    result.type = 'cafe';
-  } else if (types.includes('bakery')) {
-    result.type = 'bakery';
-  } else if (types.includes('meal_takeaway') || types.includes('meal_delivery')) {
-    result.type = 'fast_food';
-  } else if (types.includes('restaurant') || types.includes('food') || types.includes('establishment')) {
-    result.type = 'restaurant';
-  }
-
-  // Map cuisine based on more specific types
-  if (types.includes('chinese_restaurant')) {
-    result.cuisine = 'chinese';
-  } else if (types.includes('italian_restaurant')) {
-    result.cuisine = 'italian';
-  } else if (types.includes('japanese_restaurant')) {
-    result.cuisine = 'japanese';
-  } else if (types.includes('mexican_restaurant')) {
-    result.cuisine = 'mexican';
-  } else if (types.includes('indian_restaurant')) {
-    result.cuisine = 'indian';
-  } else if (types.includes('thai_restaurant')) {
-    result.cuisine = 'thai';
-  } else if (types.includes('french_restaurant')) {
-    result.cuisine = 'french';
-  } else if (types.includes('american_restaurant')) {
-    result.cuisine = 'american';
-  } else if (types.includes('pizza_restaurant')) {
-    result.cuisine = 'pizza';
-  } else if (types.includes('seafood_restaurant')) {
-    result.cuisine = 'seafood';
-  } else if (types.includes('steak_house')) {
-    result.cuisine = 'steakhouse';
-  } else if (types.includes('sushi_restaurant')) {
-    result.cuisine = 'sushi';
-  }
-
-  // Use primaryType as fallback if available
-  if (!result.type && primaryType) {
-    if (primaryType.includes('restaurant')) {
-      result.type = 'restaurant';
-    } else if (primaryType.includes('cafe')) {
-      result.type = 'cafe';
-    } else if (primaryType.includes('bar')) {
-      result.type = 'bar';
-    }
-  }
-
-  console.log('Mapped to type:', result.type, 'cuisine:', result.cuisine);
-  return result;
+  return mapPlaceTypesToRestaurant(types, primaryType);
 }
 
 // Conversion functions removed - using Google Places native format directly
@@ -555,7 +518,7 @@ function build_restaurant_data(restaurant, address_components) {
   // These would be looked up dynamically when needed for display
 
   return {
-    name: name,
+    name,
     type: typeAndCuisine.type || 'restaurant',  // Use mapped type or default
     cuisine: typeAndCuisine.cuisine || '',      // Use mapped cuisine
     address: address_components.street || restaurant.formatted_address || '',
@@ -563,9 +526,9 @@ function build_restaurant_data(restaurant, address_components) {
     state: address_components.state || '',
     postal_code: address_components.postalCode || '',
     country: address_components.country || '',
-    phone: phone,
-    website: website,
-    google_place_id: google_place_id,
+    phone,
+    website,
+    google_place_id,
     // Note: rating would be user's personal rating, not Google's
     // Google's rating, coordinates, price_level would be looked up dynamically
   };
@@ -593,12 +556,11 @@ async function check_for_duplicate_restaurant(restaurant_data) {
   return await response.json();
 }
 
-
 /**
  * Handle search errors
  * @param {string} message - Error message
  */
-function handleSearchError (message) {
+function handleSearchError(message) {
   console.error('Search error:', message);
 
   // Show error modal
@@ -622,7 +584,7 @@ function show_duplicate_restaurant_warning(check_result) {
 
 function update_restaurant_card_to_view_mode(check_result) {
   const restaurant_cards = document.querySelectorAll('.restaurant-card');
-  restaurant_cards.forEach(card => {
+  restaurant_cards.forEach((card) => {
     const card_place_id = card.getAttribute('data-place-id');
     if (card_place_id === check_result.google_place_id) {
       const button = card.querySelector('.add-restaurant-btn');

@@ -87,7 +87,21 @@ async function selectRestaurant(restaurantData) {
 
   } catch (error) {
     logger.error('Failed to add restaurant:', error);
-    showErrorToast('Failed to add restaurant. Please try again.');
+
+    // Handle structured error responses for enhanced UX
+    if (error.error && error.error.code === 'DUPLICATE_GOOGLE_PLACE_ID') {
+      // Show enhanced modal for Google Place ID duplicates
+      showDuplicateGooglePlaceIdModal(error.error);
+    } else if (error.error && error.error.code === 'DUPLICATE_RESTAURANT') {
+      // Show enhanced modal for name/city duplicates
+      showDuplicateRestaurantModal(error.error);
+    } else if (error.message && error.message.includes('Google Place ID')) {
+      showErrorToast('This restaurant already exists in your list. Please search for it in your existing restaurants.');
+    } else if (error.message && error.message.includes('already exists')) {
+      showErrorToast('A similar restaurant already exists. Please check your existing restaurants or modify the details.');
+    } else {
+      showErrorToast('Failed to add restaurant. Please check your connection and try again.');
+    }
   } finally {
     if (currentLoadingOverlay) {
       currentLoadingOverlay.hide();
@@ -163,9 +177,9 @@ async function initMap() {
         {
           featureType: 'poi.business',
           elementType: 'labels',
-          stylers: [{ visibility: 'on' }]
-        }
-      ]
+          stylers: [{ visibility: 'on' }],
+        },
+      ],
     });
 
     // Create info window
@@ -198,7 +212,7 @@ function getCurrentLocation() {
       (position) => {
         resolve({
           lat: position.coords.latitude,
-          lng: position.coords.longitude
+          lng: position.coords.longitude,
         });
       },
       (error) => {
@@ -207,8 +221,8 @@ function getCurrentLocation() {
       {
         enableHighAccuracy: true,
         timeout: 5000,
-        maximumAge: 0
-      }
+        maximumAge: 0,
+      },
     );
   });
 }
@@ -217,7 +231,7 @@ function getCurrentLocation() {
  * Clear existing markers
  */
 function clearMarkers() {
-  markers.forEach(marker => marker.setMap(null));
+  markers.forEach((marker) => marker.setMap(null));
   markers = [];
 }
 
@@ -229,12 +243,12 @@ function createMarker(restaurant) {
 
   const marker = new google.maps.Marker({
     position: restaurant.location,
-    map: map,
+    map,
     title: restaurant.name,
     icon: {
       url: 'https://maps.google.com/mapfiles/ms/icons/restaurant.png',
-      scaledSize: new google.maps.Size(32, 32)
-    }
+      scaledSize: new google.maps.Size(32, 32),
+    },
   });
 
   // Add click listener to show info window
@@ -290,7 +304,7 @@ async function handleSearch(event) {
       displayResults(results.restaurants);
 
       // Add markers to the map
-      results.restaurants.forEach(restaurant => {
+      results.restaurants.forEach((restaurant) => {
         if (restaurant.location) {
           createMarker(restaurant);
         }
@@ -299,7 +313,7 @@ async function handleSearch(event) {
       // Fit map to show all markers if we have any
       if (markers.length > 0) {
         const bounds = new google.maps.LatLngBounds();
-        markers.forEach(marker => bounds.extend(marker.getPosition()));
+        markers.forEach((marker) => bounds.extend(marker.getPosition()));
         map.fitBounds(bounds);
 
         // Don't zoom in too much for single results
@@ -410,6 +424,168 @@ if (document.readyState === 'loading') {
   // DOM is already loaded
   initializeApp().catch((error) => {
     logger.error('Unhandled error in initializeApp:', error);
+  });
+}
+
+/**
+ * Show modal for duplicate Google Place ID errors
+ */
+function showDuplicateGooglePlaceIdModal(error) {
+  const { existing_restaurant, google_place_id } = error;
+
+  showDuplicateRestaurantModal({
+    title: 'Restaurant Already Exists',
+    message: `You already have "${existing_restaurant.full_name}" in your restaurants.`,
+    details: 'This restaurant has the same Google Place ID and cannot be added again.',
+    existing_restaurant,
+    primaryAction: {
+      label: 'View Existing Restaurant',
+      url: `/restaurants/${existing_restaurant.id}`,
+    },
+    secondaryAction: {
+      label: 'Add Expense',
+      url: `/expenses/add?restaurant_id=${existing_restaurant.id}`,
+    },
+  });
+}
+
+/**
+ * Show modal for duplicate restaurant (name/city) errors
+ */
+function showDuplicateRestaurantModal(error) {
+  if (typeof error === 'object' && error.existing_restaurant) {
+    // Called with structured error object
+    const { existing_restaurant, name, city } = error;
+
+    showDuplicateModal({
+      title: 'Similar Restaurant Found',
+      message: `You already have a restaurant named "${name}"${city ? ` in ${city}` : ''}.`,
+      details: 'This might be the same restaurant. You can view the existing one or modify your input to make it unique.',
+      existing_restaurant,
+      primaryAction: {
+        label: 'View Existing Restaurant',
+        url: `/restaurants/${existing_restaurant.id}`,
+      },
+      secondaryAction: {
+        label: 'Continue Adding',
+        action: () => showWarningToast('Please modify the restaurant name or location to make it unique.'),
+      },
+    });
+  } else {
+    // Called with options object (from the first function)
+    showDuplicateModal(error);
+  }
+}
+
+/**
+ * Generic modal for duplicate restaurant conflicts
+ */
+function showDuplicateModal(options) {
+  const {
+    title,
+    message,
+    details,
+    existing_restaurant,
+    primaryAction,
+    secondaryAction,
+  } = options;
+
+  const modalHtml = `
+    <div class="modal fade duplicate-restaurant-modal" id="duplicateRestaurantModal" tabindex="-1" aria-labelledby="duplicateRestaurantModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="duplicateRestaurantModalLabel">
+              <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+              ${title}
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning" role="alert">
+              <strong>${message}</strong>
+              <br><small class="text-muted">${details}</small>
+            </div>
+
+            <div class="card mt-3">
+              <div class="card-body">
+                <h6 class="card-title">
+                  <i class="fas fa-utensils me-2"></i>
+                  ${existing_restaurant.full_name}
+                </h6>
+                <div class="d-flex gap-2 mt-2">
+                  <a href="/restaurants/${existing_restaurant.id}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-eye me-1"></i>
+                    View Details
+                  </a>
+                  <a href="/expenses/add?restaurant_id=${existing_restaurant.id}" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-plus me-1"></i>
+                    Add Expense
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            ${secondaryAction ? `
+              <button type="button" class="btn btn-warning" id="secondaryActionBtn">
+                ${secondaryAction.label}
+              </button>
+            ` : ''}
+            <button type="button" class="btn btn-primary" id="primaryActionBtn">
+              ${primaryAction.label}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Remove existing modal if any
+  const existingModal = document.getElementById('duplicateRestaurantModal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Add modal to DOM
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const modalElement = document.getElementById('duplicateRestaurantModal');
+
+  // Add event listeners
+  const primaryBtn = modalElement.querySelector('#primaryActionBtn');
+  const secondaryBtn = modalElement.querySelector('#secondaryActionBtn');
+
+  if (primaryBtn) {
+    primaryBtn.addEventListener('click', () => {
+      if (primaryAction.url) {
+        window.location.href = primaryAction.url;
+      } else if (primaryAction.action) {
+        primaryAction.action();
+      }
+    });
+  }
+
+  if (secondaryBtn && secondaryAction) {
+    secondaryBtn.addEventListener('click', () => {
+      if (secondaryAction.url) {
+        window.location.href = secondaryAction.url;
+      } else if (secondaryAction.action) {
+        secondaryAction.action();
+        const bsModal = bootstrap.Modal.getInstance(modalElement);
+        if (bsModal) bsModal.hide();
+      }
+    });
+  }
+
+  // Show modal
+  const bsModal = new bootstrap.Modal(modalElement);
+  bsModal.show();
+
+  // Clean up modal after hiding
+  modalElement.addEventListener('hidden.bs.modal', () => {
+    modalElement.remove();
   });
 }
 

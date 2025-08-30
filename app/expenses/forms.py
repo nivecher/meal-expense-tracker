@@ -5,7 +5,15 @@ from decimal import Decimal, InvalidOperation
 
 from flask import current_app
 from flask_wtf import FlaskForm
-from wtforms import DateField, DecimalField, SelectField, TextAreaField, ValidationError
+from flask_wtf.file import FileField
+from wtforms import (
+    DateField,
+    DecimalField,
+    SelectField,
+    SubmitField,
+    TextAreaField,
+    ValidationError,
+)
 from wtforms.validators import DataRequired, NumberRange, Optional
 
 
@@ -98,3 +106,10 @@ class ExpenseForm(FlaskForm):
         validators=[Optional()],
     )
     notes = TextAreaField("Notes", validators=[Optional()], render_kw={"rows": 3})
+
+
+class ExpenseImportForm(FlaskForm):
+    """Form for importing expenses from CSV or JSON files."""
+
+    file = FileField("CSV or JSON File", validators=[DataRequired()])
+    submit = SubmitField("Import")

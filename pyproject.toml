@@ -35,19 +35,8 @@ multi_line_output = 3
 
 
 
-[tool.djlint]
-profile = "django"
-indent = 4
-max_line_length = 120
-require_pragma = false
-format_attribute_template_tags = true
-format_css = true
-format_js = true
-use_gitignore = true
-extend_include = [ "*.html", "*.jinja", "*.j2",]
-
-[tool.djlint.ignore]
-ignore = [ "venv/*", ".git/*", "node_modules/*", "*.min.*",]
+# djlint config moved to .djlintrc for better maintainability
+# See .djlintrc for the actual configuration
 
 [tool.mypy]
 python_version = "3.13"
@@ -85,8 +74,7 @@ ignore_errors = true
 
 ## Bandit config consolidated to .bandit and pre-commit
 
-[tool.djlint.extend]
-rules = [ "H025", "H006", "H007",]
+
 
 [tool.pytest.ini_options]
 testpaths = [ "tests",]

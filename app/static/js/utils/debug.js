@@ -9,7 +9,7 @@
  * Initialize debug logging for Google Maps API
  * @param {string} apiKey - The Google Maps API key
  */
-export function initGoogleMapsDebug (apiKey) {
+export function initGoogleMapsDebug(apiKey) {
   console.log('Debug: Initializing Google Maps debug tools');
 
   if (!apiKey) {

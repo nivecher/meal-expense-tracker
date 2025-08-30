@@ -3,6 +3,9 @@
  * Simple, focused autocomplete for restaurant search field
  */
 
+// Import cuisine formatting utilities
+import { mapPlaceTypesToRestaurant } from './cuisine-formatter.js';
+
 // Global state
 let search_input = null;
 let suggestions_container = null;
@@ -80,7 +83,7 @@ async function fetch_suggestions(query, request_id) {
 
   const { suggestions } = await Promise.race([
     google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request),
-    timeout_promise
+    timeout_promise,
   ]);
 
   // Check if still latest request
@@ -147,7 +150,7 @@ function show_loading_state() {
 }
 
 function show_suggestions(suggestions) {
-  const html = suggestions.map(suggestion => {
+  const html = suggestions.map((suggestion) => {
     const { place_id, main_text, secondary_text } = extract_suggestion_data(suggestion);
     return create_suggestion_html(place_id, main_text, secondary_text);
   }).join('');
@@ -192,7 +195,7 @@ function create_suggestion_html(place_id, main_text, secondary_text) {
 }
 
 function setup_suggestion_handlers() {
-  suggestions_container.querySelectorAll('.dropdown-item').forEach(item => {
+  suggestions_container.querySelectorAll('.dropdown-item').forEach((item) => {
     item.addEventListener('click', function(e) {
       e.preventDefault();
       select_restaurant(this.dataset.placeId);
@@ -204,11 +207,11 @@ async function select_restaurant(place_id) {
   try {
     const place = new google.maps.places.Place({
       id: place_id,
-      requestedLanguage: 'en'
+      requestedLanguage: 'en',
     });
 
     await place.fetchFields({
-      fields: ['id', 'displayName', 'formattedAddress', 'websiteURI', 'nationalPhoneNumber', 'addressComponents', 'types', 'primaryType']
+      fields: ['id', 'displayName', 'formattedAddress', 'websiteURI', 'nationalPhoneNumber', 'addressComponents', 'types', 'primaryType'],
     });
 
     populate_form(place);
@@ -273,69 +276,9 @@ function parse_address_components(addressComponents) {
   return address_components;
 }
 
+// Use centralized cuisine formatting utility
 function mapPlaceTypesToForm(types, primaryType) {
-  const result = { type: '', cuisine: '' };
-
-  if (!types || !Array.isArray(types)) {
-    console.log('Restaurant Autocomplete: No types array provided for place type mapping');
-    return result;
-  }
-
-  console.log('Restaurant Autocomplete: Mapping place types:', types, 'Primary type:', primaryType);
-
-  // Map type based on Google Places types
-  if (types.includes('bar') || types.includes('night_club')) {
-    result.type = 'bar';
-  } else if (types.includes('cafe') || types.includes('coffee_shop')) {
-    result.type = 'cafe';
-  } else if (types.includes('bakery')) {
-    result.type = 'bakery';
-  } else if (types.includes('meal_takeaway') || types.includes('meal_delivery')) {
-    result.type = 'fast_food';
-  } else if (types.includes('restaurant') || types.includes('food') || types.includes('establishment')) {
-    result.type = 'restaurant';
-  }
-
-  // Map cuisine based on more specific types
-  if (types.includes('chinese_restaurant')) {
-    result.cuisine = 'chinese';
-  } else if (types.includes('italian_restaurant')) {
-    result.cuisine = 'italian';
-  } else if (types.includes('japanese_restaurant')) {
-    result.cuisine = 'japanese';
-  } else if (types.includes('mexican_restaurant')) {
-    result.cuisine = 'mexican';
-  } else if (types.includes('indian_restaurant')) {
-    result.cuisine = 'indian';
-  } else if (types.includes('thai_restaurant')) {
-    result.cuisine = 'thai';
-  } else if (types.includes('french_restaurant')) {
-    result.cuisine = 'french';
-  } else if (types.includes('american_restaurant')) {
-    result.cuisine = 'american';
-  } else if (types.includes('pizza_restaurant')) {
-    result.cuisine = 'pizza';
-  } else if (types.includes('seafood_restaurant')) {
-    result.cuisine = 'seafood';
-  } else if (types.includes('steak_house')) {
-    result.cuisine = 'steakhouse';
-  } else if (types.includes('sushi_restaurant')) {
-    result.cuisine = 'sushi';
-  }
-
-  // Use primaryType as fallback if available
-  if (!result.type && primaryType) {
-    if (primaryType.includes('restaurant')) {
-      result.type = 'restaurant';
-    } else if (primaryType.includes('cafe')) {
-      result.type = 'cafe';
-    } else if (primaryType.includes('bar')) {
-      result.type = 'bar';
-    }
-  }
-
-  console.log('Restaurant Autocomplete: Mapped to type:', result.type, 'cuisine:', result.cuisine);
-  return result;
+  return mapPlaceTypesToRestaurant(types, primaryType);
 }
 
 function populate_form(place) {
@@ -355,17 +298,17 @@ function populate_form(place) {
   const google_place_id = place.id || place.placeId || place.place_id || '';
 
   const fields = {
-    'name': name,
-    'type': typeAndCuisine.type || '',
-    'cuisine': typeAndCuisine.cuisine || '',
-    'address': address_components.street || place.formattedAddress || '',
-    'city': address_components.city || '',
-    'state': address_components.state || '',
-    'postal_code': address_components.postalCode || '',
-    'country': address_components.country || '',
-    'phone': phone,
-    'website': website,
-    'google_place_id': google_place_id,
+    name,
+    type: typeAndCuisine.type || '',
+    cuisine: typeAndCuisine.cuisine || '',
+    address: address_components.street || place.formattedAddress || '',
+    city: address_components.city || '',
+    state: address_components.state || '',
+    postal_code: address_components.postalCode || '',
+    country: address_components.country || '',
+    phone,
+    website,
+    google_place_id,
     // Note: rating would be user's personal rating, not Google's
     // Google's rating, coordinates, price_level would be looked up dynamically
   };
@@ -443,7 +386,7 @@ function disable_autocomplete_for_session() {
 }
 
 function setup_click_outside_handler() {
-  document.addEventListener('click', function(e) {
+  document.addEventListener('click', (e) => {
     if (!search_input.contains(e.target) && !suggestions_container.contains(e.target)) {
       hide_suggestions();
     }

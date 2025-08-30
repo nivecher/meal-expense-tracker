@@ -17,6 +17,7 @@
 /* Base Navbar */
 .navbar {
   min-height: var(--navbar-height);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   background: var(--navbar-bg);
   box-shadow: var(--shadow);
@@ -80,6 +81,7 @@
   border: 1px solid var(--bs-border-color);
   transform-origin: top center;
   animation: fadeIn 0.15s ease-out;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   background-color: rgba(255, 255, 255, 0.85);
 }

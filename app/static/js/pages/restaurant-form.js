@@ -14,7 +14,7 @@ let addressAutocompleteInitialized = false;
 // Enhanced error recovery state
 let error_recovery_initialized = false;
 let google_maps_fallback_enabled = false;
-let form_auto_save_enabled = true;
+const form_auto_save_enabled = true;
 
 // DOM elements
 const elements = {
@@ -40,7 +40,7 @@ function init() {
 
   if (!elements.form) return;
 
-    // Set up event listeners
+  // Set up event listeners
   elements.form.addEventListener('submit', handleFormSubmit);
 
   // Restaurant search autocomplete is now handled by restaurant-autocomplete.js
@@ -57,7 +57,7 @@ function init() {
   console.log('Setting up restaurantFormModule...');
   window.restaurantFormModule = {
     initAddressAutocomplete: initAddressAutocompleteWithClass,
-    showError: showError
+    showError,
   };
   console.log('restaurantFormModule set up and ready for Google Maps initialization');
 
@@ -128,7 +128,7 @@ function initAddressAutocompleteWithProvidedClass(AutocompleteClass) {
   try {
     addressAutocomplete = new AutocompleteClass(elements.address, {
       types: ['establishment', 'geocode'],
-      fields: ['place_id', 'name', 'formatted_address', 'address_components', 'geometry', 'formatted_phone_number', 'website']
+      fields: ['place_id', 'name', 'formatted_address', 'address_components', 'geometry', 'formatted_phone_number', 'website'],
     });
 
     addressAutocomplete.addListener('place_changed', () => {
@@ -206,7 +206,7 @@ function create_address_autocomplete(AutocompleteConstructor) {
     // Create autocomplete with minimal configuration to avoid runtime errors
     const autocomplete = new AutocompleteConstructor(elements.address, {
       types: ['establishment'],
-      fields: ['place_id', 'name', 'formatted_address', 'formatted_phone_number', 'website', 'geometry', 'address_components']
+      fields: ['place_id', 'name', 'formatted_address', 'formatted_phone_number', 'website', 'geometry', 'address_components'],
     });
 
     setup_address_autocomplete_listeners(autocomplete);
@@ -220,14 +220,14 @@ function create_address_autocomplete(AutocompleteConstructor) {
 
 function setup_address_autocomplete_listeners(autocomplete) {
   // Disable the default Enter key behavior
-  google.maps.event.addDomListener(elements.address, 'keydown', function(e) {
+  google.maps.event.addDomListener(elements.address, 'keydown', (e) => {
     if (e.keyCode === 13) {
       e.preventDefault();
     }
   });
 
   // Handle place selection with error boundary
-  autocomplete.addListener('place_changed', function() {
+  autocomplete.addListener('place_changed', () => {
     handle_address_place_changed(autocomplete);
   });
 }
@@ -251,7 +251,7 @@ function handle_address_place_changed(autocomplete) {
     // Fill form with place data
     fillFormWithPlace(place).then(() => {
       showAutocompleteFeedback(elements.address, 'Restaurant details loaded successfully!', 'success');
-    }).catch(error => {
+    }).catch((error) => {
       console.error('Error filling form with place:', error);
       showAutocompleteFeedback(elements.address, 'Failed to load restaurant details', 'error');
     });
@@ -290,28 +290,207 @@ function handleFormSubmit(event) {
     body: formData,
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
-      'X-CSRFToken': getCSRFToken()
-    }
+      'X-CSRFToken': getCSRFToken(),
+    },
   })
-  .then(response => {
-    if (!response.ok) {
-      return response.json().then(err => Promise.reject(err));
-    }
-    return response.json();
-  })
-  .then(data => {
-    showSuccess('Restaurant saved successfully!');
-    if (data.redirect_url) {
-      window.location.href = data.redirect_url;
-    }
-  })
-  .catch(error => {
-    console.error('Error saving restaurant:', error);
-    showError(error.message || 'Failed to save restaurant');
-  })
-  .finally(() => {
-    submitButton.disabled = false;
-    submitButton.innerHTML = originalText;
+    .then((response) => {
+      if (!response.ok) {
+        return response.json().then((err) => Promise.reject(err));
+      }
+      return response.json();
+    })
+    .then((data) => {
+      showSuccess('Restaurant saved successfully!');
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      }
+    })
+    .catch((error) => {
+      console.error('Error saving restaurant:', error);
+
+      // Handle structured error responses (already parsed by .then())
+      if (error && error.error) {
+        if (error.error.code === 'DUPLICATE_GOOGLE_PLACE_ID') {
+          handleDuplicateGooglePlaceIdError(error.error);
+          return;
+        } else if (error.error.code === 'DUPLICATE_RESTAURANT') {
+          handleDuplicateRestaurantError(error.error);
+          return;
+        }
+      }
+
+      // Enhanced error message parsing
+      let userMessage = error.message || error.error?.message || 'Failed to save restaurant';
+
+      if (userMessage.includes('Google Place ID')) {
+        userMessage = 'This restaurant already exists in your list. Please search for the existing restaurant or choose a different one.';
+      } else if (userMessage.includes('already exists')) {
+        userMessage = 'A similar restaurant already exists. Please check your existing restaurants or modify the details to make it unique.';
+      }
+
+      showError(userMessage);
+    })
+    .finally(() => {
+      submitButton.disabled = false;
+      submitButton.innerHTML = originalText;
+    });
+}
+
+// Enhanced error handling functions
+
+/**
+ * Handle duplicate Google Place ID error with user-friendly modal
+ */
+function handleDuplicateGooglePlaceIdError(error) {
+  const { existing_restaurant, google_place_id } = error;
+
+  showDuplicateRestaurantModal({
+    title: 'Restaurant Already Exists',
+    message: `You already have "${existing_restaurant.full_name}" in your restaurants.`,
+    details: 'This restaurant has the same Google Place ID and cannot be added again.',
+    existing_restaurant,
+    primaryAction: {
+      label: 'View Existing Restaurant',
+      url: `/restaurants/${existing_restaurant.id}`,
+    },
+    secondaryAction: {
+      label: 'Add Expense',
+      url: `/expenses/add?restaurant_id=${existing_restaurant.id}`,
+    },
+  });
+}
+
+/**
+ * Handle duplicate restaurant (name/city) error
+ */
+function handleDuplicateRestaurantError(error) {
+  const { existing_restaurant, name, city } = error;
+
+  showDuplicateRestaurantModal({
+    title: 'Similar Restaurant Found',
+    message: `You already have a restaurant named "${name}"${city ? ` in ${city}` : ''}.`,
+    details: 'This might be the same restaurant. You can view the existing one or modify your input to make it unique.',
+    existing_restaurant,
+    primaryAction: {
+      label: 'View Existing Restaurant',
+      url: `/restaurants/${existing_restaurant.id}`,
+    },
+    secondaryAction: {
+      label: 'Continue Adding',
+      action: () => showWarning('Please modify the restaurant name or location to make it unique.'),
+    },
+  });
+}
+
+/**
+ * Show modal for duplicate restaurant conflicts
+ */
+function showDuplicateRestaurantModal(options) {
+  const {
+    title,
+    message,
+    details,
+    existing_restaurant,
+    primaryAction,
+    secondaryAction,
+  } = options;
+
+  const modalHtml = `
+    <div class="modal fade" id="duplicateRestaurantModal" tabindex="-1" aria-labelledby="duplicateRestaurantModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="duplicateRestaurantModalLabel">
+              <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+              ${title}
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning" role="alert">
+              <strong>${message}</strong>
+              <br><small class="text-muted">${details}</small>
+            </div>
+
+            <div class="card mt-3">
+              <div class="card-body">
+                <h6 class="card-title">
+                  <i class="fas fa-utensils me-2"></i>
+                  ${existing_restaurant.full_name}
+                </h6>
+                <div class="d-flex gap-2 mt-2">
+                  <a href="/restaurants/${existing_restaurant.id}" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-eye me-1"></i>
+                    View Details
+                  </a>
+                  <a href="/expenses/add?restaurant_id=${existing_restaurant.id}" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-plus me-1"></i>
+                    Add Expense
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            ${secondaryAction ? `
+              <button type="button" class="btn btn-warning" id="secondaryActionBtn">
+                ${secondaryAction.label}
+              </button>
+            ` : ''}
+            <button type="button" class="btn btn-primary" id="primaryActionBtn">
+              ${primaryAction.label}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Remove existing modal if any
+  const existingModal = document.getElementById('duplicateRestaurantModal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Add modal to DOM
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const modalElement = document.getElementById('duplicateRestaurantModal');
+
+  // Add event listeners
+  const primaryBtn = modalElement.querySelector('#primaryActionBtn');
+  const secondaryBtn = modalElement.querySelector('#secondaryActionBtn');
+
+  if (primaryBtn) {
+    primaryBtn.addEventListener('click', () => {
+      if (primaryAction.url) {
+        window.location.href = primaryAction.url;
+      } else if (primaryAction.action) {
+        primaryAction.action();
+      }
+    });
+  }
+
+  if (secondaryBtn && secondaryAction) {
+    secondaryBtn.addEventListener('click', () => {
+      if (secondaryAction.url) {
+        window.location.href = secondaryAction.url;
+      } else if (secondaryAction.action) {
+        secondaryAction.action();
+        const bsModal = bootstrap.Modal.getInstance(modalElement);
+        if (bsModal) bsModal.hide();
+      }
+    });
+  }
+
+  // Show modal
+  const bsModal = new bootstrap.Modal(modalElement);
+  bsModal.show();
+
+  // Clean up modal after hiding
+  modalElement.addEventListener('hidden.bs.modal', () => {
+    modalElement.remove();
   });
 }
 
@@ -337,9 +516,9 @@ async function check_restaurant_exists(place_id) {
       headers: {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRFToken': getCSRFToken()
+        'X-CSRFToken': getCSRFToken(),
       },
-      body: JSON.stringify({ google_place_id: place_id })
+      body: JSON.stringify({ google_place_id: place_id }),
     });
 
     if (response.ok) {
@@ -362,7 +541,7 @@ function extract_place_fields(place) {
     name: place.name || '',
     google_place_id: place.place_id || '',
     phone: place.formatted_phone_number || '',
-    website: place.website || ''
+    website: place.website || '',
   };
 
   // Set coordinates
@@ -382,8 +561,8 @@ function parse_address_components(components) {
 
   console.log('Restaurant Form: Address components received:', components);
 
-  components.forEach(component => {
-    const types = component.types;
+  components.forEach((component) => {
+    const { types } = component;
     console.log('Restaurant Form: Processing component:', component.long_name, 'Types:', types);
 
     if (types.includes('street_number')) {
@@ -485,7 +664,7 @@ function showError(message) {
 
 function showAlert(type, message) {
   // Remove existing alerts
-  document.querySelectorAll('.alert-dismissible').forEach(alert => alert.remove());
+  document.querySelectorAll('.alert-dismissible').forEach((alert) => alert.remove());
 
   // Create new alert
   const alert = document.createElement('div');
@@ -516,7 +695,7 @@ function handleUrlParameters() {
       google_place_id: googlePlaceId,
       name: urlParams.get('name') || '',
       phone: urlParams.get('phone') || '',
-      website: urlParams.get('website') || ''
+      website: urlParams.get('website') || '',
     };
 
     // Handle coordinates
@@ -540,7 +719,7 @@ function handleUrlParameters() {
     });
 
     // Show info message that form was pre-filled
-    if (Object.values(fields).some(value => value)) {
+    if (Object.values(fields).some((value) => value)) {
       showSuccess('Form pre-filled with restaurant details from Google Places. Please review and complete any missing information.');
 
       // Clear URL parameters to keep URL clean
@@ -656,7 +835,7 @@ function setup_form_auto_save() {
         const form_data = get_form_data();
         const save_data = {
           data: form_data,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         };
         localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(save_data));
         console.log('Form data auto-saved');
@@ -804,7 +983,7 @@ function handle_google_maps_auth_failure() {
   if (window.gtag) {
     window.gtag('event', 'google_maps_auth_failure', {
       event_category: 'error',
-      event_label: 'google_maps_api_key_invalid'
+      event_label: 'google_maps_api_key_invalid',
     });
   }
 }
@@ -829,7 +1008,7 @@ function get_form_data() {
   const form_data = {};
   const inputs = elements.form.querySelectorAll('input, textarea, select');
 
-  inputs.forEach(input => {
+  inputs.forEach((input) => {
     if (input.name) {
       form_data[input.name] = input.value;
     }
@@ -878,9 +1057,9 @@ async function submit_form_with_enhanced_recovery(form_data) {
         body: form_data,
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRFToken': getCsrfToken()
+          'X-CSRFToken': getCsrfToken(),
         },
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeout_id);
@@ -921,7 +1100,7 @@ async function submit_form_with_enhanced_recovery(form_data) {
         throw error;
       } else {
         // Wait before retrying with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
       }
     }
   }
@@ -945,7 +1124,7 @@ function save_form_for_offline_submission(form_data) {
     stored_submissions.push({
       data: data_object,
       timestamp: Date.now(),
-      endpoint: elements.form?.action || window.location.pathname
+      endpoint: elements.form?.action || window.location.pathname,
     });
 
     localStorage.setItem(offline_key, JSON.stringify(stored_submissions));
@@ -982,8 +1161,8 @@ async function retry_offline_submissions() {
           body: form_data,
           headers: {
             'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRFToken': getCsrfToken()
-          }
+            'X-CSRFToken': getCsrfToken(),
+          },
         });
 
         if (response.ok) {

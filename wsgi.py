@@ -40,6 +40,30 @@ def run_migrations() -> None:
         print("Database migrations applied successfully")
 
 
+# AWS Lambda handler
+def lambda_handler(event, context):
+    """Lambda handler that delegates to the lambda_handler module.
+
+    This function imports and calls the actual lambda_handler from lambda_handler.py.
+    This approach keeps WSGI and Lambda concerns separate while satisfying the
+    Terraform configuration expectation of wsgi.lambda_handler.
+    """
+    try:
+        from lambda_handler import lambda_handler as actual_handler
+
+        return actual_handler(event, context)
+    except ImportError as e:
+        # Fallback error response if lambda_handler module is not available
+        import json
+
+        return {
+            "statusCode": 500,
+            "body": json.dumps({"error": f"Lambda handler module not found: {str(e)}"}),
+            "headers": {"Content-Type": "application/json"},
+            "isBase64Encoded": False,
+        }
+
+
 if __name__ == "__main__":
     # Local development server
     host = os.environ.get("HOST", "0.0.0.0")

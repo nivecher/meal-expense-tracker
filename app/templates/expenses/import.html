@@ -1,0 +1,124 @@
+{% extends "base.html" %} {% block title %} Import Expenses {% endblock title %} {% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h4 mb-0">Import Expenses</h2>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for category,
+                    message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %} {% endif %} {% endwith %}
+                    <div class="mb-4">
+                        <h3 class="h5 mb-3">Instructions</h3>
+                        <p
+                            >Upload a CSV or JSON file containing expense information. The file must include the
+                            following required fields:</p
+                        >
+                        <h4 class="h6 mt-3">Required Fields:</h4>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            The following fields are <strong>required</strong> in your file:
+                        </div>
+                        <ul class="mb-3">
+                            <li> <code>date</code> - Expense date (YYYY-MM-DD format) </li>
+                            <li> <code>amount</code> - Expense amount (numeric value) </li>
+                        </ul>
+                        <h4 class="h6 mt-3">Optional Fields:</h4>
+                        <ul>
+                            <li> <code>meal_type</code> - Type of meal (breakfast, lunch, dinner, snack) </li>
+                            <li> <code>notes</code> - Additional notes about the expense </li>
+                            <li> <code>category_name</code> - Category name (must match existing category) </li>
+                            <li> <code>restaurant_name</code> - Restaurant name (must match existing restaurant) </li>
+                            <li> <code>restaurant_address</code> - Restaurant address (informational only) </li>
+                        </ul>
+                        <div class="alert alert-warning mt-3">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Note:</strong> If you reference a category or restaurant that doesn't exist in your
+                            account, the import will skip those references but still create the expense.
+                        </div>
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-download me-2"></i>
+                            <a href="{{ url_for('expenses.export_expenses', format='csv') }}" class="alert-link"
+                                >Download sample CSV file</a
+                            >
+                        </div>
+                    </div>
+                    <form
+                        method="post"
+                        enctype="multipart/form-data"
+                        id="import-form"
+                        class="needs-validation"
+                        novalidate>
+                        {{ form.hidden_tag() }}
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Select CSV or JSON file</label>
+                            {{ form.file(class_="form-control", accept=".csv,.json") }}
+                            <div class="invalid-feedback">Please select a CSV or JSON file to upload.</div>
+                            <div class="form-text">Maximum file size: 5MB. CSV and JSON files are supported.</div>
+                        </div>
+                        <!-- Show form validation errors -->
+                        {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <h5 class="alert-heading">Form Validation Errors</h5>
+                            <ul class="mb-0">
+                                {% for field, errors in form.errors.items() %} {% for error in errors %}
+                                <li> <strong>{{ field }}:</strong> {{ error }} </li>
+                                {% endfor %} {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %} {% if errors %}
+                        <div class="alert alert-danger">
+                            <h5 class="alert-heading">Import Errors</h5>
+                            <ul class="mb-0">
+                                {% for error in errors %}<li>{{ error }}</li
+                                >{% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex gap-2">
+                            {{ form.submit(class_="btn btn-primary") }}
+                            <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %} {% block scripts %} {{ super() }}
+<script>
+    // Form validation
+    document.addEventListener("DOMContentLoaded", function () {
+        const form = document.getElementById("import-form");
+        const fileInput = form.querySelector("#file");
+
+        form.addEventListener("submit", function (event) {
+            if (!fileInput.files.length) {
+                event.preventDefault();
+                event.stopPropagation();
+                fileInput.classList.add("is-invalid");
+            } else {
+                fileInput.classList.remove("is-invalid");
+                fileInput.classList.add("is-valid");
+            }
+
+            form.classList.add("was-validated");
+        });
+
+        fileInput.addEventListener("change", function () {
+            if (this.files.length) {
+                this.classList.remove("is-invalid");
+                this.classList.add("is-valid");
+            }
+        });
+    });
+</script>
+{% endblock scripts %}

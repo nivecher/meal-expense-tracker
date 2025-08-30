@@ -15,7 +15,7 @@ const initCallbacks = [];
 /**
  * Initialize the restaurant search functionality
  */
-async function initRestaurantSearch () {
+async function initRestaurantSearch() {
   // Check if already initialized
   if (isInitialized) return;
 
@@ -79,7 +79,9 @@ async function initRestaurantSearch () {
     }
 
     // Handle form submission
-    searchForm.addEventListener('submit', handleSearchSubmit);
+    if (searchForm) {
+      searchForm.addEventListener('submit', handleSearchSubmit);
+    }
 
     isInitialized = true;
 
@@ -99,47 +101,27 @@ async function initRestaurantSearch () {
   }
 }
 
-/**
- * Initialize Google Places Autocomplete for restaurant name search
- */
-function initRestaurantAutocomplete() {
-  const elements = cache_autocomplete_elements();
-  if (!elements.searchInput || !elements.suggestionsContainer) return;
-
-  const services = setup_google_maps_services();
-  if (!services) return;
-
-  setup_autocomplete_event_listeners(elements, services);
-}
-
-function initRestaurantFormAutocomplete() {
-  console.log('Initializing restaurant form autocomplete...');
-
-  const elements = cache_autocomplete_elements();
-  if (!elements.searchInput || !elements.suggestionsContainer) {
-    console.log('Restaurant form search elements not found');
-    return;
-  }
-
-  const services = setup_google_maps_services();
-  if (!services) {
-    console.error('Google Maps services not available for restaurant form');
-    return;
-  }
-
-  console.log('Setting up restaurant form autocomplete event listeners...');
-  setup_autocomplete_event_listeners(elements, services);
-  console.log('✅ Restaurant form autocomplete initialized successfully');
-}
-
-function cache_autocomplete_elements() {
-  return {
-    searchInput: document.getElementById('restaurant-search'),
-    suggestionsContainer: document.getElementById('restaurant-suggestions')
+// Utility function for debouncing
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
   };
 }
 
-function setup_google_maps_services() {
+function cacheAutocompleteElements() {
+  return {
+    searchInput: document.getElementById('restaurant-search'),
+    suggestionsContainer: document.getElementById('restaurant-suggestions'),
+  };
+}
+
+function setupGoogleMapsServices() {
   if (!window.google || !window.google.maps || !window.google.maps.places) {
     console.error('Google Maps Places library not loaded');
 
@@ -157,49 +139,11 @@ function setup_google_maps_services() {
   console.log('Google Maps services are available');
   return {
     autocompleteService: new google.maps.places.AutocompleteService(),
-    placesService: new google.maps.places.PlacesService(document.createElement('div'))
+    placesService: new google.maps.places.PlacesService(document.createElement('div')),
   };
 }
 
-function setup_autocomplete_event_listeners(elements, services) {
-  const { searchInput } = elements;
-
-  searchInput.addEventListener('input', debounce(() => {
-    handle_search_input(elements, services);
-  }, 300));
-
-  searchInput.addEventListener('focus', () => {
-    handle_search_focus(elements);
-  });
-
-  document.addEventListener('click', (event) => {
-    handle_document_click(event, elements);
-  });
-}
-
-function handle_search_input(elements, services) {
-  const { searchInput, suggestionsContainer } = elements;
-  const { autocompleteService } = services;
-
-  const query = searchInput.value.trim();
-  if (query.length < 2) {
-    suggestionsContainer.style.display = 'none';
-    return;
-  }
-
-  const request = create_autocomplete_request(query);
-
-  autocompleteService.getPlacePredictions(request, (predictions, status) => {
-    if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
-      suggestionsContainer.style.display = 'none';
-      return;
-    }
-
-    show_autocomplete_suggestions(predictions, elements, services);
-  });
-}
-
-function create_autocomplete_request(query) {
+function createAutocompleteRequest(query) {
   return {
     input: query,
     types: ['restaurant', 'food', 'cafe', 'bar'],
@@ -207,26 +151,7 @@ function create_autocomplete_request(query) {
   };
 }
 
-function show_autocomplete_suggestions(predictions, elements, services) {
-  const { suggestionsContainer } = elements;
-
-  if (!predictions || predictions.length === 0) {
-    suggestionsContainer.style.display = 'none';
-    return;
-  }
-
-  render_suggestion_list(predictions, suggestionsContainer);
-  setup_suggestion_click_handlers(elements, services);
-  suggestionsContainer.style.display = 'block';
-}
-
-function render_suggestion_list(predictions, container) {
-  container.innerHTML = predictions
-    .map((prediction) => create_suggestion_html(prediction))
-    .join('');
-}
-
-function create_suggestion_html(prediction) {
+function createSuggestionHtml(prediction) {
   return `
     <a class="dropdown-item" href="#" data-place-id="${prediction.place_id}">
       <div class="d-flex align-items-center">
@@ -240,31 +165,15 @@ function create_suggestion_html(prediction) {
   `;
 }
 
-function setup_suggestion_click_handlers(elements, services) {
-  document.querySelectorAll('#restaurant-suggestions .dropdown-item').forEach((item) => {
-    item.addEventListener('click', (e) => {
-      e.preventDefault();
-      const { placeId } = e.currentTarget.dataset;
-      handle_place_selection(placeId, elements, services);
-    });
-  });
+function renderSuggestionList(predictions, container) {
+  container.innerHTML = predictions
+    .map((prediction) => createSuggestionHtml(prediction))
+    .join('');
 }
 
-function handle_place_selection(place_id, elements, services) {
-  const { placesService } = services;
-  const request = create_place_details_request(place_id);
-
-  placesService.getDetails(request, (place, status) => {
-    if (status === google.maps.places.PlacesServiceStatus.OK) {
-      populate_search_form_with_place(place, elements);
-      submit_search_form(elements);
-    }
-  });
-}
-
-function create_place_details_request(place_id) {
+function createPlaceDetailsRequest(placeId) {
   return {
-    placeId: place_id,
+    placeId,
     fields: [
       'place_id',
       'name',
@@ -274,63 +183,42 @@ function create_place_details_request(place_id) {
       'formatted_phone_number',
       'address_components',
       'business_status',
-      'types'
+      'types',
     ],
   };
 }
 
-function populate_search_form_with_place(place, elements) {
-  const { searchInput, suggestionsContainer } = elements;
-
-  // Update the search input with the selected place
-  searchInput.value = place.name;
-  suggestionsContainer.style.display = 'none';
-
-  // Check if we're in restaurant form context and populate those fields
-  const restaurant_form = document.getElementById('restaurantForm');
-  if (restaurant_form) {
-    populate_restaurant_form_fields(place);
-    return;
-  }
-
-  // Fill in location field if available (for search page)
-  const location_input = document.getElementById('locationSearch');
-  if (location_input) {
-    location_input.value = place.formatted_address || '';
-  }
-}
-
-function populate_restaurant_form_fields(place) {
+function populateRestaurantFormFields(place) {
   console.log('Populating restaurant form with place data:', place);
 
   // Basic information
-  const name_field = document.getElementById('name');
-  if (name_field) {
-    name_field.value = place.name || '';
+  const nameField = document.getElementById('name');
+  if (nameField) {
+    nameField.value = place.name || '';
   }
 
   // Address information
-  const address_field = document.getElementById('address');
-  if (address_field) {
-    address_field.value = place.formatted_address || '';
+  const addressField = document.getElementById('address');
+  if (addressField) {
+    addressField.value = place.formatted_address || '';
   }
 
   // Phone number
-  const phone_field = document.getElementById('phone');
-  if (phone_field && place.formatted_phone_number) {
-    phone_field.value = place.formatted_phone_number;
+  const phoneField = document.getElementById('phone');
+  if (phoneField && place.formatted_phone_number) {
+    phoneField.value = place.formatted_phone_number;
   }
 
   // Website
-  const website_field = document.getElementById('website');
-  if (website_field && place.website) {
-    website_field.value = place.website;
+  const websiteField = document.getElementById('website');
+  if (websiteField && place.website) {
+    websiteField.value = place.website;
   }
 
   // Google Place ID
-  const place_id_field = document.getElementById('google_place_id');
-  if (place_id_field && place.place_id) {
-    place_id_field.value = place.place_id;
+  const placeIdField = document.getElementById('google_place_id');
+  if (placeIdField && place.place_id) {
+    placeIdField.value = place.place_id;
   }
 
   // Note: coordinates would be looked up dynamically from Google Places API
@@ -338,12 +226,12 @@ function populate_restaurant_form_fields(place) {
   console.log('✅ Restaurant form fields populated successfully');
 }
 
-function submit_search_form(elements) {
+function submitSearchForm(elements) {
   const { searchInput } = elements;
 
   // Check if we're in restaurant form context
-  const restaurant_form = document.getElementById('restaurantForm');
-  if (restaurant_form) {
+  const restaurantForm = document.getElementById('restaurantForm');
+  if (restaurantForm) {
     // Don't submit the form, just populated the fields
     console.log('Restaurant selected for form population');
     return;
@@ -355,42 +243,170 @@ function submit_search_form(elements) {
   }
 }
 
-function handle_search_focus(elements) {
+function populateSearchFormWithPlace(place, elements) {
+  const { searchInput, suggestionsContainer } = elements;
+
+  // Update the search input with the selected place
+  searchInput.value = place.name;
+  suggestionsContainer.style.display = 'none';
+
+  // Check if we're in restaurant form context and populate those fields
+  const restaurantForm = document.getElementById('restaurantForm');
+  if (restaurantForm) {
+    populateRestaurantFormFields(place);
+    return;
+  }
+
+  // Fill in location field if available (for search page)
+  const locationInput = document.getElementById('locationSearch');
+  if (locationInput) {
+    locationInput.value = place.formatted_address || '';
+  }
+}
+
+function handlePlaceSelection(placeId, elements, services) {
+  const { placesService } = services;
+  const request = createPlaceDetailsRequest(placeId);
+
+  placesService.getDetails(request, (place, status) => {
+    if (status === google.maps.places.PlacesServiceStatus.OK) {
+      populateSearchFormWithPlace(place, elements);
+      submitSearchForm(elements);
+    }
+  });
+}
+
+function setupSuggestionClickHandlers(elements, services) {
+  document.querySelectorAll('#restaurant-suggestions .dropdown-item').forEach((item) => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const { placeId } = e.currentTarget.dataset;
+      handlePlaceSelection(placeId, elements, services);
+    });
+  });
+}
+
+function showAutocompleteSuggestions(predictions, elements, services) {
+  const { suggestionsContainer } = elements;
+
+  if (!predictions || predictions.length === 0) {
+    suggestionsContainer.style.display = 'none';
+    return;
+  }
+
+  renderSuggestionList(predictions, suggestionsContainer);
+  setupSuggestionClickHandlers(elements, services);
+  suggestionsContainer.style.display = 'block';
+}
+
+function handleSearchInput(elements, services) {
+  const { searchInput, suggestionsContainer } = elements;
+  const { autocompleteService } = services;
+
+  const query = searchInput.value.trim();
+  if (query.length < 2) {
+    suggestionsContainer.style.display = 'none';
+    return;
+  }
+
+  const request = createAutocompleteRequest(query);
+
+  autocompleteService.getPlacePredictions(request, (predictions, status) => {
+    if (status !== google.maps.places.PlacesServiceStatus.OK || !predictions) {
+      suggestionsContainer.style.display = 'none';
+      return;
+    }
+
+    showAutocompleteSuggestions(predictions, elements, services);
+  });
+}
+
+function handleSearchFocus(elements) {
   const { searchInput } = elements;
   if (searchInput.value.trim().length > 1) {
     // Trigger a new search to show existing suggestions
-    const services = setup_google_maps_services();
+    const services = setupGoogleMapsServices();
     if (services) {
-      handle_search_input(elements, services);
+      handleSearchInput(elements, services);
     }
   }
 }
 
-function handle_document_click(event, elements) {
+function handleDocumentClick(event, elements) {
   const { searchInput, suggestionsContainer } = elements;
   if (!searchInput.contains(event.target) && !suggestionsContainer.contains(event.target)) {
     suggestionsContainer.style.display = 'none';
   }
 }
 
-// Utility function for debouncing (moved outside the autocomplete function)
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
+function setupAutocompleteEventListeners(elements, services) {
+  const { searchInput } = elements;
+
+  searchInput.addEventListener('input', debounce(() => {
+    handleSearchInput(elements, services);
+  }, 300));
+
+  searchInput.addEventListener('focus', () => {
+    handleSearchFocus(elements);
+  });
+
+  document.addEventListener('click', (event) => {
+    handleDocumentClick(event, elements);
+  });
+}
+
+/**
+ * Initialize Google Places Autocomplete for restaurant name search
+ */
+function initRestaurantAutocomplete() {
+  const elements = cacheAutocompleteElements();
+  if (!elements.searchInput || !elements.suggestionsContainer) return;
+
+  const services = setupGoogleMapsServices();
+  if (!services) return;
+
+  setupAutocompleteEventListeners(elements, services);
+}
+
+function initRestaurantFormAutocomplete() {
+  console.log('Initializing restaurant form autocomplete...');
+
+  const elements = cacheAutocompleteElements();
+  if (!elements.searchInput || !elements.suggestionsContainer) {
+    console.log('Restaurant form search elements not found');
+    return;
+  }
+
+  const services = setupGoogleMapsServices();
+  if (!services) {
+    console.error('Google Maps services not available for restaurant form');
+    return;
+  }
+
+  console.log('Setting up restaurant form autocomplete event listeners...');
+  setupAutocompleteEventListeners(elements, services);
+  console.log('✅ Restaurant form autocomplete initialized successfully');
+}
+
+function handleSearchSubmit(e) {
+  e.preventDefault();
+  const query = document.getElementById('restaurantSearch').value.trim();
+  const location = document.getElementById('locationSearch') ? document.getElementById('locationSearch').value.trim() : '';
+
+  if (!query && !location) {
+    // Show validation error
+    return;
+  }
+
+  // Trigger search
+  performSearch(query, location);
 }
 
 /**
  * Initialize Google Places Autocomplete for location input
  * @param {HTMLElement} inputElement - The input element to attach autocomplete to
  */
-function initPlacesAutocomplete (inputElement) {
+function initPlacesAutocomplete(inputElement) {
   if (!window.google || !window.google.maps || !window.google.maps.places) {
     console.warn('Google Maps Places API not available');
     return;
@@ -415,7 +431,7 @@ function initPlacesAutocomplete (inputElement) {
  * @param {string} query - The search query (restaurant name, cuisine, etc.)
  * @param {string} location - The location to search in
  */
-function performSearch (query, location) {
+function performSearch(query, location) {
   // This function would typically make an API call to your backend
   // For now, we'll just log the search parameters
   console.log('Searching for:', { query, location });
@@ -439,20 +455,6 @@ function performSearch (query, location) {
         console.error('Error performing search:', error);
     });
     */
-}
-
-function handleSearchSubmit (e) {
-  e.preventDefault();
-  const query = document.getElementById('restaurantSearch').value.trim();
-  const location = document.getElementById('locationSearch') ? document.getElementById('locationSearch').value.trim() : '';
-
-  if (!query && !location) {
-    // Show validation error
-    return;
-  }
-
-  // Trigger search
-  performSearch(query, location);
 }
 
 // Make initRestaurantFormAutocomplete available globally for Google Maps callback

@@ -1,94 +1,107 @@
-{% extends "base.html" %}
-{% block title %}
-    Expense Details
-{% endblock title %}
-{% block content %}
-    <div class="container mt-4">
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="alert-container"></div>
-                <div class="card">
-                    <div class="card-header bg-white py-3">
-                        <div class="d-flex justify-content-between align-items-center">
+{% extends "base.html" %} {% block title %} Expense Details {% endblock title %} {% block content %}
+<!-- Breadcrumb Navigation -->
+{% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'}, {'url':
+url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Details'} ] %} {% include
+'includes/breadcrumb.html' %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="alert-container"></div>
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <a
+                                href="{{ url_for('expenses.list_expenses') }}"
+                                class="btn btn-outline-secondary btn-sm me-3"
+                                title="Back to Expenses">
+                                <i class="fas fa-arrow-left"></i>
+                            </a>
                             <h2 class="h4 mb-0">Expense Details</h2>
-                            <div class="btn-group">
-                                <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
-                                   class="btn btn-primary">
-                                    <i class="fas fa-edit me-1"></i> Edit
-                                </a>
-                                <button type="button"
-                                        class="btn btn-danger btn-delete-expense"
-                                        data-expense-id="{{ expense.id }}"
-                                        data-expense-name="{{ expense.description }}">
-                                    <i class="fas fa-trash me-1"></i> Delete
-                                </button>
-                            </div>
+                        </div>
+                        <div class="btn-group">
+                            <a
+                                href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+                                class="btn btn-primary">
+                                <i class="fas fa-edit me-1"></i> Edit
+                            </a>
+                            <button
+                                type="button"
+                                class="btn btn-danger btn-delete-expense"
+                                data-expense-id="{{ expense.id }}"
+                                data-expense-name="{{ expense.description }}">
+                                <i class="fas fa-trash me-1"></i> Delete
+                            </button>
                         </div>
                     </div>
-                    <div class="card-body">
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <h3 class="h5 mb-3">Basic Information</h3>
-                                <p>
-                                    <strong>Date:</strong> {{ expense.date.strftime("%Y-%m-%d") }}
-                                </p>
-                                <p>
-                                    <strong>Amount:</strong> ${{ "%.2f"|format(expense.amount) }}
-                                </p>
-                                {% if expense.meal_type %}
-                                    <p>
-                                        <strong>Meal Type:</strong> {{ expense.meal_type }}
-                                    </p>
-                                {% endif %}
-                                {% if expense.category %}
-                                    <p>
-                                        <strong>Category:</strong> {{ expense.category.name }}
-                                    </p>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6">
-                                <h3 class="h5 mb-3">Restaurant Information</h3>
-                                {% if expense.restaurant %}
-                                    <p>
-                                        <strong>Restaurant:</strong>
-                                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
-                                           class="text-decoration-none">{{ expense.restaurant.full_name }}</a>
-                                    </p>
-                                {% else %}
-                                    <p>
-                                        <strong>Restaurant:</strong> Not specified
-                                    </p>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% if expense.notes %}
-                            <div class="mb-4">
-                                <h3 class="h5 mb-3">Notes</h3>
-                                <p class="mb-0">{{ expense.notes }}</p>
-                            </div>
-                        {% endif %}
-                        <div class="text-muted small">
-                            <p class="mb-1">Created: {{ expense.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</p>
-                            {% if expense.updated_at != expense.created_at %}
-                                <p class="mb-0">Last updated: {{ expense.updated_at.strftime("%Y-%m-%d %H:%M:%S") }}</p>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h3 class="h5 mb-3">Basic Information</h3>
+                            <p> <strong>Date:</strong> {{ expense.date.strftime("%Y-%m-%d") }} </p>
+                            <p>
+                                <strong>Amount:</strong>
+                                <span class="amount-right d-inline-block" style="min-width: 80px"
+                                    >${{ "%.2f"|format(expense.amount) }}</span
+                                >
+                            </p>
+                            {% if expense.meal_type %}
+                            <p> <strong>Meal Type:</strong> {{ expense.meal_type }} </p>
+                            {% endif %} {% if expense.category %}
+                            <p>
+                                <strong>Category:</strong>
+                                <span
+                                    class="badge border ms-2 d-inline-flex align-items-center"
+                                    style="background-color: {{ expense.category.color }}20;
+                                                     color: {{ expense.category.color }};
+                                                     border-color: {{ expense.category.color }}40 !important">
+                                    {% if expense.category.icon %}<i class="fas fa-{{ expense.category.icon }} me-1"></i
+                                    >{% endif %} {{ expense.category.name }}
+                                </span>
+                            </p>
                             {% endif %}
                         </div>
-                        <div class="mt-4">
-                            <a href="{{ url_for('expenses.list_expenses') }}"
-                               class="btn btn-outline-secondary">Back to Expenses</a>
+                        <div class="col-md-6">
+                            <h3 class="h5 mb-3">Restaurant Information</h3>
+                            {% if expense.restaurant %}
+                            <p>
+                                <strong>Restaurant:</strong>
+                                <a
+                                    href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
+                                    class="text-decoration-none"
+                                    >{{ expense.restaurant.full_name }}</a
+                                >
+                            </p>
+                            {% else %}
+                            <p> <strong>Restaurant:</strong> Not specified </p>
+                            {% endif %}
                         </div>
+                    </div>
+                    {% if expense.notes %}
+                    <div class="mb-4">
+                        <h3 class="h5 mb-3">Notes</h3>
+                        <p class="mb-0">{{ expense.notes }}</p>
+                    </div>
+                    {% endif %}
+                    <div class="text-muted small">
+                        <p class="mb-1">Created: {{ expense.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</p>
+                        {% if expense.updated_at != expense.created_at %}
+                        <p class="mb-0">Last updated: {{ expense.updated_at.strftime("%Y-%m-%d %H:%M:%S") }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="mt-4">
+                        <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary"
+                            >Back to Expenses</a
+                        >
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <!-- Delete Form (hidden, used by the delete handler) -->
-    <form id="deleteExpenseForm"
-          data-expense-id="{{ expense.id }}"
-          class="d-none">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    </form>
-{% endblock content %}
-{% block scripts %}
-    {{ super() }}
-{% endblock scripts %}
+</div>
+<!-- Delete Form (hidden, used by the delete handler) -->
+<form id="deleteExpenseForm" data-expense-id="{{ expense.id }}" class="d-none">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+</form>
+{% endblock content %} {% block scripts %} {{ super() }} {% endblock scripts %}

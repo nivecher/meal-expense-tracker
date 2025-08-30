@@ -49,6 +49,24 @@
     border: 1px solid var(--bs-border-color);
 }
 
+/* Set minimum width for restaurant cards */
+#card-view-container .col {
+    min-width: 320px; /* Increased from 280px */
+}
+
+/* Ensure cards don't get too narrow on very wide screens */
+@media (min-width: 1400px) {
+    #card-view-container .col {
+        min-width: 380px; /* Increased from 320px */
+    }
+}
+
+@media (min-width: 1800px) {
+    #card-view-container .col {
+        min-width: 420px; /* Increased from 350px */
+    }
+}
+
 .restaurant-card:hover {
     transform: translateY(-3px);
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
@@ -129,3 +147,5 @@
     transform: translateY(-2px);
     box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
 }
+
+/* Table uses full width naturally with container-fluid */

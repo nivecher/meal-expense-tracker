@@ -14,19 +14,12 @@ def ensure_default_categories_for_user(user_id):
 
     Creates common defaults marked as is_default=True when they are missing.
     """
-    default_categories = [
-        {"name": "Food", "description": "General food expenses"},
-        {"name": "Drinks", "description": "Beverages and drinks"},
-        {"name": "Groceries", "description": "Grocery shopping"},
-        {"name": "Dining Out", "description": "Restaurant and takeout"},
-        {"name": "Transportation", "description": "Transportation costs"},
-        {"name": "Utilities", "description": "Bills and utilities"},
-        {"name": "Entertainment", "description": "Movies, events, etc."},
-        {"name": "Other", "description": "Miscellaneous expenses"},
-    ]
+    from app.constants.categories import get_default_categories
 
+    default_categories = get_default_categories()
     existing = {c.name for c in Category.query.filter_by(user_id=user_id).all()}
     created_any = False
+
     for cat in default_categories:
         if cat["name"] not in existing:
             db.session.add(
@@ -34,6 +27,8 @@ def ensure_default_categories_for_user(user_id):
                     user_id=user_id,
                     name=cat["name"],
                     description=cat.get("description"),
+                    color=cat.get("color"),
+                    icon=cat.get("icon"),
                     is_default=True,
                 )
             )

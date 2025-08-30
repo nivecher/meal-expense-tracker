@@ -1,0 +1,20 @@
+{# Breadcrumb Navigation Component #} {# Usage: {% set breadcrumb_items = [ {'url': url_for('main.index'), 'title':
+'Dashboard'}, {'url': url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Pizza Palace'} #
+Current page (no URL) ] %} {% include 'includes/breadcrumb.html' %} #} {% if breadcrumb_items and
+breadcrumb_items|length > 1 %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb bg-light px-3 py-2 rounded">
+        {% for item in breadcrumb_items %} {% if loop.last %}
+        <li class="breadcrumb-item active" aria-current="page">
+            <span class="text-muted">{{ item.title }}</span>
+        </li>
+        {% else %}
+        <li class="breadcrumb-item">
+            <a href="{{ item.url }}" class="text-decoration-none">
+                {% if loop.first %}<i class="fas fa-home me-1"></i>{% endif %} {{ item.title }}
+            </a>
+        </li>
+        {% endif %} {% endfor %}
+    </ol>
+</nav>
+{% endif %}

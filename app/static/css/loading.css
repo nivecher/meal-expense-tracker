@@ -14,6 +14,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    -webkit-backdrop-filter: blur(2px);
     backdrop-filter: blur(2px);
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
@@ -206,6 +207,7 @@
 .loading {
     position: relative;
     pointer-events: none;
+    -webkit-user-select: none;
     user-select: none;
 }
 

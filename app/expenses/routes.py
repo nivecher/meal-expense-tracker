@@ -1,6 +1,9 @@
 """Expense-related routes for the application."""
 
 # Standard library imports
+import csv
+import io
+import json
 from math import ceil
 from typing import Optional, Tuple
 
@@ -9,6 +12,7 @@ from flask import (
     current_app,
     flash,
     jsonify,
+    make_response,
     redirect,
     render_template,
     request,
@@ -20,13 +24,14 @@ from flask_login import current_user, login_required
 
 # Third-party imports
 from flask_wtf import FlaskForm
-from sqlalchemy import desc, extract
 from werkzeug.wrappers import Response as WerkzeugResponse
+
+from app.constants.categories import get_default_categories
 
 # Local application imports
 from app.expenses import bp
 from app.expenses import services as expense_services
-from app.expenses.forms import ExpenseForm
+from app.expenses.forms import ExpenseForm, ExpenseImportForm
 from app.expenses.models import Category, Expense
 from app.extensions import db
 from app.restaurants.models import Restaurant
@@ -35,6 +40,24 @@ from app.utils.messages import FlashMessages
 
 # Constants
 PER_PAGE = 10  # Number of expenses per page
+
+
+def _sort_categories_by_default_order(categories: list[Category]) -> list[Category]:
+    """Sort categories according to the default definition order."""
+    default_categories = get_default_categories()
+    default_names = [cat["name"] for cat in default_categories]
+
+    # Create a mapping of category name to order index
+    name_to_order = {name: i for i, name in enumerate(default_names)}
+
+    # Sort categories: default categories first (in original order), then others
+    def sort_key(cat):
+        if cat.name in name_to_order:
+            return (0, name_to_order[cat.name])  # Default categories first
+        else:
+            return (1, cat.name)  # Custom categories after, alphabetically
+
+    return sorted(categories, key=sort_key)
 
 
 def _get_form_choices(
@@ -50,24 +73,20 @@ def _get_form_choices(
     """
     # Ensure the user has baseline categories to choose from
     _ensure_default_categories_for_user(user_id)
-    categories = [(c.id, c.name) for c in Category.query.filter_by(user_id=user_id).order_by(Category.name).all()]
+    # Get categories and sort them by default order
+    categories_query = Category.query.filter_by(user_id=user_id).all()
+    sorted_categories = _sort_categories_by_default_order(categories_query)
+    categories = [(c.id, c.name, c.color, c.icon) for c in sorted_categories]
     restaurants = [(r.id, r.name) for r in Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()]
     return categories, restaurants
 
 
 def _ensure_default_categories_for_user(user_id: int) -> None:
     """Create baseline categories for a user if they have none."""
+    from app.constants.categories import get_default_categories
+
     existing_names = {c.name for c in Category.query.filter_by(user_id=user_id).all()}
-    default_categories = [
-        {"name": "Food", "description": "General food expenses"},
-        {"name": "Drinks", "description": "Beverages and drinks"},
-        {"name": "Groceries", "description": "Grocery shopping"},
-        {"name": "Dining Out", "description": "Restaurant and takeout"},
-        {"name": "Transportation", "description": "Transportation costs"},
-        {"name": "Utilities", "description": "Bills and utilities"},
-        {"name": "Entertainment", "description": "Movies, events, etc."},
-        {"name": "Other", "description": "Miscellaneous expenses"},
-    ]
+    default_categories = get_default_categories()
 
     created_any = False
     for cat in default_categories:
@@ -77,6 +96,8 @@ def _ensure_default_categories_for_user(user_id: int) -> None:
                     user_id=user_id,
                     name=cat["name"],
                     description=cat.get("description"),
+                    color=cat.get("color"),
+                    icon=cat.get("icon"),
                     is_default=True,
                 )
             )
@@ -104,7 +125,7 @@ def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
         normalized_restaurant_id = None
 
     form = ExpenseForm(
-        category_choices=[(None, "Select a category (optional)")] + categories,
+        category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant (optional)")] + restaurants,
         restaurant_id=normalized_restaurant_id,
     )
@@ -227,11 +248,18 @@ def add_expense() -> ResponseReturnValue:
 
     # Handle GET request
     current_app.logger.info("Rendering expense form")
+
+    # Get restaurant context if provided
+    restaurant = None
+    if form.restaurant_id.data:
+        restaurant = Restaurant.query.filter_by(id=form.restaurant_id.data, user_id=current_user.id).first()
+
     return render_template(
         "expenses/form.html",
         title="Add Expense",
         form=form,
         is_edit=False,
+        restaurant=restaurant,
     )
 
 
@@ -367,10 +395,10 @@ def _handle_expense_not_found() -> ResponseReturnValue:
     return redirect(url_for("expenses.list_expenses"))
 
 
-def _init_expense_form(categories: list[tuple[str, str]], restaurants: list[tuple[str, str]]) -> ExpenseForm:
+def _init_expense_form(categories: list[tuple[int, str, str, str]], restaurants: list[tuple[str, str]]) -> ExpenseForm:
     """Initialize an expense form with the given choices."""
     return ExpenseForm(
-        category_choices=[(None, "Select a category (optional)")] + categories,
+        category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant (optional)")] + restaurants,
     )
 
@@ -406,13 +434,13 @@ def _handle_expense_update(
 
 
 def _reinitialize_form_with_data(
-    form: ExpenseForm, categories: list[tuple[str, str]], restaurants: list[tuple[str, str]]
+    form: ExpenseForm, categories: list[tuple[int, str, str, str]], restaurants: list[tuple[str, str]]
 ) -> ExpenseForm:
     """Reinitialize form with submitted data and choices."""
     form_data = request.form.to_dict()
     return ExpenseForm(
         data=form_data,
-        category_choices=[(None, "Select a category (optional)")] + categories,
+        category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant (optional)")] + restaurants,
     )
 
@@ -445,7 +473,7 @@ def _handle_validation_errors(form: ExpenseForm, is_ajax: bool) -> ResponseRetur
 
 
 def _render_expense_form(
-    form: ExpenseForm, expense: Expense, categories: list[tuple[str, str]], is_edit: bool = False
+    form: ExpenseForm, expense: Expense, categories: list[tuple[int, str, str, str]], is_edit: bool = False
 ) -> str:
     """Render the expense form template."""
     if request.method == "GET":
@@ -456,12 +484,15 @@ def _render_expense_form(
         form.restaurant_id.data = expense.restaurant_id if expense.restaurant_id else None
         form.meal_type.data = expense.meal_type or ""
 
+    # Transform categories for template (include color and icon info)
+    categories_for_template = [{"id": c[0], "name": c[1], "color": c[2], "icon": c[3]} for c in categories]
+
     return render_template(
         "expenses/form.html",
         form=form,
         expense=expense if is_edit else None,
         is_edit=is_edit,
-        categories=categories,
+        categories=categories_for_template,
         debug=current_app.debug,
     )
 
@@ -478,38 +509,29 @@ def list_expenses() -> str:
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", PER_PAGE, type=int)
 
-    # Get expenses for the current user with optional filtering
-    query = Expense.query.filter_by(user_id=current_user.id)
+    # Extract filters from request
+    filters = {
+        "search": request.args.get("q", "").strip(),
+        "meal_type": request.args.get("meal_type", "").strip(),
+        "category": request.args.get("category", "").strip(),
+        "start_date": request.args.get("start_date", "").strip(),
+        "end_date": request.args.get("end_date", "").strip(),
+        "sort_by": request.args.get("sort", "date"),
+        "sort_order": request.args.get("order", "desc"),
+    }
 
-    # Apply filters from query parameters with type safety
-    if "category" in request.args and request.args["category"]:
-        try:
-            query = query.filter_by(category_id=int(request.args["category"]))
-        except (ValueError, TypeError):
-            pass  # Ignore invalid category IDs
+    # Get filtered expenses using the service layer
+    try:
+        from app.main.services import get_filter_options, get_user_expenses
 
-    if "month" in request.args and request.args["month"]:
-        try:
-            month, year = request.args["month"].split("/")
-            query = query.filter(
-                extract("month", Expense.date) == int(month),
-                extract("year", Expense.date) == int(year),
-            )
-        except (ValueError, AttributeError):
-            pass  # Ignore invalid month/year format
-
-    if "year" in request.args and request.args["year"]:
-        try:
-            query = query.filter(extract("year", Expense.date) == int(request.args["year"]))
-        except (ValueError, TypeError):
-            pass  # Ignore invalid year
-
-    # Order by date descending (newest first)
-    expenses = query.order_by(desc(Expense.date)).all()
-    total_amount = sum(e.amount for e in expenses)  # type: ignore
+        expenses, total_amount = get_user_expenses(current_user.id, filters)
+    except Exception as e:
+        current_app.logger.error(f"Error filtering expenses: {str(e)}")
+        expenses, total_amount = [], 0.0
 
     # Calculate pagination with bounds checking
-    total_pages = max(1, ceil(len(expenses) / per_page)) if expenses else 1
+    total_expenses = len(expenses)
+    total_pages = max(1, ceil(total_expenses / per_page)) if total_expenses else 1
     page = max(1, min(page, total_pages))  # Ensure page is within bounds
     start_idx = (page - 1) * per_page
     end_idx = start_idx + per_page
@@ -517,11 +539,12 @@ def list_expenses() -> str:
 
     # Get filter options for the filter form
     filter_options = expense_services.get_filter_options(current_user.id)
-
-    # Prepare filter values for the template with type safety
-    search = str(request.args.get("q", ""))
-    start_date = str(request.args.get("start_date", ""))
-    end_date = str(request.args.get("end_date", ""))
+    # Also get main service filter options for dropdowns
+    try:
+        main_filter_options = get_filter_options(current_user.id)
+        filter_options.update(main_filter_options)
+    except Exception as e:
+        current_app.logger.error(f"Error getting filter options: {str(e)}")
 
     return render_template(
         "expenses/list.html",
@@ -530,9 +553,12 @@ def list_expenses() -> str:
         page=page,
         per_page=per_page,
         total_pages=total_pages,
-        search=search,
-        start_date=start_date,
-        end_date=end_date,
+        total_expenses=total_expenses,
+        search=filters["search"],
+        meal_type=filters["meal_type"],
+        category=filters["category"],
+        start_date=filters["start_date"],
+        end_date=filters["end_date"],
         **filter_options,
     )
 
@@ -580,3 +606,69 @@ def delete_expense(expense_id: int) -> FlaskResponse | WerkzeugResponse:
         abort(403)
     expense_services.delete_expense(expense)
     return redirect(url_for("expenses.list_expenses"))
+
+
+@bp.route("/export")
+@login_required
+def export_expenses():
+    """Export expenses as CSV or JSON."""
+    format_type = request.args.get("format", "csv").lower()
+
+    # Get the data from the service
+    expenses = expense_services.export_expenses_for_user(current_user.id)
+
+    if not expenses:
+        flash("No expenses found to export", "warning")
+        return redirect(url_for("expenses.list_expenses"))
+
+    if format_type == "json":
+        response = make_response(json.dumps(expenses, indent=2))
+        response.headers["Content-Type"] = "application/json"
+        response.headers["Content-Disposition"] = "attachment; filename=expenses.json"
+        return response
+
+    # Default to CSV format
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=expenses[0].keys() if expenses else [], quoting=csv.QUOTE_NONNUMERIC)
+    writer.writeheader()
+    writer.writerows(expenses)
+
+    response = make_response(output.getvalue())
+    response.headers["Content-Type"] = "text/csv"
+    response.headers["Content-Disposition"] = "attachment; filename=expenses.csv"
+    return response
+
+
+@bp.route("/import", methods=["GET", "POST"])
+@login_required
+def import_expenses():
+    """Handle expense import from file upload."""
+    form = ExpenseImportForm()
+
+    if request.method == "POST" and form.validate_on_submit():
+        file = form.file.data
+        current_app.logger.info(f"Import request received for file: {file.filename if file else 'None'}")
+
+        if file and file.filename:
+            try:
+                current_app.logger.info("Processing expense import...")
+                success, message = expense_services.import_expenses_from_csv(file, current_user.id)
+                current_app.logger.info(f"Import result: success={success}, message={message}")
+
+                if success:
+                    # Extract the number of imported expenses from the message
+                    flash(message, "success")
+                    return redirect(url_for("expenses.list_expenses"))
+                else:
+                    flash(f"Import failed: {message}", "error")
+
+            except ValueError as e:
+                current_app.logger.error("ValueError during import: %s", str(e))
+                flash(str(e), "error")
+            except Exception as e:
+                current_app.logger.error("Unexpected error during import: %s", str(e))
+                flash("An unexpected error occurred during import", "error")
+        else:
+            flash("Please select a file to upload", "error")
+
+    return render_template("expenses/import.html", form=form)

@@ -15,7 +15,7 @@
 export function initializeModalAccessibility(modalElement, options = {}) {
   const {
     returnFocus = true,
-    focusElement = null
+    focusElement = null,
   } = options;
 
   if (!modalElement || !modalElement.classList.contains('modal')) {
@@ -81,7 +81,7 @@ export function initializeModalAccessibility(modalElement, options = {}) {
  */
 export function initializeAllModals(options = {}) {
   const modals = document.querySelectorAll('.modal');
-  modals.forEach(modal => {
+  modals.forEach((modal) => {
     initializeModalAccessibility(modal, options);
   });
 }
@@ -102,7 +102,7 @@ export function createAccessibleModal(options) {
     title,
     content,
     type = 'default',
-    returnFocus = true
+    returnFocus = true,
   } = options;
 
   const modalId = id || `modal-${Date.now()}`;
@@ -148,7 +148,7 @@ if (typeof document !== 'undefined') {
             }
             // Check for modals within added nodes
             const modals = node.querySelectorAll ? node.querySelectorAll('.modal') : [];
-            modals.forEach(modal => initializeModalAccessibility(modal));
+            modals.forEach((modal) => initializeModalAccessibility(modal));
           }
         });
       });
@@ -156,7 +156,7 @@ if (typeof document !== 'undefined') {
 
     observer.observe(document.body, {
       childList: true,
-      subtree: true
+      subtree: true,
     });
   });
 }

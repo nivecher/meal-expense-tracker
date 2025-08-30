@@ -41,14 +41,68 @@ flask_session = Session()
 
 def _log_session_config(app: Flask) -> None:
     """Log session configuration for debugging - Single responsibility."""
-    session_type = app.config.get("SESSION_TYPE", "default")
-    app.logger.info("Session backend: %s", session_type)
+    session_type = app.config.get("SESSION_TYPE")
 
     if session_type == "dynamodb":
+        app.logger.info("Session backend: dynamodb")
         table = app.config.get("SESSION_DYNAMODB_TABLE")
         region = app.config.get("SESSION_DYNAMODB_REGION")
         endpoint = app.config.get("SESSION_DYNAMODB_ENDPOINT_URL")
+        key_prefix = app.config.get("SESSION_KEY_PREFIX", "")
+
         app.logger.info("  Table: %s, Region: %s, Endpoint: %s", table, region, endpoint or "AWS default")
+        if key_prefix:
+            app.logger.info("  Key prefix: %s", key_prefix)
+    elif session_type is None:
+        app.logger.info("Session backend: signed-cookies (Flask default)")
+        app.logger.info("  Cookie name: %s", app.config.get("SESSION_COOKIE_NAME", "session"))
+        app.logger.info("  Cookie secure: %s", app.config.get("SESSION_COOKIE_SECURE", False))
+        app.logger.info("  Session lifetime: %s seconds", app.config.get("PERMANENT_SESSION_LIFETIME", 3600))
+    else:
+        app.logger.info("Session backend: %s", session_type)
+
+
+def _validate_dynamodb_session_config(app: Flask) -> None:
+    """Validate DynamoDB session configuration - Single responsibility."""
+    if app.config.get("SESSION_TYPE") != "dynamodb":
+        return
+
+    required_configs = {"SESSION_DYNAMODB_TABLE": "DynamoDB table name", "SESSION_DYNAMODB_REGION": "AWS region"}
+
+    missing_configs = []
+    for config_key, description in required_configs.items():
+        if not app.config.get(config_key):
+            missing_configs.append(f"{config_key} ({description})")
+
+    if missing_configs:
+        error_msg = f"Missing required DynamoDB session configuration: {', '.join(missing_configs)}"
+        app.logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    # Validate table name format
+    table_name = app.config.get("SESSION_DYNAMODB_TABLE", "")
+    if not table_name.replace("-", "").replace("_", "").isalnum():
+        raise ValueError(
+            f"Invalid DynamoDB table name: {table_name}. Must contain only alphanumeric characters, hyphens, and underscores."
+        )
+
+    # Test DynamoDB connection to ensure we're using AWS (not localhost)
+    try:
+        dynamodb_resource = app.config.get("SESSION_DYNAMODB")
+        if dynamodb_resource:
+            # Test connection by attempting to describe the table
+            table = dynamodb_resource.Table(table_name)
+            table.load()  # This will raise an exception if table doesn't exist or connection fails
+            app.logger.info("DynamoDB session table connection verified: %s", table_name)
+            app.logger.info("Table status: %s", table.table_status)
+        else:
+            app.logger.warning("SESSION_DYNAMODB resource not configured - Flask-Session will create its own")
+    except Exception as e:
+        app.logger.error("DynamoDB session table verification failed: %s", str(e))
+        # Don't fail startup - let Flask-Session handle the error gracefully
+        app.logger.info("Note: Ensure the DynamoDB table '%s' exists and is accessible", table_name)
+
+    app.logger.info("DynamoDB session configuration validated successfully")
 
 
 def _configure_csrf_handlers(app: Flask) -> None:
@@ -94,8 +148,20 @@ def init_app(app: Flask) -> None:
     csrf.init_app(app)
     migrate.init_app(app, db)
 
-    # Initialize Flask-Session
-    flask_session.init_app(app)
+    # Initialize Flask-Session based on session type
+    session_type = app.config.get("SESSION_TYPE")
+
+    if session_type == "dynamodb":
+        # Validate DynamoDB configuration
+        _validate_dynamodb_session_config(app)
+        flask_session.init_app(app)
+    elif session_type is None:
+        # Using Flask's default signed cookie sessions - no Flask-Session needed
+        app.logger.info("Using Flask's default signed cookie sessions (ideal for Lambda)")
+    else:
+        # Other session types (filesystem, redis, etc.)
+        flask_session.init_app(app)
+
     _log_session_config(app)
 
     # Initialize rate limiter

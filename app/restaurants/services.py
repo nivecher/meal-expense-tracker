@@ -5,11 +5,17 @@ import io
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from werkzeug.datastructures import FileStorage
 
 from app.expenses.models import Expense
 from app.extensions import db
+from app.restaurants.exceptions import (
+    DuplicateGooglePlaceIdError,
+    DuplicateRestaurantError,
+)
 from app.restaurants.models import Restaurant
+from app.utils.cuisine_formatter import format_cuisine_type
 
 
 def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list, dict]:
@@ -142,6 +148,49 @@ def restaurant_exists(user_id: int, name: str, city: str, google_place_id: str =
     )
 
 
+def validate_restaurant_uniqueness(
+    user_id: int, name: str, city: str, google_place_id: str = None, exclude_id: int = None
+) -> None:
+    """Validate that a restaurant doesn't violate uniqueness constraints.
+
+    Args:
+        user_id: ID of the user
+        name: Name of the restaurant
+        city: City of the restaurant
+        google_place_id: Google Place ID of the restaurant (optional)
+        exclude_id: Restaurant ID to exclude from validation (for updates)
+
+    Raises:
+        DuplicateGooglePlaceIdError: If Google Place ID already exists
+        DuplicateRestaurantError: If restaurant name/city combination already exists
+    """
+    # Check for Google Place ID duplicates first (higher priority)
+    if google_place_id:
+        existing_stmt = select(Restaurant).where(
+            Restaurant.user_id == user_id,
+            Restaurant.google_place_id == google_place_id,
+        )
+        if exclude_id:
+            existing_stmt = existing_stmt.where(Restaurant.id != exclude_id)
+
+        existing_by_place_id = db.session.scalar(existing_stmt)
+        if existing_by_place_id:
+            raise DuplicateGooglePlaceIdError(google_place_id, existing_by_place_id)
+
+    # Check for name/city duplicates
+    existing_stmt = select(Restaurant).where(
+        Restaurant.user_id == user_id,
+        func.lower(Restaurant.name) == func.lower(name),
+        func.lower(Restaurant.city) == func.lower(city) if city else True,
+    )
+    if exclude_id:
+        existing_stmt = existing_stmt.where(Restaurant.id != exclude_id)
+
+    existing_by_name_city = db.session.scalar(existing_stmt)
+    if existing_by_name_city:
+        raise DuplicateRestaurantError(name, city, existing_by_name_city)
+
+
 def create_restaurant(user_id: int, form: Any) -> Tuple[Restaurant, bool]:
     """Create a new restaurant or return existing one.
 
@@ -151,21 +200,58 @@ def create_restaurant(user_id: int, form: Any) -> Tuple[Restaurant, bool]:
 
     Returns:
         A tuple of (restaurant, is_new) where is_new is True if the restaurant was created
+
+    Raises:
+        DuplicateGooglePlaceIdError: If Google Place ID already exists
+        DuplicateRestaurantError: If restaurant name/city combination already exists
     """
-    # Check if restaurant already exists (prioritizing Google Place ID if available)
+    # Get form data
     google_place_id = getattr(form, "google_place_id", None)
     google_place_id_value = google_place_id.data if google_place_id else None
+    name = form.name.data
+    city = form.city.data
 
-    existing = restaurant_exists(user_id, form.name.data, form.city.data, google_place_id_value)
-    if existing:
-        return existing, False
+    # Validate uniqueness constraints - this will raise exceptions if duplicates found
+    validate_restaurant_uniqueness(user_id, name, city, google_place_id_value)
 
     # Create new restaurant
     restaurant = Restaurant(user_id=user_id)
     form.populate_obj(restaurant)
-    db.session.add(restaurant)
-    db.session.commit()
-    return restaurant, True
+
+    # Format cuisine type for consistency
+    if hasattr(restaurant, "cuisine") and restaurant.cuisine:
+        restaurant.cuisine = format_cuisine_type(restaurant.cuisine)
+
+    try:
+        db.session.add(restaurant)
+        db.session.commit()
+        return restaurant, True
+    except IntegrityError as e:
+        db.session.rollback()
+        # Handle database constraint violations
+        if "uix_restaurant_google_place_id_user" in str(e.orig):
+            # Re-query to get the existing restaurant for the exception
+            existing = db.session.scalar(
+                select(Restaurant).where(
+                    Restaurant.user_id == user_id,
+                    Restaurant.google_place_id == google_place_id_value,
+                )
+            )
+            if existing:
+                raise DuplicateGooglePlaceIdError(google_place_id_value, existing)
+        elif "uix_restaurant_name_city_user" in str(e.orig):
+            # Re-query to get the existing restaurant for the exception
+            existing = db.session.scalar(
+                select(Restaurant).where(
+                    Restaurant.user_id == user_id,
+                    func.lower(Restaurant.name) == func.lower(name),
+                    func.lower(Restaurant.city) == func.lower(city) if city else True,
+                )
+            )
+            if existing:
+                raise DuplicateRestaurantError(name, city, existing)
+        # Re-raise original error if we can't handle it
+        raise
 
 
 def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant:
@@ -206,6 +292,10 @@ def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant
     for key, value in form_data.items():
         if hasattr(restaurant, key):
             setattr(restaurant, key, value)
+
+    # Format cuisine type for consistency
+    if hasattr(restaurant, "cuisine") and restaurant.cuisine:
+        restaurant.cuisine = format_cuisine_type(restaurant.cuisine)
 
     db.session.commit()
     return restaurant

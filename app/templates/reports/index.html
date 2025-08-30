@@ -1,16 +1,13 @@
-{% extends "reports/base.html" %}
-{% block page_title %}
-    Reports Dashboard
-{% endblock page_title %}
-{% block reports_content %}
-    <div class="card">
-        <div class="card-body">
-            <h5 class="card-title">Welcome to Reports</h5>
-            <p class="card-text">Here's a summary of your data:</p>
-            <ul>
-                <li>Total Expenses: {{ expenses|length }}</li>
-                <li>Total Restaurants: {{ restaurants|length }}</li>
-            </ul>
-        </div>
+{% extends "reports/base.html" %} {% block page_title %} Reports Dashboard {% endblock page_title %} {% block
+reports_content %}
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Welcome to Reports</h5>
+        <p class="card-text">Here's a summary of your data:</p>
+        <ul>
+            <li>Total Expenses: {{ expenses|length }}</li>
+            <li>Total Restaurants: {{ restaurants|length }}</li>
+        </ul>
     </div>
+</div>
 {% endblock reports_content %}

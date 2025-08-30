@@ -1,27 +1,27 @@
 <div class="col">
     <div class="card restaurant-card h-100">
         {% if restaurant.photo_url %}
-            <img src="{{ restaurant.photo_url }}"
-                 class="card-img-top"
-                 alt="Photo of {{ restaurant.name }}"
-                 width="300"
-                 height="160">
+        <img
+            src="{{ restaurant.photo_url }}"
+            class="card-img-top"
+            alt="Photo of {{ restaurant.name }}"
+            width="300"
+            height="160" />
         {% else %}
-            <div class="restaurant-placeholder">
-                <i class="fas fa-utensils"></i>
-            </div>
+        <div class="restaurant-placeholder">
+            <i class="fas fa-utensils"></i>
+        </div>
         {% endif %}
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
                 <h5 class="card-title mb-1">{{ restaurant.name }}</h5>
-                {% if restaurant.cuisine %}<span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>{% endif %}
+                {% if restaurant.cuisine %}<span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>{%
+                endif %}
             </div>
             <p class="restaurant-meta mb-2">
                 <i class="fas fa-map-marker-alt me-1"></i>
-                {% if restaurant.city %}
-                    {{ restaurant.city }}
-                {% else %}
-                    <span class="text-muted">No location</span>
+                {% if restaurant.city %} {{ restaurant.city }} {% else %}
+                <span class="text-muted">No location</span>
                 {% endif %}
             </p>
             <div class="restaurant-stats">
@@ -34,42 +34,44 @@
                     <div class="stat-label">Spent</div>
                 </div>
                 {% if restaurant.rating %}
-                    <div class="stat-item">
-                        <div class="stat-value">{{ "%.1f"|format(restaurant.rating) }}</div>
-                        <div class="stat-label">Rating</div>
-                    </div>
+                <div class="stat-item">
+                    <div class="stat-value">{{ "%.1f"|format(restaurant.rating) }}</div>
+                    <div class="stat-label">Rating</div>
+                </div>
                 {% endif %}
             </div>
             {% if last_visit %}
-                <div class="last-visited">
-                    <i class="far fa-calendar-alt me-1"></i>
-                    Last visited {{ last_visit|time_ago }}
-                </div>
+            <div class="last-visited">
+                <i class="far fa-calendar-alt me-1"></i>
+                Last visited {{ last_visit|time_ago }}
+            </div>
             {% endif %}
         </div>
         <div class="card-footer bg-transparent border-top-0 pt-0">
             <div class="d-grid gap-2">
-                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                   class="btn btn-outline-primary btn-sm">
+                <a
+                    href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                    class="btn btn-outline-primary btn-sm">
                     <i class="fas fa-eye me-1"></i> View Details
                 </a>
                 {% if restaurant.google_place_id %}
-                    <a href="https://www.google.com/maps/place/?q=place_id:{{ restaurant.google_place_id }}"
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       class="btn btn-outline-secondary btn-sm">
-                        <i class="fas fa-map-marked-alt me-1"></i> View on Map
-                    </a>
-                {% endif %}
-            {% elif restaurant.address %}
-                <a href="https://www.google.com/maps/search/?api=1&query={{ restaurant.address|urlencode }}+{{ restaurant.city|urlencode }}"
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   class="btn btn-outline-secondary btn-sm">
+                <a
+                    href="https://www.google.com/maps/place/?q=place_id:{{ restaurant.google_place_id }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-outline-secondary btn-sm">
                     <i class="fas fa-map-marked-alt me-1"></i> View on Map
                 </a>
-            {% endif %}
+                {% endif %} {% elif restaurant.address %}
+                <a
+                    href="https://www.google.com/maps/search/?api=1&query={{ restaurant.address|urlencode }}+{{ restaurant.city|urlencode }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-map-marked-alt me-1"></i> View on Map
+                </a>
+                {% endif %}
+            </div>
         </div>
     </div>
-</div>
 </div>

@@ -1,118 +1,92 @@
-{% extends "base.html" %}
-{% block title %}
-    Import Restaurants
-{% endblock title %}
-{% block content %}
-    <div class="container mt-4">
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header bg-white py-3">
-                        <h2 class="h4 mb-0">Import Restaurants</h2>
+{% extends "base.html" %} {% block title %} Import Restaurants {% endblock title %} {% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h4 mb-0">Import Restaurants</h2>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for category,
+                    message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
-                    <div class="card-body">
-                        {% with messages = get_flashed_messages(with_categories=true) %}
-                            {% if messages %}
-                                {% for category, message in messages %}
-                                    <div class="alert alert-{{ category }} alert-dismissible fade show">
-                                        {{ message }}
-                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                    </div>
-                                {% endfor %}
-                            {% endif %}
-                        {% endwith %}
-                        <div class="mb-4">
-                            <h3 class="h5 mb-3">Instructions</h3>
-                            <p>Upload a CSV file containing restaurant information. The file must include the following required fields:</p>
-                            <h4 class="h6 mt-3">Required Fields:</h4>
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle me-2"></i>
-                                The following field is <strong>required</strong> in your file:
-                            </div>
-                            <ul class="mb-3">
-                                <li>
-                                    <code>name</code> - Restaurant name
-                                </li>
-                            </ul>
-                            <h4 class="h6 mt-3">Optional Fields:</h4>
-                            <ul>
-                                <li>
-                                    <code>type</code> - Restaurant type (restaurant, cafe, bar, bakery, other)
-                                </li>
-                                <li>
-                                    <code>address</code> - Street address
-                                </li>
-                                <li>
-                                    <code>city</code> - City name
-                                </li>
-                                <li>
-                                    <code>phone</code> - Contact number
-                                </li>
-                                <li>
-                                    <code>website</code> - Restaurant website URL
-                                </li>
-                                <li>
-                                    <code>cuisine</code> - Type of cuisine
-                                </li>
-                                <li>
-                                    <code>notes</code> - Additional notes
-                                </li>
-                            </ul>
-                            <div class="alert alert-info mt-3">
-                                <i class="fas fa-download me-2"></i>
-                                <a href="{{ url_for('restaurants.export_restaurants') }}"
-                                   class="alert-link">Download sample CSV file</a>
-                            </div>
+                    {% endfor %} {% endif %} {% endwith %}
+                    <div class="mb-4">
+                        <h3 class="h5 mb-3">Instructions</h3>
+                        <p
+                            >Upload a CSV file containing restaurant information. The file must include the following
+                            required fields:</p
+                        >
+                        <h4 class="h6 mt-3">Required Fields:</h4>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            The following field is <strong>required</strong> in your file:
                         </div>
-                        <form method="post"
-                              enctype="multipart/form-data"
-                              id="import-form"
-                              class="needs-validation"
-                              novalidate>
-                            {{ form.hidden_tag() }}
-                            <div class="mb-3">
-                                <label for="file" class="form-label">Select CSV file</label>
-                                {{ form.file(class_="form-control", accept=".csv") }}
-                                <div class="invalid-feedback">Please select a CSV file to upload.</div>
-                                <div class="form-text">Maximum file size: 5MB. Only CSV files are supported.</div>
-                            </div>
-                            <!-- Show form validation errors -->
-                            {% if form.errors %}
-                                <div class="alert alert-danger">
-                                    <h5 class="alert-heading">Form Validation Errors</h5>
-                                    <ul class="mb-0">
-                                        {% for field, errors in form.errors.items() %}
-                                            {% for error in errors %}
-                                                <li>
-                                                    <strong>{{ field }}:</strong> {{ error }}
-                                                </li>
-                                            {% endfor %}
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                            {% endif %}
-                            {% if errors %}
-                                <div class="alert alert-danger">
-                                    <h5 class="alert-heading">Import Errors</h5>
-                                    <ul class="mb-0">
-                                        {% for error in errors %}<li>{{ error }}</li>{% endfor %}
-                                    </ul>
-                                </div>
-                            {% endif %}
-                            <div class="d-flex gap-2">
-                                {{ form.submit(class_="btn btn-primary") }}
-                                <a href="{{ url_for('restaurants.list_restaurants') }}"
-                                   class="btn btn-outline-secondary">
-                                    <i class="fas fa-times me-1"></i> Cancel
-                                </a>
-                            </div>
-                        </form>
+                        <ul class="mb-3">
+                            <li> <code>name</code> - Restaurant name </li>
+                        </ul>
+                        <h4 class="h6 mt-3">Optional Fields:</h4>
+                        <ul>
+                            <li> <code>type</code> - Restaurant type (restaurant, cafe, bar, bakery, other) </li>
+                            <li> <code>address</code> - Street address </li>
+                            <li> <code>city</code> - City name </li>
+                            <li> <code>phone</code> - Contact number </li>
+                            <li> <code>website</code> - Restaurant website URL </li>
+                            <li> <code>cuisine</code> - Type of cuisine </li>
+                            <li> <code>notes</code> - Additional notes </li>
+                        </ul>
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-download me-2"></i>
+                            <a href="{{ url_for('restaurants.export_restaurants') }}" class="alert-link"
+                                >Download sample CSV file</a
+                            >
+                        </div>
                     </div>
+                    <form
+                        method="post"
+                        enctype="multipart/form-data"
+                        id="import-form"
+                        class="needs-validation"
+                        novalidate>
+                        {{ form.hidden_tag() }}
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Select CSV file</label>
+                            {{ form.file(class_="form-control", accept=".csv") }}
+                            <div class="invalid-feedback">Please select a CSV file to upload.</div>
+                            <div class="form-text">Maximum file size: 5MB. Only CSV files are supported.</div>
+                        </div>
+                        <!-- Show form validation errors -->
+                        {% if form.errors %}
+                        <div class="alert alert-danger">
+                            <h5 class="alert-heading">Form Validation Errors</h5>
+                            <ul class="mb-0">
+                                {% for field, errors in form.errors.items() %} {% for error in errors %}
+                                <li> <strong>{{ field }}:</strong> {{ error }} </li>
+                                {% endfor %} {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %} {% if errors %}
+                        <div class="alert alert-danger">
+                            <h5 class="alert-heading">Import Errors</h5>
+                            <ul class="mb-0">
+                                {% for error in errors %}<li>{{ error }}</li
+                                >{% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex gap-2">
+                            {{ form.submit(class_="btn btn-primary") }}
+                            <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
-{% endblock content %}
-{% block scripts %}
-    {{ super() }}
-{% endblock scripts %}
+</div>
+{% endblock content %} {% block scripts %} {{ super() }} {% endblock scripts %}

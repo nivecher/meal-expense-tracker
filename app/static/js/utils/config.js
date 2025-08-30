@@ -24,7 +24,7 @@ export function getGoogleMapsConfig() {
 
   const config = {
     apiKey: config_element.dataset.apiKey || '',
-    mapId: config_element.dataset.mapId || ''
+    mapId: config_element.dataset.mapId || '',
   };
 
   // Cache the configuration
@@ -62,7 +62,7 @@ export function getCSRFToken() {
 export function getAppConfig() {
   return {
     googleMaps: getGoogleMapsConfig(),
-    csrfToken: getCSRFToken()
+    csrfToken: getCSRFToken(),
   };
 }
 

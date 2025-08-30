@@ -110,7 +110,10 @@ resource "aws_iam_policy" "lambda_combined" {
           "dynamodb:Scan",
           "dynamodb:BatchGetItem",
           "dynamodb:BatchWriteItem",
-          "dynamodb:ConditionCheckItem"
+          "dynamodb:ConditionCheckItem",
+          "dynamodb:DescribeTable",
+          "dynamodb:DescribeTimeToLive",
+          "dynamodb:UpdateTimeToLive"
         ]
         Resource = [
           "arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.app_name}-${var.environment}-sessions",

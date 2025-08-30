@@ -1,172 +1,309 @@
-{% extends "base.html" %}
-{% block title %}
-    Expenses - Meal Expense Tracker
-{% endblock title %}
-{% block styles %}
-    {{ super() }}
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='css/main.css') }}">
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='css/dynamic.css') }}">
-{% endblock styles %}
-{% block content %}
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="h3 mb-0">Expenses</h1>
-            <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
-                <i class="fas fa-plus me-1"></i> Add Expense
-            </a>
+{% extends "base.html" %} {% block title %} Expenses - Meal Expense Tracker {% endblock title %} {% block styles %} {{
+super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dynamic.css') }}" />
+{% endblock styles %} {% block content %}
+<!-- Breadcrumb Navigation -->
+{% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'}, {'title': 'Expenses'} ] %} {% include
+'includes/breadcrumb.html' %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Expenses</h1>
+        <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Add Expense
+        </a>
+    </div>
+    <!-- Search and Filter Form -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <!-- First Row -->
+                <div class="col-md-6">
+                    <label for="search" class="form-label">Search</label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="search"
+                        name="q"
+                        value="{{ search }}"
+                        placeholder="Search restaurants, categories, notes, or meal types" />
+                </div>
+                <div class="col-md-3">
+                    <label for="meal_type" class="form-label">Meal Type</label>
+                    <select class="form-control" id="meal_type" name="meal_type">
+                        <option value="">All Meal Types</option>
+                        {% for type in meal_types %}
+                        <option value="{{ type }}" {{ 'selected' if meal_type == type else '' }}>{{ type.title() }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-control" id="category" name="category">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}" {{ 'selected' if category == cat else '' }}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <!-- Second Row -->
+                <div class="col-md-4">
+                    <label for="start_date" class="form-label">From Date</label>
+                    <input
+                        type="date"
+                        class="form-control"
+                        id="start_date"
+                        name="start_date"
+                        value="{{ start_date if start_date and start_date != 'None' else '' }}" />
+                </div>
+                <div class="col-md-4">
+                    <label for="end_date" class="form-label">To Date</label>
+                    <input
+                        type="date"
+                        class="form-control"
+                        id="end_date"
+                        name="end_date"
+                        value="{{ end_date if end_date and end_date != 'None' else '' }}" />
+                </div>
+                <div class="col-md-4 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill" aria-label="Apply filters">
+                        <i class="fas fa-search me-1" aria-hidden="true"></i> Filter
+                    </button>
+                    <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary" aria-label="Clear all filters">
+                        <i class="fas fa-times me-1" aria-hidden="true"></i> Clear
+                    </a>
+                </div>
+            </form>
         </div>
-        <!-- Search and Filter Form -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <form method="get" class="row g-3" novalidate>
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="col-md-4">
-                        <label for="search" class="form-label">Search</label>
-                        <input type="text"
-                               class="form-control"
-                               id="search"
-                               name="q"
-                               value="{{ search }}"
-                               placeholder="Search by description or notes">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="start_date" class="form-label">From Date</label>
-                        <input type="date"
-                               class="form-control"
-                               id="start_date"
-                               name="start_date"
-                               value="{{ start_date if start_date and start_date != 'None' else '' }}">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="end_date" class="form-label">To Date</label>
-                        <input type="date"
-                               class="form-control"
-                               id="end_date"
-                               name="end_date"
-                               value="{{ end_date if end_date and end_date != 'None' else '' }}">
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit"
-                                class="btn btn-primary w-100"
-                                aria-label="Apply filters">
-                            <i class="fas fa-search me-1" aria-hidden="true"></i> Filter
+    </div>
+
+    <!-- Active Filters Indicator -->
+    {% set active_filters = [] %}
+    {% if search %}{% set _ = active_filters.append('Search: "' + search + '"') %}{% endif %}
+    {% if meal_type %}{% set _ = active_filters.append('Meal Type: ' + meal_type.title()) %}{% endif %}
+    {% if category %}{% set _ = active_filters.append('Category: ' + category) %}{% endif %}
+    {% if start_date %}{% set _ = active_filters.append('From: ' + start_date) %}{% endif %}
+    {% if end_date %}{% set _ = active_filters.append('To: ' + end_date) %}{% endif %}
+
+    {% if active_filters %}
+    <div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+        <i class="fas fa-filter me-2"></i>
+        <strong>Active Filters:</strong> {{ active_filters | join(', ') }}
+        {% if expenses %}({{ total_expenses }} result{{ 's' if total_expenses != 1 else '' }} found){% endif %}
+        <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-sm btn-outline-primary ms-2">
+            <i class="fas fa-times me-1"></i> Clear All
+        </a>
+    </div>
+    {% endif %}
+
+    {% if expenses %}
+    <!-- Expenses Table -->
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-receipt me-2"></i>
+                    Expenses ({{ expenses|length }})
+                </h5>
+                <div class="btn-group" role="group">
+                    <div class="dropdown">
+                        <button
+                            class="btn btn-outline-secondary dropdown-toggle"
+                            type="button"
+                            data-bs-toggle="dropdown">
+                            <i class="fas fa-download me-1"></i> Export
                         </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('expenses.export_expenses', format='csv') }}">
+                                    <i class="fas fa-file-csv me-2"></i> CSV
+                                </a>
+                            </li>
+                            <li>
+                                <a
+                                    class="dropdown-item"
+                                    href="{{ url_for('expenses.export_expenses', format='json') }}">
+                                    <i class="fas fa-file-code me-2"></i> JSON
+                                </a>
+                            </li>
+                        </ul>
                     </div>
-                </form>
-            </div>
-        </div>
-        {% if expenses %}
-            <!-- Expenses List -->
-            <div class="row">
-                {% for expense in expenses %}
-                    <div class="col-12 mb-3">
-                        <div class="card expense-card">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <h5 class="card-title mb-1">
-                                            <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
-                                               class="text-decoration-none">{{ expense.meal_type.title() if expense.meal_type else 'Expense' }}</a>
-                                        </h5>
-                                        <p class="card-text text-muted mb-1">
-                                            <i class="far fa-calendar-alt me-1"></i>
-                                            {{ expense.date.strftime("%b %d, %Y") }}
-                                            {% if expense.restaurant %}
-                                                <span class="ms-2">
-                                                    <i class="fas fa-utensils me-1"></i>
-                                                    {{ expense.restaurant.name }}
-                                                </span>
-                                            {% endif %}
-                                        </p>
-                                        {% if expense.notes %}<p class="card-text text-muted small mb-2">{{ expense.notes|truncate(100) }}</p>{% endif %}
-                                        {% if expense.category %}
-                                            <span class="expense-category-badge category-badge-{{ expense.category.id }}">{{ expense.category.name }}</span>
-                                        {% endif %}
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="expense-amount text-success">${{ "%.2f"|format(expense.amount|abs) }}</div>
-                                        <div class="expense-actions mt-2">
-                                            <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
-                                               class="btn btn-sm btn-outline-primary me-1"
-                                               aria-label="Edit expense">
-                                                <i class="fas fa-edit" aria-hidden="true"></i>
-                                                <span class="visually-hidden">Edit</span>
-                                            </a>
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-danger btn-delete-expense"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#deleteModal{{ expense.id }}"
-                                                    data-expense-id="{{ expense.id }}"
-                                                    data-expense-name="{{ expense.meal_type.title() if expense.meal_type else 'Expense' }}"
-                                                    aria-label="Delete expense">
-                                                <i class="fas fa-trash" aria-hidden="true"></i>
-                                                <span class="visually-hidden">Delete</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Delete Modal -->
-                        <div class="modal fade"
-                             id="deleteModal{{ expense.id }}"
-                             tabindex="-1"
-                             aria-labelledby="deleteModalLabel{{ expense.id }}">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title" id="deleteModalLabel{{ expense.id }}">Confirm Delete</h5>
-                                        <button type="button"
-                                                class="btn-close"
-                                                data-bs-dismiss="modal"
-                                                aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        Are you sure you want to delete this expense?
-                                        <div class="mt-2">
-                                            <strong>Description:</strong> {{ expense.meal_type.title() if expense.meal_type else 'Expense' }}
-                                            <br>
-                                            <strong>Amount:</strong> ${{ "%.2f"|format(expense.amount) }}
-                                            <br>
-                                            <strong>Date:</strong> {{ expense.date.strftime("%b %d, %Y") }}
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                        <form action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}"
-                                              method="post"
-                                              class="d-inline">
-                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-danger">
-                                                <i class="fas fa-trash me-1"></i> Delete
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="card">
-                <div class="card-body text-center py-5">
-                    <div class="no-expenses">
-                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
-                        <h4>No expenses found</h4>
-                        <p class="text-muted">Get started by adding your first expense.</p>
-                        <a href="{{ url_for('expenses.add_expense') }}"
-                           class="btn btn-primary mt-2">
-                            <i class="fas fa-plus me-1"></i> Add Expense
-                        </a>
-                    </div>
+                    <a href="{{ url_for('expenses.import_expenses') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-upload me-1"></i> Import
+                    </a>
                 </div>
             </div>
-        {% endif %}
+        </div>
+        <div class="card-body p-0">
+            <div class="table-sticky-header">
+                <table class="table table-hover align-middle expense-table mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th data-sort="true" data-sort-type="date">Date</th>
+                            <th data-sort="true" data-sort-type="text">Category</th>
+                            <th data-sort="true" data-sort-type="text">Restaurant</th>
+                            <th data-sort="true" data-sort-type="text">Meal</th>
+                            <th data-sort="true" data-sort-type="currency">Amount</th>
+                            <th>Notes</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expense in expenses %} {% include "expenses/_expense_table_row.html" %} {% endfor %}
+                    </tbody>
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <td colspan="4" class="text-end fw-bold">Total:</td>
+                            <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_amount) }}</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
     </div>
-{% endblock content %}
-{% block scripts %}
-    {{ super() }}
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteExpenseModal" tabindex="-1" aria-labelledby="deleteExpenseModalLabel">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteExpenseModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this expense?</p>
+                    <div id="delete-expense-details" class="mt-2">
+                        <!-- Details will be populated by JavaScript -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form id="delete-expense-form" action="" method="post" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <button type="submit" class="btn btn-danger"> <i class="fas fa-trash me-1"></i> Delete </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <div class="no-expenses">
+                <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                <h4>No expenses found</h4>
+                <p class="text-muted">Get started by adding your first expense.</p>
+                <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary mt-2">
+                    <i class="fas fa-plus me-1"></i> Add Expense
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock content %} {% block scripts %} {{ super() }}
+<script>
+    // Handle delete modal functionality
+    document.addEventListener("DOMContentLoaded", function () {
+        const deleteModal = document.getElementById("deleteExpenseModal");
+        const deleteForm = document.getElementById("delete-expense-form");
+        const deleteDetails = document.getElementById("delete-expense-details");
+
+        if (deleteModal) {
+            deleteModal.addEventListener("show.bs.modal", function (event) {
+                const button = event.relatedTarget;
+                const expenseId = button.getAttribute("data-expense-id");
+                const description = button.getAttribute("data-expense-description");
+                const amount = button.getAttribute("data-expense-amount");
+                const date = button.getAttribute("data-expense-date");
+
+                // Update form action
+                deleteForm.setAttribute("action", `/expenses/${expenseId}/delete`);
+
+                // Update expense details
+                deleteDetails.innerHTML = `
+                        <strong>Description:</strong> ${description}<br>
+                        <strong>Amount:</strong> $${amount}<br>
+                        <strong>Date:</strong> ${date}
+                    `;
+            });
+        }
+
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Simple table sorting
+        const headers = document.querySelectorAll('.expense-table th[data-sort="true"]');
+        headers.forEach((header) => {
+            header.style.cursor = "pointer";
+            header.addEventListener("click", function () {
+                sortTable(this);
+            });
+        });
+
+        function sortTable(header) {
+            const table = header.closest("table");
+            const tbody = table.querySelector("tbody");
+            const rows = Array.from(tbody.querySelectorAll("tr"));
+            const columnIndex = Array.from(header.parentNode.children).indexOf(header);
+            const sortType = header.getAttribute("data-sort-type");
+            const isAscending = header.classList.contains("sort-asc");
+
+            // Remove existing sort classes
+            headers.forEach((h) => h.classList.remove("sort-asc", "sort-desc"));
+
+            // Add sort class to current header
+            header.classList.add(isAscending ? "sort-desc" : "sort-asc");
+
+            rows.sort((a, b) => {
+                const aValue = getCellValue(a.cells[columnIndex], sortType);
+                const bValue = getCellValue(b.cells[columnIndex], sortType);
+
+                if (sortType === "currency" || sortType === "number") {
+                    return isAscending ? bValue - aValue : aValue - bValue;
+                } else if (sortType === "date") {
+                    return isAscending ? new Date(bValue) - new Date(aValue) : new Date(aValue) - new Date(bValue);
+                } else {
+                    return isAscending ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue);
+                }
+            });
+
+            // Reorder rows
+            rows.forEach((row) => tbody.appendChild(row));
+        }
+
+        function getCellValue(cell, sortType) {
+            if (sortType === "currency") {
+                const text = cell.textContent.trim();
+                return parseFloat(text.replace(/[$,]/g, "")) || 0;
+            } else if (sortType === "number") {
+                return parseFloat(cell.textContent.trim()) || 0;
+            } else if (sortType === "date") {
+                const link = cell.querySelector("a");
+                return link ? link.textContent.trim() : cell.textContent.trim();
+            } else {
+                return cell.textContent.trim().toLowerCase();
+            }
+        }
+    });
+</script>
+<style>
+    .expense-table th[data-sort="true"]:hover {
+        background-color: #e9ecef;
+    }
+
+    .expense-table th.sort-asc::after {
+        content: " ↑";
+        color: #007bff;
+    }
+
+    .expense-table th.sort-desc::after {
+        content: " ↓";
+        color: #007bff;
+    }
+</style>
 {% endblock scripts %}

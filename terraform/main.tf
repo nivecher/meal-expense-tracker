@@ -522,7 +522,8 @@ module "lambda" {
 
   # Session configuration
   session_type       = "dynamodb"
-  session_table_name = "${var.app_name}-${var.environment}-sessions"
+  session_table_name = module.dynamodb.table_name
+  dynamodb_table_arn = module.dynamodb.table_arn
 
   # API Gateway integration
   api_gateway_execution_arn = module.api_gateway.api_execution_arn

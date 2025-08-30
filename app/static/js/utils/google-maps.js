@@ -16,6 +16,65 @@ class GoogleMapsLoader {
     return !!(window.google && window.google.maps);
   }
 
+  static setupAccessibilityObserver() {
+    // Safety: Ensure we can observe document.body
+    if (!document.body) {
+      logger.warn('GoogleMapsAccessibilityManager: document.body not available, deferring observer setup');
+      // Retry when DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => this.setupAccessibilityObserver());
+      }
+      return null;
+    }
+
+    try {
+      // Ensure Google Maps iframes have accessibility attributes
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          try {
+            mutation.addedNodes.forEach((node) => {
+              if (node.nodeType === Node.ELEMENT_NODE) {
+                // Check if it's an iframe or contains iframes
+                const iframes = node.nodeName === 'IFRAME' ? [node] : node.querySelectorAll ? node.querySelectorAll('iframe') : [];
+
+                iframes.forEach((iframe) => {
+                  try {
+                    if (iframe.src && iframe.src.includes('google.com') && !iframe.title) {
+                      iframe.title = 'Google Maps';
+                      iframe.setAttribute('aria-label', 'Interactive Google Maps');
+                      logger.debug('Added accessibility attributes to Google Maps iframe');
+                    }
+                  } catch (error) {
+                    logger.warn('Error setting iframe accessibility attributes:', error);
+                  }
+                });
+              }
+            });
+          } catch (error) {
+            logger.warn('Error processing mutation:', error);
+          }
+        });
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+
+      // Store observer reference for cleanup if needed
+      if (!window._googleMapsAccessibilityObserver) {
+        window._googleMapsAccessibilityObserver = observer;
+      }
+
+      logger.debug('GoogleMapsAccessibilityManager: MutationObserver setup successful');
+      return observer;
+
+    } catch (error) {
+      logger.error('GoogleMapsAccessibilityManager: Failed to setup MutationObserver:', error);
+      return null;
+    }
+  }
+
   static async load(apiKey, libraries = ['places'], options = {}) {
     // If already loaded, return immediately
     if (this.isApiLoaded()) {
@@ -84,11 +143,12 @@ class GoogleMapsLoader {
 
         const url = `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
 
-        // Add script tag
+        // Add script tag with accessibility attributes
         const script = document.createElement('script');
         script.src = url;
         script.async = true;
         script.defer = true;
+        script.title = 'Google Maps API Script';
         script.onerror = () => {
           const errorMsg = 'Failed to load Google Maps API';
           logger.error(errorMsg);
@@ -97,6 +157,9 @@ class GoogleMapsLoader {
         };
 
         document.head.appendChild(script);
+
+        // Set up iframe accessibility observer for Google Maps
+        this.setupAccessibilityObserver();
       } catch (error) {
         logger.error('Error loading Google Maps API:', error);
         reject(error);
@@ -295,7 +358,7 @@ class GooglePlacesService {
         this.autocompleteService = new google.maps.places.AutocompleteService();
         logger.debug('Legacy services created successfully:', {
           placesService: !!this.placesService,
-          autocompleteService: !!this.autocompleteService
+          autocompleteService: !!this.autocompleteService,
         });
       } catch (serviceError) {
         logger.error('Failed to create Places services:', serviceError);
@@ -316,7 +379,7 @@ class GooglePlacesService {
         initialized: this.initialized,
         useModernAPI: this.useModernAPI,
         hasPlacesService: !!this.placesService,
-        placesServiceType: this.placesService ? this.placesService.constructor.name : 'null'
+        placesServiceType: this.placesService ? this.placesService.constructor.name : 'null',
       });
       return true;
     } catch (error) {
@@ -472,14 +535,14 @@ class GooglePlacesService {
             resolve({
               results: formattedResults,
               status: 'OK',
-              error: null
+              error: null,
             });
           } else {
             logger.error('Places nearby search failed:', status);
             resolve({
               results: [],
-              status: status,
-              error: `Search failed with status: ${status}`
+              status,
+              error: `Search failed with status: ${status}`,
             });
           }
         } catch (callbackError) {

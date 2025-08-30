@@ -1,18 +1,24 @@
 {
   "name": "meal-expense-tracker",
   "version": "1.0.0",
-  "description": "Meal Expense Tracker Application",
-  "type": "module",
+  "description": "Flask-based meal expense tracking application",
+  "private": true,
   "scripts": {
+    "format-html": "prettier --write \"app/templates/**/*.html\"",
+    "format-html-check": "prettier --check \"app/templates/**/*.html\"",
+    "lint-html": "prettier --check \"app/templates/**/*.html\"",
     "lint:js": "eslint --config eslint.config.js \"app/static/js/**/*.js\"",
-    "lint:fix": "eslint --config eslint.config.js --fix \"app/static/js/**/*.js\""
+    "format:js": "eslint --config eslint.config.js \"app/static/js/**/*.js\" --fix",
+    "install-deps": "npm install"
   },
   "devDependencies": {
-    "@eslint/js": "^9.32.0",
-    "eslint": "^9.32.0",
-    "globals": "^15.0.0"
+    "prettier": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   },
   "dependencies": {
-    "jscpd": "^4.0.5"
+    "eslint": "^9.34.0"
   }
 }

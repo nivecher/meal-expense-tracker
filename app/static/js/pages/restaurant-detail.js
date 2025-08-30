@@ -49,7 +49,7 @@ function initializeMap() {
   // Load Google Maps API and initialize the map
   if (window.GOOGLE_MAPS_API_KEY) {
     console.log('Restaurant Detail: Loading Google Maps API');
-    GoogleMapsLoader.loadApi(window.GOOGLE_MAPS_API_KEY, async () => {
+    GoogleMapsLoader.loadApi(window.GOOGLE_MAPS_API_KEY, async() => {
       try {
         console.log('Restaurant Detail: Google Maps API loaded successfully');
         console.log('Restaurant Detail: Available Google Maps:', window.google?.maps);

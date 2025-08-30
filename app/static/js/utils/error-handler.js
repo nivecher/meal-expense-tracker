@@ -13,7 +13,7 @@ class ErrorHandler {
      * @param {string} defaultMessage - Default error message
      * @returns {Object} Error details
      */
-  static handleApiError (error, defaultMessage = 'An error occurred') {
+  static handleApiError(error, defaultMessage = 'An error occurred') {
     let message = defaultMessage;
     let details = null;
     let status = null;
@@ -68,7 +68,7 @@ class ErrorHandler {
   /**
      * Handle unauthorized access
      */
-  static handleUnauthorized () {
+  static handleUnauthorized() {
     // Redirect to login with a message
     const currentPath = encodeURIComponent(window.location.pathname + window.location.search);
     window.location.href = `/auth/login?next=${currentPath}`;
@@ -79,7 +79,7 @@ class ErrorHandler {
      * @param {Error} error - The error object
      * @returns {Object} Error details
      */
-  static handleNetworkError (error) {
+  static handleNetworkError(error) {
     const message = 'Network error. Please check your connection.';
     showErrorToast(message);
     console.error('Network Error:', error);
@@ -91,7 +91,7 @@ class ErrorHandler {
      * @param {Error} error - The error object
      * @returns {Object} Error details
      */
-  static handleMapsError (error) {
+  static handleMapsError(error) {
     let message = 'Failed to load Google Maps';
 
     switch(error?.code) {

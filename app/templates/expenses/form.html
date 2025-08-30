@@ -1,61 +1,65 @@
-{% extends "base.html" %}
-{% from "expenses/macros.html" import expense_form, expense_scripts %}
-{% block title %}
-    {% if is_edit %}
-        Edit Expense
-    {% else %}
-        Add Expense
-        {% if restaurant %}for {{ restaurant.name }}{% endif %}
-    {% endif %}
-{% endblock title %}
-{% block content %}
-    <div class="container mt-4">
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h2 class="mb-0">
-                            {% if is_edit %}
-                                Edit Expense
-                            {% else %}
-                                Add Expense
-                                {% if restaurant %}<small class="text-muted">{{ restaurant.name }}</small>{% endif %}
-                            {% endif %}
-                        </h2>
-                    </div>
-                    <div class="card-body">
-                        <div id="alert-container">
-                            {% with messages = get_flashed_messages(with_categories=true) %}
-                                {% if messages %}
-                                    {% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}
-                                {% endif %}
-                            {% endwith %}
-                        </div>
-                        {% if is_edit and debug %}
-                            <div class="card mb-4">
-                                <div class="card-header bg-light">
-                                    <h5 class="mb-0">Debug Information</h5>
-                                </div>
-                                <div class="card-body">
-                                    <h6>Available Categories:</h6>
-                                    <pre>{{ categories|map(attribute='name')|list|tojson(indent=2) }}</pre>
-                                    <h6>Expense Data:</h6>
-                                    <pre>Category ID: {{ expense.category_id }}</pre>
-                                    <h6>Form Category Choices:</h6>
-                                    <pre>{{ form.category_id.choices|tojson(indent=2) }}</pre>
-                                    <h6>Form Category Data:</h6>
-                                    <pre>{{ form.category_id.data }}</pre>
-                                </div>
-                            </div>
+{% extends "base.html" %} {% from "expenses/macros.html" import expense_form, expense_scripts %} {% block title %} {% if
+is_edit %} Edit Expense {% else %} Add Expense {% if restaurant %}for {{ restaurant.name }}{% endif %} {% endif %} {%
+endblock title %} {% block content %}
+<!-- Breadcrumb Navigation -->
+{% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'} ] %} {% if restaurant and not is_edit
+%} {% set _ = breadcrumb_items.extend([ {'url': url_for('restaurants.list_restaurants'), 'title': 'Restaurants'},
+{'url': url_for('restaurants.restaurant_details', restaurant_id=restaurant.id), 'title': restaurant.name}, {'title':
+'Add Expense'} ]) %} {% else %} {% set _ = breadcrumb_items.extend([ {'url': url_for('expenses.list_expenses'), 'title':
+'Expenses'}, {'title': 'Edit Expense' if is_edit else 'Add Expense'} ]) %} {% endif %} {% include
+'includes/breadcrumb.html' %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex align-items-center">
+                        {% if restaurant and not is_edit %}
+                        <a
+                            href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                            class="btn btn-outline-secondary btn-sm me-3"
+                            title="Back to {{ restaurant.name }}">
+                            <i class="fas fa-arrow-left"></i>
+                        </a>
+                        {% else %}
+                        <a
+                            href="{{ url_for('expenses.list_expenses') }}"
+                            class="btn btn-outline-secondary btn-sm me-3"
+                            title="Back to Expenses">
+                            <i class="fas fa-arrow-left"></i>
+                        </a>
                         {% endif %}
-                        {{ expense_form(form=form, expense=expense, is_edit=is_edit) }}
+                        <div>
+                            <h2 class="mb-0"> {% if is_edit %} Edit Expense {% else %} Add Expense {% endif %} </h2>
+                        </div>
                     </div>
+                </div>
+                <div class="card-body">
+                    <div id="alert-container">
+                        {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for
+                        category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{%
+                        endfor %} {% endif %} {% endwith %}
+                    </div>
+                    {% if is_edit and debug %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Debug Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <h6>Available Categories:</h6>
+                            <pre>{{ categories|map(attribute='name')|list|tojson(indent=2) }}</pre>
+                            <h6>Expense Data:</h6>
+                            <pre>Category ID: {{ expense.category_id }}</pre>
+                            <h6>Form Category Choices:</h6>
+                            <pre>{{ form.category_id.choices|tojson(indent=2) }}</pre>
+                            <h6>Form Category Data:</h6>
+                            <pre>{{ form.category_id.data }}</pre>
+                        </div>
+                    </div>
+                    {% endif %} {{ expense_form(form=form, expense=expense, is_edit=is_edit) }}
                 </div>
             </div>
         </div>
     </div>
-{% endblock content %}
-{% block scripts %}
-    {{ super() }}
-    {{ expense_scripts() }}
-{% endblock scripts %}
+</div>
+{% endblock content %} {% block scripts %} {{ super() }} {{ expense_scripts() }} {% endblock scripts %}
