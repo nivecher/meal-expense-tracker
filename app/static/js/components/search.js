@@ -2,7 +2,7 @@
  * Search component for restaurant search functionality
  */
 
-import GoogleMapsLoader from '../utils/google-maps-loader.js';
+import { GoogleMapsLoader } from '../utils/google-maps.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('restaurantSearchInput');

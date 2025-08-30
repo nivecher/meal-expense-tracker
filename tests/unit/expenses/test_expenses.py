@@ -39,7 +39,6 @@ def test_add_expense(client, auth):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "American",
-            "price_range": "$$",
         },
         follow_redirects=True,
     )
@@ -78,7 +77,6 @@ def test_edit_expense(client, auth, app):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "American",
-            "price_range": "$$",
         },
         follow_redirects=True,
     )
@@ -142,7 +140,6 @@ def test_edit_expense_unauthorized(client, auth, app):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "American",
-            "price_range": "$$",
         },
         follow_redirects=True,
     )
@@ -207,7 +204,6 @@ def test_edit_expense_invalid_data(client, auth):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "American",
-            "price_range": "$$",
         },
         follow_redirects=True,
     )
@@ -258,7 +254,6 @@ def test_delete_expense(client, auth):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "American",
-            "price_range": "$$",
         },
         follow_redirects=True,
     )
@@ -299,7 +294,6 @@ def test_expense_filters(client, auth):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "American",
-            "price_range": "$$",
         },
         follow_redirects=True,
     )
@@ -359,7 +353,6 @@ def test_add_expense_with_restaurant_type(client, auth):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "Coffee",
-            "price_range": "$",
         },
         follow_redirects=True,
     )

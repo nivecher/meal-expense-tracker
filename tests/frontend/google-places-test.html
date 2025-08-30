@@ -248,7 +248,7 @@
                         placeId: placeId,
                         fields: [
                             'name', 'formatted_address', 'formatted_phone_number',
-                            'website', 'rating', 'user_ratings_total', 'price_level',
+                            'website', 'rating', 'userRatingsTotal', 'priceLevel',
                             'opening_hours', 'photos'
                         ]
                     };
@@ -268,12 +268,12 @@
                 let html = '<div class="details">';
 
                 if (place.rating) {
-                    html += `<p>Rating: ${place.rating} (${place.user_ratings_total || 0} reviews)</p>`;
+                    html += `<p>Rating: ${place.rating} (${place.userRatingsTotal || 0} reviews)</p>`;
                 }
 
-                if (place.price_level !== undefined) {
+                if (place.priceLevel !== undefined) {
                     const priceLevels = ['Free', 'Inexpensive', 'Moderate', 'Expensive', 'Very Expensive'];
-                    html += `<p>Price: ${priceLevels[place.price_level] || 'Not specified'}</p>`;
+                    html += `<p>Price: ${priceLevels[place.priceLevel] || 'Not specified'}</p>`;
                 }
 
                 if (place.formatted_phone_number) {

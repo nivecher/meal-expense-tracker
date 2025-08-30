@@ -162,38 +162,6 @@ def get_google_maps_id():
     return jsonify({"mapId": key})
 
 
-# TODO test code
-@bp.route("/test/mime-test")
-def mime_test():
-    """Test MIME type for JavaScript files.
-
-    This route returns a simple HTML page that tests the MIME type of a JavaScript file.
-    """
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>MIME Type Test</title>
-        <script type="module">
-            import('/static/js/test-module.js')
-                .then(module => {
-                    console.log('Module loaded successfully');
-                    module.testModule();
-                })
-                .catch(error => {
-                    console.error('Error loading module:', error);
-                    document.body.innerHTML += `<p>Error: ${error.message}</p>`;
-                });
-        </script>
-    </head>
-    <body>
-        <h1>MIME Type Test</h1>
-        <p>Check the browser console for test results.</p>
-    </body>
-    </html>
-    """
-
-
 @bp.route("/test/google-places")
 @login_required
 def google_places_test():

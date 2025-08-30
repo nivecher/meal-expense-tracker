@@ -4,7 +4,7 @@
  */
 
 import { resetFormValidation } from './validation.js';
-import { apiRequest } from './api.js';
+import { apiRequest } from '../api-utils.js';
 
 /**
  * Set loading state for a form

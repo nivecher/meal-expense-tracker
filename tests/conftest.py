@@ -417,7 +417,6 @@ def test_restaurant(session: Session, test_user: User) -> Restaurant:
         user_id=test_user.id,
         type="restaurant",
         cuisine="Test Cuisine",
-        price_range="$$",
         email=f"contact@testrestaurant{uuid.uuid4().hex[:4]}.com",
         country="United States",
     )

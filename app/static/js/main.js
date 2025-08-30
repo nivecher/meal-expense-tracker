@@ -1,174 +1,81 @@
 /**
- * Main application entry point.
- *
- * This module serves as the main entry point for the application, handling
- * initialization of UI components and dynamic loading of page-specific modules.
- *
- * @module main
+ * Simple main application entry point.
+ * Focuses on essential UI initialization without over-engineering.
  */
 
-import { showErrorToast } from './utils/notifications.js';
-
-/**
- * Maps URL paths to their corresponding module paths.
- * @type {Object.<string, string>}
- */
-const PAGE_MODULES = {
-  '/restaurants/add': '/static/js/pages/restaurant-form.js',
-  '/restaurants/search': '/static/js/pages/restaurant-search.js',
-  '/expenses/add': '/static/js/pages/expense-form.js',
-  '/expenses': '/static/js/pages/expense-list.js',
-  '/restaurants': '/static/js/pages/restaurant-list.js',
+// Simple page module loading - direct and clear
+const pageModules = {
+  '/restaurants/add': () => import('./pages/restaurant-form.js'),
+  '/restaurants/search': () => import('./pages/restaurant-search.js'),
+  '/expenses/add': () => import('./pages/expense-form.js'),
+  '/expenses': () => import('./pages/expense-list.js'),
+  '/restaurants': () => import('./pages/restaurant-list.js'),
 };
 
-/**
- * Initialize global UI components.
- * Sets up tooltips, popovers, and other UI elements that are used across the application.
- * @returns {void}
- */
+// Initialize essential UI components directly
 function initUI() {
-  try {
-    // Initialize tooltips
-    const tooltipTriggerList = Array.from(
-      document.querySelectorAll('[data-bs-toggle="tooltip"]'),
-    );
+  // Bootstrap tooltips
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+  });
 
-    tooltipTriggerList.forEach((tooltipEl) => {
-      new bootstrap.Tooltip(tooltipEl, {
-        trigger: 'hover focus',
-        boundary: 'viewport',
-      });
+  // Bootstrap popovers
+  document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
+    new bootstrap.Popover(el, { html: true });
+  });
+
+  // Smooth scrolling for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(anchor.getAttribute('href'));
+      target?.scrollIntoView({ behavior: 'smooth' });
     });
-
-    // Initialize popovers
-    const popoverTriggerList = Array.from(
-      document.querySelectorAll('[data-bs-toggle="popover"]'),
-    );
-
-    popoverTriggerList.forEach((popoverEl) => {
-      new bootstrap.Popover(popoverEl, {
-        trigger: 'focus',
-        html: true,
-        sanitize: false,
-      });
-    });
-
-    // Add smooth scrolling for anchor links
-    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-      anchor.addEventListener('click', function(e) {
-        e.preventDefault();
-        const targetId = this.getAttribute('href');
-        const target = document.querySelector(targetId);
-
-        if (target) {
-          target.scrollIntoView({
-            behavior: 'smooth',
-          });
-        }
-      });
-    });
-  } catch (error) {
-    console.error('UI initialization failed:', error);
-    showErrorToast('Failed to initialize UI components.');
-  }
+  });
 }
 
-/**
- * Load and initialize the appropriate page module based on current URL.
- * @async
- * @returns {Promise<void>}
- */
+// Load page-specific module if it exists
 async function loadPageModule() {
-  const currentPath = window.location.pathname;
-  const modulePath = PAGE_MODULES[currentPath];
-
-  if (!modulePath) {
-    return;
-  }
+  const moduleLoader = pageModules[window.location.pathname];
+  if (!moduleLoader) return;
 
   try {
-    const module = await import(modulePath);
-    if (typeof module.init === 'function') {
-      await module.init();
-    }
+    const module = await moduleLoader();
+    module.init?.();
   } catch (error) {
-    console.error(`Failed to load module: ${modulePath}`, error);
-    showErrorToast('Failed to load page module. Please refresh the page.');
+    console.error('Failed to load page module:', error);
   }
 }
 
-/**
- * Initialize the application.
- * Sets up UI components and loads the appropriate page module.
- * @async
- * @returns {Promise<void>}
- */
+// Simple app initialization
 async function init() {
-  try {
-    initUI();
-    await loadPageModule();
+  initUI();
+  await loadPageModule();
 
-    // Add animation to cards on scroll
-    const animateOnScroll = () => {
-      const cards = document.querySelectorAll('.card, .animate-on-scroll');
-      cards.forEach((card) => {
-        const cardTop = card.getBoundingClientRect().top;
-        const windowHeight = window.innerHeight;
+  // Auto-dismiss alerts after 5 seconds
+  document.querySelectorAll('.alert-dismissible').forEach(alert => {
+    setTimeout(() => new bootstrap.Alert(alert).close(), 5000);
+  });
 
-        if (cardTop < windowHeight - 100) {
-          card.classList.add('animate__animated', 'animate__fadeInUp');
-        }
-      });
-    };
-
-    // Add scroll event listener
-    window.addEventListener('scroll', animateOnScroll);
-    animateOnScroll(); // Run once on page load
-
-    // Add loading state to buttons with data-loading attribute
-    document.querySelectorAll('[data-loading]').forEach((button) => {
-      button.addEventListener('click', function() {
-        this.setAttribute('data-text', this.innerHTML);
-        this.disabled = true;
-        this.innerHTML = `
-                    <span class="spinner-border spinner-border-sm"
-                          role="status"
-                          aria-hidden="true">
-                    </span>
-                    ${this.getAttribute('data-loading')}
-                `;
-      });
+  // Loading state for buttons
+  document.querySelectorAll('[data-loading]').forEach(button => {
+    button.addEventListener('click', function() {
+      const loadingText = this.dataset.loading;
+      this.dataset.originalText = this.innerHTML;
+      this.disabled = true;
+      this.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${loadingText}`;
     });
+  });
 
-    // Flash message auto-dismiss
-    const alerts = document.querySelectorAll('.alert-dismissible');
-    alerts.forEach((alert) => {
-      setTimeout(() => {
-        const bsAlert = new bootstrap.Alert(alert);
-        bsAlert.close();
-      }, 5000); // Auto-dismiss after 5 seconds
-    });
-
-    document.dispatchEvent(new CustomEvent('app:initialized'));
-  } catch (error) {
-    console.error('Application initialization failed:', error);
-    showErrorToast('Failed to initialize application. Please refresh the page.');
-  }
+  document.dispatchEvent(new CustomEvent('app:initialized'));
 }
 
-// Initialize the application when the DOM is fully loaded
+// Start the app
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
 }
 
-// Export for testing purposes
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    init,
-    initUI,
-    loadPageModule,
-
-  };
-}
+// Export for testing
+export { init, initUI, loadPageModule };

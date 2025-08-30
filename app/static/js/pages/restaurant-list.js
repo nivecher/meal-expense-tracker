@@ -1,15 +1,23 @@
-import { get, post } from '../utils/api.js';
+import { get, post } from '../utils/api-utils.js';
 
-(() => {
+/**
+ * Initialize the restaurant list page
+ */
+function init() {
   'use strict';
 
-  const mapContainer = document.getElementById('map');
-  if (!mapContainer) {
+  const map_container = document.getElementById('map');
+  if (!map_container) {
     console.log('Map container not found, skipping map initialization');
     return;
   }
 
   console.log('Map container found, initializing map...');
+
+  initialize_restaurant_map(map_container);
+}
+
+function initialize_restaurant_map(map_container) {
 
   let map;
   let userLocationMarker;
@@ -710,4 +718,14 @@ import { get, post } from '../utils/api.js';
       centerMapOnRestaurant(e.target.closest('.list-group-item-action[data-lat]'));
     }
   });
-})();
+}
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+// Export for testing and explicit initialization
+export { init };

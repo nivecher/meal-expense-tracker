@@ -5,7 +5,7 @@
  * @module restaurantAddressAutocomplete
  */
 
-import GoogleMapsLoader from '../utils/google-maps-loader.js';
+import { GoogleMapsLoader } from '../utils/google-maps.js';
 import { logger } from '../utils/logger.js';
 
 const restaurantAddressAutocomplete = (() => {
@@ -322,23 +322,12 @@ const restaurantAddressAutocomplete = (() => {
 
     // Update hidden fields for Google Places data
     const googlePlaceIdField = document.getElementById('google_place_id');
-    const latitudeField = document.getElementById('latitude');
-    const longitudeField = document.getElementById('longitude');
-
     // Update Google Place ID if available
     if (googlePlaceIdField) {
       googlePlaceIdField.value = data.place_id || '';
     }
 
-    // Update coordinates if available
-    if (geometry?.location) {
-      if (latitudeField && geometry.location.lat) {
-        latitudeField.value = geometry.location.lat;
-      }
-      if (longitudeField && geometry.location.lng) {
-        longitudeField.value = geometry.location.lng;
-      }
-    }
+    // Note: coordinates would be looked up dynamically from Google Places API
 
     // Enable the Update button
     if (state.updateAddressBtn) {

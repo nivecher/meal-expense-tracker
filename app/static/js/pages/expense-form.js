@@ -1,12 +1,26 @@
-// Initialize the expense form
-document.addEventListener('DOMContentLoaded', () => {
-  const form = document.getElementById('expenseForm');
-  if (!form) return;
+/**
+ * Initialize the expense form page
+ */
+function init() {
+  const elements = cache_form_elements();
+  if (!elements.form) return;
+
+  setup_expense_form_handlers(elements);
+}
+
+function cache_form_elements() {
+  return {
+    form: document.getElementById('expenseForm'),
+    categorySelect: document.getElementById('category_id'),
+    restaurantSelect: document.getElementById('restaurant_id')
+  };
+}
+
+function setup_expense_form_handlers(elements) {
+  const { categorySelect, restaurantSelect } = elements;
 
   // Track if category was manually changed
   let categoryManuallyChanged = false;
-  const categorySelect = document.getElementById('category_id');
-  const restaurantSelect = document.getElementById('restaurant_id');
 
   // Function to update category based on restaurant type
   function updateCategory(restaurantId) {
@@ -39,4 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     form.classList.add('was-validated');
   }, false);
-});
+}
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+// Export for testing and explicit initialization
+export { init };

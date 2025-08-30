@@ -25,7 +25,6 @@ def create_test_restaurant(client, user, test_data=None):
         "country": "US",
         "phone": "123-456-7890",
         "website": "http://test.com",
-        "price_range": "$",
         "description": "Test restaurant description",
         "notes": "Test notes",
         "is_chain": "false",
@@ -170,7 +169,6 @@ def test_expense_editing_with_restaurant(client, app, auth, test_user):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "American",
-            "price_range": "$$",
         },
     )
 
@@ -237,7 +235,6 @@ def test_expense_deletion_with_restaurant(client, app, auth, test_user):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "American",
-            "price_range": "$$",
         },
     )
 
@@ -294,7 +291,6 @@ def test_expense_export(client, app, auth, test_user):
             "phone": "123-456-7890",
             "website": "http://test.com",
             "cuisine": "American",
-            "price_range": "$$",
         },
     )
 

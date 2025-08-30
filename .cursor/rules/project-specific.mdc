@@ -1,0 +1,130 @@
+---
+description: Meal expense tracker specific patterns and business logic
+---
+
+# Project-Specific Patterns
+
+## Restaurant Management
+
+### Duplicate Prevention
+```javascript
+// Check before adding restaurant
+async function check_restaurant_exists(place_data) {
+  const response = await fetch('/restaurants/check-restaurant-exists', {
+    method: 'POST',
+    body: JSON.stringify({
+      google_place_id: place_data.place_id,
+      name: place_data.name,
+      city: extract_city_from_place(place_data)
+    })
+  });
+
+  return await response.json();
+}
+
+// Show modal if duplicate found
+function show_duplicate_warning(existing_restaurant) {
+  const modal = create_modal({
+    title: 'Restaurant Already Exists',
+    body: `${existing_restaurant.name} is already in your database`,
+    actions: [
+      { text: 'View', url: `/restaurants/${existing_restaurant.id}` },
+      { text: 'Update', url: `/restaurants/${existing_restaurant.id}/edit` },
+      { text: 'Cancel', dismiss: true }
+    ]
+  });
+  modal.show();
+}
+```
+
+### Form Auto-Population
+```javascript
+function fill_form_with_place(place_data) {
+  const address_components = parse_address_components(place_data.address_components);
+
+  // Set form fields
+  set_form_field('name', place_data.name);
+  set_form_field('google_place_id', place_data.place_id);
+  set_form_field('phone', place_data.formatted_phone_number);
+  set_form_field('website', place_data.website);
+
+  // Set address components
+  set_form_field('address', address_components.street_address);
+  set_form_field('city', address_components.city);
+  set_form_field('state', address_components.state);
+  set_form_field('postal_code', address_components.postal_code);
+
+  // Set coordinates
+  if (place_data.geometry) {
+    set_form_field('latitude', place_data.geometry.location.lat());
+    set_form_field('longitude', place_data.geometry.location.lng());
+  }
+}
+```
+
+## Database Models
+
+### Restaurant Model Key Fields
+```python
+class Restaurant(BaseModel):
+    # Required
+    name: str (max 100 chars)
+    user_id: int (foreign key)
+
+    # Google Places Integration
+    google_place_id: str (optional, unique per user)
+    latitude: float (optional)
+    longitude: float (optional)
+
+    # Address
+    address: str (optional)
+    city: str (optional)
+    state: str (optional)
+    postal_code: str (optional)
+    country: str (optional)
+
+    # Contact
+    phone: str (optional)
+    website: str (optional)
+
+    # Meta
+    type: str (restaurant/cafe/bar/bakery/other)
+    cuisine: str (optional)
+```
+
+### Expense Model Key Fields
+```python
+class Expense(BaseModel):
+    # Required
+    user_id: int (foreign key)
+    restaurant_id: int (foreign key)
+    amount: Decimal (required)
+    date: date (required)
+
+    # Optional
+    meal_type: str (breakfast/lunch/dinner/snack)
+    category_id: int (foreign key, optional)
+    notes: str (optional)
+    receipt_image_url: str (optional)
+```
+
+## API Endpoints
+
+### Restaurant CRUD
+- `GET /restaurants/` - List user's restaurants (paginated)
+- `POST /restaurants/add` - Create new restaurant
+- `GET /restaurants/{id}` - Get restaurant details
+- `POST /restaurants/{id}/edit` - Update restaurant
+- `POST /restaurants/delete/{id}` - Delete restaurant
+
+### Google Places Integration
+- `POST /restaurants/check-restaurant-exists` - Check for duplicates
+- `GET /restaurants/google-places` - Places search interface
+- `POST /restaurants/add-from-google-places` - Add from Google data
+
+### Key Validation Rules
+1. Restaurant name required, max 100 characters
+2. Google Place ID unique per user (if provided)
+3. Phone number format validation: `/^\+?[\d\s\-\(\)]+$/`
+4. Website URL validation when provided
+5. Coordinates must be valid lat/lng if provided

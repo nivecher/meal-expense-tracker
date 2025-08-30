@@ -263,24 +263,14 @@ def test_restaurant_search_page(client, auth):
     assert b"map" in response.data.lower()
 
 
-def test_search_places_missing_params(client, auth):
-    """Test search_places with missing parameters."""
+def test_google_places_search_page(client, auth):
+    """Test that the Google Places search page loads correctly."""
     auth.login("testuser_1", "testpass")
 
-    # Missing lat and lng
-    response = client.get(url_for("restaurants.search_places"))
-    assert response.status_code == 400
-    assert b"Latitude and longitude are required" in response.data
-
-    # Missing lng
-    response = client.get(url_for("restaurants.search_places", lat=40.7128))
-    assert response.status_code == 400
-    assert b"Latitude and longitude are required" in response.data
-
-    # Missing lat
-    response = client.get(url_for("restaurants.search_places", lng=-74.0060))
-    assert response.status_code == 400
-    assert b"Latitude and longitude are required" in response.data
+    # Test GET request to Google Places search page
+    response = client.get(url_for("restaurants.google_places_search"))
+    assert response.status_code == 200
+    assert b"Find Restaurants" in response.data
 
 
 def test_get_place_details_invalid_id(client, auth):

@@ -21,17 +21,15 @@ class RestaurantSchema(Schema):
     state = fields.Str()
     postal_code = fields.Str()
     country = fields.Str()
-    latitude = fields.Float()
-    longitude = fields.Float()
     phone = fields.Str()
     website = fields.Str()
     email = fields.Email()
-    price_range = fields.Int()
     cuisine = fields.Str()
     is_chain = fields.Bool()
-    rating = fields.Float()
+    rating = fields.Float()  # User's personal rating (1.0-5.0)
     notes = fields.Str()
     user_id = fields.Int(dump_only=True)
+    google_place_id = fields.Str()
 
 
 class ExpenseSchema(Schema):

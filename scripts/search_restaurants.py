@@ -92,7 +92,7 @@ def get_nearby_places(
     Search for places near a location using Google Places API.
 
     Args:
-        location: Latitude and longitude as "lat,lng" or an address string
+        location: Latitude and longitude as "lat,lng" or an address string (for search purposes)
         radius: Search radius in meters (max 50000)
         keyword: Optional filter for the search (e.g., 'restaurant', 'pizza')
         max_results: Maximum number of results to return
@@ -153,8 +153,8 @@ def get_place_details(place_id: str) -> Optional[Dict[str, Any]]:
     try:
         params = {
             "place_id": place_id,
-            "fields": "name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,"
-            "opening_hours,price_level,types",
+            "fields": "name,formatted_address,formatted_phone_number,website,rating,userRatingsTotal,"
+            "opening_hours,priceLevel,types",
             "key": GOOGLE_MAPS_API_KEY,
         }
         url = f"{PLACE_DETAILS_URL}?{urlencode(params)}"
@@ -170,7 +170,7 @@ def get_place_details(place_id: str) -> Optional[Dict[str, Any]]:
 
 
 def geocode_address(address: str) -> Optional[str]:
-    """Convert an address to latitude and longitude."""
+    """Convert an address to latitude and longitude for search purposes."""
     try:
         params = {"address": address, "key": GOOGLE_MAPS_API_KEY}
         url = f"https://maps.googleapis.com/maps/api/geocode/json?{urlencode(params)}"
@@ -192,8 +192,8 @@ def format_restaurant(restaurant: Dict[str, Any]) -> str:
     address = restaurant.get("formatted_address", "No address available")
     phone = restaurant.get("formatted_phone_number", "No phone number")
     rating = restaurant.get("rating", "N/A")
-    total_ratings = restaurant.get("user_ratings_total", 0)
-    price_level = "?" * restaurant.get("price_level", 0) or "Not specified"
+    total_ratings = restaurant.get("userRatingsTotal", 0)
+    price_level = "?" * restaurant.get("priceLevel", 0) or "Not specified"
     website = restaurant.get("website", "No website")
 
     # Format opening hours if available

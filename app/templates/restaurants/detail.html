@@ -29,11 +29,7 @@
                                 <i class="fas fa-utensils me-1"></i>{{ restaurant.cuisine }}
                             </span>
                         {% endif %}
-                        {% if restaurant.price_range %}
-                            <span class="badge bg-light text-dark border">
-                                <i class="fas fa-dollar-sign me-1"></i>{{ restaurant.price_range }}
-                            </span>
-                        {% endif %}
+                        <!-- Price range removed - would show Google's dynamic price level when available -->
                     </div>
                 </div>
                 <div class="action-buttons">
@@ -89,12 +85,7 @@
                                                     <strong>Cuisine:</strong> {{ restaurant.cuisine }}
                                                 </li>
                                             {% endif %}
-                                            {% if restaurant.price_range %}
-                                                <li class="mb-2">
-                                                    <i class="fas fa-tag me-2 text-muted"></i>
-                                                    <strong>Price Range:</strong> {{ restaurant.price_range }}
-                                                </li>
-                                            {% endif %}
+                                            <!-- Price range removed - would show Google's dynamic price level when available -->
                                             {% if restaurant.is_chain is not none %}
                                                 <li class="mb-2">
                                                     <i class="fas fa-store me-2 text-muted"></i>
@@ -103,6 +94,20 @@
                                             {% endif %}
                                         </ul>
                                     </div>
+                                    <!-- Personal Rating -->
+                                    {% if restaurant.rating %}
+                                        <div class="mb-4">
+                                            <h5 class="text-muted mb-3 border-bottom pb-2">
+                                                <i class="fas fa-star me-2"></i>Your Rating
+                                            </h5>
+                                            <div class="d-flex align-items-center">
+                                                <span class="badge bg-warning text-dark fs-6 me-3">
+                                                    <i class="fas fa-star"></i> {{ "%.1f"|format(restaurant.rating) }}/5.0
+                                                </span>
+                                                <small class="text-muted">Personal rating</small>
+                                            </div>
+                                        </div>
+                                    {% endif %}
                                     <!-- Contact Information -->
                                     {% if restaurant.phone or restaurant.website or restaurant.email %}
                                         <div class="mb-4">
@@ -159,13 +164,12 @@
                                                     </div>
                                                 {% endif %}
                                             </address>
-                                            {% if restaurant.latitude and restaurant.longitude %}
+                                            {% if restaurant.google_place_id %}
                                                 <div class="map-container mb-3 rounded overflow-hidden"
                                                      id="map-container"
-                                                     data-lat="{{ restaurant.latitude }}"
-                                                     data-lng="{{ restaurant.longitude }}"
+                                                     data-google-place-id="{{ restaurant.google_place_id }}"
                                                      data-name="{{ restaurant.name }}">
-                                                    <!-- Map will be initialized here -->
+                                                    <!-- Map will be initialized here using Google Place ID -->
                                                     <div class="ratio ratio-16x9 bg-light">
                                                         <div class="d-flex align-items-center justify-content-center h-100">
                                                             <div class="text-center">
@@ -180,6 +184,77 @@
                                             {% endif %}
                                         </div>
                                     {% endif %}
+                                    <!-- Data Completeness Indicator -->
+                                    <div class="mb-4">
+                                        <h5 class="text-muted mb-3 border-bottom pb-2">
+                                            <i class="fas fa-clipboard-check me-2"></i>Profile Completeness
+                                        </h5>
+                                        {% set fields_total = 13 %}
+                                        {% set fields_filled = 1 %}  <!-- name is always required -->
+                                        {% if restaurant.type %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.description %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.address %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.city %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.state %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.postal_code %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.country %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.phone %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.website %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.email %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.cuisine %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% if restaurant.rating %}
+                                            {% set fields_filled = fields_filled + 1 %}
+                                        {% endif %}
+                                        {% set completeness_percent = (fields_filled / fields_total * 100)|round|int %}
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress flex-grow-1 me-3" style="height: 8px;">
+                                                <div class="progress-bar
+                                                            {% if completeness_percent >= 80 %}
+                                                                bg-success
+                                                            {% elif completeness_percent >= 60 %}
+                                                                bg-warning
+                                                            {% else %}
+                                                                bg-danger
+                                                            {% endif %}"
+                                                     role="progressbar"
+                                                     aria-valuenow="{{ completeness_percent }}"
+                                                     aria-valuemin="0"
+                                                     aria-valuemax="100"
+                                                     data-width="{{ completeness_percent }}"></div>
+                                            </div>
+                                            <span class="badge
+                                                         {% if completeness_percent >= 80 %}
+                                                             bg-success
+                                                         {% elif completeness_percent >= 60 %}
+                                                             bg-warning text-dark
+                                                         {% else %}
+                                                             bg-danger
+                                                         {% endif %}">{{ completeness_percent }}%</span>
+                                        </div>
+                                        <small class="text-muted">{{ fields_filled }} of {{ fields_total }} fields completed</small>
+                                    </div>
                                     <!-- Notes -->
                                     {% if restaurant.notes %}
                                         <div class="mb-4">
@@ -199,7 +274,6 @@
                                         <div class="mb-3">{{ render_field(form.name) }}</div>
                                         <div class="mb-3">{{ render_field(form.type) }}</div>
                                         <div class="mb-3">{{ render_field(form.cuisine) }}</div>
-                                        <div class="mb-3">{{ render_field(form.price_range) }}</div>
                                         <div class="mb-3">{{ render_field(form.rating) }}</div>
                                         <div class="mb-3">{{ render_field(form.is_chain) }}</div>
                                         <div class="mb-3">{{ render_field(form.description) }}</div>
@@ -223,6 +297,31 @@
                                             <div class="col-md-6">{{ render_field(form.postal_code) }}</div>
                                         </div>
                                         <div class="mb-3">{{ render_field(form.country) }}</div>
+                                    </div>
+                                    <div class="mb-4">
+                                        <h5 class="text-muted mb-3 border-bottom pb-2">
+                                            <i class="fas fa-sticky-note me-2"></i>Additional Information
+                                        </h5>
+                                        <div class="mb-3">{{ render_field(form.notes) }}</div>
+                                        {% if restaurant.google_place_id %}
+                                            <div class="mb-3">
+                                                <label class="form-label">Google Place ID</label>
+                                                <div class="input-group">
+                                                    <input type="text"
+                                                           class="form-control bg-light"
+                                                           value="{{ restaurant.google_place_id }}"
+                                                           readonly>
+                                                    <button class="btn btn-outline-secondary"
+                                                            type="button"
+                                                            onclick="navigator.clipboard.writeText('{{ restaurant.google_place_id }}')"
+                                                            data-bs-toggle="tooltip"
+                                                            title="Copy to clipboard">
+                                                        <i class="fas fa-copy"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="form-text">Used for Google Maps integration (read-only)</div>
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -411,7 +510,7 @@
                                                     <td>
                                                         <span class="badge bg-light text-dark border">
                                                             <i class="fas fa-tag me-1 text-muted"></i>
-                                                            {{ expense.category|replace('_', ' ') |title if expense.category else 'N/A' }}
+                                                            {{ expense.category.name|replace('_', ' ') |title if expense.category else 'N/A' }}
                                                         </span>
                                                     </td>
                                                     <td>
@@ -466,12 +565,10 @@
             </div>
         </form>
         <!-- Map View Section -->
-        {% if restaurant.google_place_id or (restaurant.latitude and restaurant.longitude) %}
+        {% if restaurant.google_place_id %}
             <div class="map-container"
                  id="map-container"
                  data-google-place-id="{{ restaurant.google_place_id }}"
-                 data-lat="{{ restaurant.latitude }}"
-                 data-lng="{{ restaurant.longitude }}"
                  data-name="{{ restaurant.name }}">
                 <div class="text-muted">
                     <i class="fas fa-spinner fa-spin me-2"></i>Loading map...
@@ -612,9 +709,15 @@
 {% block scripts %}
     {{ super() }}
     <script type="module"
-            src="{{ url_for('static', filename='js/restaurant-details.js') }}"></script>
+            src="{{ url_for('static', filename='js/pages/restaurant-detail.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Set progress bar width from data attribute
+            const progressBar = document.querySelector('[data-width]');
+            if (progressBar) {
+                progressBar.style.width = progressBar.dataset.width + '%';
+            }
+
             const editBtn = document.getElementById('edit-btn');
             const cancelEditBtn = document.getElementById('cancel-edit');
             const viewMode = document.getElementById('view-mode');

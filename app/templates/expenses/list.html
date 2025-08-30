@@ -68,7 +68,7 @@
                                     <div>
                                         <h5 class="card-title mb-1">
                                             <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
-                                               class="text-decoration-none">{{ expense.meal_type.title() or 'Expense' }}</a>
+                                               class="text-decoration-none">{{ expense.meal_type.title() if expense.meal_type else 'Expense' }}</a>
                                         </h5>
                                         <p class="card-text text-muted mb-1">
                                             <i class="far fa-calendar-alt me-1"></i>
@@ -99,7 +99,7 @@
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#deleteModal{{ expense.id }}"
                                                     data-expense-id="{{ expense.id }}"
-                                                    data-expense-name="{{ expense.meal_type.title() or 'Expense' }}"
+                                                    data-expense-name="{{ expense.meal_type.title() if expense.meal_type else 'Expense' }}"
                                                     aria-label="Delete expense">
                                                 <i class="fas fa-trash" aria-hidden="true"></i>
                                                 <span class="visually-hidden">Delete</span>
@@ -126,7 +126,7 @@
                                     <div class="modal-body">
                                         Are you sure you want to delete this expense?
                                         <div class="mt-2">
-                                            <strong>Description:</strong> {{ expense.meal_type.title() or 'Expense' }}
+                                            <strong>Description:</strong> {{ expense.meal_type.title() if expense.meal_type else 'Expense' }}
                                             <br>
                                             <strong>Amount:</strong> ${{ "%.2f"|format(expense.amount) }}
                                             <br>

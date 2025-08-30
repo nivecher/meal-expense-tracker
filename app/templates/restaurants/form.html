@@ -95,20 +95,13 @@
                                 in the details.
                             </div>
                             <div class="row g-3">
-                                <div class="col-md-8">
+                                <div class="col-12">
                                     <label for="restaurant-search" class="form-label">Restaurant Search</label>
-                                    <div class="input-group">
-                                        <input type="text"
-                                               class="form-control"
-                                               id="restaurant-search"
-                                               placeholder="Search for a restaurant..."
-                                               autocomplete="off">
-                                        <button class="btn btn-outline-primary"
-                                                type="button"
-                                                id="search-restaurant-btn">
-                                            <i class="fas fa-search"></i> Search
-                                        </button>
-                                    </div>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="restaurant-search"
+                                           placeholder="Start typing restaurant name for autocomplete..."
+                                           autocomplete="off">
                                     <div id="restaurant-suggestions" class="mt-2"></div>
                                 </div>
                             </div>
@@ -124,14 +117,7 @@
                                    id="google_place_id"
                                    name="google_place_id"
                                    value="{{ form.google_place_id.data or '' }}">
-                            <input type="hidden"
-                                   id="latitude"
-                                   name="latitude"
-                                   value="{{ form.latitude.data or '' }}">
-                            <input type="hidden"
-                                   id="longitude"
-                                   name="longitude"
-                                   value="{{ form.longitude.data or '' }}">
+                            <!-- Coordinates removed - would be looked up dynamically from Google Places API -->
                             <!-- Restaurant Information Section -->
                             <div class="form-section">
                                 <h5 class="mb-3">
@@ -149,17 +135,25 @@
                                         {{ form.type(class_="form-select" + (" is-invalid" if form.type.errors else "") ) }}
                                         {% for error in form.type.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
-                                    <div class="col-md-3">
-                                        <label for="price_range" class="form-label">Price Range</label>
-                                        {{ form.price_range(class_="form-select" + (" is-invalid" if form.price_range.errors else "") ) }}
-                                        {% for error in form.price_range.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                    </div>
+                                    <!-- Price range removed - would be looked up dynamically from Google Places API -->
                                     <div class="col-md-6">
                                         <label for="cuisine" class="form-label">Cuisine</label>
-                                        {{ form.cuisine(class_="form-select" + (" is-invalid" if form.cuisine.errors else "") ) }}
+                                        {{ form.cuisine(class_="form-control" + (" is-invalid" if form.cuisine.errors else "") ) }}
                                         {% for error in form.cuisine.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
-                                    <div class="mt-3">
+                                    <div class="col-md-3">
+                                        <label for="rating" class="form-label">Your Rating</label>
+                                        {{ form.rating(class_="form-control" + (" is-invalid" if form.rating.errors else "") ) }}
+                                        {% for error in form.rating.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="is_chain" class="form-label">Part of a chain</label>
+                                        <div class="form-check form-switch mt-2">
+                                            {{ form.is_chain(class_="form-check-input" + (" is-invalid" if form.is_chain.errors else "") ) }}
+                                            {% for error in form.is_chain.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
+                                    </div>
+                                    <div class="col-12 mt-3">
                                         <label for="description" class="form-label">Description</label>
                                         {{ form.description(class_="form-control" + (" is-invalid" if form.description.errors
                                                                                 else "") , rows="3", placeholder="Brief description of the restaurant") }}
@@ -225,12 +219,34 @@
                                             {% for error in form.phone.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
                                         <div class="col-md-6">
+                                            <label for="email" class="form-label">Email</label>
+                                            {{ form.email(class_="form-control" + (" is-invalid" if form.email.errors else "") , placeholder="contact@restaurant.com") }}
+                                            {% for error in form.email.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
+                                        <div class="col-md-6">
                                             <label for="website" class="form-label">Website</label>
                                             {{ form.website(class_="form-control" + (" is-invalid" if form.website.errors else
                                                                                         "") , placeholder="https://example.com") }}
                                             {% for error in form.website.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
                                         {% if form.google_place_id.data %}
+                                            <div class="col-12 mt-3">
+                                                <label class="form-label">Google Place ID</label>
+                                                <div class="input-group">
+                                                    <input type="text"
+                                                           class="form-control bg-light"
+                                                           value="{{ form.google_place_id.data }}"
+                                                           readonly>
+                                                    <button class="btn btn-outline-secondary"
+                                                            type="button"
+                                                            onclick="navigator.clipboard.writeText('{{ form.google_place_id.data }}')"
+                                                            data-bs-toggle="tooltip"
+                                                            title="Copy to clipboard">
+                                                        <i class="fas fa-copy"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="form-text">Used for Google Maps integration (read-only)</div>
+                                            </div>
                                             <div class="col-12 mt-2">
                                                 <a href="https://www.google.com/maps/place/?q=place_id:{{ form.google_place_id.data }}"
                                                    target="_blank"
@@ -239,6 +255,19 @@
                                                 </a>
                                             </div>
                                         {% endif %}
+                                    </div>
+                                </div>
+                                <!-- Additional Information Section -->
+                                <div class="form-section">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-sticky-note me-2 text-primary"></i>Additional Information
+                                    </h5>
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label for="notes" class="form-label">Notes</label>
+                                            {{ form.notes(class_="form-control" + (" is-invalid" if form.notes.errors else "") , rows="3", placeholder="Additional notes about the restaurant") }}
+                                            {% for error in form.notes.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
                                     </div>
                                 </div>
                                 <!-- Form Actions -->
@@ -276,20 +305,18 @@
 {% block scripts %}
     {{ super() }}
     <!-- Google Maps API Configuration -->
-    <script>
-        // Initialize the Google Maps API key
-        window.GOOGLE_MAPS_API_KEY = '{{ config.GOOGLE_MAPS_API_KEY or "" }}';
-
-        // Handle any potential errors with Google Maps loading
-        window.gm_authFailure = function() {
-            console.error('Google Maps failed to load');
-            const errorElement = document.getElementById('address-error');
-            if (errorElement) {
-                errorElement.textContent = 'Failed to load Google Maps. Please try refreshing the page.';
-                errorElement.classList.remove('d-none');
-            }
-        };
-    </script>
+    <div id="google-maps-config"
+         data-api-key="{{ config.GOOGLE_MAPS_API_KEY or '' }}"
+         style="display: none"></div>
+    {% if config.GOOGLE_MAPS_API_KEY %}
+        <!-- Load Google Maps script directly -->
+        <script src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_MAPS_API_KEY }}&libraries=places&loading=async"
+                async
+                defer></script>
+        <!-- Load simple restaurant autocomplete -->
+        <script src="{{ url_for('static', filename='js/utils/restaurant-autocomplete.js') }}"></script>
+    {% endif %}
+    <!-- Load restaurant form module -->
     <script type="module"
             src="{{ url_for('static', filename='js/pages/restaurant-form.js') }}"></script>
 {% endblock scripts %}

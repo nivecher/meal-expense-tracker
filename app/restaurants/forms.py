@@ -1,8 +1,8 @@
 from flask_wtf import FlaskForm
 from wtforms import (
     BooleanField,
-    DecimalField,
     FileField,
+    FloatField,
     SelectField,
     StringField,
     SubmitField,
@@ -40,33 +40,13 @@ class RestaurantForm(FlaskForm):
 
     # Google Places Integration
     google_place_id = StringField("Google Place ID", validators=[Optional(), Length(max=255)])
-    latitude = DecimalField("Latitude", places=6, validators=[Optional(), NumberRange(-90, 90)])
-    longitude = DecimalField("Longitude", places=6, validators=[Optional(), NumberRange(-180, 180)])
 
     # Additional Information
     cuisine = StringField("Cuisine", validators=[Optional(), Length(max=100)])
-    price_range = SelectField(
-        "Price Range",
-        choices=[
-            ("", "Select price range"),
-            ("$", "$ - Inexpensive"),
-            ("$$", "$$ - Moderate"),
-            ("$$$", "$$$ - Expensive"),
-            ("$$$$", "$$$$ - Very Expensive"),
-        ],
-        validators=[Optional()],
-    )
-    rating = SelectField(
-        "Rating",
-        choices=[
-            ("", "Select rating"),
-            ("1", "1 - Poor"),
-            ("2", "2 - Fair"),
-            ("3", "3 - Good"),
-            ("4", "4 - Very Good"),
-            ("5", "5 - Excellent"),
-        ],
-        validators=[Optional()],
+    rating = FloatField(
+        "Your Rating",
+        validators=[Optional(), NumberRange(min=1.0, max=5.0)],
+        render_kw={"step": "0.5", "min": "1.0", "max": "5.0", "placeholder": "Your personal rating (1.0 - 5.0)"},
     )
     is_chain = BooleanField("Part of a chain", false_values=(False, "false", 0, "0"), default=False)
     notes = TextAreaField("Notes", validators=[Optional()])
@@ -81,27 +61,10 @@ class RestaurantSearchForm(FlaskForm):
     query = StringField("Search", validators=[Optional(), Length(max=100)])
     location = StringField("Location", validators=[Optional(), Length(max=100)])
     cuisine = StringField("Cuisine", validators=[Optional(), Length(max=50)])
-    price_range = SelectField(
-        "Price Range",
-        choices=[
-            ("", "Any"),
-            ("$", "$"),
-            ("$$", "$$"),
-            ("$$$", "$$$"),
-            ("$$$$", "$$$$"),
-        ],
-        validators=[Optional()],
-    )
-    min_rating = SelectField(
+    min_rating = FloatField(
         "Minimum Rating",
-        choices=[
-            ("", "Any"),
-            ("1", "1+ Stars"),
-            ("2", "2+ Stars"),
-            ("3", "3+ Stars"),
-            ("4", "4+ Stars"),
-        ],
-        validators=[Optional()],
+        validators=[Optional(), NumberRange(min=1.0, max=5.0)],
+        render_kw={"step": "0.5", "min": "1.0", "max": "5.0", "placeholder": "Minimum user rating"},
     )
     submit = SubmitField("Search")
 

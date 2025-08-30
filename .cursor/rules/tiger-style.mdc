@@ -1,0 +1,128 @@
+---
+description: "Tiger Style: Safety, Performance, Developer Experience + TIGER + SOLID"
+alwaysApply: true
+---
+
+# Tiger Style Development
+
+**Safety, Performance, Developer Experience + TIGER + SOLID principles**
+
+## Core Principles
+
+### 🛡️ Safety
+- Validate all inputs, set explicit bounds
+- Handle all errors, fail fast on invalid data
+- Use simple, predictable control flow
+- Minimize variable scope
+
+### ⚡ Performance
+- Design for performance early, use napkin math
+- Batch operations: Network → Disk → Memory → CPU
+- Cache with bounds, optimize slowest resources first
+
+### 👨‍💻 Developer Experience
+- Names with units (`amount_usd`, `timeout_ms`)
+- Document "why" not "what", functions <70 lines
+- Zero technical debt, consistent `snake_case`
+
+## TIGER Framework
+- **T**esting: Pure functions, dependency injection
+- **I**nterfaces: Simple signatures (≤4 params), consistent returns
+- **G**enerality: Reusable utilities, avoid hardcoding
+- **E**xamples: Usage docs, descriptive variables with units
+- **R**efactoring: Continuous simplification, single responsibility
+
+## SOLID Principles
+- **S**ingle Responsibility: One reason to change
+- **O**pen/Closed: Extend via strategy patterns, closed for modification
+- **L**iskov Substitution: Substitutable implementations honor contracts
+- **I**nterface Segregation: Focused interfaces, clients use only what they need
+- **D**ependency Inversion: Depend on abstractions, not concretions
+
+## Code Examples
+
+### Safety + Performance
+```javascript
+// ✅ Bounded, validated, error-handled
+function process_expenses(expenses, max_count = 1000) {
+  if (!Array.isArray(expenses) || expenses.length > max_count) {
+    throw new Error(`Invalid input or too many expenses (max: ${max_count})`);
+  }
+
+  const results = { processed: [], errors: [], total_usd: 0 };
+
+  for (let i = 0; i < expenses.length; i++) {
+    try {
+      const validated = validate_expense(expenses[i]);
+      results.processed.push(validated);
+      results.total_usd += validated.amount;
+    } catch (error) {
+      results.errors.push({ index: i, error: error.message });
+    }
+  }
+
+  return results;
+}
+```
+
+### TIGER + SOLID
+```python
+# ✅ Testing + Interface + Single Responsibility
+class ExpenseCalculator(ABC):  # Interface segregation
+    @abstractmethod
+    def calculate_total(self, expenses: list) -> float:
+        pass
+
+class TaxCalculator(ExpenseCalculator):  # Single responsibility
+    def __init__(self, tax_rate: float):
+        if tax_rate < 0 or tax_rate > 1:  # Safety validation
+            raise ValueError("Invalid tax rate")
+        self.tax_rate = tax_rate
+
+    def calculate_total(self, expenses: list) -> float:  # Pure, testable
+        if len(expenses) > 10000:  # Explicit bounds
+            raise ValueError("Too many expenses")
+
+        subtotal = sum(e['amount'] for e in expenses)
+        return subtotal * (1 + self.tax_rate)
+
+# ✅ Dependency inversion
+class ExpenseService:
+    def __init__(self, calculator: ExpenseCalculator):  # Depends on abstraction
+        self.calculator = calculator
+
+    def get_expense_summary(self, expenses: list) -> dict:
+        total_amount_usd = self.calculator.calculate_total(expenses)
+        expense_count = len(expenses)
+
+        return {
+            'total_amount_usd': round(total_amount_usd, 2),
+            'expense_count': expense_count,
+            'average_expense_usd': round(total_amount_usd / expense_count, 2) if expense_count > 0 else 0
+        }
+```
+
+### Performance Batching
+```javascript
+// ✅ Batch API calls with bounds
+async function fetch_restaurants_batch(ids, batch_size = 10) {
+  if (ids.length > 1000) throw new Error('Too many IDs (max: 1000)');
+
+  const batches = chunk_array(ids, batch_size);
+  const results = await Promise.all(
+    batches.map(batch => fetch_restaurant_batch(batch))
+  );
+
+  return results.flat();
+}
+```
+
+## Quick Checklists
+
+### Safety: [ ] Inputs validated [ ] Errors handled [ ] Bounds set
+### Performance: [ ] Early design [ ] Batched ops [ ] Predictable
+### Experience: [ ] Clear names [ ] Why docs [ ] <70 lines
+### TIGER: [ ] Pure functions [ ] Simple interfaces [ ] Reusable [ ] Examples
+### SOLID: [ ] Single responsibility [ ] Depend on abstractions [ ] Focused interfaces
+
+**Write code that is safe, fast, and maintainable.**

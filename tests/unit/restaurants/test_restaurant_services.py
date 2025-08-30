@@ -44,7 +44,6 @@ def test_create_restaurant_success(session, test_user):
             obj.website = "https://test.com"
             obj.email = "test@example.com"
             obj.cuisine = "Test Cuisine"
-            obj.price_range = "$$"
 
     form_mock = MockForm()
 
@@ -65,7 +64,6 @@ def test_create_restaurant_success(session, test_user):
     assert restaurant.website == "https://test.com"
     assert restaurant.email == "test@example.com"
     assert restaurant.cuisine == "Test Cuisine"
-    assert restaurant.price_range == "$$"
     assert restaurant.user_id == test_user.id
 
 

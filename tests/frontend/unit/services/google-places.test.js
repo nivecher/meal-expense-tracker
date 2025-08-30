@@ -168,8 +168,8 @@ describe('GooglePlacesService', () => {
         phone: '+1234567890',
         website: 'https://test-restaurant.com',
         rating: 4.5,
-        user_ratings_total: 100,
-        price_level: 'MODERATE',
+        userRatingsTotal: 100,
+        priceLevel: 'MODERATE',
         types: ['restaurant', 'food'],
         business_status: 'OPERATIONAL',
         location: {

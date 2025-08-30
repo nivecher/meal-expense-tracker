@@ -6,23 +6,23 @@
 /**
  * Initialize error page functionality
  */
-function initErrorPage() {
-  // Add click handler for back button
-  const backButton = document.querySelector('.btn-error-back');
-  if (backButton) {
-    backButton.addEventListener('click', () => {
+function init() {
+  // Use event delegation for error page actions
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-action="back"]');
+    if (button) {
       window.history.back();
-    });
-  }
+    }
+  });
 }
 
 // Initialize when the DOM is fully loaded
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initErrorPage);
+  document.addEventListener('DOMContentLoaded', init);
 } else {
   // DOMContentLoaded has already fired
-  initErrorPage();
+  init();
 }
 
 // Export for testing
-export { initErrorPage };
+export { init };

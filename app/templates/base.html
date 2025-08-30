@@ -42,15 +42,10 @@
         <link rel="manifest"
               href="{{ url_for('static', filename='img/favicons/site.webmanifest') }}">
         <!-- Google Maps API Configuration -->
-        <script type="text/javascript">
-            // Make Google Maps API key and Map ID available globally
-            window.GOOGLE_MAPS_API_KEY = '{{ config.get("GOOGLE_MAPS_API_KEY", "") }}';
-            window.GOOGLE_MAPS_MAP_ID = '{{ config.get("GOOGLE_MAPS_MAP_ID", "") }}';
-            console.log('Google Maps API Key:', window.GOOGLE_MAPS_API_KEY ? 'Key loaded' : 'No API key found');
-            if (window.GOOGLE_MAPS_MAP_ID) {
-                console.log('Google Maps Map ID loaded');
-            }
-        </script>
+        <div id="google-maps-global-config"
+             data-api-key="{{ config.get('GOOGLE_MAPS_API_KEY', '') }}"
+             data-map-id="{{ config.get('GOOGLE_MAPS_MAP_ID', '') }}"
+             style="display: none"></div>
         <!-- Styles -->
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
               rel="stylesheet">
@@ -150,12 +145,6 @@
         <script type="module"
                 src="{{ url_for('static', filename='js/config.js') }}"
                 defer></script>
-        <!-- Load Google Maps Auth as a module -->
-        <script type="module">
-            // Make GoogleMapsAuth globally available
-            import GoogleMapsAuth from "{{ url_for('static', filename='js/utils/google-maps-auth.js') }}";
-            window.GoogleMapsAuth = GoogleMapsAuth;
-        </script>
         <!-- Load other utility modules -->
         <script type="module"
                 src="{{ url_for('static', filename='js/utils/logger.js') }}"
@@ -180,35 +169,13 @@
         <div id="flash-messages" data-messages='{ {%- for category, message in get_flashed_messages(with_categories=true) -%} "{{ loop.index0 }}": {"type": "{{ category|e }}", "message": "{{ message|e }}"}
             {% if not loop.last %},{% endif %}
         {%- endfor -%} }'></div>
-    <script type="module">
-        import {
-            initFlashMessages
-        } from "{{ url_for('static', filename='js/utils/flash-messages.js') }}";
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const flashContainer = document.getElementById('flash-messages');
-            if (flashContainer) {
-                const messagesData = flashContainer.dataset.messages || '{}';
-                try {
-                    const messages = Object.values(JSON.parse(messagesData));
-                    if (messages.length > 0) {
-                        initFlashMessages(messages);
-                    }
-                } catch (error) {
-                    console.error('Error parsing flash messages:', error);
-                }
-            }
-        });
-    </script>
+    <!-- Load flash messages initialization -->
+    <script type="module"
+            src="{{ url_for('static', filename='js/pages/flash-messages-init.js') }}"></script>
     <!-- Initialize page modules -->
-    <script type="module">
-        import {
-            initRestaurantSearch
-        } from "{{ url_for('static', filename='js/pages/restaurant-search-init.js') }}";
-        document.addEventListener('DOMContentLoaded', () => {
-            initRestaurantSearch();
-        });
-    </script>
+    <!-- Load configuration utility -->
+    <script type="module"
+            src="{{ url_for('static', filename='js/utils/config.js') }}"></script>
     <!-- Table sort component -->
     <script type="module"
             src="{{ url_for('static', filename='js/components/table-sort.js') }}"

@@ -3,14 +3,27 @@
  * Handles date validation and form submission for the expenses list page.
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-  const form = document.querySelector('form[method="get"]');
-  if (!form) return;
+/**
+ * Initialize the expense list page
+ */
+function init() {
+  const elements = cache_list_elements();
+  if (!elements.form) return;
 
-  // Initialize date inputs
-  const startDateInput = document.getElementById('start_date');
-  const endDateInput = document.getElementById('end_date');
-  const searchInput = document.getElementById('search');
+  setup_date_validation(elements);
+}
+
+function cache_list_elements() {
+  return {
+    form: document.querySelector('form[method="get"]'),
+    startDateInput: document.getElementById('start_date'),
+    endDateInput: document.getElementById('end_date'),
+    searchInput: document.getElementById('search')
+  };
+}
+
+function setup_date_validation(elements) {
+  const { form, startDateInput, endDateInput } = elements;
 
   // Validate date range when form is submitted
   form.addEventListener('submit', (e) => {
@@ -100,4 +113,14 @@ document.addEventListener('DOMContentLoaded', () => {
       message.remove();
     });
   }
-});
+}
+
+// Auto-initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+// Export for testing and explicit initialization
+export { init };

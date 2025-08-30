@@ -83,25 +83,47 @@ async function handleFormSubmit(event) {
   event.preventDefault();
   console.log('Form submission started');
 
-  const form = event.target;
-  const formData = new FormData(form);
-  const submitButton = form.querySelector('button[type="submit"]');
-  const originalButtonText = submitButton?.innerHTML;
-  const alertContainer = document.getElementById('alert-container');
+  const form_elements = cache_form_elements(event.target);
+  const form_data = new FormData(form_elements.form);
 
-  // Clear previous errors
-  if (alertContainer) {
-    alertContainer.innerHTML = '';
-  }
+  clear_previous_errors(form_elements.alertContainer);
 
-  // Client-side validation
-  const validationErrors = validateFormData(formData);
-  if (validationErrors) {
-    console.error('Client-side validation failed:', validationErrors);
-    console.log('Form data being validated:', Object.fromEntries(formData.entries()));
-    showFormErrors(form, validationErrors);
+  const validation_result = validate_form_data(form_data);
+  if (!validation_result.isValid) {
+    handle_validation_errors(form_elements.form, validation_result.errors, form_data);
     return;
   }
+
+  await process_form_submission(form_elements, form_data);
+}
+
+function cache_form_elements(form) {
+  return {
+    form,
+    submitButton: form.querySelector('button[type="submit"]'),
+    alertContainer: document.getElementById('alert-container')
+  };
+}
+
+function clear_previous_errors(alert_container) {
+  if (alert_container) {
+    alert_container.innerHTML = '';
+  }
+}
+
+function validate_form_data(form_data) {
+  const validation_errors = validateFormData(form_data);
+  return {
+    isValid: !validation_errors,
+    errors: validation_errors
+  };
+}
+
+function handle_validation_errors(form, errors, form_data) {
+  console.error('Client-side validation failed:', errors);
+  console.log('Form data being validated:', Object.fromEntries(form_data.entries()));
+  showFormErrors(form, errors);
+}
 
   try {
     // Show loading state
@@ -288,5 +310,132 @@ function showFormErrors(form, errors) {
   if (firstError) {
     firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
     firstError.focus();
+  }
+}
+
+// Helper functions for form submission processing
+async function process_form_submission(form_elements, form_data) {
+  const { form, submitButton } = form_elements;
+  const original_button_text = submitButton?.innerHTML;
+
+  try {
+    set_loading_state(submitButton);
+
+    const prepared_data = prepare_form_data_for_submission(form, form_data);
+    log_submission_details(form, prepared_data);
+
+    const response = await submit_form_to_server(form, prepared_data);
+    const result = await response.json();
+
+    console.log('Response data:', result);
+
+    if (response.ok && result.success) {
+      handle_successful_submission(result);
+    } else {
+      handle_submission_error(form, response, result);
+    }
+
+  } catch (error) {
+    handle_submission_exception(form, error);
+  } finally {
+    restore_button_state(submitButton, original_button_text);
+  }
+}
+
+function set_loading_state(submit_button) {
+  if (submit_button) {
+    submit_button.disabled = true;
+    submit_button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+  }
+}
+
+function prepare_form_data_for_submission(form, form_data) {
+  console.log('Submitting form data:', Object.fromEntries(form_data.entries()));
+
+  const csrf_token = document.querySelector('input[name="csrf_token"]')?.value;
+
+  // Add CSRF token if not already in form
+  if (csrf_token && !form_data.has('csrf_token')) {
+    form_data.append('csrf_token', csrf_token);
+  }
+
+  return form_data;
+}
+
+function log_submission_details(form, form_data) {
+  const form_data_obj = Object.fromEntries(form_data.entries());
+  console.log('Form data being sent:', form_data_obj);
+  console.log('Sending request to:', form.action);
+  console.log('Request method:', 'POST');
+  console.log('Request headers:', {
+    'X-Requested-With': 'XMLHttpRequest',
+    Accept: 'application/json',
+  });
+}
+
+async function submit_form_to_server(form, form_data) {
+  const response = await fetch(form.action, {
+    method: 'POST',
+    body: form_data,
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      Accept: 'application/json',
+    },
+  });
+
+  console.log('Response status:', response.status);
+  return response;
+}
+
+function handle_successful_submission(result) {
+  console.log('Form submission successful');
+
+  show_success_alert(result);
+
+  const redirect_url = result.redirect_url || `/expenses/${result.expense.id}`;
+  console.log('Form submitted successfully, redirecting to:', redirect_url);
+  window.location.href = redirect_url;
+}
+
+function show_success_alert(result) {
+  const alert_container = document.getElementById('alert-container');
+  if (alert_container) {
+    alert_container.innerHTML = `
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        Expense added successfully! <a href="/expenses/${result.expense.id}">View expense</a>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    `;
+  }
+}
+
+function handle_submission_error(form, response, result) {
+  console.error('Form submission failed with status:', response.status);
+
+  if (result.errors) {
+    console.error('Form validation errors:', JSON.stringify(result.errors, null, 2));
+    showFormErrors(form, result.errors);
+  } else if (result.message) {
+    console.error('Server error:', result.message);
+    showFormErrors(form, { _error: [result.message] });
+  } else {
+    console.error('No error details provided in response');
+    showFormErrors(form, {
+      _error: [`An error occurred (${response.status}): ${response.statusText || 'Unknown error'}`],
+    });
+  }
+}
+
+function handle_submission_exception(form, error) {
+  console.error('Error during form submission:', error);
+  showFormErrors(form, {
+    _error: ['An error occurred while submitting the form. Please try again.'],
+  });
+}
+
+function restore_button_state(submit_button, original_text) {
+  if (submit_button && original_text) {
+    submit_button.disabled = false;
+    submit_button.innerHTML = original_text;
   }
 }

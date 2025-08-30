@@ -107,17 +107,32 @@ def get_unique_cuisines(user_id: int) -> list[str]:
     ]
 
 
-def restaurant_exists(user_id: int, name: str, city: str) -> Optional[Restaurant]:
-    """Check if a restaurant with the same name and city already exists for the user.
+def restaurant_exists(user_id: int, name: str, city: str, google_place_id: str = None) -> Optional[Restaurant]:
+    """Check if a restaurant already exists for the user.
+
+    Prioritizes checking by google_place_id if provided, then falls back to name and city.
 
     Args:
         user_id: ID of the user
         name: Name of the restaurant
         city: City of the restaurant
+        google_place_id: Google Place ID of the restaurant (optional)
 
     Returns:
         The existing restaurant if found, None otherwise
     """
+    # First check by Google Place ID if provided
+    if google_place_id:
+        existing_by_place_id = db.session.scalar(
+            select(Restaurant).where(
+                Restaurant.user_id == user_id,
+                Restaurant.google_place_id == google_place_id,
+            )
+        )
+        if existing_by_place_id:
+            return existing_by_place_id
+
+    # Fallback to checking by name and city
     return db.session.scalar(
         select(Restaurant).where(
             Restaurant.user_id == user_id,
@@ -137,8 +152,11 @@ def create_restaurant(user_id: int, form: Any) -> Tuple[Restaurant, bool]:
     Returns:
         A tuple of (restaurant, is_new) where is_new is True if the restaurant was created
     """
-    # Check if restaurant with same name and city already exists
-    existing = restaurant_exists(user_id, form.name.data, form.city.data)
+    # Check if restaurant already exists (prioritizing Google Place ID if available)
+    google_place_id = getattr(form, "google_place_id", None)
+    google_place_id_value = google_place_id.data if google_place_id else None
+
+    existing = restaurant_exists(user_id, form.name.data, form.city.data, google_place_id_value)
     if existing:
         return existing, False
 
@@ -170,7 +188,7 @@ def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant
 
     # Create a dictionary of form data, converting empty strings to None for numeric fields
     form_data = {}
-    numeric_fields = {"rating", "latitude", "longitude"}
+    numeric_fields = {"rating"}
     boolean_fields = {"is_chain"}
 
     for field in form:
@@ -209,6 +227,33 @@ def _validate_restaurant_row(row: dict) -> Tuple[bool, str]:
     return True, ""
 
 
+# Helper function to safely convert to float
+def safe_import_float(value):
+    if not value or str(value).strip() == "":
+        return None
+    try:
+        return float(str(value).strip())
+    except (ValueError, TypeError):
+        return None
+
+
+# Helper function to safely convert to bool
+def safe_import_bool(value):
+    if not value or str(value).strip() == "":
+        return None
+    return str(value).strip().lower() in ("true", "1", "yes", "on")
+
+
+# Helper function to safely convert to int
+def safe_import_int(value):
+    if not value or str(value).strip() == "":
+        return None
+    try:
+        return int(str(value).strip())
+    except (ValueError, TypeError):
+        return None
+
+
 def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Restaurant]:
     """Process a single restaurant row from CSV.
 
@@ -229,9 +274,17 @@ def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Restaur
             name=row.get("name", "").strip(),
             city=row.get("city", "").strip(),
             address=row.get("address", "").strip() or None,
+            state=row.get("state", "").strip() or None,
+            postal_code=row.get("postal_code", "").strip() or None,
+            country=row.get("country", "").strip() or None,
             phone=row.get("phone", "").strip() or None,
+            email=row.get("email", "").strip() or None,
             website=row.get("website", "").strip() or None,
             cuisine=row.get("cuisine", "").strip() or None,
+            rating=safe_import_float(row.get("rating")),
+            is_chain=safe_import_bool(row.get("is_chain")),
+            google_place_id=row.get("google_place_id", "").strip() or None,
+            notes=row.get("notes", "").strip() or None,
         )
         return True, "", restaurant
     except Exception as e:
@@ -365,11 +418,9 @@ def export_restaurants_for_user(user_id: int) -> List[Dict[str, Any]]:
             "email": r.email or "",
             "cuisine": r.cuisine or "",
             "website": r.website or "",
-            "price_range": r.price_range or "",
             "rating": safe_float(r.rating) if r.rating is not None else "",
             "is_chain": bool(r.is_chain) if r.is_chain is not None else "",
-            "latitude": safe_float(r.latitude) if r.latitude is not None else "",
-            "longitude": safe_float(r.longitude) if r.longitude is not None else "",
+            "google_place_id": r.google_place_id or "",
             "notes": r.notes or "",
             "created_at": r.created_at.isoformat() if r.created_at else "",
             "updated_at": r.updated_at.isoformat() if r.updated_at else "",
@@ -418,10 +469,7 @@ def create_restaurant_for_user(user_id: int, data: Dict[str, Any]) -> Restaurant
         email=data.get("email"),
         website=data.get("website"),
         google_place_id=data.get("google_place_id"),
-        latitude=data.get("latitude"),
-        longitude=data.get("longitude"),
         cuisine=data.get("cuisine"),
-        price_range=data.get("price_range"),
         rating=data.get("rating"),
         is_chain=data.get("is_chain", False),
         notes=data.get("notes"),
@@ -459,10 +507,7 @@ def update_restaurant_for_user(restaurant: Restaurant, data: Dict[str, Any]) -> 
         "email",
         "website",
         "google_place_id",
-        "latitude",
-        "longitude",
         "cuisine",
-        "price_range",
         "rating",
         "is_chain",
         "notes",

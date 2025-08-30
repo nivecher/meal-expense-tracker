@@ -1,298 +1,164 @@
-import { logger } from './logger.js';
-import { initializeModalAccessibility } from './modal-accessibility.js';
-
 /**
- * Shows a toast notification
- * @param {string} message - The message to display
- * @param {string} type - The type of notification (success, error, info, warning)
- * @param {number} [duration=3000] - Duration in milliseconds to show the toast
+ * Simple notifications - toast, confirm, and loading
  */
-/**
- * Creates and returns the toast container element if it doesn't exist
- * @returns {HTMLElement} The toast container element
- */
-function getOrCreateToastContainer () {
-  let toastContainer = document.getElementById('toast-container');
 
-  if (!toastContainer) {
-    toastContainer = document.createElement('div');
-    toastContainer.id = 'toast-container';
-    toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-    document.body.appendChild(toastContainer);
+// Get or create toast container
+function getToastContainer() {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+    document.body.appendChild(container);
   }
-
-  return toastContainer;
+  return container;
 }
 
-/**
- * Creates a toast element with the given message and type
- * @param {string} message - The message to display
- * @param {string} type - The type of notification
- * @param {string} title - The title of the toast
- * @returns {HTMLElement} The created toast element
- */
-function createToastElement (message, type, title) {
+// Create toast element
+function createToast(message, type) {
   const toast = document.createElement('div');
-  const toastClass = type === 'error' ? 'bg-danger' : `bg-${type}`;
+  const bgClass = type === 'error' ? 'bg-danger' : `bg-${type}`;
+  const title = type.charAt(0).toUpperCase() + type.slice(1);
 
-  toast.className = `toast align-items-center text-white bg-${type} border-0`;
+  toast.className = `toast align-items-center text-white ${bgClass} border-0`;
   toast.setAttribute('role', 'alert');
-  toast.setAttribute('aria-live', 'assertive');
-  toast.setAttribute('aria-atomic', 'true');
-
   toast.innerHTML = `
-    <div class="toast-header ${toastClass} text-white">
+    <div class="toast-header ${bgClass} text-white">
       <strong class="me-auto">${title}</strong>
-      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+      <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
     </div>
-    <div class="toast-body">
-      ${message}
-    </div>
+    <div class="toast-body">${message}</div>
   `;
 
   return toast;
 }
 
-/**
- * Sets up event listeners for toast cleanup after hiding
- * @param {HTMLElement} toast - The toast element
- * @param {HTMLElement} container - The toast container
- */
-function setupToastCleanup (toast, container) {
-  const handleHidden = () => {
+// Setup toast cleanup
+function setupToastCleanup(toast, container) {
+  toast.addEventListener('hidden.bs.toast', () => {
     toast.remove();
     if (container.children.length === 0) {
       container.remove();
     }
-    toast.removeEventListener('hidden.bs.toast', handleHidden);
-  };
-
-  toast.addEventListener('hidden.bs.toast', handleHidden);
-  return handleHidden;
+  });
 }
 
-/**
- * Shows a toast notification
- * @param {string} message - The message to display
- * @param {string} type - The type of notification (success, error, info, warning)
- * @param {number} [duration=3000] - Duration in milliseconds to show the toast
- * @returns {Object|null} The Bootstrap Toast instance or null if Bootstrap is not available
- */
-function showToast (message, type = 'info', duration = 3000) {
-  // Ensure Bootstrap is available
-  if (typeof bootstrap === 'undefined' || !bootstrap.Toast) {
-    logger.warn('Bootstrap Toast not available. Showing fallback notification.');
+// Show toast notification
+function showToast(message, type = 'info', duration = 3000) {
+  if (!bootstrap?.Toast) {
     alert(`${type.toUpperCase()}: ${message}`);
-    return null;
+    return;
   }
 
-  const toastContainer = getOrCreateToastContainer();
-  const title = type.charAt(0).toUpperCase() + type.slice(1);
-  const toast = createToastElement(message, type, title);
+  const container = getToastContainer();
+  const toast = createToast(message, type);
 
-  // Add toast to container
-  toastContainer.appendChild(toast);
+  container.appendChild(toast);
 
-  // Initialize and show toast
   const bsToast = new bootstrap.Toast(toast, { autohide: true, delay: duration });
   bsToast.show();
 
-  // Set up cleanup after toast is hidden
-  setupToastCleanup(toast, toastContainer);
-
+  setupToastCleanup(toast, container);
   return bsToast;
 }
 
-/**
-     * Gets the appropriate icon for the toast based on type
-     * @param {string} type - The type of notification
-     * @returns {string} The icon class
-     */
-function getToastIcon (type) {
-  const icons = {
-    success: 'bi-check-circle-fill',
-    error: 'bi-exclamation-triangle-fill',
-    warning: 'bi-exclamation-triangle-fill',
-    info: 'bi-info-circle-fill',
-  };
-  return icons[type] || 'bi-info-circle-fill';
-}
 
-/**
-     * Shows a confirmation dialog
-     * @param {Object} options - Configuration options
-     * @param {string} options.title - Dialog title
-     * @param {string} options.message - Dialog message
-     * @param {string} [options.confirmText='Confirm'] - Confirm button text
-     * @param {string} [options.cancelText='Cancel'] - Cancel button text
-     * @param {string} [options.type='warning'] - Dialog type (warning, danger, info, success)
-     * @returns {Promise<boolean>} Resolves to true if confirmed, false if cancelled
-     */
-function showConfirmDialog ({
+
+// Show confirmation dialog
+function showConfirmDialog({
   title = 'Are you sure?',
   message = 'This action cannot be undone.',
   confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  type = 'warning',
+  cancelText = 'Cancel'
 } = {}) {
-  return new Promise((resolve) => {
-    // Ensure Bootstrap is available
-    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
-      logger.warn('Bootstrap Modal not available. Using browser confirm dialog.');
+  return new Promise(resolve => {
+    if (!bootstrap?.Modal) {
       resolve(confirm(`${title}\n\n${message}`));
       return;
     }
 
-    // Create modal element
     const modalId = `confirm-modal-${Date.now()}`;
     const modal = document.createElement('div');
-    const modalTypeClass = `modal-${type}`;
-    modal.className = `modal fade ${modalTypeClass}`;
-    modal.id = modalId;
-    modal.tabIndex = '-1';
-    modal.setAttribute('aria-labelledby', `${modalId}-label`);
-
-    // Modal content
+    modal.className = 'modal fade';
     modal.innerHTML = `
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="${modalId}-label">${title}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            ${message}
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">${cancelText}</button>
-                            <button type="button" class="btn btn-primary" id="${modalId}-confirm">${confirmText}</button>
-                        </div>
-                    </div>
-                </div>
-            `;
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">${title}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">${message}</div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">${cancelText}</button>
+            <button type="button" class="btn btn-primary" data-confirm>${confirmText}</button>
+          </div>
+        </div>
+      </div>
+    `;
 
-    // Add to body
     document.body.appendChild(modal);
-
-    // Initialize modal
     const modalInstance = new bootstrap.Modal(modal);
-
-    // Initialize accessibility using the utility
-    if (typeof initializeModalAccessibility === 'function') {
-      initializeModalAccessibility(modal);
-    } else {
-      // Fallback accessibility handling
-      modal.addEventListener('show.bs.modal', () => {
-        modal.setAttribute('aria-hidden', 'false');
-        modal.setAttribute('aria-modal', 'true');
-      });
-
-      modal.addEventListener('hidden.bs.modal', () => {
-        modal.setAttribute('aria-hidden', 'true');
-        modal.setAttribute('aria-modal', 'false');
-      });
-    }
-
     modalInstance.show();
 
-    // Handle confirm button click
-    const confirmButton = document.getElementById(`${modalId}-confirm`);
-    confirmButton.addEventListener('click', () => {
+    // Handle buttons
+    modal.querySelector('[data-confirm]').addEventListener('click', () => {
       modalInstance.hide();
       resolve(true);
     });
 
-    // Handle modal hidden event
     modal.addEventListener('hidden.bs.modal', () => {
       modal.remove();
+      resolve(false);
     });
   });
 }
 
-/**
-     * Shows a loading overlay
-     * @param {string} [message='Loading...'] - The message to display
-     * @param {boolean} [showSpinner=true] - Whether to show the spinner
-     * @returns {Object} An object with hide() method to hide the overlay
-     */
-function showLoadingOverlay (message = 'Loading...', showSpinner = true) {
-  // Create overlay element
-  const overlayId = `loading-overlay-${Date.now()}`;
+// Show loading overlay
+function showLoadingOverlay(message = 'Loading...') {
   const overlay = document.createElement('div');
-  overlay.id = overlayId;
-  overlay.className = 'loading-overlay position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center';
-  overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-  overlay.style.zIndex = '9999';
-
-  // Create spinner if needed
-  const spinner = showSpinner ? `
-            <div class="spinner-border text-primary me-3" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        ` : '';
-
-  // Set overlay content
+  overlay.className = 'position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center';
+  overlay.style.cssText = 'background: rgba(0,0,0,0.5); z-index: 9999;';
   overlay.innerHTML = `
-            <div class="bg-white rounded p-4 d-flex align-items-center">
-                ${spinner}
-                <span class="h5 mb-0">${message}</span>
-            </div>
-        `;
+    <div class="bg-white rounded p-4 d-flex align-items-center">
+      <div class="spinner-border text-primary me-3"></div>
+      <span class="h5 mb-0">${message}</span>
+    </div>
+  `;
 
-  // Add to body
   document.body.appendChild(overlay);
   document.body.style.overflow = 'hidden';
 
-  // Return object with hide method
   return {
-    hide () {
-      if (overlay?.parentNode) {
-        overlay.remove();
-        document.body.style.overflow = '';
-      }
-    },
+    hide() {
+      overlay.remove();
+      document.body.style.overflow = '';
+    }
   };
 }
 
-// Helper functions for common toast types
-function showErrorToast (message, duration = 5000) {
-  return showToast(message, 'error', duration);
-}
+// Toast helper functions
+const showErrorToast = (message, duration = 5000) => showToast(message, 'error', duration);
+const showSuccessToast = (message, duration = 3000) => showToast(message, 'success', duration);
+const showInfoToast = (message, duration = 3000) => showToast(message, 'info', duration);
+const showWarningToast = (message, duration = 4000) => showToast(message, 'warning', duration);
 
-function showSuccessToast (message, duration = 3000) {
-  return showToast(message, 'success', duration);
-}
-
-function showInfoToast (message, duration = 3000) {
-  return showToast(message, 'info', duration);
-}
-
-function showWarningToast (message, duration = 4000) {
-  return showToast(message, 'warning', duration);
-}
-
-// Export all functions as named exports
+// Export everything
 export {
   showToast,
   showErrorToast,
   showSuccessToast,
   showInfoToast,
   showWarningToast,
-  getToastIcon,
   showConfirmDialog,
-  showLoadingOverlay,
+  showLoadingOverlay
 };
 
-// Also export as default for backward compatibility
-const notifications = {
+export default {
   showToast,
   showErrorToast,
   showSuccessToast,
   showInfoToast,
   showWarningToast,
-  getToastIcon,
   showConfirmDialog,
-  showLoadingOverlay,
+  showLoadingOverlay
 };
-
-export default notifications;

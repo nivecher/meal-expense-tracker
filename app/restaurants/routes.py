@@ -75,17 +75,12 @@ def add_restaurant():
                     200,
                 )
 
-            # Regular form submission handling
+            # Regular form submission handling - redirect without flash messages
+            # Success/error feedback should be handled by the destination page
             if is_new:
-                flash("Restaurant added successfully!", "success")
                 return redirect(url_for("restaurants.list_restaurants"))
-
-            flash(
-                f"A restaurant with the name '{restaurant.name}' in "
-                f"'{restaurant.city or 'unknown location'}' already exists.",
-                "info",
-            )
-            return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
+            else:
+                return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
 
         except Exception as e:
             if is_ajax:
@@ -182,7 +177,7 @@ def edit_restaurant(restaurant_id):
         try:
             # Update restaurant with form data
             services.update_restaurant(restaurant.id, current_user.id, form)
-            flash("Restaurant updated successfully!", "success")
+            # Redirect without flash message - success feedback handled by destination page
             return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
         except Exception as e:
             flash(f"Error updating restaurant: {str(e)}", "danger")
@@ -444,8 +439,7 @@ def _prepare_restaurant_form(data, csrf_token):
         "phone": data.get("formatted_phone_number") or data.get("phone", ""),
         "website": data.get("website", ""),
         "google_place_id": data.get("place_id") or data.get("google_place_id", ""),
-        "latitude": data.get("geometry", {}).get("location", {}).get("lat") or data.get("latitude"),
-        "longitude": data.get("geometry", {}).get("location", {}).get("lng") or data.get("longitude"),
+        # Note: coordinates would be looked up dynamically from Google Places API
         "csrf_token": csrf_token,
     }
 
@@ -532,8 +526,7 @@ def add_from_google_places():
         "phone": "+1234567890",
         "website": "https://example.com",
         "google_place_id": "ChIJ...",
-        "latitude": 40.7128,
-        "longitude": -74.0060
+        # Note: coordinates would be looked up dynamically from Google Places API
     }
 
     Returns:
@@ -582,11 +575,8 @@ def add_from_google_places():
         restaurant.update_from_google_places(data)
         db.session.commit()
 
-        # Set flash message based on whether it's a new restaurant
-        if is_new:
-            flash("Restaurant added successfully!", "success")
-        else:
-            flash("Restaurant updated with the latest information.", "info")
+        # Return success response with message for client-side handling
+        message = "Restaurant added successfully!" if is_new else "Restaurant updated with the latest information."
 
         return jsonify(
             {
@@ -594,6 +584,7 @@ def add_from_google_places():
                 "is_new": is_new,
                 "exists": False,
                 "restaurant_id": restaurant.id,
+                "message": message,
                 "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=restaurant.id),
             }
         )
@@ -716,9 +707,9 @@ def find_by_google_place():
                 "website",
                 "geometry",
                 "opening_hours",
-                "price_level",
+                "priceLevel",
                 "rating",
-                "user_ratings_total",
+                "userRatingsTotal",
                 "photos",
                 "types",
                 "url",
@@ -758,10 +749,9 @@ def find_by_google_place():
             "website": result.get("website", ""),
             "google_place_id": place_id,
             "google_maps_url": result.get("url", ""),
-            "latitude": result.get("geometry", {}).get("location", {}).get("lat"),
-            "longitude": result.get("geometry", {}).get("location", {}).get("lng"),
+            # Note: coordinates, rating, price_level would be looked up dynamically from Google Places API
             "rating": result.get("rating"),
-            "price_level": result.get("price_level"),
+            "price_level": result.get("priceLevel"),
             "types": result.get("types", []),
         }
 

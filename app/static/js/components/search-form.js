@@ -1,16 +1,11 @@
 /**
- * Search form functionality for restaurant search
+ * Simple search form - auto-submit on select changes
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Auto-submit form when sort, order, or per_page changes
-  const form = document.querySelector('form');
-  if (!form) return;
-
-  const selects = form.querySelectorAll('select');
-  selects.forEach((select) => {
-    select.addEventListener('change', () => {
-      form.submit();
-    });
+// Auto-submit form when select values change
+const form = document.querySelector('form');
+if (form) {
+  form.querySelectorAll('select').forEach(select => {
+    select.addEventListener('change', () => form.submit());
   });
-});
+}

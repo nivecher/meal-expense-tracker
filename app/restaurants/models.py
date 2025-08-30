@@ -26,15 +26,13 @@ class Restaurant(BaseModel):
         state: State/Province
         postal_code: ZIP/Postal code
         country: Country
-        latitude: Geographic latitude
-        longitude: Geographic longitude
+
         phone: Contact phone number
         website: Restaurant website URL
         email: Contact email
-        price_range: Price range (1-5)
         cuisine: Type of cuisine
         is_chain: Whether it's a chain restaurant
-        rating: Average rating (1-5)
+        rating: User's personal rating (1.0-5.0)
         notes: Additional notes
     """
 
@@ -62,8 +60,6 @@ class Restaurant(BaseModel):
     state: Mapped[Optional[str]] = db.Column(db.String(100), comment="State/Province")
     postal_code: Mapped[Optional[str]] = db.Column(db.String(20), comment="ZIP/Postal code")
     country: Mapped[Optional[str]] = db.Column(db.String(100), comment="Country")
-    latitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Geographic latitude")
-    longitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Geographic longitude")
 
     # Contact Information
     phone: Mapped[Optional[str]] = db.Column(db.String(20), comment="Contact phone number")
@@ -73,8 +69,7 @@ class Restaurant(BaseModel):
         db.String(255), index=True, comment="Google Place ID for the restaurant"
     )
 
-    # Business Details
-    price_range: Mapped[Optional[int]] = db.Column(db.SmallInteger, comment="Price range (1-5)")
+    # Business Details - User Customizable
     cuisine: Mapped[Optional[str]] = db.Column(db.String(100), index=True, comment="Type of cuisine")
     is_chain: Mapped[bool] = db.Column(
         db.Boolean,
@@ -82,7 +77,7 @@ class Restaurant(BaseModel):
         nullable=False,
         comment="Whether it's a chain restaurant",
     )
-    rating: Mapped[Optional[float]] = db.Column(db.Float, comment="Average rating (1-5)")
+    rating: Mapped[Optional[float]] = db.Column(db.Float, comment="User's personal rating (1.0-5.0)")
     notes: Mapped[Optional[str]] = db.Column(db.Text, comment="Additional notes")
 
     # Foreign Keys
@@ -160,8 +155,7 @@ class Restaurant(BaseModel):
         """
         if self.google_place_id:
             return f"https://www.google.com/maps/place/?q=place_id:{self.google_place_id}"
-        elif self.latitude is not None and self.longitude is not None:
-            return f"https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}"
+        # Coordinates removed - would need to lookup from Google Places API
         else:
             search_query = self.google_search
             if search_query:
@@ -226,10 +220,7 @@ class Restaurant(BaseModel):
         Args:
             place_data: Raw Google Places API response data
         """
-        if "geometry" in place_data and "location" in place_data["geometry"]:
-            location = place_data["geometry"]["location"]
-            self.latitude = location.get("lat", self.latitude)
-            self.longitude = location.get("lng", self.longitude)
+        # Coordinates no longer stored - would be looked up dynamically from Google Places API
 
     def update_from_google_places(self, place_data: dict) -> None:
         """Update restaurant data from Google Places API response.
@@ -246,7 +237,7 @@ class Restaurant(BaseModel):
                     'website': str,
                     'geometry': {'location': {'lat': float, 'lng': float}},
                     'business_status': str,
-                    'price_level': int (0-4),
+
                     'rating': float,
                     'opening_hours': dict,
                     'photos': list,
@@ -263,7 +254,7 @@ class Restaurant(BaseModel):
                 'website': 'https://about.google/',
                 'geometry': {'location': {'lat': 37.422, 'lng': -122.084}},
                 'business_status': 'OPERATIONAL',
-                'price_level': 2,
+
                 'rating': 4.5
             }
         """
@@ -307,14 +298,8 @@ class Restaurant(BaseModel):
         if "business_status" in place_data:
             self.business_status = place_data["business_status"]
 
-        # Price level (convert Google's 0-4 to our 1-5 scale)
-        price_level = place_data.get("price_level")
-        if price_level is not None:
-            self.price_range = min(5, max(1, price_level + 1))
-
-        # Rating
-        if "rating" in place_data:
-            self.rating = place_data["rating"]
+        # Note: rating is now user's personal rating, not from Google Places
+        # Google's rating/price_level would be looked up dynamically via lookup service
 
         # Website (as fallback if not set in _update_contact_info)
         if not self.website and "website" in place_data:
@@ -340,12 +325,9 @@ class Restaurant(BaseModel):
             "state": self.state,
             "postal_code": self.postal_code,
             "country": self.country,
-            "latitude": float(self.latitude) if self.latitude is not None else None,
-            "longitude": float(self.longitude) if self.longitude is not None else None,
             "phone": self.phone,
             "website": self.website,
             "email": self.email,
-            "price_range": self.price_range,
             "cuisine": self.cuisine,
             "is_chain": self.is_chain,
             "rating": self.rating,

@@ -1,0 +1,122 @@
+---
+description: "Web development patterns: JavaScript, HTML, Python Flask"
+globs: "*.js,*.html,*.py"
+---
+
+# Web Development Patterns
+
+## JavaScript Modules
+```javascript
+// ✅ Simple page initialization
+export function init() {
+  const form = document.getElementById('restaurantForm');
+  if (!form) return;
+
+  setup_form_validation(form);
+  setup_autocomplete(form);
+}
+
+// ✅ Event delegation
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-action="delete"]');
+  if (button) delete_restaurant(button.dataset.restaurantId);
+});
+```
+
+## HTML-JS Separation
+```html
+<!-- ✅ Data attributes, no inline handlers -->
+<button data-action="delete" data-restaurant-id="123">Delete</button>
+<form data-validate="restaurant">
+  <input data-autocomplete="address">
+</form>
+```
+
+## Google Maps
+```javascript
+// ✅ Async loading + simple autocomplete
+async function setup_maps(api_key) {
+  const script = document.createElement('script');
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${api_key}`;
+  document.head.appendChild(script);
+
+  return new Promise(resolve => script.onload = resolve);
+}
+
+function setup_autocomplete(input) {
+  return new google.maps.places.Autocomplete(input, {
+    types: ['establishment', 'geocode'],
+    fields: ['place_id', 'formatted_address', 'geometry']
+  });
+}
+```
+
+## Flask Routes
+```python
+# ✅ Thin routes, service layer
+@restaurants.route('/add', methods=['POST'])
+def add_restaurant():
+    try:
+        data = request.get_json()
+        if not data.get('name'):
+            return jsonify({'error': 'Name required'}), 400
+
+        restaurant = create_restaurant(data, current_user.id)
+        return jsonify(restaurant.to_dict()), 201
+
+    except ValidationError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Failed to create restaurant: {e}")
+        return jsonify({'error': 'Internal error'}), 500
+
+# ✅ Service functions with type hints
+def create_restaurant(data: dict, user_id: int) -> Restaurant:
+    return Restaurant.create(
+        name=data['name'],
+        address=data.get('address'),
+        user_id=user_id
+    )
+```
+
+## Database Queries
+```python
+# ✅ SQLAlchemy 2.0 syntax
+def get_user_restaurants(user_id: int) -> List[Restaurant]:
+    return db.session.execute(
+        select(Restaurant)
+        .where(Restaurant.user_id == user_id)
+        .order_by(Restaurant.name)
+    ).scalars().all()
+```
+
+## Error Handling
+```javascript
+// ✅ Always handle errors
+async function save_restaurant(data) {
+  try {
+    const response = await fetch('/restaurants/add', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    show_error_toast('Failed to save restaurant');
+    throw error;
+  }
+}
+```
+
+```python
+# ✅ Global error handlers
+@app.errorhandler(ValidationError)
+def handle_validation_error(e):
+    return jsonify({'error': str(e)}), 400
+
+@app.errorhandler(500)
+def handle_internal_error(e):
+    logger.error(f"Internal error: {e}")
+    return jsonify({'error': 'Internal server error'}), 500
+```

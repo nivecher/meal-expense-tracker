@@ -63,44 +63,11 @@
                     <input type="hidden" name="phone" id="restaurant-phone">
                     <input type="hidden" name="website" id="restaurant-website">
                     <input type="hidden" name="google_place_id" id="restaurant-google-place-id">
-                    <input type="hidden" name="latitude" id="restaurant-latitude">
-                    <input type="hidden" name="longitude" id="restaurant-longitude">
+                    <!-- Coordinates removed - would be looked up dynamically from Google Places API -->
                 </form>
             </div>
         </div>
-        <!-- Success Modal -->
-        <div class="modal fade"
-             id="successModal"
-             tabindex="-1"
-             aria-labelledby="successModalLabel"
-             role="dialog">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header bg-success text-white">
-                        <h1 class="modal-title h5" id="successModalLabel">Success!</h1>
-                        <button type="button"
-                                class="btn-close"
-                                data-bs-dismiss="modal"
-                                aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body text-center py-4">
-                        <div class="mb-3" aria-hidden="true">
-                            <i class="fas fa-check-circle fa-4x text-success"></i>
-                        </div>
-                        <h2 class="h5">Restaurant Added Successfully</h2>
-                        <p class="mb-0" id="success-message">The restaurant has been added to your list.</p>
-                    </div>
-                    <div class="modal-footer">
-                        <a href="{{ url_for('restaurants.list_restaurants') }}"
-                           class="btn btn-outline-secondary">View Restaurant</a>
-                        <button type="button"
-                                class="btn btn-success"
-                                data-bs-dismiss="modal"
-                                autofocus>Continue Searching</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Success Modal removed - using toasts for feedback instead -->
         <!-- Error Modal -->
         <div class="modal fade"
              id="errorModal"
@@ -127,7 +94,8 @@
                         <button type="button"
                                 class="btn btn-danger"
                                 data-bs-dismiss="modal"
-                                autofocus>Close</button>
+                                id="error-close-btn"
+                                tabindex="-1">Close</button>
                     </div>
                 </div>
             </div>
