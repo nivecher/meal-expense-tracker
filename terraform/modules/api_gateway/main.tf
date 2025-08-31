@@ -1,3 +1,5 @@
+
+
 # Look up the existing Route53 zone if domain_name is provided
 data "aws_route53_zone" "main" {
   name         = var.domain_name
@@ -103,7 +105,12 @@ resource "aws_apigatewayv2_api" "main" {
   # CORS configuration for Flask Lambda deployment
   cors_configuration {
     # Must specify exact origins when allow_credentials = true
-    # allow_origins = ["*"]
+    # Note: API Gateway execution URL will be handled by Lambda CORS headers
+    allow_origins = [
+      "https://${var.api_domain_name}",                                # Custom domain
+      "http://localhost:5000",                                        # Local dev
+      "http://127.0.0.1:5000"                                        # Local dev
+    ]
 
     # HTTP methods for Flask application
     allow_methods = [
@@ -115,10 +122,9 @@ resource "aws_apigatewayv2_api" "main" {
       "DELETE",
     ]
 
-    # Headers needed for Flask forms and sessions
+    # Headers needed for Flask forms and sessions (CSRF disabled for Lambda)
     allow_headers = [
       "Content-Type",
-      "X-CSRF-Token",
       "Authorization",
       "X-Requested-With",
       "Accept",

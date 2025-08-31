@@ -72,6 +72,24 @@
         <!-- Simple auth form handler -->
         <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Add error logging that persists across redirects
+            window.addEventListener('error', function(e) {
+                console.error('Global error:', e.error, e.filename, e.lineno);
+                localStorage.setItem('lastError', JSON.stringify({
+                    error: e.error?.toString(),
+                    filename: e.filename,
+                    lineno: e.lineno,
+                    timestamp: new Date().toISOString()
+                }));
+            });
+
+            // Check for previous errors
+            const lastError = localStorage.getItem('lastError');
+            if (lastError) {
+                console.log('Previous error found:', lastError);
+                // Clear it after logging
+                localStorage.removeItem('lastError');
+            }
             // Helper function to display validation errors
             function displayValidationErrors(form, errors) {
                 // Clear existing errors
@@ -170,6 +188,10 @@
                             window.location.reload();
                         } else {
                             // Handle error responses
+                            console.error('Response failed with status:', response.status);
+                            console.error('Response headers:', [...response.headers.entries()]);
+                            debugger; // Pause here to examine the response
+
                             const contentType = response.headers.get('content-type');
                             if (contentType && contentType.includes('application/json')) {
                                 try {
@@ -189,11 +211,11 @@
                             }
 
                             console.error('Form submission failed:', response.status, response.statusText);
-                            // Only reload if we couldn't handle the error gracefully
-                            window.location.reload();
+                            // Don't reload to preserve error info for debugging
                         }
                     } catch (error) {
                         console.error('Form submission error:', error);
+                        debugger; // This will pause execution to see the error
                         alert('An error occurred. Please try again.');
                     } finally {
                         // Restore button state

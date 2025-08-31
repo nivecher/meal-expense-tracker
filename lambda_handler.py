@@ -378,13 +378,15 @@ def _handle_admin_operation(event: Dict[str, Any]) -> Dict[str, Any]:
 
 def _handle_cors_preflight() -> Dict[str, Any]:
     """Handle CORS preflight OPTIONS requests."""
+    # Note: API Gateway handles CORS, so this is a fallback
+    # Use permissive settings since credentials are handled by API Gateway
     return {
         "statusCode": 200,
         "headers": {
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-CSRFToken, X-Requested-With",
-            "Access-Control-Allow-Credentials": "false",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control",
+            "Access-Control-Allow-Credentials": "false",  # API Gateway handles credentials
             "Access-Control-Max-Age": "86400",
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "public, max-age=86400",
@@ -401,12 +403,15 @@ def _process_awsgi_response(response: Dict[str, Any]) -> Dict[str, str]:
         headers = {}
 
     headers = {str(k): str(v) for k, v in headers.items()}
+
+    # For Lambda Function URL access, use permissive CORS
+    # API Gateway will override these headers for custom domain access
     headers.update(
         {
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-CSRFToken, X-Requested-With",
-            "Access-Control-Allow-Credentials": "false",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control",
+            "Access-Control-Allow-Credentials": "false",  # Safe for wildcard origin
         }
     )
 
@@ -458,8 +463,25 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 logger.info("Converted API Gateway v2.0 event to v1.0 format")
 
         # Use awsgi for HTTP request handling
+        # Include additional content types that might need base64 encoding
         response = awsgi.response(
-            app, event, context, base64_content_types={"image/png", "image/jpg", "application/octet-stream"}
+            app,
+            event,
+            context,
+            base64_content_types={
+                "image/png",
+                "image/jpg",
+                "image/jpeg",
+                "image/gif",
+                "image/webp",
+                "application/octet-stream",
+                "application/pdf",
+                "application/zip",
+                "font/woff",
+                "font/woff2",
+                "application/font-woff",
+                "application/font-woff2",
+            },
         )
 
         # Process and enhance response headers

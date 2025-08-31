@@ -472,14 +472,82 @@ def _validate_import_file(file: FileStorage) -> bool:
     return True
 
 
+def _normalize_field_names(data_row: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize field names to match expected format.
+
+    Maps various common field names to the standard field names used by the system.
+
+    Args:
+        data_row: Raw data row from import file
+
+    Returns:
+        Normalized data row with standard field names
+    """
+    # Define field mappings (case-insensitive)
+    field_mappings = {
+        # Date field mappings
+        "postedon": "date",
+        "posted_on": "date",
+        "transaction_date": "date",
+        "expense_date": "date",
+        "when": "date",
+        # Amount field mappings
+        "cost": "amount",
+        "price": "amount",
+        "total": "amount",
+        "expense_amount": "amount",
+        "value": "amount",
+        # Restaurant/vendor mappings
+        "payee": "restaurant_name",
+        "vendor": "restaurant_name",
+        "merchant": "restaurant_name",
+        "restaurant": "restaurant_name",
+        "place": "restaurant_name",
+        "location": "restaurant_name",
+        # Category mappings
+        "usage_category": "category_name",
+        "expense_category": "category_name",
+        "type": "category_name",
+        "category": "category_name",
+        # Address mappings
+        "address": "restaurant_address",
+        "location_address": "restaurant_address",
+        "vendor_address": "restaurant_address",
+        # Meal type mappings
+        "meal": "meal_type",
+        "meal_category": "meal_type",
+        # Notes mappings
+        "description": "notes",
+        "memo": "notes",
+        "note": "notes",
+        "comment": "notes",
+        "remarks": "notes",
+    }
+
+    # Create normalized row
+    normalized_row = {}
+
+    # First, copy all original fields (preserve case)
+    for key, value in data_row.items():
+        normalized_row[key] = value
+
+    # Then add normalized field mappings
+    for original_key, value in data_row.items():
+        normalized_key = field_mappings.get(original_key.lower().strip())
+        if normalized_key:
+            normalized_row[normalized_key] = value
+
+    return normalized_row
+
+
 def _parse_import_file(file: FileStorage) -> Optional[List[Dict[str, Any]]]:
-    """Parse the uploaded file and return the data.
+    """Parse the uploaded file and return normalized data.
 
     Args:
         file: The uploaded file
 
     Returns:
-        List of expense data dictionaries or None if error
+        List of normalized expense data dictionaries or None if error
     """
     try:
         if file.filename.lower().endswith(".json"):
@@ -489,13 +557,20 @@ def _parse_import_file(file: FileStorage) -> Optional[List[Dict[str, Any]]]:
             if not isinstance(data, list):
                 current_app.logger.error("Invalid JSON format. Expected an array of expenses.")
                 return None
-            return data
+        else:
+            # Parse CSV file
+            file.seek(0)
+            csv_data = file.read().decode("utf-8")
+            reader = csv.DictReader(io.StringIO(csv_data))
+            data = list(reader)
 
-        # Parse CSV file
-        file.seek(0)
-        csv_data = file.read().decode("utf-8")
-        reader = csv.DictReader(io.StringIO(csv_data))
-        return list(reader)
+        # Normalize field names for all rows
+        normalized_data = []
+        for row in data:
+            normalized_row = _normalize_field_names(row)
+            normalized_data.append(normalized_row)
+
+        return normalized_data
     except UnicodeDecodeError:
         current_app.logger.error("Error decoding the file. Please ensure it's a valid CSV or JSON file.")
         return None
@@ -523,7 +598,12 @@ def _process_csv_file(file: FileStorage) -> Tuple[bool, Optional[str], Optional[
 
 
 def _parse_expense_date(date_str: str) -> Tuple[Optional[date], Optional[str]]:
-    """Parse expense date from string.
+    """Parse expense date from string with support for multiple formats.
+
+    Supported formats:
+    - ISO format: YYYY-MM-DD
+    - US format: M/D/YYYY, MM/DD/YYYY
+    - Alternative US: M-D-YYYY, MM-DD-YYYY
 
     Args:
         date_str: The date string to parse
@@ -534,17 +614,39 @@ def _parse_expense_date(date_str: str) -> Tuple[Optional[date], Optional[str]]:
     if not date_str:
         return None, "Date is required"
 
+    # Try multiple date formats in order of preference
+    date_formats = [
+        "%Y-%m-%d",  # ISO format: 2025-08-30
+        "%m/%d/%Y",  # US format: 8/30/2025, 08/30/2025
+        "%m-%d-%Y",  # Alternative: 8-30-2025, 08-30-2025
+        "%d/%m/%Y",  # European: 30/8/2025, 30/08/2025
+        "%Y/%m/%d",  # Alternative ISO: 2025/08/30
+    ]
+
+    # First try fromisoformat for strict ISO
     try:
         return datetime.fromisoformat(date_str).date(), None
     except ValueError:
+        pass
+
+    # Try each format
+    for date_format in date_formats:
         try:
-            return datetime.strptime(date_str, "%Y-%m-%d").date(), None
+            return datetime.strptime(date_str, date_format).date(), None
         except ValueError:
-            return None, f"Invalid date format: {date_str}"
+            continue
+
+    return None, f"Invalid date format: {date_str}. Supported formats: YYYY-MM-DD, M/D/YYYY, MM/DD/YYYY"
 
 
 def _parse_expense_amount(amount_str: str) -> Tuple[Optional[Decimal], Optional[str]]:
-    """Parse expense amount from string.
+    """Parse expense amount from string with support for multiple formats.
+
+    Supported formats:
+    - Basic numeric: 24.77, -24.77
+    - Currency symbols: $24.77, -$24.77
+    - Parentheses for negative: (24.77), ($24.77)
+    - Thousands separators: 1,234.56, $1,234.56
 
     Args:
         amount_str: The amount string to parse
@@ -556,17 +658,49 @@ def _parse_expense_amount(amount_str: str) -> Tuple[Optional[Decimal], Optional[
         return None, "Amount is required"
 
     try:
-        amount = Decimal(str(amount_str).replace("$", "").replace(",", ""))
+        # Clean the amount string
+        cleaned_amount = str(amount_str).strip()
+
+        # Handle parentheses for negative amounts
+        is_negative = False
+        if cleaned_amount.startswith("(") and cleaned_amount.endswith(")"):
+            is_negative = True
+            cleaned_amount = cleaned_amount[1:-1]  # Remove parentheses
+
+        # Remove currency symbols and thousands separators
+        cleaned_amount = cleaned_amount.replace("$", "").replace(",", "").strip()
+
+        # Convert to Decimal
+        amount = Decimal(cleaned_amount)
+
+        # Handle amount sign logic for expenses vs reimbursements
+        # Parentheses amounts like ($24.77) → store as positive (regular expenses)
+        # Plus sign amounts like +$76.89 → store as negative (reimbursements)
+        # Plain amounts without sign → store as positive (regular expenses)
+
+        # Check if original amount string had explicit plus sign (reimbursement)
+        has_plus_sign = str(amount_str).strip().startswith("+")
+
+        if is_negative:
+            # Parentheses indicate a regular expense, store as positive
+            amount = abs(amount)
+        elif has_plus_sign:
+            # Plus sign indicates a reimbursement, store as negative
+            amount = -abs(amount)
+        else:
+            # Plain amounts are regular expenses, store as positive
+            amount = abs(amount)
+
         return amount, None
     except (ValueError, InvalidOperation):
-        return None, f"Invalid amount: {amount_str}"
+        return None, f"Invalid amount: {amount_str}. Supported formats: 24.77, $24.77, (24.77), ($24.77)"
 
 
 def _find_category_by_name(category_name: str, user_id: int) -> Optional[Category]:
-    """Find category by name for a user.
+    """Find category by name for a user with support for hierarchical categories.
 
     Args:
-        category_name: The category name to search for
+        category_name: The category name to search for (supports hierarchical format like "Parent:Child")
         user_id: The user ID
 
     Returns:
@@ -574,13 +708,41 @@ def _find_category_by_name(category_name: str, user_id: int) -> Optional[Categor
     """
     if not category_name:
         return None
-    return Category.query.filter_by(user_id=user_id, name=category_name).first()
+
+    # First try exact match
+    category = Category.query.filter_by(user_id=user_id, name=category_name).first()
+    if category:
+        return category
+
+    # Handle hierarchical category format (e.g., "Dining & Drinks:Fast Food")
+    if ":" in category_name:
+        # Try the part after the colon (subcategory)
+        subcategory_name = category_name.split(":", 1)[1].strip()
+        category = Category.query.filter_by(user_id=user_id, name=subcategory_name).first()
+        if category:
+            return category
+
+        # Try the part before the colon (parent category)
+        parent_category_name = category_name.split(":", 1)[0].strip()
+        category = Category.query.filter_by(user_id=user_id, name=parent_category_name).first()
+        if category:
+            return category
+
+    # Try case-insensitive search as fallback
+    category = Category.query.filter(Category.user_id == user_id, Category.name.ilike(f"%{category_name}%")).first()
+
+    return category
 
 
-def _find_or_create_restaurant(restaurant_name: str, restaurant_address: str, user_id: int) -> Optional[Restaurant]:
-    """Find existing restaurant or create new one if not found.
+def _find_or_create_restaurant(
+    restaurant_name: str, restaurant_address: str, user_id: int
+) -> Tuple[Optional[Restaurant], Optional[str]]:
+    """Find existing restaurant or create new one if not found, with ambiguity checking.
 
-    Uses smart duplicate detection similar to restaurant import.
+    Prevents duplicate creation by:
+    1. Exact name + address match (if address provided)
+    2. Unique name match (only if exactly one restaurant with that name exists)
+    3. Skips creation if name is ambiguous without address
 
     Args:
         restaurant_name: The restaurant name
@@ -588,12 +750,14 @@ def _find_or_create_restaurant(restaurant_name: str, restaurant_address: str, us
         user_id: The user ID
 
     Returns:
-        The restaurant (existing or newly created) if successful, None otherwise
+        Tuple of (restaurant, warning_message):
+        - restaurant: The found restaurant if unique match, None if ambiguous/not found
+        - warning_message: None if success, warning text if skipped due to ambiguity
     """
     if not restaurant_name:
-        return None
+        return None, None
 
-    # Try to find existing restaurant using multiple strategies
+    # Clean inputs
     restaurant_name = restaurant_name.strip()
     restaurant_address = restaurant_address.strip() if restaurant_address else None
 
@@ -601,27 +765,41 @@ def _find_or_create_restaurant(restaurant_name: str, restaurant_address: str, us
     if restaurant_address:
         existing = Restaurant.query.filter_by(user_id=user_id, name=restaurant_name, address=restaurant_address).first()
         if existing:
-            return existing
+            return existing, None
 
-    # Strategy 2: Exact name match (fallback)
-    existing = Restaurant.query.filter_by(user_id=user_id, name=restaurant_name).first()
-    if existing:
-        return existing
+        # If address provided but no match, create new restaurant
+        try:
+            new_restaurant = Restaurant(
+                user_id=user_id,
+                name=restaurant_name,
+                address=restaurant_address,
+                city=None,  # Will be filled by user later if needed
+            )
+            db.session.add(new_restaurant)
+            db.session.flush()  # Get the ID without committing
+            return new_restaurant, None
+        except Exception:
+            # If creation fails, try to find again
+            existing = Restaurant.query.filter_by(user_id=user_id, name=restaurant_name).first()
+            return existing, None
 
-    # Strategy 3: Create new restaurant if none found
-    try:
-        new_restaurant = Restaurant(
-            user_id=user_id,
-            name=restaurant_name,
-            address=restaurant_address,
-            city=None,  # Will be filled by user later if needed
+    # Strategy 2: Check for name matches when no address provided
+    name_matches = Restaurant.query.filter_by(user_id=user_id, name=restaurant_name).all()
+    if len(name_matches) == 1:
+        # Exactly one match - safe to use
+        return name_matches[0], None
+    elif len(name_matches) > 1:
+        # Multiple matches - ambiguous, skip with warning
+        return (
+            None,
+            f"Restaurant '{restaurant_name}' matches multiple existing restaurants. Please provide an address to disambiguate.",
         )
-        db.session.add(new_restaurant)
-        db.session.flush()  # Get the ID without committing
-        return new_restaurant
-    except Exception:
-        # If creation fails (e.g., constraint violation), try to find again
-        return Restaurant.query.filter_by(user_id=user_id, name=restaurant_name).first()
+    else:
+        # No matches - skip creation without address to prevent duplicates
+        return (
+            None,
+            f"Restaurant '{restaurant_name}' not found. Please provide an address to create a new restaurant entry.",
+        )
 
 
 def _check_expense_duplicate(
@@ -690,7 +868,11 @@ def _create_expense_from_data(data: Dict[str, Any], user_id: int) -> Tuple[Optio
         # Find or create restaurant with smart logic
         restaurant_name = data.get("restaurant_name", "").strip()
         restaurant_address = data.get("restaurant_address", "").strip()
-        restaurant = _find_or_create_restaurant(restaurant_name, restaurant_address, user_id)
+        restaurant, restaurant_warning = _find_or_create_restaurant(restaurant_name, restaurant_address, user_id)
+
+        # If restaurant matching failed due to ambiguity, return warning
+        if restaurant_warning:
+            return None, restaurant_warning
 
         # Extract meal type
         meal_type = data.get("meal_type", "").strip() or None
@@ -740,6 +922,11 @@ def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tu
             if error:
                 if error.startswith("Duplicate expense:"):
                     info_messages.append(f"Row {i}: {error}")
+                elif (
+                    "matches multiple existing restaurants" in error or "not found. Please provide an address" in error
+                ):
+                    # Restaurant ambiguity warnings should be treated as info messages
+                    info_messages.append(f"Row {i}: {error}")
                 else:
                     errors.append(f"Row {i}: {error}")
                 continue
@@ -760,6 +947,92 @@ def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tu
     return success_count, errors, info_messages
 
 
+def _count_warning_types(info_messages: List[str]) -> Tuple[int, int]:
+    """Count different types of warning messages.
+
+    Args:
+        info_messages: List of informational messages
+
+    Returns:
+        Tuple of (duplicate_count, restaurant_warning_count)
+    """
+    duplicate_count = sum(1 for msg in info_messages if "Duplicate expense:" in msg)
+    restaurant_warning_count = len(info_messages) - duplicate_count
+    return duplicate_count, restaurant_warning_count
+
+
+def _build_warning_message(info_messages: List[str]) -> str:
+    """Build warning message text from info messages.
+
+    Args:
+        info_messages: List of informational messages
+
+    Returns:
+        Warning message text or empty string if no warnings
+    """
+    if not info_messages:
+        return ""
+
+    duplicate_count, restaurant_warning_count = _count_warning_types(info_messages)
+
+    if duplicate_count > 0 and restaurant_warning_count > 0:
+        return f"{duplicate_count} duplicates and {restaurant_warning_count} restaurant warnings"
+    elif duplicate_count > 0:
+        return f"{duplicate_count} duplicates skipped"
+    elif restaurant_warning_count > 0:
+        return f"{restaurant_warning_count} restaurant warnings"
+
+    return ""
+
+
+def _build_import_message(success_count: int, info_messages: List[str], errors: List[str]) -> str:
+    """Build the main import result message.
+
+    Args:
+        success_count: Number of successfully imported expenses
+        info_messages: List of informational messages
+        errors: List of error messages
+
+    Returns:
+        Complete import result message
+    """
+    parts = []
+
+    if success_count > 0:
+        parts.append(f"{success_count} expenses imported successfully")
+
+    warning_message = _build_warning_message(info_messages)
+    if warning_message:
+        parts.append(warning_message)
+
+    if errors:
+        parts.append(f"{len(errors)} errors occurred")
+
+    if parts:
+        return ". ".join(parts) + "."
+    else:
+        return "No expenses processed."
+
+
+def _prepare_error_details(errors: List[str]) -> List[str]:
+    """Prepare error details with appropriate limits.
+
+    Args:
+        errors: List of error messages
+
+    Returns:
+        Limited list of error details for display
+    """
+    if not errors:
+        return []
+
+    error_limit = 5
+    if len(errors) > error_limit:
+        return errors[:error_limit] + [f"... and {len(errors) - error_limit} more errors"]
+    else:
+        return errors
+
+
 def _generate_import_result(
     success_count: int, errors: List[str], info_messages: List[str]
 ) -> Tuple[bool, Dict[str, Any]]:
@@ -776,46 +1049,21 @@ def _generate_import_result(
     if success_count > 0:
         db.session.commit()
 
-    # Calculate skipped count from info messages
-    skipped_count = len(info_messages)
-
-    # Build result data with separate components
+    # Build result data structure
     result_data = {
         "success_count": success_count,
-        "skipped_count": skipped_count,
+        "skipped_count": len(info_messages),
         "error_count": len(errors),
         "errors": errors,
         "info_messages": info_messages,
-        "has_warnings": skipped_count > 0,
+        "has_warnings": len(info_messages) > 0,
         "has_errors": len(errors) > 0,
+        "message": _build_import_message(success_count, info_messages, errors),
     }
 
-    # Build main message
-    parts = []
-    if success_count > 0:
-        parts.append(f"{success_count} expenses imported successfully")
-
-    if info_messages:
-        duplicate_count = len(info_messages)
-        parts.append(f"{duplicate_count} duplicates skipped")
-
+    # Add error details if needed
     if errors:
-        parts.append(f"{len(errors)} errors occurred")
-
-    if parts:
-        result_data["message"] = ". ".join(parts) + "."
-    else:
-        result_data["message"] = "No expenses processed."
-
-    # Add error details if there are actual errors
-    if errors:
-        # Limit error details to avoid overwhelming the user
-        error_limit = 5
-        if len(errors) > error_limit:
-            error_details = errors[:error_limit] + [f"... and {len(errors) - error_limit} more errors"]
-        else:
-            error_details = errors
-        result_data["error_details"] = error_details
+        result_data["error_details"] = _prepare_error_details(errors)
 
     # Determine success - it's successful if there are no actual errors
     is_success = len(errors) == 0

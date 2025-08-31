@@ -26,25 +26,46 @@
                             The following fields are <strong>required</strong> in your file:
                         </div>
                         <ul class="mb-3">
-                            <li> <code>date</code> - Expense date (YYYY-MM-DD format) </li>
-                            <li> <code>amount</code> - Expense amount (numeric value) </li>
+                            <li> <code>date</code> - Expense date (supports: YYYY-MM-DD, M/D/YYYY, MM/DD/YYYY) </li>
+                            <li> <code>amount</code> - Expense amount (supports: 24.77, $24.77, (24.77) for expenses, +$24.77 for reimbursements) </li>
                         </ul>
                         <h4 class="h6 mt-3">Optional Fields:</h4>
                         <ul>
                             <li> <code>meal_type</code> - Type of meal (breakfast, lunch, dinner, snack) </li>
                             <li> <code>notes</code> - Additional notes about the expense </li>
-                            <li> <code>category_name</code> - Category name (must match existing category) </li>
+                            <li> <code>category_name</code> - Category name (supports hierarchical: "Parent:Child") </li>
                             <li> <code>restaurant_name</code> - Restaurant name (will auto-create if doesn't exist) </li>
                             <li> <code>restaurant_address</code> - Restaurant address (helps avoid duplicates) </li>
                         </ul>
+                        <h4 class="h6 mt-3">Alternative Field Names:</h4>
+                        <div class="alert alert-success">
+                            <i class="fas fa-magic me-2"></i>
+                            <strong>Flexible Column Names:</strong> The import system automatically recognizes alternative field names:
+                            <ul class="mb-0 mt-2">
+                                <li><strong>Date:</strong> postedOn, posted_on, transaction_date, expense_date</li>
+                                <li><strong>Amount:</strong> cost, price, total, expense_amount, value</li>
+                                <li><strong>Restaurant:</strong> payee, vendor, merchant, place, location</li>
+                                <li><strong>Category:</strong> usage_category, expense_category, type</li>
+                                <li><strong>Notes:</strong> description, memo, comment, remarks</li>
+                            </ul>
+                        </div>
                         <div class="alert alert-success mt-3">
                             <i class="fas fa-check-circle me-2"></i>
                             <strong>Smart Import Features:</strong>
                             <ul class="mb-0 mt-2">
-                                <li>Restaurants will be automatically created if they don't exist</li>
+                                <li>Flexible date formats (ISO, US, European) automatically recognized</li>
+                                <li>Smart amount parsing: parentheses for expenses, + for reimbursements, currency symbols, thousands separators</li>
+                                <li>Hierarchical categories (e.g., "Dining & Drinks:Fast Food") automatically mapped</li>
+                                <li>Alternative column names automatically recognized (payee → restaurant, etc.)</li>
+                                <li>Smart restaurant matching prevents duplicates: exact match with address, unique name match, or skip if ambiguous</li>
+                                <li>Restaurant warnings when names match multiple locations without address disambiguation</li>
                                 <li>Duplicate expenses are automatically detected and skipped</li>
-                                <li>Duplicate restaurants are avoided using name + address matching</li>
+                                <li>New restaurants created only when address is provided to prevent duplicates</li>
                             </ul>
+                        </div>
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Amount Display:</strong> Regular expenses show in green, reimbursements show in red. Parentheses like ($24.77) are treated as expenses, plus signs like +$76.89 are treated as reimbursements.
                         </div>
                         <div class="alert alert-info mt-3">
                             <i class="fas fa-info-circle me-2"></i>
@@ -80,20 +101,114 @@
                                 {% endfor %} {% endfor %}
                             </ul>
                         </div>
-                        {% endif %} {% if errors %}
+                        {% endif %}
+
+                        <!-- Import Summary (when available) -->
+                        {% if import_summary %}
+                        <div class="alert alert-info">
+                            <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Import Summary</h5>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <strong>Processed:</strong> {{ import_summary.get('success_count', 0) + import_summary.get('error_count', 0) }} rows
+                                </div>
+                                <div class="col-md-3">
+                                    <strong class="text-success">Imported:</strong> {{ import_summary.get('success_count', 0) }}
+                                </div>
+                                <div class="col-md-3">
+                                    <strong class="text-warning">Skipped:</strong> {{ import_summary.get('skipped_count', 0) }}
+                                </div>
+                                <div class="col-md-3">
+                                    <strong class="text-danger">Errors:</strong> {{ import_summary.get('error_count', 0) }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Import Warnings (Duplicates) -->
+                        {% if warnings %}
+                        <div class="alert alert-warning">
+                            <h5 class="alert-heading"><i class="fas fa-exclamation-circle me-2"></i>Import Warnings</h5>
+                            <p class="mb-3">The following items were skipped during import:</p>
+                            <div class="warning-list" style="max-height: 200px; overflow-y: auto;">
+                                <ul class="mb-0">
+                                    {% for warning in warnings[:10] %}
+                                    <li class="mb-1"><small>{{ warning }}</small></li>
+                                    {% endfor %}
+                                    {% if warnings|length > 10 %}
+                                    <li class="text-muted mt-2"><em>... and {{ warnings|length - 10 }} more warnings</em></li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Detailed Import Errors -->
+                        {% if errors %}
                         <div class="alert alert-danger">
-                            <h5 class="alert-heading">Import Errors</h5>
-                            <ul class="mb-0">
-                                {% for error in errors %}<li>{{ error }}</li
-                                >{% endfor %}
-                            </ul>
+                            <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Import Errors</h5>
+                            <p class="mb-3">The following errors occurred during import. Please fix these issues in your file and try again:</p>
+                            {% if errors|length > 10 %}
+                            <div class="mb-3">
+                                <small class="text-muted">Showing first 10 errors of {{ errors|length }} total errors.</small>
+                            </div>
+                            {% endif %}
+                            <div class="error-list" style="max-height: 300px; overflow-y: auto;">
+                                <ul class="mb-0">
+                                    {% for error in errors[:10] %}
+                                    <li class="mb-1"><code>{{ error }}</code></li>
+                                    {% endfor %}
+                                    {% if errors|length > 10 %}
+                                    <li class="text-muted mt-2"><em>... and {{ errors|length - 10 }} more errors</em></li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            {% if errors|length > 10 %}
+                            <div class="mt-3">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#allErrors" aria-expanded="false">
+                                    <i class="fas fa-list me-1"></i> Show All {{ errors|length }} Errors
+                                </button>
+                            </div>
+                            <div class="collapse mt-3" id="allErrors">
+                                <div class="card card-body">
+                                    <div style="max-height: 400px; overflow-y: auto;">
+                                        <ul class="mb-0">
+                                            {% for error in errors %}
+                                            <li class="mb-1"><code>{{ error }}</code></li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Common Error Help -->
+                            <div class="mt-3 p-3 bg-light rounded">
+                                <h6><i class="fas fa-lightbulb me-2"></i>Common Solutions:</h6>
+                                <ul class="mb-0 small">
+                                    <li><strong>"Amount is required":</strong> Check that your amount column has data and is named correctly (amount, cost, price, etc.)</li>
+                                    <li><strong>"Date is required":</strong> Ensure your date column exists and uses supported formats (M/D/YYYY, YYYY-MM-DD)</li>
+                                    <li><strong>"Invalid amount format":</strong> Use formats like: 24.77, $24.77, (24.77), +$24.77</li>
+                                    <li><strong>"Invalid date format":</strong> Use: 8/30/2025, 2025-08-30, or similar supported formats</li>
+                                    <li><strong>"matches multiple existing restaurants":</strong> Add an address column to disambiguate restaurants with the same name</li>
+                                    <li><strong>"not found. Please provide an address":</strong> Add an address column to create new restaurant entries</li>
+                                </ul>
+                            </div>
                         </div>
                         {% endif %}
                         <div class="d-flex gap-2">
+                            {% if import_summary and import_summary.get('success_count', 0) > 0 %}
+                            <!-- Show different buttons when import was partially successful -->
+                            <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-success">
+                                <i class="fas fa-check me-1"></i> View Imported Expenses
+                            </a>
+                            {{ form.submit(class_="btn btn-primary") }}
+                            {% else %}
+                            <!-- Show normal submit when no import happened yet -->
                             {{ form.submit(class_="btn btn-primary") }}
                             <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary">
                                 <i class="fas fa-times me-1"></i> Cancel
                             </a>
+                            {% endif %}
                         </div>
                     </form>
                 </div>

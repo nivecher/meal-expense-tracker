@@ -661,26 +661,45 @@ def import_expenses():
                     if result_data.get("success_count", 0) > 0:
                         flash(f"Successfully imported {result_data['success_count']} expenses.", "success")
 
-                    # Show warning toast for skipped duplicates
+                    # Show warning toast for skipped items (duplicates and restaurant warnings)
                     if result_data.get("has_warnings", False):
-                        flash(f"{result_data['skipped_count']} duplicate expenses were skipped.", "warning")
+                        warning_count = result_data.get("skipped_count", 0)
+                        flash(f"{warning_count} items were skipped (duplicates or restaurant warnings).", "warning")
+
+                    # If there are warnings but success, show import summary before redirecting
+                    if result_data.get("has_warnings", False) and result_data.get("info_messages"):
+                        return render_template(
+                            "expenses/import.html",
+                            form=form,
+                            import_summary=result_data,
+                            warnings=result_data.get("info_messages", []),
+                        )
 
                     return redirect(url_for("expenses.list_expenses"))
                 else:
-                    # Show error toast with details
+                    # Show error toast with summary
                     error_message = result_data.get("message", "Import failed")
                     flash(error_message, "danger")
 
-                    # Log detailed errors for debugging
-                    if result_data.get("error_details"):
-                        current_app.logger.error(f"Import errors: {result_data['error_details']}")
+                    # Pass detailed errors to template for display
+                    detailed_errors = result_data.get("error_details", [])
+                    current_app.logger.error(f"Import errors: {detailed_errors}")
+
+                    # Render template with error details
+                    return render_template(
+                        "expenses/import.html", form=form, errors=detailed_errors, import_summary=result_data
+                    )
 
             except ValueError as e:
                 current_app.logger.error("ValueError during import: %s", str(e))
                 flash(str(e), "danger")
+                return render_template("expenses/import.html", form=form, errors=[str(e)])
             except Exception as e:
                 current_app.logger.error("Unexpected error during import: %s", str(e))
                 flash("An unexpected error occurred during import", "danger")
+                return render_template(
+                    "expenses/import.html", form=form, errors=["An unexpected error occurred during import"]
+                )
         else:
             flash("Please select a file to upload", "danger")
 
