@@ -344,26 +344,81 @@ def safe_import_int(value):
         return None
 
 
-def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Restaurant]:
-    """Process a single restaurant row from CSV.
+def _find_existing_restaurant(
+    name: str, address: str, city: str, google_place_id: str, user_id: int
+) -> Optional[Restaurant]:
+    """Find existing restaurant using smart duplicate detection.
+
+    Checks for duplicates by:
+    1. Google Place ID (if provided)
+    2. Name + Address combination
+    3. Name + City combination (as fallback)
+
+    Args:
+        name: Restaurant name
+        address: Restaurant address
+        city: Restaurant city
+        google_place_id: Google Place ID
+        user_id: User ID
+
+    Returns:
+        Existing restaurant if found, None otherwise
+    """
+    # Strategy 1: Match by Google Place ID (most reliable)
+    if google_place_id:
+        existing = Restaurant.query.filter_by(user_id=user_id, google_place_id=google_place_id).first()
+        if existing:
+            return existing
+
+    # Strategy 2: Match by name + address (if both provided)
+    if name and address:
+        existing = Restaurant.query.filter_by(user_id=user_id, name=name, address=address).first()
+        if existing:
+            return existing
+
+    # Strategy 3: Match by name + city (existing constraint)
+    if name and city:
+        existing = Restaurant.query.filter_by(user_id=user_id, name=name, city=city).first()
+        if existing:
+            return existing
+
+    return None
+
+
+def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Optional[Restaurant]]:
+    """Process a single restaurant row from CSV with smart duplicate detection.
 
     Args:
         row: Dictionary containing restaurant data
         user_id: ID of the user importing the restaurants
 
     Returns:
-        Tuple of (success, error_message, restaurant)
+        Tuple of (success, error_message, restaurant_or_none)
     """
     try:
         is_valid, error = _validate_restaurant_row(row)
         if not is_valid:
             return False, error, None
 
+        # Extract and clean data
+        name = row.get("name", "").strip()
+        address = row.get("address", "").strip() or None
+        city = row.get("city", "").strip() or None
+        google_place_id = row.get("google_place_id", "").strip() or None
+
+        # Check for existing restaurant using smart detection
+        existing_restaurant = _find_existing_restaurant(name, address, city, google_place_id, user_id)
+
+        if existing_restaurant:
+            # Skip duplicate - return success but no restaurant to add
+            return True, f"Skipped duplicate restaurant: {name}", None
+
+        # Create new restaurant
         restaurant = Restaurant(
             user_id=user_id,
-            name=row.get("name", "").strip(),
-            city=row.get("city", "").strip(),
-            address=row.get("address", "").strip() or None,
+            name=name,
+            city=city,
+            address=address,
             state=row.get("state", "").strip() or None,
             postal_code=row.get("postal_code", "").strip() or None,
             country=row.get("country", "").strip() or None,
@@ -373,10 +428,11 @@ def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Restaur
             cuisine=row.get("cuisine", "").strip() or None,
             rating=safe_import_float(row.get("rating")),
             is_chain=safe_import_bool(row.get("is_chain")),
-            google_place_id=row.get("google_place_id", "").strip() or None,
+            google_place_id=google_place_id,
             notes=row.get("notes", "").strip() or None,
         )
         return True, "", restaurant
+
     except Exception as e:
         return False, str(e), None
 
@@ -403,54 +459,94 @@ def _process_csv_file(file: FileStorage) -> Tuple[bool, str, Optional[csv.DictRe
         return False, f"Error reading CSV file: {str(e)}", None
 
 
-def _import_restaurants_from_reader(csv_reader: csv.DictReader, user_id: int) -> Tuple[int, List[str]]:
-    """Import restaurants from a CSV reader.
+def _import_restaurants_from_reader(csv_reader: csv.DictReader, user_id: int) -> Tuple[int, int, List[str]]:
+    """Import restaurants from a CSV reader with smart duplicate detection.
 
     Args:
         csv_reader: CSV reader with restaurant data
         user_id: ID of the user importing the restaurants
 
     Returns:
-        Tuple of (success_count, errors)
+        Tuple of (success_count, skipped_count, errors)
     """
     success_count = 0
+    skipped_count = 0
     errors = []
 
     for i, row in enumerate(csv_reader, 2):  # Start from line 2 (1-based + header)
-        success, error, restaurant = _process_restaurant_row(row, user_id)
-        if success and restaurant:
-            db.session.add(restaurant)
-            success_count += 1
+        success, message, restaurant = _process_restaurant_row(row, user_id)
+
+        if success:
+            if restaurant:
+                # New restaurant to add
+                db.session.add(restaurant)
+                success_count += 1
+            else:
+                # Duplicate skipped
+                skipped_count += 1
         else:
-            errors.append(f"Line {i}: {error}")
+            # Error processing row
+            errors.append(f"Line {i}: {message}")
 
-    return success_count, errors
+    return success_count, skipped_count, errors
 
 
-def _generate_import_result(success_count: int, errors: List[str]) -> Tuple[bool, str]:
+def _generate_import_result(success_count: int, skipped_count: int, errors: List[str]) -> Tuple[bool, Dict[str, Any]]:
     """Generate the result of the import operation.
 
     Args:
         success_count: Number of successfully imported restaurants
+        skipped_count: Number of skipped duplicate restaurants
         errors: List of error messages
 
     Returns:
-        Tuple of (success, message)
+        Tuple of (success, result_data)
     """
     if success_count > 0:
         db.session.commit()
 
+    # Build result data with separate components
+    result_data = {
+        "success_count": success_count,
+        "skipped_count": skipped_count,
+        "error_count": len(errors),
+        "errors": errors,
+        "has_warnings": skipped_count > 0,
+        "has_errors": len(errors) > 0,
+    }
+
+    # Build main message
+    parts = []
+    if success_count > 0:
+        parts.append(f"{success_count} restaurants imported successfully")
+
+    if skipped_count > 0:
+        parts.append(f"{skipped_count} duplicates skipped")
+
     if errors:
-        error_msg = (
-            f"{success_count} restaurants imported successfully, but {len(errors)} "
-            f"rows had errors. Errors: {', '.join(errors)}"
-        )
-        return success_count > 0, error_msg
+        parts.append(f"{len(errors)} errors occurred")
 
-    return True, f"{success_count} restaurants imported successfully"
+    if parts:
+        result_data["message"] = ". ".join(parts) + "."
+    else:
+        result_data["message"] = "No restaurants processed."
+
+    # Add error details if there are actual errors
+    if errors:
+        # Limit error details to avoid overwhelming the user
+        error_limit = 5
+        if len(errors) > error_limit:
+            error_details = errors[:error_limit] + [f"... and {len(errors) - error_limit} more errors"]
+        else:
+            error_details = errors
+        result_data["error_details"] = error_details
+
+    # Determine success - it's successful if there are no actual errors
+    is_success = len(errors) == 0
+    return is_success, result_data
 
 
-def import_restaurants_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, str]:
+def import_restaurants_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, Dict[str, Any]]:
     """Import restaurants from a CSV file.
 
     Args:
@@ -458,23 +554,24 @@ def import_restaurants_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, 
         user_id: ID of the user importing the restaurants
 
     Returns:
-        A tuple containing (success: bool, message: str)
+        A tuple containing (success: bool, result_data: Dict[str, Any])
     """
     try:
         # Process the CSV file
         success, error, csv_reader = _process_csv_file(file)
         if not success:
-            return False, error
+            return False, {"message": error, "has_errors": True, "error_details": [error]}
 
         # Import restaurants from the CSV data
-        success_count, errors = _import_restaurants_from_reader(csv_reader, user_id)
+        success_count, skipped_count, errors = _import_restaurants_from_reader(csv_reader, user_id)
 
-        # Generate the result message
-        return _generate_import_result(success_count, errors)
+        # Generate the result data
+        return _generate_import_result(success_count, skipped_count, errors)
 
     except Exception as e:
         db.session.rollback()
-        return False, f"Error processing CSV file: {str(e)}"
+        error_msg = f"Error processing CSV file: {str(e)}"
+        return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
 
 
 def export_restaurants_for_user(user_id: int) -> List[Dict[str, Any]]:

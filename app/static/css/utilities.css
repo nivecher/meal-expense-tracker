@@ -118,6 +118,30 @@
     object-fit: cover;
 }
 
+/* Width Utilities */
+.min-width-80 { min-width: 80px !important; }
+.min-width-100 { min-width: 100px !important; }
+.min-width-120 { min-width: 120px !important; }
+.min-width-150 { min-width: 150px !important; }
+.min-width-200 { min-width: 200px !important; }
+
+/* Display Utilities Extended */
+.hidden { display: none !important; }
+
+/* Amount display utilities */
+.amount-display {
+    min-width: 80px !important;
+    text-align: right !important;
+    display: inline-block !important;
+}
+
+/* Category badge with dynamic colors */
+.category-badge {
+    background-color: color-mix(in srgb, var(--category-color, #6c757d) 20%, transparent);
+    color: var(--category-color, #6c757d);
+    border-color: color-mix(in srgb, var(--category-color, #6c757d) 40%, transparent) !important;
+}
+
 /* Print Utilities */
 @media print {
     .no-print {

@@ -24,8 +24,12 @@ body {
   margin: 0;
   padding: 0;
   -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
+
+/* Firefox doesn't support text-size-adjust property
+   Browser will use default text scaling behavior */
 
 .container {
   max-width: 1200px;

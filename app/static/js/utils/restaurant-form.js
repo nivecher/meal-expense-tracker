@@ -8,7 +8,8 @@
  */
 
 import { logger, debounce } from './core-utils.js';
-import { showFormLoading, hideFormLoading, showErrorToast, showSuccessToast } from './ui-utils.js';
+import { showErrorToast, showSuccessToast } from './notifications.js';
+import { showFormLoading, hideFormLoading } from './ui-utils.js';
 import { post } from './api-utils.js';
 import { googleMapsManager } from './google-maps.js';
 

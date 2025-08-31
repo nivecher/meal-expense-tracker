@@ -317,7 +317,7 @@
     <!-- Google Maps API Configuration -->
     <div id="google-maps-config"
          data-api-key="{{ config.GOOGLE_MAPS_API_KEY or '' }}"
-         style="display: none"></div>
+         class="hidden"></div>
     {% if config.GOOGLE_MAPS_API_KEY %}
         <!-- Load Google Maps script directly -->
         <script src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_MAPS_API_KEY }}&libraries=places&loading=async"

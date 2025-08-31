@@ -577,6 +577,77 @@ def _find_category_by_name(category_name: str, user_id: int) -> Optional[Categor
     return Category.query.filter_by(user_id=user_id, name=category_name).first()
 
 
+def _find_or_create_restaurant(restaurant_name: str, restaurant_address: str, user_id: int) -> Optional[Restaurant]:
+    """Find existing restaurant or create new one if not found.
+
+    Uses smart duplicate detection similar to restaurant import.
+
+    Args:
+        restaurant_name: The restaurant name
+        restaurant_address: The restaurant address (optional)
+        user_id: The user ID
+
+    Returns:
+        The restaurant (existing or newly created) if successful, None otherwise
+    """
+    if not restaurant_name:
+        return None
+
+    # Try to find existing restaurant using multiple strategies
+    restaurant_name = restaurant_name.strip()
+    restaurant_address = restaurant_address.strip() if restaurant_address else None
+
+    # Strategy 1: Exact name + address match (if address provided)
+    if restaurant_address:
+        existing = Restaurant.query.filter_by(user_id=user_id, name=restaurant_name, address=restaurant_address).first()
+        if existing:
+            return existing
+
+    # Strategy 2: Exact name match (fallback)
+    existing = Restaurant.query.filter_by(user_id=user_id, name=restaurant_name).first()
+    if existing:
+        return existing
+
+    # Strategy 3: Create new restaurant if none found
+    try:
+        new_restaurant = Restaurant(
+            user_id=user_id,
+            name=restaurant_name,
+            address=restaurant_address,
+            city=None,  # Will be filled by user later if needed
+        )
+        db.session.add(new_restaurant)
+        db.session.flush()  # Get the ID without committing
+        return new_restaurant
+    except Exception:
+        # If creation fails (e.g., constraint violation), try to find again
+        return Restaurant.query.filter_by(user_id=user_id, name=restaurant_name).first()
+
+
+def _check_expense_duplicate(
+    user_id: int, restaurant_id: Optional[int], amount: Decimal, expense_date: date, meal_type: Optional[str]
+) -> bool:
+    """Check if an expense with the same details already exists.
+
+    Args:
+        user_id: User ID
+        restaurant_id: Restaurant ID (can be None)
+        amount: Expense amount
+        expense_date: Date of expense
+        meal_type: Type of meal (can be None)
+
+    Returns:
+        True if duplicate exists, False otherwise
+    """
+    existing = (
+        Expense.query.filter_by(user_id=user_id, restaurant_id=restaurant_id, amount=amount, meal_type=meal_type)
+        .filter(db.func.date(Expense.date) == expense_date)
+        .first()
+    )
+
+    return existing is not None
+
+
 def _find_restaurant_by_name(restaurant_name: str, user_id: int) -> Optional[Restaurant]:
     """Find restaurant by name for a user.
 
@@ -593,7 +664,7 @@ def _find_restaurant_by_name(restaurant_name: str, user_id: int) -> Optional[Res
 
 
 def _create_expense_from_data(data: Dict[str, Any], user_id: int) -> Tuple[Optional[Expense], Optional[str]]:
-    """Create an expense from import data.
+    """Create an expense from import data with smart restaurant handling and duplicate detection.
 
     Args:
         data: The expense data dictionary
@@ -613,16 +684,31 @@ def _create_expense_from_data(data: Dict[str, Any], user_id: int) -> Tuple[Optio
         if amount_error:
             return None, amount_error
 
-        # Find category and restaurant
+        # Find category
         category = _find_category_by_name(data.get("category_name", "").strip(), user_id)
-        restaurant = _find_restaurant_by_name(data.get("restaurant_name", "").strip(), user_id)
+
+        # Find or create restaurant with smart logic
+        restaurant_name = data.get("restaurant_name", "").strip()
+        restaurant_address = data.get("restaurant_address", "").strip()
+        restaurant = _find_or_create_restaurant(restaurant_name, restaurant_address, user_id)
+
+        # Extract meal type
+        meal_type = data.get("meal_type", "").strip() or None
+
+        # Check for duplicate expense
+        if _check_expense_duplicate(user_id, restaurant.id if restaurant else None, amount, expense_date, meal_type):
+            restaurant_name_display = restaurant.name if restaurant else "Unknown"
+            return (
+                None,
+                f"Duplicate expense: ${amount} at {restaurant_name_display} on {expense_date} for {meal_type or 'unspecified meal'}",
+            )
 
         # Create expense
         expense = Expense(
             user_id=user_id,
             date=expense_date,
             amount=amount,
-            meal_type=data.get("meal_type", "").strip() or None,
+            meal_type=meal_type,
             notes=data.get("notes", "").strip() or None,
             category_id=category.id if category else None,
             restaurant_id=restaurant.id if restaurant else None,
@@ -634,7 +720,7 @@ def _create_expense_from_data(data: Dict[str, Any], user_id: int) -> Tuple[Optio
         return None, f"Error creating expense: {str(e)}"
 
 
-def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tuple[int, List[str]]:
+def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tuple[int, List[str], List[str]]:
     """Import expenses from parsed data.
 
     Args:
@@ -642,16 +728,20 @@ def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tu
         user_id: The ID of the user importing the expenses
 
     Returns:
-        Tuple of (success_count, errors)
+        Tuple of (success_count, errors, info_messages)
     """
     success_count = 0
     errors = []
+    info_messages = []
 
     for i, row in enumerate(data, 1):
         try:
             expense, error = _create_expense_from_data(row, user_id)
             if error:
-                errors.append(f"Row {i}: {error}")
+                if error.startswith("Duplicate expense:"):
+                    info_messages.append(f"Row {i}: {error}")
+                else:
+                    errors.append(f"Row {i}: {error}")
                 continue
 
             if expense:
@@ -661,37 +751,78 @@ def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tu
         except Exception as e:
             errors.append(f"Row {i}: Unexpected error - {str(e)}")
 
-    # Limit errors reported to avoid overwhelming output
+    # Limit messages reported to avoid overwhelming output
     if len(errors) > 10:
         errors = errors[:10] + [f"... and {len(errors) - 10} more errors"]
+    if len(info_messages) > 10:
+        info_messages = info_messages[:10] + [f"... and {len(info_messages) - 10} more duplicates"]
 
-    return success_count, errors
+    return success_count, errors, info_messages
 
 
-def _generate_import_result(success_count: int, errors: List[str]) -> Tuple[bool, str]:
+def _generate_import_result(
+    success_count: int, errors: List[str], info_messages: List[str]
+) -> Tuple[bool, Dict[str, Any]]:
     """Generate the result of the import operation.
 
     Args:
         success_count: Number of successfully imported expenses
-        errors: List of error messages
+        errors: List of error messages (actual problems)
+        info_messages: List of informational messages (like duplicates)
 
     Returns:
-        Tuple of (success, message)
+        Tuple of (success, result_data)
     """
     if success_count > 0:
         db.session.commit()
 
+    # Calculate skipped count from info messages
+    skipped_count = len(info_messages)
+
+    # Build result data with separate components
+    result_data = {
+        "success_count": success_count,
+        "skipped_count": skipped_count,
+        "error_count": len(errors),
+        "errors": errors,
+        "info_messages": info_messages,
+        "has_warnings": skipped_count > 0,
+        "has_errors": len(errors) > 0,
+    }
+
+    # Build main message
+    parts = []
+    if success_count > 0:
+        parts.append(f"{success_count} expenses imported successfully")
+
+    if info_messages:
+        duplicate_count = len(info_messages)
+        parts.append(f"{duplicate_count} duplicates skipped")
+
     if errors:
-        error_msg = (
-            f"{success_count} expenses imported successfully, but {len(errors)} "
-            f"rows had errors. Errors: {', '.join(errors)}"
-        )
-        return success_count > 0, error_msg
+        parts.append(f"{len(errors)} errors occurred")
 
-    return True, f"{success_count} expenses imported successfully"
+    if parts:
+        result_data["message"] = ". ".join(parts) + "."
+    else:
+        result_data["message"] = "No expenses processed."
+
+    # Add error details if there are actual errors
+    if errors:
+        # Limit error details to avoid overwhelming the user
+        error_limit = 5
+        if len(errors) > error_limit:
+            error_details = errors[:error_limit] + [f"... and {len(errors) - error_limit} more errors"]
+        else:
+            error_details = errors
+        result_data["error_details"] = error_details
+
+    # Determine success - it's successful if there are no actual errors
+    is_success = len(errors) == 0
+    return is_success, result_data
 
 
-def import_expenses_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, str]:
+def import_expenses_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, Dict[str, Any]]:
     """Import expenses from a CSV file.
 
     Args:
@@ -699,24 +830,27 @@ def import_expenses_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, str
         user_id: ID of the user importing the expenses
 
     Returns:
-        A tuple containing (success: bool, message: str)
+        A tuple containing (success: bool, result_data: Dict[str, Any])
     """
     try:
         # Validate file
         if not _validate_import_file(file):
-            return False, "Invalid file type. Please upload a CSV or JSON file."
+            error_msg = "Invalid file type. Please upload a CSV or JSON file."
+            return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
 
         # Parse file
         data = _parse_import_file(file)
         if data is None:
-            return False, "Error parsing file. Please check the file format."
+            error_msg = "Error parsing file. Please check the file format."
+            return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
 
         # Import expenses from the data
-        success_count, errors = _import_expenses_from_reader(data, user_id)
+        success_count, errors, info_messages = _import_expenses_from_reader(data, user_id)
 
-        # Generate the result message
-        return _generate_import_result(success_count, errors)
+        # Generate the result data
+        return _generate_import_result(success_count, errors, info_messages)
 
     except Exception as e:
         db.session.rollback()
-        return False, f"Error processing file: {str(e)}"
+        error_msg = f"Error processing file: {str(e)}"
+        return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}

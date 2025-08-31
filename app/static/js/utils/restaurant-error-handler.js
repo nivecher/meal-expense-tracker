@@ -3,7 +3,7 @@
  * Handles specific error cases like duplicate Google Place ID
  */
 
-import { showErrorToast, showWarningToast, showInfoToast } from './ui-utils.js';
+import { showErrorToast, showWarningToast, showInfoToast } from './notifications.js';
 import { getLogger } from './logger.js';
 
 const logger = getLogger('RestaurantErrorHandler');

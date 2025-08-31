@@ -7,7 +7,7 @@
                     <h4 class="card-title mb-0">Login</h4>
                 </div>
                 <div class="card-body">
-                    <form method="post" novalidate data-ajax data-validate>
+                    <form id="login-form" method="post" novalidate>
                         {{ form.hidden_tag() }}
                         <div class="mb-3">
                             {{ form.username.label(class="form-label") }} {{ form.username(class="form-control",

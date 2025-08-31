@@ -106,8 +106,10 @@ include 'includes/breadcrumb.html' %}
                                 >
                             </h5>
                             {% if restaurant.cuisine %}
-                            <span class="badge bg-light text-dark border mb-2">
-                                <i class="fas fa-utensils me-1 text-muted"></i>{{ restaurant.cuisine }}
+                            <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
+                                <span class="badge bg-light text-dark border mb-2">
+                                    <i class="fas fa-utensils me-1 text-muted"></i>{{ restaurant.cuisine }}
+                                </span>
                             </span>
                             {% endif %}
                         </div>
@@ -433,5 +435,7 @@ include 'includes/breadcrumb.html' %}
         }
     });
 </script>
+<!-- Cuisine badge component for restaurant displays -->
+<script type="module" src="{{ url_for('static', filename='js/components/cuisine-badge.js') }}"></script>
     </body>
 </html>

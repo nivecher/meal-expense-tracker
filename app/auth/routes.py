@@ -71,6 +71,19 @@ def login():
 
     form = LoginForm()
 
+    # Debug logging for form validation issues
+    from flask import current_app
+
+    current_app.logger.info(
+        f"Login attempt - Method: {request.method}, CSRF enabled: {current_app.config.get('WTF_CSRF_ENABLED', True)}"
+    )
+    if request.method == "POST":
+        current_app.logger.info(
+            f"Form data received: username={form.username.data}, remember_me={form.remember_me.data}"
+        )
+        current_app.logger.info(f"Form validation errors: {form.errors}")
+        current_app.logger.info(f"Form validate_on_submit: {form.validate_on_submit()}")
+
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
@@ -123,6 +136,9 @@ def register():
 @login_required
 def change_password():
     form = ChangePasswordForm()
+    # Pre-populate username field for accessibility (hidden from user)
+    if request.method == "GET":
+        form.username.data = current_user.username
     if form.validate_on_submit():
         if current_user.check_password(form.current_password.data):
             services.change_user_password(current_user, form.current_password.data, form.new_password.data)

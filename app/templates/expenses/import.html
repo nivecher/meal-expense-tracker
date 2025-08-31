@@ -34,13 +34,21 @@
                             <li> <code>meal_type</code> - Type of meal (breakfast, lunch, dinner, snack) </li>
                             <li> <code>notes</code> - Additional notes about the expense </li>
                             <li> <code>category_name</code> - Category name (must match existing category) </li>
-                            <li> <code>restaurant_name</code> - Restaurant name (must match existing restaurant) </li>
-                            <li> <code>restaurant_address</code> - Restaurant address (informational only) </li>
+                            <li> <code>restaurant_name</code> - Restaurant name (will auto-create if doesn't exist) </li>
+                            <li> <code>restaurant_address</code> - Restaurant address (helps avoid duplicates) </li>
                         </ul>
-                        <div class="alert alert-warning mt-3">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>Note:</strong> If you reference a category or restaurant that doesn't exist in your
-                            account, the import will skip those references but still create the expense.
+                        <div class="alert alert-success mt-3">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>Smart Import Features:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Restaurants will be automatically created if they don't exist</li>
+                                <li>Duplicate expenses are automatically detected and skipped</li>
+                                <li>Duplicate restaurants are avoided using name + address matching</li>
+                            </ul>
+                        </div>
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Duplicate Detection:</strong> Expenses are considered duplicates if they have the same restaurant, amount, date, and meal type.
                         </div>
                         <div class="alert alert-info mt-3">
                             <i class="fas fa-download me-2"></i>

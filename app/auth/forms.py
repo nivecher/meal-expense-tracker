@@ -31,6 +31,7 @@ class RegistrationForm(FlaskForm):
 
 
 class ChangePasswordForm(FlaskForm):
+    username = StringField("Username")  # Hidden field for accessibility
     current_password = PasswordField("Current Password", validators=[DataRequired()])
     new_password = PasswordField("New Password", validators=[DataRequired()])
     confirm_new_password = PasswordField("Confirm New Password", validators=[DataRequired(), EqualTo("new_password")])

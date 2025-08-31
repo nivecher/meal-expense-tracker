@@ -60,7 +60,9 @@ function should_process_query(query) {
   }
 
   if (autocomplete_disabled) {
-    show_error_message('Restaurant search disabled due to technical issues.');
+    if (window.showErrorToast) {
+      window.showErrorToast('Restaurant search disabled due to technical issues.');
+    }
     return false;
   }
 
@@ -123,9 +125,13 @@ function should_disable_autocomplete(error, request_id) {
 
 function show_user_friendly_error(error) {
   if (error.message.includes('InvalidValueError')) {
-    show_error_message('Restaurant search temporarily unavailable due to technical issue.');
+    if (window.showErrorToast) {
+      window.showErrorToast('Restaurant search temporarily unavailable due to technical issue.');
+    }
   } else {
-    show_error_message('Unable to search restaurants. Please check your connection and try again.');
+    if (window.showErrorToast) {
+      window.showErrorToast('Unable to search restaurants. Please check your connection and try again.');
+    }
   }
 }
 
@@ -221,7 +227,9 @@ async function select_restaurant(place_id) {
 
   } catch (error) {
     console.error('Error fetching place details:', error);
-    show_error_message('Failed to load restaurant details.');
+    if (window.showErrorToast) {
+      window.showErrorToast('Failed to load restaurant details.');
+    }
   }
 }
 
@@ -362,6 +370,7 @@ function show_success_feedback(message) {
 }
 
 function show_error_message(message) {
+  // Show in UI suggestions area
   suggestions_container.innerHTML = `
     <div class="alert alert-warning mt-2 mb-0">
       <i class="fas fa-info-circle me-2"></i>
@@ -372,6 +381,11 @@ function show_error_message(message) {
     </div>
   `;
   suggestions_container.style.display = 'block';
+
+  // Also show as toast for better visibility
+  if (window.showWarningToast) {
+    window.showWarningToast(message);
+  }
 }
 
 function disable_autocomplete_for_session() {

@@ -259,7 +259,14 @@ def export_restaurants():
 
 
 def _validate_import_file(file):
-    """Validate the uploaded file for restaurant import."""
+    """Validate the uploaded file for restaurant import.
+
+    Args:
+        file: Uploaded file object
+
+    Returns:
+        bool: True if file is valid, False otherwise
+    """
     if not file or file.filename == "":
         flash("No file selected", "error")
         return False
@@ -299,6 +306,65 @@ def _parse_import_file(file):
         return None
 
 
+def _process_import_file(file, user_id):
+    """Process the uploaded file and return import results.
+
+    Args:
+        file: Uploaded file object
+        user_id: Current user ID
+
+    Returns:
+        tuple: (success, result_data) indicating outcome
+    """
+    current_app.logger.info("Validating file...")
+    if not _validate_import_file(file):
+        current_app.logger.warning("File validation failed")
+        return False, {"message": "File validation failed"}
+
+    current_app.logger.info("File validation passed")
+
+    # Process and save restaurants
+    current_app.logger.info("Processing restaurants...")
+    success, result_data = services.import_restaurants_from_csv(file, user_id)
+    current_app.logger.info(f"Import result: success={success}, data={result_data}")
+
+    return success, result_data
+
+
+def _handle_import_success(result_data):
+    """Handle successful import results and show appropriate messages.
+
+    Args:
+        result_data: Dictionary containing import results
+
+    Returns:
+        Flask redirect response
+    """
+    # Show success message for imported restaurants
+    if result_data.get("success_count", 0) > 0:
+        flash(f"Successfully imported {result_data['success_count']} restaurants.", "success")
+
+    # Show warning toast for skipped duplicates
+    if result_data.get("has_warnings", False):
+        flash(f"{result_data['skipped_count']} duplicate restaurants were skipped.", "warning")
+
+    return redirect(url_for("restaurants.list_restaurants"))
+
+
+def _handle_import_error(result_data):
+    """Handle import errors and log details.
+
+    Args:
+        result_data: Dictionary containing error information
+    """
+    error_message = result_data.get("message", "Import failed")
+    flash(error_message, "danger")
+
+    # Log detailed errors for debugging
+    if result_data.get("error_details"):
+        current_app.logger.error(f"Import errors: {result_data['error_details']}")
+
+
 @bp.route("/import", methods=["GET", "POST"])
 @login_required
 def import_restaurants():
@@ -313,42 +379,22 @@ def import_restaurants():
 
         if file and file.filename:
             try:
-                # Validate file
-                current_app.logger.info("Validating file...")
-                if not _validate_import_file(file):
-                    current_app.logger.warning("File validation failed")
-                    return render_template("restaurants/import.html", form=form)
-
-                current_app.logger.info("File validation passed")
-
-                # Process and save restaurants
-                current_app.logger.info("Processing restaurants...")
-                success, message = services.import_restaurants_from_csv(file, current_user.id)
-                current_app.logger.info(f"Import result: success={success}, message={message}")
+                success, result_data = _process_import_file(file, current_user.id)
 
                 if success:
-                    # Extract the number of imported restaurants from the message
-                    added = message.count("imported")
-                    # This is a simple approximation, adjust as needed
-                    skipped = message.count("skipped")
-
-                    flash(
-                        f"Successfully imported {added} restaurants. {skipped} duplicates skipped.",
-                        "success",
-                    )
-                    return redirect(url_for("restaurants.list_restaurants"))
+                    return _handle_import_success(result_data)
                 else:
-                    flash(f"Import failed: {message}", "error")
+                    _handle_import_error(result_data)
 
             except ValueError as e:
                 current_app.logger.error("ValueError during import: %s", str(e))
-                flash(str(e), "error")
+                flash(str(e), "danger")
             except Exception as e:
                 current_app.logger.error("Error importing restaurants: %s", str(e), exc_info=True)
-                flash("An error occurred while importing restaurants.", "error")
+                flash("An error occurred while importing restaurants.", "danger")
         else:
             current_app.logger.warning("No file selected for import")
-            flash("No file selected", "error")
+            flash("No file selected", "danger")
 
     return render_template("restaurants/import.html", form=form)
 

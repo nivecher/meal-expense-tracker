@@ -1,56 +1,138 @@
-/* Toast notifications */
+/* Enhanced Toast Notifications - Responsive & Accessible */
+
+/* Base toast container styles */
 .toast-container {
     z-index: 1090;
     position: fixed;
-    top: 1rem;
-    right: 1rem;
-    max-width: 350px;
+    max-width: 400px;
+    pointer-events: none; /* Allow clicks through container */
 }
 
+/* Individual toast pointer events */
+.toast-container .toast {
+    pointer-events: auto;
+}
+
+/* Desktop positioning - top right */
+@media (min-width: 1025px) {
+    .toast-container {
+        top: 1rem;
+        right: 1rem;
+        max-width: 400px;
+    }
+}
+
+/* Tablet positioning - bottom right */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .toast-container {
+        bottom: 1rem;
+        right: 1rem;
+        max-width: 350px;
+    }
+}
+
+/* Mobile positioning - full width bottom */
+@media (max-width: 768px) {
+    .toast-container {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-width: 100%;
+        padding: 0.5rem;
+    }
+
+    .toast-container .toast {
+        margin-bottom: 0.5rem;
+        width: 100%;
+    }
+}
+
+/* Enhanced toast styles */
 .toast {
     border: none;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    margin-bottom: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-bottom: 0.75rem;
     overflow: hidden;
-    opacity: 0.95;
+    opacity: 0.98;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease-in-out;
+    max-width: 100%;
+    word-wrap: break-word;
 }
 
+.toast:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Toast header improvements */
 .toast-header {
     border: none;
-    font-weight: 500;
-    padding: 0.5rem 1rem;
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    align-items: center;
 }
 
 .toast-header .btn-close {
-    margin-left: 0.5rem;
-    opacity: 0.8;
+    margin-left: auto;
+    opacity: 0.9;
+    filter: brightness(0) invert(1); /* White close button */
+    transition: opacity 0.2s ease;
 }
 
+.toast-header .btn-close:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* Toast body improvements */
 .toast-body {
     padding: 1rem;
+    line-height: 1.5;
+    font-size: 0.95rem;
 }
 
-/* Toast variants */
+/* Icons in toast body */
+.toast-body i {
+    vertical-align: middle;
+}
+
+/* Toast variants with better colors */
+.toast.bg-success,
 .toast.bg-success .toast-header {
-    background-color: var(--secondary-color);
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
     color: white;
 }
 
 .toast.bg-error,
-.toast.bg-danger {
-    background-color: var(--danger-color);
+.toast.bg-danger,
+.toast.bg-error .toast-header,
+.toast.bg-danger .toast-header {
+    background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);
+    color: white;
 }
 
-.toast.bg-warning {
-    background-color: var(--warning-color);
+.toast.bg-warning,
+.toast.bg-warning .toast-header {
+    background: linear-gradient(135deg, #ffc107 0%, #f39c12 100%);
+    color: #212529;
 }
 
-.toast.bg-info {
-    background-color: var(--primary-color);
+.toast.bg-warning .btn-close {
+    filter: brightness(0); /* Dark close button for warning */
 }
 
-/* Animation */
+.toast.bg-info,
+.toast.bg-info .toast-header {
+    background: linear-gradient(135deg, #17a2b8 0%, #3498db 100%);
+    color: white;
+}
+
+/* Enhanced animations */
 @keyframes slideInRight {
     from {
         transform: translateX(100%);
@@ -73,10 +155,111 @@
     }
 }
 
-.toast.show {
-    animation: slideInRight 0.3s forwards;
+@keyframes slideInUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
-.toast.hide {
-    animation: slideOutRight 0.3s forwards;
+@keyframes slideOutDown {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+}
+
+/* Desktop animations */
+@media (min-width: 769px) {
+    .toast.show {
+        animation: slideInRight 0.4s ease-out forwards;
+    }
+
+    .toast.hide {
+        animation: slideOutRight 0.3s ease-in forwards;
+    }
+}
+
+/* Mobile animations */
+@media (max-width: 768px) {
+    .toast.show {
+        animation: slideInUp 0.4s ease-out forwards;
+    }
+
+    .toast.hide {
+        animation: slideOutDown 0.3s ease-in forwards;
+    }
+}
+
+/* Loading overlay improvements */
+.loading-overlay {
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+
+.loading-overlay > div {
+    animation: fadeInScale 0.3s ease-out;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Accessibility improvements */
+.toast:focus-within {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .toast {
+        border: 2px solid currentColor;
+    }
+
+    .toast-header {
+        border-bottom: 1px solid currentColor;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .toast,
+    .toast.show,
+    .toast.hide,
+    .loading-overlay > div {
+        animation: none;
+        transition: none;
+    }
+
+    .toast:hover {
+        transform: none;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .toast {
+        box-shadow: 0 8px 32px rgba(255, 255, 255, 0.1), 0 2px 8px rgba(255, 255, 255, 0.05);
+    }
+
+    .loading-overlay > div {
+        background-color: #2d3748 !important;
+        color: white;
+    }
 }

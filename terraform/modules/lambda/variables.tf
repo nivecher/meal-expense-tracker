@@ -242,6 +242,12 @@ variable "session_table_name" {
   default     = "flask_sessions"
 }
 
+variable "api_gateway_domain_name" {
+  description = "The Domain name of the API Gateway that will invoke this Lambda"
+  type        = string
+  default     = ""
+}
+
 # API Gateway Integration
 variable "api_gateway_execution_arn" {
   description = "The ARN of the API Gateway that will invoke this Lambda"

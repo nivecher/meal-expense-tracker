@@ -4,7 +4,7 @@
  */
 
 import { logger } from '../utils/core-utils.js';
-import { showSuccessToast, showErrorToast, showLoadingOverlay } from '../utils/ui-utils.js';
+import { showSuccessToast, showErrorToast, showLoadingOverlay } from '../utils/notifications.js';
 import { post } from '../utils/api-utils.js';
 import { googleMapsManager, googleMapsService, googlePlacesService } from '../utils/google-maps.js';
 

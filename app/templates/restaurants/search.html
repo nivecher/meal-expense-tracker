@@ -96,7 +96,15 @@
                                             >{{ restaurant.name }}</a
                                         >
                                     </td>
-                                    <td>{{ restaurant.cuisine or 'N/A' }}</td>
+                                    <td>
+                                        {% if restaurant.cuisine %}
+                                        <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
+                                            <span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>
+                                        </span>
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if restaurant.city %} {{ restaurant.city }} {% if restaurant.state %}, {{
                                         restaurant.state }}{% endif %} {% else %} N/A {% endif %}
@@ -157,4 +165,6 @@
 </script>
 <script src="{{ url_for('static', filename='js/components/search-form.js' ) }}" defer></script>
 <script src="{{ url_for('static', filename='js/components/search.js' ) }}" defer></script>
+<!-- Cuisine badge component for restaurant displays -->
+<script type="module" src="{{ url_for('static', filename='js/components/cuisine-badge.js') }}"></script>
 {% endblock scripts %}

@@ -236,6 +236,185 @@ def handle_database_operation(operation: str, **kwargs: Any) -> ApiGatewayRespon
         }
 
 
+def _get_allowed_domains(headers: Dict[str, str]) -> list[str]:
+    """Get allowed domains for referrer validation."""
+    allowed_domains = os.getenv("ALLOWED_REFERRER_DOMAINS", "").split(",")
+    if not allowed_domains or allowed_domains == [""]:
+        host = headers.get("Host") or headers.get("host", "")
+        if host:
+            allowed_domains = [f"https://{host}"]
+            if "execute-api" in host or "lambda-url" in host or "amazonaws.com" in host:
+                allowed_domains.extend([f"https://{host}", f"http://{host}"])
+        else:
+            allowed_domains = ["http://localhost:5000", "https://localhost:5000"]
+    return allowed_domains
+
+
+def _should_skip_referrer_validation(event: Dict[str, Any]) -> bool:
+    """Check if referrer validation should be skipped."""
+    http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method", "")
+
+    # Skip for OPTIONS, GET requests
+    if http_method in ["OPTIONS", "GET"]:
+        return True
+
+    # Skip for admin/database operations
+    if "admin_operation" in event or "operation" in event:
+        return True
+
+    return False
+
+
+def _is_referrer_allowed(referer: str, allowed_domains: list[str]) -> bool:
+    """Check if referrer is allowed."""
+    if not referer:
+        return True  # Allow requests without referrer
+
+    # Check against allowed domains
+    for domain in allowed_domains:
+        if referer.startswith(domain.strip()):
+            return True
+
+    # Additional check for AWS domains
+    if "amazonaws.com" in referer:
+        return True
+
+    return False
+
+
+def _validate_referrer(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Validate the referrer header for security."""
+    if _should_skip_referrer_validation(event):
+        return None
+
+    headers = event.get("headers", {})
+    referer = headers.get("Referer") or headers.get("referer", "")
+    allowed_domains = _get_allowed_domains(headers)
+
+    if _is_referrer_allowed(referer, allowed_domains):
+        if referer:
+            logging.info(f"Referrer validation passed: {referer}")
+        return None
+
+    # Log but don't block for now
+    logging.warning(f"Invalid referrer: {referer}. Allowed domains: {allowed_domains}")
+    return None  # Don't block during development
+
+
+def _enhance_security_headers(headers: Dict[str, str]) -> None:
+    """Ensure security headers are properly set for Lambda environment."""
+    # Essential security headers
+    if "X-Content-Type-Options" not in headers:
+        headers["X-Content-Type-Options"] = "nosniff"
+
+    # Remove deprecated headers
+    headers.pop("Pragma", None)
+    headers.pop("X-Frame-Options", None)
+
+    # Ensure CSP header for HTML responses
+    content_type = headers.get("Content-Type", "")
+    if "html" in content_type and "Content-Security-Policy" not in headers:
+        headers["Content-Security-Policy"] = (
+            "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline' "
+            "https://cdn.jsdelivr.net https://code.jquery.com https://maps.googleapis.com "
+            "https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net "
+            "https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' "
+            "https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+            "img-src 'self' data: https: blob:; connect-src 'self' https://maps.googleapis.com "
+            "https://places.googleapis.com; object-src 'none'; base-uri 'self';"
+        )
+
+
+def _fix_cache_control_headers(headers: Dict[str, str]) -> None:
+    """Fix cache-control header conflicts and ensure proper caching."""
+    cache_control = headers.get("Cache-Control", "")
+    content_type = headers.get("Content-Type", "")
+
+    # Remove conflicting directives
+    if "no-cache" in cache_control and "max-age" in cache_control:
+        if "html" in content_type:
+            headers["Cache-Control"] = "no-cache"
+        elif any(ext in content_type for ext in ["css", "javascript", "image", "font/"]):
+            headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            headers["Cache-Control"] = "public, max-age=3600"
+
+    # Set proper cache control if missing
+    if not cache_control:
+        if "html" in content_type:
+            headers["Cache-Control"] = "no-cache"
+        elif any(ext in content_type for ext in ["css", "javascript", "image", "font/"]):
+            headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            headers["Cache-Control"] = "public, max-age=3600"
+
+
+def _handle_database_operation(event: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle database operations with enhanced headers."""
+    operation = str(event["operation"])
+    db_response = handle_database_operation(operation, **event)
+    db_headers = db_response.get("headers", {})
+    _enhance_security_headers(db_headers)
+    _fix_cache_control_headers(db_headers)
+    return {
+        "statusCode": db_response["statusCode"],
+        "body": db_response["body"],
+        "headers": db_headers,
+        "isBase64Encoded": db_response["isBase64Encoded"],
+    }
+
+
+def _handle_admin_operation(event: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle admin operations with enhanced headers."""
+    from app.admin.lambda_admin import handle_admin_request
+
+    app = get_or_create_app()
+    admin_response = handle_admin_request(app, event)
+    if isinstance(admin_response, dict) and "headers" in admin_response:
+        _enhance_security_headers(admin_response["headers"])
+        _fix_cache_control_headers(admin_response["headers"])
+    return admin_response
+
+
+def _handle_cors_preflight() -> Dict[str, Any]:
+    """Handle CORS preflight OPTIONS requests."""
+    return {
+        "statusCode": 200,
+        "headers": {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-CSRFToken, X-Requested-With",
+            "Access-Control-Allow-Credentials": "false",
+            "Access-Control-Max-Age": "86400",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "public, max-age=86400",
+        },
+        "body": "",
+        "isBase64Encoded": False,
+    }
+
+
+def _process_awsgi_response(response: Dict[str, Any]) -> Dict[str, str]:
+    """Process and enhance AWSGI response headers."""
+    headers = response.get("headers", {})
+    if not isinstance(headers, dict):
+        headers = {}
+
+    headers = {str(k): str(v) for k, v in headers.items()}
+    headers.update(
+        {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-CSRFToken, X-Requested-With",
+            "Access-Control-Allow-Credentials": "false",
+        }
+    )
+
+    _enhance_security_headers(headers)
+    _fix_cache_control_headers(headers)
+    return headers
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handle Lambda events from API Gateway v1.0 (REST API) or v2.0 (HTTP API).
 
@@ -250,20 +429,25 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     # Handle direct invocation for database operations
     if "operation" in event:
-        operation = str(event["operation"])
-        db_response = handle_database_operation(operation, **event)
-        # Convert ApiGatewayResponse to Dict[str, Any] for return
-        return {
-            "statusCode": db_response["statusCode"],
-            "body": db_response["body"],
-            "headers": db_response["headers"],
-            "isBase64Encoded": db_response["isBase64Encoded"],
-        }
+        return _handle_database_operation(event)
+
+    # Handle admin operations
+    if "admin_operation" in event:
+        return _handle_admin_operation(event)
+
+    # Validate referrer for security (before processing HTTP requests)
+    referrer_error = _validate_referrer(event)
+    if referrer_error:
+        return referrer_error
 
     # Handle HTTP API events (both v1.0 and v2.0 formats)
     app = get_or_create_app()
 
     try:
+        # Handle CORS preflight requests for OPTIONS method
+        http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
+        if http_method == "OPTIONS":
+            return _handle_cors_preflight()
         # Convert API Gateway v2.0 format to v1.0 format if needed
         # v2.0 uses 'requestContext.http.method' while v1.0 uses 'httpMethod'
         if "httpMethod" not in event and "requestContext" in event:
@@ -278,38 +462,27 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             app, event, context, base64_content_types={"image/png", "image/jpg", "application/octet-stream"}
         )
 
-        # Ensure CORS headers are set
-        headers = response.get("headers", {})
-        if not isinstance(headers, dict):
-            headers = {}
+        # Process and enhance response headers
+        headers = _process_awsgi_response(response)
 
-        # Ensure all header keys are strings
-        headers = {str(k): str(v) for k, v in headers.items()}
-
-        # Add CORS headers
-        headers.update(
-            {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            }
-        )
-
-        # Ensure response has all required fields
-        api_response: Dict[str, Any] = {
+        return {
             "statusCode": response.get("statusCode", 500),
             "body": response.get("body", ""),
             "headers": headers,
             "isBase64Encoded": response.get("isBase64Encoded", False),
         }
 
-        return api_response
-
     except Exception as e:
         logger.exception("Error handling request: %s", str(e))
+        error_headers = {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-cache",
+        }
         return {
             "statusCode": 500,
             "body": json.dumps({"error": "Internal server error"}),
-            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+            "headers": error_headers,
             "isBase64Encoded": False,
         }

@@ -30,8 +30,10 @@
                                 <div class="d-flex align-items-center flex-wrap gap-2">
                                     {% if restaurant.type %}<span class="badge bg-light text-dark border">{{ restaurant.type|title }}</span>{% endif %}
                                     {% if restaurant.cuisine %}
-                                        <span class="badge bg-primary text-white">
-                                            <i class="fas fa-globe-americas me-1"></i>{{ restaurant.cuisine }}
+                                        <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
+                                            <span class="badge bg-primary text-white">
+                                                <i class="fas fa-globe-americas me-1"></i>{{ restaurant.cuisine }}
+                                            </span>
                                         </span>
                                     {% endif %}
                                     {% if restaurant.rating %}
@@ -110,7 +112,9 @@
                                                     <div class="list-group-item px-0 py-2 border-0">
                                                         <div class="d-flex justify-content-between align-items-center">
                                                             <span class="text-muted">Cuisine</span>
-                                                            <span class="fw-medium">{{ restaurant.cuisine }}</span>
+                                                            <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
+                                                                <span class="fw-medium">{{ restaurant.cuisine }}</span>
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 {% endif %}
@@ -738,6 +742,8 @@
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
+    <!-- Cuisine badge component for restaurant displays -->
+    <script type="module" src="{{ url_for('static', filename='js/components/cuisine-badge.js') }}"></script>
     <script type="module"
             src="{{ url_for('static', filename='js/pages/restaurant-detail.js') }}"></script>
     <script>

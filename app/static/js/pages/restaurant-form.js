@@ -81,6 +81,9 @@ function init() {
   // Check for URL parameters and pre-fill form if coming from search
   handleUrlParameters();
 
+  // Check for Google Places data from conflict resolution
+  handleGooglePlacesDataFromConflict();
+
   isInitialized = true;
 }
 
@@ -681,6 +684,144 @@ function showAlert(type, message) {
   } else {
     elements.form.prepend(alert);
   }
+}
+
+// Handle Google Places data from conflict resolution (stored in session storage)
+function handleGooglePlacesDataFromConflict() {
+  try {
+    const storedData = sessionStorage.getItem('restaurantEditGooglePlacesData');
+    if (!storedData) return;
+
+    const parsedData = JSON.parse(storedData);
+
+    // Safety: Validate data structure and expiry (5 minutes)
+    if (!parsedData.googlePlacesData || !parsedData.timestamp) {
+      sessionStorage.removeItem('restaurantEditGooglePlacesData');
+      return;
+    }
+
+    // Check if data is expired (5 minutes)
+    const dataAge = Date.now() - parsedData.timestamp;
+    if (dataAge > 5 * 60 * 1000) {
+      sessionStorage.removeItem('restaurantEditGooglePlacesData');
+      console.log('Google Places data expired, removed from session storage');
+      return;
+    }
+
+    // Check if this is the correct restaurant
+    const currentUrl = window.location.pathname;
+    const restaurantIdMatch = currentUrl.match(/\/restaurants\/(\d+)\/edit/);
+
+    if (!restaurantIdMatch || parseInt(restaurantIdMatch[1]) !== parsedData.restaurantId) {
+      console.log('Restaurant ID mismatch, ignoring stored Google Places data');
+      return;
+    }
+
+    console.log('Found Google Places data from conflict resolution:', parsedData.googlePlacesData);
+
+    // Populate form with Google Places data
+    populateFormWithGooglePlacesData(parsedData.googlePlacesData);
+
+    // Clear the session storage data after use
+    sessionStorage.removeItem('restaurantEditGooglePlacesData');
+
+  } catch (error) {
+    console.error('Error handling Google Places data from conflict:', error);
+    sessionStorage.removeItem('restaurantEditGooglePlacesData');
+  }
+}
+
+/**
+ * Populate form fields with Google Places data
+ * @param {Object} googlePlacesData - Google Places data from conflict resolution
+ */
+function populateFormWithGooglePlacesData(googlePlacesData) {
+  try {
+    // Extract address components from Google Places data
+    const addressComponents = extractAddressComponents(googlePlacesData.address_components || googlePlacesData.addressComponents || []);
+
+    // Build form field data
+    const formFields = {
+      name: googlePlacesData.name || googlePlacesData.displayName?.text || '',
+      google_place_id: googlePlacesData.placeId || googlePlacesData.place_id || googlePlacesData.id || '',
+      phone: googlePlacesData.formatted_phone_number || googlePlacesData.nationalPhoneNumber || '',
+      website: googlePlacesData.website || googlePlacesData.websiteURI || '',
+      address: addressComponents.street || googlePlacesData.formatted_address || '',
+      city: addressComponents.city || '',
+      state: addressComponents.state || '',
+      postal_code: addressComponents.postalCode || '',
+      country: addressComponents.country || ''
+    };
+
+    console.log('Populating form with Google Places data:', formFields);
+
+    // Populate form fields
+    Object.entries(formFields).forEach(([fieldId, value]) => {
+      if (value) {
+        const element = document.getElementById(fieldId);
+        if (element) {
+          element.value = value;
+          // Trigger change event for any listeners
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          console.log(`Populated ${fieldId} with: ${value}`);
+        }
+      }
+    });
+
+    // Show success message
+    showSuccess('Form updated with Google Places data. Google Place ID and associated fields have been populated. Please review and save the changes.');
+
+  } catch (error) {
+    console.error('Error populating form with Google Places data:', error);
+    showError('Error updating form with Google Places data. Please fill fields manually.');
+  }
+}
+
+/**
+ * Extract address components from Google Places address components array
+ * @param {Array} addressComponentsArray - Array of address components from Google Places
+ * @returns {Object} Extracted address components
+ */
+function extractAddressComponents(addressComponentsArray) {
+  const addressComponents = {
+    street: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: ''
+  };
+
+  if (!Array.isArray(addressComponentsArray)) {
+    return addressComponents;
+  }
+
+  let streetNumber = '';
+  let route = '';
+
+  addressComponentsArray.forEach((component) => {
+    const types = component.types || [];
+    const longText = component.long_name || component.longText || '';
+    const shortText = component.short_name || component.shortText || '';
+
+    if (types.includes('street_number')) {
+      streetNumber = longText;
+    } else if (types.includes('route')) {
+      route = longText;
+    } else if (types.includes('locality') || types.includes('sublocality_level_1')) {
+      addressComponents.city = longText;
+    } else if (types.includes('administrative_area_level_1')) {
+      addressComponents.state = shortText || longText;
+    } else if (types.includes('postal_code') || types.includes('postal_code_prefix')) {
+      addressComponents.postalCode = longText;
+    } else if (types.includes('country')) {
+      addressComponents.country = longText;
+    }
+  });
+
+  // Build street address from components
+  addressComponents.street = [streetNumber, route].filter(Boolean).join(' ');
+
+  return addressComponents;
 }
 
 // Handle URL parameters when redirected from search results

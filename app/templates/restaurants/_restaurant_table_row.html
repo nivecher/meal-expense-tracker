@@ -1,7 +1,11 @@
 <tr>
     <td>
         <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">{{ restaurant.name }}</a>
-        {% if restaurant.cuisine %}<span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>{% endif %}
+        {% if restaurant.cuisine %}
+        <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
+            <span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>
+        </span>
+        {% endif %}
     </td>
     <td>{{ restaurant.city or '' }}</td>
     <td>{{ restaurant.visit_count }}</td>

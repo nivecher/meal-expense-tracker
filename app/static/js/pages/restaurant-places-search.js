@@ -10,7 +10,7 @@ import { googlePlacesService } from '../services/google-places.js';
 import { GoogleMapsLoader } from '../utils/google-maps.js';
 import { initializeModalAccessibility } from '../utils/modal-accessibility.js';
 import { getCSRFToken } from '../utils/csrf-token.js';
-import { show_success_message, show_error_message } from '../utils/ui-feedback.js';
+import { showSuccessToast, showErrorToast } from '../utils/notifications.js';
 import { mapPlaceTypesToRestaurant } from '../utils/cuisine-formatter.js';
 
 // Initialize the page when the DOM is fully loaded
@@ -236,8 +236,17 @@ document.addEventListener('DOMContentLoaded', async() => {
  * @param {Object} restaurant - Selected restaurant data from Google Places
  */
 async function handleAddRestaurantClick(restaurant) {
+  // Safety: Validate restaurant data
+  if (!restaurant || typeof restaurant !== 'object') {
+    console.error('Invalid restaurant data provided to handleAddRestaurantClick');
+    showErrorToast('Invalid restaurant data. Please try selecting a different restaurant.');
+    return;
+  }
+
   try {
     const google_place_id = extract_place_id(restaurant);
+
+    // Check for existing restaurant before attempting to add
     const duplicate_check = await check_for_existing_restaurant(google_place_id);
 
     if (duplicate_check.exists) {
@@ -248,7 +257,21 @@ async function handleAddRestaurantClick(restaurant) {
     await process_new_restaurant_addition(restaurant, google_place_id);
   } catch (error) {
     console.error('Error handling add restaurant click:', error);
-    handleSearchError(`Error adding restaurant: ${error.message}`);
+
+    // Enhanced error handling - check if it's a conflict that wasn't caught by pre-check
+    if (error.message && error.message.includes('already exists')) {
+      showErrorToast('This restaurant already exists in your list. Please check your existing restaurants.');
+    } else if (error.message && error.message.includes('Restaurant conflict handled')) {
+      // Error was already handled by showConflictDialog, no need to show additional error
+      return;
+    } else {
+      // Generic error handling
+      const userFriendlyMessage = error.message.includes('HTTP error')
+        ? 'Unable to connect to server. Please check your connection and try again.'
+        : `Error adding restaurant: ${error.message}`;
+
+      handleSearchError(userFriendlyMessage);
+    }
   }
 }
 
@@ -313,62 +336,21 @@ function build_restaurant_submission_data(restaurant, address_components, google
  * @param {Object} restaurant - Original restaurant data from Google Places
  */
 function showExistingRestaurantModal(existsData, restaurant) {
-  const modalHtml = `
-    <div class="modal fade" id="existingRestaurantModal" tabindex="-1">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="fas fa-exclamation-triangle text-warning me-2"></i>
-              Restaurant Already Exists
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <p>The restaurant "<strong>${existsData.restaurant_name}</strong>" already exists in your collection.</p>
-            <p>What would you like to do?</p>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <a href="/restaurants/${existsData.restaurant_id}" class="btn btn-primary">
-              <i class="fas fa-eye me-1"></i>View Restaurant
-            </a>
-            <a href="/restaurants/${existsData.restaurant_id}/edit" class="btn btn-outline-primary">
-              <i class="fas fa-edit me-1"></i>Update Restaurant
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Remove any existing modal
-  const existingModal = document.getElementById('existingRestaurantModal');
-  if (existingModal) {
-    existingModal.remove();
-  }
-
-  // Add modal to body
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-  // Show modal
-  const modalElement = document.getElementById('existingRestaurantModal');
-  const modal = new bootstrap.Modal(modalElement);
-
-  // Add proper focus management
-  modalElement.addEventListener('shown.bs.modal', () => {
-    const viewBtn = modalElement.querySelector('.btn-primary');
-    if (viewBtn) {
-      viewBtn.focus();
+  // Convert legacy existsData to new conflict dialog format for consistency
+  const errorData = {
+    error: {
+      code: 'DUPLICATE_GOOGLE_PLACE_ID',
+      existing_restaurant: {
+        id: existsData.restaurant_id,
+        name: existsData.restaurant_name,
+        full_name: existsData.restaurant_name,
+        city: existsData.restaurant_city || null
+      }
     }
-  });
+  };
 
-  modal.show();
-
-  // Clean up modal after hiding
-  modalElement.addEventListener('hidden.bs.modal', () => {
-    modalElement.remove();
-  });
+  // Use the enhanced conflict dialog
+  showConflictDialog(errorData, restaurant);
 }
 
 /**
@@ -388,7 +370,18 @@ async function handleRestaurantSelect(restaurant) {
 
     const duplicate_check = await check_for_duplicate_restaurant(restaurant_data);
     if (duplicate_check.exists) {
-      show_duplicate_restaurant_warning(duplicate_check);
+      // Use the new conflict dialog for consistency
+      const errorData = {
+        error: {
+          code: 'DUPLICATE_RESTAURANT',
+          existing_restaurant: {
+            id: duplicate_check.restaurant_id,
+            name: duplicate_check.restaurant_name,
+            full_name: duplicate_check.restaurant_name
+          }
+        }
+      };
+      showConflictDialog(errorData, restaurant_data);
       return;
     }
 
@@ -396,7 +389,7 @@ async function handleRestaurantSelect(restaurant) {
 
   } catch (error) {
     console.error('Error handling restaurant selection:', error);
-    show_error_message('Failed to add restaurant. Please try again.');
+    showErrorToast('Failed to add restaurant. Please try again.');
   }
 }
 
@@ -651,7 +644,19 @@ async function submit_restaurant_data(restaurant_data) {
     credentials: 'same-origin',
   });
 
+  // Handle non-200 responses with proper error handling
   if (!response.ok) {
+    if (response.status === 409) {
+      // Handle conflict (duplicate restaurant) with enhanced dialog
+      try {
+        const errorData = await response.json();
+        showConflictDialog(errorData, restaurant_data);
+        return; // Don't throw, let dialog handle the interaction
+      } catch (parseError) {
+        console.error('Failed to parse conflict response:', parseError);
+        throw new Error('Restaurant already exists. Please check your existing restaurants.');
+      }
+    }
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 
@@ -659,7 +664,7 @@ async function submit_restaurant_data(restaurant_data) {
 
   if (result.success) {
     // Show success toast with message from server
-    show_success_message(result.message || 'Restaurant added successfully!');
+    showSuccessToast(result.message || 'Restaurant added successfully!');
 
     // Delay redirect slightly to allow toast to show
     setTimeout(() => {
@@ -674,7 +679,196 @@ async function submit_restaurant_data(restaurant_data) {
   }
 }
 
-// UI feedback functions are imported from utils/ui-feedback.js
+/**
+ * Show conflict dialog when restaurant already exists
+ * @param {Object} errorData - Error response data with conflict details
+ * @param {Object} originalData - Original restaurant data being submitted
+ */
+function showConflictDialog(errorData, originalData) {
+  // Safety: Validate inputs
+  if (!errorData || !errorData.error) {
+    console.error('Invalid error data provided to showConflictDialog');
+    showErrorToast('Restaurant conflict detected, but details are unavailable.');
+    return;
+  }
+
+  const { error } = errorData;
+  const existingRestaurant = error.existing_restaurant;
+
+  // Safety: Ensure existing restaurant data is available
+  if (!existingRestaurant) {
+    console.error('Missing existing restaurant data in conflict response');
+    showErrorToast('Restaurant already exists. Please check your restaurant list.');
+    return;
+  }
+
+  const modalId = 'restaurantConflictModal';
+  const isGooglePlaceConflict = error.code === 'DUPLICATE_GOOGLE_PLACE_ID';
+
+  // Build warning message based on conflict type
+  const conflictMessage = isGooglePlaceConflict
+    ? `The restaurant "${existingRestaurant.name}" from this Google Places location already exists in your list.`
+    : `A restaurant named "${existingRestaurant.name}" already exists in your list.`;
+
+  const modalHtml = `
+    <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-warning text-dark">
+            <h5 class="modal-title" id="${modalId}Label">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Restaurant Already Exists
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning d-flex align-items-start" role="alert">
+              <div class="flex-grow-1">
+                <strong>Conflict Detected</strong><br>
+                ${conflictMessage}
+                ${isGooglePlaceConflict ? '<br><small class="text-muted">This location is already tracked in your restaurants.</small>' : ''}
+              </div>
+            </div>
+
+            <div class="card border-primary">
+              <div class="card-header bg-light">
+                <h6 class="card-title mb-0">
+                  <i class="fas fa-utensils me-2"></i>
+                  Existing Restaurant
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <strong>${existingRestaurant.full_name || existingRestaurant.name}</strong>
+                    ${existingRestaurant.city ? `<br><small class="text-muted">${existingRestaurant.city}</small>` : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <p class="mb-2"><strong>What would you like to do?</strong></p>
+              <ul class="text-muted small mb-0">
+                <li>View the existing restaurant details</li>
+                <li>Update the existing restaurant with new information</li>
+                <li>Cancel and search for a different restaurant</li>
+              </ul>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              Cancel
+            </button>
+            <button type="button" class="btn btn-primary" id="viewExistingBtn" data-restaurant-id="${existingRestaurant.id}">
+              <i class="fas fa-eye me-1"></i>View Restaurant
+            </button>
+            <button type="button" class="btn btn-secondary" id="updateExistingBtn" data-restaurant-id="${existingRestaurant.id}">
+              <i class="fas fa-edit me-1"></i>Update Restaurant
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Remove any existing conflict modal
+  const existingModal = document.getElementById(modalId);
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Add modal to DOM
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const modalElement = document.getElementById(modalId);
+  const modal = new bootstrap.Modal(modalElement);
+
+  // Set up event handlers for action buttons
+  setupConflictModalHandlers(modalElement, existingRestaurant.id, originalData);
+
+  // Show modal with proper focus management
+  modal.show();
+
+  // Focus management
+  modalElement.addEventListener('shown.bs.modal', () => {
+    const viewBtn = modalElement.querySelector('#viewExistingBtn');
+    if (viewBtn) {
+      viewBtn.focus();
+    }
+  });
+
+  // Clean up modal after hiding
+  modalElement.addEventListener('hidden.bs.modal', () => {
+    modalElement.remove();
+  });
+}
+
+/**
+ * Set up event handlers for conflict modal action buttons
+ * @param {HTMLElement} modalElement - The modal DOM element
+ * @param {number} restaurantId - ID of the existing restaurant
+ * @param {Object} googlePlacesData - Google Places data for the restaurant
+ */
+function setupConflictModalHandlers(modalElement, restaurantId, googlePlacesData = null) {
+  // Safety: Validate inputs
+  if (!modalElement || !restaurantId) {
+    console.error('Invalid parameters for conflict modal handlers');
+    return;
+  }
+
+  const viewBtn = modalElement.querySelector('#viewExistingBtn');
+  const updateBtn = modalElement.querySelector('#updateExistingBtn');
+
+  if (viewBtn) {
+    viewBtn.addEventListener('click', () => {
+      window.location.href = `/restaurants/${restaurantId}`;
+    });
+  }
+
+  if (updateBtn) {
+    updateBtn.addEventListener('click', () => {
+      // Store Google Places data for the edit form and redirect
+      storeGooglePlacesDataForEdit(googlePlacesData, restaurantId);
+    });
+  }
+}
+
+/**
+ * Store Google Places data in session storage and redirect to edit form
+ * @param {Object} googlePlacesData - Google Places data for the restaurant
+ * @param {number} restaurantId - ID of the restaurant to edit
+ */
+function storeGooglePlacesDataForEdit(googlePlacesData, restaurantId) {
+  // Safety: Validate inputs
+  if (!restaurantId) {
+    console.error('Restaurant ID required for edit redirect');
+    return;
+  }
+
+  try {
+    // Store Google Places data in session storage for the edit form to use
+    if (googlePlacesData && typeof googlePlacesData === 'object') {
+      const dataToStore = {
+        timestamp: Date.now(),
+        restaurantId: restaurantId,
+        googlePlacesData: googlePlacesData
+      };
+
+      sessionStorage.setItem('restaurantEditGooglePlacesData', JSON.stringify(dataToStore));
+      console.log('Stored Google Places data for restaurant edit:', dataToStore);
+    }
+
+    // Redirect to edit form
+    window.location.href = `/restaurants/${restaurantId}/edit`;
+  } catch (error) {
+    console.error('Error storing Google Places data:', error);
+    // Fallback: redirect without data
+    window.location.href = `/restaurants/${restaurantId}/edit`;
+  }
+}
+
+// UI feedback functions are imported from utils/notifications.js
 
 // Set up event delegation for view restaurant buttons
 document.addEventListener('click', (event) => {

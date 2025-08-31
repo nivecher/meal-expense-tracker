@@ -652,23 +652,36 @@ def import_expenses():
         if file and file.filename:
             try:
                 current_app.logger.info("Processing expense import...")
-                success, message = expense_services.import_expenses_from_csv(file, current_user.id)
-                current_app.logger.info(f"Import result: success={success}, message={message}")
+                success, result_data = expense_services.import_expenses_from_csv(file, current_user.id)
+                current_app.logger.info(f"Import result: success={success}, data={result_data}")
 
+                # Handle the structured result data to show appropriate toasts
                 if success:
-                    # Extract the number of imported expenses from the message
-                    flash(message, "success")
+                    # Show success message for imported expenses
+                    if result_data.get("success_count", 0) > 0:
+                        flash(f"Successfully imported {result_data['success_count']} expenses.", "success")
+
+                    # Show warning toast for skipped duplicates
+                    if result_data.get("has_warnings", False):
+                        flash(f"{result_data['skipped_count']} duplicate expenses were skipped.", "warning")
+
                     return redirect(url_for("expenses.list_expenses"))
                 else:
-                    flash(f"Import failed: {message}", "error")
+                    # Show error toast with details
+                    error_message = result_data.get("message", "Import failed")
+                    flash(error_message, "danger")
+
+                    # Log detailed errors for debugging
+                    if result_data.get("error_details"):
+                        current_app.logger.error(f"Import errors: {result_data['error_details']}")
 
             except ValueError as e:
                 current_app.logger.error("ValueError during import: %s", str(e))
-                flash(str(e), "error")
+                flash(str(e), "danger")
             except Exception as e:
                 current_app.logger.error("Unexpected error during import: %s", str(e))
-                flash("An unexpected error occurred during import", "error")
+                flash("An unexpected error occurred during import", "danger")
         else:
-            flash("Please select a file to upload", "error")
+            flash("Please select a file to upload", "danger")
 
     return render_template("expenses/import.html", form=form)

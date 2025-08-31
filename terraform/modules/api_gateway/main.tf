@@ -100,44 +100,40 @@ resource "aws_apigatewayv2_api" "main" {
   protocol_type = "HTTP"
   description   = "API Gateway for ${var.app_name} ${var.environment} environment"
 
-  # Secure CORS configuration
+  # CORS configuration for Flask Lambda deployment
   cors_configuration {
-    # Only allow specific origins
-    allow_origins = var.environment == "dev" ? [
-      "http://localhost:5000",  # Local development
-      "http://127.0.0.1:5000",
-      "http://localhost:5001",
-      "http://127.0.0.1:5001",
-      "https://${var.domain_name}"  # Production domain
-    ] : [
-      "https://${var.domain_name}"  # Only production domain in non-dev
-    ]
+    # Must specify exact origins when allow_credentials = true
+    # allow_origins = ["*"]
 
-    # Only allow necessary HTTP methods
+    # HTTP methods for Flask application
     allow_methods = [
       "GET",
       "POST",
+      "OPTIONS",
       "PUT",
+      "PATCH",
       "DELETE",
-      "OPTIONS"
     ]
 
-    # Only allow necessary headers
+    # Headers needed for Flask forms and sessions
     allow_headers = [
       "Content-Type",
-      "Authorization",
       "X-CSRF-Token",
-      "X-Requested-With"
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+      "Cache-Control"
     ]
 
-    # Only expose necessary headers to the client
+    # Headers to expose to JavaScript
     expose_headers = [
       "Content-Length",
-      "X-CSRF-Token"
+      "Content-Type"
     ]
 
-    # Allow credentials if needed (for cookies, authorization headers)
-    allow_credentials = false  # Set to true if using cookies/sessions
+    # REQUIRED for Flask sessions/cookies to work (even with DynamoDB)
+    allow_credentials = true
 
     # Cache preflight requests for 1 hour
     max_age = 3600

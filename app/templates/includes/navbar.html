@@ -20,18 +20,72 @@
         <!-- Navigation Links -->
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto">
-                <li class="nav-item">
+                <li class="nav-item dropdown">
                     <a
-                        class="nav-link {% if request.endpoint == 'main.index' %}active{% endif %}"
-                        href="{{ url_for('main.index') }}"
-                        aria-current="{% if request.endpoint == 'main.index' %}
-                                         page
-                                     {% else %}
-                                         false
-                                     {% endif %}">
+                        class="nav-link dropdown-toggle {% if request.endpoint and 'expenses' in request.endpoint %}active{% endif %}"
+                        href="#"
+                        id="expensesDropdown"
+                        role="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false">
                         <i class="fas fa-receipt" aria-hidden="true"></i>
                         <span>Expenses</span>
                     </a>
+                    <ul class="dropdown-menu" aria-labelledby="expensesDropdown" role="menu">
+                        <!-- Primary Actions -->
+                        <li role="group">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'expenses.add_expense' %}active{% endif %}"
+                                href="{{ url_for('expenses.add_expense') }}"
+                                role="menuitem">
+                                <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                                <span>Add Expense</span>
+                            </a>
+                        </li>
+                        <li role="group">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'expenses.list_expenses' %}active{% endif %}"
+                                href="{{ url_for('expenses.list_expenses') }}"
+                                role="menuitem">
+                                <i class="fas fa-list" aria-hidden="true"></i>
+                                <span>View All</span>
+                            </a>
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider" role="separator" />
+                        </li>
+                        <!-- Data Management Options -->
+                        <li role="group">
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('expenses.export_expenses', format='csv') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-csv" aria-hidden="true"></i>
+                                <span>Export as CSV</span>
+                            </a>
+                        </li>
+                        <li role="group">
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('expenses.export_expenses', format='json') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-code" aria-hidden="true"></i>
+                                <span>Export as JSON</span>
+                            </a>
+                        </li>
+                        <li>
+                            <hr class="dropdown-divider" role="separator" />
+                        </li>
+                        <li role="group">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'expenses.import_expenses' %}active{% endif %}"
+                                href="{{ url_for('expenses.import_expenses') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-import" aria-hidden="true"></i>
+                                <span>Import Expenses</span>
+                            </a>
+                        </li>
+                    </ul>
                 </li>
                 <li class="nav-item dropdown">
                     <a
@@ -190,20 +244,18 @@
                     </div>
                 </li>
                 {% else %}
-                <div class="d-flex gap-2">
-                    <li class="nav-item">
+                <li class="nav-item">
+                    <div class="d-flex gap-2">
                         <a class="btn btn-outline-primary btn-sm" href="{{ url_for('auth.login') }}">
                             <i class="fas fa-sign-in-alt me-1"></i>
                             <span>Login</span>
                         </a>
-                    </li>
-                    <li class="nav-item">
                         <a class="btn btn-primary btn-sm" href="{{ url_for('auth.register') }}">
                             <i class="fas fa-user-plus me-1"></i>
                             <span>Register</span>
                         </a>
-                    </li>
-                </div>
+                    </div>
+                </li>
                 {% endif %}
             </ul>
         </div>

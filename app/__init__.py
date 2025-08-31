@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Optional, Union
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import get_config
@@ -33,34 +33,27 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     # Load configuration from config object
     app.config.from_object(config)
 
+    # Configure app components
+    _configure_request_handlers(app)
+    _configure_app_settings(app)
+    _configure_logging(app)
+    _initialize_components(app)
+    _initialize_admin_and_cli(app)
+
+    return app
+
+
+def _configure_request_handlers(app: Flask) -> None:
+    """Configure request and response handlers."""
+
     # Configure static file headers
     @app.after_request
     def add_static_headers(response):
         """Add cache-control and other headers for static files."""
         if response.headers.get("Content-Type"):
-            content_type = response.headers.get("Content-Type")
-
-            # Cache static assets for longer periods with immutable directive
-            if any(ext in content_type for ext in ["css", "javascript", "image"]):
-                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"  # 1 year, immutable
-            elif "html" in content_type:
-                response.headers["Cache-Control"] = "no-cache, no-store"
-            else:
-                response.headers["Cache-Control"] = "public, max-age=3600"  # 1 hour
-
-        # Security headers
-        response.headers["X-Content-Type-Options"] = "nosniff"
-
-        # Remove deprecated headers if they exist
-        response.headers.pop("Pragma", None)
-
-        # Only add CSP for HTML responses to avoid unnecessary headers on static resources
-        if content_type and "html" in content_type:
-            response.headers["Content-Security-Policy"] = (
-                "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.jquery.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; connect-src 'self' https://maps.googleapis.com https://places.googleapis.com; object-src 'none'; base-uri 'self';"
-            )
-        # Remove deprecated X-XSS-Protection (modern browsers have built-in XSS protection)
-
+            content_type = _fix_content_type_headers(response)
+            _set_cache_control_headers(response, content_type)
+            _set_security_headers(response, content_type)
         return response
 
     # Register service worker route with proper headers
@@ -69,9 +62,66 @@ def create_app(config_name: Optional[str] = None) -> Flask:
         response = app.send_static_file("js/service-worker.js")
         response.headers["Service-Worker-Allowed"] = "/"
         response.headers["Content-Type"] = "application/javascript"
-        response.headers["Cache-Control"] = "no-cache, no-store"
+        response.headers["Cache-Control"] = "no-cache, max-age=0"
         return response
 
+
+def _fix_content_type_headers(response) -> str:
+    """Fix content-type headers for different file types."""
+    content_type = response.headers.get("Content-Type")
+
+    # Fix font file content-type headers (no charset for fonts)
+    if request.path and any(request.path.endswith(ext) for ext in [".woff2", ".woff", ".ttf", ".eot", ".otf"]):
+        font_type_map = {
+            ".woff2": "font/woff2",
+            ".woff": "font/woff",
+            ".ttf": "font/ttf",
+            ".eot": "font/eot",
+            ".otf": "font/otf",
+        }
+        for ext, mime_type in font_type_map.items():
+            if request.path.endswith(ext):
+                response.headers["Content-Type"] = mime_type
+                return mime_type
+
+    # Fix charset for HTML/text responses - ensure UTF-8 is properly set
+    elif "text/" in content_type or "html" in content_type:
+        base_content_type = content_type.split(";")[0].strip()
+        if "html" in base_content_type or "text/" in base_content_type:
+            response.headers["Content-Type"] = f"{base_content_type}; charset=utf-8"
+            return response.headers["Content-Type"]
+
+    return content_type
+
+
+def _set_cache_control_headers(response, content_type: str) -> None:
+    """Set appropriate cache control headers based on content type."""
+    if any(ext in content_type for ext in ["css", "javascript", "image", "font/"]):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"  # 1 year, immutable
+    elif "html" in content_type:
+        response.headers["Cache-Control"] = "no-cache, max-age=0"  # Prevent caching of HTML
+    else:
+        response.headers["Cache-Control"] = "public, max-age=3600"  # 1 hour
+
+
+def _set_security_headers(response, content_type: str) -> None:
+    """Set security headers for responses."""
+    # Security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    # Remove deprecated headers if they exist
+    response.headers.pop("Pragma", None)
+    response.headers.pop("Expires", None)  # Remove deprecated Expires header
+
+    # Only add CSP for HTML responses to avoid unnecessary headers on static resources
+    if content_type and "html" in content_type:
+        response.headers["Content-Security-Policy"] = (
+            "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.jquery.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; connect-src 'self' https://maps.googleapis.com https://places.googleapis.com; object-src 'none'; base-uri 'self';"
+        )
+
+
+def _configure_app_settings(app: Flask) -> None:
+    """Configure basic application settings and validation."""
     # Ensure required config values are set
     if not app.config.get("SQLALCHEMY_DATABASE_URI"):
         raise ValueError("SQLALCHEMY_DATABASE_URI is not configured")
@@ -79,6 +129,9 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     # Set default SQLAlchemy config if not set
     app.config.setdefault("SQLALCHEMY_TRACK_MODIFICATIONS", False)
 
+
+def _configure_logging(app: Flask) -> None:
+    """Configure application logging."""
     # Configure logging
     log_level = logging.DEBUG if app.debug else logging.INFO
     logger.setLevel(log_level)
@@ -89,6 +142,9 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     logger.debug(f"- DEBUG: {app.debug}")
     logger.debug(f"- DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI', 'Not set')}")
 
+
+def _initialize_components(app: Flask) -> None:
+    """Initialize core application components."""
     # Initialize all extensions
     from .database import init_database
     from .extensions import init_app as init_extensions
@@ -122,6 +178,20 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     # Configure CORS
     _configure_cors(app)
 
+    # Log registered routes
+    _log_registered_routes(app)
+
+
+def _initialize_admin_and_cli(app: Flask) -> None:
+    """Initialize admin module and CLI commands."""
+    # Initialize admin module if available
+    try:
+        from . import admin
+
+        admin.init_app(app)
+    except ImportError:
+        logger.warning("Admin module not available")
+
     # Initialize CLI commands
     from .auth.cli import register_commands as register_auth_commands
     from .expenses.cli import register_commands as register_expenses_commands
@@ -131,11 +201,6 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     register_expenses_commands(app)
     register_restaurant_commands(app)
     logger.debug("Initialized CLI commands")
-
-    # Log registered routes
-    _log_registered_routes(app)
-
-    return app
 
 
 def _configure_jwt_handlers(app: Flask) -> None:

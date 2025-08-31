@@ -7,7 +7,7 @@
                     <h4 class="card-title mb-0">Register</h4>
                 </div>
                 <div class="card-body">
-                    <form method="post" novalidate>
+                    <form id="register-form" method="post" novalidate>
                         {{ form.hidden_tag() }}
                         <div class="mb-3">
                             {{ form.username.label(class="form-label") }} {{ form.username(class="form-control",

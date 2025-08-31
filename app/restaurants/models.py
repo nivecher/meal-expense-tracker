@@ -96,7 +96,7 @@ class Restaurant(BaseModel):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="restaurants", lazy="joined")
+    user: Mapped["User"] = relationship("User", back_populates="restaurants", lazy="select")
     expenses: Mapped[List["Expense"]] = relationship(
         "Expense",
         back_populates="restaurant",

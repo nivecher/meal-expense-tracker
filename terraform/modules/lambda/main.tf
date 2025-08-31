@@ -328,6 +328,9 @@ resource "aws_lambda_function" "main" {
         ENABLE_AWS_SERVICES = "true"
         DATABASE_URL        = local.db_url
 
+        # Security configuration
+        ALLOWED_REFERRER_DOMAINS = "${var.server_name},${var.api_gateway_domain_name}"
+
         # Session configuration
         SESSION_TYPE            = var.session_type
         SESSION_TABLE_NAME      = var.session_table_name

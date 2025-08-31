@@ -8,7 +8,7 @@
  */
 
 import { logger } from './core-utils.js';
-import { showErrorToast } from './ui-utils.js';
+import { showErrorToast } from './notifications.js';
 
 // ===== API UTILITIES =====
 
