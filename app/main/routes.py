@@ -205,12 +205,16 @@ def index():
         .limit(5)
     ).all()
 
+    # Import cuisine color function for template use
+    from app.constants.cuisines import get_cuisine_color
+
     return render_template(
         "main/dashboard.html",
         expense_stats=expense_stats,
         restaurant_stats=restaurant_stats,
         recent_expenses=recent_expenses,
         top_restaurants=top_restaurants,
+        get_cuisine_color=get_cuisine_color,
     )
 
 

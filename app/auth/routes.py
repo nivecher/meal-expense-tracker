@@ -174,6 +174,7 @@ def profile():
             current_user.bio = request.form.get("bio", "").strip() or None
             current_user.phone = request.form.get("phone", "").strip() or None
             current_user.timezone = request.form.get("timezone", "UTC").strip()
+            current_user.avatar_url = request.form.get("avatar_url", "").strip() or None
 
             # Basic validation
             if current_user.phone and len(current_user.phone) > 20:
@@ -182,6 +183,11 @@ def profile():
 
             if current_user.bio and len(current_user.bio) > 500:
                 flash("Bio is too long (max 500 characters)", "error")
+                return redirect(url_for("auth.profile"))
+
+            # Validate avatar URL if provided
+            if current_user.avatar_url and len(current_user.avatar_url) > 255:
+                flash("Avatar URL is too long (max 255 characters)", "error")
                 return redirect(url_for("auth.profile"))
 
             # Validate timezone

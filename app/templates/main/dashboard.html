@@ -1,14 +1,19 @@
 {% extends "base.html" %}
+{% from 'macros/category_helpers.html' import hex_to_rgb %}
+{% from 'macros/cuisine_helpers.html' import cuisine_badge %}
 
 {% block title %}Dashboard - Meal Expense Tracker{% endblock %}
 
 {% block head_extra %}
 <link href="{{ url_for('static', filename='css/components/dashboard.css') }}" rel="stylesheet" />
+<link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
+<link href="{{ url_for('static', filename='css/components/cuisine-badges.css') }}" rel="stylesheet" />
 {% endblock %}
 
 {% block content %}
+<div class="dashboard">
 <!-- Welcome Section -->
-<section class="welcome-section mb-4">
+<section class="welcome-section mb-3">
         <div class="row align-items-center">
             <div class="col-xl-9 col-lg-8">
                 <div class="welcome-content">
@@ -17,7 +22,7 @@
                         <span class="text-primary">Welcome to</span><br>
                         <span class="text-dark">Meal Expense Tracker</span>
                     </h1>
-                    <p class="lead text-muted mb-4">
+<p class="lead text-muted mb-3">
                         Track your dining expenses, discover spending patterns, and manage your restaurant visits all in one place.
                         Get insights into your food budget and make informed decisions about your dining choices.
                     </p>
@@ -52,7 +57,7 @@
     </section>
 
 <!-- Quick Stats Cards -->
-<section class="stats-section mb-4">
+<section class="stats-section mb-3">
         <div class="row g-4">
             <!-- Total Expenses -->
             <div class="col-6 col-md-3">
@@ -109,7 +114,7 @@
     </section>
 
 <!-- Main Content Grid -->
-<div class="row g-4 mb-4">
+<div class="row g-4 mb-3">
         <!-- Recent Expenses -->
         <div class="col-lg-6">
             <div class="card h-100">
@@ -135,16 +140,16 @@
                                                 <div class="restaurant-icon me-2 flex-shrink-0">
                                                     {% if restaurant_website %}
                                                         <img
-                                                            src="https://www.google.com/s2/favicons?domain={{ restaurant_website }}&sz=16"
+                                                            src="https://www.google.com/s2/favicons?domain={{ restaurant_website }}&sz=28"
                                                             alt="{{ restaurant_name }} icon"
                                                             class="restaurant-favicon"
-                                                            width="16"
-                                                            height="16"
+                                                            width="28"
+                                                            height="28"
                                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
                                                         />
-                                                        <i class="fas fa-store text-muted restaurant-fallback-icon" style="display: none; font-size: 16px;"></i>
+                                                        <i class="fas fa-store text-muted restaurant-fallback-icon" style="display: none;"></i>
                                                     {% else %}
-                                                        <i class="fas fa-store text-muted restaurant-fallback-icon" style="font-size: 16px;"></i>
+                                                        <i class="fas fa-store text-muted restaurant-fallback-icon"></i>
                                                     {% endif %}
                                                 </div>
                                                 {{ restaurant_name or 'Unknown Restaurant' }}
@@ -154,21 +159,9 @@
                                                     {{ expense.date.strftime('%b %d, %Y') }}
                                                 </span>
                                                 {% if expense.meal_type %}
-                                                    <span class="meal-type-badge meal-type-{{ expense.meal_type.lower().replace(' ', '-') }}">
-                                                        {% if expense.meal_type.lower() == 'breakfast' %}
-                                                            <i class="fas fa-sun"></i>
-                                                        {% elif expense.meal_type.lower() == 'lunch' %}
-                                                            <i class="fas fa-cloud-sun"></i>
-                                                        {% elif expense.meal_type.lower() == 'dinner' %}
-                                                            <i class="fas fa-moon"></i>
-                                                        {% elif expense.meal_type.lower() == 'snack' %}
-                                                            <i class="fas fa-cookie-bite"></i>
-                                                        {% elif expense.meal_type.lower() == 'brunch' %}
-                                                            <i class="fas fa-coffee"></i>
-                                                        {% else %}
-                                                            <i class="fas fa-clock"></i>
-                                                        {% endif %}
-                                                        {{ expense.meal_type.title() }}
+                                                    <span class="meal-type-badge {{ expense.meal_type|meal_type_css_class }}">
+                                                        <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>
+                                                        {{ expense.meal_type|title }}
                                                     </span>
                                                 {% endif %}
                                             </div>
@@ -214,18 +207,18 @@
                                         <div class="restaurant-info">
                                             <div class="restaurant-name d-flex align-items-center">
                                                 <div class="restaurant-icon me-2 flex-shrink-0">
-                                                    {% if restaurant[2] %}
+                                                                                                        {% if restaurant[2] %}
                                                         <img
-                                                            src="https://www.google.com/s2/favicons?domain={{ restaurant[2] }}&sz=16"
+                                                            src="https://www.google.com/s2/favicons?domain={{ restaurant[2] }}&sz=28"
                                                             alt="{{ restaurant[1] }} icon"
                                                             class="restaurant-favicon"
-                                                            width="16"
-                                                            height="16"
+                                                            width="28"
+                                                            height="28"
                                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
                                                         />
-                                                        <i class="fas fa-store-alt text-muted restaurant-fallback-icon" style="display: none; font-size: 16px;"></i>
+                                                        <i class="fas fa-store-alt text-muted restaurant-fallback-icon" style="display: none;"></i>
                                                     {% else %}
-                                                        <i class="fas fa-store-alt text-muted restaurant-fallback-icon" style="font-size: 16px;"></i>
+                                                        <i class="fas fa-store-alt text-muted restaurant-fallback-icon"></i>
                                                     {% endif %}
                                                 </div>
                                                 {{ restaurant[1] }}
@@ -233,11 +226,7 @@
                                             <div class="restaurant-stats d-flex align-items-center gap-2">
                                                 <span class="visit-count">{{ restaurant[4] }} visits</span>
                                                 {% if restaurant[3] %}
-                                                    <span class="cuisine-badge-small">
-                                                        <span class="badge bg-light text-dark border">
-                                                            <i class="fas fa-utensils me-1 text-muted"></i>{{ restaurant[3] }}
-                                                        </span>
-                                                    </span>
+                                                    {{ cuisine_badge(restaurant[3], compact=true) }}
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -264,7 +253,7 @@
     </div>
 
 <!-- Quick Actions -->
-<section class="quick-actions-section mb-4">
+<section class="quick-actions-section mb-3">
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
@@ -357,6 +346,7 @@
             </div>
         </div>
 </section>
+</div>
 {% endblock %}
 
 {% block scripts %}

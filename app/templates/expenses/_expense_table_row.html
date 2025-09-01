@@ -32,10 +32,9 @@
         {% endif %}
     </td>
     <td>
+        {% from 'macros/cuisine_helpers.html' import cuisine_badge %}
         {% if expense.restaurant and expense.restaurant.cuisine %}
-            <span class="cuisine-badge" data-cuisine="{{ expense.restaurant.cuisine }}">
-                <span class="badge bg-light text-dark">{{ expense.restaurant.cuisine }}</span>
-            </span>
+            {{ cuisine_badge(expense.restaurant.cuisine, compact=true) }}
         {% else %}
             <span class="text-muted">-</span>
         {% endif %}
@@ -55,6 +54,15 @@
     <td>
         {% from 'macros/category_helpers.html' import category_badge %}
         {{ category_badge(expense.category, compact=true) }}
+    </td>
+    <td>
+        {% if expense.notes %}
+            <span class="text-muted small" title="{{ expense.notes }}">
+                {{ expense.notes|truncate(30, '...') }}
+            </span>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
     </td>
     <td class="text-end">
         <div class="btn-group" role="group">

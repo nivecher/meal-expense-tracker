@@ -1,0 +1,43 @@
+{# Cuisine Badge Helper Macros #}
+
+{# Helper function to convert hex color to RGB values #}
+{% macro hex_to_rgb(hex_color) -%}
+    {%- if hex_color and hex_color.startswith('#') and hex_color|length == 7 -%}
+        {%- set r = hex_color[1:3]|int(16) -%}
+        {%- set g = hex_color[3:5]|int(16) -%}
+        {%- set b = hex_color[5:7]|int(16) -%}
+        {{- r }}, {{ g }}, {{ b -}}
+    {%- else -%}
+        108, 117, 125
+    {%- endif -%}
+{%- endmacro %}
+
+{# Cuisine Badge Component Macro #}
+{% macro cuisine_badge(cuisine_name, compact=false, link_url="") -%}
+    {%- if cuisine_name -%}
+        {%- set cuisine_color = cuisine_name|cuisine_color -%}
+        {%- set cuisine_icon = cuisine_name|cuisine_icon -%}
+        {%- set cuisine_css_class = cuisine_name|cuisine_css_class -%}
+        {%- set rgb_values = hex_to_rgb(cuisine_color) -%}
+
+        {%- if link_url -%}
+            <a href="{{ link_url }}"
+               class="cuisine-badge {{ cuisine_css_class }}{{ ' compact' if compact }}"
+               style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }};">
+                <i class="fas fa-{{ cuisine_icon }}"></i>{{ cuisine_name }}
+            </a>
+        {%- else -%}
+            <span class="cuisine-badge {{ cuisine_css_class }}{{ ' compact' if compact }}"
+                  style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }};">
+                <i class="fas fa-{{ cuisine_icon }}"></i>{{ cuisine_name }}
+            </span>
+        {%- endif -%}
+    {%- else -%}
+        <span class="text-muted">-</span>
+    {%- endif -%}
+{%- endmacro %}
+
+{# Simple cuisine text with fallback #}
+{% macro cuisine_text(cuisine_name) -%}
+    {{- cuisine_name if cuisine_name else '-' -}}
+{%- endmacro %}

@@ -21,8 +21,9 @@
         <link href="{{ url_for('static', filename='css/components/navbar.css') }}" rel="stylesheet" />
         <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" />
         <link href="{{ url_for('static', filename='css/components/table.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
+            <link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/cuisine-badges.css') }}" rel="stylesheet" />
     </head>
     <body>
         {% include "includes/navbar.html" %}
@@ -358,6 +359,7 @@ include 'includes/breadcrumb.html' %}
                                 <th data-sort="true" data-sort-type="text">Meal</th>
                                 <th data-sort="true" data-sort-type="currency">Amount</th>
                                 <th data-sort="true" data-sort-type="text">Category</th>
+                                <th data-sort="true" data-sort-type="text">Notes</th>
                                 <th class="text-end">Actions</th>
                             </tr>
                         </thead>
@@ -368,7 +370,7 @@ include 'includes/breadcrumb.html' %}
                             <tr>
                                 <td colspan="4" class="text-end fw-bold">Total:</td>
                                 <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_amount) }}</td>
-                                <td colspan="2"></td>
+                                <td colspan="3"></td>
                             </tr>
                         </tfoot>
                     </table>

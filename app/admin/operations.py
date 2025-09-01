@@ -701,6 +701,328 @@ class DatabaseMaintenanceOperation(BaseAdminOperation):
             return {"success": False, "message": f"Database maintenance failed: {str(e)}"}
 
 
+class ValidateRestaurantsOperation(BaseAdminOperation):
+    """Validate restaurant information using Google Places API."""
+
+    name = "validate_restaurants"
+    description = "Validate restaurant information against Google Places API and optionally fix mismatches"
+    requires_confirmation = False
+
+    def validate_params(self, **kwargs) -> Dict[str, Any]:
+        """Validate restaurant validation parameters."""
+        errors = []
+
+        # Must specify at least one filter
+        user_id = kwargs.get("user_id")
+        username = kwargs.get("username", "").strip()
+        all_users = kwargs.get("all_users", False)
+        restaurant_id = kwargs.get("restaurant_id")
+
+        if not any([user_id, username, all_users, restaurant_id]):
+            errors.append("Must specify --user-id, --username, --all-users, or --restaurant-id")
+
+        if user_id is not None and not isinstance(user_id, int):
+            errors.append("user_id must be an integer")
+
+        if restaurant_id is not None and not isinstance(restaurant_id, int):
+            errors.append("restaurant_id must be an integer")
+
+        fix_mismatches = kwargs.get("fix_mismatches", False)
+        if not isinstance(fix_mismatches, bool):
+            errors.append("fix_mismatches must be a boolean")
+
+        dry_run = kwargs.get("dry_run", False)
+        if not isinstance(dry_run, bool):
+            errors.append("dry_run must be a boolean")
+
+        return {"valid": len(errors) == 0, "errors": errors}
+
+    def _get_target_users(self, **kwargs) -> tuple[Optional[Dict[str, Any]], List[User]]:
+        """Get target users based on parameters."""
+        try:
+            user_id = kwargs.get("user_id")
+            username = kwargs.get("username", "").strip()
+            all_users = kwargs.get("all_users", False)
+
+            if user_id:
+                user = User.query.get(user_id)
+                if not user:
+                    return {"success": False, "message": f"User with ID {user_id} not found"}, []
+                return None, [user]
+            elif username:
+                user = User.query.filter_by(username=username).first()
+                if not user:
+                    return {"success": False, "message": f"User with username '{username}' not found"}, []
+                return None, [user]
+            elif all_users:
+                users = User.query.all()
+                if not users:
+                    return {"success": False, "message": "No users found in database"}, []
+                return None, users
+
+            return {"success": False, "message": "No user filter provided"}, []
+
+        except Exception as e:
+            logger.exception(f"Error getting target users: {e}")
+            return {"success": False, "message": f"Failed to get users: {str(e)}"}, []
+
+    def _get_restaurants_to_validate(self, **kwargs) -> tuple[Optional[Dict[str, Any]], List]:
+        """Get restaurants to validate based on parameters."""
+        try:
+            from app.restaurants.models import Restaurant
+
+            restaurant_id = kwargs.get("restaurant_id")
+
+            if restaurant_id:
+                restaurant = Restaurant.query.get(restaurant_id)
+                if not restaurant:
+                    return {"success": False, "message": f"Restaurant with ID {restaurant_id} not found"}, []
+                return None, [restaurant]
+            else:
+                error_response, users = self._get_target_users(**kwargs)
+                if error_response:
+                    return error_response, []
+
+                restaurants_to_validate = []
+                for user in users:
+                    user_restaurants = (
+                        Restaurant.query.filter_by(user_id=user.id).filter(Restaurant.google_place_id.isnot(None)).all()
+                    )
+                    restaurants_to_validate.extend(user_restaurants)
+
+                return None, restaurants_to_validate
+
+        except ImportError:
+            return {"success": False, "message": "Restaurant model not available"}, []
+        except Exception as e:
+            logger.exception(f"Error getting restaurants to validate: {e}")
+            return {"success": False, "message": f"Failed to get restaurants: {str(e)}"}, []
+
+    def _validate_restaurant_with_google(self, restaurant) -> Dict[str, Any]:
+        """Validate restaurant using Google Places API."""
+        try:
+            from app.api.routes import get_gmaps_client
+
+            if not restaurant.google_place_id:
+                return {"valid": None, "errors": ["No Google Place ID available for validation"]}
+
+            gmaps = get_gmaps_client()
+            if not gmaps:
+                return {"valid": False, "errors": ["Google Maps API not configured"]}
+
+            place = gmaps.place(
+                place_id=restaurant.google_place_id,
+                language="en",
+                fields=[
+                    "name",
+                    "formatted_address",
+                    "geometry/location",
+                    "rating",
+                    "business_status",
+                    "type",
+                    "user_ratings_total",
+                    "opening_hours",
+                    "website",
+                    "international_phone_number",
+                    "price_level",
+                    "editorial_summary",
+                ],
+            )
+
+            if place and "result" in place:
+                google_data = place["result"]
+                return {
+                    "valid": True,
+                    "google_name": google_data.get("name"),
+                    "google_address": google_data.get("formatted_address"),
+                    "google_rating": google_data.get("rating"),
+                    "google_status": google_data.get("business_status"),
+                    "types": google_data.get("type", []),
+                    "google_phone": google_data.get("international_phone_number"),
+                    "google_website": google_data.get("website"),
+                    "google_price_level": google_data.get("price_level"),
+                    "errors": [],
+                }
+            elif place and "status" in place:
+                status = place["status"]
+                error_msg = place.get("error_message", f"Google API error: {status}")
+                return {"valid": False, "errors": [error_msg]}
+            else:
+                return {"valid": False, "errors": ["No response from Google Places API"]}
+
+        except ImportError:
+            return {"valid": False, "errors": ["Google Places API service not available"]}
+        except Exception as e:
+            logger.exception(f"Error validating restaurant {restaurant.id}: {e}")
+            return {"valid": False, "errors": [f"Unexpected error: {str(e)}"]}
+
+    def _check_restaurant_mismatches(
+        self, restaurant, validation_result: Dict[str, Any]
+    ) -> tuple[List[str], Dict[str, str]]:
+        """Check for mismatches between restaurant data and Google data."""
+        google_name = validation_result.get("google_name")
+        google_address = validation_result.get("google_address")
+
+        mismatches = []
+        fixes_to_apply = {}
+
+        if google_name and google_name.lower() != restaurant.name.lower():
+            mismatches.append(f"Name: '{restaurant.name}' vs Google: '{google_name}'")
+            fixes_to_apply["name"] = google_name
+
+        if google_address and restaurant.address and google_address.lower() != restaurant.address.lower():
+            mismatches.append(f"Address: '{restaurant.address}' vs Google: '{google_address}'")
+            fixes_to_apply["address"] = google_address
+
+        return mismatches, fixes_to_apply
+
+    def _apply_restaurant_fixes(self, restaurant, fixes_to_apply: Dict[str, str], dry_run: bool) -> tuple[bool, str]:
+        """Apply fixes to restaurant data."""
+        if dry_run:
+            return True, f"Would fix: {', '.join(fixes_to_apply.keys())}"
+
+        try:
+            changes_made = []
+            if "name" in fixes_to_apply:
+                restaurant.name = fixes_to_apply["name"]
+                changes_made.append("name")
+            if "address" in fixes_to_apply:
+                restaurant.address = fixes_to_apply["address"]
+                changes_made.append("address")
+
+            if changes_made:
+                db.session.commit()
+                return True, f"Fixed: {', '.join(changes_made)}"
+            else:
+                return True, "No changes needed"
+
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(f"Error fixing restaurant {restaurant.id}: {e}")
+            return False, f"Error fixing: {str(e)}"
+
+    def _process_restaurant_validation(self, restaurant, fix_mismatches: bool, dry_run: bool) -> Dict[str, Any]:
+        """Process validation for a single restaurant."""
+        result = {
+            "id": restaurant.id,
+            "name": restaurant.name,
+            "user_id": restaurant.user_id,
+            "google_place_id": restaurant.google_place_id,
+            "status": "error",
+            "mismatches": [],
+            "fixed": False,
+            "would_fix": False,
+            "dry_run": dry_run,
+            "errors": [],
+        }
+
+        validation_result = self._validate_restaurant_with_google(restaurant)
+
+        if validation_result["valid"] is True:
+            result["status"] = "valid"
+
+            # Check for mismatches
+            mismatches, fixes_to_apply = self._check_restaurant_mismatches(restaurant, validation_result)
+            result["mismatches"] = mismatches
+
+            if mismatches and fix_mismatches and fixes_to_apply:
+                fixed, fix_message = self._apply_restaurant_fixes(restaurant, fixes_to_apply, dry_run)
+                if dry_run:
+                    result["would_fix"] = fixed
+                else:
+                    result["fixed"] = fixed
+                result["fix_message"] = fix_message
+
+        elif validation_result["valid"] is False:
+            result["status"] = "invalid"
+            result["errors"] = validation_result["errors"]
+        else:
+            result["status"] = "error"
+            result["errors"] = validation_result["errors"]
+
+        return result
+
+    def _process_all_restaurants(
+        self, restaurants_to_validate: List, fix_mismatches: bool, dry_run: bool
+    ) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
+        """Process validation for all restaurants and return results and counts."""
+        validation_results = []
+        valid_count = 0
+        invalid_count = 0
+        error_count = 0
+        fixed_count = 0
+
+        for restaurant in restaurants_to_validate:
+            result = self._process_restaurant_validation(restaurant, fix_mismatches, dry_run)
+            validation_results.append(result)
+
+            if result["status"] == "valid":
+                valid_count += 1
+            elif result["status"] == "invalid":
+                invalid_count += 1
+            else:
+                error_count += 1
+
+            if result.get("fixed") or result.get("would_fix"):
+                fixed_count += 1
+
+        summary = {
+            "valid_count": valid_count,
+            "invalid_count": invalid_count,
+            "error_count": error_count,
+            "fixed_count": fixed_count,
+            "dry_run": dry_run,
+            "total_restaurants": len(validation_results),
+        }
+
+        return validation_results, summary
+
+    def _get_action_text(self, fix_mismatches: bool, dry_run: bool) -> str:
+        """Get appropriate action text based on parameters."""
+        if fix_mismatches:
+            if dry_run:
+                return "validated (dry run - no changes made)"
+            else:
+                return "validated and fixed"
+        return "validated"
+
+    def execute(self, **kwargs) -> Dict[str, Any]:
+        """Execute restaurant validation operation."""
+        try:
+            fix_mismatches = kwargs.get("fix_mismatches", False)
+            dry_run = kwargs.get("dry_run", False)
+
+            # Get restaurants to validate
+            error_response, restaurants_to_validate = self._get_restaurants_to_validate(**kwargs)
+            if error_response:
+                return error_response
+
+            if not restaurants_to_validate:
+                return {
+                    "success": False,
+                    "message": "No restaurants with Google Place IDs found to validate",
+                }
+
+            # Process all restaurants
+            validation_results, summary = self._process_all_restaurants(
+                restaurants_to_validate, fix_mismatches, dry_run
+            )
+            action_text = self._get_action_text(fix_mismatches, dry_run)
+
+            return {
+                "success": True,
+                "message": f"Successfully {action_text} {len(validation_results)} restaurants",
+                "data": {
+                    "validation_results": validation_results,
+                    "summary": summary,
+                },
+            }
+
+        except Exception as e:
+            logger.exception(f"Error in restaurant validation: {e}")
+            return {"success": False, "message": f"Restaurant validation failed: {str(e)}"}
+
+
 class AdminOperationRegistry:
     """Registry for all available admin operations."""
 
@@ -712,6 +1034,7 @@ class AdminOperationRegistry:
         "recent_activity": RecentActivityOperation,
         "init_db": InitializeDatabaseOperation,
         "db_maintenance": DatabaseMaintenanceOperation,
+        "validate_restaurants": ValidateRestaurantsOperation,
     }
 
     @classmethod

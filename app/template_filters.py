@@ -4,6 +4,11 @@ from datetime import datetime, timezone
 
 from flask import Flask
 
+from app.constants.cuisines import (
+    get_cuisine_color,
+    get_cuisine_css_class,
+    get_cuisine_icon,
+)
 from app.constants.meal_type_colors import get_meal_type_color
 from app.constants.meal_types import get_meal_type_icon
 
@@ -82,6 +87,42 @@ def restaurant_cuisine(restaurant) -> str:
     return "-"
 
 
+def cuisine_icon(cuisine_name: str) -> str:
+    """Get icon for a cuisine type.
+
+    Args:
+        cuisine_name: Name of the cuisine
+
+    Returns:
+        Font Awesome icon name
+    """
+    return get_cuisine_icon(cuisine_name)
+
+
+def cuisine_color(cuisine_name: str) -> str:
+    """Get color for a cuisine type.
+
+    Args:
+        cuisine_name: Name of the cuisine
+
+    Returns:
+        Hex color code
+    """
+    return get_cuisine_color(cuisine_name)
+
+
+def cuisine_css_class_filter(cuisine_name: str) -> str:
+    """Get CSS class for a cuisine type.
+
+    Args:
+        cuisine_name: Name of the cuisine
+
+    Returns:
+        CSS class string
+    """
+    return get_cuisine_css_class(cuisine_name)
+
+
 def meal_type_css_class_filter(meal_type: str) -> str:
     """Get the CSS class for a meal type using centralized approach.
 
@@ -121,6 +162,9 @@ def init_app(app: Flask) -> None:
     app.add_template_filter(meal_type_icon, name="meal_type_icon")
     app.add_template_filter(meal_type_css_class_filter, name="meal_type_css_class")
     app.add_template_filter(restaurant_cuisine, name="restaurant_cuisine")
+    app.add_template_filter(cuisine_icon, name="cuisine_icon")
+    app.add_template_filter(cuisine_color, name="cuisine_color")
+    app.add_template_filter(cuisine_css_class_filter, name="cuisine_css_class")
 
     # Add template global functions
     app.add_template_global(get_app_version, name="get_app_version")

@@ -4,12 +4,12 @@ name: CI/CD Pipeline
 env:
   # Application settings
   APP_NAME: meal-expense-tracker
-  PYTHON_VERSION: '3.11' # Using 3.11 as the latest stable version
+  PYTHON_VERSION: '3.13' # Using 3.13 as specified in pyproject.toml
   PYTHONPATH: ${{ github.workspace }}
   FLASK_APP: wsgi:app
   FLASK_ENV: test
   TESTING: 'true'
-  POETRY_VERSION: '1.8.0'
+  NODE_VERSION: '20'
 
   # Deployment settings
   ENV: ${{ github.event.inputs.environment || 'dev' }}
@@ -18,7 +18,7 @@ env:
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY || '123456789012.dkr.ecr.us-east-1.amazonaws.com' }}
 
   # Cache settings
-  CACHE_VERSION: v2
+  CACHE_VERSION: v3
 
 # Required permissions for the workflow
 permissions:
@@ -57,91 +57,98 @@ on:
         default: false
 
 jobs:
-  test:
-    name: Test (Python ${{ matrix.python-version }})
+  # Quality gate - comprehensive testing and linting
+  quality-gate:
+    name: Quality Gate
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
-
+        test-suite: ['unit', 'integration', 'lint', 'security']
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for proper versioning
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-          cache-dependency-path: '**/poetry.lock'
+          cache-dependency-path: 'requirements*.txt'
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y make
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
-
       - name: Set up cache
         uses: actions/cache@v4
-        id: cache
         with:
           path: |
-            ~/.cache/pypoetry/virtualenvs
-            ~/.cache/pypoetry/artifacts
-          key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+            venv/
+            ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements*.txt') }}
           restore-keys: |
-            ${{ runner.os }}-poetry-${{ matrix.python-version }}-
-            ${{ runner.os }}-poetry-
+            ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-
+            ${{ runner.os }}-pip-
 
-      - name: Install Python dependencies
+      - name: Create virtual environment and install dependencies
         run: |
-          poetry install --no-interaction --no-root --with dev,test
-          poetry run pip install --upgrade pip
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
 
-      - name: Run tests
+      - name: Setup Node.js (for frontend linting)
+        if: matrix.test-suite == 'lint'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        if: matrix.test-suite == 'lint'
         run: |
-          # Install test dependencies
-          poetry install --no-interaction --with test
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-          # Run unit tests with coverage
-          poetry run pytest tests/unit -v --cov=app --cov-report=xml --cov-fail-under=80
-
-          # Run integration tests (only on Python 3.11)
-          if [ "${{ matrix.python-version }}" = "3.11" ]; then
-            poetry run pytest tests/integration -v
-          fi
-
-      - name: Run linters and type checks
-        if: matrix.python-version == '3.11' # Only run linters once
+      - name: Run unit tests
+        if: matrix.test-suite == 'unit'
         run: |
-          # Install development dependencies
-          poetry install --no-interaction --with dev
+          source venv/bin/activate
+          make test-unit
 
-          # Run all linters using the Makefile
+      - name: Run integration tests
+        if: matrix.test-suite == 'integration'
+        run: |
+          source venv/bin/activate
+          make test-integration
+
+      - name: Run linting and formatting checks
+        if: matrix.test-suite == 'lint'
+        run: |
+          source venv/bin/activate
           make lint
 
-          # Additional security checks
-          poetry run detect-secrets scan --update .secrets.baseline
-          poetry run detect-secrets audit .secrets.baseline --report --fail
+      - name: Run security checks
+        if: matrix.test-suite == 'security'
+        run: |
+          source venv/bin/activate
+          make security-check
 
-      - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.11' # Only upload coverage once
+      - name: Upload coverage reports
+        if: matrix.test-suite == 'unit'
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
 
+  # Enhanced security scanning
   security-scan:
     name: Security Scan
-    needs: test
+    needs: quality-gate
     runs-on: ubuntu-latest
 
     steps:
@@ -166,7 +173,7 @@ jobs:
       - name: Run Semgrep
         run: semgrep --config=p/ci --error-on-findings .
 
-      - name: Run Grype
+      - name: Run Grype vulnerability scan
         run: |
           GRYPE_DB_AUTO_UPDATE=false /usr/local/bin/grype dir:. --fail-on high
 
@@ -175,10 +182,75 @@ jobs:
           detect-secrets scan --update .secrets.baseline
           detect-secrets audit .secrets.baseline --report --fail
 
+  # Version tagging - only after all checks pass
+  version-tag:
+    name: Version & Tag
+    needs: [quality-gate, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install setuptools-scm
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools-scm[toml]
+
+      - name: Generate version
+        id: version
+        run: |
+          # Generate version using setuptools-scm (based on git tags)
+          VERSION=$(python -m setuptools_scm)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+
+      - name: Create version file
+        run: |
+          # Generate version file for build
+          python -m setuptools_scm
+          
+      - name: Commit version file
+        run: |
+          # Commit the generated version file if it changed
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          if [ -f "app/_version.py" ] && git diff --exit-code app/_version.py; then
+            echo "Version file unchanged"
+          else
+            git add app/_version.py
+            git commit -m "chore: update version to ${{ steps.version.outputs.version }} [skip ci]" || echo "No version changes to commit"
+          fi
+
+      - name: Create and push tag
+        run: |
+          # Create annotated tag with version info
+          TAG="${{ steps.version.outputs.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
+          else
+            git tag -a "$TAG" -m "Release ${{ steps.version.outputs.version }}"
+            git push origin "$TAG"
+            echo "Created and pushed tag: $TAG"
+          fi
+
   build:
     name: Build and Push
-    needs: [test, security-scan]
-    if: github.event_name != 'pull_request'
+    needs: [quality-gate, security-scan, version-tag]
+    if: github.event_name != 'pull_request' && needs.version-tag.result == 'success'
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'dev' }}
 
@@ -198,17 +270,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y make
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Install Python dependencies
+      - name: Create virtual environment and install dependencies
         run: |
-          poetry install --no-interaction --with prod
-          poetry run pip install --upgrade pip
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -241,8 +308,12 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}}
+            type=raw,value=${{ needs.version-tag.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=long
+          labels: |
+            org.opencontainers.image.version=${{ needs.version-tag.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -256,9 +327,9 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: [test, security-scan, build]
+    needs: [quality-gate, security-scan, version-tag, build]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'dev')
-    environment: ${{ github.event.inputs.environment }}
+    environment: ${{ github.event.inputs.environment || 'dev' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -361,7 +432,7 @@ jobs:
 
   terraform:
     name: Terraform (${{ github.event.inputs.environment || 'dev' }})
-    needs: [test, security-scan]
+    needs: [quality-gate, security-scan, version-tag]
     if: github.event_name == 'push' || github.event.inputs.terraform_apply == 'true'
     environment: ${{ github.event.inputs.environment || 'dev' }}
     runs-on: ubuntu-latest
@@ -439,7 +510,7 @@ jobs:
 
   notify:
     name: Notify
-    needs: [deploy, terraform]
+    needs: [deploy, terraform, version-tag]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -460,9 +531,12 @@ jobs:
       - name: Send Deployment Status
         uses: actions/github-script@v7
         if: success() || failure()
+        env:
+          VERSION: ${{ needs.version-tag.outputs.version || 'unknown' }}
+          TAG: ${{ needs.version-tag.outputs.tag || 'unknown' }}
         with:
           script: |
-            const { STATUS, COLOR, ENV, EMOJI } = process.env;
+            const { STATUS, COLOR, ENV, EMOJI, VERSION, TAG } = process.env;
             const repo = context.repo;
             const workflowRunId = context.runId;
             const workflowUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${workflowRunId}`;
@@ -473,6 +547,8 @@ jobs:
                 ...repo,
                 issue_number: context.issue.number,
                 body: `${EMOJI} **Deployment to ${ENV} ${STATUS}**\n\n` +
+                      `- **Version:** ${VERSION}\n` +
+                      `- **Tag:** ${TAG}\n` +
                       `- **Workflow:** [View Workflow Run](${workflowUrl})\n` +
                       `- **Commit:** ${context.sha.slice(0, 7)}\n` +
                       `- **Triggered by:** ${context.actor}\n`
@@ -488,9 +564,9 @@ jobs:
               conclusion: STATUS === 'succeeded' ? 'success' : 'failure',
               details_url: workflowUrl,
               output: {
-                title: `Deployment ${STATUS}`,
-                summary: `Deployment to ${ENV} ${STATUS}`,
-                text: `Workflow run: ${workflowUrl}`
+                title: `Deployment ${STATUS} - Version ${VERSION}`,
+                summary: `Deployment to ${ENV} ${STATUS} - Version ${VERSION}`,
+                text: `Workflow run: ${workflowUrl}\nVersion: ${VERSION}\nTag: ${TAG}`
               }
             });
 
@@ -505,7 +581,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*${{ steps.set_status.outputs.EMOJI }} Deployment ${{ steps.set_status.outputs.STATUS == 'succeeded' && 'Succeeded' || 'Failed' }}\n*\n*Environment:* ${{ steps.set_status.outputs.ENV }}\n*Repository:* <https://github.com/${{ github.repository }}|${{ github.repository }}>\n*Workflow:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
+                    "text": "*${{ steps.set_status.outputs.EMOJI }} Deployment ${{ steps.set_status.outputs.STATUS == 'succeeded' && 'Succeeded' || 'Failed' }}\n*\n*Version:* ${{ needs.version-tag.outputs.version || 'unknown' }}\n*Tag:* ${{ needs.version-tag.outputs.tag || 'unknown' }}\n*Environment:* ${{ steps.set_status.outputs.ENV }}\n*Repository:* <https://github.com/${{ github.repository }}|${{ github.repository }}>\n*Workflow:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
                   }
                 },
                 {

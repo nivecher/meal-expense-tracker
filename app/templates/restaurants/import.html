@@ -9,34 +9,149 @@
                 <div class="card-body">
                     <!-- Flash messages now handled by base template -->
                     <div class="mb-4">
-                        <h3 class="h5 mb-3">Instructions</h3>
-                        <p
-                            >Upload a CSV file containing restaurant information. The file must include the following
-                            required fields:</p
-                        >
-                        <h4 class="h6 mt-3">Required Fields:</h4>
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            The following field is <strong>required</strong> in your file:
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <h3 class="h5 mb-0">Quick Start</h3>
+                            <a href="{{ url_for('restaurants.export_restaurants') }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-download me-1"></i>Sample CSV
+                            </a>
                         </div>
-                        <ul class="mb-3">
-                            <li> <code>name</code> - Restaurant name </li>
-                        </ul>
-                        <h4 class="h6 mt-3">Optional Fields:</h4>
-                        <ul>
-                            <li> <code>type</code> - Restaurant type (restaurant, cafe, bar, bakery, other) </li>
-                            <li> <code>address</code> - Street address </li>
-                            <li> <code>city</code> - City name </li>
-                            <li> <code>phone</code> - Contact number </li>
-                            <li> <code>website</code> - Restaurant website URL </li>
-                            <li> <code>cuisine</code> - Type of cuisine </li>
-                            <li> <code>notes</code> - Additional notes </li>
-                        </ul>
-                        <div class="alert alert-info mt-3">
-                            <i class="fas fa-download me-2"></i>
-                            <a href="{{ url_for('restaurants.export_restaurants') }}" class="alert-link"
-                                >Download sample CSV file</a
-                            >
+
+                        <div class="alert alert-primary">
+                            <i class="fas fa-upload me-2"></i>
+                            <strong>Upload a CSV file with restaurant data.</strong>
+                            Required: <code>name</code> column.
+                            Optional: type, address, city, phone, website, cuisine, notes.
+                        </div>
+
+                        <!-- Expandable Sections -->
+                        <div class="accordion" id="importAccordion">
+
+                            <!-- Required Fields -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingRequired">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#collapseRequired" aria-expanded="false" aria-controls="collapseRequired">
+                                        <i class="fas fa-asterisk text-danger me-2"></i>
+                                        <strong>Required Fields</strong>
+                                    </button>
+                                </h2>
+                                <div id="collapseRequired" class="accordion-collapse collapse"
+                                     aria-labelledby="headingRequired" data-bs-parent="#importAccordion">
+                                    <div class="accordion-body">
+                                        <ul class="mb-0">
+                                            <li><code>name</code> - Restaurant name (must be unique per user)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Optional Fields -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingOptional">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#collapseOptional" aria-expanded="false" aria-controls="collapseOptional">
+                                        <i class="fas fa-plus-circle text-success me-2"></i>
+                                        <strong>Optional Fields</strong>
+                                    </button>
+                                </h2>
+                                <div id="collapseOptional" class="accordion-collapse collapse"
+                                     aria-labelledby="headingOptional" data-bs-parent="#importAccordion">
+                                    <div class="accordion-body">
+                                        <ul class="mb-0">
+                                            <li><code>type</code> - Restaurant type (restaurant, cafe, bar, bakery, other)</li>
+                                            <li><code>address</code> - Full street address</li>
+                                            <li><code>city</code> - City name</li>
+                                            <li><code>phone</code> - Contact phone number</li>
+                                            <li><code>website</code> - Restaurant website URL</li>
+                                            <li><code>cuisine</code> - Type of cuisine served</li>
+                                            <li><code>notes</code> - Additional notes or comments</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Smart Features -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingFeatures">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#collapseFeatures" aria-expanded="false" aria-controls="collapseFeatures">
+                                        <i class="fas fa-magic text-primary me-2"></i>
+                                        <strong>Smart Import Features</strong>
+                                    </button>
+                                </h2>
+                                <div id="collapseFeatures" class="accordion-collapse collapse"
+                                     aria-labelledby="headingFeatures" data-bs-parent="#importAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>Flexible Column Names</h6>
+                                                <small class="text-muted">
+                                                    <strong>Name:</strong> restaurant_name, business_name, establishment<br>
+                                                    <strong>Type:</strong> restaurant_type, category, business_type<br>
+                                                    <strong>Address:</strong> street_address, location, full_address<br>
+                                                    <strong>Phone:</strong> telephone, contact_number, phone_number<br>
+                                                    <strong>Notes:</strong> description, comments, details
+                                                </small>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>Smart Processing</h6>
+                                                <small class="text-muted">
+                                                    • Duplicate name detection and prevention<br>
+                                                    • URL validation and formatting<br>
+                                                    • Phone number normalization<br>
+                                                    • Address standardization<br>
+                                                    • Type validation against allowed values
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Format Examples -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingExamples">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#collapseExamples" aria-expanded="false" aria-controls="collapseExamples">
+                                        <i class="fas fa-list-alt text-info me-2"></i>
+                                        <strong>Format Examples</strong>
+                                    </button>
+                                </h2>
+                                <div id="collapseExamples" class="accordion-collapse collapse"
+                                     aria-labelledby="headingExamples" data-bs-parent="#importAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>Valid Restaurant Types</h6>
+                                                <code class="d-block">restaurant</code>
+                                                <code class="d-block">cafe</code>
+                                                <code class="d-block">bar</code>
+                                                <code class="d-block">bakery</code>
+                                                <code class="d-block">other</code>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>Valid Phone Formats</h6>
+                                                <code class="d-block">(555) 123-4567</code>
+                                                <code class="d-block">555-123-4567</code>
+                                                <code class="d-block">+1-555-123-4567</code>
+                                                <code class="d-block">5551234567</code>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-3">
+                                            <div class="col-12">
+                                                <h6>Sample CSV Row</h6>
+                                                <div class="bg-light p-2 rounded">
+                                                    <code>
+                                                        name,type,address,city,phone,website,cuisine,notes<br>
+                                                        "Joe's Pizza",restaurant,"123 Main St","New York",(555) 123-4567,https://joespizza.com,Italian,"Great thin crust"
+                                                    </code>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
                     <form
@@ -48,7 +163,7 @@
                         {{ form.hidden_tag() }}
                         <div class="mb-3">
                             <label for="file" class="form-label">Select CSV file</label>
-                            {{ form.file(class_="form-control", accept=".csv") }}
+                            {{ form.file(class_="form-control", accept=".csv", id="file") }}
                             <div class="invalid-feedback">Please select a CSV file to upload.</div>
                             <div class="form-text">Maximum file size: 5MB. Only CSV files are supported.</div>
                         </div>
@@ -62,20 +177,114 @@
                                 {% endfor %} {% endfor %}
                             </ul>
                         </div>
-                        {% endif %} {% if errors %}
+                        {% endif %}
+
+                        <!-- Import Summary (when available) -->
+                        {% if import_summary %}
+                        <div class="alert alert-info">
+                            <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Import Summary</h5>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <strong>Processed:</strong> {{ import_summary.get('success_count', 0) + import_summary.get('error_count', 0) }} rows
+                                </div>
+                                <div class="col-md-3">
+                                    <strong class="text-success">Imported:</strong> {{ import_summary.get('success_count', 0) }}
+                                </div>
+                                <div class="col-md-3">
+                                    <strong class="text-warning">Skipped:</strong> {{ import_summary.get('skipped_count', 0) }}
+                                </div>
+                                <div class="col-md-3">
+                                    <strong class="text-danger">Errors:</strong> {{ import_summary.get('error_count', 0) }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Import Warnings (Duplicates) -->
+                        {% if warnings %}
+                        <div class="alert alert-warning">
+                            <h5 class="alert-heading"><i class="fas fa-exclamation-circle me-2"></i>Import Warnings</h5>
+                            <p class="mb-3">The following items were skipped during import:</p>
+                            <div class="warning-list" style="max-height: 200px; overflow-y: auto;">
+                                <ul class="mb-0">
+                                    {% for warning in warnings[:10] %}
+                                    <li class="mb-1"><small>{{ warning }}</small></li>
+                                    {% endfor %}
+                                    {% if warnings|length > 10 %}
+                                    <li class="text-muted mt-2"><em>... and {{ warnings|length - 10 }} more warnings</em></li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Detailed Import Errors -->
+                        {% if errors %}
                         <div class="alert alert-danger">
-                            <h5 class="alert-heading">Import Errors</h5>
-                            <ul class="mb-0">
-                                {% for error in errors %}<li>{{ error }}</li
-                                >{% endfor %}
-                            </ul>
+                            <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Import Errors</h5>
+                            <p class="mb-3">The following errors occurred during import. Please fix these issues in your file and try again:</p>
+                            {% if errors|length > 10 %}
+                            <div class="mb-3">
+                                <small class="text-muted">Showing first 10 errors of {{ errors|length }} total errors.</small>
+                            </div>
+                            {% endif %}
+                            <div class="error-list" style="max-height: 300px; overflow-y: auto;">
+                                <ul class="mb-0">
+                                    {% for error in errors[:10] %}
+                                    <li class="mb-1"><code>{{ error }}</code></li>
+                                    {% endfor %}
+                                    {% if errors|length > 10 %}
+                                    <li class="text-muted mt-2"><em>... and {{ errors|length - 10 }} more errors</em></li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            {% if errors|length > 10 %}
+                            <div class="mt-3">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#allErrors" aria-expanded="false">
+                                    <i class="fas fa-list me-1"></i> Show All {{ errors|length }} Errors
+                                </button>
+                            </div>
+                            <div class="collapse mt-3" id="allErrors">
+                                <div class="card card-body">
+                                    <div style="max-height: 400px; overflow-y: auto;">
+                                        <ul class="mb-0">
+                                            {% for error in errors %}
+                                            <li class="mb-1"><code>{{ error }}</code></li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <!-- Common Error Help -->
+                            <div class="mt-3 p-3 bg-light rounded">
+                                <h6><i class="fas fa-lightbulb me-2"></i>Common Solutions:</h6>
+                                <ul class="mb-0 small">
+                                    <li><strong>"Name is required":</strong> Check that your name column has data and is named correctly (name, restaurant_name, etc.)</li>
+                                    <li><strong>"Duplicate restaurant name":</strong> Restaurant names must be unique for each user</li>
+                                    <li><strong>"Invalid restaurant type":</strong> Use one of: restaurant, cafe, bar, bakery, other</li>
+                                    <li><strong>"Invalid phone format":</strong> Use formats like: (555) 123-4567, 555-123-4567, +1-555-123-4567</li>
+                                    <li><strong>"Invalid website URL":</strong> Include http:// or https:// prefix (e.g., https://example.com)</li>
+                                    <li><strong>"Column not found":</strong> Ensure your CSV has the correct column headers</li>
+                                </ul>
+                            </div>
                         </div>
                         {% endif %}
                         <div class="d-flex gap-2">
+                            {% if import_summary and import_summary.get('success_count', 0) > 0 %}
+                            <!-- Show different buttons when import was partially successful -->
+                            <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-success">
+                                <i class="fas fa-check me-1"></i> View Imported Restaurants
+                            </a>
+                            {{ form.submit(class_="btn btn-primary") }}
+                            {% else %}
+                            <!-- Show normal submit when no import happened yet -->
                             {{ form.submit(class_="btn btn-primary") }}
                             <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary">
                                 <i class="fas fa-times me-1"></i> Cancel
                             </a>
+                            {% endif %}
                         </div>
                     </form>
                 </div>
@@ -83,4 +292,53 @@
         </div>
     </div>
 </div>
-{% endblock content %} {% block scripts %} {{ super() }} {% endblock scripts %}
+{% endblock content %} {% block scripts %} {{ super() }}
+<script>
+    // Form validation
+    document.addEventListener("DOMContentLoaded", function () {
+        const form = document.getElementById("import-form");
+        const fileInput = form.querySelector("#file");
+
+        // Reset any initial validation states
+        fileInput.classList.remove("is-invalid", "is-valid");
+
+        form.addEventListener("submit", function (event) {
+            // Clear any previous validation states
+            fileInput.classList.remove("is-invalid", "is-valid");
+
+            if (!fileInput.files.length) {
+                event.preventDefault();
+                event.stopPropagation();
+                fileInput.classList.add("is-invalid");
+                form.classList.add("was-validated");
+            } else {
+                // File is selected, allow form submission
+                fileInput.classList.add("is-valid");
+            }
+        });
+
+        fileInput.addEventListener("change", function () {
+            // Clear any validation classes when file selection changes
+            this.classList.remove("is-invalid", "is-valid");
+
+            if (this.files.length) {
+                // File selected, show positive feedback but don't persist it
+                this.classList.add("is-valid");
+
+                // Remove validation state after a short delay to prevent persistent green border
+                setTimeout(() => {
+                    if (!form.classList.contains("was-validated")) {
+                        this.classList.remove("is-valid");
+                    }
+                }, 1000);
+            }
+        });
+
+        // Clear validation states when form is reset or page loads
+        form.addEventListener("reset", function() {
+            fileInput.classList.remove("is-invalid", "is-valid");
+            form.classList.remove("was-validated");
+        });
+    });
+</script>
+{% endblock scripts %}

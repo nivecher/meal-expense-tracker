@@ -5,6 +5,7 @@
 {% block head_extra %}
 <link href="{{ url_for('static', filename='css/forms.css') }}" rel="stylesheet">
 <script src="{{ url_for('static', filename='js/components/timezone-detector.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/components/avatar-picker.js') }}" defer></script>
 <style>
     .profile-container {
         max-width: 800px;
@@ -259,10 +260,113 @@
         color: white;
     }
 
-    .btn-sm {
+        .btn-sm {
         padding: 0.375rem 0.75rem;
         font-size: 0.8125rem;
         border-radius: 4px;
+    }
+
+    /* Avatar Picker Styles */
+    .avatar-picker-section {
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        background: #f8fafc;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .avatar-picker-header {
+        font-size: 1rem;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 1rem;
+        transition: color 0.3s ease;
+    }
+
+    .avatar-picker-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+        gap: 1rem;
+        max-width: 500px;
+    }
+
+    .avatar-option {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        overflow: hidden;
+        cursor: pointer;
+        border: 3px solid transparent;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .avatar-option:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        border-color: #667eea;
+    }
+
+    .avatar-option.selected {
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+    }
+
+    .avatar-option img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .avatar-option-initials {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 1.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .avatar-option-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(102, 126, 234, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        border-radius: 50%;
+    }
+
+    .avatar-option.selected .avatar-option-overlay {
+        opacity: 1;
+    }
+
+    .avatar-option-overlay i {
+        color: white;
+        font-size: 1.5rem;
+    }
+
+    .avatar-upload-placeholder {
+        padding: 1rem;
+        background: #f0f9ff;
+        border: 2px dashed #bfdbfe;
+        border-radius: 8px;
+        text-align: center;
+        color: #374151;
+        margin-top: 1rem;
     }
 
     @media (max-width: 768px) {
@@ -311,12 +415,32 @@
         <p class="profile-username">@{{ current_user.username }}</p>
     </div>
 
-    <!-- Profile Form -->
+        <!-- Profile Form -->
     <form method="POST" class="profile-form" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-        <!-- Avatar Upload (Hidden) -->
-        <input type="file" id="avatar-upload" name="avatar" accept="image/*" class="hidden">
+        <!-- Hidden avatar URL input for form submission -->
+        <input type="hidden" id="avatar-url-input" name="avatar_url" value="{{ current_user.avatar_url or '' }}">
+
+        <!-- Avatar Selection -->
+        <div class="form-section">
+            <h2 class="form-section-title">
+                <i class="fas fa-image me-2"></i>Avatar
+            </h2>
+
+            <div class="avatar-picker-section">
+                <div class="avatar-picker-header">Choose your avatar:</div>
+                <div id="avatar-picker-container">
+                    <!-- Avatar options will be populated by JavaScript -->
+                </div>
+
+                <div class="avatar-upload-placeholder">
+                    <i class="fas fa-cloud-upload-alt me-2"></i>
+                    <strong>Coming Soon:</strong> Upload your own avatar image
+                    <br><small class="text-muted">For now, choose from the selection above or use your initials</small>
+                </div>
+            </div>
+        </div>
 
         <!-- Personal Information -->
         <div class="form-section">
@@ -485,15 +609,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Avatar upload handling (placeholder for future implementation)
-    const avatarUpload = document.getElementById('avatar-upload');
-    if (avatarUpload) {
-        avatarUpload.addEventListener('change', function(e) {
-            if (e.target.files && e.target.files[0]) {
-                // TODO: Implement avatar upload
-                alert('Avatar upload will be implemented in the next phase!');
-            }
-        });
+    // Initialize avatar picker with current selection
+    if (window.avatarPicker) {
+        const currentAvatarUrl = document.getElementById('avatar-url-input').value;
+        if (currentAvatarUrl) {
+            // Set the current avatar as selected
+            setTimeout(() => {
+                window.avatarPicker.setSelectedAvatar(currentAvatarUrl);
+            }, 100);
+        }
     }
 });
 </script>

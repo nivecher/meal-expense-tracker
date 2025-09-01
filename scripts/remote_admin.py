@@ -33,6 +33,12 @@ Examples:
     # Recent activity
     python scripts/remote_admin.py recent-activity --days 30
 
+    # Validate restaurants
+    python scripts/remote_admin.py validate-restaurants --user-id 1
+    python scripts/remote_admin.py validate-restaurants --username admin --dry-run
+    python scripts/remote_admin.py validate-restaurants --all-users --fix-mismatches
+    python scripts/remote_admin.py validate-restaurants --restaurant-id 123
+
     # Initialize database (with confirmation)
     python scripts/remote_admin.py --confirm init-db --sample-data
 
@@ -142,6 +148,8 @@ class RemoteAdminClient:
             self._format_users_output(data["users"], output)
         elif "operations" in data:
             self._format_operations_output(data["operations"], output)
+        elif "validation_results" in data:
+            self._format_validation_results_output(data, output)
         elif any(key in data for key in ["users", "content", "system"]):
             self._format_stats_output(data, output)
 
@@ -185,6 +193,71 @@ class RemoteAdminClient:
         if "content" in data:
             stats = data["content"]
             output.append(f"📝 Content: {stats.get('restaurants', 0)} restaurants, {stats.get('expenses', 0)} expenses")
+
+    def _format_validation_results_output(self, data: Dict[str, Any], output: List[str]) -> None:
+        """Format restaurant validation results output."""
+        validation_results = data.get("validation_results", [])
+        summary = data.get("summary", {})
+
+        output.append(f"\n🍽️  Restaurant Validation Results ({len(validation_results)} restaurants):")
+
+        # Show individual results
+        self._format_individual_validation_results(validation_results, output)
+
+        # Show summary
+        self._format_validation_summary(summary, output)
+
+    def _format_individual_validation_results(
+        self, validation_results: List[Dict[str, Any]], output: List[str]
+    ) -> None:
+        """Format individual validation results."""
+        for result in validation_results[:5]:  # Show first 5
+            restaurant_name = result.get("name", "Unknown")
+            status = result.get("status", "unknown")
+
+            status_icon = self._get_status_icon(status)
+            output.append(f"  {status_icon} {restaurant_name}")
+
+            # Show mismatches if any
+            mismatches = result.get("mismatches", [])
+            if mismatches:
+                output.append(f"      Mismatches: {', '.join(mismatches[:2])}")
+                if len(mismatches) > 2:
+                    output.append(f"      ... and {len(mismatches) - 2} more")
+
+            # Show if fixed
+            if result.get("fixed"):
+                output.append("      🔧 Fixed")
+            elif result.get("would_fix") and result.get("dry_run"):
+                output.append("      🔧 Would fix (dry run)")
+
+        if len(validation_results) > 5:
+            output.append(f"  ... and {len(validation_results) - 5} more restaurants")
+
+    def _get_status_icon(self, status: str) -> str:
+        """Get status icon for validation result."""
+        if status == "valid":
+            return "✅"
+        elif status == "invalid":
+            return "❌"
+        else:
+            return "⚠️"
+
+    def _format_validation_summary(self, summary: Dict[str, Any], output: List[str]) -> None:
+        """Format validation summary."""
+        if not summary:
+            return
+
+        output.append("\n📊 Summary:")
+        output.append(f"   ✅ Valid: {summary.get('valid_count', 0)}")
+        output.append(f"   ❌ Invalid: {summary.get('invalid_count', 0)}")
+        output.append(f"   ⚠️  Cannot validate: {summary.get('error_count', 0)}")
+
+        if summary.get("fixed_count", 0) > 0:
+            if summary.get("dry_run"):
+                output.append(f"   🔧 Would fix: {summary.get('fixed_count', 0)} restaurants")
+            else:
+                output.append(f"   🔧 Fixed: {summary.get('fixed_count', 0)} restaurants")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -256,6 +329,25 @@ def create_parser() -> argparse.ArgumentParser:
     db_parser = subparsers.add_parser("db-maintenance", help="Perform database maintenance")
     db_parser.add_argument(
         "--operation", choices=["analyze", "vacuum"], default="analyze", help="Maintenance operation to perform"
+    )
+
+    # Validate restaurants
+    validate_restaurants_parser = subparsers.add_parser(
+        "validate-restaurants", help="Validate restaurant information using Google Places API"
+    )
+    validate_restaurants_parser.add_argument("--user-id", type=int, help="Specific user ID to validate restaurants for")
+    validate_restaurants_parser.add_argument(
+        "--username", type=str, help="Specific username to validate restaurants for"
+    )
+    validate_restaurants_parser.add_argument(
+        "--all-users", action="store_true", help="Validate restaurants for all users"
+    )
+    validate_restaurants_parser.add_argument("--restaurant-id", type=int, help="Validate a specific restaurant by ID")
+    validate_restaurants_parser.add_argument(
+        "--fix-mismatches", action="store_true", help="Automatically fix name/address mismatches from Google"
+    )
+    validate_restaurants_parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be fixed without making changes"
     )
 
     return parser
@@ -357,6 +449,29 @@ def _handle_db_maintenance(client: RemoteAdminClient, args: argparse.Namespace) 
     return client.invoke_operation("db_maintenance", params, args.confirm)
 
 
+def _handle_validate_restaurants(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+    """Handle validate-restaurants command."""
+    params = {}
+
+    # Add identity parameters
+    if args.user_id:
+        params["user_id"] = args.user_id
+    if args.username:
+        params["username"] = args.username
+    if args.all_users:
+        params["all_users"] = args.all_users
+    if args.restaurant_id:
+        params["restaurant_id"] = args.restaurant_id
+
+    # Add action parameters
+    if args.fix_mismatches:
+        params["fix_mismatches"] = args.fix_mismatches
+    if args.dry_run:
+        params["dry_run"] = args.dry_run
+
+    return client.invoke_operation("validate_restaurants", params, args.confirm)
+
+
 def _execute_command(client: RemoteAdminClient, args: argparse.Namespace) -> Optional[Dict[str, Any]]:
     """Execute the specified command and return the result."""
     command_handlers = {
@@ -368,6 +483,7 @@ def _execute_command(client: RemoteAdminClient, args: argparse.Namespace) -> Opt
         "recent-activity": lambda: _handle_recent_activity(client, args),
         "init-db": lambda: _handle_init_db(client, args),
         "db-maintenance": lambda: _handle_db_maintenance(client, args),
+        "validate-restaurants": lambda: _handle_validate_restaurants(client, args),
     }
 
     handler = command_handlers.get(args.command)
