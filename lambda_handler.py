@@ -247,6 +247,19 @@ def _get_allowed_domains(headers: Dict[str, str]) -> list[str]:
                 allowed_domains.extend([f"https://{host}", f"http://{host}"])
         else:
             allowed_domains = ["http://localhost:5000", "https://localhost:5000"]
+    else:
+        # Always include the current host for Lambda Function URLs and API Gateway
+        host = headers.get("Host") or headers.get("host", "")
+        if host and ("lambda-url" in host or "execute-api" in host or "amazonaws.com" in host):
+            allowed_domains.append(f"https://{host}")
+            allowed_domains.append(f"http://{host}")
+
+    # Always allow localhost for development
+    if "http://localhost:5000" not in allowed_domains:
+        allowed_domains.append("http://localhost:5000")
+    if "https://localhost:5000" not in allowed_domains:
+        allowed_domains.append("https://localhost:5000")
+
     return allowed_domains
 
 

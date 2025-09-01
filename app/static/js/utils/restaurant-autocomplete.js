@@ -71,7 +71,7 @@ function should_process_query(query) {
 
 function generate_request_id(query) {
   const request_id = ++current_request_id;
-  console.log(`Autocomplete request ${request_id}: "${query}"`);
+  console.debug(`Starting autocomplete request ${request_id} for: "${query}"`);
   return request_id;
 }
 
@@ -97,6 +97,8 @@ async function fetch_suggestions(query, request_id) {
 }
 
 function handle_success_result(suggestions, request_id) {
+  console.debug(`Request ${request_id} completed successfully with ${suggestions?.length || 0} suggestions`);
+
   if (suggestions && suggestions.length > 0) {
     show_suggestions(suggestions);
   } else {
@@ -105,9 +107,13 @@ function handle_success_result(suggestions, request_id) {
 }
 
 function handle_error_result(error, request_id) {
-  console.error(`Request ${request_id} failed:`, error);
+  // Don't log outdated requests as errors - they're expected behavior
+  if (error.message === 'Outdated request') {
+    console.debug(`Request ${request_id} superseded by newer request`);
+    return;
+  }
 
-  if (error.message === 'Outdated request') return;
+  console.error(`Request ${request_id} failed:`, error);
 
   if (should_disable_autocomplete(error, request_id)) {
     disable_autocomplete_for_session();

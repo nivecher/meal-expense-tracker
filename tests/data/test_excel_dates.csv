@@ -1,0 +1,6 @@
+date,amount,restaurant_name,meal_type,notes
+45230,24.77,Chick-Fil-A,lunch,Excel serial date test
+45232,15.50,Starbucks,breakfast,Another Excel date
+2025-09-05,12.99,McDonald's,dinner,Regular ISO date
+9/7/2025,8.75,Subway,lunch,US format date
+44927,22.45,Pizza Hut,dinner,Excel date from 2023

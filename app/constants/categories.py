@@ -2,9 +2,13 @@
 
 This module contains the default categories that are created for new users
 and provides utilities for category management.
+
+Following TIGER principles: Safety, Performance, Developer Experience
 """
 
 from typing import List, TypedDict
+
+from .colors import get_category_color
 
 
 class CategoryData(TypedDict):
@@ -21,30 +25,45 @@ DEFAULT_CATEGORIES: List[CategoryData] = [
     {
         "name": "Restaurants",
         "description": "Restaurant meals and takeout",
-        "color": "#fd7e14",  # Orange
+        "color": get_category_color("restaurants"),  # Orange #fd7e14
         "icon": "utensils",
     },
     {
         "name": "Groceries",
         "description": "Grocery shopping and food supplies",
-        "color": "#198754",  # Green
+        "color": get_category_color("groceries"),  # Green #198754
         "icon": "shopping-cart",
     },
-    {"name": "Drinks", "description": "Beverages, coffee, and drinks", "color": "#0dcaf0", "icon": "coffee"},  # Cyan
-    {"name": "Fast Food", "description": "Quick service and fast food", "color": "#dc3545", "icon": "hamburger"},  # Red
+    {
+        "name": "Drinks",
+        "description": "Beverages, coffee, and drinks",
+        "color": get_category_color("drinks"),  # Cyan #0dcaf0
+        "icon": "coffee",
+    },
+    {
+        "name": "Fast Food",
+        "description": "Quick service and fast food",
+        "color": get_category_color("fast_food"),  # Red #dc3545
+        "icon": "hamburger",
+    },
     {
         "name": "Entertainment",
         "description": "Movies, events, and entertainment",
-        "color": "#6f42c1",  # Purple
+        "color": get_category_color("entertainment"),  # Purple #6f42c1
         "icon": "theater-masks",
     },
     {
         "name": "Snacks & Vending",
         "description": "Snacks and vending machines",
-        "color": "#0d6efd",  # Blue
-        "icon": "car",
+        "color": get_category_color("snacks_vending"),  # Blue #0d6efd
+        "icon": "car",  # Vending machine access, drive-through snacks
     },
-    {"name": "Other", "description": "Miscellaneous expenses", "color": "#6c757d", "icon": "question"},  # Gray
+    {
+        "name": "Other",
+        "description": "Miscellaneous expenses",
+        "color": get_category_color("other"),  # Gray #6c757d
+        "icon": "question",
+    },
 ]
 
 

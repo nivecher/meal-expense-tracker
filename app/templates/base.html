@@ -49,8 +49,8 @@
             class="visually-hidden-permanent">
         </div>
         <!-- Styles -->
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/components/search.css') }}" rel="stylesheet" />
@@ -74,6 +74,19 @@
     <body>
         {% include "includes/navbar.html" %}
         <main class="container py-4">
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages mb-4">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                <div class="alert-message">{{ message }}</div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
             <!-- Toast Container -->
             <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3"> </div>
             {% block content %} {% endblock content %}
@@ -105,14 +118,34 @@
         <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
         <!-- Bootstrap Bundle with Popper -->
         <script
-            src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
-            integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz"
+            src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
             crossorigin="anonymous"
             defer></script>
         <!-- Application Configuration -->
         <div
             id="app-config"
-            data-app-config='{ "staticBaseUrl": "{{ request.script_root or "" }}", "app": { "debug": {{ "true" if config.DEBUG else "false" }}, "env": "{{ config.ENV or "production" }}", "version": "1.0.0" }, "googleMaps": { "apiKey": "{{ config.GOOGLE_MAPS_API_KEY or "" }}", "libraries": ["places"] } }'>
+            data-app-config='{
+                "staticBaseUrl": "{{ request.script_root or "" }}",
+                "app": {
+                    "debug": {{ "true" if config.DEBUG else "false" }},
+                    "env": "{{ config.ENV or "production" }}",
+                    "version": "{{ get_app_version() }}"
+                },
+                "googleMaps": {
+                    "apiKey": "{{ config.GOOGLE_MAPS_API_KEY or "" }}",
+                    "libraries": ["places"]
+                },
+                "colors": {
+                    "gray": "#6c757d",
+                    "orange": "#fd7e14",
+                    "green": "#198754",
+                    "cyan": "#0dcaf0",
+                    "red": "#dc3545",
+                    "purple": "#6f42c1",
+                    "blue": "#0d6efd"
+                }
+            }'>
         </div>
         <!-- Core Application Scripts -->
         <script type="module" src="{{ url_for('static', filename='js/config.js') }}" defer></script>
@@ -125,17 +158,7 @@
         {% endif %}
         <!-- Page-specific scripts -->
         {% block scripts %} {% endblock scripts %} {% block extra_js %} {% endblock extra_js %}
-        <!-- Flash messages container (data will be read by JavaScript) -->
-        <div
-            id="flash-messages"
-            data-messages='{ {%- for category, message in get_flashed_messages(with_categories=true) -%} "{{ loop.index0 }}": {"type": "{{ category|e }}", "message": "{{ message|e }}"}
-            {% if not loop.last %}
- ,
-            {% endif %}
-        {%- endfor -%} }'>
-        </div>
-        <!-- Load flash messages initialization -->
-        <script type="module" src="{{ url_for('static', filename='js/pages/flash-messages-init.js') }}"></script>
+
         <!-- Initialize page modules -->
         <!-- Load configuration utility -->
         <script type="module" src="{{ url_for('static', filename='js/utils/config.js') }}"></script>
@@ -143,9 +166,7 @@
         <script type="module" src="{{ url_for('static', filename='js/components/table-sort.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/components/sticky-tables.js') }}" defer></script>
         <!-- Navbar components -->
-        <script type="module" src="{{ url_for('static', filename='js/components/avatar.js') }}" defer></script>
+        <script type="module" src="{{ url_for('static', filename='js/components/modern-avatar.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/components/navbar.js') }}" defer></script>
-        <!-- Avatar fallback component -->
-        <script type="module" src="{{ url_for('static', filename='js/components/avatar-fallback.js') }}" defer></script>
     </body>
 </html>

@@ -8,6 +8,20 @@ from typing import Any, Dict
 from flask import current_app
 
 
+def _get_app_version() -> str:
+    """Get the application version for User-Agent header.
+
+    Returns:
+        str: Application version string
+    """
+    try:
+        from app._version import __version__
+
+        return __version__
+    except ImportError:
+        return "development"
+
+
 class GoogleMapsOptimizer:
     """Optimizes Google Maps API requests with proper caching headers."""
 
@@ -21,7 +35,7 @@ class GoogleMapsOptimizer:
         """
         return {
             "Cache-Control": "public, max-age=300, s-maxage=600",  # 5min client, 10min proxy
-            "User-Agent": f"MealExpenseTracker/{current_app.config.get('APP_VERSION', '1.0.0')}",
+            "User-Agent": f"MealExpenseTracker/{_get_app_version()}",
             "Accept": "application/json",
             "Accept-Encoding": "gzip, deflate, br",
         }
@@ -66,6 +80,7 @@ class GoogleMapsOptimizer:
                 "price_level",
                 "website",
                 "formatted_phone_number",
+                "address_components",
             ],
             "language": "en",
             "region": "US",

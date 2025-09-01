@@ -1,6 +1,17 @@
 from __future__ import annotations
 
-from flask import flash, jsonify, redirect, render_template, request, url_for
+from datetime import datetime, timezone
+
+import pytz
+from flask import (
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.auth import bp, services
@@ -72,8 +83,6 @@ def login():
     form = LoginForm()
 
     # Debug logging for form validation issues
-    from flask import current_app
-
     current_app.logger.info(
         f"Login attempt - Method: {request.method}, CSRF enabled: {current_app.config.get('WTF_CSRF_ENABLED', True)}"
     )
@@ -103,8 +112,6 @@ def login():
     if validation_response:
         return validation_response
 
-    from datetime import datetime, timezone
-
     return render_template("auth/login.html", form=form, title="Login", now=datetime.now(timezone.utc))
 
 
@@ -127,7 +134,6 @@ def register():
         db.session.commit()
         flash("Congratulations, you are now a registered user!")
         return redirect(url_for("auth.login"))
-    from datetime import datetime, timezone
 
     return render_template("auth/register.html", form=form, title="Register", now=datetime.now(timezone.utc))
 
@@ -146,7 +152,6 @@ def change_password():
             return redirect(url_for("main.index"))
         else:
             flash("Invalid password.")
-    from datetime import datetime, timezone
 
     return render_template(
         "auth/change_password.html",
@@ -156,10 +161,116 @@ def change_password():
     )
 
 
-@bp.route("/profile")
+@bp.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
-    """User profile page."""
-    from datetime import datetime, timezone
+    """User profile management page."""
+    if request.method == "POST":
+        try:
+            # Update profile fields
+            current_user.first_name = request.form.get("first_name", "").strip() or None
+            current_user.last_name = request.form.get("last_name", "").strip() or None
+            current_user.display_name = request.form.get("display_name", "").strip() or None
+            current_user.bio = request.form.get("bio", "").strip() or None
+            current_user.phone = request.form.get("phone", "").strip() or None
+            current_user.timezone = request.form.get("timezone", "UTC").strip()
 
-    return render_template("auth/profile.html", title="Profile", now=datetime.now(timezone.utc))
+            # Basic validation
+            if current_user.phone and len(current_user.phone) > 20:
+                flash("Phone number is too long (max 20 characters)", "error")
+                return redirect(url_for("auth.profile"))
+
+            if current_user.bio and len(current_user.bio) > 500:
+                flash("Bio is too long (max 500 characters)", "error")
+                return redirect(url_for("auth.profile"))
+
+            # Validate timezone
+            if current_user.timezone not in pytz.all_timezones:
+                current_user.timezone = "UTC"
+                flash("Invalid timezone, defaulted to UTC", "warning")
+
+            db.session.commit()
+            flash("Profile updated successfully!", "success")
+            return redirect(url_for("auth.profile"))
+
+        except Exception as e:
+            db.session.rollback()
+            flash("Failed to update profile. Please try again.", "error")
+            current_app.logger.error(f"Profile update failed for user {current_user.id}: {e}")
+            return redirect(url_for("auth.profile"))
+
+    # Get common timezones for the dropdown
+    common_timezones = [
+        "UTC",
+        "US/Eastern",
+        "US/Central",
+        "US/Mountain",
+        "US/Pacific",
+        "Europe/London",
+        "Europe/Paris",
+        "Europe/Berlin",
+        "Asia/Tokyo",
+        "Asia/Shanghai",
+        "Australia/Sydney",
+    ]
+
+    return render_template(
+        "auth/profile.html",
+        title="Profile",
+        now=datetime.now(timezone.utc),
+        common_timezones=common_timezones,
+        all_timezones=sorted(pytz.all_timezones),
+    )
+
+
+@bp.route("/api/detect-timezone", methods=["POST"])
+@login_required
+def detect_timezone():
+    """API endpoint for timezone detection from coordinates."""
+    try:
+        data = request.get_json()
+        lat = float(data.get("latitude", 0))
+        lng = float(data.get("longitude", 0))
+
+        # Basic timezone detection logic (simplified)
+        # In production, you might want to use a more sophisticated
+        # timezone boundary database or external service
+
+        timezone_mappings = [
+            # North America
+            {"bounds": {"north": 71, "south": 25, "west": -130, "east": -114}, "tz": "America/Los_Angeles"},
+            {"bounds": {"north": 71, "south": 25, "west": -114, "east": -104}, "tz": "America/Denver"},
+            {"bounds": {"north": 71, "south": 25, "west": -104, "east": -80}, "tz": "America/Chicago"},
+            {"bounds": {"north": 71, "south": 25, "west": -80, "east": -60}, "tz": "America/New_York"},
+            # Europe
+            {"bounds": {"north": 71, "south": 35, "west": -10, "east": 15}, "tz": "Europe/London"},
+            {"bounds": {"north": 71, "south": 35, "west": 15, "east": 30}, "tz": "Europe/Berlin"},
+            # Asia
+            {"bounds": {"north": 71, "south": 10, "west": 75, "east": 105}, "tz": "Asia/Bangkok"},
+            {"bounds": {"north": 71, "south": 10, "west": 105, "east": 135}, "tz": "Asia/Shanghai"},
+            {"bounds": {"north": 71, "south": 25, "west": 135, "east": 180}, "tz": "Asia/Tokyo"},
+            # Australia
+            {"bounds": {"north": -10, "south": -45, "west": 110, "east": 155}, "tz": "Australia/Sydney"},
+        ]
+
+        detected_timezone = "UTC"  # Default fallback
+
+        for mapping in timezone_mappings:
+            bounds = mapping["bounds"]
+            if lat <= bounds["north"] and lat >= bounds["south"] and lng >= bounds["west"] and lng <= bounds["east"]:
+                detected_timezone = mapping["tz"]
+                break
+
+        # Validate the timezone
+        if detected_timezone not in pytz.all_timezones:
+            detected_timezone = "UTC"
+
+        return jsonify(
+            {"success": True, "timezone": detected_timezone, "confidence": "medium", "method": "coordinate_lookup"}
+        )
+
+    except (ValueError, TypeError, KeyError):
+        return jsonify({"success": False, "error": "Invalid coordinates provided", "timezone": "UTC"}), 400
+    except Exception as e:
+        current_app.logger.error(f"Timezone detection API error: {e}")
+        return jsonify({"success": False, "error": "Server error during timezone detection", "timezone": "UTC"}), 500

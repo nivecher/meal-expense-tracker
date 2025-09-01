@@ -67,7 +67,7 @@ TIGER principles (Testable, Incremental, Goal-oriented, Explicit, Responsibility
 - **Web Framework**: Flask 3.1.1 with Blueprints for route organization
 - **Database**: SQLAlchemy ORM with PostgreSQL
 - **API**: RESTful design with JSON:API specification
-- **Authentication**: JWT-based authentication with Flask-JWT-Extended
+- **Authentication**: Session-based authentication with Flask-Login
 - **Validation**: Pydantic models for request/response validation
 - **Testing**: Pytest with factory_boy for test data generation
 
@@ -125,7 +125,7 @@ app/
 
 - **Routes**: Defined in Blueprints under `app/api/v1/`
 - **Request Validation**: Pydantic models in `*/schemas.py`
-- **Authentication**: JWT token validation and user context
+- **Authentication**: Session validation and user context
 - **Error Handling**: Consistent error responses and status codes
 
 ### Service Layer
@@ -161,7 +161,7 @@ app/
 
 #### 2. Authentication Service
 
-- Implement JWT authentication
+- Implement Flask-Login authentication
 - Add user registration and login endpoints
 - Set up password hashing and verification
 

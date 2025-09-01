@@ -1,7 +1,15 @@
-{% extends "base.html" %} {% block title %} Expense Details {% endblock title %} {% block content %}
+{% extends "base.html" %}
+{% block title %} Expense Details {% endblock title %}
+{% block styles %}
+{{ super() }}
+<link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
+<link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
+{% endblock styles %}
+{% block content %}
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-lg-8">
+            <!-- Main Expense Card -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                     <h1 class="h5 mb-0">Expense Details</h1>
@@ -11,65 +19,247 @@
                             class="btn btn-sm btn-outline-primary">
                             <i class="fas fa-edit me-1"></i> Edit
                         </a>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#deleteExpenseModal"
+                                data-expense-id="{{ expense.id }}"
+                                data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
+                                data-expense-amount="{{ '%.2f'|format(expense.amount) }}"
+                                data-expense-date="{{ expense.date.strftime('%B %d, %Y') }}">
+                            <i class="fas fa-trash me-1"></i> Delete
+                        </button>
                         <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-sm btn-outline-secondary">
                             <i class="fas fa-arrow-left me-1"></i> Back to List
                         </a>
                     </div>
                 </div>
                 <div class="card-body">
+                    <!-- Primary Info Section -->
                     <div class="row mb-4">
+                        <!-- Date and Amount - Primary Row -->
                         <div class="col-md-6 mb-3">
                             <h6 class="text-muted mb-1">Date</h6>
-                            <p class="mb-0">{{ expense.date.strftime("%B %d, %Y") }}</p>
+                            <p class="mb-0 fs-5">{{ expense.date.strftime("%B %d, %Y") }}</p>
                         </div>
                         <div class="col-md-6 mb-3">
                             <h6 class="text-muted mb-1">Amount</h6>
-                            <p class="mb-0 amount-right">${{ "%.2f"|format(expense.amount) }}</p>
+                            <p class="mb-0 fw-bold text-success fs-4">${{ "%.2f"|format(expense.amount) }}</p>
                         </div>
+                    </div>
+
+                    <!-- Secondary Info Section -->
+                    <div class="row mb-4">
+                        <!-- Meal Type with Badge -->
                         <div class="col-md-6 mb-3">
                             <h6 class="text-muted mb-1">Meal Type</h6>
-                            <p class="mb-0">{{ expense.meal_type|title }}</p>
+                            {% if expense.meal_type %}
+                                <span class="meal-type-badge compact {{ expense.meal_type.lower().replace(' ', '-') }}">
+                                    <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">Not specified</span>
+                            {% endif %}
                         </div>
+
+                        <!-- Category with Enhanced Badge -->
                         {% if expense.category %}
                         <div class="col-md-6 mb-3">
                             <h6 class="text-muted mb-1">Category</h6>
-                            <span
-                                class="badge border d-flex align-items-center"
-                                style="background-color: {{ expense.category.color }}20;
-                                                 color: {{ expense.category.color }};
-                                                 border-color: {{ expense.category.color }}40 !important;
-                                                 width: fit-content">
-                                {% if expense.category.icon %}<i class="fas fa-{{ expense.category.icon }} me-1"></i>{%
-                                endif %} {{ expense.category.name }}
-                            </span>
-                        </div>
-                        {% endif %} {% if expense.restaurant %}
-                        <div class="col-12 mb-3">
-                            <h6 class="text-muted mb-1">Restaurant</h6>
-                            <p class="mb-0">
-                                <i class="fas fa-utensils me-2"></i>
-                                <a
-                                    href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}">
-                                    {{ expense.restaurant.name }}
-                                </a>
-                            </p>
-                        </div>
-                        {% endif %} {% if expense.notes %}
-                        <div class="col-12 mb-3">
-                            <h6 class="text-muted mb-1">Notes</h6>
-                            <p class="mb-0">{{ expense.notes }}</p>
+                            {% from 'macros/category_helpers.html' import category_badge %}
+                            {{ category_badge(expense.category, compact=true) }}
                         </div>
                         {% endif %}
                     </div>
+
+                    <!-- Restaurant Info Section -->
+                    {% if expense.restaurant %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2">Restaurant</h6>
+                            <div class="d-flex align-items-center flex-wrap gap-2">
+                                <div class="d-flex align-items-center">
+                                    <!-- Restaurant Icon -->
+                                    <div class="restaurant-icon me-2 flex-shrink-0">
+                                        {% if expense.restaurant.website %}
+                                            <img
+                                                src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website }}&sz=24"
+                                                alt="{{ expense.restaurant.name }} icon"
+                                                class="restaurant-favicon"
+                                                width="24"
+                                                height="24"
+                                                onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                                            />
+                                            <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 20px;"></i>
+                                        {% else %}
+                                            <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 20px;"></i>
+                                        {% endif %}
+                                    </div>
+                                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
+                                       class="text-decoration-none fw-semibold">
+                                        {{ expense.restaurant.name }}
+                                    </a>
+                                </div>
+                                {% if expense.restaurant.cuisine %}
+                                <span class="cuisine-badge" data-cuisine="{{ expense.restaurant.cuisine }}">
+                                    <span class="badge bg-light text-dark">{{ expense.restaurant.cuisine }}</span>
+                                </span>
+                                {% endif %}
+                                {% if expense.restaurant.type %}
+                                <span class="badge bg-secondary text-white">{{ expense.restaurant.type|title }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Notes Section -->
+                    {% if expense.notes %}
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-1">Notes</h6>
+                            <div class="bg-light p-3 rounded">
+                                <p class="mb-0">{{ expense.notes }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-                <div class="card-footer bg-white py-3 d-flex justify-content-between">
-                    <small class="text-muted">Created: {{ expense.created_at.strftime("%B %d, %Y %I:%M %p") }}</small>
-                    <small class="text-muted"
-                        >Last updated: {{ expense.updated_at.strftime("%B %d, %Y %I:%M %p") }}</small
-                    >
+
+                <!-- Quick Stats Footer -->
+                <div class="card-footer bg-white py-3">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="d-flex flex-wrap gap-3">
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-1"></i>
+                                    Created: {{ expense.created_at.strftime("%B %d, %Y %I:%M %p") }}
+                                </small>
+                                <small class="text-muted">
+                                    <i class="fas fa-edit me-1"></i>
+                                    Last updated: {{ expense.updated_at.strftime("%B %d, %Y %I:%M %p") }}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <small class="text-muted">
+                                <i class="fas fa-receipt me-1"></i>
+                                Expense #{{ expense.id }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Stats Card -->
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="card-title text-muted mb-3">
+                        <i class="fas fa-chart-line me-1"></i>
+                        Quick Stats
+                    </h6>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="border-end">
+                                <div class="fs-6 fw-bold text-primary">{{ expense.date.strftime("%a") }}</div>
+                                <small class="text-muted">Day of Week</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border-end">
+                                <div class="fs-6 fw-bold text-info">
+                                    {% if expense.created_at.strftime('%Y-%m-%d') == expense.date.strftime('%Y-%m-%d') %}
+                                        Same Day
+                                    {% else %}
+                                        Entry Logged
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">Entry Timing</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="fs-6 fw-bold text-warning">${{ "%.0f"|format(expense.amount) }}</div>
+                            <small class="text-muted">Rounded Amount</small>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteExpenseModal" tabindex="-1" aria-labelledby="deleteExpenseModalLabel">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteExpenseModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
+                </h5>
+                <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p> Are you sure you want to delete this expense? </p>
+                <div id="delete-expense-details" class="mt-2">
+                    <!-- Details will be populated by JavaScript -->
+                </div>
+                <p class="text-danger">
+                    <i class="fas fa-exclamation-circle me-1"></i>
+                    This action cannot be undone.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <form id="delete-expense-form" method="post" action="">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i> Delete Expense
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock content %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Delete expense modal functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteModal = document.getElementById("deleteExpenseModal");
+
+        if (deleteModal) {
+            deleteModal.addEventListener("show.bs.modal", function (event) {
+                const button = event.relatedTarget;
+                const expenseId = button.getAttribute("data-expense-id");
+                const expenseDescription = button.getAttribute("data-expense-description");
+                const expenseAmount = button.getAttribute("data-expense-amount");
+                const expenseDate = button.getAttribute("data-expense-date");
+
+                // Update modal content
+                const detailsDiv = deleteModal.querySelector("#delete-expense-details");
+                detailsDiv.innerHTML = `
+                    <div class="alert alert-light">
+                        <strong>Restaurant:</strong> ${expenseDescription}<br>
+                        <strong>Amount:</strong> $${expenseAmount}<br>
+                        <strong>Date:</strong> ${expenseDate}
+                    </div>
+                `;
+
+                // Update form action
+                const form = deleteModal.querySelector("#delete-expense-form");
+                form.action = `/expenses/${expenseId}/delete`;
+            });
+        }
+    });
+</script>
+<!-- Cuisine badge component for restaurant displays -->
+<script type="module" src="{{ url_for('static', filename='js/components/cuisine-badge.js') }}"></script>
+{% endblock scripts %}

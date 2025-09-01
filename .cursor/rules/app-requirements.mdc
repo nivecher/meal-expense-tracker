@@ -1,3 +1,6 @@
+---
+alwaysApply: true
+---
 # Application Requirements and Specifications
 
 ## Core Application Purpose
@@ -26,7 +29,7 @@ The Meal Expense Tracker is a web application that allows users to:
 
 ### Expense Management
 - **Expense Entry**: Date, amount, restaurant, category, notes
-- **Categorization**: Food type, meal type (breakfast, lunch, dinner, snack)
+- **Categorization**: Food type, meal type (breakfast, lunch, dinner, snacks)
 - **Attachments**: Receipt images, notes, tags
 - **Validation**: Required fields, amount validation, date validation
 
@@ -94,7 +97,3 @@ The Meal Expense Tracker is a web application that allows users to:
 - Reports generate in under 5 seconds
 - 99.9% uptime for production system
 - User satisfaction score above 4.5/5.0
-description:
-globs:
-alwaysApply: false
----

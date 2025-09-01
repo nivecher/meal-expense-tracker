@@ -1,13 +1,29 @@
 {% extends "base.html" %} {% block content %}
 <div class="card">
     <div class="card-header">
-        <h2 class="card-title">About Meal Expense Tracker</h2>
+        <h2 class="card-title"><i class="fas fa-utensils me-2"></i>About Meal Expense Tracker</h2>
     </div>
     <div class="card-body">
         <div class="container">
+            <!-- Application Description -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="alert alert-info border-0">
+                        <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i>What is Meal Expense Tracker?</h5>
+                        <p class="mb-2">
+                            A modern web application that helps you track dining expenses, analyze spending patterns, and maintain a history of your culinary experiences.
+                            Built with Flask and designed for food enthusiasts who want to understand their dining habits and manage their meal budgets effectively.
+                        </p>
+                        <p class="mb-0">
+                            <strong>Perfect for:</strong> Food bloggers, budget-conscious diners, business expense tracking, culinary adventurers, and anyone who wants to gain insights into their dining patterns.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div class="row">
                 <div class="col-md-12">
-                    <h4 class="mb-4">Application Information</h4>
+                    <h4 class="mb-4"><i class="fas fa-info me-2"></i>Application Information</h4>
                     <div class="row">
                         <div class="col-md-4">
                             <div class="card bg-light">
@@ -20,17 +36,120 @@
                         <div class="col-md-8">
                             <div class="card">
                                 <div class="card-body">
-                                    <h5 class="card-title">Features</h5>
-                                    <ul class="list-group list-group-flush">
-                                        <li class="list-group-item">Track meal expenses</li>
-                                        <li class="list-group-item">Categorize expenses</li>
-                                        <li class="list-group-item">Restaurant management</li>
-                                        <li class="list-group-item">Expense filtering and sorting</li>
-                                        <li class="list-group-item">User authentication</li>
-                                    </ul>
+                                    <h5 class="card-title">Core Features</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6 class="text-primary mb-2"><i class="fas fa-receipt me-1"></i> Expense Management</h6>
+                                            <ul class="list-unstyled mb-3">
+                                                <li><i class="fas fa-check text-success me-1"></i> Track meal expenses with notes and details</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> 9 meal types (breakfast, brunch, lunch, dinner, snacks, drinks, dessert, late night, groceries)</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Customizable expense categories</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Advanced filtering and sorting</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> CSV export functionality</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Bulk import capabilities</li>
+                                            </ul>
+
+                                            <h6 class="text-primary mb-2"><i class="fas fa-map-marker-alt me-1"></i> Restaurant Management</h6>
+                                            <ul class="list-unstyled mb-3">
+                                                <li><i class="fas fa-check text-success me-1"></i> Add & manage restaurant database</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> 25+ cuisine types with color-coding</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Google Maps integration & autocomplete</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Restaurant search and management</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Visit history tracking</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Restaurant export & import</li>
+                                            </ul>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <h6 class="text-primary mb-2"><i class="fas fa-chart-bar me-1"></i> Analytics & Reporting</h6>
+                                            <ul class="list-unstyled mb-3">
+                                                <li><i class="fas fa-check text-success me-1"></i> Spending dashboard & summaries</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Category and restaurant analytics</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Visual spending insights</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Trend analysis by time period</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Top restaurant rankings</li>
+                                            </ul>
+
+                                            <h6 class="text-primary mb-2"><i class="fas fa-shield-alt me-1"></i> Security & User Experience</h6>
+                                            <ul class="list-unstyled mb-3">
+                                                <li><i class="fas fa-check text-success me-1"></i> Secure session-based authentication</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> User registration & profile management</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Password change functionality</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Rate limiting & security headers</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> Responsive mobile-first design</li>
+                                                <li><i class="fas fa-check text-success me-1"></i> RESTful API with comprehensive endpoints</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3">
+                                        <h6 class="text-primary mb-2"><i class="fas fa-cogs me-1"></i> Technical Highlights</h6>
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <span class="badge bg-secondary me-1">Flask + SQLAlchemy</span>
+                                                <span class="badge bg-secondary me-1">PostgreSQL</span>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <span class="badge bg-secondary me-1">Google Maps API</span>
+                                                <span class="badge bg-secondary me-1">Flask-Login</span>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <span class="badge bg-secondary me-1">Bootstrap 5</span>
+                                                <span class="badge bg-secondary me-1">Modern JavaScript</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Information -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card border-primary">
+                        <div class="card-body">
+                            <h6 class="card-title text-primary"><i class="fas fa-rocket me-1"></i> Getting Started</h6>
+                            <p class="card-text small mb-2">Start tracking your meal expenses in just a few steps:</p>
+                            <ol class="small mb-0">
+                                <li>Add your favorite restaurants</li>
+                                <li>Create custom expense categories</li>
+                                <li>Log your first meal expense</li>
+                                <li>Explore insights on your dashboard</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card border-success">
+                        <div class="card-body">
+                            <h6 class="card-title text-success"><i class="fas fa-lightbulb me-1"></i> Pro Tips</h6>
+                            <ul class="small mb-0">
+                                <li>Use Google Maps autocomplete for accurate restaurant data</li>
+                                <li>Set up categories that match your lifestyle</li>
+                                <li>Export your data regularly for backup</li>
+                                <li>Check your dashboard weekly for spending insights</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Version & System Info -->
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <div class="text-center text-muted small">
+                        <p class="mb-1">
+                            <i class="fas fa-code me-1"></i>
+                            Built with <span class="text-danger">❤️</span> using Flask, Bootstrap, and modern web technologies
+                        </p>
+                        <p class="mb-0">
+                            <i class="fas fa-shield-alt me-1"></i>
+                            Secure, fast, and reliable - designed following TIGER principles for optimal performance
+                        </p>
                     </div>
                 </div>
             </div>

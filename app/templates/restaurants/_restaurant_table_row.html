@@ -1,15 +1,61 @@
 <tr>
     <td>
-        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">{{ restaurant.name }}</a>
-        {% if restaurant.cuisine %}
-        <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
-            <span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>
-        </span>
-        {% endif %}
+        <div class="d-flex align-items-center">
+            <!-- Restaurant Icon (small for table view) -->
+            <div class="restaurant-icon-table me-2 flex-shrink-0">
+                {% if restaurant.website %}
+                    <img
+                        src="https://www.google.com/s2/favicons?domain={{ restaurant.website }}&sz=16"
+                        alt="{{ restaurant.name }} icon"
+                        class="restaurant-favicon-table"
+                        width="16"
+                        height="16"
+                        onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                    />
+                    <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="display: none; font-size: 14px;"></i>
+                {% else %}
+                    <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 14px;"></i>
+                {% endif %}
+            </div>
+
+            <!-- Restaurant Name and Cuisine -->
+            <div>
+                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">{{ restaurant.name }}</a>
+                {% if restaurant.cuisine %}
+                <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
+                    <span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>
+                </span>
+                {% endif %}
+            </div>
+        </div>
     </td>
-    <td>{{ restaurant.city or '' }}</td>
+    <td>
+        <div class="d-flex align-items-center">
+            <div>
+                {% if restaurant.city or restaurant.state %}
+                    {% set location_parts = [] %}
+                    {% if restaurant.city %}{% set _ = location_parts.append(restaurant.city) %}{% endif %}
+                    {% if restaurant.state %}{% set _ = location_parts.append(restaurant.state) %}{% endif %}
+                    {{ location_parts|join(', ') }}
+                {% else %}
+                    <span class="text-muted">-</span>
+                {% endif %}
+            </div>
+            {% set maps_url = restaurant|google_maps_url %}
+            {% if maps_url %}
+            <a href="{{ maps_url }}"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="btn btn-sm btn-outline-secondary ms-2"
+               data-bs-toggle="tooltip"
+               title="View on Google Maps">
+                <i class="fas fa-map-marked-alt"></i>
+            </a>
+            {% endif %}
+        </div>
+    </td>
     <td>{{ restaurant.visit_count }}</td>
-    <td>${{ "%.2f"|format(restaurant.total_spent) if restaurant.total_spent is defined else '0.00' }}</td>
+    <td class="fw-bold text-success amount-right">${{ "%.2f"|format(restaurant.total_spent) if restaurant.total_spent is defined else '0.00' }}</td>
     <td>
         {% if restaurant.rating %}
         <span
@@ -21,8 +67,14 @@
         {% endif %}
     </td>
     <td>
-        {% if last_visit %} {{ last_visit|time_ago }} {% else %}
-        <span class="text-muted">No visits</span>
+        {% if last_visit %}
+        <span data-sort-value="{{ last_visit.isoformat() }}"
+              data-bs-toggle="tooltip"
+              title="{{ last_visit.strftime('%B %d, %Y at %I:%M %p') }}">
+            {{ last_visit|time_ago }}
+        </span>
+        {% else %}
+        <span class="text-muted" data-sort-value="">No visits</span>
         {% endif %}
     </td>
     <td class="actions">

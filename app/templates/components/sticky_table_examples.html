@@ -77,7 +77,7 @@
                                         <tr>
                                             <td>2024-01-{{ '%02d'|format((i % 31) + 1) }}</td>
                                             <td>Restaurant {{ i + 1 }}</td>
-                                            <td>{{ ['Breakfast', 'Lunch', 'Dinner', 'Snack'][i % 4] }}</td>
+                                            <td>{{ ['Breakfast', 'Lunch', 'Dinner', 'Snacks'][i % 4] }}</td>
                                             <td>{{ ['Fast Food', 'Fine Dining', 'Casual', 'Coffee'][i % 4] }}</td>
                                             <td>${{ "%.2f"|format((i * 3.75 + 12.50) ) }}</td>
                                             <td>Sample note for expense {{ i + 1 }}</td>

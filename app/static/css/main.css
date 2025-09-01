@@ -526,38 +526,32 @@ p {
     box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.25);
 }
 
-/* User Avatar */
+/* User Avatar - Updated for modern design */
 .user-avatar {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background-color: var(--accent-light);
-    color: var(--accent-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    object-fit: cover;
     margin-right: 0.5rem;
-    font-size: 0.875rem;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.9);
 }
 
-.user-avatar i {
-    margin: 0;
+.user-avatar:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color);
 }
 
 .username {
     font-weight: 500;
     color: var(--gray-800);
-    transition: color 0.2s ease;
-}
-
-.nav-link:hover .user-avatar {
-    background-color: var(--accent-color);
-    color: white;
+    transition: color 0.3s ease;
 }
 
 .nav-link:hover .username {
-    color: var(--accent-color);
+    color: var(--primary-color);
 }
 
 /* Dropdown Arrow */
@@ -911,38 +905,32 @@ footer {
     box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.25);
 }
 
-/* User Avatar */
+/* User Avatar - Updated for modern design */
 .user-avatar {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background-color: var(--accent-light);
-    color: var(--accent-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    object-fit: cover;
     margin-right: 0.5rem;
-    font-size: 0.875rem;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.9);
 }
 
-.user-avatar i {
-    margin: 0;
+.user-avatar:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    border-color: var(--primary-color);
 }
 
 .username {
     font-weight: 500;
     color: var(--gray-800);
-    transition: color 0.2s ease;
-}
-
-.nav-link:hover .user-avatar {
-    background-color: var(--accent-color);
-    color: white;
+    transition: color 0.3s ease;
 }
 
 .nav-link:hover .username {
-    color: var(--accent-color);
+    color: var(--primary-color);
 }
 
 /* Dropdown Arrow */

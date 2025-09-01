@@ -1,6 +1,7 @@
 /**
  * Navbar functionality
  * Handles mobile menu toggle and dropdown interactions
+ * Works with Bootstrap's built-in navbar functionality
  */
 class NavbarManager {
   constructor() {
@@ -14,30 +15,28 @@ class NavbarManager {
   }
 
   init() {
-    document.addEventListener('DOMContentLoaded', () => {
-      this.setupEventListeners();
-      this.setupDropdowns();
-      this.setupResizeObserver();
-    });
+    this.setupDropdowns();
+    this.setupResizeObserver();
+    this.setupBootstrapEventListeners();
   }
 
-  setupEventListeners() {
-    // Mobile menu toggle
-    if (this.navbarToggler && this.navbarCollapse) {
-      this.navbarToggler.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.toggleMobileMenu();
+  setupBootstrapEventListeners() {
+    // Listen to Bootstrap's collapse events instead of overriding
+    if (this.navbarCollapse) {
+      this.navbarCollapse.addEventListener('show.bs.collapse', () => {
+        document.body.classList.add('mobile-menu-open');
+        this.navbar.dispatchEvent(new CustomEvent('mobileMenuOpened'));
+      });
+
+      this.navbarCollapse.addEventListener('hide.bs.collapse', () => {
+        document.body.classList.remove('mobile-menu-open');
+        // Close all dropdowns when closing mobile menu
+        this.dropdownToggles.forEach((toggle) => {
+          this.closeDropdown(toggle);
+        });
+        this.navbar.dispatchEvent(new CustomEvent('mobileMenuClosed'));
       });
     }
-
-    // Close mobile menu when clicking outside
-    document.addEventListener('click', (e) => {
-      if (this.isMobileMenuOpen() &&
-                !this.navbar.contains(e.target) &&
-                !e.target.closest('.navbar')) {
-        this.closeMobileMenu();
-      }
-    });
 
     // Handle escape key
     document.addEventListener('keydown', (e) => {
@@ -95,42 +94,26 @@ class NavbarManager {
   }
 
   toggleMobileMenu() {
-    if (this.navbarCollapse.classList.contains('show')) {
-      this.closeMobileMenu();
-    } else {
-      this.openMobileMenu();
-    }
+    // Use Bootstrap's collapse functionality
+    const bsCollapse = new bootstrap.Collapse(this.navbarCollapse, {
+      toggle: true
+    });
   }
 
   openMobileMenu() {
     if (!this.navbarCollapse) return;
-
-    this.navbarCollapse.classList.add('show');
-    this.navbarToggler.setAttribute('aria-expanded', 'true');
-
-    // Add a class to body to prevent scrolling when menu is open
-    document.body.classList.add('mobile-menu-open');
-
-    // Dispatch custom event
-    this.navbar.dispatchEvent(new CustomEvent('mobileMenuOpened'));
+    const bsCollapse = new bootstrap.Collapse(this.navbarCollapse, {
+      toggle: false
+    });
+    bsCollapse.show();
   }
 
   closeMobileMenu() {
     if (!this.navbarCollapse) return;
-
-    this.navbarCollapse.classList.remove('show');
-    this.navbarToggler.setAttribute('aria-expanded', 'false');
-
-    // Remove the class that prevents scrolling
-    document.body.classList.remove('mobile-menu-open');
-
-    // Close all dropdowns when closing mobile menu
-    this.dropdownToggles.forEach((toggle) => {
-      this.closeDropdown(toggle);
+    const bsCollapse = new bootstrap.Collapse(this.navbarCollapse, {
+      toggle: false
     });
-
-    // Dispatch custom event
-    this.navbar.dispatchEvent(new CustomEvent('mobileMenuClosed'));
+    bsCollapse.hide();
   }
 
   isMobileMenuOpen() {

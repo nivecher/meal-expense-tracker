@@ -8,7 +8,7 @@ const defaults = {
   app: {
     debug: false,
     env: 'production',
-    version: '1.0.0',
+    version: '0.0.0',
   },
 };
 
@@ -31,4 +31,10 @@ function loadConfig() {
 }
 
 const config = loadConfig();
+
+// Make colors globally available for backward compatibility
+if (config.colors) {
+  window.MEAL_TRACKER_COLORS = config.colors;
+}
+
 export default config;

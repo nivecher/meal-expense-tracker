@@ -36,9 +36,7 @@ endblock title %} {% block content %}
                 </div>
                 <div class="card-body">
                     <div id="alert-container">
-                        {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for
-                        category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{%
-                        endfor %} {% endif %} {% endwith %}
+                        <!-- Flash messages now handled by base template -->
                     </div>
                     {% if is_edit and debug %}
                     <div class="card mb-4">

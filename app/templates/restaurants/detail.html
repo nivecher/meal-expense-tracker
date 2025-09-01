@@ -7,6 +7,8 @@
 {% block extra_css %}
     <link rel="stylesheet"
           href="{{ url_for('static', filename='css/pages/restaurant-detail.css') }}">
+    <link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
 {% endblock extra_css %}
 {% block breadcrumb %}
 {% endblock breadcrumb %}
@@ -26,7 +28,25 @@
                     <div class="row align-items-center">
                         <div class="col-lg-8">
                             <div class="mb-3">
-                                <h1 class="h3 mb-2" id="restaurant-name">{{ restaurant.name }}</h1>
+                                <h1 class="h3 mb-2 d-flex align-items-center" id="restaurant-name">
+                                    <!-- Restaurant Icon -->
+                                    <div class="restaurant-icon me-3 flex-shrink-0">
+                                        {% if restaurant.website %}
+                                            <img
+                                                src="https://www.google.com/s2/favicons?domain={{ restaurant.website }}&sz=32"
+                                                alt="{{ restaurant.name }} icon"
+                                                class="restaurant-favicon"
+                                                width="32"
+                                                height="32"
+                                                onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                                            />
+                                            <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 28px;"></i>
+                                        {% else %}
+                                            <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 28px;"></i>
+                                        {% endif %}
+                                    </div>
+                                    {{ restaurant.name }}
+                                </h1>
                                 <div class="d-flex align-items-center flex-wrap gap-2">
                                     {% if restaurant.type %}<span class="badge bg-light text-dark border">{{ restaurant.type|title }}</span>{% endif %}
                                     {% if restaurant.cuisine %}
@@ -56,13 +76,20 @@
                                     <a href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
                                        class="btn btn-success"
                                        id="add-expense-here-btn">
-                                        <i class="fas fa-plus me-1"></i>Add Expense Here
+                                        <i class="fas fa-plus me-1"></i>Add Expense
                                     </a>
                                     <a href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
                                        class="btn btn-outline-primary"
                                        id="edit-btn">
                                         <i class="fas fa-edit me-1"></i>Edit
                                     </a>
+                                    <button type="button"
+                                            class="btn btn-outline-danger"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#deleteRestaurantModal"
+                                            id="delete-btn">
+                                        <i class="fas fa-trash me-1"></i>Delete
+                                    </button>
                                 {% else %}
                                     <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
                                        class="btn btn-outline-secondary"
@@ -96,52 +123,10 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="row g-4">
-                                        <!-- Restaurant Details -->
-                                        <div class="col-md-4">
-                                            <h6 class="text-muted mb-3">Details</h6>
-                                            <div class="list-group list-group-flush">
-                                                {% if restaurant.type %}
-                                                    <div class="list-group-item px-0 py-2 border-0">
-                                                        <div class="d-flex justify-content-between align-items-center">
-                                                            <span class="text-muted">Type</span>
-                                                            <span class="fw-medium">{{ restaurant.type|title }}</span>
-                                                        </div>
-                                                    </div>
-                                                {% endif %}
-                                                {% if restaurant.cuisine %}
-                                                    <div class="list-group-item px-0 py-2 border-0">
-                                                        <div class="d-flex justify-content-between align-items-center">
-                                                            <span class="text-muted">Cuisine</span>
-                                                            <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
-                                                                <span class="fw-medium">{{ restaurant.cuisine }}</span>
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                {% endif %}
-                                                {% if restaurant.is_chain is not none %}
-                                                    <div class="list-group-item px-0 py-2 border-0">
-                                                        <div class="d-flex justify-content-between align-items-center">
-                                                            <span class="text-muted">Chain</span>
-                                                            <span class="fw-medium">{{ 'Yes' if restaurant.is_chain else 'No' }}</span>
-                                                        </div>
-                                                    </div>
-                                                {% endif %}
-                                                {% if restaurant.rating %}
-                                                    <div class="list-group-item px-0 py-2 border-0">
-                                                        <div class="d-flex justify-content-between align-items-center">
-                                                            <span class="text-muted">Your Rating</span>
-                                                            <span class="badge bg-warning text-dark">
-                                                                <i class="fas fa-star me-1"></i>{{ "%.1f"|format(restaurant.rating) }}/5.0
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <!-- Contact Information -->
-                                        {% if restaurant.phone or restaurant.website or restaurant.email %}
-                                            <div class="col-md-4">
-                                                <h6 class="text-muted mb-3">Contact</h6>
+                                        <!-- Contact Information (Expanded) -->
+                                        {% if restaurant.phone or restaurant.website %}
+                                            <div class="col-md-6">
+                                                <h6 class="text-muted mb-3">Contact Information</h6>
                                                 <div class="list-group list-group-flush">
                                                     {% if restaurant.phone %}
                                                         <div class="list-group-item px-0 py-2 border-0">
@@ -153,36 +138,111 @@
                                                     {% endif %}
                                                     {% if restaurant.website %}
                                                         <div class="list-group-item px-0 py-2 border-0">
-                                                            <div class="d-flex align-items-center">
-                                                                <i class="fas fa-globe text-muted me-3"></i>
+                                                            <div class="d-flex align-items-center justify-content-between">
+                                                                <div class="d-flex align-items-center flex-grow-1">
+                                                                    <i class="fas fa-globe text-muted me-3"></i>
+                                                                    <a href="{{ restaurant.website }}"
+                                                                       target="_blank"
+                                                                       rel="noopener noreferrer"
+                                                                       class="text-decoration-none flex-grow-1"
+                                                                       style="word-break: break-all;">
+                                                                        {{ restaurant.website|truncate(80) }}
+                                                                    </a>
+                                                                </div>
                                                                 <a href="{{ restaurant.website }}"
                                                                    target="_blank"
                                                                    rel="noopener noreferrer"
-                                                                   class="text-decoration-none">
-                                                                    {{ restaurant.website|truncate(25) }}
-                                                                    <i class="fas fa-external-link-alt ms-1 small"></i>
+                                                                   class="btn btn-sm btn-outline-primary ms-2"
+                                                                   title="Open website in new tab">
+                                                                    <i class="fas fa-external-link-alt"></i>
                                                                 </a>
                                                             </div>
                                                         </div>
                                                     {% endif %}
-                                                    {% if restaurant.email %}
+                                                    {% if restaurant.type %}
                                                         <div class="list-group-item px-0 py-2 border-0">
                                                             <div class="d-flex align-items-center">
-                                                                <i class="fas fa-envelope text-muted me-3"></i>
-                                                                <a href="mailto:{{ restaurant.email }}" class="text-decoration-none">{{ restaurant.email|truncate(25) }}</a>
+                                                                <i class="fas fa-utensils text-muted me-3"></i>
+                                                                <span>{{ restaurant.type|title }}</span>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if restaurant.cuisine %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-globe-americas text-muted me-3"></i>
+                                                                <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
+                                                                    <span>{{ restaurant.cuisine }}</span>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if restaurant.is_chain is not none %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-building text-muted me-3"></i>
+                                                                <span>{{ 'Chain Restaurant' if restaurant.is_chain else 'Independent Restaurant' }}</span>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if restaurant.rating %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-star text-muted me-3"></i>
+                                                                <span class="badge bg-warning text-dark">
+                                                                    <i class="fas fa-star me-1"></i>{{ "%.1f"|format(restaurant.rating) }}/5.0
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     {% endif %}
                                                 </div>
                                             </div>
                                         {% else %}
-                                            <div class="col-md-4">
-                                                <!-- Empty column if no contact info -->
+                                            <div class="col-md-6">
+                                                <h6 class="text-muted mb-3">Restaurant Information</h6>
+                                                <div class="list-group list-group-flush">
+                                                    {% if restaurant.type %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-utensils text-muted me-3"></i>
+                                                                <span>{{ restaurant.type|title }}</span>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if restaurant.cuisine %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-globe-americas text-muted me-3"></i>
+                                                                <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
+                                                                    <span>{{ restaurant.cuisine }}</span>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if restaurant.is_chain is not none %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-building text-muted me-3"></i>
+                                                                <span>{{ 'Chain Restaurant' if restaurant.is_chain else 'Independent Restaurant' }}</span>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                    {% if restaurant.rating %}
+                                                        <div class="list-group-item px-0 py-2 border-0">
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-star text-muted me-3"></i>
+                                                                <span class="badge bg-warning text-dark">
+                                                                    <i class="fas fa-star me-1"></i>{{ "%.1f"|format(restaurant.rating) }}/5.0
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
                                             </div>
                                         {% endif %}
                                         <!-- Location Information -->
                                         {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %}
-                                            <div class="col-md-4">
+                                            <div class="col-md-6">
                                                 <h6 class="text-muted mb-3">Location</h6>
                                                 <div class="d-flex align-items-start">
                                                     <i class="fas fa-map-marker-alt text-muted me-3 mt-1"></i>
@@ -194,9 +254,21 @@
                                                         {% if restaurant.country %}<div>{{ restaurant.country }}</div>{% endif %}
                                                     </address>
                                                 </div>
-                                                {% if restaurant.google_place_id %}
-                                                    <div class="mt-3">
-                                                        <a href="https://www.google.com/maps/place/?q=place_id:{{ restaurant.google_place_id }}"
+                                                {% set maps_url = restaurant|google_maps_url %}
+                                                {% if maps_url %}
+                                                    <div class="mt-3 d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            {% if current_user.is_authenticated and current_user.is_admin and restaurant.google_place_id %}
+                                                                <button type="button"
+                                                                        class="btn btn-sm btn-outline-warning me-2"
+                                                                        data-bs-toggle="modal"
+                                                                        data-bs-target="#clearPlaceIdModal"
+                                                                        title="Clear Google Place ID">
+                                                                    <i class="fas fa-times me-1"></i>Clear Place ID
+                                                                </button>
+                                                            {% endif %}
+                                                        </div>
+                                                        <a href="{{ maps_url }}"
                                                            target="_blank"
                                                            rel="noopener noreferrer"
                                                            class="btn btn-sm btn-outline-primary">
@@ -503,6 +575,7 @@
                                             <th>Amount</th>
                                             <th>Category</th>
                                             <th>Meal Type</th>
+                                            <th>Notes</th>
                                             <th class="text-end pe-3">Actions</th>
                                         </tr>
                                     </thead>
@@ -525,21 +598,26 @@
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    {% if expense.category %}
-                                                        <span class="badge border d-flex align-items-center"
-                                                              style="--category-color: {{ expense.category.color }}; background-color: var(--category-color, #f8f9fa)20; color: var(--category-color, #495057); border-color: var(--category-color, #dee2e6)40 !important"
-                                                            {% if expense.category.icon %}<i class="fas fa-{{ expense.category.icon }} me-1"></i>{% endif %}
-                                                            {{ expense.category.name|replace('_', ' ') |title }}
+                                                    {% from 'macros/category_helpers.html' import category_badge %}
+                                                    {{ category_badge(expense.category, compact=true) if expense.category else '<span class="text-muted">N/A</span>' }}
+                                                </td>
+                                                <td>
+                                                    {% if expense.meal_type %}
+                                                        <span class="meal-type-badge compact {{ expense.meal_type.lower().replace(' ', '-') }}">
+                                                            <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
                                                         </span>
                                                     {% else %}
                                                         <span class="text-muted">N/A</span>
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    <span class="badge bg-light text-dark border">
-                                                        <i class="fas fa-utensils me-1 text-muted"></i>
-                                                        {{ expense.meal_type|replace('_', ' ') |title if expense.meal_type else 'N/A' }}
-                                                    </span>
+                                                    {% if expense.notes %}
+                                                        <span class="text-muted small" title="{{ expense.notes }}">
+                                                            {{ expense.notes|truncate(30) }}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="text-muted">-</span>
+                                                    {% endif %}
                                                 </td>
                                                 <td class="text-end pe-3">
                                                     <div class="btn-group btn-group-sm"
@@ -726,6 +804,78 @@
         </div>
     </div>
 {% endfor %}
+
+<!-- Clear Google Place ID Modal -->
+<div class="modal fade" id="clearPlaceIdModal" tabindex="-1" aria-labelledby="clearPlaceIdModalLabel">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="clearPlaceIdModalLabel">Clear Google Place ID</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> This action will remove the Google Place ID association.
+                </div>
+                <p>Are you sure you want to clear the Google Place ID for <strong>{{ restaurant.name }}</strong>?</p>
+                <p class="text-muted small">
+                    <strong>Current Place ID:</strong> {{ restaurant.google_place_id }}<br>
+                    This will remove the ability to view this restaurant on Google Maps and may affect location services.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Cancel
+                </button>
+                <form action="{{ url_for('restaurants.clear_place_id', restaurant_id=restaurant.id) }}" method="post" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-times me-1"></i>Clear Place ID
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Restaurant Modal -->
+<div class="modal fade" id="deleteRestaurantModal" tabindex="-1" aria-labelledby="deleteRestaurantModalLabel">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteRestaurantModalLabel">Confirm Delete Restaurant</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> This action cannot be undone.
+                </div>
+                <p>Are you sure you want to delete <strong>{{ restaurant.name }}</strong>?</p>
+                {% if expenses %}
+                    <p class="text-danger">
+                        <strong>Note:</strong> This restaurant has {{ expenses|length }} expense{{ 's' if expenses|length != 1 else '' }}
+                        totaling ${{ "%.2f"|format(expenses|sum(attribute='amount')) }}.
+                        All associated expenses will also be deleted.
+                    </p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Cancel
+                </button>
+                <form action="{{ url_for('restaurants.delete_restaurant', restaurant_id=restaurant.id) }}" method="post" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i>Delete Restaurant
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% else %}
 <div class="alert alert-info" role="alert">
     <h2 class="h4 alert-heading">Restaurant Not Found</h2>

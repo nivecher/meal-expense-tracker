@@ -37,9 +37,9 @@
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <!-- Bootstrap CSS -->
         <link
-            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
             rel="stylesheet"
-            integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+            integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
             crossorigin="anonymous" />
         <!-- Bootstrap Icons -->
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" />
@@ -49,13 +49,19 @@
     </head>
     <body class="d-flex flex-column min-vh-100">
         <main class="flex-grow-1">
-            {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for category, message
-            in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible fade show mb-0" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"> </button>
-            </div>
-            {% endfor %} {% endif %} {% endwith %} {% block content %} {% endblock content %}
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages mb-0">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                <div class="alert-message">{{ message }}</div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %} {% block content %} {% endblock content %}
         </main>
         <footer class="footer mt-auto py-3 bg-light">
             <div class="container text-center">
@@ -64,8 +70,8 @@
         </footer>
         <!-- Bootstrap JS Bundle with Popper -->
         <script
-            src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-            integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+            src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
             crossorigin="anonymous"></script>
         <!-- Custom JS -->
         <script src="{{ url_for('static', filename='js/main.js') }}" type="module"></script>
@@ -146,22 +152,51 @@
                     }
 
                     try {
+                        console.log('=== FORM SUBMISSION STARTING ===');
+                        console.log('Form action:', form.action || window.location.pathname);
+                        console.log('Form method:', form.method);
+
                         const formData = new FormData(form);
+
+                        // Log form data for debugging
+                        console.log('Form data entries:');
+                        for (let [key, value] of formData.entries()) {
+                            console.log(`  ${key}: ${key === 'password' ? '[REDACTED]' : value}`);
+                        }
 
                         // Include CSRF token only if available in form (local dev)
                         const csrfInput = form.querySelector('input[name="csrf_token"]');
                         if (csrfInput && csrfInput.value) {
                             formData.set('csrf_token', csrfInput.value);
+                            console.log('CSRF token added from form input');
+                        } else {
+                            // For Lambda deployment, add empty CSRF token to satisfy form validation
+                            formData.set('csrf_token', '');
+                            console.log('Added empty CSRF token for Lambda deployment');
                         }
                         // Note: For Lambda deployment, CSRF is disabled entirely
 
-                        const response = await fetch(form.action || window.location.pathname, {
+                        console.log('=== MAKING FETCH REQUEST ===');
+                        const url = form.action || window.location.pathname;
+                        console.log('Request URL:', url);
+
+                        const response = await fetch(url, {
                             method: 'POST',
                             body: formData,
                             headers: {
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
                         });
+
+                        console.log('=== RESPONSE RECEIVED ===');
+                        console.log('Response status:', response.status);
+                        console.log('Response ok:', response.ok);
+                        console.log('Response URL:', response.url);
+                        console.log('Response headers:', [...response.headers.entries()]);
+
+                        // Try to get response body for debugging
+                        const responseText = await response.clone().text();
+                        console.log('Response body preview:', responseText.substring(0, 500));
 
                         if (response.ok) {
                             // Check if it's a redirect (successful login/registration)

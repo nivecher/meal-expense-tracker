@@ -7,75 +7,136 @@
                     <h2 class="h4 mb-0">Import Expenses</h2>
                 </div>
                 <div class="card-body">
-                    {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for category,
-                    message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                    {% endfor %} {% endif %} {% endwith %}
+                    <!-- Flash messages now handled by base template -->
                     <div class="mb-4">
-                        <h3 class="h5 mb-3">Instructions</h3>
-                        <p
-                            >Upload a CSV or JSON file containing expense information. The file must include the
-                            following required fields:</p
-                        >
-                        <h4 class="h6 mt-3">Required Fields:</h4>
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            The following fields are <strong>required</strong> in your file:
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <h3 class="h5 mb-0">Quick Start</h3>
+                            <a href="{{ url_for('expenses.export_expenses', format='csv') }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-download me-1"></i>Sample CSV
+                            </a>
                         </div>
-                        <ul class="mb-3">
-                            <li> <code>date</code> - Expense date (supports: YYYY-MM-DD, M/D/YYYY, MM/DD/YYYY) </li>
-                            <li> <code>amount</code> - Expense amount (supports: 24.77, $24.77, (24.77) for expenses, +$24.77 for reimbursements) </li>
-                        </ul>
-                        <h4 class="h6 mt-3">Optional Fields:</h4>
-                        <ul>
-                            <li> <code>meal_type</code> - Type of meal (breakfast, lunch, dinner, snack) </li>
-                            <li> <code>notes</code> - Additional notes about the expense </li>
-                            <li> <code>category_name</code> - Category name (supports hierarchical: "Parent:Child") </li>
-                            <li> <code>restaurant_name</code> - Restaurant name (will auto-create if doesn't exist) </li>
-                            <li> <code>restaurant_address</code> - Restaurant address (helps avoid duplicates) </li>
-                        </ul>
-                        <h4 class="h6 mt-3">Alternative Field Names:</h4>
-                        <div class="alert alert-success">
-                            <i class="fas fa-magic me-2"></i>
-                            <strong>Flexible Column Names:</strong> The import system automatically recognizes alternative field names:
-                            <ul class="mb-0 mt-2">
-                                <li><strong>Date:</strong> postedOn, posted_on, transaction_date, expense_date</li>
-                                <li><strong>Amount:</strong> cost, price, total, expense_amount, value</li>
-                                <li><strong>Restaurant:</strong> payee, vendor, merchant, place, location</li>
-                                <li><strong>Category:</strong> usage_category, expense_category, type</li>
-                                <li><strong>Notes:</strong> description, memo, comment, remarks</li>
-                            </ul>
+
+                        <div class="alert alert-primary">
+                            <i class="fas fa-upload me-2"></i>
+                            <strong>Upload a CSV or JSON file with expense data.</strong>
+                            Required: <code>date</code> and <code>amount</code> columns.
+                            Optional: restaurant, category, meal type, notes.
                         </div>
-                        <div class="alert alert-success mt-3">
-                            <i class="fas fa-check-circle me-2"></i>
-                            <strong>Smart Import Features:</strong>
-                            <ul class="mb-0 mt-2">
-                                <li>Flexible date formats (ISO, US, European) automatically recognized</li>
-                                <li>Smart amount parsing: parentheses for expenses, + for reimbursements, currency symbols, thousands separators</li>
-                                <li>Hierarchical categories (e.g., "Dining & Drinks:Fast Food") automatically mapped</li>
-                                <li>Alternative column names automatically recognized (payee → restaurant, etc.)</li>
-                                <li>Smart restaurant matching prevents duplicates: exact match with address, unique name match, or skip if ambiguous</li>
-                                <li>Restaurant warnings when names match multiple locations without address disambiguation</li>
-                                <li>Duplicate expenses are automatically detected and skipped</li>
-                                <li>New restaurants created only when address is provided to prevent duplicates</li>
-                            </ul>
-                        </div>
-                        <div class="alert alert-info mt-3">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>Amount Display:</strong> Regular expenses show in green, reimbursements show in red. Parentheses like ($24.77) are treated as expenses, plus signs like +$76.89 are treated as reimbursements.
-                        </div>
-                        <div class="alert alert-info mt-3">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>Duplicate Detection:</strong> Expenses are considered duplicates if they have the same restaurant, amount, date, and meal type.
-                        </div>
-                        <div class="alert alert-info mt-3">
-                            <i class="fas fa-download me-2"></i>
-                            <a href="{{ url_for('expenses.export_expenses', format='csv') }}" class="alert-link"
-                                >Download sample CSV file</a
-                            >
+
+                        <!-- Expandable Sections -->
+                        <div class="accordion" id="importAccordion">
+
+                            <!-- Required Fields -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingRequired">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#collapseRequired" aria-expanded="false" aria-controls="collapseRequired">
+                                        <i class="fas fa-asterisk text-danger me-2"></i>
+                                        <strong>Required Fields</strong>
+                                    </button>
+                                </h2>
+                                <div id="collapseRequired" class="accordion-collapse collapse"
+                                     aria-labelledby="headingRequired" data-bs-parent="#importAccordion">
+                                    <div class="accordion-body">
+                                        <ul class="mb-0">
+                                            <li><code>date</code> - Expense date (YYYY-MM-DD, M/D/YYYY, Excel serial dates)</li>
+                                            <li><code>amount</code> - Amount (24.77, $24.77, (24.77) for expenses, +$24.77 for reimbursements)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Optional Fields -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingOptional">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#collapseOptional" aria-expanded="false" aria-controls="collapseOptional">
+                                        <i class="fas fa-plus-circle text-success me-2"></i>
+                                        <strong>Optional Fields</strong>
+                                    </button>
+                                </h2>
+                                <div id="collapseOptional" class="accordion-collapse collapse"
+                                     aria-labelledby="headingOptional" data-bs-parent="#importAccordion">
+                                    <div class="accordion-body">
+                                        <ul class="mb-0">
+                                            <li><code>restaurant_name</code> - Restaurant name (auto-creates if new)</li>
+                                            <li><code>restaurant_address</code> - Address (prevents duplicates)</li>
+                                            <li><code>category_name</code> - Category ("Parent:Child" format supported)</li>
+                                            <li><code>meal_type</code> - breakfast, lunch, dinner, snacks</li>
+                                            <li><code>notes</code> - Additional details</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Smart Features -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingFeatures">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#collapseFeatures" aria-expanded="false" aria-controls="collapseFeatures">
+                                        <i class="fas fa-magic text-primary me-2"></i>
+                                        <strong>Smart Import Features</strong>
+                                    </button>
+                                </h2>
+                                <div id="collapseFeatures" class="accordion-collapse collapse"
+                                     aria-labelledby="headingFeatures" data-bs-parent="#importAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>Flexible Column Names</h6>
+                                                <small class="text-muted">
+                                                    <strong>Date:</strong> postedOn, transaction_date, expense_date<br>
+                                                    <strong>Amount:</strong> cost, price, total, value<br>
+                                                    <strong>Restaurant:</strong> payee, vendor, merchant, location<br>
+                                                    <strong>Category:</strong> usage_category, type<br>
+                                                    <strong>Notes:</strong> description, memo, comment
+                                                </small>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>Smart Processing</h6>
+                                                <small class="text-muted">
+                                                    • Multiple date formats (ISO, US, European, Excel)<br>
+                                                    • Currency symbols and thousands separators<br>
+                                                    • Duplicate detection and prevention<br>
+                                                    • Restaurant matching and disambiguation<br>
+                                                    • Hierarchical category mapping
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Format Examples -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingExamples">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                            data-bs-target="#collapseExamples" aria-expanded="false" aria-controls="collapseExamples">
+                                        <i class="fas fa-list-alt text-info me-2"></i>
+                                        <strong>Format Examples</strong>
+                                    </button>
+                                </h2>
+                                <div id="collapseExamples" class="accordion-collapse collapse"
+                                     aria-labelledby="headingExamples" data-bs-parent="#importAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>Valid Date Formats</h6>
+                                                <code class="d-block">2025-09-15</code>
+                                                <code class="d-block">9/15/2025</code>
+                                                <code class="d-block">45230 (Excel serial)</code>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>Valid Amount Formats</h6>
+                                                <code class="d-block">24.77 (expense)</code>
+                                                <code class="d-block">($15.50) (expense)</code>
+                                                <code class="d-block">+$76.89 (reimbursement)</code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
                     <form
@@ -87,7 +148,7 @@
                         {{ form.hidden_tag() }}
                         <div class="mb-3">
                             <label for="file" class="form-label">Select CSV or JSON file</label>
-                            {{ form.file(class_="form-control", accept=".csv,.json") }}
+                            {{ form.file(class_="form-control", accept=".csv,.json", id="file") }}
                             <div class="invalid-feedback">Please select a CSV or JSON file to upload.</div>
                             <div class="form-text">Maximum file size: 5MB. CSV and JSON files are supported.</div>
                         </div>
@@ -223,24 +284,45 @@
         const form = document.getElementById("import-form");
         const fileInput = form.querySelector("#file");
 
+        // Reset any initial validation states
+        fileInput.classList.remove("is-invalid", "is-valid");
+
         form.addEventListener("submit", function (event) {
+            // Clear any previous validation states
+            fileInput.classList.remove("is-invalid", "is-valid");
+
             if (!fileInput.files.length) {
                 event.preventDefault();
                 event.stopPropagation();
                 fileInput.classList.add("is-invalid");
+                form.classList.add("was-validated");
             } else {
-                fileInput.classList.remove("is-invalid");
+                // File is selected, allow form submission
                 fileInput.classList.add("is-valid");
             }
-
-            form.classList.add("was-validated");
         });
 
         fileInput.addEventListener("change", function () {
+            // Clear any validation classes when file selection changes
+            this.classList.remove("is-invalid", "is-valid");
+
             if (this.files.length) {
-                this.classList.remove("is-invalid");
+                // File selected, show positive feedback but don't persist it
                 this.classList.add("is-valid");
+
+                // Remove validation state after a short delay to prevent persistent green border
+                setTimeout(() => {
+                    if (!form.classList.contains("was-validated")) {
+                        this.classList.remove("is-valid");
+                    }
+                }, 1000);
             }
+        });
+
+        // Clear validation states when form is reset or page loads
+        form.addEventListener("reset", function() {
+            fileInput.classList.remove("is-invalid", "is-valid");
+            form.classList.remove("was-validated");
         });
     });
 </script>

@@ -5,7 +5,9 @@ import csv
 import io
 import json
 from math import ceil
-from typing import Optional, Tuple
+
+# Type annotations for responses
+from typing import Optional, Tuple, Union
 
 from flask import (
     abort,
@@ -18,8 +20,9 @@ from flask import (
     request,
     url_for,
 )
-from flask.typing import ResponseReturnValue
 from flask.wrappers import Response as FlaskResponse
+
+ResponseReturnValue = Union[str, FlaskResponse, tuple]
 from flask_login import current_user, login_required
 
 # Third-party imports
@@ -509,22 +512,12 @@ def list_expenses() -> str:
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", PER_PAGE, type=int)
 
-    # Extract filters from request
-    filters = {
-        "search": request.args.get("q", "").strip(),
-        "meal_type": request.args.get("meal_type", "").strip(),
-        "category": request.args.get("category", "").strip(),
-        "start_date": request.args.get("start_date", "").strip(),
-        "end_date": request.args.get("end_date", "").strip(),
-        "sort_by": request.args.get("sort", "date"),
-        "sort_order": request.args.get("order", "desc"),
-    }
+    # Extract filters from request using the service layer
+    filters = expense_services.get_expense_filters(request)
 
     # Get filtered expenses using the service layer
     try:
-        from app.main.services import get_filter_options, get_user_expenses
-
-        expenses, total_amount = get_user_expenses(current_user.id, filters)
+        expenses, total_amount = expense_services.get_user_expenses(current_user.id, filters)
     except Exception as e:
         current_app.logger.error(f"Error filtering expenses: {str(e)}")
         expenses, total_amount = [], 0.0
@@ -541,7 +534,7 @@ def list_expenses() -> str:
     filter_options = expense_services.get_filter_options(current_user.id)
     # Also get main service filter options for dropdowns
     try:
-        main_filter_options = get_filter_options(current_user.id)
+        main_filter_options = expense_services.get_main_filter_options(current_user.id)
         filter_options.update(main_filter_options)
     except Exception as e:
         current_app.logger.error(f"Error getting filter options: {str(e)}")

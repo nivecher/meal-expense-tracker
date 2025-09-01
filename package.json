@@ -1,6 +1,6 @@
 {
   "name": "meal-expense-tracker",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Flask-based meal expense tracking application",
   "private": true,
   "scripts": {
@@ -19,6 +19,7 @@
     "npm": ">=9.0.0"
   },
   "dependencies": {
+    "@playwright/test": "^1.55.0",
     "eslint": "^9.34.0"
   }
 }

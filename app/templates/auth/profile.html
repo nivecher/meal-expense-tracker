@@ -1,6 +1,500 @@
-{% extends "base_auth.html" %} {% block title %} Profile {% endblock title %} {% block content %}
-<div class="container">
-    <h1>Profile</h1>
-    <p>Username: {{ current_user.username }}</p>
+{% extends "base.html" %}
+
+{% block title %}Profile{% endblock title %}
+
+{% block head_extra %}
+<link href="{{ url_for('static', filename='css/forms.css') }}" rel="stylesheet">
+<script src="{{ url_for('static', filename='js/components/timezone-detector.js') }}" defer></script>
+<style>
+    .profile-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .profile-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .profile-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="white" opacity="0.1"/><circle cx="80" cy="40" r="1" fill="white" opacity="0.1"/><circle cx="40" cy="80" r="1.5" fill="white" opacity="0.1"/></svg>');
+        pointer-events: none;
+    }
+
+    .profile-avatar-container {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+
+    .profile-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 4px solid rgba(255, 255, 255, 0.9);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        margin: 0 auto;
+        display: block;
+        position: relative;
+        z-index: 2;
+    }
+
+    .avatar-upload-overlay {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        cursor: pointer;
+        z-index: 3;
+    }
+
+    .profile-avatar-container:hover .avatar-upload-overlay {
+        opacity: 1;
+    }
+
+    .avatar-upload-text {
+        color: white;
+        font-size: 0.875rem;
+        text-align: center;
+        font-weight: 500;
+    }
+
+    .profile-display-name {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+        position: relative;
+        z-index: 2;
+    }
+
+    .profile-username {
+        font-size: 1rem;
+        opacity: 0.9;
+        margin: 0.5rem 0 0 0;
+        position: relative;
+        z-index: 2;
+    }
+
+    .profile-form {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .form-section {
+        margin-bottom: 2rem;
+    }
+
+    .form-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .form-section-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        display: block;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        background: white;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    textarea.form-control {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 6px;
+        color: white;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.875rem;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+        background: #6b7280;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 6px;
+        color: white;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.875rem;
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+    }
+
+    .btn-secondary:hover {
+        background: #4b5563;
+        color: white;
+        text-decoration: none;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+        margin-top: 2rem;
+    }
+
+    .char-counter {
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-align: right;
+        margin-top: 0.25rem;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .timezone-container {
+        position: relative;
+    }
+
+    .timezone-detection-result {
+        font-size: 0.875rem;
+        padding: 0.5rem;
+        border-radius: 4px;
+        background: #f0f9ff;
+        border: 1px solid #bfdbfe;
+    }
+
+    .timezone-detection-result .text-success {
+        color: #059669 !important;
+        font-weight: 500;
+    }
+
+    .btn-outline-primary {
+        color: #667eea;
+        border: 1px solid #667eea;
+        background: transparent;
+        transition: all 0.2s ease;
+    }
+
+    .btn-outline-primary:hover {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+
+    .btn-outline-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-success {
+        background: #10b981;
+        border-color: #10b981;
+        color: white;
+    }
+
+    .btn-sm {
+        padding: 0.375rem 0.75rem;
+        font-size: 0.8125rem;
+        border-radius: 4px;
+    }
+
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+
+        .profile-form {
+            padding: 1.5rem;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock head_extra %}
+
+{% block content %}
+<div class="profile-container">
+    <!-- Profile Header -->
+    <div class="profile-header">
+        <div class="profile-avatar-container">
+            <img
+                src="{{ current_user.avatar_url or '' }}"
+                alt="{{ current_user.get_display_name() }}"
+                class="profile-avatar"
+                data-avatar
+                data-username="{{ current_user.username }}"
+                data-email="{{ current_user.email }}"
+                data-default-src="{{ url_for('static', filename='img/default-avatar.png') }}"
+            />
+            <div class="avatar-upload-overlay" onclick="document.getElementById('avatar-upload').click()">
+                <div class="avatar-upload-text">
+                    <i class="fas fa-camera"></i><br>
+                    Change Avatar
+                </div>
+            </div>
+        </div>
+        <h1 class="profile-display-name">{{ current_user.get_display_name() }}</h1>
+        <p class="profile-username">@{{ current_user.username }}</p>
+    </div>
+
+    <!-- Profile Form -->
+    <form method="POST" class="profile-form" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+        <!-- Avatar Upload (Hidden) -->
+        <input type="file" id="avatar-upload" name="avatar" accept="image/*" class="hidden">
+
+        <!-- Personal Information -->
+        <div class="form-section">
+            <h2 class="form-section-title">
+                <i class="fas fa-user me-2"></i>Personal Information
+            </h2>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="first_name" class="form-label">First Name</label>
+                    <input
+                        type="text"
+                        id="first_name"
+                        name="first_name"
+                        class="form-control"
+                        value="{{ current_user.first_name or '' }}"
+                        maxlength="64"
+                        placeholder="Enter your first name"
+                    />
+                </div>
+
+                <div class="form-group">
+                    <label for="last_name" class="form-label">Last Name</label>
+                    <input
+                        type="text"
+                        id="last_name"
+                        name="last_name"
+                        class="form-control"
+                        value="{{ current_user.last_name or '' }}"
+                        maxlength="64"
+                        placeholder="Enter your last name"
+                    />
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="display_name" class="form-label">Display Name</label>
+                <input
+                    type="text"
+                    id="display_name"
+                    name="display_name"
+                    class="form-control"
+                    value="{{ current_user.display_name or '' }}"
+                    maxlength="128"
+                    placeholder="How you'd like to be displayed (optional)"
+                />
+                <div class="char-counter">
+                    <span id="display_name_count">{{ (current_user.display_name or '') | length }}</span>/128
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="bio" class="form-label">Bio</label>
+                <textarea
+                    id="bio"
+                    name="bio"
+                    class="form-control"
+                    maxlength="500"
+                    placeholder="Tell us a bit about yourself (optional)"
+                    rows="3"
+                >{{ current_user.bio or '' }}</textarea>
+                <div class="char-counter">
+                    <span id="bio_count">{{ (current_user.bio or '') | length }}</span>/500
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="form-section">
+            <h2 class="form-section-title">
+                <i class="fas fa-address-book me-2"></i>Contact Information
+            </h2>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email" class="form-label">Email Address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        class="form-control"
+                        value="{{ current_user.email }}"
+                        disabled
+                        title="Email cannot be changed here. Contact support if needed."
+                    />
+                    <small class="text-muted">Contact support to change your email address</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone" class="form-label">Phone Number</label>
+                    <input
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        class="form-control"
+                        value="{{ current_user.phone or '' }}"
+                        maxlength="20"
+                        placeholder="+1 (555) 123-4567"
+                    />
+                </div>
+            </div>
+        </div>
+
+        <!-- Preferences -->
+        <div class="form-section">
+            <h2 class="form-section-title">
+                <i class="fas fa-cog me-2"></i>Preferences
+            </h2>
+
+            <div class="form-group">
+                <label for="timezone" class="form-label">Timezone</label>
+                <div class="timezone-container">
+                    <select id="timezone" name="timezone" class="form-control">
+                        <optgroup label="Common Timezones">
+                            {% for tz in common_timezones %}
+                            <option value="{{ tz }}" {{ 'selected' if current_user.timezone == tz else '' }}>
+                                {{ tz.replace('_', ' ') }}
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="All Timezones">
+                            {% for tz in all_timezones %}
+                            {% if tz not in common_timezones %}
+                            <option value="{{ tz }}" {{ 'selected' if current_user.timezone == tz else '' }}>
+                                {{ tz.replace('_', ' ') }}
+                            </option>
+                            {% endif %}
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                    <button
+                        type="button"
+                        id="detect-timezone-btn"
+                        class="btn btn-outline-primary btn-sm mt-2"
+                        onclick="window.timezoneDetector?.detectManually()"
+                    >
+                        <i class="fas fa-location-dot me-1"></i>Auto-detect
+                    </button>
+                    <div id="timezone-detected" class="timezone-detection-result mt-2" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+            <a href="{{ url_for('main.index') }}" class="btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Cancel
+            </a>
+            <button type="submit" class="btn-primary">
+                <i class="fas fa-save me-1"></i>Save Changes
+            </button>
+        </div>
+    </form>
 </div>
+
+<script>
+// Character counters
+document.addEventListener('DOMContentLoaded', function() {
+    const textareas = document.querySelectorAll('input[maxlength], textarea[maxlength]');
+
+    textareas.forEach(function(element) {
+        const countElement = document.getElementById(element.id + '_count');
+        if (countElement) {
+            element.addEventListener('input', function() {
+                countElement.textContent = element.value.length;
+            });
+        }
+    });
+
+    // Avatar upload handling (placeholder for future implementation)
+    const avatarUpload = document.getElementById('avatar-upload');
+    if (avatarUpload) {
+        avatarUpload.addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                // TODO: Implement avatar upload
+                alert('Avatar upload will be implemented in the next phase!');
+            }
+        });
+    }
+});
+</script>
 {% endblock content %}

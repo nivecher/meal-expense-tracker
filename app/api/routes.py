@@ -72,6 +72,20 @@ def health_check() -> Response:
     return jsonify({"status": "healthy"})
 
 
+# Version Information
+@bp.route("/version")
+def version_info() -> Response:
+    """Get application version information.
+
+    Returns:
+        JSON response with version from git tags
+    """
+    from app._version import __version__
+
+    version_data = {"version": __version__}
+    return _create_api_response(data=version_data, message="Version information retrieved successfully")
+
+
 # Google Places API endpoints
 @bp.route("/address-autocomplete")
 @login_required

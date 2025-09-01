@@ -3,13 +3,13 @@
 import csv
 import io
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple, cast
 
-from flask import current_app
+from flask import Request, current_app
 from flask_wtf import FlaskForm
-from sqlalchemy import extract, func, select
+from sqlalchemy import extract, func, or_, select
 from werkzeug.datastructures import FileStorage
 
 from app.constants.categories import get_default_categories
@@ -17,6 +17,187 @@ from app.expenses.forms import ExpenseForm
 from app.expenses.models import Category, Expense
 from app.extensions import db
 from app.restaurants.models import Restaurant
+
+# =============================================================================
+# EXPENSE FILTERING AND SEARCH FUNCTIONALITY
+# =============================================================================
+
+
+def get_expense_filters(request: Request) -> Dict[str, Any]:
+    """Extract and validate filter parameters from the request.
+
+    Args:
+        request: The Flask request object
+
+    Returns:
+        Dict containing filter parameters
+    """
+    # Support both 'search' and 'q' parameters for search functionality
+    search_term = request.args.get("search", "").strip() or request.args.get("q", "").strip()
+    return {
+        "search": search_term,
+        "meal_type": request.args.get("meal_type", "").strip(),
+        "category": request.args.get("category", "").strip(),
+        "start_date": request.args.get("start_date", "").strip(),
+        "end_date": request.args.get("end_date", "").strip(),
+        "sort_by": request.args.get("sort", "date"),
+        "sort_order": request.args.get("order", "desc"),
+    }
+
+
+def get_user_expenses(user_id: int, filters: Dict[str, Any]) -> Tuple[List[Expense], float]:
+    """Get expenses for a user with the given filters.
+
+    Args:
+        user_id: The ID of the user
+        filters: Dictionary of filter parameters
+
+    Returns:
+        Tuple of (expenses, total_amount)
+    """
+    # Base query
+    stmt = select(Expense).where(Expense.user_id == user_id)
+
+    # Apply filters
+    stmt = apply_filters(stmt, filters)
+
+    # Apply sorting
+    stmt = apply_sorting(stmt, filters["sort_by"], filters["sort_order"])
+
+    # Execute query
+    result = db.session.execute(stmt)
+    expenses = result.scalars().all()
+
+    # Calculate total
+    total_amount = sum(expense.amount for expense in expenses) if expenses else 0.0
+
+    return expenses, total_amount
+
+
+def apply_filters(stmt, filters: Dict[str, Any]):
+    """Apply filters to the query with comprehensive search across text fields.
+
+    Args:
+        stmt: The SQLAlchemy select statement
+        filters: Dictionary of filter parameters
+
+    Returns:
+        The modified select statement with filters applied
+    """
+    # Always join restaurant and category tables for search (using outer joins to include expenses without these)
+    stmt = stmt.join(Expense.restaurant, isouter=True)
+    stmt = stmt.join(Expense.category, isouter=True)
+    # Apply search filter across all text-based fields
+    if filters["search"]:
+        search_term = f"%{filters['search']}%"
+        stmt = stmt.where(
+            or_(
+                # Restaurant fields
+                Restaurant.name.ilike(search_term),
+                Restaurant.address.ilike(search_term),
+                # Expense fields
+                Expense.notes.ilike(search_term),
+                Expense.meal_type.ilike(search_term),
+                # Category fields
+                Category.name.ilike(search_term),
+            )
+        )
+
+    # Apply meal type filter
+    if filters["meal_type"]:
+        stmt = stmt.where(Expense.meal_type == filters["meal_type"])
+
+    # Apply category filter
+    if filters["category"]:
+        stmt = stmt.where(Category.name == filters["category"])
+
+    # Apply date range filters with proper error handling
+    if filters["start_date"]:
+        try:
+            start_date = datetime.strptime(filters["start_date"], "%Y-%m-%d").date()
+            stmt = stmt.where(Expense.date >= start_date)
+        except (ValueError, TypeError):
+            # Log the error but don't fail the query
+            pass
+
+    if filters["end_date"]:
+        try:
+            end_date = datetime.strptime(filters["end_date"], "%Y-%m-%d").date()
+            stmt = stmt.where(Expense.date <= end_date)
+        except (ValueError, TypeError):
+            # Log the error but don't fail the query
+            pass
+
+    return stmt
+
+
+def apply_sorting(stmt, sort_by: str, sort_order: str):
+    """Apply sorting to the query.
+
+    Args:
+        stmt: The SQLAlchemy select statement
+        sort_by: Field to sort by
+        sort_order: Sort order ('asc' or 'desc')
+
+    Returns:
+        The modified select statement with sorting applied
+    """
+    sort_field = None
+    is_desc = sort_order.lower() == "desc"
+
+    if sort_by == "date":
+        sort_field = Expense.date
+    elif sort_by == "amount":
+        sort_field = Expense.amount
+    elif sort_by == "meal_type":
+        sort_field = Expense.meal_type
+    elif sort_by == "category":
+        # Sort by category name through the relationship
+        stmt = stmt.join(Expense.category)
+        sort_field = Category.name
+    elif sort_by == "restaurant":
+        return stmt.order_by(Restaurant.name.desc() if is_desc else Restaurant.name.asc())
+
+    if sort_field:
+        return stmt.order_by(sort_field.desc() if is_desc else sort_field.asc())
+
+    return stmt
+
+
+def get_main_filter_options(user_id: int) -> Dict[str, List[str]]:
+    """Get filter options (meal types and categories) for the current user.
+
+    This provides simple filter options for main dashboard filtering.
+
+    Args:
+        user_id: The ID of the user
+
+    Returns:
+        Dictionary containing filter options
+    """
+    # Get unique meal types and categories for filter dropdowns
+    meal_types = (
+        db.session.query(Expense.meal_type).filter(Expense.user_id == user_id, Expense.meal_type != "").distinct().all()
+    )
+
+    # Get unique categories through the relationship
+    categories = (
+        db.session.query(Category.name)
+        .join(Expense, Expense.category_id == Category.id)
+        .filter(Expense.user_id == user_id)
+        .distinct()
+        .all()
+    )
+
+    return {
+        "meal_types": [m[0] for m in meal_types if m[0]],  # Filter out None values
+        "categories": [c[0] for c in categories if c[0]],  # Filter out None values
+    }
+
+
+# =============================================================================
+# EXISTING FUNCTIONALITY
+# =============================================================================
 
 
 def _sort_categories_by_default_order(categories: list[Category]) -> list[Category]:
@@ -597,13 +778,33 @@ def _process_csv_file(file: FileStorage) -> Tuple[bool, Optional[str], Optional[
         return False, f"Error processing CSV file: {str(e)}", None
 
 
-def _parse_expense_date(date_str: str) -> Tuple[Optional[date], Optional[str]]:
-    """Parse expense date from string with support for multiple formats.
+def _parse_excel_serial_date(date_str: str) -> Tuple[Optional[date], bool]:
+    """Parse Excel serial date format.
 
-    Supported formats:
-    - ISO format: YYYY-MM-DD
-    - US format: M/D/YYYY, MM/DD/YYYY
-    - Alternative US: M-D-YYYY, MM-DD-YYYY
+    Args:
+        date_str: The date string to parse
+
+    Returns:
+        Tuple of (parsed_date, is_excel_date)
+    """
+    try:
+        serial_number = float(date_str)
+        if serial_number.is_integer() and 1 <= serial_number <= 2958465:  # Valid Excel date range
+            # Excel uses 1900-01-01 as day 1, but incorrectly treats 1900 as a leap year
+            excel_epoch = datetime(1899, 12, 30)  # Day 0 in Excel
+            try:
+                parsed_date = excel_epoch + timedelta(days=int(serial_number))
+                return parsed_date.date(), True
+            except (ValueError, OverflowError):
+                pass
+    except (ValueError, TypeError):
+        pass
+
+    return None, False
+
+
+def _parse_standard_date_formats(date_str: str) -> Tuple[Optional[date], Optional[str]]:
+    """Parse standard date formats (ISO, US, European).
 
     Args:
         date_str: The date string to parse
@@ -611,8 +812,11 @@ def _parse_expense_date(date_str: str) -> Tuple[Optional[date], Optional[str]]:
     Returns:
         Tuple of (parsed_date, error_message)
     """
-    if not date_str:
-        return None, "Date is required"
+    # First try fromisoformat for strict ISO
+    try:
+        return datetime.fromisoformat(date_str).date(), None
+    except ValueError:
+        pass
 
     # Try multiple date formats in order of preference
     date_formats = [
@@ -623,12 +827,6 @@ def _parse_expense_date(date_str: str) -> Tuple[Optional[date], Optional[str]]:
         "%Y/%m/%d",  # Alternative ISO: 2025/08/30
     ]
 
-    # First try fromisoformat for strict ISO
-    try:
-        return datetime.fromisoformat(date_str).date(), None
-    except ValueError:
-        pass
-
     # Try each format
     for date_format in date_formats:
         try:
@@ -636,7 +834,40 @@ def _parse_expense_date(date_str: str) -> Tuple[Optional[date], Optional[str]]:
         except ValueError:
             continue
 
-    return None, f"Invalid date format: {date_str}. Supported formats: YYYY-MM-DD, M/D/YYYY, MM/DD/YYYY"
+    return (
+        None,
+        f"Invalid date format: {date_str}. Supported formats: YYYY-MM-DD, M/D/YYYY, MM/DD/YYYY, Excel serial dates",
+    )
+
+
+def _parse_expense_date(date_str: str) -> Tuple[Optional[date], Optional[str]]:
+    """Parse expense date from string with support for multiple formats.
+
+    Supported formats:
+    - ISO format: YYYY-MM-DD
+    - US format: M/D/YYYY, MM/DD/YYYY
+    - Alternative US: M-D-YYYY, MM-DD-YYYY
+    - Excel serial dates: numeric values (1-based from 1900-01-01)
+
+    Args:
+        date_str: The date string to parse
+
+    Returns:
+        Tuple of (parsed_date, error_message)
+    """
+    if not date_str:
+        return None, "Date is required"
+
+    # Strip whitespace
+    date_str = str(date_str).strip()
+
+    # Try Excel serial date first
+    excel_date, is_excel = _parse_excel_serial_date(date_str)
+    if is_excel:
+        return excel_date, None
+
+    # Try standard date formats
+    return _parse_standard_date_formats(date_str)
 
 
 def _parse_expense_amount(amount_str: str) -> Tuple[Optional[Decimal], Optional[str]]:

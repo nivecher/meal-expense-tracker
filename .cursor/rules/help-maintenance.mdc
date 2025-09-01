@@ -1,0 +1,249 @@
+---
+alwaysApply: true
+---
+
+# Help Page Maintenance Rule
+
+## Overview
+This rule ensures the help pages remain accurate and up-to-date as new features are added or existing features are modified.
+
+## Rule: Always Update Help Documentation
+
+### When Adding New Features
+When implementing any new user-facing feature, you MUST:
+
+1. **Update Help Content**: Add the new feature to the appropriate section in `/app/templates/main/help.html`
+2. **Update Visual Elements**: If the feature includes new badges, colors, icons, or UI elements, showcase them in the help page
+3. **Update Reference Sections**: Add new constants (meal types, cuisines, categories) to the reference guide
+4. **Update Navigation**: If needed, add new quick navigation links for major feature additions
+
+### When Modifying Existing Features
+When changing existing functionality, you MUST:
+
+1. **Review Help Accuracy**: Check if the help content still accurately describes the feature
+2. **Update Descriptions**: Modify any text that no longer matches the current implementation
+3. **Update Screenshots/Examples**: If visual elements changed, update the help page to reflect them
+4. **Update FAQ**: Add new common questions that arise from feature changes
+
+### Specific Areas to Maintain
+
+#### Constants and Options
+- **Meal Types**: When adding/removing meal types in `app/constants/meal_types.py`, update the meal types section
+- **Cuisines**: When modifying `app/constants/cuisines.py`, update the cuisine reference
+- **Categories**: When changing default categories in `app/constants/categories.py`, update the categories section
+
+#### Feature Sections
+- **Expense Management**: Update when expense forms, validation, or workflows change
+- **Restaurant Management**: Update when restaurant features, Google Maps integration, or search changes
+- **Analytics**: Update when dashboard, charts, or reporting features are modified
+- **Import/Export**: Update when CSV formats or import/export functionality changes
+
+#### Navigation and UX
+- **Keyboard Shortcuts**: Update when new shortcuts are added
+- **User Flows**: Update step-by-step guides when workflows change
+- **Error Handling**: Update FAQ when new error scenarios are added
+
+### Implementation Checklist
+
+When making feature changes, use this checklist:
+
+- [ ] Feature implemented and tested
+- [ ] Help page content reviewed and updated
+- [ ] New badges/visual elements showcased (if applicable)
+- [ ] Reference sections updated (if applicable)
+- [ ] Navigation links updated (if applicable)
+- [ ] FAQ section reviewed and updated (if applicable)
+- [ ] Help page tested in browser
+- [ ] All accordion sections expand/collapse properly
+- [ ] Mobile responsiveness verified
+
+### Code Integration Points
+
+The help page integrates with these key files:
+- **Route**: `/app/main/routes.py` - `help_page()` function
+- **Template**: `/app/templates/main/help.html` - Main help content
+- **Constants**:
+  - `/app/constants/meal_types.py` - Meal type data
+  - `/app/constants/cuisines.py` - Cuisine data
+  - `/app/constants/categories.py` - Category data
+- **Navigation**: `/app/templates/includes/navbar.html` - Help menu link
+
+### Quality Standards
+
+Help content must be:
+- **Accurate**: Reflects current functionality exactly
+- **Complete**: Covers all user-facing features
+- **Clear**: Uses plain language and good examples
+- **Visual**: Shows badges, colors, and icons where appropriate
+- **Organized**: Uses collapsible sections for easy navigation
+- **Searchable**: Uses good headings and anchor links
+- **Accessible**: Works with screen readers and keyboard navigation
+
+### Maintenance Schedule
+
+- **After each feature**: Update help immediately when implementing new features
+- **Monthly review**: Check for any missed updates or improvements
+- **User feedback**: Update based on support questions and user confusion
+- **Version releases**: Comprehensive review before major version releases
+
+## Examples of Good Help Updates
+
+### Adding a New Meal Type
+```python
+# After adding to meal_types.py:
+MEAL_TYPE_CONSTANTS.append({
+    "name": "afternoon_tea",
+    "color": "#f3e5f5",
+    "icon": "coffee",
+    "description": "Afternoon tea and light snacks",
+    "time_range": "2:00 PM - 5:00 PM"
+})
+```
+**Help Update Required**: The meal types section will automatically show the new type since it uses `get_meal_type_constants()`, but you should verify the display and update any descriptive text if needed.
+
+### Adding New Analytics Feature
+If adding expense trend charts:
+1. Update the "Analytics & Reporting" accordion section
+2. Add description of the new charts
+3. Update the "Key Features" overview
+4. Add any new keyboard shortcuts or interactions
+
+### Modifying Import/Export
+If changing CSV format:
+1. Update import/export instructions in the Expense Management section
+2. Update any example formats or field descriptions
+3. Add migration notes to FAQ if needed
+
+## Enforcement
+
+This rule is MANDATORY. Pull requests that add or modify user-facing features without updating the help documentation will be rejected.
+
+The help page serves as:
+- User documentation
+- Feature showcase
+- Onboarding guide
+- Support resource
+
+Keeping it current is essential for user experience and reducing support burden.# Help Page Maintenance Rule
+
+## Overview
+This rule ensures the help pages remain accurate and up-to-date as new features are added or existing features are modified.
+
+## Rule: Always Update Help Documentation
+
+### When Adding New Features
+When implementing any new user-facing feature, you MUST:
+
+1. **Update Help Content**: Add the new feature to the appropriate section in `/app/templates/main/help.html`
+2. **Update Visual Elements**: If the feature includes new badges, colors, icons, or UI elements, showcase them in the help page
+3. **Update Reference Sections**: Add new constants (meal types, cuisines, categories) to the reference guide
+4. **Update Navigation**: If needed, add new quick navigation links for major feature additions
+
+### When Modifying Existing Features
+When changing existing functionality, you MUST:
+
+1. **Review Help Accuracy**: Check if the help content still accurately describes the feature
+2. **Update Descriptions**: Modify any text that no longer matches the current implementation
+3. **Update Screenshots/Examples**: If visual elements changed, update the help page to reflect them
+4. **Update FAQ**: Add new common questions that arise from feature changes
+
+### Specific Areas to Maintain
+
+#### Constants and Options
+- **Meal Types**: When adding/removing meal types in `app/constants/meal_types.py`, update the meal types section
+- **Cuisines**: When modifying `app/constants/cuisines.py`, update the cuisine reference
+- **Categories**: When changing default categories in `app/constants/categories.py`, update the categories section
+
+#### Feature Sections
+- **Expense Management**: Update when expense forms, validation, or workflows change
+- **Restaurant Management**: Update when restaurant features, Google Maps integration, or search changes
+- **Analytics**: Update when dashboard, charts, or reporting features are modified
+- **Import/Export**: Update when CSV formats or import/export functionality changes
+
+#### Navigation and UX
+- **Keyboard Shortcuts**: Update when new shortcuts are added
+- **User Flows**: Update step-by-step guides when workflows change
+- **Error Handling**: Update FAQ when new error scenarios are added
+
+### Implementation Checklist
+
+When making feature changes, use this checklist:
+
+- [ ] Feature implemented and tested
+- [ ] Help page content reviewed and updated
+- [ ] New badges/visual elements showcased (if applicable)
+- [ ] Reference sections updated (if applicable)
+- [ ] Navigation links updated (if applicable)
+- [ ] FAQ section reviewed and updated (if applicable)
+- [ ] Help page tested in browser
+- [ ] All accordion sections expand/collapse properly
+- [ ] Mobile responsiveness verified
+
+### Code Integration Points
+
+The help page integrates with these key files:
+- **Route**: `/app/main/routes.py` - `help_page()` function
+- **Template**: `/app/templates/main/help.html` - Main help content
+- **Constants**:
+  - `/app/constants/meal_types.py` - Meal type data
+  - `/app/constants/cuisines.py` - Cuisine data
+  - `/app/constants/categories.py` - Category data
+- **Navigation**: `/app/templates/includes/navbar.html` - Help menu link
+
+### Quality Standards
+
+Help content must be:
+- **Accurate**: Reflects current functionality exactly
+- **Complete**: Covers all user-facing features
+- **Clear**: Uses plain language and good examples
+- **Visual**: Shows badges, colors, and icons where appropriate
+- **Organized**: Uses collapsible sections for easy navigation
+- **Searchable**: Uses good headings and anchor links
+- **Accessible**: Works with screen readers and keyboard navigation
+
+### Maintenance Schedule
+
+- **After each feature**: Update help immediately when implementing new features
+- **Monthly review**: Check for any missed updates or improvements
+- **User feedback**: Update based on support questions and user confusion
+- **Version releases**: Comprehensive review before major version releases
+
+## Examples of Good Help Updates
+
+### Adding a New Meal Type
+```python
+# After adding to meal_types.py:
+MEAL_TYPE_CONSTANTS.append({
+    "name": "afternoon_tea",
+    "color": "#f3e5f5",
+    "icon": "coffee",
+    "description": "Afternoon tea and light snacks",
+    "time_range": "2:00 PM - 5:00 PM"
+})
+```
+**Help Update Required**: The meal types section will automatically show the new type since it uses `get_meal_type_constants()`, but you should verify the display and update any descriptive text if needed.
+
+### Adding New Analytics Feature
+If adding expense trend charts:
+1. Update the "Analytics & Reporting" accordion section
+2. Add description of the new charts
+3. Update the "Key Features" overview
+4. Add any new keyboard shortcuts or interactions
+
+### Modifying Import/Export
+If changing CSV format:
+1. Update import/export instructions in the Expense Management section
+2. Update any example formats or field descriptions
+3. Add migration notes to FAQ if needed
+
+## Enforcement
+
+This rule is MANDATORY. Pull requests that add or modify user-facing features without updating the help documentation will be rejected.
+
+The help page serves as:
+- User documentation
+- Feature showcase
+- Onboarding guide
+- Support resource
+
+Keeping it current is essential for user experience and reducing support burden.

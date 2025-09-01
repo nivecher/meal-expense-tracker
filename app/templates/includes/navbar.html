@@ -20,6 +20,16 @@
         <!-- Navigation Links -->
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto">
+                <!-- Dashboard Link -->
+                <li class="nav-item">
+                    <a
+                        class="nav-link {% if request.endpoint == 'main.index' %}active{% endif %}"
+                        href="{{ url_for('main.index') }}"
+                        role="menuitem">
+                        <i class="fas fa-chart-line" aria-hidden="true"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
                 <li class="nav-item dropdown">
                     <a
                         class="nav-link dropdown-toggle {% if request.endpoint and 'expenses' in request.endpoint %}active{% endif %}"
@@ -174,14 +184,6 @@
             </ul>
             <!-- Right-aligned navigation items -->
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item d-flex align-items-center">
-                    <a
-                        class="btn btn-primary btn-sm"
-                        href="{{ url_for('expenses.add_expense') }}"
-                        title="Add New Expense">
-                        <i class="fas fa-plus me-1"></i> Add Expense
-                    </a>
-                </li>
                 <!-- User Dropdown -->
                 {% if current_user.is_authenticated %}
                 <li class="nav-item dropdown">
@@ -194,27 +196,33 @@
                         aria-expanded="false">
                         <div class="position-relative">
                             <img
-                                src="{{ current_user.avatar_url or url_for('static', filename='img/default-avatar.png') }}"
+                                src="{{ current_user.avatar_url or '' }}"
                                 alt="{{ current_user.username }}"
                                 class="rounded-circle"
                                 width="32"
                                 height="32"
                                 data-avatar
+                                data-username="{{ current_user.username }}"
+                                data-email="{{ current_user.email }}"
+                                data-initials="{{ current_user.get_initials() }}"
                                 data-default-src="{{ url_for('static', filename='img/default-avatar.png') }}" />
                         </div>
-                        <span class="ms-2 d-none d-lg-inline">{{ current_user.username }}</span>
+                        <span class="ms-2 d-none d-md-inline username">{{ current_user.username }}</span>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown" role="menu">
                         <!-- User Info -->
                         <div class="user-info" role="none">
                             <div class="d-flex align-items-center">
                                 <img
-                                    src="{{ current_user.avatar_url or url_for('static', filename='img/default-avatar.svg') }}"
-                                    alt="User Avatar"
+                                    src="{{ current_user.avatar_url or '' }}"
+                                    alt="{{ current_user.username }}"
                                     class="user-avatar me-3"
-                                    width="32"
-                                    height="32"
+                                    width="36"
+                                    height="36"
                                     data-avatar
+                                    data-username="{{ current_user.username }}"
+                                    data-email="{{ current_user.email }}"
+                                    data-initials="{{ current_user.get_initials() }}"
                                     data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}" />
                                 <div>
                                     <div class="user-name">{{ current_user.username }}</div>
@@ -225,6 +233,10 @@
                         <div class="dropdown-divider" role="separator"></div>
                         <!-- Menu Items -->
                         <div class="px-2" role="group">
+                            <a href="{{ url_for('auth.profile') }}" class="dropdown-item" role="menuitem">
+                                <i class="fas fa-user" aria-hidden="true"></i>
+                                <span>Profile</span>
+                            </a>
                             <a href="{{ url_for('auth.change_password') }}" class="dropdown-item" role="menuitem">
                                 <i class="fas fa-lock" aria-hidden="true"></i>
                                 <span>Change Password</span>
@@ -232,7 +244,7 @@
                         </div>
                         <div class="dropdown-divider" role="separator"></div>
                         <div class="px-2" role="group">
-                            <a href="#" class="dropdown-item" role="menuitem">
+                            <a href="{{ url_for('main.help_page') }}" class="dropdown-item" role="menuitem">
                                 <i class="fas fa-question-circle" aria-hidden="true"></i>
                                 <span>Help</span>
                             </a>
@@ -261,13 +273,3 @@
         </div>
     </div>
 </nav>
-{# Flash Messages #}
-<div class="container mt-3">
-    {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for category, message in
-    messages %}
-    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-        <div class="alert-message">{{ message }}</div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    {% endfor %} {% endif %} {% endwith %}
-</div>

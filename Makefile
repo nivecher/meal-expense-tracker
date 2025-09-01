@@ -127,6 +127,7 @@ help:  ## Show this help message
 	@echo "  \033[1mmake tf-validate\033[0m    Validate Terraform configuration"
 
 	@echo "\n\033[1mDeployment:\033[0m"
+	@echo "  \033[1mmake deploy\033[0m         Deploy using deploy-lambda.sh script"
 	@echo "  \033[1mmake deploy-dev\033[0m      Deploy to development environment"
 	@echo "  \033[1mmake deploy-staging\033[0m  Deploy to staging environment"
 	@echo "  \033[1mmake deploy-prod\033[0m     Deploy to production environment"
@@ -732,6 +733,12 @@ destroy-tf-backend:
 # =============================================================================
 # Deployment
 # =============================================================================
+
+## Deploy using deploy-lambda.sh script
+.PHONY: deploy
+deploy:
+	@echo "\033[1m🚀 Running deployment script...\033[0m"
+	@./scripts/deploy_lambda.sh
 
 ## Deploy to dev environment
 .PHONY: deploy-dev

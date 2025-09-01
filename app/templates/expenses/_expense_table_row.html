@@ -4,30 +4,37 @@
            class="text-decoration-none">{{ expense.date.strftime("%Y-%m-%d") }}</a>
     </td>
     <td>
-        {% if expense.category %}
-            <span class="badge border d-flex align-items-center compact-category-badge"
-                  style="background-color: #f8f9fa;
-                         color: #495057;
-                         border-color: #dee2e6;
-                         font-size: 0.75rem;
-                         padding: 0.25rem 0.5rem">
-                {% if expense.category.icon %}
-                    <i class="fas fa-{{ expense.category.icon }} me-1"
-                       style="font-size: 0.7rem;
-                              color: {{ expense.category.color }}"></i>
-                {% endif %}
-                {{ expense.category.name }}
-            </span>
+        {% if expense.restaurant %}
+            <div class="d-flex align-items-center">
+                <!-- Restaurant Icon (small for table view) -->
+                <div class="restaurant-icon-table me-2 flex-shrink-0">
+                    {% if expense.restaurant.website %}
+                        <img
+                            src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website }}&sz=16"
+                            alt="{{ expense.restaurant.name }} icon"
+                            class="restaurant-favicon-table"
+                            width="16"
+                            height="16"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                        />
+                        <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="display: none; font-size: 14px;"></i>
+                    {% else %}
+                        <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 14px;"></i>
+                    {% endif %}
+                </div>
+
+                <!-- Restaurant Name -->
+                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
+                   class="text-decoration-none">{{ expense.restaurant.name }}</a>
+            </div>
         {% else %}
             <span class="text-muted">-</span>
         {% endif %}
     </td>
     <td>
-        {% if expense.restaurant %}
-            <span class="d-flex align-items-center">
-                <i class="fas fa-utensils me-2 text-muted"></i>
-                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
-                   class="text-decoration-none">{{ expense.restaurant.name }}</a>
+        {% if expense.restaurant and expense.restaurant.cuisine %}
+            <span class="cuisine-badge" data-cuisine="{{ expense.restaurant.cuisine }}">
+                <span class="badge bg-light text-dark">{{ expense.restaurant.cuisine }}</span>
             </span>
         {% else %}
             <span class="text-muted">-</span>
@@ -36,7 +43,9 @@
     <td>
         <div class="d-flex align-items-center">
             {% if expense.meal_type %}
-                <span class="badge bg-light text-dark me-2">{{ expense.meal_type.title() }}</span>
+                <span class="meal-type-badge compact {{ expense.meal_type.lower().replace(' ', '-') }}">
+                    <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
+                </span>
             {% else %}
                 <span class="text-muted me-2">Expense</span>
             {% endif %}
@@ -44,11 +53,8 @@
     </td>
     <td class="fw-bold text-success amount-right">${{ "%.2f"|format(expense.amount) }}</td>
     <td>
-        {% if expense.notes %}
-            <span class="text-muted small" title="{{ expense.notes }}">{{ expense.notes|truncate(50) }}</span>
-        {% else %}
-            <span class="text-muted">-</span>
-        {% endif %}
+        {% from 'macros/category_helpers.html' import category_badge %}
+        {{ category_badge(expense.category, compact=true) }}
     </td>
     <td class="text-end">
         <div class="btn-group" role="group">

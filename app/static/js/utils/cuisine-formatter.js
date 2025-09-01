@@ -9,22 +9,22 @@
  * Each cuisine has name, color (hex), icon (Font Awesome), and description
  */
 const CUISINE_CONSTANTS = [
-  { name: 'Chinese', color: '#dc2626', icon: 'utensils', description: 'Chinese cuisine' },
+  { name: 'Chinese', color: '#dc2626', icon: 'bowl-rice', description: 'Chinese cuisine' },
   { name: 'Italian', color: '#16a34a', icon: 'pizza-slice', description: 'Italian cuisine' },
-  { name: 'Japanese', color: '#e91e63', icon: 'fish', description: 'Japanese cuisine' },
-  { name: 'Mexican', color: '#ea580c', icon: 'pepper-hot', description: 'Mexican cuisine' },
+  { name: 'Japanese', color: '#bc002d', icon: 'fish', description: 'Japanese cuisine' },
+  { name: 'Mexican', color: '#006847', icon: 'pepper-hot', description: 'Mexican cuisine' },
   { name: 'Indian', color: '#f59e0b', icon: 'fire', description: 'Indian cuisine' },
   { name: 'Thai', color: '#059669', icon: 'leaf', description: 'Thai cuisine' },
   { name: 'French', color: '#7c3aed', icon: 'wine-glass', description: 'French cuisine' },
-  { name: 'American', color: '#2563eb', icon: 'utensils', description: 'American cuisine' },
+  { name: 'American', color: '#2563eb', icon: 'flag-usa', description: 'American cuisine' },
   { name: 'Barbecue', color: '#7c2d12', icon: 'drumstick-bite', description: 'Barbecue cuisine' },
   { name: 'Pizza', color: '#16a34a', icon: 'pizza-slice', description: 'Pizza restaurants' },
-  { name: 'Seafood', color: '#0891b2', icon: 'fish', description: 'Seafood restaurants' },
-  { name: 'Steakhouse', color: '#7c2d12', icon: 'drumstick-bite', description: 'Steakhouse restaurants' },
+  { name: 'Seafood', color: '#0891b2', icon: 'shrimp', description: 'Seafood restaurants' },
+  { name: 'Steakhouse', color: '#7c2d12', icon: 'cow', description: 'Steakhouse restaurants' },
   { name: 'Sushi', color: '#e91e63', icon: 'fish', description: 'Sushi restaurants' },
   { name: 'Korean', color: '#dc2626', icon: 'fire', description: 'Korean cuisine' },
-  { name: 'Vietnamese', color: '#059669', icon: 'utensils', description: 'Vietnamese cuisine' },
-  { name: 'Mediterranean', color: '#0891b2', icon: 'leaf', description: 'Mediterranean cuisine' },
+  { name: 'Vietnamese', color: '#da020e', icon: 'bowl-food', description: 'Vietnamese cuisine' },
+  { name: 'Mediterranean', color: '#0891b2', icon: 'seedling', description: 'Mediterranean cuisine' },
   { name: 'Greek', color: '#2563eb', icon: 'leaf', description: 'Greek cuisine' },
   { name: 'Spanish', color: '#f59e0b', icon: 'pepper-hot', description: 'Spanish cuisine' },
   { name: 'German', color: '#6b7280', icon: 'beer', description: 'German cuisine' },
@@ -33,10 +33,10 @@ const CUISINE_CONSTANTS = [
   { name: 'Lebanese', color: '#16a34a', icon: 'leaf', description: 'Lebanese cuisine' },
   { name: 'Ethiopian', color: '#f59e0b', icon: 'fire', description: 'Ethiopian cuisine' },
   { name: 'Moroccan', color: '#ea580c', icon: 'star', description: 'Moroccan cuisine' },
-  { name: 'Brazilian', color: '#16a34a', icon: 'leaf', description: 'Brazilian cuisine' },
-  { name: 'Peruvian', color: '#dc2626', icon: 'pepper-hot', description: 'Peruvian cuisine' },
-  { name: 'Argentinian', color: '#2563eb', icon: 'drumstick-bite', description: 'Argentinian cuisine' },
-  { name: 'Fast Food', color: '#fbbf24', icon: 'burger', description: 'Fast food cuisine' },
+  { name: 'Brazilian', color: '#16a34a', icon: 'drumstick-bite', description: 'Brazilian cuisine' },
+  { name: 'Peruvian', color: '#dc2626', icon: 'flag', description: 'Peruvian cuisine' },
+  { name: 'Argentinian', color: '#2563eb', icon: 'flag', description: 'Argentinian cuisine' },
+  { name: 'Fast Food', color: '#fbbf24', icon: 'hamburger', description: 'Fast food cuisine' },
 ];
 
 /**
@@ -317,7 +317,9 @@ export function getCuisineData(cuisineName) {
  */
 export function getCuisineColor(cuisineName) {
   const cuisineData = getCuisineData(cuisineName);
-  return cuisineData ? cuisineData.color : '#6c757d'; // Default gray
+  // Use centralized default gray color (fallback to hardcoded if not available)
+  const defaultGray = window.MEAL_TRACKER_COLORS?.gray || '#6c757d';
+  return cuisineData ? cuisineData.color : defaultGray;
 }
 
 /**

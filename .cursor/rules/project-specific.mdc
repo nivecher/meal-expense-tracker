@@ -102,7 +102,7 @@ class Expense(BaseModel):
     date: date (required)
 
     # Optional
-    meal_type: str (breakfast/lunch/dinner/snack)
+    meal_type: str (breakfast/lunch/dinner/snacks)
     category_id: int (foreign key, optional)
     notes: str (optional)
     receipt_image_url: str (optional)

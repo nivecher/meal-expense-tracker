@@ -97,9 +97,13 @@ class ExpenseForm(FlaskForm):
         choices=[
             ("", "Select a meal type (optional)"),
             ("breakfast", "Breakfast"),
+            ("brunch", "Brunch"),
             ("lunch", "Lunch"),
             ("dinner", "Dinner"),
             ("snacks", "Snacks"),
+            ("drinks", "Drinks"),
+            ("dessert", "Dessert"),
+            ("late night", "Late Night"),
             ("groceries", "Groceries"),
             ("other", "Other"),
         ],

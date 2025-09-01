@@ -29,14 +29,15 @@ from app.restaurants.exceptions import (
 from app.restaurants.forms import RestaurantForm
 from app.restaurants.models import Restaurant
 from app.restaurants.services import calculate_expense_stats
+from app.utils.decorators import admin_required
 
 
 @bp.route("/")
 @login_required
 def list_restaurants():
     """Show a list of all restaurants."""
-    restaurants, _ = services.get_restaurants_with_stats(current_user.id, request.args)
-    return render_template("restaurants/list.html", restaurants=restaurants)
+    restaurants, stats = services.get_restaurants_with_stats(current_user.id, request.args)
+    return render_template("restaurants/list.html", restaurants=restaurants, total_spent=stats.get("total_spent", 0))
 
 
 @bp.route("/add", methods=["GET", "POST"])
@@ -223,6 +224,48 @@ def delete_restaurant(restaurant_id):
 
         flash("An error occurred while deleting the restaurant", "error")
         return redirect(url_for("restaurants.list_restaurants"))
+
+
+@bp.route("/clear-place-id/<int:restaurant_id>", methods=["POST"])
+@login_required
+@admin_required
+def clear_place_id(restaurant_id):
+    """Clear the Google Place ID for a restaurant (admin only).
+
+    This endpoint allows admin users to remove the Google Place ID association
+    from a restaurant, which will disable Google Maps integration.
+    """
+    try:
+        # Get the restaurant and verify it belongs to the user or user is admin
+        restaurant = services.get_restaurant_for_user(restaurant_id, current_user.id)
+        if not restaurant and not current_user.is_admin:
+            flash("Restaurant not found.", "error")
+            return redirect(url_for("restaurants.list_restaurants"))
+
+        # If not found by user_id, try to find it as admin
+        if not restaurant and current_user.is_admin:
+            restaurant = db.session.get(Restaurant, restaurant_id)
+            if not restaurant:
+                flash("Restaurant not found.", "error")
+                return redirect(url_for("restaurants.list_restaurants"))
+
+        # Clear the Google Place ID
+        old_place_id = restaurant.google_place_id
+        restaurant.google_place_id = None
+        db.session.commit()
+
+        flash(f"Google Place ID cleared successfully for {restaurant.name}.", "success")
+        current_app.logger.info(
+            f"Admin {current_user.username} cleared Google Place ID {old_place_id} for restaurant {restaurant.name} (ID: {restaurant_id})"
+        )
+
+        return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant_id))
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error clearing Google Place ID for restaurant {restaurant_id}: {str(e)}")
+        flash("An error occurred while clearing the Google Place ID.", "error")
+        return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant_id))
 
 
 @bp.route("/export")
@@ -793,6 +836,7 @@ def find_by_google_place():
                 "photos",
                 "types",
                 "url",
+                "address_components",
             ],
         )
 
@@ -828,7 +872,6 @@ def find_by_google_place():
             "phone": result.get("formatted_phone_number", ""),
             "website": result.get("website", ""),
             "google_place_id": place_id,
-            "google_maps_url": result.get("url", ""),
             # Note: coordinates, rating, price_level would be looked up dynamically from Google Places API
             "rating": result.get("rating"),
             "price_level": result.get("priceLevel"),

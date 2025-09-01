@@ -1,43 +1,44 @@
 # Core
-Flask>=3.0.0,<4.0.0
-toml>=0.10.2,<1.0.0
-python-dotenv==1.1.1,<2.0.0
-Flask-WTF>=1.2.2,<2.0.0
-email-validator>=2.1.0,<3.0.0
-click==8.1.7  # Pinned to avoid yanked version
+Flask>=3.0.0,<4.0.0                # Core Python web framework for routing, templating, and request handling
+toml>=0.10.2,<1.0.0                # Parse and write TOML files (for config and pyproject support)
+python-dotenv==1.1.1,<2.0.0        # Load environment variables from .env files for configuration
+Flask-WTF>=1.2.2,<2.0.0            # WTForms integration for Flask, provides secure form handling and CSRF protection
+email-validator>=2.1.0,<3.0.0      # Validates email addresses for user registration and profile updates
+click==8.1.7                       # Command-line interface creation, used for Flask CLI commands (pinned to avoid yanked version)
+pytz>=2023.3,<2025.0.0             # Timezone support for user profiles and date handling
 
 # Security
-Flask-Login>=0.6.3,<0.7.0
-Flask-Limiter==3.5.0  # Pinned to stable version
-Flask-JWT-Extended>=4.5.0,<5.0.0
-Flask-Cors>=4.0.2,<5.0.0
+Flask-Login>=0.6.3,<0.7.0          # User session management and authentication for Flask
+Flask-Limiter==3.5.0               # Rate limiting for Flask endpoints to prevent abuse (pinned to stable version)
+Flask-JWT-Extended>=4.5.0,<5.0.0   # JWT authentication for API endpoints and session management
+Flask-Cors>=6.0.1,<7.0.0           # Cross-Origin Resource Sharing (CORS) support for API endpoints (6.0.1+ fixes CVE-2024-6839, CVE-2024-6844, CVE-2024-6866)
 
 # Database
-Alembic>=1.12.0,<2.0.0
-Flask-Migrate>=4.1.0,<5.0.0
-Flask-SQLAlchemy>=3.1.0,<4.0.0
-psycopg2-binary==2.9.10  # Pinned for Python 3.13 compatibility
-SQLAlchemy>=2.0.0,<3.0.0
+Alembic>=1.12.0,<2.0.0             # Database schema migrations for SQLAlchemy
+Flask-Migrate>=4.1.0,<5.0.0        # Flask integration for Alembic migrations
+Flask-SQLAlchemy>=3.1.0,<4.0.0     # SQLAlchemy ORM integration for Flask
+psycopg2-binary==2.9.10            # PostgreSQL database driver (pinned for Python 3.13 compatibility)
+SQLAlchemy>=2.0.0,<3.0.0           # Core SQLAlchemy ORM and database toolkit
 
 # AWS
-boto3>=1.38.46,<2.0.0
-requests>=2.32.4,<3.0.0
-mypy-boto3-dynamodb>=1.40.0,<2.0.0  # Required for Flask-Session DynamoDB support
+boto3>=1.38.46,<2.0.0              # AWS SDK for Python, used for S3, DynamoDB, and other AWS services
+requests>=2.32.4,<3.0.0            # HTTP library for making API requests (used by boto3 and for integrations)
+mypy-boto3-dynamodb>=1.40.0,<2.0.0 # Type hints for boto3 DynamoDB, required for Flask-Session DynamoDB support
 
 # Session Management
-Flask-Session==0.8.0  # Latest stable version with proper DynamoDB support
-cachelib>=0.9.0,<1.0.0  # Required by Flask-Session
+Flask-Session==0.8.0               # Server-side session management for Flask (supports DynamoDB, Redis, etc.)
+cachelib>=0.9.0,<1.0.0             # Caching backend library required by Flask-Session
 
 # WSGI Server
-gunicorn>=23.0.0,<24.0.0
-Werkzeug>=3.1.0,<4.0.0
+gunicorn>=23.0.0,<24.0.0           # Production WSGI server for running Flask apps
+Werkzeug>=3.1.0,<4.0.0             # WSGI utility library, used internally by Flask
 
 # AWS Lambda WSGI Adapter
-aws-wsgi>=0.2.7,<1.0.0
-marshmallow
+aws-wsgi>=0.2.7,<1.0.0             # Adapter to run Flask apps on AWS Lambda via API Gateway
+marshmallow                        # Object serialization/deserialization and validation (used for API schemas)
 
 # Google Maps
-googlemaps>=4.2.0,<5.0.0
+googlemaps>=4.2.0,<5.0.0           # Google Maps API client for Python (location services, autocomplete, etc.)
 
 # Message serialization
-msgspec>=0.18.0,<1.0.0
+msgspec>=0.18.0,<1.0.0             # Fast serialization/deserialization for JSON, MessagePack, etc. (used for API and caching)

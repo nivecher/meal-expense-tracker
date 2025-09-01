@@ -105,9 +105,11 @@ export function enhanceCuisineBadge(badgeElement, options = {}) {
       // Keep existing content but add styling for unknown cuisines
       const existingBadge = badgeElement.querySelector('.badge');
       if (existingBadge) {
-        existingBadge.style.backgroundColor = '#6c757d20';
-        existingBadge.style.color = '#6c757d';
-        existingBadge.style.borderColor = '#6c757d40';
+        // Import colors from centralized constants (fallback to hardcoded if import fails)
+        const defaultGray = window.MEAL_TRACKER_COLORS?.gray || '#6c757d';
+        existingBadge.style.backgroundColor = `${defaultGray}20`;
+        existingBadge.style.color = defaultGray;
+        existingBadge.style.borderColor = `${defaultGray}40`;
 
         // Add question icon for unknown cuisines if showIcon is true
         if (showIcon && !existingBadge.querySelector('i')) {

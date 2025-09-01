@@ -1,0 +1,647 @@
+/* Dashboard Styles - Light, Modern, Sleek Design */
+
+/* Welcome Section */
+.welcome-section {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e9ecef;
+    border-radius: 1.25rem;
+    padding: 2.5rem 2rem;
+    margin: 0 -15px 2rem -15px;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.03);
+}
+
+.welcome-content h1 {
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+.welcome-content .lead {
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.welcome-illustration {
+    padding: 2rem;
+}
+
+.dashboard-icon {
+    font-size: 8rem;
+    opacity: 0.7;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+/* Stats Cards */
+.stats-section {
+    margin: 0 -15px 2rem -15px;
+    padding: 0 15px;
+}
+
+.stats-card {
+    background: #ffffff;
+    border-radius: 1.25rem;
+    padding: 1.75rem 1.25rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    border: 1px solid #f1f3f4;
+    transition: all 0.3s ease;
+    text-align: center;
+    height: 100%;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.12);
+    border-color: #e9ecef;
+}
+
+.stats-icon {
+    margin-bottom: 1rem;
+}
+
+.stats-icon i {
+    font-size: 2.5rem;
+}
+
+.stats-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 0.5rem;
+}
+
+.stats-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Cards */
+.card {
+    border: 1px solid #f1f3f4;
+    border-radius: 1.25rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+    background: #ffffff;
+}
+
+.card:hover {
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.1);
+    border-color: #e9ecef;
+    transform: translateY(-1px);
+}
+
+.card-header {
+    background: #ffffff;
+    border-bottom: 1px solid #f1f3f4;
+    border-radius: 1.25rem 1.25rem 0 0 !important;
+    padding: 1.5rem 2rem;
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+.card-title {
+    font-weight: 600;
+    color: #212529;
+}
+
+/* Recent Expenses */
+.recent-expenses-list {
+    max-height: 450px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Clickable expense links */
+.expense-item-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.expense-item-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+.expense-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid #f1f3f4;
+    transition: all 0.2s ease;
+}
+
+.expense-item:last-child {
+    border-bottom: none;
+}
+
+.expense-item:hover {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    margin: 0 -0.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.expense-info {
+    flex: 1;
+}
+
+.expense-restaurant {
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 0.25rem;
+}
+
+.expense-details {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.expense-date {
+    font-size: 0.875rem;
+}
+
+
+
+/* Meal type colors following TIGER principles - predefined classes */
+.meal-type-badge {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    border-radius: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.meal-type-badge i {
+    font-size: 0.65rem;
+}
+
+.meal-type-breakfast { background-color: #fff8e1; color: #f57c00; border: 1px solid #ffcc02; }
+.meal-type-lunch { background-color: #e8f5e8; color: #2e7d32; border: 1px solid #4caf50; }
+.meal-type-dinner { background-color: #fce4ec; color: #c2185b; border: 1px solid #e91e63; }
+.meal-type-snack { background-color: #f3e5f5; color: #7b1fa2; border: 1px solid #9c27b0; }
+.meal-type-brunch { background-color: #e1f5fe; color: #0277bd; border: 1px solid #03a9f4; }
+.meal-type-late-night { background-color: #f5f5f5; color: #616161; border: 1px solid #9e9e9e; }
+
+.expense-amount {
+    font-weight: 700;
+    color: #28a745;
+    font-size: 1.1rem;
+}
+
+/* Top Restaurants */
+.top-restaurants-list {
+    max-height: 450px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Clickable restaurant links */
+.restaurant-item-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.restaurant-item-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+.restaurant-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid #f1f3f4;
+    transition: all 0.2s ease;
+}
+
+.restaurant-item:last-child {
+    border-bottom: none;
+}
+
+.restaurant-item:hover {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    margin: 0 -0.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.restaurant-info {
+    flex: 1;
+}
+
+.restaurant-name {
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 0.25rem;
+}
+
+.restaurant-stats {
+    display: flex;
+    gap: 1rem;
+}
+
+.visit-count {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.restaurant-total {
+    font-weight: 700;
+    color: #ffc107;
+    font-size: 1.1rem;
+}
+
+/* Empty States */
+.empty-state {
+    padding: 3rem 1rem;
+}
+
+.empty-icon {
+    font-size: 3rem;
+    opacity: 0.5;
+}
+
+/* Quick Actions */
+.quick-actions-section .card {
+    background: #ffffff;
+    border: 1px solid #f1f3f4;
+    margin: 0 -15px;
+}
+
+.quick-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.75rem 1rem;
+    text-decoration: none;
+    color: #495057;
+    border-radius: 1rem;
+    transition: all 0.3s ease;
+    background: #ffffff;
+    border: 1px solid #f1f3f4;
+    text-align: center;
+    height: 100%;
+}
+
+.quick-action-btn:hover {
+    color: #0d6efd;
+    background: #f8f9fa;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(13, 110, 253, 0.15);
+    text-decoration: none;
+    border-color: #e9ecef;
+}
+
+.quick-action-btn i {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    transition: transform 0.3s ease;
+}
+
+.quick-action-btn:hover i {
+    transform: scale(1.1);
+}
+
+.quick-action-btn div {
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+/* Navigation Guide */
+.navigation-guide .card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #f1f3f4;
+    margin: 0 -15px;
+}
+
+.guide-step {
+    text-align: center;
+    padding: 1rem;
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    background: #0d6efd;
+    color: white;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.guide-step h6 {
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 0.75rem;
+}
+
+.guide-step p {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: 0;
+}
+
+/* Better horizontal utilization for quick actions */
+@media (min-width: 1400px) {
+    .quick-action-btn {
+        padding: 2rem 1.25rem;
+    }
+
+    .quick-action-btn i {
+        font-size: 1.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .quick-action-btn div {
+        font-size: 0.9rem;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .welcome-section {
+        padding: 2rem 1.5rem;
+        text-align: center;
+        margin: 0;
+        border-radius: 1rem;
+    }
+
+    .welcome-content h1 {
+        font-size: 2rem;
+    }
+
+    .welcome-illustration {
+        padding: 1rem;
+    }
+
+    .dashboard-icon {
+        font-size: 5rem;
+    }
+
+    .stats-section {
+        margin: 0 0 2rem 0;
+        padding: 0;
+    }
+
+    .stats-card {
+        padding: 1.25rem 1rem;
+    }
+
+    .stats-value {
+        font-size: 1.5rem;
+    }
+
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    .card-header {
+        padding: 1rem 1.5rem;
+    }
+
+    .expense-item,
+    .restaurant-item {
+        padding: 0.75rem 0;
+    }
+
+    .expense-details {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .quick-action-btn {
+        padding: 1.25rem 0.75rem;
+    }
+
+    .quick-action-btn i {
+        font-size: 1.25rem;
+    }
+
+    .quick-action-btn div {
+        font-size: 0.8rem;
+    }
+
+    .quick-actions-section .card,
+    .navigation-guide .card,
+    .row.g-4.mb-4 {
+        margin: 0;
+    }
+
+    /* Better mobile layout for 7 buttons */
+    .quick-actions-section .row {
+        justify-content: center;
+    }
+
+    .quick-actions-section .col-6 {
+        max-width: 48%;
+    }
+}
+
+@media (max-width: 576px) {
+    .welcome-section {
+        padding: 1.5rem 1rem;
+        margin: 0;
+    }
+
+    .welcome-content .lead {
+        font-size: 1rem;
+    }
+
+    .stats-section {
+        margin: 0 0 1.5rem 0;
+    }
+
+    .stats-card {
+        padding: 1rem 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .stats-value {
+        font-size: 1.25rem;
+    }
+
+    .stats-icon i {
+        font-size: 2rem;
+    }
+
+    .expense-amount,
+    .restaurant-total {
+        font-size: 1rem;
+    }
+
+    .step-number {
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 1rem;
+    }
+
+    .card-body {
+        padding: 1.25rem;
+    }
+
+    .card-header {
+        padding: 1rem 1.25rem;
+    }
+}
+
+/* Layout Improvements */
+/* Main content grid improvements */
+.row.g-4.mb-4 {
+    margin: 0 -15px 2rem -15px;
+    padding: 0 15px;
+}
+
+/* Prevent horizontal overflow */
+.expense-info,
+.restaurant-info {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.expense-restaurant,
+.restaurant-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+/* Light theme consistency */
+body .container {
+    max-width: 1200px;
+}
+
+/* Better full-width utilization */
+.container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/* Enhanced layout for larger screens */
+@media (min-width: 1200px) {
+    .welcome-section {
+        padding: 3rem 2.5rem;
+    }
+
+    .stats-card {
+        padding: 2rem 1.5rem;
+    }
+
+    .card-body {
+        padding: 2.5rem;
+    }
+
+    .card-header {
+        padding: 1.75rem 2.5rem;
+    }
+}
+
+/* Restaurant Icons */
+.restaurant-favicon {
+    border-radius: 2px;
+    object-fit: cover;
+}
+
+.restaurant-fallback-icon {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Cuisine badges for dashboard */
+.cuisine-badge-small .badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.5rem;
+}
+
+.cuisine-badge-small .badge i {
+    font-size: 0.6rem;
+}
+
+/* Enhanced light styling for better consistency */
+
+/* Improved contrast and readability */
+.text-muted {
+    color: #6c757d !important;
+}
+
+.stats-value {
+    color: #212529;
+}
+
+/* Consistent section spacing and alignment */
+section {
+    position: relative;
+}
+
+/* Visual connection between sections */
+.welcome-section::after {
+    content: '';
+    position: absolute;
+    bottom: -1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(135deg, #0d6efd 0%, #6610f2 100%);
+    border-radius: 2px;
+    opacity: 0.6;
+}
+
+/* Enhanced visual hierarchy */
+.stats-section .row {
+    position: relative;
+}
+
+.stats-section .row::before {
+    content: '';
+    position: absolute;
+    top: -1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 2px;
+    background: #e9ecef;
+    border-radius: 1px;
+}
+
+/* Better visual flow */
+.quick-actions-section {
+    position: relative;
+}
+
+.navigation-guide {
+    position: relative;
+    margin-top: 2rem;
+}

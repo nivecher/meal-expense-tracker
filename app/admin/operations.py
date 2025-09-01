@@ -9,7 +9,6 @@ invoked remotely via Lambda. Each operation follows the TIGER principles:
 - Refactoring: Single responsibility per operation
 """
 
-import json
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
@@ -39,7 +38,6 @@ class BaseAdminOperation(ABC):
         Returns:
             dict: {"valid": bool, "errors": List[str]}
         """
-        pass
 
     @abstractmethod
     def execute(self, **kwargs) -> Dict[str, Any]:
@@ -48,7 +46,6 @@ class BaseAdminOperation(ABC):
         Returns:
             dict: {"success": bool, "message": str, "data": Any}
         """
-        pass
 
 
 class ListUsersOperation(BaseAdminOperation):
@@ -556,6 +553,7 @@ class InitializeDatabaseOperation(BaseAdminOperation):
             logger.warning("User model not available")
             return None, "User model not available - skipping sample data creation"
 
+    # TODO: confusion between expense categories and meal types
     def _create_default_categories(self, admin_user: User) -> str:
         """Create default expense categories for admin user.
 
@@ -573,7 +571,9 @@ class InitializeDatabaseOperation(BaseAdminOperation):
                 {"name": "Lunch", "color": "#4ECDC4", "icon": "utensils"},
                 {"name": "Dinner", "color": "#45B7D1", "icon": "plate"},
                 {"name": "Snacks", "color": "#96CEB4", "icon": "cookie"},
+                {"name": "Dessert", "color": "#FCE7F3", "icon": "cupcake"},
                 {"name": "Beverages", "color": "#FFEAA7", "icon": "glass"},
+                {"name": "Groceries", "color": "#B2E0A4", "icon": "shopping-basket"},
             ]
 
             created_categories = 0

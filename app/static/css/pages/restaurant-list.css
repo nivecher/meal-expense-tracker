@@ -149,3 +149,53 @@
 }
 
 /* Table uses full width naturally with container-fluid */
+
+/* Restaurant name link hover effect */
+.restaurant-name-link:hover {
+    color: var(--bs-primary) !important;
+    transition: color 0.2s ease;
+}
+
+/* Restaurant icon styles */
+.restaurant-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.restaurant-favicon {
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background-color: white;
+}
+
+.restaurant-fallback-icon {
+    color: var(--bs-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Table view icon styles (smaller) */
+.restaurant-icon-table {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.restaurant-favicon-table {
+    border-radius: 2px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background-color: white;
+}
+
+.restaurant-fallback-icon-table {
+    color: var(--bs-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

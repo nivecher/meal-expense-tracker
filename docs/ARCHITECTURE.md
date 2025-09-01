@@ -46,7 +46,7 @@ graph TD
 
 ### 3. Authentication
 
-- JWT-based authentication
+- Session-based authentication
 - Role-based access control
 
 ### 4. Infrastructure
@@ -60,7 +60,7 @@ graph TD
 
 1. **User Authentication**
 
-- Secure JWT-based authentication
+- Secure session-based authentication
   - Role-based access control
   - Session management
 

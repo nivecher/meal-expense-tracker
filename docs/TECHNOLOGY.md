@@ -25,7 +25,7 @@ This document outlines the technology choices and architecture decisions for the
 - **Database ORM**: [SQLAlchemy](https://www.sqlalchemy.org/)
   - Async SQLAlchemy for non-blocking database access
 - **Data Validation**: Pydantic
-- **Authentication**: Flask-JWT-Extended
+- **Authentication**: Flask-Login
 - **Testing**: Pytest with Flask-Testing
 - **Code Quality**: Black, isort, Flake8, Mypy
 

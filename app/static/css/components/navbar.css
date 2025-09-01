@@ -220,27 +220,30 @@
   box-shadow: 0 0 0 3px var(--bs-primary);
 }
 
-/* Mobile styles */
+/* Mobile styles - Use Bootstrap's default behavior */
 @media (max-width: 991.98px) {
   .navbar-collapse {
-    position: fixed;
-    top: var(--navbar-height);
-    left: 0;
-    right: 0;
-    bottom: 0;
     background: var(--bs-body-bg);
-    padding: 1rem;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    overflow-y: auto;
+    padding: 1.5rem;
+    margin-top: 0.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--bs-border-color);
   }
 
-  .navbar-collapse.show { transform: translateX(0); }
-  .nav-link { padding: 1rem; }
+  .nav-link {
+    padding: 1.25rem 1.5rem;
+    margin: 0.25rem 0;
+    border-radius: 8px;
+    font-size: 1.1rem;
+  }
+
   .dropdown-menu {
-    margin: 0.25rem 0 0.25rem 1rem;
-    background: rgba(0, 0, 0, 0.02);
+    margin: 0.5rem 0 1rem 0;
+    background: rgba(0, 0, 0, 0.03);
     box-shadow: none;
+    border-radius: 8px;
+    padding: 0.5rem 0;
   }
 
   /* Prevent body scroll when menu is open */
@@ -260,113 +263,7 @@ body.mobile-menu-open {
   height: 100%;
 }
 
-/* Mobile Styles */
-@media (max-width: 991.98px) {
-  .navbar {
-    padding: 0.5rem 1rem;
-    position: relative;
-  }
 
-  .navbar-collapse {
-    position: fixed;
-    top: var(--navbar-height);
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--bs-body-bg);
-    padding: 1rem;
-    margin: 0;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    overflow-y: auto;
-    transform: translateX(100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 0;
-    z-index: 1030;
-    pointer-events: none;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-  }
-
-  /* Prevent body scroll when mobile menu is open */
-  body.mobile-menu-open {
-    touch-action: none;
-    -webkit-overflow-scrolling: auto;
-  }
-
-  .navbar-collapse.show {
-    transform: translateX(0);
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .navbar-nav {
-    padding: 0.5rem 0;
-    margin: 0 -1rem;
-  }
-
-  .nav-link {
-    padding: 1rem 1.25rem;
-    margin: 0.125rem 0;
-    border-radius: 8px;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-  }
-
-  .nav-link:active {
-    transform: scale(0.98);
-  }
-
-  .dropdown-menu {
-    position: static !important;
-    transform: none !important;
-    border: none;
-    padding: 0;
-    margin: 0.25rem 0 0.25rem 1rem;
-    box-shadow: none;
-    background-color: rgba(0, 0, 0, 0.02);
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out;
-    opacity: 0;
-    display: block !important;
-  }
-
-  .dropdown-menu.show {
-    max-height: 1000px; /* Adjust based on your needs */
-    opacity: 1;
-  }
-
-  .dropdown-item {
-    padding: 0.75rem 1.5rem;
-    border-radius: 0;
-    transition: background-color 0.2s ease;
-  }
-
-  .dropdown-divider {
-    margin: 0.5rem 0;
-  }
-
-  #userDropdown {
-    margin: 0.5rem 0;
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1.25rem;
-  }
-
-  /* Override for mobile menu backdrop */
-  .navbar-toggler:focus {
-    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
-  }
-
-  /* Smooth transition for dropdown toggles */
-  .dropdown-toggle::after {
-    transition: transform 0.2s ease;
-  }
-
-  .dropdown-toggle[aria-expanded="true"]::after {
-    transform: rotate(180deg);
-  }
-}
 
 /* Animations */
 @keyframes fadeIn {
@@ -380,32 +277,116 @@ body.mobile-menu-open {
   }
 }
 
-/* Avatar styles */
+/* Modern Avatar styles */
+.avatar-container {
+  position: relative;
+  display: inline-block;
+}
+
 .avatar-loading {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%);
   background-size: 200% 100%;
-  animation: var(--avatar-pulse);
-  opacity: 0.7;
+  animation: avatar-pulse 1.5s infinite ease-in-out;
   border-radius: 50%;
+  position: relative;
+}
+
+.avatar-loading::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  animation: avatar-shimmer 2s infinite ease-in-out;
 }
 
 .avatar-loaded {
-  transition: opacity 0.3s ease-in-out;
-  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: scale(1);
 }
 
 .avatar-error {
-  background-color: #f8f9fa;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6c757d;
-  font-size: 0.8em;
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.avatar-error:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Avatar image improvements */
+img[data-avatar] {
+  border-radius: 50%;
+  object-fit: cover;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+img[data-avatar]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border-color: var(--bs-primary);
+}
+
+/* Initials avatar fallback */
+.avatar-initials {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.avatar-initials:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  border-color: rgba(255, 255, 255, 1);
+}
+
+/* Navbar specific avatar styling */
+.navbar .avatar-initials,
+.navbar img[data-avatar] {
+  width: 32px;
+  height: 32px;
+}
+
+.dropdown-menu .avatar-initials,
+.dropdown-menu img[data-avatar] {
+  width: 36px;
+  height: 36px;
+  font-size: 1rem;
 }
 
 @keyframes avatar-pulse {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+@keyframes avatar-shimmer {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
 }
 
 /* UI Demo Button */

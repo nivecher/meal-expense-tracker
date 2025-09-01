@@ -1,4 +1,10 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %}
+{% block styles %}
+{{ super() }}
+<link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
+<link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
+{% endblock styles %}
+{% block content %}
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">Meal Expenses</h1>
@@ -214,22 +220,14 @@
                             </td>
                             <td>
                                 {% if expense.meal_type %}
-                                <span class="badge bg-light text-dark">{{ expense.meal_type }}</span>
+                                <span class="meal-type-badge compact {{ expense.meal_type.lower().replace(' ', '-') }}">
+                                    <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
+                                </span>
                                 {% else %} - {% endif %}
                             </td>
                             <td>
-                                {% if expense.category %}
-                                <span
-                                    class="badge border d-flex align-items-center"
-                                    style="background-color: {{ expense.category.color }}20;
-                                                         color: {{ expense.category.color }};
-                                                         border-color: {{ expense.category.color }}40 !important">
-                                    {% if expense.category.icon %}<i class="fas fa-{{ expense.category.icon }} me-1"></i
-                                    >{% endif %} {{ expense.category.name }}
-                                </span>
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
+                                {% from 'macros/category_helpers.html' import category_badge %}
+                                {{ category_badge(expense.category, compact=true) }}
                             </td>
                             <td class="fw-bold amount-right">${{ "%.2f"|format(expense.amount) }}</td>
                             <td>

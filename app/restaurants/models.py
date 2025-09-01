@@ -156,16 +156,76 @@ class Restaurant(BaseModel):
     def get_google_maps_url(self) -> Optional[str]:
         """Return a Google Maps URL for this restaurant.
 
+        Uses the best available method in order of preference (all API token-free):
+        1. Google Maps URLs API with place_id (recommended format)
+        2. Coordinate-based URL if coordinates are available
+        3. Search-based URL with restaurant name and address
+
         Returns:
             Optional[str]: Google Maps URL or None if no location data is available
         """
+        from urllib.parse import quote_plus
+
+        # First preference: Use the improved place_id format with restaurant name
         if self.google_place_id:
-            return f"https://www.google.com/maps/place/?q=place_id:{self.google_place_id}"
-        # Coordinates removed - would need to lookup from Google Places API
-        else:
-            search_query = self.google_search
-            if search_query:
-                return f"https://www.google.com/maps/search/?api=1&query={search_query}"
+            # Use the recommended Google Maps URLs API format with both query and place_id
+            # This provides the most reliable link without API token usage
+            restaurant_name = quote_plus(self.name)
+            return f"https://www.google.com/maps/search/?api=1&query={restaurant_name}&query_place_id={self.google_place_id}"
+
+        # Second preference: Use coordinates if available (would need to be stored or fetched)
+        # Note: Coordinates would need to be added to the model or fetched dynamically
+        # if hasattr(self, 'latitude') and hasattr(self, 'longitude') and self.latitude and self.longitude:
+        #     return f"https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}"
+
+        # Third preference: Use search-based URL with detailed address
+        search_query = self._build_optimized_search_query()
+        if search_query:
+            return f"https://www.google.com/maps/search/?api=1&query={search_query}"
+
+        return None
+
+    def _build_optimized_search_query(self) -> Optional[str]:
+        """Build an optimized search query for Google Maps.
+
+        Creates a comprehensive search string that includes restaurant name, address,
+        and location details to maximize the chance of finding the correct place.
+
+        Returns:
+            Optional[str]: URL-encoded search query or None if insufficient data
+        """
+        from urllib.parse import quote_plus
+
+        search_parts = []
+
+        # Always include restaurant name
+        if self.name:
+            search_parts.append(self.name)
+
+        # Add address details in order of specificity
+        if self.address:
+            search_parts.append(self.address)
+        elif self.city:
+            # If no street address, at least include city
+            search_parts.append(self.city)
+
+        # Add city if not already included in address
+        if self.city and self.address and self.city.lower() not in self.address.lower():
+            search_parts.append(self.city)
+
+        # Add state for better disambiguation
+        if self.state:
+            search_parts.append(self.state)
+
+        # Add postal code for precision
+        if self.postal_code:
+            search_parts.append(self.postal_code)
+
+        # Join parts and URL encode
+        if search_parts:
+            search_query = ", ".join(search_parts)
+            return quote_plus(search_query)
+
         return None
 
     def _update_address_components(self, address_components: list[dict]) -> None:

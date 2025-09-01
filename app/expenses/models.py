@@ -189,7 +189,7 @@ class Category(BaseModel):
     Attributes:
         name: Name of the category (unique per user)
         description: Optional description of the category
-        color: Hex color code for the category (default: #6c757d)
+        color: Hex color code for the category (default: Bootstrap gray #6c757d)
         icon: Optional icon identifier for the category
         is_default: Whether this is a default category
         user_id: ID of the user who owns this category

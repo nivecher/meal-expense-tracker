@@ -1,0 +1,643 @@
+{% extends "base.html" %} {% from 'macros/category_helpers.html' import category_badge, hex_to_rgb %} {% block title
+%}Help - Meal Expense Tracker{% endblock title %} {% block head_extra %} {{ super() }}
+<link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
+<link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
+<style>
+    .help-section {
+        margin-bottom: 2rem;
+    }
+
+    .badge-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.75rem;
+        margin: 1rem 0;
+    }
+
+    .feature-badge {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+        background: white;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s ease;
+    }
+
+    .feature-badge:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .feature-icon {
+        font-size: 1.5rem;
+        margin-right: 0.75rem;
+        min-width: 30px;
+    }
+
+    .help-cuisine-badge,
+    .meal-type-badge,
+    .category-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        margin: 0.25rem;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: white;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+
+    /* Cuisine badges using CSS custom properties */
+    .help-cuisine-badge {
+        background-color: rgba(var(--cuisine-color-rgb), 1);
+        border: 2px solid rgba(var(--cuisine-color-rgb), 0.8);
+        color: white;
+    }
+
+    .help-cuisine-badge:hover {
+        background-color: rgba(var(--cuisine-color-rgb), 0.9);
+        transform: scale(1.05);
+        text-decoration: none;
+        color: white;
+    }
+
+    .meal-type-badge:hover,
+    .category-badge:hover {
+        transform: scale(1.05);
+        text-decoration: none;
+        color: white;
+    }
+
+    .help-cuisine-badge i,
+    .meal-type-badge i,
+    .category-badge i {
+        margin-right: 0.5rem;
+        font-size: 1rem;
+    }
+
+    .accordion-button:not(.collapsed) {
+        background-color: #f8f9fa;
+        color: #0d6efd;
+    }
+
+    .step-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        background: #0d6efd;
+        color: white;
+        border-radius: 50%;
+        font-weight: bold;
+        margin-right: 0.75rem;
+        flex-shrink: 0;
+    }
+
+    .help-card {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: white;
+    }
+
+    .shortcut-key {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 0.25rem 0.5rem;
+        font-family: monospace;
+        font-size: 0.875rem;
+    }
+
+    .time-range {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        margin-left: 0.5rem;
+    }
+
+    .help-category-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        margin: 0.25rem;
+    }
+
+    .category-description {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        margin-top: 0.25rem;
+        margin-left: 0.5rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock head_extra %} {% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex align-items-center mb-4">
+                <i class="fas fa-question-circle text-primary me-3" style="font-size: 2rem"></i>
+                <div>
+                    <h1 class="mb-0">Help & User Guide</h1>
+                    <p class="text-muted mb-0">Everything you need to know about using Meal Expense Tracker</p>
+                </div>
+            </div>
+
+            <!-- Quick Navigation -->
+            <div class="help-card bg-light">
+                <h5><i class="fas fa-compass me-2"></i>Quick Navigation</h5>
+                <div class="row">
+                    <div class="col-md-3">
+                        <a href="#getting-started" class="feature-badge">
+                            <i class="fas fa-rocket feature-icon text-success"></i>
+                            <span>Getting Started</span>
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="#expenses" class="feature-badge">
+                            <i class="fas fa-receipt feature-icon text-primary"></i>
+                            <span>Expense Management</span>
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="#restaurants" class="feature-badge">
+                            <i class="fas fa-utensils feature-icon text-warning"></i>
+                            <span>Restaurant Management</span>
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="#reference" class="feature-badge">
+                            <i class="fas fa-book feature-icon text-info"></i>
+                            <span>Reference Guide</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Accordion Sections -->
+            <div class="accordion" id="helpAccordion">
+                <!-- Getting Started Section -->
+                <div class="accordion-item" id="getting-started">
+                    <h2 class="accordion-header">
+                        <button
+                            class="accordion-button"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapseGettingStarted">
+                            <i class="fas fa-rocket me-2"></i>Getting Started
+                        </button>
+                    </h2>
+                    <div
+                        id="collapseGettingStarted"
+                        class="accordion-collapse collapse show"
+                        data-bs-parent="#helpAccordion">
+                        <div class="accordion-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-list-ol me-2"></i>First Steps</h6>
+                                    <div class="d-flex align-items-start mb-3">
+                                        <span class="step-number">1</span>
+                                        <div>
+                                            <strong>Add Your First Restaurant</strong>
+                                            <p class="mb-1"
+                                                >Use the Google Maps integration to find and add restaurants you
+                                                visit.</p
+                                            >
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-start mb-3">
+                                        <span class="step-number">2</span>
+                                        <div>
+                                            <strong>Customize Categories</strong>
+                                            <p class="mb-1"
+                                                >Set up expense categories that match your spending habits.</p
+                                            >
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-start mb-3">
+                                        <span class="step-number">3</span>
+                                        <div>
+                                            <strong>Log Your First Expense</strong>
+                                            <p class="mb-1">Start tracking by adding your first meal expense.</p>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-start mb-3">
+                                        <span class="step-number">4</span>
+                                        <div>
+                                            <strong>Explore Analytics</strong>
+                                            <p class="mb-1">Check your dashboard for spending insights and trends.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-lightbulb me-2"></i>Pro Tips</h6>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"
+                                            ><i class="fas fa-check text-success me-2"></i>Enable autocomplete for
+                                            faster restaurant entry</li
+                                        >
+                                        <li class="mb-2"
+                                            ><i class="fas fa-check text-success me-2"></i>Use consistent categorization
+                                            for better analytics</li
+                                        >
+                                        <li class="mb-2"
+                                            ><i class="fas fa-check text-success me-2"></i>Set up weekly data export as
+                                            backup</li
+                                        >
+                                        <li class="mb-2"
+                                            ><i class="fas fa-check text-success me-2"></i>Review spending patterns
+                                            monthly</li
+                                        >
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expense Management Section -->
+                <div class="accordion-item" id="expenses">
+                    <h2 class="accordion-header">
+                        <button
+                            class="accordion-button collapsed"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapseExpenses">
+                            <i class="fas fa-receipt me-2"></i>Expense Management
+                        </button>
+                    </h2>
+                    <div id="collapseExpenses" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-plus-circle me-2"></i>Adding Expenses</h6>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"><strong>Amount:</strong> Enter the total cost of your meal</li>
+                                        <li class="mb-2"><strong>Restaurant:</strong> Select or add a restaurant</li>
+                                        <li class="mb-2"><strong>Date & Time:</strong> When the expense occurred</li>
+                                        <li class="mb-2"><strong>Meal Type:</strong> Choose from 9 available types</li>
+                                        <li class="mb-2"><strong>Category:</strong> Organize by expense type</li>
+                                        <li class="mb-2"><strong>Notes:</strong> Add any additional details</li>
+                                    </ul>
+
+                                    <h6><i class="fas fa-filter me-2"></i>Filtering & Sorting</h6>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"><i class="fas fa-calendar me-1"></i>Filter by date range</li>
+                                        <li class="mb-2"><i class="fas fa-utensils me-1"></i>Filter by restaurant</li>
+                                        <li class="mb-2"
+                                            ><i class="fas fa-tags me-1"></i>Filter by category or meal type</li
+                                        >
+                                        <li class="mb-2"
+                                            ><i class="fas fa-sort me-1"></i>Sort by date, amount, or restaurant</li
+                                        >
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-download me-2"></i>Import & Export</h6>
+                                    <div class="alert alert-info">
+                                        <strong>CSV Export:</strong> Download your expenses for backup or analysis in
+                                        spreadsheet software.
+                                    </div>
+                                    <div class="alert alert-success">
+                                        <strong>CSV Import:</strong> Bulk import expenses from spreadsheets or other
+                                        expense tracking apps.
+                                    </div>
+
+                                    <h6><i class="fas fa-keyboard me-2"></i>Keyboard Shortcuts</h6>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Add new expense</span>
+                                        <kbd class="shortcut-key">Ctrl + N</kbd>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Search expenses</span>
+                                        <kbd class="shortcut-key">Ctrl + F</kbd>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Export to CSV</span>
+                                        <kbd class="shortcut-key">Ctrl + E</kbd>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Restaurant Management Section -->
+                <div class="accordion-item" id="restaurants">
+                    <h2 class="accordion-header">
+                        <button
+                            class="accordion-button collapsed"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapseRestaurants">
+                            <i class="fas fa-utensils me-2"></i>Restaurant Management
+                        </button>
+                    </h2>
+                    <div id="collapseRestaurants" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-map-marker-alt me-2"></i>Google Maps Integration</h6>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"
+                                            ><i class="fas fa-search me-1"></i>Autocomplete restaurant search</li
+                                        >
+                                        <li class="mb-2"
+                                            ><i class="fas fa-map me-1"></i>Automatic address population</li
+                                        >
+                                        <li class="mb-2"
+                                            ><i class="fas fa-info-circle me-1"></i>Restaurant details from Google
+                                            Places</li
+                                        >
+                                        <li class="mb-2"
+                                            ><i class="fas fa-star me-1"></i>Ratings and reviews integration</li
+                                        >
+                                    </ul>
+
+                                    <h6><i class="fas fa-edit me-2"></i>Managing Restaurants</h6>
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2"><strong>Add:</strong> Search Google Places or add manually</li>
+                                        <li class="mb-2"><strong>Edit:</strong> Update name, cuisine, or address</li>
+                                        <li class="mb-2"
+                                            ><strong>Organize:</strong> Assign cuisine types for better
+                                            categorization</li
+                                        >
+                                        <li class="mb-2"
+                                            ><strong>Track:</strong> See visit history and spending totals</li
+                                        >
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-chart-line me-2"></i>Restaurant Analytics</h6>
+                                    <div class="alert alert-primary">
+                                        <strong>Visit Tracking:</strong> See how often you visit each restaurant and
+                                        total spending.
+                                    </div>
+                                    <div class="alert alert-success">
+                                        <strong>Favorites:</strong> Identify your most visited restaurants and top
+                                        spending locations.
+                                    </div>
+
+                                    <h6><i class="fas fa-palette me-2"></i>Cuisine Color Coding</h6>
+                                    <p class="text-muted"
+                                        >Restaurants are visually organized by cuisine type with unique colors and icons
+                                        for easy identification.</p
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reference Guide Section -->
+                <div class="accordion-item" id="reference">
+                    <h2 class="accordion-header">
+                        <button
+                            class="accordion-button collapsed"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapseReference">
+                            <i class="fas fa-book me-2"></i>Reference Guide
+                        </button>
+                    </h2>
+                    <div id="collapseReference" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body">
+                            <!-- Meal Types -->
+                            <div class="help-section">
+                                <h5><i class="fas fa-clock me-2"></i>Meal Types ({{ meal_types|length }} Available)</h5>
+                                <p class="text-muted"
+                                    >Choose from these meal types to categorize your expenses by time of day:</p
+                                >
+                                <div class="badge-grid">
+                                    {% for meal_type in meal_types %}
+                                    <div class="meal-type-badge {{ meal_type.name|meal_type_css_class }}">
+                                        <i class="fas fa-{{ meal_type.icon }}"></i>
+                                        <div>
+                                            <strong>{{ meal_type.name|title }}</strong>
+                                            <div class="time-range">{{ meal_type.time_range }}</div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- Cuisines -->
+                            <div class="help-section">
+                                <h5
+                                    ><i class="fas fa-globe me-2"></i>Cuisine Types ({{ cuisines|length }}
+                                    Available)</h5
+                                >
+                                <p class="text-muted"
+                                    >Organize restaurants by cuisine type with distinctive colors and icons:</p
+                                >
+                                <div class="badge-grid">
+                                    {% for cuisine in cuisines %}
+                                    <span
+                                        class="help-cuisine-badge"
+                                        style="--cuisine-color-rgb: {{ hex_to_rgb(cuisine.color) }};">
+                                        <i class="fas fa-{{ cuisine.icon }}"></i>
+                                        <span>{{ cuisine.name }}</span>
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- Categories -->
+                            <div class="help-section">
+                                <h5
+                                    ><i class="fas fa-tags me-2"></i>Default Categories ({{ categories|length }}
+                                    Available)</h5
+                                >
+                                <p class="text-muted">Standard expense categories to help organize your spending:</p>
+                                <div class="badge-grid">
+                                    {% for category in categories %}
+                                    <div class="help-category-wrapper">
+                                        {{ category_badge(category) }}
+                                        <div class="category-description">{{ category.description }}</div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="alert alert-info mt-3">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Pro Tip:</strong> You can create custom categories to match your specific
+                                    spending patterns and lifestyle.
+                                </div>
+                            </div>
+
+                            <!-- Features Overview -->
+                            <div class="help-section">
+                                <h5><i class="fas fa-star me-2"></i>Key Features</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-primary">Data Management</h6>
+                                        <ul class="list-unstyled">
+                                            <li><i class="fas fa-check text-success me-2"></i>CSV import/export</li>
+                                            <li><i class="fas fa-check text-success me-2"></i>Advanced filtering</li>
+                                            <li><i class="fas fa-check text-success me-2"></i>Search functionality</li>
+                                            <li><i class="fas fa-check text-success me-2"></i>Data validation</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-primary">Analytics & Insights</h6>
+                                        <ul class="list-unstyled">
+                                            <li><i class="fas fa-check text-success me-2"></i>Spending dashboard</li>
+                                            <li><i class="fas fa-check text-success me-2"></i>Visual charts</li>
+                                            <li><i class="fas fa-check text-success me-2"></i>Trend analysis</li>
+                                            <li><i class="fas fa-check text-success me-2"></i>Top restaurants</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Section -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button
+                            class="accordion-button collapsed"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapseFAQ">
+                            <i class="fas fa-question-circle me-2"></i>Frequently Asked Questions
+                        </button>
+                    </h2>
+                    <div id="collapseFAQ" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Q: How do I import expenses from another app?</h6>
+                                    <p
+                                        >Use the CSV import feature. Export your data from the other app, then format it
+                                        to match our CSV template and import.</p
+                                    >
+
+                                    <h6>Q: Can I edit or delete expenses?</h6>
+                                    <p
+                                        >Yes! Click on any expense to view details, then use the Edit or Delete buttons
+                                        to make changes.</p
+                                    >
+
+                                    <h6>Q: How accurate is the Google Maps integration?</h6>
+                                    <p
+                                        >Very accurate! We use Google Places API to provide real restaurant data
+                                        including names, addresses, and locations.</p
+                                    >
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Q: Can I customize categories and meal types?</h6>
+                                    <p
+                                        >Categories can be customized. Meal types are standardized for consistency, but
+                                        you can use the notes field for additional details.</p
+                                    >
+
+                                    <h6>Q: How is my data protected?</h6>
+                                    <p
+                                        >We use secure session-based authentication, rate limiting, and follow security
+                                        best practices to protect your data.</p
+                                    >
+
+                                    <h6>Q: Can I access this on mobile?</h6>
+                                    <p
+                                        >Yes! The interface is fully responsive and works great on mobile devices and
+                                        tablets.</p
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Help -->
+            <div class="help-card bg-light mt-4">
+                <div class="text-center">
+                    <h5><i class="fas fa-heart text-danger me-2"></i>Need More Help?</h5>
+                    <p class="mb-3"
+                        >This guide covers the main features. For additional assistance or feature requests:</p
+                    >
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="{{ url_for('main.contact') }}" class="btn btn-primary">
+                            <i class="fas fa-envelope me-2"></i>Contact Support
+                        </a>
+                        <a href="{{ url_for('main.about') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-info-circle me-2"></i>About the App
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-expand sections based on URL hash
+    document.addEventListener("DOMContentLoaded", function () {
+        if (window.location.hash) {
+            const targetId = window.location.hash.substring(1);
+            const targetElement = document.getElementById(targetId);
+            if (targetElement && targetElement.classList.contains("accordion-item")) {
+                const collapseElement = targetElement.querySelector(".accordion-collapse");
+                if (collapseElement) {
+                    const bsCollapse = new bootstrap.Collapse(collapseElement, { show: true });
+                }
+            }
+        }
+    });
+
+    // Enhanced navigation for accordion sections
+    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            const targetId = this.getAttribute("href").substring(1);
+            const targetElement = document.getElementById(targetId);
+
+            if (targetElement && targetElement.classList.contains("accordion-item")) {
+                // Find the collapse element within this accordion item
+                const collapseElement = targetElement.querySelector(".accordion-collapse");
+                if (collapseElement) {
+                    // Check if the section is already open
+                    if (collapseElement.classList.contains("show")) {
+                        // Already open, just scroll to it
+                        targetElement.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                        });
+                    } else {
+                        // Open the accordion section using Bootstrap's Collapse API
+                        const bsCollapse = new bootstrap.Collapse(collapseElement, { show: true });
+
+                        // Wait for the collapse animation to complete, then scroll
+                        collapseElement.addEventListener(
+                            "shown.bs.collapse",
+                            function () {
+                                targetElement.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "start",
+                                });
+                            },
+                            { once: true }
+                        );
+                    }
+                }
+            } else if (targetElement) {
+                // Regular smooth scrolling for non-accordion targets
+                targetElement.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                });
+            }
+        });
+    });
+</script>
+
+{% endblock content %}

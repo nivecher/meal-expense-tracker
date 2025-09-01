@@ -7,6 +7,8 @@ Following TIGER principles: Safety, Performance, Developer Experience
 
 from typing import Dict, List, Optional, TypedDict
 
+from .colors import BOOTSTRAP_COLORS
+
 
 class CuisineData(TypedDict):
     """Type definition for cuisine data."""
@@ -17,54 +19,90 @@ class CuisineData(TypedDict):
     description: str
 
 
+# Cuisine color mapping using Bootstrap colors for consistency
+CUISINE_COLORS = {
+    # Asian cuisines - reds and oranges
+    "Chinese": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
+    "Japanese": BOOTSTRAP_COLORS["purple"]["hex"],  # #6f42c1
+    "Korean": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
+    "Thai": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "Vietnamese": BOOTSTRAP_COLORS["teal"]["hex"],  # #20c997
+    "Indian": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
+    "Sushi": BOOTSTRAP_COLORS["purple"]["hex"],  # #6f42c1
+    # European cuisines - blues and purples
+    "Italian": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "French": BOOTSTRAP_COLORS["indigo"]["hex"],  # #6610f2
+    "German": BOOTSTRAP_COLORS["gray"]["hex"],  # #6c757d
+    "Spanish": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
+    "Greek": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
+    "British": BOOTSTRAP_COLORS["indigo"]["hex"],  # #6610f2
+    "Turkish": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
+    # American cuisines - blues and teals
+    "American": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
+    "Mexican": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
+    "Barbecue": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
+    "Pizza": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "Fast Food": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
+    # Specialty cuisines
+    "Seafood": BOOTSTRAP_COLORS["cyan"]["hex"],  # #0dcaf0
+    "Steakhouse": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
+    "Mediterranean": BOOTSTRAP_COLORS["cyan"]["hex"],  # #0dcaf0
+    "Lebanese": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "Ethiopian": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
+    "Moroccan": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
+    "Brazilian": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "Peruvian": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
+    "Argentinian": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
+}
+
 # Cuisine constants with colors and icons
 CUISINE_CONSTANTS: List[CuisineData] = [
     {
         "name": "Chinese",
         "color": "#dc2626",  # Bolder Red
-        "icon": "utensils",
+        "icon": "bowl-rice",  # Traditional Chinese rice bowl
         "description": "Chinese cuisine",
     },
     {
         "name": "Italian",
         "color": "#16a34a",  # Bolder Green
-        "icon": "pizza-slice",
+        "icon": "pizza-slice",  # Iconic Italian food
         "description": "Italian cuisine",
     },
     {
         "name": "Japanese",
-        "color": "#e91e63",  # Bolder Pink
-        "icon": "fish",
+        "color": "#bc002d",  # Japanese Flag Red
+        "icon": "fish",  # Sushi/sashimi focus
         "description": "Japanese cuisine",
     },
     {
         "name": "Mexican",
-        "color": "#ea580c",  # Bolder Orange
-        "icon": "pepper-hot",
+        "color": "#006847",  # Mexican Flag Green
+        "icon": "pepper-hot",  # Spicy Mexican food
         "description": "Mexican cuisine",
     },
     {
         "name": "Indian",
         "color": "#f59e0b",  # Bolder Yellow
-        "icon": "fire",
+        "icon": "fire",  # Spicy Indian cuisine
         "description": "Indian cuisine",
     },
     {
         "name": "Thai",
         "color": "#059669",  # Bolder Teal
-        "icon": "leaf",
+        "icon": "leaf",  # Fresh herbs and ingredients
         "description": "Thai cuisine",
     },
     {
         "name": "French",
         "color": "#7c3aed",  # Bolder Purple
-        "icon": "wine-glass",
+        "icon": "wine-glass",  # French dining culture
         "description": "French cuisine",
     },
     {
         "name": "American",
         "color": "#2563eb",  # Bolder Blue
-        "icon": "utensils",
+        "icon": "flag-usa",  # US flag (Font Awesome has this one)
         "description": "American cuisine",
     },
     {
@@ -82,13 +120,13 @@ CUISINE_CONSTANTS: List[CuisineData] = [
     {
         "name": "Seafood",
         "color": "#0891b2",  # Bolder Cyan
-        "icon": "fish",
+        "icon": "shrimp",  # Maritime/seafood symbol
         "description": "Seafood restaurants",
     },
     {
         "name": "Steakhouse",
         "color": "#7c2d12",  # Bolder Brown
-        "icon": "drumstick-bite",
+        "icon": "cow",  # Steakhouse/beef symbol
         "description": "Steakhouse restaurants",
     },
     {
@@ -100,91 +138,91 @@ CUISINE_CONSTANTS: List[CuisineData] = [
     {
         "name": "Korean",
         "color": "#dc2626",  # Bolder Red
-        "icon": "fire",
+        "icon": "fire",  # Spicy Korean cuisine
         "description": "Korean cuisine",
     },
     {
         "name": "Vietnamese",
-        "color": "#059669",  # Bolder Teal
-        "icon": "utensils",
+        "color": "#da020e",  # Vietnamese Flag Red
+        "icon": "bowl-food",  # Vietnamese pho bowls
         "description": "Vietnamese cuisine",
     },
     {
         "name": "Mediterranean",
         "color": "#0891b2",  # Bolder Cyan
-        "icon": "leaf",
+        "icon": "seedling",  # Fresh herbs and ingredients
         "description": "Mediterranean cuisine",
     },
     {
         "name": "Greek",
         "color": "#2563eb",  # Bolder Blue
-        "icon": "leaf",
+        "icon": "leaf",  # Mediterranean herbs
         "description": "Greek cuisine",
     },
     {
         "name": "Spanish",
         "color": "#f59e0b",  # Bolder Yellow
-        "icon": "pepper-hot",
+        "icon": "pepper-hot",  # Spanish spices
         "description": "Spanish cuisine",
     },
     {
         "name": "German",
         "color": "#6b7280",  # Bolder Gray
-        "icon": "beer",
+        "icon": "beer",  # German beer culture
         "description": "German cuisine",
     },
     {
         "name": "British",
         "color": "#7c3aed",  # Bolder Purple
-        "icon": "crown",
+        "icon": "crown",  # British culture
         "description": "British cuisine",
     },
     {
         "name": "Turkish",
         "color": "#dc2626",  # Bolder Red
-        "icon": "star",
+        "icon": "star",  # Turkish star
         "description": "Turkish cuisine",
     },
     {
         "name": "Lebanese",
         "color": "#16a34a",  # Bolder Green
-        "icon": "leaf",
+        "icon": "leaf",  # Mediterranean herbs
         "description": "Lebanese cuisine",
     },
     {
         "name": "Ethiopian",
         "color": "#f59e0b",  # Bolder Yellow
-        "icon": "fire",
+        "icon": "fire",  # Spicy Ethiopian cuisine
         "description": "Ethiopian cuisine",
     },
     {
         "name": "Moroccan",
         "color": "#ea580c",  # Bolder Orange
-        "icon": "star",
+        "icon": "star",  # Moroccan culture
         "description": "Moroccan cuisine",
     },
     {
         "name": "Brazilian",
         "color": "#16a34a",  # Bolder Green
-        "icon": "leaf",
+        "icon": "drumstick-bite",  # Churrasco/grilled meat
         "description": "Brazilian cuisine",
     },
     {
         "name": "Peruvian",
         "color": "#dc2626",  # Bolder Red
-        "icon": "pepper-hot",
+        "icon": "flag",  # Peruvian flag representation
         "description": "Peruvian cuisine",
     },
     {
         "name": "Argentinian",
         "color": "#2563eb",  # Bolder Blue
-        "icon": "drumstick-bite",
+        "icon": "flag",  # Argentinian flag representation
         "description": "Argentinian cuisine",
     },
     {
         "name": "Fast Food",  # TODO should remove this?
         "color": "#fbbf24",  # Bolder Amber
-        "icon": "burger",
+        "icon": "hamburger",
         "description": "Fast food cuisine",
     },
 ]
@@ -248,20 +286,28 @@ def get_cuisine_data(cuisine_name: str) -> Optional[CuisineData]:
 
 
 def get_cuisine_color(cuisine_name: str) -> str:
-    """Get color for a cuisine type.
+    """Get color for a cuisine using centralized Bootstrap colors.
 
     Args:
         cuisine_name: Name of the cuisine
 
     Returns:
-        Hex color code or default gray color if not found
+        Hex color code or default Bootstrap gray if not found
 
     Example:
         color = get_cuisine_color('Mexican')
         print(color)  # '#fd7e14'
     """
+    if not cuisine_name or not isinstance(cuisine_name, str):
+        return BOOTSTRAP_COLORS["gray"]["hex"]
+
+    # Try centralized color mapping first
+    if cuisine_name in CUISINE_COLORS:
+        return CUISINE_COLORS[cuisine_name]
+
+    # Fallback to cuisine data
     cuisine_data = get_cuisine_data(cuisine_name)
-    return cuisine_data["color"] if cuisine_data else "#6c757d"  # Default gray
+    return cuisine_data["color"] if cuisine_data else BOOTSTRAP_COLORS["gray"]["hex"]
 
 
 def get_cuisine_icon(cuisine_name: str) -> str:
@@ -308,3 +354,29 @@ def validate_cuisine_name(cuisine_name: str) -> bool:
         is_invalid = validate_cuisine_name('Unknown')  # False
     """
     return get_cuisine_data(cuisine_name) is not None
+
+
+def get_cuisine_css_class(cuisine_name: str) -> str:
+    """Get CSS class name for a cuisine (consistent with category approach).
+
+    Args:
+        cuisine_name: Name of the cuisine
+
+    Returns:
+        CSS class string for cuisine styling
+
+    Example:
+        css_class = get_cuisine_css_class('Chinese')
+        print(css_class)  # 'chinese'
+    """
+    if not cuisine_name or not isinstance(cuisine_name, str):
+        return "cuisine-default"
+
+    # Normalize to lowercase and replace spaces with hyphens for CSS class
+    normalized_name = cuisine_name.strip().lower().replace(" ", "-")
+
+    # Validate cuisine exists
+    if get_cuisine_data(cuisine_name):
+        return normalized_name
+
+    return "cuisine-default"

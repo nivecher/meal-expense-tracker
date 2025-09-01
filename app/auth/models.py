@@ -63,6 +63,44 @@ class User(BaseModel, UserMixin):
         comment="Whether the user has admin privileges",
     )
 
+    # Profile fields
+    first_name: Mapped[Optional[str]] = db.Column(
+        db.String(64),
+        nullable=True,
+        comment="User's first name",
+    )
+    last_name: Mapped[Optional[str]] = db.Column(
+        db.String(64),
+        nullable=True,
+        comment="User's last name",
+    )
+    display_name: Mapped[Optional[str]] = db.Column(
+        db.String(128),
+        nullable=True,
+        comment="User's preferred display name",
+    )
+    bio: Mapped[Optional[str]] = db.Column(
+        db.Text,
+        nullable=True,
+        comment="User's bio or description",
+    )
+    avatar_url: Mapped[Optional[str]] = db.Column(
+        db.String(255),
+        nullable=True,
+        comment="URL to user's avatar image",
+    )
+    phone: Mapped[Optional[str]] = db.Column(
+        db.String(20),
+        nullable=True,
+        comment="User's phone number",
+    )
+    timezone: Mapped[Optional[str]] = db.Column(
+        db.String(50),
+        nullable=True,
+        default="UTC",
+        comment="User's timezone preference",
+    )
+
     # Relationships
     expenses: Mapped[List["Expense"]] = relationship(
         "Expense",
@@ -121,6 +159,40 @@ class User(BaseModel, UserMixin):
         """Return the user ID as a string for Flask-Login."""
         return str(self.id)
 
+    def get_display_name(self) -> str:
+        """Get the user's preferred display name.
+
+        Returns:
+            The display name if set, otherwise the full name, otherwise the username
+        """
+        if self.display_name:
+            return self.display_name
+
+        if self.first_name and self.last_name:
+            return f"{self.first_name} {self.last_name}"
+        elif self.first_name:
+            return self.first_name
+
+        return self.username
+
+    def get_initials(self) -> str:
+        """Get user initials for avatar display.
+
+        Returns:
+            Two-character initials based on name or username
+        """
+        if self.first_name and self.last_name:
+            return f"{self.first_name[0]}{self.last_name[0]}".upper()
+        elif self.first_name:
+            return self.first_name[:2].upper()
+        elif self.display_name:
+            parts = self.display_name.split()
+            if len(parts) >= 2:
+                return f"{parts[0][0]}{parts[1][0]}".upper()
+            return self.display_name[:2].upper()
+
+        return self.username[:2].upper()
+
     def to_dict(self) -> Dict[str, Any]:
         """Return a dictionary representation of the user.
 
@@ -131,6 +203,13 @@ class User(BaseModel, UserMixin):
             "id": self.id,
             "username": self.username,
             "email": self.email,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "display_name": self.display_name,
+            "bio": self.bio,
+            "avatar_url": self.avatar_url,
+            "phone": self.phone,
+            "timezone": self.timezone,
             "is_active": self.is_active,
             "is_admin": self.is_admin,
             "created_at": self.created_at.isoformat() if self.created_at else None,

@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 
 from flask import Flask
 
+from app.constants.meal_type_colors import get_meal_type_color
+from app.constants.meal_types import get_meal_type_icon
+
 
 def time_ago(value: datetime) -> str:
     """Format a datetime as a relative time string (e.g., '2 hours ago').
@@ -41,6 +44,72 @@ def time_ago(value: datetime) -> str:
     return "Just now"
 
 
+def meal_type_color(meal_type: str) -> str:
+    """Get the background color for a meal type.
+
+    Args:
+        meal_type: The meal type name
+
+    Returns:
+        Hex color code or default gray if not found
+    """
+    return get_meal_type_color(meal_type, "background")
+
+
+def meal_type_icon(meal_type: str) -> str:
+    """Get the icon for a meal type.
+
+    Args:
+        meal_type: The meal type name
+
+    Returns:
+        Font Awesome icon name or default utensils if not found
+    """
+    return get_meal_type_icon(meal_type)
+
+
+def restaurant_cuisine(restaurant) -> str:
+    """Get the cuisine for a restaurant.
+
+    Args:
+        restaurant: The restaurant object
+
+    Returns:
+        The cuisine name or dash if not available
+    """
+    if restaurant and hasattr(restaurant, "cuisine") and restaurant.cuisine:
+        return restaurant.cuisine
+    return "-"
+
+
+def meal_type_css_class_filter(meal_type: str) -> str:
+    """Get the CSS class for a meal type using centralized approach.
+
+    Args:
+        meal_type: The meal type name
+
+    Returns:
+        CSS class name string
+    """
+    from app.constants.meal_types import get_meal_type_css_class
+
+    return get_meal_type_css_class(meal_type)
+
+
+def get_app_version() -> str:
+    """Get the application version from git tags.
+
+    Returns:
+        str: Application version string, defaults to "development" if not found
+    """
+    try:
+        from app._version import __version__
+
+        return __version__
+    except ImportError:
+        return "development"
+
+
 def init_app(app: Flask) -> None:
     """Initialize template filters for the Flask app.
 
@@ -48,3 +117,10 @@ def init_app(app: Flask) -> None:
         app: The Flask application instance.
     """
     app.add_template_filter(time_ago, name="time_ago")
+    app.add_template_filter(meal_type_color, name="meal_type_color")
+    app.add_template_filter(meal_type_icon, name="meal_type_icon")
+    app.add_template_filter(meal_type_css_class_filter, name="meal_type_css_class")
+    app.add_template_filter(restaurant_cuisine, name="restaurant_cuisine")
+
+    # Add template global functions
+    app.add_template_global(get_app_version, name="get_app_version")

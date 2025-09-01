@@ -394,7 +394,6 @@ export class GooglePlacesService {
     const priceLevel = place.priceLevel || place.price_level || 0;
     const types = Array.isArray(place.types) ? place.types : [];
     const businessStatus = place.businessStatus || place.business_status || 'UNKNOWN';
-    const url = place.googleMapsUri || place.url || '';
 
     // Format the result with camelCase property names
     return {
@@ -411,7 +410,6 @@ export class GooglePlacesService {
       location,
       photos,
       businessStatus,
-      url,
       // Include the raw place object for debugging
       _raw: place,
     };
