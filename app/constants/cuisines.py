@@ -220,7 +220,7 @@ CUISINE_CONSTANTS: List[CuisineData] = [
         "description": "Argentinian cuisine",
     },
     {
-        "name": "Fast Food",  # TODO should remove this?
+        "name": "Fast Food",
         "color": "#fbbf24",  # Bolder Amber
         "icon": "hamburger",
         "description": "Fast food cuisine",

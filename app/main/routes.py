@@ -114,47 +114,6 @@ def contact():
     return render_template("main/contact.html", form=form)
 
 
-# TODO test code
-@bp.route("/test/static/<path:filename>")
-def test_static(filename):
-    """Test route to verify static file serving.
-
-    Args:
-        filename: Name of the file to serve from static folder
-
-    Returns:
-        The requested static file
-    """
-    # Debug information
-    static_folder = current_app.static_folder
-    full_path = os.path.join(static_folder, filename)
-    exists = os.path.exists(full_path)
-
-    # Log debug information
-    current_app.logger.info(f"Static folder: {static_folder}")
-    current_app.logger.info(f"Requested file: {filename}")
-    current_app.logger.info(f"Full path: {full_path}")
-    current_app.logger.info(f"File exists: {exists}")
-
-    if not exists:
-        return f"File not found: {full_path}", 404
-
-    return send_from_directory(static_folder, filename)
-
-
-@bp.route("/debug/routes")
-def debug_routes():
-    """Debug endpoint to list all registered routes."""
-    from flask import current_app
-
-    output = []
-    for rule in current_app.url_map.iter_rules():
-        methods = ",".join(rule.methods)
-        line = f"{rule.endpoint}: {rule.rule} [{methods}]"
-        output.append(line)
-
-    return "<br>".join(sorted(output))
-
 
 @bp.route("/")
 @login_required
@@ -217,58 +176,3 @@ def index():
         get_cuisine_color=get_cuisine_color,
     )
 
-
-# TODO debug (remove)
-@bp.route("/api/config/google-maps-key")
-def get_google_maps_key():
-    """Return the Google Maps API key.
-
-    Returns:
-        JSON response containing the Google Maps API key or an error message
-    """
-    key = current_app.config.get("GOOGLE_MAPS_API_KEY")
-    if not key:
-        return jsonify({"error": "Google Maps API key not configured"}), 500
-    return jsonify({"apiKey": key})
-
-
-# TODO debug (remove)
-@bp.route("/api/config/google-maps-id")
-def get_google_maps_id():
-    """Return the Google Maps Map ID.
-
-    Returns:
-        JSON response containing the Google Maps Map ID or an error message
-    """
-    key = current_app.config.get("GOOGLE_MAPS_MAP_ID")
-    if not key:
-        return jsonify({"error": "Google Maps Map ID not configured"}), 500
-    return jsonify({"mapId": key})
-
-
-@bp.route("/test/google-places")
-@login_required
-def google_places_test():
-    """Test page for Google Places API integration.
-
-    This page provides a testing interface for the Google Places API functionality.
-    It allows users to search for places and view the results on a map.
-
-    Returns:
-        str: Rendered template for the Google Places test page.
-    """
-    return render_template("test/google_places_test.html", title="Google Places Test")
-
-
-@bp.route("/sticky-tables-demo")
-@login_required
-def sticky_tables_demo():
-    """Demo page for sticky table headers and frozen columns."""
-    return render_template("components/sticky_table_examples.html")
-
-
-@bp.route("/error-handling-demo")
-@login_required
-def error_handling_demo():
-    """Demo page for enhanced restaurant error handling."""
-    return render_template("test/error-handling-demo.html")

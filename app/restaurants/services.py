@@ -759,7 +759,7 @@ def delete_restaurant_by_id(restaurant_id: int, user_id: int) -> Tuple[bool, str
         raise e
 
 
-# TODO consider consolidating logic with get_restaurants_with_stats
+# Note: This logic could potentially be consolidated with get_restaurants_with_stats in future refactoring
 def calculate_expense_stats(restaurant_id: int, user_id: int) -> Dict[str, Any]:
     """Calculate expense statistics for a restaurant.
 
