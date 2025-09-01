@@ -114,7 +114,7 @@
 
 /* Recent Expenses */
 .recent-expenses-list {
-    max-height: 450px;
+    max-height: 520px;
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -208,7 +208,7 @@
 
 /* Top Restaurants */
 .top-restaurants-list {
-    max-height: 450px;
+    max-height: 520px;
     overflow-y: auto;
     overflow-x: hidden;
 }
