@@ -76,18 +76,20 @@
 
 ### Frontend
 
-- Modern JavaScript (ES6+)
-- HTML5 / CSS3
-- Bootstrap 5 for styling
-- jQuery for DOM manipulation
-- Webpack for asset bundling
+- **Template Engine**: Jinja2 (server-side rendering)
+- **CSS Framework**: Bootstrap 5.3.3 for responsive components  
+- **JavaScript**: Modern ES6+ with jQuery 3.7.1 for DOM manipulation
+- **Enhancement Strategy**: Progressive enhancement over server-rendered HTML
+- **Build Process**: Make-based workflow (no bundling required)
 
 ### Infrastructure
 
-- AWS (EC2, RDS, S3, Lambda)
-- Terraform for infrastructure as code
-- Docker for containerization
-- GitHub Actions for CI/CD
+- **AWS Serverless**: Lambda + API Gateway (primary deployment)
+- **Database**: RDS PostgreSQL (production), SQLite (development)
+- **Storage**: S3 for deployment packages and assets
+- **Infrastructure as Code**: Terraform with comprehensive CI/CD
+- **Development**: Docker Compose for local services
+- **CI/CD**: GitHub Actions with security scanning and testing
 
 ## Python/Flask Guidelines
 
@@ -130,25 +132,25 @@ app/
 
 ## JavaScript Guidelines
 
-### Code Style (2)
+### Code Style
 
-- Use ES6+ syntax
+- Use ES6+ syntax with appropriate browser support
 - Use `camelCase` for variables and functions
-- Use `PascalCase` for React components
+- Use `PascalCase` for JavaScript classes
 - Use `UPPER_CASE` for constants
 - Use template literals for string interpolation
 - Use destructuring for objects and arrays
-- Use arrow functions for callbacks
+- Use arrow functions for callbacks and pure functions
 
-### Best Practices (2)
+### Best Practices
 
-- No inline JavaScript in HTML files
-- Use modules for code organization
-- Keep DOM manipulation separate from business logic
-- Use event delegation for dynamic content
-- Implement proper error handling
-- Use modern browser APIs and features
-- Follow accessibility best practices
+- **No inline JavaScript** - Use external files and data attributes for configuration
+- **ES6 modules** for code organization and dependency management
+- **Progressive enhancement** - Ensure functionality without JavaScript
+- **Event delegation** for dynamic content and performance
+- **Comprehensive error handling** with user-friendly feedback
+- **jQuery patterns** - Use jQuery idiomatically with proper chaining
+- **Accessibility first** - ARIA labels, keyboard navigation, screen reader support
 
 ## Testing Guidelines
 

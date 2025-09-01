@@ -17,17 +17,58 @@ This document outlines the technology choices and architecture decisions for the
 ### Backend
 
 - **Language**: [Python 3.13](https://www.python.org/)
-- Type hints and modern Python features
-- Async/await support for I/O-bound operations
+  - Type hints and modern Python features
+  - Strict typing with Mypy for better code quality
 
-- **Serverless Framework**: AWS Lambda
+- **Web Framework**: [Flask 3.1.1](https://flask.palletsprojects.com/)
+  - Blueprints for modular application structure
+  - AWS Lambda WSGI adapter for serverless deployment
 
-- **Database ORM**: [SQLAlchemy](https://www.sqlalchemy.org/)
-  - Async SQLAlchemy for non-blocking database access
-- **Data Validation**: Pydantic
-- **Authentication**: Flask-Login
-- **Testing**: Pytest with Flask-Testing
-- **Code Quality**: Black, isort, Flake8, Mypy
+- **Database**: [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
+  - Modern SQLAlchemy with improved type hints
+  - PostgreSQL for production, SQLite for development
+  - Flask-Migrate for schema management
+
+- **Data & Validation**: 
+  - [Marshmallow](https://marshmallow.readthedocs.io/) for API serialization/validation
+  - [msgspec](https://jcristharif.com/msgspec/) for high-performance JSON serialization
+  - [WTForms](https://wtforms.readthedocs.io/) for form validation
+
+- **Authentication & Security**:
+  - Flask-Login for session-based authentication
+  - JWT for API token authentication
+  - Flexible session storage (DynamoDB for AWS, signed cookies for Lambda)
+  - Flask-Limiter for rate limiting
+  - CSRF protection (disabled in Lambda, enabled in development)
+
+- **Testing**: Pytest with comprehensive test fixtures
+- **Code Quality**: Black, isort, Flake8, Mypy, pre-commit hooks
+
+### Frontend
+
+- **Framework Strategy**: Server-side rendered templates with progressive enhancement
+  - [Jinja2](https://jinja.palletsprojects.com/) templates for server-side rendering
+  - [Bootstrap 5.3.3](https://getbootstrap.com/) for responsive UI components
+  - [jQuery 3.7.1](https://jquery.com/) for DOM manipulation and AJAX
+  - Vanilla JavaScript ES6+ for modern features and custom components
+
+- **UI Components & Styling**:
+  - Bootstrap Icons for consistent iconography
+  - Select2 with Bootstrap 5 theme for enhanced form controls
+  - Custom CSS following BEM methodology
+  - Responsive design with mobile-first approach
+
+- **JavaScript Architecture**:
+  - ES6 modules for code organization
+  - Service classes for API interaction
+  - Utils for common functionality
+  - Progressive enhancement pattern
+
+- **Third-Party Integrations**:
+  - [Google Maps JavaScript API](https://developers.google.com/maps/documentation/javascript/) for location services
+  - [Chart.js](https://www.chartjs.org/) for data visualization
+  - [Prettier](https://prettier.io/) for HTML formatting
+  - [ESLint](https://eslint.org/) for JavaScript linting
 
 ### AWS Lambda Integration
 
@@ -101,36 +142,48 @@ This document outlines the technology choices and architecture decisions for the
 
 ## Development Tools
 
-### Local Development (2)
+### Local Development
 
-- **Local Stack**: Docker Compose for local AWS services
-- **Database**: Local PostgreSQL container
-- **Testing**:
-  - Pytest with fixtures
-  - Factory Boy for test data
-  - HTTPretty for HTTP mocking
+- **Development Environment**: Make-based workflow with comprehensive targets
+  - `make setup` - Automated development environment setup
+  - `make run` - Start Flask development server
+  - `make test` - Run test suite with coverage
+  - `make lint` - Run all linters and formatters
 
-### Code Quality
+- **Containerization**: Docker Compose for local services
+  - PostgreSQL container for local database
+  - LocalStack for AWS service emulation (when needed)
+  - Development-focused container setup
 
-- **Linting**:
-- Flake8 (Python)
-- ShellCheck (Shell scripts)
-- TFLint (Terraform)
+- **Dependency Management**: pip-tools with structured requirements
+  - `requirements/base.in` - Core dependencies
+  - `requirements/dev.in` - Development tools
+  - `requirements/test.in` - Testing dependencies
+  - `requirements/prod.in` - Production-specific packages
 
-- **Formatting**:
+### Code Quality & Linting
 
-  - Black (Python)
-  - shfmt (Shell)
-  - Terraform fmt
+- **Python**:
+  - [Flake8](https://flake8.pycqa.org/) - Style and complexity linting
+  - [Black](https://black.readthedocs.io/) - Code formatting (120 char line length)
+  - [isort](https://pycqa.github.io/isort/) - Import sorting
+  - [Mypy](https://mypy.readthedocs.io/) - Static type checking
+  - [Bandit](https://bandit.readthedocs.io/) - Security vulnerability scanning
 
-- **Type Checking**:
+- **Frontend**:
+  - [ESLint 9.34.0](https://eslint.org/) - JavaScript linting with flat config
+  - [Prettier 3.2.4](https://prettier.io/) - HTML template formatting
+  - Environment-specific rules (development vs production)
 
-  - Mypy (Python)
+- **Infrastructure**:
+  - [TFLint](https://github.com/terraform-linters/tflint) - Terraform linting
+  - [ShellCheck](https://www.shellcheck.net/) - Shell script analysis
+  - [yamllint](https://yamllint.readthedocs.io/) - YAML file validation
 
-- **Security**:
-  - Trivy for dependency scanning
-  - Bandit for Python security
-  - GitLeaks for secret detection
+- **Security Scanning**:
+  - [Trivy](https://trivy.dev/) - Dependency and container vulnerability scanning
+  - [GitLeaks](https://github.com/gitleaks/gitleaks) - Secret detection
+  - Pre-commit hooks for automated quality checks
 
 ### AWS Development
 
