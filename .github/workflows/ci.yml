@@ -54,11 +54,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
 
       - name: Install Node dependencies
         run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          if [ -f package-lock.json ]; then 
+            npm ci
+          else 
+            npm install
+          fi
 
       - name: Python linting
         run: |
@@ -67,7 +70,7 @@ jobs:
 
       - name: JavaScript linting
         run: |
-          npm run lint:js || npx eslint --config eslint.config.js "app/static/js/**/*.js"
+          npm run lint:js
 
       - name: CSS linting
         run: |

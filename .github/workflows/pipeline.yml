@@ -107,12 +107,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
 
       - name: Install Node dependencies
         if: matrix.test-suite == 'lint'
         run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          if [ -f package.json ]; then
+            if [ -f package-lock.json ]; then 
+              npm ci
+            else 
+              npm install
+            fi
+          else
+            echo "No package.json found, skipping npm dependencies"
+          fi
 
       - name: Run unit tests
         if: matrix.test-suite == 'unit'
