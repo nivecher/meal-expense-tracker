@@ -138,6 +138,10 @@
 
             authForms.forEach(form => {
                 form.addEventListener('submit', async function(e) {
+                    // Temporarily disable JavaScript form handling to test normal form submission
+                    console.log('Form submission intercepted by JavaScript - allowing normal submission');
+                    return; // Allow normal form submission
+
                     e.preventDefault();
 
                     const submitBtn = form.querySelector('input[type="submit"], button[type="submit"]');

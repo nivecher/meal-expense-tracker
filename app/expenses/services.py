@@ -5,7 +5,7 @@ import io
 import json
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 from flask import Request, current_app
 from flask_wtf import FlaskForm
@@ -14,7 +14,7 @@ from werkzeug.datastructures import FileStorage
 
 from app.constants.categories import get_default_categories
 from app.expenses.forms import ExpenseForm
-from app.expenses.models import Category, Expense
+from app.expenses.models import Category, Expense, ExpenseTag, Tag
 from app.extensions import db
 from app.restaurants.models import Restaurant
 
@@ -303,6 +303,90 @@ def _process_amount(amount_value: Any) -> Tuple[Optional[Decimal], Optional[str]
         return None, f"Invalid amount: {amount_value}"
 
 
+def _parse_tags_json(tags_data: str) -> Tuple[Optional[list], Optional[str]]:
+    """Parse JSON tags data.
+
+    Args:
+        tags_data: JSON string containing tags
+
+    Returns:
+        A tuple of (parsed_tags, error_message)
+    """
+    try:
+        return json.loads(tags_data), None
+    except json.JSONDecodeError:
+        return None, "Invalid tags format"
+
+
+def _validate_tags_list(tags_list: Any) -> Tuple[Optional[list[str]], Optional[str]]:
+    """Validate and clean tags list.
+
+    Args:
+        tags_list: List of tags to validate
+
+    Returns:
+        A tuple of (cleaned_tags, error_message)
+    """
+    if not isinstance(tags_list, list):
+        return None, "Tags must be a list"
+
+    processed_tags = []
+    for tag in tags_list:
+        if not isinstance(tag, str):
+            return None, "All tags must be strings"
+        tag_clean = tag.strip()
+        if tag_clean:  # Only add non-empty tags
+            processed_tags.append(tag_clean)
+
+    return processed_tags, None
+
+
+def _process_tags(form: ExpenseForm) -> Tuple[Optional[list[str]], Optional[str]]:
+    """Process and validate tags from form data.
+
+    Args:
+        form: The expense form containing tags data
+
+    Returns:
+        A tuple of (processed_tags, error_message)
+    """
+    try:
+        # Get tags from form data (sent as JSON string from JavaScript)
+        tags_data = form.tags.data if hasattr(form, "tags") and form.tags.data else None
+
+        if not tags_data:
+            return [], None  # No tags is valid
+
+        # Parse JSON if it's a string
+        if isinstance(tags_data, str):
+            tags_list, error = _parse_tags_json(tags_data)
+            if error:
+                return None, error
+        else:
+            tags_list = tags_data
+
+        # Validate and clean tags
+        return _validate_tags_list(tags_list)
+
+    except Exception as e:
+        current_app.logger.error(f"Error processing tags: {str(e)}")
+        return None, f"Error processing tags: {str(e)}"
+
+
+def _add_tags_to_expense(expense_id: int, user_id: int, tags: list[str]) -> None:
+    """Add tags to an expense safely.
+
+    Args:
+        expense_id: ID of the expense
+        user_id: ID of the user
+        tags: List of tag names to add
+    """
+    try:
+        update_expense_tags(expense_id, user_id, tags)
+    except Exception as e:
+        current_app.logger.warning(f"Failed to add tags to expense {expense_id}: {str(e)}")
+
+
 def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], Optional[str]]:
     """Create a new expense from form data.
 
@@ -317,21 +401,11 @@ def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], 
     """
     try:
         # Process form data
-        category_id, error = _process_category_id(form)
-        if error:
-            return None, error
+        expense_data = _process_expense_form_data(form)
+        if isinstance(expense_data, str):  # Error message
+            return None, expense_data
 
-        restaurant_id, error = _process_restaurant_id(form)
-        if error:
-            return None, error
-
-        date_value, error = _process_date(form.date.data)
-        if error:
-            return None, error
-
-        amount, error = _process_amount(form.amount.data)
-        if error:
-            return None, error
+        category_id, restaurant_id, date_value, amount, tags = expense_data
 
         # Create and save the expense
         expense = Expense(
@@ -346,12 +420,49 @@ def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], 
 
         db.session.add(expense)
         db.session.commit()
+
+        # Add tags to the expense after it's created
+        if tags:
+            _add_tags_to_expense(expense.id, user_id, tags)
+
         return expense, None
 
     except Exception as e:
         db.session.rollback()
         current_app.logger.error("Error creating expense: %s", str(e), exc_info=True)
         return None, f"An error occurred while creating the expense: {str(e)}"
+
+
+def _process_expense_form_data(form: ExpenseForm) -> Union[Tuple[int, Optional[int], date, Decimal, list[str]], str]:
+    """Process all form data for expense creation/update.
+
+    Args:
+        form: The expense form
+
+    Returns:
+        Either a tuple of processed data or an error message string
+    """
+    category_id, error = _process_category_id(form)
+    if error:
+        return error
+
+    restaurant_id, error = _process_restaurant_id(form)
+    if error:
+        return error
+
+    date_value, error = _process_date(form.date.data)
+    if error:
+        return error
+
+    amount, error = _process_amount(form.amount.data)
+    if error:
+        return error
+
+    tags, error = _process_tags(form)
+    if error:
+        return error
+
+    return category_id, restaurant_id, date_value, amount, tags
 
 
 def update_expense(expense: Expense, form: ExpenseForm) -> Tuple[Optional[Expense], Optional[str]]:
@@ -370,21 +481,11 @@ def update_expense(expense: Expense, form: ExpenseForm) -> Tuple[Optional[Expens
         current_app.logger.info("Updating expense with form data: %s", form.data)
 
         # Process form data
-        category_id, error = _process_category_id(form)
-        if error:
-            return None, error
+        expense_data = _process_expense_form_data(form)
+        if isinstance(expense_data, str):  # Error message
+            return None, expense_data
 
-        restaurant_id, error = _process_restaurant_id(form)
-        if error:
-            return None, error
-
-        date_value, error = _process_date(form.date.data)
-        if error:
-            return None, error
-
-        amount, error = _process_amount(form.amount.data)
-        if error:
-            return None, error
+        category_id, restaurant_id, date_value, amount, tags = expense_data
 
         # Update expense fields
         expense.amount = float(amount)
@@ -396,6 +497,11 @@ def update_expense(expense: Expense, form: ExpenseForm) -> Tuple[Optional[Expens
 
         current_app.logger.info("Updated expense data: %s", expense)
         db.session.commit()
+
+        # Update tags for the expense
+        if tags is not None:  # Allow empty list to clear tags
+            _add_tags_to_expense(expense.id, expense.user_id, tags)
+
         return expense, None
 
     except Exception as e:
@@ -1333,3 +1439,305 @@ def import_expenses_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, Dic
         db.session.rollback()
         error_msg = f"Error processing file: {str(e)}"
         return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
+
+
+# Tag Services
+def create_tag(user_id: int, name: str, color: str = "#6c757d", description: str = None) -> Tag:
+    """Create a new tag for a user.
+
+    Args:
+        user_id: ID of the user creating the tag
+        name: Name of the tag (will be normalized to Jira-style)
+        color: Hex color code for the tag
+        description: Optional description of the tag
+
+    Returns:
+        The created Tag object
+
+    Raises:
+        ValueError: If tag name is invalid or already exists
+    """
+    if not name or not name.strip():
+        raise ValueError("Tag name is required")
+
+    # Normalize tag name to Jira-style
+    normalized_name = name.strip().lower().replace(" ", "-")
+    normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
+
+    if not normalized_name:
+        raise ValueError("Tag name must contain at least one alphanumeric character")
+
+    # Check if tag already exists for this user
+    existing_tag = Tag.query.filter_by(name=normalized_name, user_id=user_id).first()
+    if existing_tag:
+        raise ValueError(f"Tag '{name}' already exists")
+
+    # Create new tag
+    tag = Tag(name=normalized_name, color=color, description=description, user_id=user_id)
+
+    db.session.add(tag)
+    db.session.commit()
+
+    return tag
+
+
+def get_user_tags(user_id: int) -> list[Tag]:
+    """Get all tags for a user.
+
+    Args:
+        user_id: ID of the user
+
+    Returns:
+        List of Tag objects for the user
+    """
+    return Tag.query.filter_by(user_id=user_id).order_by(Tag.name).all()
+
+
+def search_tags(user_id: int, query: str, limit: int = 10) -> list[Tag]:
+    """Search tags by name for a user.
+
+    Args:
+        user_id: ID of the user
+        query: Search query string
+        limit: Maximum number of results to return
+
+    Returns:
+        List of matching Tag objects
+    """
+    if not query or not query.strip():
+        return []
+
+    search_term = f"%{query.strip().lower()}%"
+    return Tag.query.filter(Tag.user_id == user_id, Tag.name.ilike(search_term)).limit(limit).all()
+
+
+def get_or_create_tag(user_id: int, name: str, color: str = "#6c757d") -> Tag:
+    """Get an existing tag or create a new one if it doesn't exist.
+
+    Args:
+        user_id: ID of the user
+        name: Name of the tag
+        color: Hex color code for new tags (legacy, now uses CSS classes)
+
+    Returns:
+        The Tag object (existing or newly created)
+    """
+    # Normalize tag name
+    normalized_name = name.strip().lower().replace(" ", "-")
+    normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
+
+    if not normalized_name:
+        raise ValueError("Tag name must contain at least one alphanumeric character")
+
+    # Try to find existing tag
+    tag = Tag.query.filter_by(name=normalized_name, user_id=user_id).first()
+
+    if not tag:
+        # Create new tag with default color (CSS classes handle the actual colors)
+        tag = Tag(name=normalized_name, color=color, user_id=user_id)
+        db.session.add(tag)
+        db.session.commit()
+
+    return tag
+
+
+def add_tags_to_expense(expense_id: int, user_id: int, tag_names: list[str]) -> list[Tag]:
+    """Add tags to an expense.
+
+    Args:
+        expense_id: ID of the expense
+        user_id: ID of the user adding the tags
+        tag_names: List of tag names to add
+
+    Returns:
+        List of Tag objects that were added
+    """
+    expense = Expense.query.get(expense_id)
+    if not expense:
+        raise ValueError("Expense not found")
+
+    if expense.user_id != user_id:
+        raise ValueError("User can only add tags to their own expenses")
+
+    added_tags = []
+
+    for tag_name in tag_names:
+        if not tag_name or not tag_name.strip():
+            continue
+
+        try:
+            # Get or create tag
+            tag = get_or_create_tag(user_id, tag_name.strip())
+
+            # Check if tag is already added to this expense
+            existing_expense_tag = ExpenseTag.query.filter_by(expense_id=expense_id, tag_id=tag.id).first()
+
+            if not existing_expense_tag:
+                # Add tag to expense
+                expense_tag = ExpenseTag(expense_id=expense_id, tag_id=tag.id, added_by=user_id)
+                db.session.add(expense_tag)
+                added_tags.append(tag)
+
+        except ValueError as e:
+            current_app.logger.warning(f"Failed to add tag '{tag_name}': {e}")
+            continue
+
+    if added_tags:
+        db.session.commit()
+
+    return added_tags
+
+
+def remove_tags_from_expense(expense_id: int, user_id: int, tag_names: list[str]) -> list[Tag]:
+    """Remove tags from an expense.
+
+    Args:
+        expense_id: ID of the expense
+        user_id: ID of the user removing the tags
+        tag_names: List of tag names to remove
+
+    Returns:
+        List of Tag objects that were removed
+    """
+    expense = Expense.query.get(expense_id)
+    if not expense:
+        raise ValueError("Expense not found")
+
+    if expense.user_id != user_id:
+        raise ValueError("User can only remove tags from their own expenses")
+
+    removed_tags = []
+
+    for tag_name in tag_names:
+        if not tag_name or not tag_name.strip():
+            continue
+
+        # Normalize tag name
+        normalized_name = tag_name.strip().lower().replace(" ", "-")
+        normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
+
+        # Find tag
+        tag = Tag.query.filter_by(name=normalized_name, user_id=user_id).first()
+        if not tag:
+            continue
+
+        # Find and remove expense tag
+        expense_tag = ExpenseTag.query.filter_by(expense_id=expense_id, tag_id=tag.id).first()
+
+        if expense_tag:
+            db.session.delete(expense_tag)
+            removed_tags.append(tag)
+
+    if removed_tags:
+        db.session.commit()
+
+    return removed_tags
+
+
+def get_expense_tags(expense_id: int, user_id: int) -> list[Tag]:
+    """Get all tags for an expense.
+
+    Args:
+        expense_id: ID of the expense
+        user_id: ID of the user (for authorization)
+
+    Returns:
+        List of Tag objects for the expense
+    """
+    expense = Expense.query.get(expense_id)
+    if not expense:
+        return []
+
+    if expense.user_id != user_id:
+        return []
+
+    return expense.tags
+
+
+def update_expense_tags(expense_id: int, user_id: int, tag_names: list[str]) -> list[Tag]:
+    """Update tags for an expense (replace all existing tags).
+
+    Args:
+        expense_id: ID of the expense
+        user_id: ID of the user updating the tags
+        tag_names: List of tag names to set
+
+    Returns:
+        List of Tag objects that are now associated with the expense
+    """
+    expense = Expense.query.get(expense_id)
+    if not expense:
+        raise ValueError("Expense not found")
+
+    if expense.user_id != user_id:
+        raise ValueError("User can only update tags on their own expenses")
+
+    # Remove all existing tags
+    ExpenseTag.query.filter_by(expense_id=expense_id).delete()
+
+    # Add new tags
+    final_tags = []
+    for tag_name in tag_names:
+        if not tag_name or not tag_name.strip():
+            continue
+
+        try:
+            tag = get_or_create_tag(user_id, tag_name.strip())
+            expense_tag = ExpenseTag(expense_id=expense_id, tag_id=tag.id, added_by=user_id)
+            db.session.add(expense_tag)
+            final_tags.append(tag)
+        except ValueError as e:
+            current_app.logger.warning(f"Failed to add tag '{tag_name}': {e}")
+            continue
+
+    db.session.commit()
+    return final_tags
+
+
+def delete_tag(user_id: int, tag_id: int) -> bool:
+    """Delete a tag and remove it from all expenses.
+
+    Args:
+        user_id: ID of the user deleting the tag
+        tag_id: ID of the tag to delete
+
+    Returns:
+        True if tag was deleted, False if not found or unauthorized
+    """
+    tag = Tag.query.get(tag_id)
+    if not tag or tag.user_id != user_id:
+        return False
+
+    # Remove tag from all expenses
+    ExpenseTag.query.filter_by(tag_id=tag_id).delete()
+
+    # Delete the tag
+    db.session.delete(tag)
+    db.session.commit()
+
+    return True
+
+
+def get_popular_tags(user_id: int, limit: int = 10) -> list[dict]:
+    """Get the most popular tags for a user.
+
+    Args:
+        user_id: ID of the user
+        limit: Maximum number of tags to return
+
+    Returns:
+        List of dicts with tag info and usage count
+    """
+    from sqlalchemy import func
+
+    result = (
+        db.session.query(Tag, func.count(ExpenseTag.id).label("usage_count"))
+        .outerjoin(ExpenseTag)
+        .filter(Tag.user_id == user_id)
+        .group_by(Tag.id)
+        .order_by(func.count(ExpenseTag.id).desc(), Tag.name)
+        .limit(limit)
+        .all()
+    )
+
+    return [{"tag": tag.to_dict(), "usage_count": usage_count} for tag, usage_count in result]

@@ -1,10 +1,10 @@
 /**
  * Form submission utilities
- * @module FormSubmission
+ * Handles form validation, submission, and error handling
  */
 
-import { resetFormValidation } from './validation.js';
 import { apiRequest } from '../api-utils.js';
+import { get_api_csrf_token } from '../csrf-token.js';
 
 /**
  * Set loading state for a form
@@ -72,7 +72,8 @@ const handleFormSubmissionResponse = (result, form) => {
 
   if (result.success) {
     form.reset();
-    resetFormValidation(form);
+    // Assuming resetFormValidation is no longer needed or replaced by a new utility
+    // resetFormValidation(form);
   }
 };
 

@@ -1,0 +1,271 @@
+/* Standardized Avatar Components */
+/* Consistent avatar display with generated icons and responsive username support */
+
+/* Avatar Container */
+.avatar-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Avatar Size Variants */
+.avatar-sm {
+  width: 24px;
+  height: 24px;
+  font-size: 0.75rem;
+}
+
+.avatar-md {
+  width: 32px;
+  height: 32px;
+  font-size: 0.875rem;
+}
+
+.avatar-lg {
+  width: 48px;
+  height: 48px;
+  font-size: 1.125rem;
+}
+
+.avatar-xl {
+  width: 64px;
+  height: 64px;
+  font-size: 1.5rem;
+}
+
+/* Avatar Image Styling */
+.avatar-container img[data-avatar] {
+  border-radius: 50%;
+  object-fit: cover;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+}
+
+.avatar-container img[data-avatar]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border-color: var(--bs-primary);
+}
+
+/* Generated Initials Avatar */
+.avatar-container .avatar-initials {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.avatar-container .avatar-initials:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  border-color: rgba(255, 255, 255, 1);
+}
+
+/* User Info Display */
+.avatar-user-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0; /* Allow text truncation */
+}
+
+.avatar-username {
+  font-weight: 500;
+  color: var(--bs-body-color);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px; /* Prevent overflow */
+}
+
+.avatar-email {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+/* Navbar Specific Avatar Styling */
+.navbar .avatar-container {
+  margin-right: 0.5rem;
+}
+
+.navbar .avatar-username {
+  font-weight: 500;
+  color: var(--bs-body-color);
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover .avatar-username {
+  color: var(--bs-primary);
+}
+
+/* Dropdown Specific Avatar Styling */
+.dropdown-menu .avatar-container {
+  margin-bottom: 0.5rem;
+}
+
+.dropdown-menu .avatar-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dropdown-menu .avatar-username {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--bs-heading-color);
+  line-height: 1.2;
+}
+
+.dropdown-menu .avatar-email {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  display: block;
+}
+
+/* Loading State */
+.avatar-loading {
+  background: linear-gradient(90deg, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%);
+  background-size: 200% 100%;
+  animation: avatar-pulse 1.5s infinite ease-in-out;
+  border-radius: 50%;
+  position: relative;
+}
+
+.avatar-loading::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  animation: avatar-shimmer 2s infinite ease-in-out;
+}
+
+.avatar-loaded {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Error State */
+.avatar-error {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.avatar-error:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  /* Hide username on small screens for compact display */
+  .avatar-container .avatar-username {
+    display: none;
+  }
+
+  /* Show username only in dropdowns on mobile */
+  .dropdown-menu .avatar-username {
+    display: block;
+  }
+
+  /* Adjust avatar sizes for mobile */
+  .avatar-container.avatar-lg {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .avatar-container.avatar-xl {
+    width: 48px;
+    height: 48px;
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 576px) {
+  /* Further reduce sizes on very small screens */
+  .avatar-container.avatar-md {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+
+  .avatar-container.avatar-lg {
+    width: 36px;
+    height: 36px;
+    font-size: 0.875rem;
+  }
+}
+
+/* Animations */
+@keyframes avatar-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes avatar-shimmer {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+/* Hover Effects */
+.avatar-container:hover img[data-avatar],
+.avatar-container:hover .avatar-initials {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* Focus States for Accessibility */
+.avatar-container:focus-within img[data-avatar],
+.avatar-container:focus-within .avatar-initials {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+/* Dark Theme Support */
+[data-theme="dark"] .avatar-container .avatar-username {
+  color: var(--bs-body-color);
+}
+
+[data-theme="dark"] .avatar-container .avatar-email {
+  color: var(--bs-secondary-color);
+}
+
+[data-theme="dark"] .avatar-container img[data-avatar] {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .avatar-container .avatar-initials {
+  border-color: rgba(255, 255, 255, 0.2);
+}

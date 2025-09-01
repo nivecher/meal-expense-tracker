@@ -1,4 +1,5 @@
 {# Main Navigation #}
+{% from 'macros/avatar_helpers.html' import user_avatar_navbar, user_avatar_dropdown %}
 <nav class="navbar navbar-expand-lg navbar-light sticky-top">
     <div class="container">
         <!-- Brand -->
@@ -181,6 +182,49 @@
                         <span>Reports</span>
                     </a>
                 </li>
+                {% if current_user.is_authenticated and current_user.is_admin %}
+                <li class="nav-item dropdown">
+                    <a
+                        class="nav-link dropdown-toggle {% if request.endpoint and 'admin' in request.endpoint %}active{% endif %}"
+                        href="#"
+                        id="adminDropdown"
+                        role="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false">
+                        <i class="fas fa-cog" aria-hidden="true"></i>
+                        <span>Admin</span>
+                    </a>
+                    <ul class="dropdown-menu" aria-labelledby="adminDropdown" role="menu">
+                        <li role="group">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}"
+                                href="{{ url_for('admin.dashboard') }}"
+                                role="menuitem">
+                                <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
+                                <span>Dashboard</span>
+                            </a>
+                        </li>
+                        <li role="group">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'admin.list_users' %}active{% endif %}"
+                                href="{{ url_for('admin.list_users') }}"
+                                role="menuitem">
+                                <i class="fas fa-users" aria-hidden="true"></i>
+                                <span>User Management</span>
+                            </a>
+                        </li>
+                        <li role="group">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'admin.create_user' %}active{% endif %}"
+                                href="{{ url_for('admin.create_user') }}"
+                                role="menuitem">
+                                <i class="fas fa-user-plus" aria-hidden="true"></i>
+                                <span>Create User</span>
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                {% endif %}
             </ul>
             <!-- Right-aligned navigation items -->
             <ul class="navbar-nav ms-auto">
@@ -194,41 +238,12 @@
                         role="button"
                         data-bs-toggle="dropdown"
                         aria-expanded="false">
-                        <div class="position-relative">
-                            <img
-                                src="{{ current_user.avatar_url or '' }}"
-                                alt="{{ current_user.username }}"
-                                class="rounded-circle"
-                                width="32"
-                                height="32"
-                                data-avatar
-                                data-username="{{ current_user.username }}"
-                                data-email="{{ current_user.email }}"
-                                data-initials="{{ current_user.get_initials() }}"
-                                data-default-src="{{ url_for('static', filename='img/default-avatar.png') }}" />
-                        </div>
-                        <span class="ms-2 d-none d-md-inline username">{{ current_user.username }}</span>
+                        {{ user_avatar_navbar(current_user) }}
                     </a>
                     <div class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown" role="menu">
                         <!-- User Info -->
                         <div class="user-info" role="none">
-                            <div class="d-flex align-items-center">
-                                <img
-                                    src="{{ current_user.avatar_url or '' }}"
-                                    alt="{{ current_user.username }}"
-                                    class="user-avatar me-3"
-                                    width="36"
-                                    height="36"
-                                    data-avatar
-                                    data-username="{{ current_user.username }}"
-                                    data-email="{{ current_user.email }}"
-                                    data-initials="{{ current_user.get_initials() }}"
-                                    data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}" />
-                                <div>
-                                    <div class="user-name">{{ current_user.username }}</div>
-                                    <div class="user-email">{{ current_user.email }}</div>
-                                </div>
-                            </div>
+                            {{ user_avatar_dropdown(current_user) }}
                         </div>
                         <div class="dropdown-divider" role="separator"></div>
                         <!-- Menu Items -->

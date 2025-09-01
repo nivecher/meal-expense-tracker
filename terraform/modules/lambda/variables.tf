@@ -285,6 +285,25 @@ variable "dynamodb_table_arn" {
   default     = ""
 }
 
+# Email Configuration
+variable "mail_enabled" {
+  description = "Enable email functionality via AWS SES"
+  type        = bool
+  default     = true
+}
+
+variable "mail_default_sender" {
+  description = "Default sender email address for AWS SES"
+  type        = string
+  default     = "noreply@nivecher.com"
+}
+
+variable "aws_ses_region" {
+  description = "AWS region for SES service"
+  type        = string
+  default     = "us-east-1"
+}
+
 # Tags
 variable "tags" {
   description = "A map of tags to add to all resources"

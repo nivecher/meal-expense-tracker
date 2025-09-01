@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+    {% from 'macros/tag_helpers.html' import tag_badge %}
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -24,6 +25,7 @@
             <link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/cuisine-badges.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
     </head>
     <body>
         {% include "includes/navbar.html" %}
@@ -182,6 +184,76 @@ include 'includes/breadcrumb.html' %}
 
     <!-- Active filters are now shown in the collapsible button above -->
 
+    <!-- Pagination Controls -->
+    {% if total_expenses > 0 %}
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <!-- Results Summary -->
+        <div class="d-flex align-items-center">
+            <span class="text-muted">
+                Showing {{ expenses|length }} of {{ total_expenses }} expense{{ 's' if total_expenses != 1 else '' }}
+                {% if total_amount > 0 %}
+                    (Total: ${{ "%.2f"|format(total_amount) }})
+                {% endif %}
+            </span>
+        </div>
+
+            <!-- Pagination Controls -->
+    <div class="d-flex align-items-center gap-3">
+        <!-- Items per page selector -->
+        <div class="d-flex align-items-center">
+            <label for="per_page" class="form-label mb-0 me-2 small text-muted">Show:</label>
+            <select id="per_page" name="per_page" class="form-select form-select-sm border-0 bg-light" style="width: auto; min-width: 80px;">
+                <option value="10" {{ 'selected' if per_page == 10 else '' }}>10</option>
+                <option value="25" {{ 'selected' if per_page == 25 else '' }}>25</option>
+                <option value="50" {{ 'selected' if per_page == 50 else '' }}>50</option>
+                <option value="100" {{ 'selected' if per_page == 100 else '' }}>100</option>
+                <option value="-1" {{ 'selected' if per_page == -1 else '' }}>All</option>
+            </select>
+        </div>
+
+        <!-- Page navigation (only show if paginated) -->
+        {% if per_page != -1 and total_pages > 1 %}
+        <div class="btn-group" role="group" aria-label="Page navigation">
+            <!-- Previous page -->
+            {% if page > 1 %}
+            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', page=page-1, per_page=per_page, q=search, meal_type=meal_type, category=category, start_date=start_date, end_date=end_date) }}" aria-label="Previous">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+            {% else %}
+            <button class="btn btn-outline-primary btn-sm" disabled>
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            {% endif %}
+
+            <!-- Page numbers -->
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == page %}
+                <button class="btn btn-primary btn-sm" disabled>{{ p }}</button>
+                {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
+                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', page=p, per_page=per_page, q=search, meal_type=meal_type, category=category, start_date=start_date, end_date=end_date) }}">{{ p }}</a>
+                {% elif p == 4 and page > 5 %}
+                <button class="btn btn-outline-primary btn-sm" disabled>...</button>
+                {% elif p == total_pages - 3 and page < total_pages - 4 %}
+                <button class="btn btn-outline-primary btn-sm" disabled>...</button>
+                {% endif %}
+            {% endfor %}
+
+            <!-- Next page -->
+            {% if page < total_pages %}
+            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', page=page+1, per_page=per_page, q=search, meal_type=meal_type, category=category, start_date=start_date, end_date=end_date) }}" aria-label="Next">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+            {% else %}
+            <button class="btn btn-outline-primary btn-sm" disabled>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    </div>
+    {% endif %}
+
     {% if expenses %}
     <!-- Card View (responsive grid) -->
     <div id="card-view-container" class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-3 mb-4">
@@ -231,7 +303,7 @@ include 'includes/breadcrumb.html' %}
                             </div>
                             {% if expense.meal_type %}
                             <div>
-                                <span class="meal-type-badge {{ expense.meal_type.lower().replace(' ', '-') }}">
+                                <span class="meal-type-badge {{ expense.meal_type|meal_type_css_class }}">
                                     <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
                                 </span>
                             </div>
@@ -248,6 +320,15 @@ include 'includes/breadcrumb.html' %}
                         <div class="text-muted">
                             <i class="fas fa-sticky-note me-1"></i>
                             <span class="fst-italic">{{ expense.notes|truncate(50, '...') }}</span>
+                        </div>
+                        {% endif %}
+
+                        <!-- Tags -->
+                        {% if expense.tags %}
+                        <div class="expense-tags">
+                            {% for tag in expense.tags %}
+                                {{ tag_badge(tag) }}
+                            {% endfor %}
                         </div>
                         {% endif %}
                     </div>
@@ -357,8 +438,8 @@ include 'includes/breadcrumb.html' %}
                                 <th data-sort="true" data-sort-type="text">Restaurant</th>
                                 <th data-sort="true" data-sort-type="text">Cuisine</th>
                                 <th data-sort="true" data-sort-type="text">Meal</th>
-                                <th data-sort="true" data-sort-type="currency">Amount</th>
                                 <th data-sort="true" data-sort-type="text">Category</th>
+                                <th data-sort="true" data-sort-type="currency">Amount</th>
                                 <th data-sort="true" data-sort-type="text">Notes</th>
                                 <th class="text-end">Actions</th>
                             </tr>
@@ -368,9 +449,9 @@ include 'includes/breadcrumb.html' %}
                         </tbody>
                         <tfoot class="table-secondary">
                             <tr>
-                                <td colspan="4" class="text-end fw-bold">Total:</td>
+                                <td colspan="5" class="text-end fw-bold">Total:</td>
                                 <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_amount) }}</td>
-                                <td colspan="3"></td>
+                                <td colspan="2"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -590,6 +671,24 @@ include 'includes/breadcrumb.html' %}
             } else {
                 return cell.textContent.trim().toLowerCase();
             }
+        }
+
+        // Handle per_page selector changes
+        const perPageSelector = document.getElementById("per_page");
+        if (perPageSelector) {
+            perPageSelector.addEventListener("change", function() {
+                const newPerPage = this.value;
+                const currentUrl = new URL(window.location);
+
+                // Update per_page parameter
+                currentUrl.searchParams.set("per_page", newPerPage);
+
+                // Reset to page 1 when changing per_page
+                currentUrl.searchParams.set("page", "1");
+
+                // Navigate to the new URL
+                window.location.href = currentUrl.toString();
+            });
         }
     });
 </script>

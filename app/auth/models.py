@@ -12,7 +12,7 @@ from app.extensions import LoginManager, db
 from app.models.base import BaseModel
 
 if TYPE_CHECKING:
-    from app.expenses.models import Category, Expense
+    from app.expenses.models import Category, Expense, Tag
     from app.restaurants.models import Restaurant
 
 
@@ -118,6 +118,13 @@ class User(BaseModel, UserMixin):
     )
     categories: Mapped[List["Category"]] = relationship(
         "Category",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    tags: Mapped[List["Tag"]] = relationship(
+        "Tag",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="dynamic",

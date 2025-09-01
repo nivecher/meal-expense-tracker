@@ -21,6 +21,7 @@
         <link href="{{ url_for('static', filename='css/components/navbar.css') }}" rel="stylesheet" />
         <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" />
         <link href="{{ url_for('static', filename='css/components/table.css') }}" rel="stylesheet" />
+        <link href="{{ url_for('static', filename='css/components/service-level-badges.css') }}" rel="stylesheet" />
     </head>
     <body>
         {% include "includes/navbar.html" %}
@@ -79,8 +80,34 @@ include 'includes/breadcrumb.html' %}
     </div>
 </div>
 
-<!-- View Toggle -->
-<div class="d-flex justify-content-end mb-3">
+<!-- Search & Filter + View Toggle Row -->
+{% set active_filters_count = (1 if search else 0) + (1 if cuisine else 0) + (1 if service_level else 0) + (1 if city else 0) + (1 if is_chain else 0) + (1 if rating_min else 0) + (1 if rating_max else 0) %}
+{% set show_filters = active_filters_count > 0 or request.args.get('filter_expanded') == '1' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <!-- Search & Filter Collapsible Button -->
+    <div class="d-flex align-items-center">
+        <button
+            class="btn btn-outline-primary d-flex align-items-center {% if active_filters_count %}border-primary{% endif %}"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#filterCollapse"
+            aria-expanded="{% if show_filters %}true{% else %}false{% endif %}"
+            aria-controls="filterCollapse">
+            <i class="fas fa-filter me-2"></i>
+            <span class="d-none d-sm-inline">Search & Filter</span>
+            <span class="d-sm-none">Filter</span>
+            {% if active_filters_count %}
+                <span class="badge bg-primary ms-2">{{ active_filters_count }}</span>
+            {% endif %}
+            <i class="fas {% if show_filters %}fa-chevron-up{% else %}fa-chevron-down{% endif %} ms-2"></i>
+        </button>
+        {% if active_filters_count %}
+            <span class="badge bg-secondary ms-2 d-none d-md-inline">{{ restaurants|length }} result{{ 's' if restaurants|length != 1 else '' }}</span>
+        {% endif %}
+    </div>
+
+    <!-- View Toggle -->
     <div class="btn-group" role="group" aria-label="View Toggle">
         <input type="radio" class="btn-check" name="view-type" id="card-view" autocomplete="off" checked />
         <label class="btn btn-outline-primary" for="card-view" id="card-view-label">
@@ -92,6 +119,171 @@ include 'includes/breadcrumb.html' %}
         </label>
     </div>
 </div>
+
+<!-- Collapsible Filter Form -->
+<div class="collapse {% if show_filters %}show{% endif %} mb-4" id="filterCollapse">
+    <div class="card">
+        <div class="card-body">
+            <form method="get" class="row g-3" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <!-- First Row -->
+                <div class="col-md-6">
+                    <label for="search" class="form-label">Search</label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="search"
+                        name="q"
+                        value="{{ search }}"
+                        placeholder="Search restaurants, cuisines, cities, or notes" />
+                </div>
+                <div class="col-md-3">
+                    <label for="cuisine" class="form-label">Cuisine</label>
+                    <select class="form-control" id="cuisine" name="cuisine">
+                        <option value="">All Cuisines</option>
+                        {% for cuisine_type in cuisines %}
+                        <option value="{{ cuisine_type }}" {{ 'selected' if cuisine == cuisine_type else '' }}>{{ cuisine_type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="service_level" class="form-label">Service Level</label>
+                    <select class="form-control" id="service_level" name="service_level">
+                        <option value="">All Service Levels</option>
+                        {% for level in service_levels %}
+                        <option value="{{ level }}" {{ 'selected' if service_level == level else '' }}>{{ level|replace('_', ' ')|title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <!-- Second Row -->
+                <div class="col-md-4">
+                    <label for="city" class="form-label">City</label>
+                    <select class="form-control" id="city" name="city">
+                        <option value="">All Cities</option>
+                        {% for city_name in cities %}
+                        <option value="{{ city_name }}" {{ 'selected' if city == city_name else '' }}>{{ city_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="is_chain" class="form-label">Chain</label>
+                    <select class="form-control" id="is_chain" name="is_chain">
+                        <option value="">All</option>
+                        <option value="true" {{ 'selected' if is_chain == 'true' else '' }}>Chain</option>
+                        <option value="false" {{ 'selected' if is_chain == 'false' else '' }}>Independent</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="rating_min" class="form-label">Min Rating</label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="rating_min"
+                        name="rating_min"
+                        min="1"
+                        max="5"
+                        step="0.1"
+                        value="{{ rating_min if rating_min and rating_min != 'None' else '' }}"
+                        placeholder="1.0" />
+                </div>
+                <div class="col-md-2">
+                    <label for="rating_max" class="form-label">Max Rating</label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="rating_max"
+                        name="rating_max"
+                        min="1"
+                        max="5"
+                        step="0.1"
+                        value="{{ rating_max if rating_max and rating_max != 'None' else '' }}"
+                        placeholder="5.0" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill" aria-label="Apply filters">
+                        <i class="fas fa-search me-1" aria-hidden="true"></i> Filter
+                    </button>
+                    <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary" aria-label="Clear all filters">
+                        <i class="fas fa-times me-1" aria-hidden="true"></i> Clear
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Pagination Controls -->
+{% if total_restaurants > 0 %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <!-- Results Summary -->
+    <div class="d-flex align-items-center">
+        <span class="text-muted">
+            Showing {{ restaurants|length }} of {{ total_restaurants }} restaurant{{ 's' if total_restaurants != 1 else '' }}
+            {% if total_spent > 0 %}
+                (Total Spent: ${{ "%.2f"|format(total_spent) }})
+            {% endif %}
+        </span>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div class="d-flex align-items-center gap-3">
+        <!-- Items per page selector -->
+        <div class="d-flex align-items-center">
+            <label for="per_page" class="form-label mb-0 me-2 small text-muted">Show:</label>
+            <select id="per_page" name="per_page" class="form-select form-select-sm border-0 bg-light" style="width: auto; min-width: 80px;">
+                <option value="10" {{ 'selected' if per_page == 10 else '' }}>10</option>
+                <option value="25" {{ 'selected' if per_page == 25 else '' }}>25</option>
+                <option value="50" {{ 'selected' if per_page == 50 else '' }}>50</option>
+                <option value="100" {{ 'selected' if per_page == 100 else '' }}>100</option>
+                <option value="-1" {{ 'selected' if per_page == -1 else '' }}>All</option>
+            </select>
+        </div>
+
+        <!-- Page navigation (only show if paginated) -->
+        {% if per_page != -1 and total_pages > 1 %}
+        <div class="btn-group" role="group" aria-label="Page navigation">
+            <!-- Previous page -->
+            {% if page > 1 %}
+            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('restaurants.list_restaurants', page=page-1, per_page=per_page, q=search, cuisine=cuisine, service_level=service_level, city=city, is_chain=is_chain, rating_min=rating_min, rating_max=rating_max) }}" aria-label="Previous">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+            {% else %}
+            <button class="btn btn-outline-primary btn-sm" disabled>
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            {% endif %}
+
+            <!-- Page numbers -->
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == page %}
+                <button class="btn btn-primary btn-sm" disabled>{{ p }}</button>
+                {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
+                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('restaurants.list_restaurants', page=p, per_page=per_page, q=search, cuisine=cuisine, service_level=service_level, city=city, is_chain=is_chain, rating_min=rating_min, rating_max=rating_max) }}">{{ p }}</a>
+                {% elif p == 4 and page > 5 %}
+                <button class="btn btn-outline-primary btn-sm" disabled>...</button>
+                {% elif p == total_pages - 3 and page < total_pages - 4 %}
+                <button class="btn btn-outline-primary btn-sm" disabled>...</button>
+                {% endif %}
+            {% endfor %}
+
+            <!-- Next page -->
+            {% if page < total_pages %}
+            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('restaurants.list_restaurants', page=page+1, per_page=per_page, q=search, cuisine=cuisine, service_level=service_level, city=city, is_chain=is_chain, rating_min=rating_min, rating_max=rating_max) }}" aria-label="Next">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+            {% else %}
+            <button class="btn btn-outline-primary btn-sm" disabled>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Restaurant List -->
 {% if restaurants %}
     <!-- Card View (responsive grid) -->
@@ -112,7 +304,10 @@ include 'includes/breadcrumb.html' %}
                                         class="restaurant-favicon"
                                         width="32"
                                         height="32"
+                                        loading="lazy"
                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                                        onload="this.style.opacity='1';"
+                                        style="opacity: 0; transition: opacity 0.2s;"
                                     />
                                     <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px;"></i>
                                 {% else %}
@@ -120,7 +315,7 @@ include 'includes/breadcrumb.html' %}
                                 {% endif %}
                             </div>
 
-                            <!-- Title -->
+                            <!-- Title and Cuisine -->
                             <div>
                                 <h5 class="card-title mb-1">
                                     <a
@@ -131,21 +326,26 @@ include 'includes/breadcrumb.html' %}
                                         >{{ restaurant.name }}</a
                                     >
                                 </h5>
+                                {% if restaurant.cuisine %}
+                                <div class="mt-1">
+                                    <span class="badge bg-light text-dark border" style="font-size: 0.75rem;">
+                                        <i class="fas fa-utensils me-1 text-muted"></i>{{ restaurant.cuisine }}
+                                    </span>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
 
-                        <!-- Right side: Rating and Cuisine Badge -->
+                        <!-- Right side: Rating and Service Level -->
                         <div class="d-flex flex-column align-items-end">
                             {% if restaurant.rating %}
-                            <span class="badge bg-warning text-dark mb-2">
+                            <span class="badge bg-warning text-dark mb-1">
                                 <i class="fas fa-star"></i> {{ "%.1f"|format(restaurant.rating) }}
                             </span>
                             {% endif %}
-                            {% if restaurant.cuisine %}
-                            <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
-                                <span class="badge bg-light text-dark border">
-                                    <i class="fas fa-utensils me-1 text-muted"></i>{{ restaurant.cuisine }}
-                                </span>
+                            {% if restaurant.service_level %}
+                                                            <span class="service-level-badge-sm" data-service-level="{{ restaurant.service_level }}">
+                                <i class="fas fa-concierge-bell"></i> {{ restaurant.service_level|replace('_', ' ')|title }}
                             </span>
                             {% endif %}
                         </div>
@@ -306,10 +506,11 @@ include 'includes/breadcrumb.html' %}
                             <tr>
                                 <th data-sort="true" data-sort-type="text">Name</th>
                                 <th data-sort="true" data-sort-type="text">Location</th>
+                                <th data-sort="true" data-sort-type="text">Service Level</th>
                                 <th data-sort="true" data-sort-type="number">Visits</th>
-                                <th data-sort="true" data-sort-type="currency">Total Spent</th>
-                                <th data-sort="true" data-sort-type="number">Rating</th>
                                 <th data-sort="true" data-sort-type="date">Last Visit</th>
+                                <th data-sort="true" data-sort-type="number">Rating</th>
+                                <th data-sort="true" data-sort-type="currency">Total Spent</th>
                                 <th class="text-end">Actions</th>
                             </tr>
                         </thead>
@@ -321,9 +522,9 @@ include 'includes/breadcrumb.html' %}
                         </tbody>
                         <tfoot class="table-secondary">
                             <tr>
-                                <td colspan="3" class="text-end fw-bold">Total:</td>
+                                <td colspan="6" class="text-end fw-bold">Total:</td>
                                 <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_spent) if total_spent is defined else '0.00' }}</td>
-                                <td colspan="3"></td>
+                                <td></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -546,6 +747,24 @@ include 'includes/breadcrumb.html' %}
             } else {
                 return cell.textContent.trim().toLowerCase();
             }
+        }
+
+        // Handle per_page selector changes
+        const perPageSelector = document.getElementById("per_page");
+        if (perPageSelector) {
+            perPageSelector.addEventListener("change", function() {
+                const newPerPage = this.value;
+                const currentUrl = new URL(window.location);
+
+                // Update per_page parameter
+                currentUrl.searchParams.set("per_page", newPerPage);
+
+                // Reset to page 1 when changing per_page
+                currentUrl.searchParams.set("page", "1");
+
+                // Navigate to the new URL
+                window.location.href = currentUrl.toString();
+            });
         }
     });
 </script>

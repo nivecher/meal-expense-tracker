@@ -1,3 +1,4 @@
+{% from 'macros/tag_helpers.html' import tag_badge %}
 <tr>
     <td>
         <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
@@ -42,7 +43,7 @@
     <td>
         <div class="d-flex align-items-center">
             {% if expense.meal_type %}
-                <span class="meal-type-badge compact {{ expense.meal_type.lower().replace(' ', '-') }}">
+                <span class="meal-type-badge compact {{ expense.meal_type|meal_type_css_class }}">
                     <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
                 </span>
             {% else %}
@@ -50,11 +51,11 @@
             {% endif %}
         </div>
     </td>
-    <td class="fw-bold text-success amount-right">${{ "%.2f"|format(expense.amount) }}</td>
     <td>
         {% from 'macros/category_helpers.html' import category_badge %}
         {{ category_badge(expense.category, compact=true) }}
     </td>
+    <td class="fw-bold text-success amount-right">${{ "%.2f"|format(expense.amount) }}</td>
     <td>
         {% if expense.notes %}
             <span class="text-muted small" title="{{ expense.notes }}">
@@ -62,6 +63,15 @@
             </span>
         {% else %}
             <span class="text-muted">-</span>
+        {% endif %}
+
+        <!-- Tags -->
+        {% if expense.tags %}
+            <div class="table-tags mt-1">
+                {% for tag in expense.tags %}
+                    {{ tag_badge(tag, compact=true) }}
+                {% endfor %}
+            </div>
         {% endif %}
     </td>
     <td class="text-end">

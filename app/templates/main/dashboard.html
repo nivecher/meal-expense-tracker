@@ -145,7 +145,10 @@
                                                             class="restaurant-favicon"
                                                             width="28"
                                                             height="28"
+                                                            loading="lazy"
                                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                                                            onload="this.style.opacity='1';"
+                                                            style="opacity: 0; transition: opacity 0.2s;"
                                                         />
                                                         <i class="fas fa-store text-muted restaurant-fallback-icon" style="display: none;"></i>
                                                     {% else %}
@@ -214,7 +217,10 @@
                                                             class="restaurant-favicon"
                                                             width="28"
                                                             height="28"
+                                                            loading="lazy"
                                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                                                            onload="this.style.opacity='1';"
+                                                            style="opacity: 0; transition: opacity 0.2s;"
                                                         />
                                                         <i class="fas fa-store-alt text-muted restaurant-fallback-icon" style="display: none;"></i>
                                                     {% else %}

@@ -10,6 +10,7 @@ from wtforms import (
     DateField,
     DecimalField,
     SelectField,
+    StringField,
     SubmitField,
     TextAreaField,
     ValidationError,
@@ -110,6 +111,17 @@ class ExpenseForm(FlaskForm):
         validators=[Optional()],
     )
     notes = TextAreaField("Notes", validators=[Optional()], render_kw={"rows": 3})
+
+    # Tags field for custom labels
+    tags = StringField(
+        "Tags",
+        validators=[Optional()],
+        render_kw={
+            "class": "form-control",
+            "placeholder": "Enter tags separated by commas (e.g., business, travel, urgent)",
+            "data-tags-input": "true",
+        },
+    )
 
 
 class ExpenseImportForm(FlaskForm):

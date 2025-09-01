@@ -122,11 +122,12 @@ resource "aws_apigatewayv2_api" "main" {
       "DELETE",
     ]
 
-    # Headers needed for Flask forms and sessions (CSRF disabled for Lambda)
+    # Headers needed for Flask forms and sessions (including CSRF protection)
     allow_headers = [
       "Content-Type",
       "Authorization",
       "X-Requested-With",
+      "X-CSRFToken",
       "Accept",
       "Origin",
       "Cache-Control"
@@ -135,7 +136,8 @@ resource "aws_apigatewayv2_api" "main" {
     # Headers to expose to JavaScript
     expose_headers = [
       "Content-Length",
-      "Content-Type"
+      "Content-Type",
+      "X-CSRFToken"
     ]
 
     # REQUIRED for Flask sessions/cookies to work (even with DynamoDB)

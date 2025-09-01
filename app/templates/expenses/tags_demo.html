@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block title %}Custom Tags Demo - Meal Expense Tracker{% endblock title %}
+
+{% block styles %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tags.css') }}">
+    <style>
+        .demo-section {
+            margin-bottom: 3rem;
+            padding: 2rem;
+            border: 1px solid #e9ecef;
+            border-radius: 0.5rem;
+            background-color: #f8f9fa;
+        }
+
+        .demo-section h3 {
+            color: #495057;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 0.5rem;
+        }
+
+        .demo-example {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.375rem;
+            border: 1px solid #dee2e6;
+            margin-bottom: 1rem;
+        }
+
+        .demo-example h4 {
+            color: #6c757d;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .interactive-demo {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-list li::before {
+            content: "✓";
+            color: #198754;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .color-palette {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .color-sample {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+    </style>
+{% endblock styles %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-4">
+                <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary btn-sm me-3">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+                <h1 class="mb-0">Custom Tags Demo</h1>
+            </div>
+
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                This demo showcases the custom tags feature with Jira-style labels for organizing expenses.
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Overview -->
+    <div class="demo-section">
+        <h3><i class="fas fa-star me-2"></i>Key Features</h3>
+        <div class="row">
+            <div class="col-md-6">
+                <ul class="feature-list">
+                    <li><strong>Dynamic Tag Creation:</strong> Create tags on-the-fly while adding expenses</li>
+                    <li><strong>Jira-Style Naming:</strong> Automatic normalization to lowercase with hyphens</li>
+                    <li><strong>Color-Coded Badges:</strong> Each tag gets a unique color for easy identification</li>
+                    <li><strong>Auto-Complete:</strong> Smart suggestions based on existing tags</li>
+                    <li><strong>Persistent Storage:</strong> Tags are saved and available across sessions</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <ul class="feature-list">
+                    <li><strong>Multi-Select:</strong> Add multiple tags to a single expense</li>
+                    <li><strong>Search & Filter:</strong> Find expenses by tags</li>
+                    <li><strong>User-Specific:</strong> Each user has their own tag collection</li>
+                    <li><strong>Responsive Design:</strong> Works seamlessly on mobile and desktop</li>
+                    <li><strong>Keyboard Navigation:</strong> Full keyboard support for accessibility</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive Demo -->
+    <div class="demo-section">
+        <h3><i class="fas fa-play me-2"></i>Interactive Demo</h3>
+        <div class="interactive-demo">
+            <h4>Try the Tags Input</h4>
+            <p class="text-muted mb-3">
+                Type in the field below to see the tags input in action. Try typing "business", "travel", or "urgent" to see suggestions.
+            </p>
+
+            <div class="mb-3">
+                <label for="demoTagsInput" class="form-label">Tags Input Demo</label>
+                <div id="demoTagsInput" data-tags-input="true"></div>
+                <div class="form-text">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Press Enter to add tags, Backspace to remove, Arrow keys to navigate suggestions
+                    </small>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="addSampleTags()">
+                    <i class="fas fa-plus me-1"></i>Add Sample Tags
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" onclick="clearTags()">
+                    <i class="fas fa-trash me-1"></i>Clear All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tag Examples -->
+    <div class="demo-section">
+        <h3><i class="fas fa-tags me-2"></i>Tag Examples</h3>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="demo-example">
+                    <h4>Business Tags</h4>
+                    <div class="mb-2">
+                        <span class="tag-badge tag-color-blue">business</span>
+                        <span class="tag-badge tag-color-green">client-meeting</span>
+                        <span class="tag-badge tag-color-red">urgent</span>
+                        <span class="tag-badge tag-color-yellow">expense-report</span>
+                    </div>
+                    <small class="text-muted">Common tags for business expenses</small>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="demo-example">
+                    <h4>Personal Tags</h4>
+                    <div class="mb-2">
+                        <span class="tag-badge tag-color-purple">personal</span>
+                        <span class="tag-badge tag-color-orange">celebration</span>
+                        <span class="tag-badge tag-color-teal">healthy</span>
+                        <span class="tag-badge tag-color-pink">splurge</span>
+                    </div>
+                    <small class="text-muted">Tags for personal expense tracking</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="demo-example">
+                    <h4>Travel Tags</h4>
+                    <div class="mb-2">
+                        <span class="tag-badge tag-color-indigo">travel</span>
+                        <span class="tag-badge tag-color-cyan">vacation</span>
+                        <span class="tag-badge tag-color-lime">work-trip</span>
+                        <span class="tag-badge tag-color-gray">airport-food</span>
+                    </div>
+                    <small class="text-muted">Tags for travel-related expenses</small>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="demo-example">
+                    <h4>Meal Type Tags</h4>
+                    <div class="mb-2">
+                        <span class="tag-badge tag-color-orange">breakfast</span>
+                        <span class="tag-badge tag-color-teal">lunch</span>
+                        <span class="tag-badge tag-color-purple">dinner</span>
+                        <span class="tag-badge tag-color-yellow">coffee</span>
+                    </div>
+                    <small class="text-muted">Tags for different meal types</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Color Palette -->
+    <div class="demo-section">
+        <h3><i class="fas fa-palette me-2"></i>Available Colors</h3>
+        <p class="text-muted mb-3">Tags automatically get assigned one of these colors for easy visual identification:</p>
+
+        <div class="color-palette">
+            <div class="color-sample" style="background-color: #0d6efd;">P</div>
+            <div class="color-sample" style="background-color: #6c757d;">S</div>
+            <div class="color-sample" style="background-color: #198754;">G</div>
+            <div class="color-sample" style="background-color: #dc3545;">R</div>
+            <div class="color-sample" style="background-color: #ffc107; color: #000;">Y</div>
+            <div class="color-sample" style="background-color: #0dcaf0;">C</div>
+            <div class="color-sample" style="background-color: #6f42c1;">P</div>
+            <div class="color-sample" style="background-color: #d63384;">P</div>
+            <div class="color-sample" style="background-color: #fd7e14;">O</div>
+            <div class="color-sample" style="background-color: #20c997;">T</div>
+            <div class="color-sample" style="background-color: #6610f2;">I</div>
+            <div class="color-sample" style="background-color: #84ca50;">L</div>
+        </div>
+
+        <small class="text-muted">
+            <i class="fas fa-info-circle me-1"></i>
+            Colors are automatically assigned when creating new tags
+        </small>
+    </div>
+
+    <!-- Usage Examples -->
+    <div class="demo-section">
+        <h3><i class="fas fa-lightbulb me-2"></i>Usage Examples</h3>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="demo-example">
+                    <h4>Business Expense Tracking</h4>
+                    <p class="small text-muted mb-2">Tag business meals for expense reports:</p>
+                    <div class="mb-2">
+                        <span class="tag-badge tag-color-blue">business</span>
+                        <span class="tag-badge tag-color-green">client-meeting</span>
+                        <span class="tag-badge tag-color-red">urgent</span>
+                    </div>
+                    <small class="text-muted">Example: "Lunch with client - $45.00"</small>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="demo-example">
+                    <h4>Personal Budget Categories</h4>
+                    <p class="small text-muted mb-2">Categorize personal spending:</p>
+                    <div class="mb-2">
+                        <span class="tag-badge tag-color-purple">personal</span>
+                        <span class="tag-badge tag-color-orange">celebration</span>
+                        <span class="tag-badge tag-color-teal">healthy</span>
+                    </div>
+                    <small class="text-muted">Example: "Birthday dinner - $85.00"</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="demo-example">
+                    <h4>Travel Expense Management</h4>
+                    <p class="small text-muted mb-2">Track travel-related expenses:</p>
+                    <div class="mb-2">
+                        <span class="tag-badge tag-color-indigo">travel</span>
+                        <span class="tag-badge tag-color-cyan">vacation</span>
+                        <span class="tag-badge tag-color-gray">airport-food</span>
+                    </div>
+                    <small class="text-muted">Example: "Airport lunch - $22.50"</small>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="demo-example">
+                    <h4>Health & Wellness Tracking</h4>
+                    <p class="small text-muted mb-2">Monitor healthy eating habits:</p>
+                    <div class="mb-2">
+                        <span class="tag-badge tag-color-teal">healthy</span>
+                        <span class="tag-badge tag-color-lime">organic</span>
+                        <span class="tag-badge tag-color-yellow">vegetarian</span>
+                    </div>
+                    <small class="text-muted">Example: "Organic salad - $18.75"</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How to Use -->
+    <div class="demo-section">
+        <h3><i class="fas fa-question-circle me-2"></i>How to Use</h3>
+        <div class="row">
+            <div class="col-md-8">
+                <ol class="mb-3">
+                    <li><strong>Adding Tags:</strong> Type in the tags field and press Enter to create new tags</li>
+                    <li><strong>Auto-Complete:</strong> Existing tags will appear as suggestions as you type</li>
+                    <li><strong>Multiple Tags:</strong> Add several tags to a single expense for better organization</li>
+                    <li><strong>Removing Tags:</strong> Click the × button on any tag to remove it</li>
+                    <li><strong>Keyboard Navigation:</strong> Use Arrow keys to navigate suggestions, Escape to close</li>
+                </ol>
+
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Note:</strong> Tags are automatically normalized to lowercase with hyphens (e.g., "Business Lunch" becomes "business-lunch")
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-keyboard me-2"></i>Keyboard Shortcuts</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0">
+                            <li><kbd>Enter</kbd> Add tag</li>
+                            <li><kbd>Backspace</kbd> Remove last tag</li>
+                            <li><kbd>↑↓</kbd> Navigate suggestions</li>
+                            <li><kbd>Escape</kbd> Close suggestions</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/components/tags-input.js') }}"></script>
+    <script>
+        let demoTagsInput;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize demo tags input
+            const container = document.getElementById('demoTagsInput');
+            if (container) {
+                demoTagsInput = new TagsInput(container, {
+                    apiEndpoint: '/expenses/tags',
+                    searchEndpoint: '/expenses/tags/search',
+                    createEndpoint: '/expenses/tags'
+                });
+            }
+        });
+
+        function addSampleTags() {
+            if (demoTagsInput) {
+                const sampleTags = ['business', 'travel', 'urgent', 'client-meeting'];
+                sampleTags.forEach(tag => {
+                    demoTagsInput.addTag(tag);
+                });
+            }
+        }
+
+        function clearTags() {
+            if (demoTagsInput) {
+                demoTagsInput.clear();
+            }
+        }
+    </script>
+{% endblock scripts %}

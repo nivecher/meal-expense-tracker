@@ -67,6 +67,11 @@ def get_or_create_app() -> Flask:
             # Validate session configuration for Lambda environment
             _validate_session_config(_APP_INSTANCE)
 
+            # Initialize migration manager
+            from app.utils.migration_manager import init_migration_manager
+
+            init_migration_manager(_APP_INSTANCE)
+
         except Exception as e:
             logger.exception("Failed to create Flask application")
             raise RuntimeError(f"Failed to initialize application: {str(e)}")
@@ -187,16 +192,25 @@ def handle_migration(app: Flask) -> Dict[str, Any]:
     Returns:
         Dict with operation results
     """
-    from flask_migrate import upgrade
+    from app.utils.migration_manager import migration_manager
 
     try:
         with app.app_context():
-            upgrade()
-            return {
-                "statusCode": 200,
-                "body": json.dumps({"message": "Database migrations applied successfully"}),
-                "headers": {"Content-Type": "application/json"},
-            }
+            # Use the migration manager for safe migrations
+            result = migration_manager.run_migrations()
+
+            if result["success"]:
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps({"message": result["message"], "data": result.get("data", {})}),
+                    "headers": {"Content-Type": "application/json"},
+                }
+            else:
+                return {
+                    "statusCode": 500,
+                    "body": json.dumps({"error": result["message"]}),
+                    "headers": {"Content-Type": "application/json"},
+                }
     except Exception as e:
         logger.exception("Database migration failed")
         return {
@@ -433,32 +447,28 @@ def _process_awsgi_response(response: Dict[str, Any]) -> Dict[str, str]:
     return headers
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Handle Lambda events from API Gateway v1.0 (REST API) or v2.0 (HTTP API).
+def _run_auto_migration() -> None:
+    """Run auto-migration on first request if enabled."""
+    if not hasattr(lambda_handler, "_migration_checked"):
+        try:
+            from app.utils.migration_manager import migration_manager
 
-    Args:
-        event: The Lambda event
-        context: The Lambda context object (not used but required by Lambda)
+            # Only run auto-migration on the first request to avoid performance impact
+            migration_result = migration_manager.auto_migrate()
+            if migration_result.get("success"):
+                logger.info(f"Auto-migration: {migration_result['message']}")
+            else:
+                logger.warning(f"Auto-migration failed: {migration_result.get('message', 'Unknown error')}")
 
-    Returns:
-        dict: Response in appropriate API Gateway format
-    """
-    _ = context  # Mark as unused
+        except Exception as e:
+            logger.warning(f"Auto-migration error (non-critical): {e}")
 
-    # Handle direct invocation for database operations
-    if "operation" in event:
-        return _handle_database_operation(event)
+        # Mark as checked to avoid running on every request
+        lambda_handler._migration_checked = True
 
-    # Handle admin operations
-    if "admin_operation" in event:
-        return _handle_admin_operation(event)
 
-    # Validate referrer for security (before processing HTTP requests)
-    referrer_error = _validate_referrer(event)
-    if referrer_error:
-        return referrer_error
-
-    # Handle HTTP API events (both v1.0 and v2.0 formats)
+def _handle_http_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+    """Handle HTTP API events."""
     app = get_or_create_app()
 
     try:
@@ -466,8 +476,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
         if http_method == "OPTIONS":
             return _handle_cors_preflight()
+
         # Convert API Gateway v2.0 format to v1.0 format if needed
-        # v2.0 uses 'requestContext.http.method' while v1.0 uses 'httpMethod'
         if "httpMethod" not in event and "requestContext" in event:
             http_context = event.get("requestContext", {})
             if "http" in http_context:
@@ -476,7 +486,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 logger.info("Converted API Gateway v2.0 event to v1.0 format")
 
         # Use awsgi for HTTP request handling
-        # Include additional content types that might need base64 encoding
         response = awsgi.response(
             app,
             event,
@@ -521,3 +530,35 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "headers": error_headers,
             "isBase64Encoded": False,
         }
+
+
+def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+    """Handle Lambda events from API Gateway v1.0 (REST API) or v2.0 (HTTP API).
+
+    Args:
+        event: The Lambda event
+        context: The Lambda context object (not used but required by Lambda)
+
+    Returns:
+        dict: Response in appropriate API Gateway format
+    """
+    _ = context  # Mark as unused
+
+    # Handle direct invocation for database operations
+    if "operation" in event:
+        return _handle_database_operation(event)
+
+    # Handle admin operations
+    if "admin_operation" in event:
+        return _handle_admin_operation(event)
+
+    # Auto-migrate on first request (if enabled)
+    _run_auto_migration()
+
+    # Validate referrer for security (before processing HTTP requests)
+    referrer_error = _validate_referrer(event)
+    if referrer_error:
+        return referrer_error
+
+    # Handle HTTP API events
+    return _handle_http_request(event, context)

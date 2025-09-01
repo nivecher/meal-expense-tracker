@@ -31,13 +31,60 @@ from app.restaurants.models import Restaurant
 from app.restaurants.services import calculate_expense_stats
 from app.utils.decorators import admin_required
 
+# Constants
+PER_PAGE = 10  # Number of restaurants per page
+SHOW_ALL = -1  # Special value to show all restaurants
+
 
 @bp.route("/")
 @login_required
 def list_restaurants():
-    """Show a list of all restaurants."""
+    """Show a list of all restaurants with pagination."""
+    # Get pagination parameters with type hints
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", PER_PAGE, type=int)
+
+    # Get all restaurants and stats
     restaurants, stats = services.get_restaurants_with_stats(current_user.id, request.args)
-    return render_template("restaurants/list.html", restaurants=restaurants, total_spent=stats.get("total_spent", 0))
+
+    # Handle pagination or show all
+    total_restaurants = len(restaurants)
+    if per_page == SHOW_ALL:
+        # Show all restaurants without pagination
+        paginated_restaurants = restaurants
+        total_pages = 1
+        page = 1
+    else:
+        # Calculate pagination with bounds checking
+        total_pages = max(1, (total_restaurants + per_page - 1) // per_page) if total_restaurants else 1
+        page = max(1, min(page, total_pages))  # Ensure page is within bounds
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_restaurants = restaurants[start_idx:end_idx]
+
+    # Get filter options for the filter form
+    filter_options = services.get_filter_options(current_user.id)
+
+    # Extract current filter values
+    filters = services.get_restaurant_filters(request.args)
+
+    return render_template(
+        "restaurants/list.html",
+        restaurants=paginated_restaurants,
+        total_spent=stats.get("total_spent", 0),
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+        total_restaurants=total_restaurants,
+        search=filters["search"],
+        cuisine=filters["cuisine"],
+        service_level=filters["service_level"],
+        city=filters["city"],
+        is_chain=filters["is_chain"],
+        rating_min=filters["rating_min"],
+        rating_max=filters["rating_max"],
+        **filter_options,
+    )
 
 
 @bp.route("/add", methods=["GET", "POST"])
@@ -522,6 +569,22 @@ def _prepare_restaurant_form(data, csrf_token):
         current_app.logger.error(error_msg)
         return None, (jsonify({"success": False, "message": error_msg}), 400)
 
+    # Detect service level from Google Places data if available
+    service_level = None
+    if any(key in data for key in ["price_level", "types", "rating", "user_ratings_total"]):
+        from app.restaurants.services import detect_service_level_from_google_data
+
+        google_places_data = {
+            "price_level": data.get("price_level"),
+            "types": data.get("types", []),
+            "rating": data.get("rating"),
+            "user_ratings_total": data.get("user_ratings_total"),
+        }
+
+        detected_level, confidence = detect_service_level_from_google_data(google_places_data)
+        if confidence > 0.3:  # Only use if confidence is reasonable
+            service_level = detected_level
+
     form_data = {
         "name": data.get("name", ""),
         "address": data.get("formatted_address") or data.get("address", ""),
@@ -532,6 +595,7 @@ def _prepare_restaurant_form(data, csrf_token):
         "phone": data.get("formatted_phone_number") or data.get("phone", ""),
         "website": data.get("website", ""),
         "google_place_id": data.get("place_id") or data.get("google_place_id", ""),
+        "service_level": service_level,
         # Note: coordinates would be looked up dynamically from Google Places API
         "csrf_token": csrf_token,
     }
@@ -861,6 +925,21 @@ def find_by_google_place():
                     if address_type in address_components:
                         address_components[address_type] = component["long_name"]
 
+        # Detect service level from Google Places data
+        from app.restaurants.services import (
+            detect_service_level_from_google_data,
+            get_service_level_display_info,
+        )
+
+        google_places_data = {
+            "price_level": result.get("priceLevel"),
+            "types": result.get("types", []),
+            "rating": result.get("rating"),
+            "user_ratings_total": result.get("userRatingsTotal"),
+        }
+
+        service_level, confidence = detect_service_level_from_google_data(google_places_data)
+
         # Build the response
         response = {
             "name": result.get("name", ""),
@@ -872,10 +951,13 @@ def find_by_google_place():
             "phone": result.get("formatted_phone_number", ""),
             "website": result.get("website", ""),
             "google_place_id": place_id,
-            # Note: coordinates, rating, price_level would be looked up dynamically from Google Places API
             "rating": result.get("rating"),
             "price_level": result.get("priceLevel"),
             "types": result.get("types", []),
+            "service_level": service_level,
+            "service_level_display": get_service_level_display_info(service_level)["display_name"],
+            "service_level_description": get_service_level_display_info(service_level)["description"],
+            "service_level_confidence": round(confidence, 2),
         }
 
         return jsonify(response)

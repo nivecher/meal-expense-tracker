@@ -1,0 +1,203 @@
+{% extends "admin/base.html" %}
+
+{% block page_actions %}
+<div class="btn-group" role="group">
+    <a href="{{ url_for('admin.list_users') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>
+        Back to Users
+    </a>
+</div>
+{% endblock %}
+
+{% block admin_content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-plus me-2"></i>Create New User
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="username" name="username"
+                                       required maxlength="64" placeholder="Enter username">
+                                <div class="form-text">Must be unique and at least 3 characters long.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="email" name="email"
+                                       required maxlength="120" placeholder="Enter email address">
+                                <div class="form-text">Must be a valid email address.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="first_name" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name"
+                                       maxlength="64" placeholder="Enter first name">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="last_name" class="form-label">Last Name</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name"
+                                       maxlength="64" placeholder="Enter last name">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Account Settings</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin">
+                                    <label class="form-check-label" for="is_admin">
+                                        <i class="fas fa-user-shield me-1"></i>
+                                        Grant admin privileges
+                                    </label>
+                                    <div class="form-text">Admin users can access the admin panel and manage other users.</div>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+                                    <label class="form-check-label" for="is_active">
+                                        <i class="fas fa-user-check me-1"></i>
+                                        Account is active
+                                    </label>
+                                    <div class="form-text">Inactive users cannot log in to the system.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Password Options</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="send_password_email" name="send_password_email" checked>
+                                    <label class="form-check-label" for="send_password_email">
+                                        <i class="fas fa-envelope me-1"></i>
+                                        Send password via email
+                                    </label>
+                                    <div class="form-text">A secure password will be generated and sent to the user's email.</div>
+                                </div>
+                                <div class="alert alert-info mt-2">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <strong>Note:</strong> A secure random password will be automatically generated for the new user.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('admin.list_users') }}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i>
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-user-plus me-1"></i>
+                            Create User
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Help Information -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-question-circle me-2"></i>Help
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-user-shield me-1"></i>Admin Privileges</h6>
+                        <p class="text-muted small">
+                            Admin users have access to the admin panel where they can:
+                        </p>
+                        <ul class="text-muted small">
+                            <li>View and manage all users</li>
+                            <li>Reset user passwords</li>
+                            <li>Grant or revoke admin privileges</li>
+                            <li>Activate or deactivate accounts</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-key me-1"></i>Password Security</h6>
+                        <p class="text-muted small">
+                            When creating a new user:
+                        </p>
+                        <ul class="text-muted small">
+                            <li>A secure random password is generated</li>
+                            <li>The password is hashed before storage</li>
+                            <li>You can choose to email the password to the user</li>
+                            <li>Users can change their password after first login</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    const form = document.querySelector('form');
+    const usernameInput = document.getElementById('username');
+    const emailInput = document.getElementById('email');
+
+    // Username validation
+    usernameInput.addEventListener('input', function() {
+        const username = this.value.trim();
+        if (username.length > 0 && username.length < 3) {
+            this.setCustomValidity('Username must be at least 3 characters long');
+        } else {
+            this.setCustomValidity('');
+        }
+    });
+
+    // Email validation
+    emailInput.addEventListener('input', function() {
+        const email = this.value.trim();
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (email.length > 0 && !emailRegex.test(email)) {
+            this.setCustomValidity('Please enter a valid email address');
+        } else {
+            this.setCustomValidity('');
+        }
+    });
+
+    // Form submission confirmation
+    form.addEventListener('submit', function(e) {
+        const isAdmin = document.getElementById('is_admin').checked;
+        const sendEmail = document.getElementById('send_password_email').checked;
+
+        let message = 'Are you sure you want to create this user?';
+        if (isAdmin) {
+            message += '\n\nThis user will have admin privileges.';
+        }
+        if (sendEmail) {
+            message += '\n\nA password will be sent to their email address.';
+        }
+
+        if (!confirm(message)) {
+            e.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

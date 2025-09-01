@@ -20,6 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.auth.models import User
 from app.extensions import db
+from app.restaurants.models import Restaurant
 
 logger = logging.getLogger(__name__)
 
@@ -708,6 +709,24 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
     description = "Validate restaurant information against Google Places API and optionally fix mismatches"
     requires_confirmation = False
 
+    def _build_street_address_from_components(self, address_components: list[dict]) -> str:
+        """Build street address from Google Places address components."""
+        street_number = next(
+            (comp.get("long_name") for comp in address_components if "street_number" in comp.get("types", [])),
+            None,
+        )
+        route = next(
+            (comp.get("long_name") for comp in address_components if "route" in comp.get("types", [])),
+            None,
+        )
+        return " ".join(filter(None, [street_number, route]))
+
+    def _detect_service_level_from_google_data(self, google_data: dict) -> tuple[str, float]:
+        """Detect service level from Google Places data."""
+        from app.restaurants.services import detect_service_level_from_google_data
+
+        return detect_service_level_from_google_data(google_data)
+
     def validate_params(self, **kwargs) -> Dict[str, Any]:
         """Validate restaurant validation parameters."""
         errors = []
@@ -730,6 +749,10 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
         fix_mismatches = kwargs.get("fix_mismatches", False)
         if not isinstance(fix_mismatches, bool):
             errors.append("fix_mismatches must be a boolean")
+
+        update_service_levels = kwargs.get("update_service_levels", False)
+        if not isinstance(update_service_levels, bool):
+            errors.append("update_service_levels must be a boolean")
 
         dry_run = kwargs.get("dry_run", False)
         if not isinstance(dry_run, bool):
@@ -842,6 +865,7 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
                     "international_phone_number",
                     "price_level",
                     "editorial_summary",
+                    "address_component",
                 ],
             )
 
@@ -857,6 +881,10 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
                     "google_phone": google_data.get("international_phone_number"),
                     "google_website": google_data.get("website"),
                     "google_price_level": google_data.get("price_level"),
+                    "google_street_address": self._build_street_address_from_components(
+                        google_data.get("address_component", [])
+                    ),
+                    "google_service_level": self._detect_service_level_from_google_data(google_data),
                     "errors": [],
                 }
             elif place and "status" in place:
@@ -877,7 +905,7 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
     ) -> tuple[List[str], Dict[str, str]]:
         """Check for mismatches between restaurant data and Google data."""
         google_name = validation_result.get("google_name")
-        google_address = validation_result.get("google_address")
+        google_street_address = validation_result.get("google_street_address")
 
         mismatches = []
         fixes_to_apply = {}
@@ -886,9 +914,24 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             mismatches.append(f"Name: '{restaurant.name}' vs Google: '{google_name}'")
             fixes_to_apply["name"] = google_name
 
-        if google_address and restaurant.address and google_address.lower() != restaurant.address.lower():
-            mismatches.append(f"Address: '{restaurant.address}' vs Google: '{google_address}'")
-            fixes_to_apply["address"] = google_address
+        if google_street_address and restaurant.address and google_street_address.lower() != restaurant.address.lower():
+            mismatches.append(f"Address: '{restaurant.address}' vs Google: '{google_street_address}'")
+            fixes_to_apply["address"] = google_street_address
+
+        # Check service level
+        google_service_level_data = validation_result.get("google_service_level")
+        if google_service_level_data:
+            google_service_level, confidence = google_service_level_data
+            from app.restaurants.services import validate_restaurant_service_level
+
+            has_mismatch, mismatch_message, suggested_fix = validate_restaurant_service_level(
+                restaurant, google_service_level, confidence
+            )
+
+            if has_mismatch:
+                mismatches.append(mismatch_message)
+                if suggested_fix:
+                    fixes_to_apply["service_level"] = suggested_fix
 
         return mismatches, fixes_to_apply
 
@@ -905,6 +948,9 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             if "address" in fixes_to_apply:
                 restaurant.address = fixes_to_apply["address"]
                 changes_made.append("address")
+            if "service_level" in fixes_to_apply:
+                restaurant.service_level = fixes_to_apply["service_level"]
+                changes_made.append("service_level")
 
             if changes_made:
                 db.session.commit()
@@ -1000,6 +1046,194 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
 
         return validation_results, summary
 
+    def _get_restaurants_without_google_id(self, **kwargs) -> List[Restaurant]:
+        """Get restaurants without Google Place IDs for service level updates."""
+        try:
+            from app.restaurants.models import Restaurant
+
+            # Handle specific restaurant case
+            restaurant_id = kwargs.get("restaurant_id")
+            if restaurant_id:
+                return self._get_specific_restaurant_without_google_id(restaurant_id)
+
+            # Handle user-based filtering
+            users = self._get_target_users_for_service_levels(**kwargs)
+            if not users:
+                return []
+
+            return self._get_restaurants_for_users_without_google_id(users)
+
+        except Exception as e:
+            logger.exception(f"Error getting restaurants without Google Place IDs: {e}")
+            return []
+
+    def _get_specific_restaurant_without_google_id(self, restaurant_id: int) -> List[Restaurant]:
+        """Get specific restaurant without Google Place ID."""
+        from app.restaurants.models import Restaurant
+
+        restaurant = Restaurant.query.get(restaurant_id)
+        if restaurant and not restaurant.google_place_id:
+            return [restaurant]
+        return []
+
+    def _get_target_users_for_service_levels(self, **kwargs) -> List[User]:
+        """Get target users for service level updates."""
+        user_id = kwargs.get("user_id")
+        username = kwargs.get("username", "").strip()
+        all_users = kwargs.get("all_users", False)
+
+        if user_id:
+            user = User.query.get(user_id)
+            return [user] if user else []
+        elif username:
+            user = User.query.filter_by(username=username).first()
+            return [user] if user else []
+        elif all_users:
+            return User.query.all()
+
+        return []
+
+    def _get_restaurants_for_users_without_google_id(self, users: List[User]) -> List[Restaurant]:
+        """Get restaurants without Google Place IDs for given users."""
+        from app.restaurants.models import Restaurant
+
+        restaurants = []
+        for user in users:
+            user_restaurants = (
+                Restaurant.query.filter_by(user_id=user.id).filter(Restaurant.google_place_id.is_(None)).all()
+            )
+            restaurants.extend(user_restaurants)
+
+        return restaurants
+
+    def _suggest_service_level_from_restaurant_data(self, restaurant: Restaurant) -> str:
+        """Suggest service level based on available restaurant data."""
+        name_lower = restaurant.name.lower()
+
+        # Quick service indicators
+        quick_service_keywords = [
+            "mcdonald",
+            "burger king",
+            "wendy",
+            "subway",
+            "kfc",
+            "taco bell",
+            "pizza hut",
+            "domino",
+            "chipotle",
+            "starbucks",
+            "dunkin",
+            "pizza",
+            "burger",
+            "sandwich",
+            "coffee",
+            "ice cream",
+            "donut",
+            "bakery",
+        ]
+
+        # Fast casual indicators
+        fast_casual_keywords = [
+            "panera",
+            "chipotle",
+            "qdoba",
+            "moe",
+            "noodles",
+            "panda express",
+            "five guys",
+            "shake shack",
+            "in-n-out",
+            "whataburger",
+        ]
+
+        # Fine dining indicators
+        fine_dining_keywords = [
+            "steakhouse",
+            "grill",
+            "bistro",
+            "cafe",
+            "restaurant",
+            "dining",
+            "kitchen",
+            "table",
+            "chef",
+            "gourmet",
+            "fine",
+            "upscale",
+        ]
+
+        # Check for quick service
+        for keyword in quick_service_keywords:
+            if keyword in name_lower:
+                return "quick_service"
+
+        # Check for fast casual
+        for keyword in fast_casual_keywords:
+            if keyword in name_lower:
+                return "fast_casual"
+
+        # Check for fine dining
+        for keyword in fine_dining_keywords:
+            if keyword in name_lower:
+                return "fine_dining"
+
+        # Default to casual dining if no specific indicators found
+        return "casual_dining"
+
+    def _update_service_levels_for_restaurants_without_google_id(self, **kwargs) -> Dict[str, Any]:
+        """Update service levels for restaurants without Google Place IDs."""
+        try:
+            restaurants = self._get_restaurants_without_google_id(**kwargs)
+            if not restaurants:
+                return {
+                    "success": True,
+                    "message": "No restaurants without Google Place IDs found",
+                    "updated_count": 0,
+                    "total_count": 0,
+                }
+
+            dry_run = kwargs.get("dry_run", False)
+            updated_count = 0
+
+            for restaurant in restaurants:
+                logger.info(f"Processing restaurant {restaurant.id}: {restaurant.name}")
+
+                suggested_service_level = self._suggest_service_level_from_restaurant_data(restaurant)
+
+                if suggested_service_level and suggested_service_level != restaurant.service_level:
+                    if dry_run:
+                        logger.info(
+                            f"Would update service level for {restaurant.name}: '{restaurant.service_level or 'Not set'}' → '{suggested_service_level}'"
+                        )
+                    else:
+                        try:
+                            restaurant.service_level = suggested_service_level
+                            db.session.commit()
+                            logger.info(f"Updated service level for {restaurant.name}: '{suggested_service_level}'")
+                            updated_count += 1
+                        except Exception as e:
+                            db.session.rollback()
+                            logger.error(f"Error updating service level for {restaurant.name}: {e}")
+                else:
+                    logger.info(f"No service level update needed for {restaurant.name}")
+
+            action_text = "would update" if dry_run else "updated"
+            return {
+                "success": True,
+                "message": f"Successfully {action_text} service levels for {updated_count} out of {len(restaurants)} restaurants",
+                "updated_count": updated_count,
+                "total_count": len(restaurants),
+            }
+
+        except Exception as e:
+            logger.exception(f"Error updating service levels: {e}")
+            return {
+                "success": False,
+                "message": f"Failed to update service levels: {str(e)}",
+                "updated_count": 0,
+                "total_count": 0,
+            }
+
     def _get_action_text(self, fix_mismatches: bool, dry_run: bool) -> str:
         """Get appropriate action text based on parameters."""
         if fix_mismatches:
@@ -1013,7 +1247,13 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
         """Execute restaurant validation operation."""
         try:
             fix_mismatches = kwargs.get("fix_mismatches", False)
+            update_service_levels = kwargs.get("update_service_levels", False)
             dry_run = kwargs.get("dry_run", False)
+
+            # Handle service level updates for restaurants without Google Place IDs
+            service_level_results = None
+            if update_service_levels:
+                service_level_results = self._update_service_levels_for_restaurants_without_google_id(**kwargs)
 
             # Get restaurants to validate
             error_response, restaurants_to_validate, restaurant_counts = self._get_restaurants_to_validate(**kwargs)
@@ -1021,16 +1261,33 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
                 return error_response
 
             if not restaurants_to_validate:
+                summary = {
+                    "total_restaurants": restaurant_counts["total_restaurants"],
+                    "missing_google_id": restaurant_counts["missing_google_id"],
+                    "with_google_id": restaurant_counts["with_google_id"],
+                    "valid_count": 0,
+                    "invalid_count": 0,
+                    "error_count": 0,
+                    "fixed_count": 0,
+                    "mismatch_count": 0,
+                    "dry_run": dry_run,
+                }
+
+                # Add service level metrics to summary
+                if service_level_results and service_level_results.get("success"):
+                    summary["service_level_metrics"] = {
+                        "total_without_google_id": service_level_results.get("total_count", 0),
+                        "updated_count": service_level_results.get("updated_count", 0),
+                        "dry_run": dry_run,
+                    }
+
                 return {
-                    "success": False,
+                    "success": True,
                     "message": "No restaurants with Google Place IDs found to validate",
                     "data": {
                         "restaurant_counts": restaurant_counts,
-                        "summary": {
-                            "total_restaurants": restaurant_counts["total_restaurants"],
-                            "missing_google_id": restaurant_counts["missing_google_id"],
-                            "with_google_id": restaurant_counts["with_google_id"],
-                        },
+                        "service_level_results": service_level_results,
+                        "summary": summary,
                     },
                 }
 
@@ -1044,18 +1301,97 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
 
             action_text = self._get_action_text(fix_mismatches, dry_run)
 
+            # Add service level metrics to summary
+            if service_level_results and service_level_results.get("success"):
+                summary["service_level_metrics"] = {
+                    "total_without_google_id": service_level_results.get("total_count", 0),
+                    "updated_count": service_level_results.get("updated_count", 0),
+                    "dry_run": dry_run,
+                }
+
             return {
                 "success": True,
                 "message": f"Successfully {action_text} {len(validation_results)} restaurants",
                 "data": {
                     "validation_results": validation_results,
                     "summary": summary,
+                    "service_level_results": service_level_results,
                 },
             }
 
         except Exception as e:
             logger.exception(f"Error in restaurant validation: {e}")
             return {"success": False, "message": f"Restaurant validation failed: {str(e)}"}
+
+
+class RunMigrationsOperation(BaseAdminOperation):
+    """Run database migrations safely using the migration manager."""
+
+    name = "run_migrations"
+    description = "Run pending database migrations without affecting existing data"
+    requires_confirmation = True
+
+    def validate_params(self, **kwargs) -> Dict[str, Any]:
+        """Validate migration parameters."""
+        errors = []
+
+        # Optional: target revision
+        target_revision = kwargs.get("target_revision")
+        if target_revision is not None and not isinstance(target_revision, str):
+            errors.append("target_revision must be a string or None")
+
+        # Optional: dry run
+        dry_run = kwargs.get("dry_run", False)
+        if not isinstance(dry_run, bool):
+            errors.append("dry_run must be a boolean")
+
+        return {"valid": len(errors) == 0, "errors": errors}
+
+    def _handle_fix_history(self) -> Dict[str, Any]:
+        """Handle migration history fix operation."""
+        from app.utils.migration_manager import migration_manager
+
+        logger.info("Fixing migration history...")
+        fix_result = migration_manager.fix_migration_history()
+        if not fix_result["success"]:
+            return {
+                "success": False,
+                "message": f"Failed to fix migration history: {fix_result['error']}",
+                "data": {"error": fix_result["error"]},
+            }
+        logger.info("Migration history fixed successfully")
+        return {"success": True}
+
+    def execute(self, **kwargs) -> Dict[str, Any]:
+        """Execute database migrations using the migration manager."""
+        try:
+            dry_run = kwargs.get("dry_run", False)
+            target_revision = kwargs.get("target_revision")
+            fix_history = kwargs.get("fix_history", False)
+
+            with current_app.app_context():
+                from app.utils.migration_manager import migration_manager
+
+                # Handle fix_history parameter
+                if fix_history:
+                    fix_result = self._handle_fix_history()
+                    if not fix_result["success"]:
+                        return fix_result
+
+                # Run migrations using the migration manager
+                result = migration_manager.run_migrations(dry_run=dry_run, target_revision=target_revision)
+
+                return result
+
+        except Exception as e:
+            logger.exception(f"Database migration failed: {e}")
+            return {
+                "success": False,
+                "message": f"Database migration failed: {str(e)}",
+                "data": {
+                    "error": str(e),
+                },
+            }
 
 
 class AdminOperationRegistry:
@@ -1070,6 +1406,7 @@ class AdminOperationRegistry:
         "init_db": InitializeDatabaseOperation,
         "db_maintenance": DatabaseMaintenanceOperation,
         "validate_restaurants": ValidateRestaurantsOperation,
+        "run_migrations": RunMigrationsOperation,
     }
 
     @classmethod

@@ -44,15 +44,20 @@ export function getGoogleMapsConfig() {
  * @returns {string} CSRF token
  */
 export function getCSRFToken() {
-  if (config_cache.csrfToken) {
-    return config_cache.csrfToken;
+  // Try meta tag first (preferred method)
+  const meta_tag = document.querySelector('meta[name="csrf-token"]');
+  if (meta_tag && meta_tag.getAttribute('content')) {
+    return meta_tag.getAttribute('content');
   }
 
-  const meta_tag = document.querySelector('meta[name="csrf-token"]');
-  const token = meta_tag ? meta_tag.getAttribute('content') : '';
+  // Fallback to form input
+  const csrf_input = document.querySelector('input[name="csrf_token"]');
+  if (csrf_input && csrf_input.value) {
+    return csrf_input.value;
+  }
 
-  config_cache.csrfToken = token;
-  return token;
+  console.warn('CSRF token not found in DOM');
+  return '';
 }
 
 /**

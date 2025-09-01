@@ -43,6 +43,7 @@ from app.utils.messages import FlashMessages
 
 # Constants
 PER_PAGE = 10  # Number of expenses per page
+SHOW_ALL = -1  # Special value to show all expenses
 
 
 def _sort_categories_by_default_order(categories: list[Category]) -> list[Category]:
@@ -522,13 +523,20 @@ def list_expenses() -> str:
         current_app.logger.error(f"Error filtering expenses: {str(e)}")
         expenses, total_amount = [], 0.0
 
-    # Calculate pagination with bounds checking
+    # Handle pagination or show all
     total_expenses = len(expenses)
-    total_pages = max(1, ceil(total_expenses / per_page)) if total_expenses else 1
-    page = max(1, min(page, total_pages))  # Ensure page is within bounds
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    paginated_expenses = expenses[start_idx:end_idx]
+    if per_page == SHOW_ALL:
+        # Show all expenses without pagination
+        paginated_expenses = expenses
+        total_pages = 1
+        page = 1
+    else:
+        # Calculate pagination with bounds checking
+        total_pages = max(1, ceil(total_expenses / per_page)) if total_expenses else 1
+        page = max(1, min(page, total_pages))  # Ensure page is within bounds
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_expenses = expenses[start_idx:end_idx]
 
     # Get filter options for the filter form
     filter_options = expense_services.get_filter_options(current_user.id)
@@ -697,3 +705,186 @@ def import_expenses():
             flash("Please select a file to upload", "danger")
 
     return render_template("expenses/import.html", form=form)
+
+
+# Tag Management Routes
+@bp.route("/tags", methods=["GET"])
+@login_required
+def list_tags():
+    """Get all tags for the current user."""
+    try:
+        tags = expense_services.get_user_tags(current_user.id)
+        return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})
+    except Exception as e:
+        current_app.logger.error(f"Error fetching tags: {e}")
+        return jsonify({"success": False, "message": "Failed to fetch tags"}), 500
+
+
+@bp.route("/tags/search", methods=["GET"])
+@login_required
+def search_tags():
+    """Search tags by name."""
+    query = request.args.get("q", "").strip()
+    limit = request.args.get("limit", 10, type=int)
+
+    try:
+        tags = expense_services.search_tags(current_user.id, query, limit)
+        return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})
+    except Exception as e:
+        current_app.logger.error(f"Error searching tags: {e}")
+        return jsonify({"success": False, "message": "Failed to search tags"}), 500
+
+
+@bp.route("/tags", methods=["POST"])
+@login_required
+def create_tag():
+    """Create a new tag."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "No data provided"}), 400
+
+    name = data.get("name", "").strip()
+    color = data.get("color", "#6c757d")
+    description = data.get("description", "").strip()
+
+    if not name:
+        return jsonify({"success": False, "message": "Tag name is required"}), 400
+
+    try:
+        tag = expense_services.create_tag(current_user.id, name, color, description)
+        return jsonify({"success": True, "tag": tag.to_dict(), "message": f"Tag '{name}' created successfully"}), 201
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error creating tag: {e}")
+        return jsonify({"success": False, "message": "Failed to create tag"}), 500
+
+
+@bp.route("/tags/<int:tag_id>", methods=["DELETE"])
+@login_required
+def delete_tag(tag_id):
+    """Delete a tag."""
+    try:
+        success = expense_services.delete_tag(current_user.id, tag_id)
+        if success:
+            return jsonify({"success": True, "message": "Tag deleted successfully"})
+        else:
+            return jsonify({"success": False, "message": "Tag not found or unauthorized"}), 404
+    except Exception as e:
+        current_app.logger.error(f"Error deleting tag: {e}")
+        return jsonify({"success": False, "message": "Failed to delete tag"}), 500
+
+
+@bp.route("/<int:expense_id>/tags", methods=["GET"])
+@login_required
+def get_expense_tags(expense_id):
+    """Get all tags for an expense."""
+    try:
+        tags = expense_services.get_expense_tags(expense_id, current_user.id)
+        return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})
+    except Exception as e:
+        current_app.logger.error(f"Error fetching expense tags: {e}")
+        return jsonify({"success": False, "message": "Failed to fetch expense tags"}), 500
+
+
+@bp.route("/<int:expense_id>/tags", methods=["POST"])
+@login_required
+def add_expense_tags(expense_id):
+    """Add tags to an expense."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "No data provided"}), 400
+
+    tag_names = data.get("tags", [])
+    if not tag_names:
+        return jsonify({"success": False, "message": "No tags provided"}), 400
+
+    try:
+        added_tags = expense_services.add_tags_to_expense(expense_id, current_user.id, tag_names)
+        return jsonify(
+            {
+                "success": True,
+                "tags": [tag.to_dict() for tag in added_tags],
+                "message": f"Added {len(added_tags)} tag(s) to expense",
+            }
+        )
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error adding tags to expense: {e}")
+        return jsonify({"success": False, "message": "Failed to add tags to expense"}), 500
+
+
+@bp.route("/<int:expense_id>/tags", methods=["PUT"])
+@login_required
+def update_expense_tags(expense_id):
+    """Update tags for an expense (replace all existing tags)."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "No data provided"}), 400
+
+    tag_names = data.get("tags", [])
+
+    try:
+        final_tags = expense_services.update_expense_tags(expense_id, current_user.id, tag_names)
+        return jsonify(
+            {
+                "success": True,
+                "tags": [tag.to_dict() for tag in final_tags],
+                "message": f"Updated expense with {len(final_tags)} tag(s)",
+            }
+        )
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error updating expense tags: {e}")
+        return jsonify({"success": False, "message": "Failed to update expense tags"}), 500
+
+
+@bp.route("/<int:expense_id>/tags", methods=["DELETE"])
+@login_required
+def remove_expense_tags(expense_id):
+    """Remove tags from an expense."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "No data provided"}), 400
+
+    tag_names = data.get("tags", [])
+    if not tag_names:
+        return jsonify({"success": False, "message": "No tags provided"}), 400
+
+    try:
+        removed_tags = expense_services.remove_tags_from_expense(expense_id, current_user.id, tag_names)
+        return jsonify(
+            {
+                "success": True,
+                "tags": [tag.to_dict() for tag in removed_tags],
+                "message": f"Removed {len(removed_tags)} tag(s) from expense",
+            }
+        )
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error removing tags from expense: {e}")
+        return jsonify({"success": False, "message": "Failed to remove tags from expense"}), 500
+
+
+@bp.route("/tags/popular", methods=["GET"])
+@login_required
+def get_popular_tags():
+    """Get the most popular tags for the current user."""
+    limit = request.args.get("limit", 10, type=int)
+
+    try:
+        popular_tags = expense_services.get_popular_tags(current_user.id, limit)
+        return jsonify({"success": True, "tags": popular_tags})
+    except Exception as e:
+        current_app.logger.error(f"Error fetching popular tags: {e}")
+        return jsonify({"success": False, "message": "Failed to fetch popular tags"}), 500
+
+
+@bp.route("/tags/demo")
+@login_required
+def tags_demo():
+    """Show the tags demo page."""
+    return render_template("expenses/tags_demo.html")

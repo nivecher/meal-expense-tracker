@@ -5,13 +5,17 @@
 
 // Get CSRF token from meta tag or form
 function getCSRFToken() {
-  // Try meta tag first
-  const metaToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-  if (metaToken) return metaToken;
+  // Try meta tag first (preferred method)
+  const meta_tag = document.querySelector('meta[name="csrf-token"]');
+  if (meta_tag && meta_tag.getAttribute('content')) {
+    return meta_tag.getAttribute('content');
+  }
 
-  // Try form input
-  const formToken = document.querySelector('input[name="csrf_token"]')?.value;
-  if (formToken) return formToken;
+  // Fallback to form input
+  const form_token = document.querySelector('input[name="csrf_token"]')?.value;
+  if (form_token) {
+    return form_token;
+  }
 
   console.warn('CSRF token not found');
   return null;

@@ -9,6 +9,7 @@
           href="{{ url_for('static', filename='css/pages/restaurant-detail.css') }}">
     <link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/service-level-badges.css') }}" rel="stylesheet" />
 {% endblock extra_css %}
 {% block breadcrumb %}
 {% endblock breadcrumb %}
@@ -38,7 +39,10 @@
                                                 class="restaurant-favicon"
                                                 width="32"
                                                 height="32"
+                                                loading="lazy"
                                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                                                onload="this.style.opacity='1';"
+                                                style="opacity: 0; transition: opacity 0.2s;"
                                             />
                                             <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 28px;"></i>
                                         {% else %}
@@ -54,6 +58,11 @@
                                             <span class="badge bg-primary text-white">
                                                 <i class="fas fa-globe-americas me-1"></i>{{ restaurant.cuisine }}
                                             </span>
+                                        </span>
+                                    {% endif %}
+                                    {% if restaurant.service_level %}
+                                        <span class="service-level-badge" data-service-level="{{ restaurant.service_level }}">
+                                            <i class="fas fa-concierge-bell me-1"></i>{{ restaurant.service_level|replace('_', ' ')|title }}
                                         </span>
                                     {% endif %}
                                     {% if restaurant.rating %}
@@ -138,23 +147,14 @@
                                                     {% endif %}
                                                     {% if restaurant.website %}
                                                         <div class="list-group-item px-0 py-2 border-0">
-                                                            <div class="d-flex align-items-center justify-content-between">
-                                                                <div class="d-flex align-items-center flex-grow-1">
-                                                                    <i class="fas fa-globe text-muted me-3"></i>
-                                                                    <a href="{{ restaurant.website }}"
-                                                                       target="_blank"
-                                                                       rel="noopener noreferrer"
-                                                                       class="text-decoration-none flex-grow-1"
-                                                                       style="word-break: break-all;">
-                                                                        {{ restaurant.website|truncate(80) }}
-                                                                    </a>
-                                                                </div>
+                                                            <div class="d-flex align-items-center">
+                                                                <i class="fas fa-globe text-muted me-3"></i>
                                                                 <a href="{{ restaurant.website }}"
                                                                    target="_blank"
                                                                    rel="noopener noreferrer"
-                                                                   class="btn btn-sm btn-outline-primary ms-2"
-                                                                   title="Open website in new tab">
-                                                                    <i class="fas fa-external-link-alt"></i>
+                                                                   class="text-decoration-none"
+                                                                   style="word-break: break-all;">
+                                                                    {{ restaurant.website|truncate(80) }}
                                                                 </a>
                                                             </div>
                                                         </div>
@@ -599,15 +599,15 @@
                                                 </td>
                                                 <td>
                                                     {% from 'macros/category_helpers.html' import category_badge %}
-                                                    {{ category_badge(expense.category, compact=true) if expense.category else '<span class="text-muted">N/A</span>' }}
+                                                    {{ category_badge(expense.category, compact=true) }}
                                                 </td>
                                                 <td>
                                                     {% if expense.meal_type %}
-                                                        <span class="meal-type-badge compact {{ expense.meal_type.lower().replace(' ', '-') }}">
+                                                        <span class="meal-type-badge compact {{ expense.meal_type|meal_type_css_class }}">
                                                             <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
                                                         </span>
                                                     {% else %}
-                                                        <span class="text-muted">N/A</span>
+                                                        <span class="text-muted">-</span>
                                                     {% endif %}
                                                 </td>
                                                 <td>

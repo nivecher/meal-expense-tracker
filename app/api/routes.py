@@ -12,7 +12,7 @@ from app.categories import services as category_services
 from app.expenses import services as expense_services
 from app.restaurants import services as restaurant_services
 
-from . import bp
+from . import bp, validate_api_csrf
 from .schemas import CategorySchema, ExpenseSchema, RestaurantSchema
 
 # Initialize Google Maps client
@@ -138,7 +138,7 @@ def place_details() -> Response:
         place = gmaps.place(
             place_id=place_id,
             language=language,
-            fields=["name", "formatted_address", "geometry/location", "address_component"],
+            fields=["name", "formatted_address", "geometry/location", "address_components"],
         )
 
         if not place or "result" not in place:
@@ -148,7 +148,7 @@ def place_details() -> Response:
             "name": place["result"].get("name", ""),
             "formatted_address": place["result"].get("formatted_address", ""),
             "location": place["result"].get("geometry", {}).get("location", {}),
-            "address_components": place["result"].get("address_component", []),
+            "address_components": place["result"].get("address_components", []),
         }
 
         return _create_api_response(data=result, message="Place details retrieved successfully")
@@ -172,6 +172,7 @@ def get_expenses() -> Response:
 
 @bp.route("/expenses", methods=["POST"])
 @login_required
+@validate_api_csrf
 def create_expense() -> Tuple[Response, int]:
     """Create a new expense."""
     try:
@@ -201,6 +202,7 @@ def get_expense(expense_id: int) -> Response:
 
 @bp.route("/expenses/<int:expense_id>", methods=["PUT"])
 @login_required
+@validate_api_csrf
 def update_expense(expense_id: int) -> Tuple[Response, int]:
     """Update an expense."""
     try:
@@ -220,6 +222,7 @@ def update_expense(expense_id: int) -> Tuple[Response, int]:
 
 @bp.route("/expenses/<int:expense_id>", methods=["DELETE"])
 @login_required
+@validate_api_csrf
 def delete_expense(expense_id: int) -> Tuple[Response, int]:
     """Delete an expense."""
     try:
@@ -251,6 +254,7 @@ def get_restaurants() -> Response:
 
 @bp.route("/restaurants", methods=["POST"])
 @login_required
+@validate_api_csrf
 def create_restaurant() -> Tuple[Response, int]:
     """Create a new restaurant."""
     try:
@@ -284,6 +288,7 @@ def get_restaurant(restaurant_id: int) -> Response:
 
 @bp.route("/restaurants/<int:restaurant_id>", methods=["PUT"])
 @login_required
+@validate_api_csrf
 def update_restaurant(restaurant_id: int) -> Tuple[Response, int]:
     """Update a restaurant."""
     try:
@@ -305,6 +310,7 @@ def update_restaurant(restaurant_id: int) -> Tuple[Response, int]:
 
 @bp.route("/restaurants/<int:restaurant_id>", methods=["DELETE"])
 @login_required
+@validate_api_csrf
 def delete_restaurant(restaurant_id: int) -> Tuple[Response, int]:
     """Delete a restaurant."""
     try:
@@ -345,6 +351,53 @@ def check_restaurant_exists() -> Response:
         return _handle_service_error(e, "check restaurant existence")
 
 
+@bp.route("/restaurants/validate", methods=["POST"])
+@login_required
+@validate_api_csrf
+def validate_restaurant() -> Tuple[Response, int]:
+    """Validate restaurant information using Google Places API."""
+    try:
+        data = request.get_json()
+        if not data:
+            return _create_api_response(message="JSON data required", status="error", code=400)
+
+        name = data.get("name", "").strip()
+        address = data.get("address", "").strip()
+        google_place_id = data.get("google_place_id")
+
+        if not name:
+            return _create_api_response(message="Restaurant name is required", status="error", code=400)
+
+        if not address:
+            return _create_api_response(message="Address is required", status="error", code=400)
+
+        # Use centralized service function
+        success, message, validation_data = restaurant_services.validate_restaurant_with_google_places(
+            name, address, google_place_id
+        )
+
+        if success:
+            return _create_api_response(
+                data=validation_data,
+                message=f"Validation completed. Found {len(validation_data.get('mismatches', []))} mismatch(es).",
+            )
+        else:
+            # For "not found" cases, return success with empty validation data
+            if "not found" in message.lower():
+                return _create_api_response(
+                    data={"valid": False, "mismatches": [], "fixes": {}, "google_data": {}},
+                    message="No matching restaurant found in Google Places. The restaurant may not be listed or the information may need manual verification.",
+                )
+            elif "invalid" in message.lower():
+                return _create_api_response(message=message, status="error", code=400)
+            else:
+                return _create_api_response(message=message, status="error", code=500)
+
+    except Exception as e:
+        current_app.logger.error(f"Error validating restaurant: {e}")
+        return _create_api_response(message=f"Failed to validate restaurant: {str(e)}", status="error", code=500)
+
+
 # Generic CRUD operations for categories
 @bp.route("/categories", methods=["GET"])
 @login_required
@@ -362,6 +415,7 @@ def get_categories() -> Response:
 
 @bp.route("/categories", methods=["POST"])
 @login_required
+@validate_api_csrf
 def create_category() -> Tuple[Response, int]:
     """Create a new category."""
     try:
@@ -393,6 +447,7 @@ def get_category(category_id: int) -> Response:
 
 @bp.route("/categories/<int:category_id>", methods=["PUT"])
 @login_required
+@validate_api_csrf
 def update_category(category_id: int) -> Tuple[Response, int]:
     """Update a category."""
     try:
@@ -414,6 +469,7 @@ def update_category(category_id: int) -> Tuple[Response, int]:
 
 @bp.route("/categories/<int:category_id>", methods=["DELETE"])
 @login_required
+@validate_api_csrf
 def delete_category(category_id: int) -> Tuple[Response, int]:
     """Delete a category."""
     try:

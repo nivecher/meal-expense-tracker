@@ -314,6 +314,11 @@ resource "aws_lambda_function" "main" {
         GOOGLE_MAPS_API_KEY = data.aws_ssm_parameter.google_maps_api_key.value
         GOOGLE_MAPS_MAP_ID  = data.aws_ssm_parameter.google_maps_map_id.value
 
+        # Email configuration (AWS SES)
+        MAIL_ENABLED         = var.mail_enabled ? "true" : "false"
+        MAIL_DEFAULT_SENDER  = var.mail_default_sender
+        AWS_SES_REGION       = var.aws_ses_region
+
         # Database configuration will be set at runtime via the secret
 
         # CORS configuration

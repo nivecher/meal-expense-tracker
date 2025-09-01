@@ -557,6 +557,11 @@ module "lambda" {
     SESSION_DYNAMODB_ENDPOINT = ""
   }
 
+  # Email configuration
+  mail_enabled        = var.mail_enabled
+  mail_default_sender = var.mail_default_sender
+  aws_ses_region      = var.aws_ses_region
+
   # Tags
   tags = merge(local.tags, {
     Name        = "${var.app_name}-${var.environment}-lambda"

@@ -4,7 +4,8 @@ import csv
 import io
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import func, select
+from flask import current_app
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from werkzeug.datastructures import FileStorage
 
@@ -16,6 +17,34 @@ from app.restaurants.exceptions import (
 )
 from app.restaurants.models import Restaurant
 from app.utils.cuisine_formatter import format_cuisine_type
+from app.utils.service_level_detector import (
+    ServiceLevelDetector,
+    detect_restaurant_service_level,
+)
+
+
+def get_restaurant_filters(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract and validate filter parameters from the request.
+
+    Args:
+        args: The request arguments
+
+    Returns:
+        Dict containing filter parameters
+    """
+    # Support both 'search' and 'q' parameters for search functionality
+    search_term = args.get("search", "").strip() or args.get("q", "").strip()
+    return {
+        "search": search_term,
+        "cuisine": args.get("cuisine", "").strip(),
+        "service_level": args.get("service_level", "").strip(),
+        "city": args.get("city", "").strip(),
+        "is_chain": args.get("is_chain", "").strip(),
+        "rating_min": args.get("rating_min", "").strip(),
+        "rating_max": args.get("rating_max", "").strip(),
+        "sort_by": args.get("sort", "name"),
+        "sort_order": args.get("order", "asc"),
+    }
 
 
 def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list, dict]:
@@ -29,9 +58,8 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
     Returns:
         A tuple containing the list of restaurants (as dicts) and summary statistics.
     """
-    sort_by = args.get("sort", "name")
-    sort_order = args.get("order", "asc")
-    cuisine_filter = args.get("cuisine")
+    # Extract filters
+    filters = get_restaurant_filters(args)
 
     stmt = (
         select(
@@ -48,25 +76,11 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
         .group_by(Restaurant.id)
     )
 
-    if cuisine_filter:
-        stmt = stmt.where(Restaurant.cuisine == cuisine_filter)
+    # Apply filters
+    stmt = apply_restaurant_filters(stmt, filters)
 
-    sort_column = {
-        "name": Restaurant.name,
-        "visits": func.count(Expense.id),
-        "spent": func.coalesce(func.sum(Expense.amount), 0),
-        "last_visit": func.max(Expense.date),
-    }.get(sort_by, Restaurant.name)
-
-    sort_direction = sort_order.upper() if sort_order in ["asc", "desc"] else "ASC"
-    # Ensure sort_column is not None before calling asc() or desc()
-    if sort_column is not None:
-        stmt = stmt.order_by(
-            sort_column.asc() if sort_direction == "ASC" else sort_column.desc(),
-            Restaurant.name.asc(),
-        )
-    else:
-        stmt = stmt.order_by(Restaurant.name.asc())
+    # Apply sorting
+    stmt = apply_restaurant_sorting(stmt, filters["sort_by"], filters["sort_order"])
 
     # Execute query and convert results to list of dicts
     results = db.session.execute(stmt).all()
@@ -99,6 +113,113 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
     return restaurants, stats
 
 
+def _apply_search_filter(stmt, search_term: str):
+    """Apply search filter to the query."""
+    if not search_term:
+        return stmt
+
+    search_pattern = f"%{search_term}%"
+    return stmt.where(
+        or_(
+            Restaurant.name.ilike(search_pattern),
+            Restaurant.address.ilike(search_pattern),
+            Restaurant.city.ilike(search_pattern),
+            Restaurant.state.ilike(search_pattern),
+            Restaurant.notes.ilike(search_pattern),
+            Restaurant.cuisine.ilike(search_pattern),
+        )
+    )
+
+
+def _apply_rating_filters(stmt, rating_min: str, rating_max: str):
+    """Apply rating range filters to the query."""
+    if rating_min:
+        try:
+            rating_min_val = float(rating_min)
+            stmt = stmt.where(Restaurant.rating >= rating_min_val)
+        except (ValueError, TypeError):
+            pass
+
+    if rating_max:
+        try:
+            rating_max_val = float(rating_max)
+            stmt = stmt.where(Restaurant.rating <= rating_max_val)
+        except (ValueError, TypeError):
+            pass
+
+    return stmt
+
+
+def apply_restaurant_filters(stmt, filters: Dict[str, Any]):
+    """Apply filters to the restaurant query.
+
+    Args:
+        stmt: The SQLAlchemy select statement
+        filters: Dictionary of filter parameters
+
+    Returns:
+        The modified select statement with filters applied
+    """
+    # Apply search filter
+    stmt = _apply_search_filter(stmt, filters["search"])
+
+    # Apply exact match filters
+    if filters["cuisine"]:
+        stmt = stmt.where(Restaurant.cuisine == filters["cuisine"])
+
+    if filters["service_level"]:
+        stmt = stmt.where(Restaurant.service_level == filters["service_level"])
+
+    if filters["city"]:
+        stmt = stmt.where(Restaurant.city.ilike(f"%{filters['city']}%"))
+
+    if filters["is_chain"]:
+        is_chain_value = filters["is_chain"].lower() == "true"
+        stmt = stmt.where(Restaurant.is_chain == is_chain_value)
+
+    # Apply rating filters
+    stmt = _apply_rating_filters(stmt, filters["rating_min"], filters["rating_max"])
+
+    return stmt
+
+
+def apply_restaurant_sorting(stmt, sort_by: str, sort_order: str):
+    """Apply sorting to the restaurant query.
+
+    Args:
+        stmt: The SQLAlchemy select statement
+        sort_by: Field to sort by
+        sort_order: Sort order ('asc' or 'desc')
+
+    Returns:
+        The modified select statement with sorting applied
+    """
+    sort_field = None
+    is_desc = sort_order.lower() == "desc"
+
+    if sort_by == "name":
+        sort_field = Restaurant.name
+    elif sort_by == "city":
+        sort_field = Restaurant.city
+    elif sort_by == "cuisine":
+        sort_field = Restaurant.cuisine
+    elif sort_by == "rating":
+        sort_field = Restaurant.rating
+    elif sort_by == "visits":
+        sort_field = func.count(Expense.id)
+    elif sort_by == "spent":
+        sort_field = func.coalesce(func.sum(Expense.amount), 0)
+    elif sort_by == "last_visit":
+        sort_field = func.max(Expense.date)
+    elif sort_by == "created_at":
+        sort_field = Restaurant.created_at
+
+    if sort_field:
+        return stmt.order_by(sort_field.desc() if is_desc else sort_field.asc())
+
+    return stmt
+
+
 def get_unique_cuisines(user_id: int) -> list[str]:
     """Get a list of unique cuisines for a user."""
     return [
@@ -111,6 +232,54 @@ def get_unique_cuisines(user_id: int) -> list[str]:
         ).all()
         if cuisine is not None
     ]
+
+
+def get_unique_cities(user_id: int) -> list[str]:
+    """Get a list of unique cities for a user."""
+    return [
+        city
+        for city in db.session.scalars(
+            select(Restaurant.city)
+            .where(Restaurant.user_id == user_id, Restaurant.city.isnot(None))
+            .distinct()
+            .order_by(Restaurant.city)
+        ).all()
+        if city is not None
+    ]
+
+
+def get_unique_service_levels(user_id: int) -> list[str]:
+    """Get a list of unique service levels for a user."""
+    return [
+        service_level
+        for service_level in db.session.scalars(
+            select(Restaurant.service_level)
+            .where(Restaurant.user_id == user_id, Restaurant.service_level.isnot(None))
+            .distinct()
+            .order_by(Restaurant.service_level)
+        ).all()
+        if service_level is not None
+    ]
+
+
+def get_filter_options(user_id: int) -> Dict[str, Any]:
+    """
+    Get filter options for the restaurants list.
+
+    Args:
+        user_id: ID of the current user
+
+    Returns:
+        Dictionary containing filter options:
+        - cuisines: List of cuisine names
+        - cities: List of city names
+        - service_levels: List of service level names
+    """
+    return {
+        "cuisines": get_unique_cuisines(user_id),
+        "cities": get_unique_cities(user_id),
+        "service_levels": get_unique_service_levels(user_id),
+    }
 
 
 def restaurant_exists(user_id: int, name: str, city: str, google_place_id: str = None) -> Optional[Restaurant]:
@@ -218,6 +387,9 @@ def create_restaurant(user_id: int, form: Any) -> Tuple[Restaurant, bool]:
     restaurant = Restaurant(user_id=user_id)
     form.populate_obj(restaurant)
 
+    # Handle service level auto-detection
+    _auto_detect_service_level(restaurant)
+
     # Format cuisine type for consistency
     if hasattr(restaurant, "cuisine") and restaurant.cuisine:
         restaurant.cuisine = format_cuisine_type(restaurant.cuisine)
@@ -292,6 +464,9 @@ def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant
     for key, value in form_data.items():
         if hasattr(restaurant, key):
             setattr(restaurant, key, value)
+
+    # Handle service level auto-detection for updates
+    _auto_detect_service_level(restaurant)
 
     # Format cuisine type for consistency
     if hasattr(restaurant, "cuisine") and restaurant.cuisine:
@@ -426,6 +601,7 @@ def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Optiona
             email=row.get("email", "").strip() or None,
             website=row.get("website", "").strip() or None,
             cuisine=row.get("cuisine", "").strip() or None,
+            service_level=row.get("service_level", "").strip() or None,
             rating=safe_import_float(row.get("rating")),
             is_chain=safe_import_bool(row.get("is_chain")),
             google_place_id=google_place_id,
@@ -604,6 +780,7 @@ def export_restaurants_for_user(user_id: int) -> List[Dict[str, Any]]:
             "phone": r.phone or "",
             "email": r.email or "",
             "cuisine": r.cuisine or "",
+            "service_level": r.service_level or "",
             "website": r.website or "",
             "rating": safe_float(r.rating) if r.rating is not None else "",
             "is_chain": bool(r.is_chain) if r.is_chain is not None else "",
@@ -657,6 +834,7 @@ def create_restaurant_for_user(user_id: int, data: Dict[str, Any]) -> Restaurant
         website=data.get("website"),
         google_place_id=data.get("google_place_id"),
         cuisine=data.get("cuisine"),
+        service_level=data.get("service_level"),
         rating=data.get("rating"),
         is_chain=data.get("is_chain", False),
         notes=data.get("notes"),
@@ -695,6 +873,7 @@ def update_restaurant_for_user(restaurant: Restaurant, data: Dict[str, Any]) -> 
         "website",
         "google_place_id",
         "cuisine",
+        "service_level",
         "rating",
         "is_chain",
         "notes",
@@ -792,3 +971,447 @@ def calculate_expense_stats(restaurant_id: int, user_id: int) -> Dict[str, Any]:
         "avg_per_visit": avg_per_visit,
         "last_visit": stats.last_visit if stats else None,
     }
+
+
+# ===== Service Level Validation Functions =====
+
+
+def detect_service_level_from_google_data(google_data: Dict[str, Any]) -> Tuple[str, float]:
+    """
+    Centralized function to detect service level from Google Places data.
+
+    Args:
+        google_data: Dictionary containing Google Places API response data
+
+    Returns:
+        Tuple of (service_level, confidence_score)
+    """
+    try:
+        google_places_data = {
+            "price_level": google_data.get("price_level"),
+            "types": google_data.get("types", []),
+            "rating": google_data.get("rating"),
+            "user_ratings_total": google_data.get("user_ratings_total"),
+        }
+
+        detected_level, confidence = detect_restaurant_service_level(google_places_data)
+        return detected_level.value, confidence
+    except Exception:
+        return "unknown", 0.0
+
+
+def validate_restaurant_service_level(
+    restaurant: Restaurant, google_service_level: str, confidence: float
+) -> Tuple[bool, str, Optional[str]]:
+    """
+    Validate restaurant service level against Google data.
+
+    Args:
+        restaurant: Restaurant instance to validate
+        google_service_level: Service level detected from Google
+        confidence: Confidence score of the detection
+
+    Returns:
+        Tuple of (has_mismatch: bool, mismatch_message: str, suggested_fix: Optional[str])
+    """
+    if google_service_level == "unknown" or confidence <= 0.3:
+        return False, "", None
+
+    if restaurant.service_level and restaurant.service_level != google_service_level:
+        return (
+            True,
+            f"Service Level: '{restaurant.service_level}' vs Google: '{google_service_level}' (confidence: {confidence:.2f})",
+            google_service_level,
+        )
+    elif not restaurant.service_level:
+        return (
+            True,
+            f"Service Level: Not set vs Google: '{google_service_level}' (confidence: {confidence:.2f})",
+            google_service_level,
+        )
+
+    return False, "", None
+
+
+def _auto_detect_service_level(restaurant: Restaurant) -> None:
+    """
+    Auto-detect service level for a restaurant if not set and Google Place ID is available.
+
+    Args:
+        restaurant: Restaurant instance to update
+    """
+    if not restaurant.service_level and restaurant.google_place_id:
+        google_data = _get_google_place_data_for_service_level(restaurant.google_place_id)
+        if google_data:
+            detected_level, confidence = detect_service_level_from_google_data(google_data)
+            if confidence > 0.3:  # Only use if confidence is reasonable
+                restaurant.service_level = detected_level
+                current_app.logger.info(
+                    f"Auto-detected service level '{detected_level}' for restaurant "
+                    f"'{restaurant.name}' (confidence: {confidence:.2f})"
+                )
+
+
+def _get_google_place_data_for_service_level(place_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get Google Places data for service level detection.
+
+    Args:
+        place_id: Google Place ID
+
+    Returns:
+        Dictionary with Google Places data or None if failed
+    """
+    try:
+        import googlemaps
+
+        gmaps = googlemaps.Client(key=current_app.config["GOOGLE_MAPS_API_KEY"])
+
+        # Get place details
+        place = gmaps.place(
+            place_id=place_id,
+            fields=[
+                "priceLevel",
+                "rating",
+                "userRatingsTotal",
+                "types",
+            ],
+        )
+
+        if not place or "result" not in place:
+            return None
+
+        result = place["result"]
+        return {
+            "price_level": result.get("priceLevel"),
+            "types": result.get("types", []),
+            "rating": result.get("rating"),
+            "user_ratings_total": result.get("userRatingsTotal"),
+        }
+    except Exception as e:
+        current_app.logger.warning(f"Failed to fetch Google Places data for service level detection: {str(e)}")
+        return None
+
+
+def get_service_level_display_info(service_level: str) -> Dict[str, str]:
+    """
+    Get display information for a service level.
+
+    Args:
+        service_level: Service level string value
+
+    Returns:
+        Dictionary with display_name and description
+    """
+    try:
+        # Convert string to ServiceLevel enum
+        level_enum = ServiceLevelDetector.get_service_level_from_string(service_level)
+        return {
+            "display_name": ServiceLevelDetector.get_service_level_display_name(level_enum),
+            "description": ServiceLevelDetector.get_service_level_description(level_enum),
+        }
+    except (ValueError, AttributeError):
+        return {
+            "display_name": "Unknown",
+            "description": "Service level could not be determined",
+        }
+
+
+def validate_restaurant_with_google_places(
+    name: str, address: str, google_place_id: str = None
+) -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    Validate restaurant information using Google Places API.
+
+    This is the centralized validation function used by CLI, admin operations, and API routes.
+
+    Args:
+        name: Restaurant name to validate
+        address: Restaurant address to validate
+        google_place_id: Optional Google Place ID for direct validation
+
+    Returns:
+        Tuple of (success: bool, message: str, validation_data: Dict[str, Any])
+        validation_data contains:
+        - valid: bool
+        - mismatches: List[str]
+        - fixes: Dict[str, str]
+        - google_data: Dict[str, Any]
+    """
+    try:
+        import googlemaps
+
+        # Get Google Maps client
+        gmaps = googlemaps.Client(key=current_app.config["GOOGLE_MAPS_API_KEY"])
+
+        if google_place_id:
+            # Validate against specific Google Place ID
+            return _validate_with_place_id(gmaps, google_place_id, name, address)
+        else:
+            # Search for restaurant using text search
+            return _validate_with_text_search(gmaps, name, address)
+
+    except Exception as e:
+        current_app.logger.error(f"Error validating restaurant with Google Places: {e}")
+        return False, f"Failed to validate restaurant: {str(e)}", {}
+
+
+def _validate_with_place_id(gmaps, google_place_id: str, name: str, address: str) -> Tuple[bool, str, Dict[str, Any]]:
+    """Validate restaurant using Google Place ID."""
+    try:
+        place = gmaps.place(
+            place_id=google_place_id,
+            language="en",
+            fields=[
+                "name",
+                "formatted_address",
+                "geometry/location",
+                "rating",
+                "business_status",
+                "type",
+                "user_ratings_total",
+                "opening_hours",
+                "website",
+                "international_phone_number",
+                "price_level",
+                "editorial_summary",
+                "address_component",
+            ],
+        )
+
+        if place and "result" in place:
+            google_data = place["result"]
+            return True, "Validation completed", _process_validation_results(name, address, google_data)
+        else:
+            return False, "Invalid Google Place ID", {}
+
+    except Exception as e:
+        current_app.logger.error(f"Error validating with Google Place ID: {e}")
+        return False, f"Failed to validate with Google Places: {str(e)}", {}
+
+
+def _validate_with_text_search(gmaps, name: str, address: str) -> Tuple[bool, str, Dict[str, Any]]:
+    """Validate restaurant using text search."""
+    try:
+        places_result = gmaps.places(query=f"{name} {address}", type="restaurant", language="en")
+
+        if places_result.get("results"):
+            # Use the first result
+            place = places_result["results"][0]
+            place_id = place.get("place_id")
+
+            if place_id:
+                # Get detailed information
+                place_details = gmaps.place(
+                    place_id=place_id,
+                    language="en",
+                    fields=[
+                        "name",
+                        "formatted_address",
+                        "geometry/location",
+                        "rating",
+                        "business_status",
+                        "type",
+                        "user_ratings_total",
+                        "opening_hours",
+                        "website",
+                        "international_phone_number",
+                        "price_level",
+                        "editorial_summary",
+                        "address_component",
+                    ],
+                )
+
+                if place_details and "result" in place_details:
+                    google_data = place_details["result"]
+                    return (
+                        True,
+                        "Validation completed",
+                        _process_validation_results(name, address, google_data, place_id),
+                    )
+
+        return False, "No matching restaurant found in Google Places", {}
+
+    except Exception as e:
+        current_app.logger.error(f"Error searching for restaurant: {e}")
+        return False, f"Failed to search for restaurant: {str(e)}", {}
+
+
+def _process_validation_results(
+    name: str, address: str, google_data: Dict[str, Any], google_place_id: str = None
+) -> Dict[str, Any]:
+    """Process validation results and return structured data."""
+    try:
+        # Extract Google data
+        google_name = google_data.get("name", "")
+        google_address = google_data.get("formatted_address", "")
+        google_rating = google_data.get("rating")
+        google_phone = google_data.get("international_phone_number", "")
+        google_website = google_data.get("website", "")
+        google_price_level = google_data.get("price_level")
+
+        # Extract address components
+        address_components = google_data.get("address_component", [])
+
+        # Build street address from components
+        street_number = next(
+            (comp.get("long_name") for comp in address_components if "street_number" in comp.get("types", [])),
+            None,
+        )
+        route = next(
+            (comp.get("long_name") for comp in address_components if "route" in comp.get("types", [])),
+            None,
+        )
+        google_street_address = " ".join(filter(None, [street_number, route]))
+
+        # Extract other address components
+        google_city = next(
+            (comp.get("long_name") for comp in address_components if "locality" in comp.get("types", [])),
+            None,
+        )
+        google_state = next(
+            (
+                comp.get("short_name")
+                for comp in address_components
+                if "administrative_area_level_1" in comp.get("types", [])
+            ),
+            None,
+        )
+        google_postal_code = next(
+            (comp.get("long_name") for comp in address_components if "postal_code" in comp.get("types", [])),
+            None,
+        )
+        google_country = next(
+            (comp.get("long_name") for comp in address_components if "country" in comp.get("types", [])),
+            None,
+        )
+
+        # Detect service level
+        service_level, confidence = detect_service_level_from_google_data(google_data)
+
+        # Check for mismatches and build fixes
+        mismatches, fixes = _build_validation_mismatches_and_fixes(
+            name,
+            address,
+            google_name,
+            google_street_address,
+            google_city,
+            google_state,
+            google_postal_code,
+            google_country,
+            google_phone,
+            google_website,
+            service_level,
+            confidence,
+            google_place_id,
+        )
+
+        # Prepare response data
+        return {
+            "valid": True,
+            "mismatches": mismatches,
+            "fixes": fixes,
+            "google_data": {
+                "name": google_name,
+                "address": google_street_address,
+                "full_address": google_address,
+                "rating": google_rating,
+                "phone": google_phone,
+                "website": google_website,
+                "price_level": google_price_level,
+                "service_level": service_level,
+                "confidence": confidence,
+                "place_id": google_place_id,
+            },
+        }
+
+    except Exception as e:
+        current_app.logger.error(f"Error processing validation results: {e}")
+        return {"valid": False, "mismatches": [], "fixes": {}, "google_data": {}}
+
+
+def _build_validation_mismatches_and_fixes(
+    name: str,
+    address: str,
+    google_name: str,
+    google_street_address: str,
+    google_city: str,
+    google_state: str,
+    google_postal_code: str,
+    google_country: str,
+    google_phone: str,
+    google_website: str,
+    service_level: str,
+    confidence: float,
+    google_place_id: str,
+) -> Tuple[List[str], Dict[str, str]]:
+    """Build mismatches list and fixes dictionary."""
+    mismatches = []
+    fixes = {}
+
+    # Check for name and address mismatches
+    _check_name_mismatch(name, google_name, mismatches, fixes)
+    _check_address_mismatch(address, google_street_address, mismatches, fixes)
+
+    # Add other potential fixes
+    _add_google_data_fixes(
+        fixes,
+        google_city,
+        google_state,
+        google_postal_code,
+        google_country,
+        google_phone,
+        google_website,
+        service_level,
+        confidence,
+        google_place_id,
+    )
+
+    return mismatches, fixes
+
+
+def _check_name_mismatch(name: str, google_name: str, mismatches: List[str], fixes: Dict[str, str]) -> None:
+    """Check for name mismatch and add to lists if found."""
+    if google_name and google_name.lower() != name.lower():
+        mismatches.append(f"Name: '{name}' vs Google: '{google_name}'")
+        fixes["name"] = google_name
+
+
+def _check_address_mismatch(
+    address: str, google_street_address: str, mismatches: List[str], fixes: Dict[str, str]
+) -> None:
+    """Check for address mismatch and add to lists if found."""
+    if google_street_address and google_street_address.lower() != address.lower():
+        mismatches.append(f"Address: '{address}' vs Google: '{google_street_address}'")
+        fixes["address"] = google_street_address
+
+
+def _add_google_data_fixes(
+    fixes: Dict[str, str],
+    google_city: str,
+    google_state: str,
+    google_postal_code: str,
+    google_country: str,
+    google_phone: str,
+    google_website: str,
+    service_level: str,
+    confidence: float,
+    google_place_id: str,
+) -> None:
+    """Add Google data fixes to the fixes dictionary."""
+    if google_city:
+        fixes["city"] = google_city
+    if google_state:
+        fixes["state"] = google_state
+    if google_postal_code:
+        fixes["postal_code"] = google_postal_code
+    if google_country:
+        fixes["country"] = google_country
+    if google_phone:
+        fixes["phone"] = google_phone
+    if google_website:
+        fixes["website"] = google_website
+    if service_level != "unknown" and confidence > 0.3:
+        fixes["service_level"] = service_level
+    if google_place_id:
+        fixes["google_place_id"] = google_place_id

@@ -53,6 +53,18 @@ CUISINE_COLORS = {
     "Brazilian": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
     "Peruvian": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
     "Argentinian": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
+    "Breakfast & Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107 TODO handle alternatives better
+    "Breakfast and Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
+    "Breakfast&Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
+    "Breakfast - Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
+    "Breakfast": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
+    "Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
+    "Coffee House": "#92400e",  # Custom brown
+    "Coffee Bar": "#92400e",  # Custom brown
+    "Cafe": "#92400e",  # Custom brown
+    "Deli": BOOTSTRAP_COLORS["teal"]["hex"],  # #20c997
+    "Bakery": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
+    "Ice Cream": "#e83e8c",  # Custom pink
 }
 
 # Cuisine constants with colors and icons
@@ -225,6 +237,78 @@ CUISINE_CONSTANTS: List[CuisineData] = [
         "icon": "hamburger",
         "description": "Fast food cuisine",
     },
+    {
+        "name": "Breakfast & Brunch",
+        "color": "#f59e0b",  # Bolder Yellow
+        "icon": "coffee",
+        "description": "Breakfast and brunch restaurants",
+    },
+    {
+        "name": "Breakfast and Brunch",
+        "color": "#f59e0b",  # Bolder Yellow
+        "icon": "coffee",
+        "description": "Breakfast and brunch restaurants",
+    },
+    {
+        "name": "Breakfast&Brunch",
+        "color": "#f59e0b",  # Bolder Yellow
+        "icon": "coffee",
+        "description": "Breakfast and brunch restaurants",
+    },
+    {
+        "name": "Breakfast - Brunch",
+        "color": "#f59e0b",  # Bolder Yellow
+        "icon": "coffee",
+        "description": "Breakfast and brunch restaurants",
+    },
+    {
+        "name": "Breakfast",
+        "color": "#f59e0b",  # Bolder Yellow
+        "icon": "coffee",
+        "description": "Breakfast restaurants",
+    },
+    {
+        "name": "Brunch",
+        "color": "#f59e0b",  # Bolder Yellow
+        "icon": "coffee",
+        "description": "Brunch restaurants",
+    },
+    {
+        "name": "Coffee House",
+        "color": "#92400e",  # Custom brown
+        "icon": "coffee",
+        "description": "Coffee houses and cafes",
+    },
+    {
+        "name": "Coffee Bar",
+        "color": "#92400e",  # Custom brown
+        "icon": "coffee",
+        "description": "Coffee bars and cafes",
+    },
+    {
+        "name": "Cafe",
+        "color": "#92400e",  # Bolder Brown
+        "icon": "coffee",
+        "description": "Cafe and coffee shops",
+    },
+    {
+        "name": "Deli",
+        "color": "#059669",  # Bolder Teal
+        "icon": "sandwich",
+        "description": "Deli and sandwich shops",
+    },
+    {
+        "name": "Bakery",
+        "color": "#fbbf24",  # Bolder Amber
+        "icon": "bread-slice",
+        "description": "Bakery and pastry shops",
+    },
+    {
+        "name": "Ice Cream",
+        "color": "#ec4899",  # Bolder Pink
+        "icon": "ice-cream",
+        "description": "Ice cream and dessert shops",
+    },
 ]
 
 
@@ -254,8 +338,36 @@ def get_cuisine_names() -> List[str]:
     return [cuisine["name"] for cuisine in CUISINE_CONSTANTS]
 
 
+def _fuzzy_match_cuisine(normalized_name: str) -> Optional[CuisineData]:
+    """Helper function for fuzzy cuisine matching.
+
+    Args:
+        normalized_name: Normalized cuisine name to match
+
+    Returns:
+        Matched cuisine data or None
+    """
+    for cuisine in CUISINE_CONSTANTS:
+        cuisine_lower = cuisine["name"].lower()
+
+        # Special handling for breakfast/brunch variations
+        if "breakfast" in normalized_name or "brunch" in normalized_name:
+            if "breakfast" in cuisine_lower or "brunch" in cuisine_lower:
+                return cuisine.copy()
+
+        # Special handling for other common variations
+        elif "fast food" in normalized_name and "fast food" in cuisine_lower:
+            return cuisine.copy()
+        elif "ice cream" in normalized_name and "ice cream" in cuisine_lower:
+            return cuisine.copy()
+        elif "coffee" in normalized_name and "cafe" in cuisine_lower:
+            return cuisine.copy()
+
+    return None
+
+
 def get_cuisine_data(cuisine_name: str) -> Optional[CuisineData]:
-    """Get cuisine data by name.
+    """Get cuisine data by name with fuzzy matching for common variations.
 
     Args:
         cuisine_name: Name of the cuisine to look up
@@ -275,14 +387,20 @@ def get_cuisine_data(cuisine_name: str) -> Optional[CuisineData]:
     if len(cuisine_name) > 100:
         return None
 
-    # Case-insensitive lookup
-    normalized_name = cuisine_name.strip()
+    # Normalize the input
+    normalized_name = cuisine_name.strip().lower()
 
+    # Remove common punctuation and extra spaces
+    normalized_name = normalized_name.replace("&", " and ").replace("-", " ")
+    normalized_name = " ".join(normalized_name.split())  # Remove extra spaces
+
+    # First, try exact match (case-insensitive)
     for cuisine in CUISINE_CONSTANTS:
-        if cuisine["name"].lower() == normalized_name.lower():
+        if cuisine["name"].lower() == normalized_name:
             return cuisine.copy()  # Return copy for safety
 
-    return None
+    # Then, try fuzzy matching
+    return _fuzzy_match_cuisine(normalized_name)
 
 
 def get_cuisine_color(cuisine_name: str) -> str:

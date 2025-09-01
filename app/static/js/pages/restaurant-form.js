@@ -654,7 +654,20 @@ function showExistingRestaurantModal(existsData) {
 
 // Utility functions
 function getCSRFToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.content || '';
+  // Try meta tag first (preferred method)
+  const meta_tag = document.querySelector('meta[name="csrf-token"]');
+  if (meta_tag && meta_tag.getAttribute('content')) {
+    return meta_tag.getAttribute('content');
+  }
+
+  // Fallback to form input
+  const csrf_input = document.querySelector('input[name="csrf_token"]');
+  if (csrf_input && csrf_input.value) {
+    return csrf_input.value;
+  }
+
+  console.warn('CSRF token not found in DOM');
+  return '';
 }
 
 function showSuccess(message) {

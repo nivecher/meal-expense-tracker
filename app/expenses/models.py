@@ -15,6 +15,170 @@ if TYPE_CHECKING:
     from app.restaurants.models import Restaurant
 
 
+class Tag(BaseModel):
+    """Tag model for custom expense labels.
+
+    Attributes:
+        name: Name of the tag (unique per user)
+        color: Hex color code for the tag badge
+        description: Optional description of the tag
+        user_id: ID of the user who owns this tag
+
+    Notes:
+        - Each user can have their own set of tags
+        - Tags are soft-deleted when a user is deleted
+        - Tags follow Jira-style naming conventions
+    """
+
+    __tablename__ = "tag"
+    __table_args__ = (
+        UniqueConstraint("name", "user_id", name="uix_tag_name_user"),
+        {"comment": "Custom tags for organizing expenses"},
+    )
+
+    # Tag details
+    name: Mapped[str] = db.Column(
+        db.String(50),
+        nullable=False,
+        index=True,
+        comment="Name of the tag (unique per user, Jira-style)",
+    )
+    color: Mapped[str] = db.Column(
+        db.String(20),
+        default="#6c757d",
+        nullable=False,
+        comment="Hex color code for the tag badge (e.g., #6c757d)",
+    )
+    description: Mapped[Optional[str]] = db.Column(db.Text, nullable=True, comment="Description of the tag")
+
+    # Foreign key
+    user_id: Mapped[int] = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Reference to the user who owns this tag",
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="tags", lazy="joined", innerjoin=True)
+    expense_tags: Mapped[list["ExpenseTag"]] = relationship(
+        "ExpenseTag",
+        back_populates="tag",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="dynamic",
+    )
+
+    @property
+    def expense_count(self) -> int:
+        """Get the number of expenses using this tag."""
+        if hasattr(self, "_expense_count"):
+            return self._expense_count
+        if hasattr(self, "expense_tags") and hasattr(self.expense_tags, "count"):
+            return self.expense_tags.count()
+        return 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary representation of the tag.
+
+        Returns:
+            Dict containing the tag data with related counts
+        """
+        result = {
+            "id": self.id,
+            "name": self.name,
+            "color": self.color,
+            "description": self.description,
+            "user_id": self.user_id,
+            "expense_count": self.expense_count,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+        # Include user info if loaded
+        if hasattr(self, "user") and self.user is not None:
+            result["user"] = {"id": self.user.id, "username": self.user.username}
+
+        return result
+
+    def __repr__(self) -> str:
+        return f"<Tag(id={self.id}, name='{self.name}', user_id={self.user_id})>"
+
+
+class ExpenseTag(BaseModel):
+    """Association table for expense-tag many-to-many relationship.
+
+    Attributes:
+        expense_id: ID of the expense
+        tag_id: ID of the tag
+        added_by: ID of the user who added the tag
+
+    Notes:
+        - This is a many-to-many relationship between expenses and tags
+        - Tracks who added each tag to an expense
+        - Soft-deleted when either expense or tag is deleted
+    """
+
+    __tablename__ = "expense_tag"
+    __table_args__ = (
+        UniqueConstraint("expense_id", "tag_id", name="uix_expense_tag"),
+        {"comment": "Association table for expense-tag relationships"},
+    )
+
+    # Foreign keys
+    expense_id: Mapped[int] = db.Column(
+        db.Integer,
+        db.ForeignKey("expense.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Reference to the expense",
+    )
+    tag_id: Mapped[int] = db.Column(
+        db.Integer,
+        db.ForeignKey("tag.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Reference to the tag",
+    )
+    added_by: Mapped[int] = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="User who added this tag to the expense",
+    )
+
+    # Relationships
+    expense: Mapped["Expense"] = relationship("Expense", back_populates="expense_tags", lazy="joined", innerjoin=True)
+    tag: Mapped["Tag"] = relationship("Tag", back_populates="expense_tags", lazy="joined", innerjoin=True)
+    user: Mapped["User"] = relationship("User", lazy="joined", innerjoin=True)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary representation of the expense tag.
+
+        Returns:
+            Dict containing the expense tag data
+        """
+        result = {
+            "id": self.id,
+            "expense_id": self.expense_id,
+            "tag_id": self.tag_id,
+            "added_by": self.added_by,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+        # Include related objects if loaded
+        if hasattr(self, "tag") and self.tag is not None:
+            result["tag"] = self.tag.to_dict()
+        if hasattr(self, "user") and self.user is not None:
+            result["user"] = {"id": self.user.id, "username": self.user.username}
+
+        return result
+
+    def __repr__(self) -> str:
+        return f"<ExpenseTag(expense_id={self.expense_id}, tag_id={self.tag_id})>"
+
+
 class Expense(BaseModel):
     """Expense model for tracking meal expenses.
 
@@ -95,6 +259,20 @@ class Expense(BaseModel):
     restaurant: Mapped[Optional["Restaurant"]] = relationship("Restaurant", back_populates="expenses", lazy="joined")
     category: Mapped[Optional["Category"]] = relationship("Category", back_populates="expenses", lazy="joined")
 
+    # Tags relationship
+    expense_tags: Mapped[list["ExpenseTag"]] = relationship(
+        "ExpenseTag",
+        back_populates="expense",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="dynamic",
+    )
+
+    @property
+    def tags(self) -> list["Tag"]:
+        """Get all tags associated with this expense."""
+        return [et.tag for et in self.expense_tags if et.tag is not None]
+
     @property
     def formatted_amount(self) -> str:
         """Return the amount formatted as a currency string."""
@@ -147,6 +325,9 @@ class Expense(BaseModel):
                 "email": self.user.email,
             }
 
+        # Include tags
+        result["tags"] = [tag.to_dict() for tag in self.tags]
+
         return result
 
     def __repr__(self) -> str:
@@ -181,6 +362,28 @@ def validate_expense(mapper, connection, target):
         else:
             # For date objects, convert to timezone-aware datetime
             target.date = datetime.combine(target.date, datetime.min.time(), tzinfo=timezone.utc)
+
+
+@event.listens_for(Tag, "before_insert")
+@event.listens_for(Tag, "before_update")
+def validate_tag(mapper, connection, target):
+    """Validate tag data before insert/update."""
+    # Clean string fields
+    if target.name:
+        # Convert to lowercase and replace spaces with hyphens for Jira-style naming
+        target.name = target.name.strip().lower().replace(" ", "-")
+        # Remove any non-alphanumeric characters except hyphens
+        target.name = "".join(c for c in target.name if c.isalnum() or c == "-")
+        # Ensure it starts with a letter or number
+        if target.name and not target.name[0].isalnum():
+            target.name = target.name[1:]
+    if target.description:
+        target.description = target.description.strip()
+    if target.color:
+        # Ensure color is lowercase and starts with #
+        target.color = target.color.lower().lstrip("#")
+        if not target.color.startswith("#"):
+            target.color = f"#{target.color}"
 
 
 class Category(BaseModel):

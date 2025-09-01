@@ -119,6 +119,15 @@ resource "aws_iam_policy" "lambda_combined" {
           "arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.app_name}-${var.environment}-sessions",
           "arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.app_name}-${var.environment}-sessions/index/*"
         ]
+      },
+      # AWS SES access for email functionality
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"
       }
     ]
   })

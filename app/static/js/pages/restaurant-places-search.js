@@ -663,17 +663,12 @@ async function submit_restaurant_data(restaurant_data) {
   const result = await response.json();
 
   if (result.success) {
-    // Show success toast with message from server
-    showSuccessToast(result.message || 'Restaurant added successfully!');
-
-    // Delay redirect slightly to allow toast to show
-    setTimeout(() => {
-      if (result.redirect_url) {
-        window.location.href = result.redirect_url;
-      } else {
-        window.location.reload();
-      }
-    }, 1500); // Show toast for 1.5 seconds before redirect
+    // Show success toast with action buttons instead of redirecting
+    showSuccessToastWithActions(
+      result.message || 'Restaurant added successfully!',
+      result.restaurant_id || null,
+      restaurant_data.name || 'Restaurant'
+    );
   } else {
     throw new Error(result.message || 'Failed to add restaurant');
   }
@@ -763,7 +758,7 @@ function showConflictDialog(errorData, originalData) {
             <button type="button" class="btn btn-primary" id="viewExistingBtn" data-restaurant-id="${existingRestaurant.id}">
               <i class="fas fa-eye me-1"></i>View Restaurant
             </button>
-            <button type="button" class="btn btn-secondary" id="updateExistingBtn" data-restaurant-id="${existingRestaurant.id}">
+            <button type="button" class="btn btn-success" id="updateExistingBtn" data-restaurant-id="${existingRestaurant.id}">
               <i class="fas fa-edit me-1"></i>Update Restaurant
             </button>
           </div>
@@ -865,6 +860,120 @@ function storeGooglePlacesDataForEdit(googlePlacesData, restaurantId) {
     console.error('Error storing Google Places data:', error);
     // Fallback: redirect without data
     window.location.href = `/restaurants/${restaurantId}/edit`;
+  }
+}
+
+/**
+ * Show success toast with action buttons for newly added restaurant
+ * @param {string} message - Success message to display
+ * @param {number|null} restaurantId - ID of the newly created restaurant
+ * @param {string} restaurantName - Name of the restaurant
+ */
+function showSuccessToastWithActions(message, restaurantId, restaurantName) {
+  // Safety: Validate inputs
+  if (!message || typeof message !== 'string') {
+    console.error('Invalid message provided to showSuccessToastWithActions');
+    return;
+  }
+
+  const toastContainer = document.getElementById('toastContainer');
+  if (!toastContainer) {
+    console.error('Toast container not found');
+    return;
+  }
+
+  // Create success toast with action buttons
+  const toast = document.createElement('div');
+  toast.className = 'toast align-items-center text-white bg-success border-0';
+  toast.setAttribute('role', 'alert');
+  toast.setAttribute('aria-live', 'assertive');
+  toast.setAttribute('aria-atomic', 'true');
+
+  // Build toast content with action buttons
+  let actionButtons = '';
+  if (restaurantId) {
+    actionButtons = `
+      <div class="mt-2 d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-light" data-action="view-restaurant" data-restaurant-id="${restaurantId}">
+          <i class="fas fa-eye me-1"></i>View Restaurant
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-light" data-action="continue-search">
+          <i class="fas fa-search me-1"></i>Continue Searching
+        </button>
+      </div>
+    `;
+  }
+
+  toast.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body flex-grow-1">
+        <div class="d-flex align-items-start">
+          <i class="fas fa-check-circle me-2 mt-1" aria-hidden="true"></i>
+          <div class="flex-grow-1">
+            <strong>Success!</strong><br>
+            ${message}
+            ${actionButtons}
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close notification"></button>
+    </div>
+  `;
+
+  // Add toast to container
+  toastContainer.appendChild(toast);
+
+  // Initialize Bootstrap toast
+  const bsToast = new bootstrap.Toast(toast, {
+    autohide: false, // Don't auto-hide so user can interact with buttons
+    delay: 0,
+  });
+
+  // Set up event handlers for action buttons
+  setupSuccessToastHandlers(toast, restaurantId, bsToast);
+
+  // Show the toast
+  bsToast.show();
+
+  // Remove toast after it's hidden
+  toast.addEventListener('hidden.bs.toast', () => {
+    toast.remove();
+  });
+}
+
+/**
+ * Set up event handlers for success toast action buttons
+ * @param {HTMLElement} toast - The toast DOM element
+ * @param {number|null} restaurantId - ID of the newly created restaurant
+ * @param {Object} bsToast - Bootstrap toast instance
+ */
+function setupSuccessToastHandlers(toast, restaurantId, bsToast) {
+  // View restaurant button
+  const viewBtn = toast.querySelector('[data-action="view-restaurant"]');
+  if (viewBtn && restaurantId) {
+    viewBtn.addEventListener('click', () => {
+      bsToast.hide();
+      window.location.href = `/restaurants/${restaurantId}`;
+    });
+  }
+
+  // Continue searching button
+  const continueBtn = toast.querySelector('[data-action="continue-search"]');
+  if (continueBtn) {
+    continueBtn.addEventListener('click', () => {
+      bsToast.hide();
+      // Clear any search results and reset the search component
+      const searchResults = document.getElementById('search-results');
+      if (searchResults) {
+        searchResults.innerHTML = '';
+      }
+
+      // Focus back on search input if available
+      const searchInput = document.querySelector('#find-places-search input[type="text"]');
+      if (searchInput) {
+        searchInput.focus();
+      }
+    });
   }
 }
 

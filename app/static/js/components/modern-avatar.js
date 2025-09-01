@@ -27,13 +27,53 @@ class ModernAvatarManager {
     } else {
       this.setupAvatars();
     }
+
+    // Also run after a short delay to catch any dynamically loaded avatars
+    setTimeout(() => this.setupAvatars(), 100);
+
+    // Watch for dynamically added avatars
+    this.setupMutationObserver();
+  }
+
+  setupMutationObserver() {
+    if (typeof MutationObserver === 'undefined') return;
+
+    const observer = new MutationObserver((mutations) => {
+      let shouldUpdate = false;
+
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check if the added node is an avatar or contains avatars
+            if (node.hasAttribute && node.hasAttribute('data-avatar')) {
+              shouldUpdate = true;
+            } else if (node.querySelector && node.querySelector('[data-avatar]')) {
+              shouldUpdate = true;
+            }
+          }
+        });
+      });
+
+      if (shouldUpdate) {
+        setTimeout(() => this.setupAvatars(), 50);
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
 
   setupAvatars() {
     const avatarElements = document.querySelectorAll('[data-avatar]');
 
     avatarElements.forEach((element, index) => {
+      // Skip if already processed
+      if (element.dataset.avatarProcessed) return;
+
       this.processAvatar(element, index);
+      element.dataset.avatarProcessed = 'true';
     });
   }
 
@@ -47,14 +87,26 @@ class ModernAvatarManager {
       ...avatarData,
     });
 
-    // Add loading state
-    this.setLoadingState(element);
+    // Check if there's already an initials div - if so, just show it immediately
+    const container = element.parentNode;
+    const existingInitials = container.querySelector('.avatar-initials');
 
-    // Try to load the image
-    if (avatarData.src && avatarData.src !== avatarData.fallbackSrc) {
+    if (existingInitials) {
+      // There's already an initials div, just show it and hide the image
+      existingInitials.style.display = 'flex';
+      element.style.display = 'none';
+      element.classList.remove('avatar-loading');
+      element.classList.add('avatar-loaded');
+      return;
+    }
+
+    // Try to load the image only if there's a valid source
+    if (avatarData.src && avatarData.src.trim() !== '' && avatarData.src !== avatarData.fallbackSrc) {
+      // Add loading state only when we're actually loading an image
+      this.setLoadingState(element);
       this.loadImage(avatarId, avatarData.src);
     } else {
-      // No valid source, go straight to initials
+      // No valid source, go straight to initials without loading state
       this.showInitials(avatarId);
     }
   }
@@ -63,8 +115,14 @@ class ModernAvatarManager {
     const rect = element.getBoundingClientRect();
     const computedStyle = window.getComputedStyle(element);
 
+    // Get the image source and clean it up
+    let src = element.src || element.dataset.src || '';
+    if (src && (src.trim() === '' || src === 'about:blank' || src === 'data:,')) {
+      src = '';
+    }
+
     return {
-      src: element.src || element.dataset.src,
+      src: src,
       fallbackSrc: element.dataset.defaultSrc,
       alt: element.alt || '',
       username: element.dataset.username || this.extractUsernameFromAlt(element.alt),
@@ -133,6 +191,14 @@ class ModernAvatarManager {
     // Ensure image styling
     element.style.objectFit = 'cover';
     element.style.opacity = '1';
+    element.style.display = 'block';
+
+    // Hide any existing initials div
+    const container = element.parentNode;
+    const existingInitials = container.querySelector('.avatar-initials');
+    if (existingInitials) {
+      existingInitials.style.display = 'none';
+    }
   }
 
   showInitials(avatarId) {
@@ -143,24 +209,36 @@ class ModernAvatarManager {
     const initials = this.generateInitials(username, email, element);
     const colors = this.getColorForUser(username || email);
 
-    // Replace img element with initials div
-    const initialsElement = this.createInitialsElement(initials, colors, size);
+    // Check if there's already an initials div in the container
+    const container = element.parentNode;
+    const existingInitials = container.querySelector('.avatar-initials');
 
-    // Copy over classes and attributes we want to preserve
-    initialsElement.className = element.className;
-    initialsElement.classList.remove('avatar-loading');
-    initialsElement.classList.add('avatar-initials', 'avatar-loaded');
+    if (existingInitials) {
+      // Update existing initials div
+      existingInitials.textContent = initials;
+      existingInitials.style.background = `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1]} 100%)`;
+      existingInitials.style.display = 'flex';
+      element.style.display = 'none';
+    } else {
+      // Create new initials div (fallback for old implementations)
+      const initialsElement = this.createInitialsElement(initials, colors, size);
 
-    // Copy data attributes
-    Object.keys(element.dataset).forEach((key) => {
-      initialsElement.dataset[key] = element.dataset[key];
-    });
+      // Copy over classes and attributes we want to preserve
+      initialsElement.className = element.className;
+      initialsElement.classList.remove('avatar-loading');
+      initialsElement.classList.add('avatar-initials', 'avatar-loaded');
 
-    // Replace element in DOM
-    element.parentNode.replaceChild(initialsElement, element);
+      // Copy data attributes
+      Object.keys(element.dataset).forEach((key) => {
+        initialsElement.dataset[key] = element.dataset[key];
+      });
 
-    // Update our reference
-    avatarData.element = initialsElement;
+      // Replace element in DOM
+      element.parentNode.replaceChild(initialsElement, element);
+
+      // Update our reference
+      avatarData.element = initialsElement;
+    }
   }
 
   generateInitials(username, email, element = null) {
@@ -248,8 +326,14 @@ class ModernAvatarManager {
   }
 
   setLoadingState(element) {
-    element.classList.add('avatar-loading');
-    element.style.opacity = '0.7';
+    // Only show loading state if there's no existing initials div
+    const container = element.parentNode;
+    const existingInitials = container.querySelector('.avatar-initials');
+
+    if (!existingInitials) {
+      element.classList.add('avatar-loading');
+      element.style.opacity = '0.7';
+    }
   }
 
   // Public method to refresh a specific avatar

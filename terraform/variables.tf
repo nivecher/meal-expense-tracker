@@ -287,3 +287,24 @@ variable "alarm_notification_arns" {
     error_message = "Alarm notification ARNs must be valid SNS topic ARNs"
   }
 }
+
+# ======================
+# Email Configuration
+# ======================
+variable "mail_enabled" {
+  type        = bool
+  description = "Enable email functionality via AWS SES"
+  default     = true
+}
+
+variable "mail_default_sender" {
+  type        = string
+  description = "Default sender email address for AWS SES"
+  default     = "noreply@nivecher.com"
+}
+
+variable "aws_ses_region" {
+  type        = string
+  description = "AWS region for SES service"
+  default     = "us-east-1"
+}

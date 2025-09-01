@@ -79,6 +79,35 @@
                 {% if form.notes.errors %}<div class="invalid-feedback">{{ form.notes.errors[0] }}</div>{% endif %}
             </div>
         </div>
+
+        <!-- Tags Section -->
+        <div class="row mb-3">
+            <div class="col-12">
+                {{ form.tags.label(class="form-label") }}
+                <div class="tags-input-container">
+                    <div class="tags-input-wrapper">
+                        <div class="tags-display" id="tagsDisplay">
+                            <!-- Tags will be displayed here as badges -->
+                        </div>
+                        <input type="text"
+                               id="tagsInput"
+                               class="form-control tags-input"
+                               placeholder="Type to add tags..."
+                               autocomplete="off">
+                    </div>
+                    <div class="tags-suggestions" id="tagsSuggestions" style="display: none;">
+                        <!-- Tag suggestions will appear here -->
+                    </div>
+                </div>
+                <div class="form-text">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Tags are automatically created and follow Jira-style naming (lowercase with hyphens)
+                    </small>
+                </div>
+                {% if form.tags.errors %}<div class="invalid-feedback">{{ form.tags.errors[0] }}</div>{% endif %}
+            </div>
+        </div>
         <div class="d-flex justify-content-between">
             {% if expense and expense.restaurant %}
                 <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
@@ -91,12 +120,18 @@
     </form>
 {% endmacro %}
 {% macro expense_scripts() %}
+    <!-- Tags CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tags.css') }}">
+
     <!-- Expense form handler (handles form submission via Fetch API) -->
     <script type="module"
             src="{{ url_for('static', filename='js/pages/expense-form-handler.js') }}"></script>
     <!-- Category and restaurant type handling -->
     <script type="module"
             src="{{ url_for('static', filename='js/pages/expense-form.js') }}"></script>
+    <!-- Tags input component -->
+    <script src="{{ url_for('static', filename='js/components/tags-input.js') }}"></script>
+
     <!-- Category dropdown enhancement -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -117,6 +152,15 @@
 
                 categorySelect.addEventListener('change', updateCategoryStyle);
                 updateCategoryStyle(); // Set initial style
+            }
+
+            // Initialize tags input
+            const tagsContainer = document.querySelector('[data-tags-input]');
+            if (tagsContainer) {
+                const expenseId = tagsContainer.dataset.expenseId;
+                window.tagsInputInstance = new TagsInput(tagsContainer, {
+                    expenseId: expenseId ? parseInt(expenseId) : null
+                });
             }
         });
     </script>

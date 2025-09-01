@@ -1,5 +1,6 @@
 /* Main CSS file for Meal Expense Tracker */
 @import url('../css/components/table.css');
+@import url('../css/components/avatar.css');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {

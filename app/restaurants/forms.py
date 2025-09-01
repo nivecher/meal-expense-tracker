@@ -8,7 +8,20 @@ from wtforms import (
     SubmitField,
     TextAreaField,
 )
-from wtforms.validators import URL, DataRequired, Length, NumberRange, Optional
+from wtforms.validators import (
+    URL,
+    DataRequired,
+    Length,
+    NumberRange,
+    Optional,
+    ValidationError,
+)
+
+
+def validate_service_level(form, field):
+    """Validate service level field."""
+    if field.data and field.data not in ["", "fine_dining", "casual_dining", "fast_casual", "quick_service", "unknown"]:
+        raise ValidationError("Invalid service level selected.")
 
 
 class RestaurantForm(FlaskForm):
@@ -43,6 +56,22 @@ class RestaurantForm(FlaskForm):
 
     # Additional Information
     cuisine = StringField("Cuisine", validators=[Optional(), Length(max=100)])
+    service_level = SelectField(
+        "Service Level",
+        choices=[
+            ("", "Auto-detect (Google)"),
+            ("fine_dining", "Fine Dining"),
+            ("casual_dining", "Casual Dining"),
+            ("fast_casual", "Fast Casual"),
+            ("quick_service", "Quick Service"),
+            ("unknown", "Unknown"),
+        ],
+        validators=[Optional(), validate_service_level],
+        render_kw={
+            "data-bs-toggle": "tooltip",
+            "title": "Service level will be auto-detected from Google Places data if available",
+        },
+    )
     rating = FloatField(
         "Your Rating",
         validators=[Optional(), NumberRange(min=1.0, max=5.0)],

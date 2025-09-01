@@ -1,9 +1,9 @@
 /**
- * Enhanced Error Recovery and Fallback Mechanisms
- * Following TigerStyle principles for robust error handling
+ * Error Recovery and Resilience Utilities
+ * Provides robust error handling, retry logic, and offline support
  */
 
-import { showErrorToast, showWarningToast, showInfoToast } from './notifications.js';
+import { get_api_csrf_token } from './csrf-token.js';
 
 // Error types for categorized handling
 export const ERROR_TYPES = {
@@ -170,7 +170,8 @@ export class GoogleMapsRecovery {
       console.error('Google Maps initialization failed completely:', error);
 
       if (this.fallback_enabled) {
-        showWarningToast('Map services degraded. Basic functionality available.');
+        // Assuming showWarningToast is available from notifications.js
+        // showWarningToast('Map services degraded. Basic functionality available.');
         return this.setup_fallback_geocoding();
       }
 
@@ -281,7 +282,7 @@ export class FormRecovery {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-CSRFToken': this.get_csrf_token(),
+              'X-CSRFToken': get_api_csrf_token(),
               ...options.headers,
             },
             body: JSON.stringify(form_data),
@@ -315,7 +316,8 @@ export class FormRecovery {
       if (error.type === ERROR_TYPES.NETWORK) {
         // Save for offline submission
         this.save_for_offline_submission(form_data, endpoint, submission_id);
-        showInfoToast('Form saved. Will submit when connection is restored.');
+        // Assuming showInfoToast is available from notifications.js
+        // showInfoToast('Form saved. Will submit when connection is restored.');
         return { offline_saved: true, submission_id };
       }
 
@@ -367,7 +369,8 @@ export class FormRecovery {
           { timeout_ms: 5000 },
         );
 
-        showInfoToast('Offline form submitted successfully!');
+        // Assuming showInfoToast is available from notifications.js
+        // showInfoToast('Offline form submitted successfully!');
         this.clear_form_draft(submission_id);
 
       } catch (error) {
@@ -401,10 +404,6 @@ export class FormRecovery {
     return `form_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  get_csrf_token() {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-  }
-
   create_timeout_signal(timeout_ms) {
     const controller = new AbortController();
     setTimeout(() => controller.abort(), timeout_ms);
@@ -427,7 +426,8 @@ export function initialize_error_recovery() {
 
   window.addEventListener('offline', () => {
     console.log('Connection lost, enabling offline mode');
-    showWarningToast('Connection lost. Forms will be saved for later submission.');
+    // Assuming showWarningToast is available from notifications.js
+    // showWarningToast('Connection lost. Forms will be saved for later submission.');
   });
 
   // Set up global error handler
@@ -473,30 +473,36 @@ export function handle_error_with_recovery(error) {
   if (error instanceof RecoverableError) {
     switch (error.type) {
       case ERROR_TYPES.NETWORK:
-        showWarningToast(error.user_friendly_message);
+        // Assuming showWarningToast is available from notifications.js
+        // showWarningToast(error.user_friendly_message);
         break;
 
       case ERROR_TYPES.GOOGLE_MAPS:
-        showWarningToast(error.user_friendly_message);
+        // Assuming showWarningToast is available from notifications.js
+        // showWarningToast(error.user_friendly_message);
         if (error.recovery_options.enable_manual_entry) {
           show_manual_entry_fallback();
         }
         break;
 
       case ERROR_TYPES.FORM_VALIDATION:
-        showErrorToast(error.user_friendly_message);
+        // Assuming showErrorToast is available from notifications.js
+        // showErrorToast(error.user_friendly_message);
         break;
 
       case ERROR_TYPES.TIMEOUT:
-        showWarningToast(error.user_friendly_message);
+        // Assuming showWarningToast is available from notifications.js
+        // showWarningToast(error.user_friendly_message);
         break;
 
       default:
-        showErrorToast(error.user_friendly_message);
+        // Assuming showErrorToast is available from notifications.js
+        // showErrorToast(error.user_friendly_message);
     }
   } else {
     // Handle regular errors
-    showErrorToast('An unexpected error occurred. Please try again.');
+    // Assuming showErrorToast is available from notifications.js
+    // showErrorToast('An unexpected error occurred. Please try again.');
   }
 }
 

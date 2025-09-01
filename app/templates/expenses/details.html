@@ -54,22 +54,20 @@
                         <div class="col-md-6 mb-3">
                             <h6 class="text-muted mb-1">Meal Type</h6>
                             {% if expense.meal_type %}
-                                <span class="meal-type-badge compact {{ expense.meal_type.lower().replace(' ', '-') }}">
+                                <span class="meal-type-badge {{ expense.meal_type|meal_type_css_class }}">
                                     <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
                                 </span>
                             {% else %}
-                                <span class="text-muted">Not specified</span>
+                                <span class="text-muted">-</span>
                             {% endif %}
                         </div>
 
                         <!-- Category with Enhanced Badge -->
-                        {% if expense.category %}
                         <div class="col-md-6 mb-3">
                             <h6 class="text-muted mb-1">Category</h6>
                             {% from 'macros/category_helpers.html' import category_badge %}
-                            {{ category_badge(expense.category, compact=true) }}
+                            {{ category_badge(expense.category) }}
                         </div>
-                        {% endif %}
                     </div>
 
                     <!-- Restaurant Info Section -->
@@ -106,7 +104,7 @@
                                 </span>
                                 {% endif %}
                                 {% if expense.restaurant.type %}
-                                <span class="badge bg-secondary text-white">{{ expense.restaurant.type|title }}</span>
+                                    <span class="badge bg-secondary text-white">{{ expense.restaurant.type|title }}</span>
                                 {% endif %}
                             </div>
                         </div>

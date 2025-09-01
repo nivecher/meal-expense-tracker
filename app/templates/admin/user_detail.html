@@ -1,0 +1,223 @@
+{% extends "admin/base.html" %}
+{% from 'macros/avatar_helpers.html' import user_avatar_simple %}
+
+{% block page_actions %}
+<div class="btn-group" role="group">
+    <a href="{{ url_for('admin.list_users') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>
+        Back to Users
+    </a>
+    <a href="{{ url_for('admin.create_user') }}" class="btn btn-success">
+        <i class="fas fa-user-plus me-1"></i>
+        Create User
+    </a>
+</div>
+{% endblock %}
+
+{% block admin_content %}
+<div class="row">
+    <!-- User Information -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user me-2"></i>User Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Username</label>
+                            <p class="form-control-plaintext">{{ user.username }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Email</label>
+                            <p class="form-control-plaintext">
+                                <a href="mailto:{{ user.email }}" class="text-decoration-none">
+                                    {{ user.email }}
+                                </a>
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Display Name</label>
+                            <p class="form-control-plaintext">{{ user.get_display_name() }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">First Name</label>
+                            <p class="form-control-plaintext">{{ user.first_name or 'Not set' }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Last Name</label>
+                            <p class="form-control-plaintext">{{ user.last_name or 'Not set' }}</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Phone</label>
+                            <p class="form-control-plaintext">{{ user.phone or 'Not set' }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {% if user.bio %}
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Bio</label>
+                    <p class="form-control-plaintext">{{ user.bio }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- User Status & Actions -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>Status & Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- User Avatar -->
+                <div class="text-center mb-4">
+                    {{ user_avatar_simple(user, size='xl', class='mx-auto') }}
+                    <h5 class="mt-3 mb-1">{{ user.get_display_name() }}</h5>
+                    <p class="text-muted">@{{ user.username }}</p>
+                </div>
+
+                <!-- Status Badges -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Status:</span>
+                        {% if user.is_active %}
+                            <span class="badge bg-success">Active</span>
+                        {% else %}
+                            <span class="badge bg-danger">Inactive</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Role:</span>
+                        {% if user.is_admin %}
+                            <span class="badge bg-warning">Admin</span>
+                        {% else %}
+                            <span class="badge bg-secondary">User</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <form method="POST" action="{{ url_for('admin.reset_user_password', user_id=user.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-warning w-100 mb-2"
+                                data-confirm="Are you sure you want to reset the password for {{ user.get_display_name() }}? A new password will be generated and sent to their email.">
+                            <i class="fas fa-key me-1"></i>
+                            Reset Password
+                        </button>
+                    </form>
+
+                    {% if user.id != current_user.id %}
+                        <form method="POST" action="{{ url_for('admin.toggle_user_admin', user_id=user.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-{{ 'danger' if user.is_admin else 'success' }} w-100 mb-2"
+                                    data-confirm="Are you sure you want to {{ 'remove admin privileges from' if user.is_admin else 'grant admin privileges to' }} {{ user.get_display_name() }}?">
+                                <i class="fas fa-user-shield me-1"></i>
+                                {{ 'Remove Admin' if user.is_admin else 'Make Admin' }}
+                            </button>
+                        </form>
+
+                        <form method="POST" action="{{ url_for('admin.toggle_user_active', user_id=user.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-{{ 'danger' if user.is_active else 'success' }} w-100 mb-2"
+                                    data-confirm="Are you sure you want to {{ 'deactivate' if user.is_active else 'activate' }} {{ user.get_display_name() }}?">
+                                <i class="fas fa-user-{{ 'times' if user.is_active else 'check' }} me-1"></i>
+                                {{ 'Deactivate' if user.is_active else 'Activate' }} Account
+                            </button>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-1"></i>
+                            You cannot modify your own account
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Information -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Account Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <small class="text-muted">User ID:</small>
+                    <div class="fw-bold">{{ user.id }}</div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Created:</small>
+                    <div class="fw-bold">
+                        {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'Unknown' }}
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Last Updated:</small>
+                    <div class="fw-bold">
+                        {{ user.updated_at.strftime('%Y-%m-%d %H:%M') if user.updated_at else 'Unknown' }}
+                    </div>
+                </div>
+                {% if user.timezone %}
+                <div class="mb-2">
+                    <small class="text-muted">Timezone:</small>
+                    <div class="fw-bold">{{ user.timezone }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Statistics -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>User Statistics
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h3 text-primary">{{ stats.expense_count }}</div>
+                            <div class="text-muted">Expenses</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h3 text-success">{{ stats.restaurant_count }}</div>
+                            <div class="text-muted">Restaurants</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h3 text-info">{{ stats.category_count }}</div>
+                            <div class="text-muted">Categories</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h3 text-warning">{{ (stats.expense_count + stats.restaurant_count + stats.category_count) }}</div>
+                            <div class="text-muted">Total Items</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

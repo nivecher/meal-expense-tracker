@@ -36,6 +36,16 @@ class Config:
     GOOGLE_MAPS_API_KEY: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
     GOOGLE_MAPS_MAP_ID: str = os.getenv("GOOGLE_MAPS_MAP_ID", "")
 
+    # Application settings
+    APP_NAME: str = os.getenv("APP_NAME", "Meal Expense Tracker")
+
+    # Email configuration (AWS SES only)
+    MAIL_ENABLED: bool = os.getenv("MAIL_ENABLED", "false").lower() == "true"
+    MAIL_DEFAULT_SENDER: str = os.getenv("MAIL_DEFAULT_SENDER", "noreply@nivecher.com")
+
+    # AWS SES configuration (uses IAM roles by default)
+    AWS_SES_REGION: str = os.getenv("AWS_SES_REGION", "us-east-1")
+
     def __init__(self) -> None:
         """Initialize configuration."""
         # Set environment if not set

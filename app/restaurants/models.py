@@ -77,6 +77,9 @@ class Restaurant(BaseModel):
 
     # Business Details - User Customizable
     cuisine: Mapped[Optional[str]] = db.Column(db.String(100), index=True, comment="Type of cuisine")
+    service_level: Mapped[Optional[str]] = db.Column(
+        db.String(50), index=True, comment="Service level (fine_dining, casual_dining, fast_casual, quick_service)"
+    )
     is_chain: Mapped[bool] = db.Column(
         db.Boolean,
         default=False,

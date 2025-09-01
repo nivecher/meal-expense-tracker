@@ -75,6 +75,15 @@ function validateFormData(formData) {
     errors.date = ['Please enter a valid date in YYYY-MM-DD format'];
   }
 
+  // Add tags to form data if available
+  const tagsInput = document.querySelector('[data-tags-input]');
+  if (tagsInput && window.tagsInputInstance) {
+    const tags = window.tagsInputInstance.getTags();
+    if (tags.length > 0) {
+      formData.append('tags', JSON.stringify(tags));
+    }
+  }
+
   console.log('Validation errors:', errors);
   return Object.keys(errors).length === 0 ? null : errors;
 }

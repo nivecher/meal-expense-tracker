@@ -48,6 +48,24 @@ th {
   text-align: inherit;
 }
 
+/* Favicon loading improvements */
+.restaurant-favicon,
+.restaurant-favicon-table {
+  border-radius: 4px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+}
+
+.restaurant-favicon:not([src]),
+.restaurant-favicon-table:not([src]) {
+  display: none;
+}
+
+.restaurant-fallback-icon,
+.restaurant-fallback-icon-table {
+  transition: opacity 0.2s ease-in-out;
+}
+
 /* Backdrop filter with vendor prefixes */
 .backdrop-blur {
   -webkit-backdrop-filter: blur(10px);

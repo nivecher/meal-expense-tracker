@@ -217,6 +217,7 @@ function setup_suggestion_handlers() {
 
 async function select_restaurant(place_id) {
   try {
+    // First, get basic place info for immediate feedback
     const place = new google.maps.places.Place({
       id: place_id,
       requestedLanguage: 'en',
@@ -226,15 +227,59 @@ async function select_restaurant(place_id) {
       fields: ['id', 'displayName', 'formattedAddress', 'websiteURI', 'nationalPhoneNumber', 'addressComponents', 'types', 'primaryType'],
     });
 
-    populate_form(place);
-    hide_suggestions();
+    // Show immediate feedback
     search_input.value = place.displayName;
-    show_success_feedback(`Restaurant "${place.displayName}" selected!`);
+    show_success_feedback(`Loading details for "${place.displayName}"...`);
+
+    // Then fetch detailed information including service level from our backend
+    const detailed_response = await fetch(`/restaurants/find-by-google-place?place_id=${place_id}`, {
+      credentials: 'same-origin' // Include cookies for authentication
+    });
+
+    if (!detailed_response.ok) {
+      throw new Error(`HTTP ${detailed_response.status}: ${detailed_response.statusText}`);
+    }
+
+    const detailed_data = await detailed_response.json();
+
+    if (detailed_data.error) {
+      throw new Error(detailed_data.error);
+    }
+
+    // Populate form with detailed data including service level
+    populate_form_with_detailed_data(detailed_data);
+    hide_suggestions();
+
+    // Show success message with service level info
+    let successMessage = `Restaurant "${detailed_data.name}" selected!`;
+    if (detailed_data.service_level_display) {
+      successMessage += ` Service Level will be auto-detected: ${detailed_data.service_level_display}`;
+    }
+    show_success_feedback(successMessage);
 
   } catch (error) {
     console.error('Error fetching place details:', error);
-    if (window.showErrorToast) {
-      window.showErrorToast('Failed to load restaurant details.');
+
+    // Fallback to basic place data if detailed fetch fails
+    try {
+      const place = new google.maps.places.Place({
+        id: place_id,
+        requestedLanguage: 'en',
+      });
+
+      await place.fetchFields({
+        fields: ['id', 'displayName', 'formattedAddress', 'websiteURI', 'nationalPhoneNumber', 'addressComponents', 'types', 'primaryType'],
+      });
+
+      populate_form(place);
+      hide_suggestions();
+      search_input.value = place.displayName;
+      show_success_feedback(`Restaurant "${place.displayName}" selected! (Service level detection unavailable)`);
+    } catch (fallback_error) {
+      console.error('Fallback also failed:', fallback_error);
+      if (window.showErrorToast) {
+        window.showErrorToast('Failed to load restaurant details.');
+      }
     }
   }
 }
@@ -348,6 +393,48 @@ function populate_form(place) {
   }
   if (typeAndCuisine.cuisine) {
     successMessage += `, Cuisine: ${typeAndCuisine.cuisine}`;
+  }
+  show_success_feedback(successMessage);
+}
+
+function populate_form_with_detailed_data(data) {
+  console.log('Restaurant Autocomplete: Populating form with detailed data:', data);
+
+  // Map backend response fields to form fields
+  const fields = {
+    name: data.name || '',
+    address: data.address || '',
+    city: data.city || '',
+    state: data.state || '',
+    postal_code: data.postal_code || '',
+    country: data.country || '',
+    phone: data.phone || '',
+    website: data.website || '',
+    google_place_id: data.google_place_id || '',
+    service_level: '', // Always set to Auto-detect when selecting from Google Places
+  };
+
+  console.log('Restaurant Autocomplete: Detailed field mappings:', fields);
+
+  Object.entries(fields).forEach(([field_id, value]) => {
+    const field = document.getElementById(field_id);
+    if (field && value) {
+      field.value = value;
+      console.log(`Restaurant Autocomplete: Set ${field_id} = ${value}`);
+    } else if (field) {
+      console.log(`Restaurant Autocomplete: Field ${field_id} found but no value to set`);
+    } else if (value) {
+      console.warn(`Restaurant Autocomplete: Field ${field_id} not found in DOM`);
+    }
+  });
+
+  // Show success feedback with service level info
+  let successMessage = `Restaurant "${data.name}" selected and form populated!`;
+  if (data.service_level_display) {
+    successMessage += ` Service Level will be auto-detected: ${data.service_level_display}`;
+  }
+  if (data.service_level_confidence) {
+    successMessage += ` (Confidence: ${data.service_level_confidence})`;
   }
   show_success_feedback(successMessage);
 }

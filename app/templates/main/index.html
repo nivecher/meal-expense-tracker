@@ -220,7 +220,7 @@
                             </td>
                             <td>
                                 {% if expense.meal_type %}
-                                <span class="meal-type-badge compact {{ expense.meal_type.lower().replace(' ', '-') }}">
+                                <span class="meal-type-badge compact {{ expense.meal_type|meal_type_css_class }}">
                                     <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
                                 </span>
                                 {% else %} - {% endif %}

@@ -26,6 +26,166 @@ def register_commands(app):
     restaurant_cli.add_command(validate_restaurants)
 
 
+def _build_street_address_from_components(address_components: list[dict]) -> str:
+    """Build street address from Google Places address components."""
+    street_number = next(
+        (comp.get("long_name") for comp in address_components if "street_number" in comp.get("types", [])),
+        None,
+    )
+    route = next(
+        (comp.get("long_name") for comp in address_components if "route" in comp.get("types", [])),
+        None,
+    )
+    return " ".join(filter(None, [street_number, route]))
+
+
+def _detect_service_level_from_google_data(google_data: dict) -> tuple[str, float]:
+    """Detect service level from Google Places data."""
+    from app.restaurants.services import detect_service_level_from_google_data
+
+    return detect_service_level_from_google_data(google_data)
+
+
+def _get_restaurants_without_google_id(
+    user_id: int | None, username: str | None, all_users: bool, restaurant_id: int | None
+) -> list[Restaurant]:
+    """Get restaurants without Google Place IDs for service level updates."""
+    try:
+        if restaurant_id:
+            restaurant = Restaurant.query.get(restaurant_id)
+            if restaurant and not restaurant.google_place_id:
+                return [restaurant]
+            return []
+
+        users = _get_target_users(user_id, username, all_users)
+        if not users:
+            return []
+
+        restaurants = []
+        for user in users:
+            user_restaurants = (
+                Restaurant.query.filter_by(user_id=user.id).filter(Restaurant.google_place_id.is_(None)).all()
+            )
+            restaurants.extend(user_restaurants)
+
+        return restaurants
+    except Exception as e:
+        click.echo(f"❌ Error getting restaurants without Google Place IDs: {e}")
+        return []
+
+
+def _update_service_levels_for_restaurants(restaurants: list[Restaurant], dry_run: bool) -> int:
+    """Update service levels for restaurants using backend logic."""
+    from app.restaurants.services import detect_service_level_from_google_data
+
+    fixed_count = 0
+
+    for restaurant in restaurants:
+        click.echo(f"\n🍽️  {restaurant.name} (ID: {restaurant.id})")
+        click.echo(f"   User: {restaurant.user.username}")
+        click.echo(f"   Current Service Level: {restaurant.service_level or 'Not set'}")
+
+        # Note: Google Places data not available without Google Place ID
+
+        # For now, we'll use a simple heuristic based on restaurant name and other available data
+        # This could be enhanced with external APIs or manual classification
+        suggested_service_level = _suggest_service_level_from_restaurant_data(restaurant)
+
+        if suggested_service_level and suggested_service_level != restaurant.service_level:
+            if dry_run:
+                click.echo(
+                    f"   🔧 Would update service level: '{restaurant.service_level or 'Not set'}' → '{suggested_service_level}'"
+                )
+            else:
+                try:
+                    restaurant.service_level = suggested_service_level
+                    db.session.commit()
+                    click.echo(f"   ✅ Updated service level: '{suggested_service_level}'")
+                    fixed_count += 1
+                except Exception as e:
+                    db.session.rollback()
+                    click.echo(f"   ❌ Error updating service level: {e}")
+        else:
+            click.echo("   ℹ️  No service level update needed")
+
+    return fixed_count
+
+
+def _suggest_service_level_from_restaurant_data(restaurant: Restaurant) -> str | None:
+    """Suggest service level based on available restaurant data."""
+    name_lower = restaurant.name.lower()
+
+    # Quick service indicators
+    quick_service_keywords = [
+        "mcdonald",
+        "burger king",
+        "wendy",
+        "subway",
+        "kfc",
+        "taco bell",
+        "pizza hut",
+        "domino",
+        "chipotle",
+        "starbucks",
+        "dunkin",
+        "pizza",
+        "burger",
+        "sandwich",
+        "coffee",
+        "ice cream",
+        "donut",
+        "bakery",
+    ]
+
+    # Fast casual indicators
+    fast_casual_keywords = [
+        "panera",
+        "chipotle",
+        "qdoba",
+        "moe",
+        "noodles",
+        "panda express",
+        "five guys",
+        "shake shack",
+        "in-n-out",
+        "whataburger",
+    ]
+
+    # Fine dining indicators
+    fine_dining_keywords = [
+        "steakhouse",
+        "grill",
+        "bistro",
+        "cafe",
+        "restaurant",
+        "dining",
+        "kitchen",
+        "table",
+        "chef",
+        "gourmet",
+        "fine",
+        "upscale",
+    ]
+
+    # Check for quick service
+    for keyword in quick_service_keywords:
+        if keyword in name_lower:
+            return "quick_service"
+
+    # Check for fast casual
+    for keyword in fast_casual_keywords:
+        if keyword in name_lower:
+            return "fast_casual"
+
+    # Check for fine dining
+    for keyword in fine_dining_keywords:
+        if keyword in name_lower:
+            return "fine_dining"
+
+    # Default to casual dining if no specific indicators found
+    return "casual_dining"
+
+
 def _get_target_users(user_id: int | None, username: str | None, all_users: bool) -> list[User]:
     """Get target users based on options."""
     if user_id:
@@ -84,6 +244,7 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                     "international_phone_number",
                     "price_level",
                     "editorial_summary",
+                    "address_component",
                 ],
             )
 
@@ -100,11 +261,11 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                     "google_phone": google_data.get("international_phone_number"),
                     "google_website": google_data.get("website"),
                     "google_price_level": google_data.get("price_level"),
-                    "google_address_components": google_data.get("address_components", []),
+                    "google_address_components": google_data.get("address_component", []),
                     "google_street_number": next(
                         (
                             comp.get("long_name")
-                            for comp in google_data.get("address_components", [])
+                            for comp in google_data.get("address_component", [])
                             if "street_number" in comp.get("types", [])
                         ),
                         None,
@@ -112,15 +273,19 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                     "google_route": next(
                         (
                             comp.get("long_name")
-                            for comp in google_data.get("address_components", [])
+                            for comp in google_data.get("address_component", [])
                             if "route" in comp.get("types", [])
                         ),
                         None,
                     ),
+                    "google_street_address": _build_street_address_from_components(
+                        google_data.get("address_component", [])
+                    ),
+                    "google_service_level": _detect_service_level_from_google_data(google_data),
                     "google_city": next(
                         (
                             comp.get("long_name")
-                            for comp in google_data.get("address_components", [])
+                            for comp in google_data.get("address_component", [])
                             if "locality" in comp.get("types", [])
                         ),
                         None,
@@ -128,7 +293,7 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                     "google_state": next(
                         (
                             comp.get("short_name")
-                            for comp in google_data.get("address_components", [])
+                            for comp in google_data.get("address_component", [])
                             if "administrative_area_level_1" in comp.get("types", [])
                         ),
                         None,
@@ -136,7 +301,7 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                     "google_postal_code": next(
                         (
                             comp.get("long_name")
-                            for comp in google_data.get("address_components", [])
+                            for comp in google_data.get("address_component", [])
                             if "postal_code" in comp.get("types", [])
                         ),
                         None,
@@ -144,7 +309,7 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                     "google_country": next(
                         (
                             comp.get("long_name")
-                            for comp in google_data.get("address_components", [])
+                            for comp in google_data.get("address_component", [])
                             if "country" in comp.get("types", [])
                         ),
                         None,
@@ -343,6 +508,7 @@ def _check_restaurant_mismatches(restaurant: Restaurant, validation_result: dict
     """Check for mismatches between restaurant data and Google data."""
     google_name = validation_result.get("google_name")
     google_street_address = validation_result.get("google_street_address")
+    google_service_level_data = validation_result.get("google_service_level")
 
     mismatches = []
     fixes_to_apply = {}
@@ -354,6 +520,20 @@ def _check_restaurant_mismatches(restaurant: Restaurant, validation_result: dict
     if google_street_address and restaurant.address and google_street_address.lower() != restaurant.address.lower():
         mismatches.append(f"Address: '{restaurant.address}' vs Google: '{google_street_address}'")
         fixes_to_apply["address"] = google_street_address
+
+    # Check service level
+    if google_service_level_data:
+        google_service_level, confidence = google_service_level_data
+        from app.restaurants.services import validate_restaurant_service_level
+
+        has_mismatch, mismatch_message, suggested_fix = validate_restaurant_service_level(
+            restaurant, google_service_level, confidence
+        )
+
+        if has_mismatch:
+            mismatches.append(mismatch_message)
+            if suggested_fix:
+                fixes_to_apply["service_level"] = suggested_fix
 
     return mismatches, fixes_to_apply
 
@@ -368,8 +548,10 @@ def _apply_restaurant_fixes(restaurant: Restaurant, fixes_to_apply: dict[str, st
             # Apply fixes
             if "name" in fixes_to_apply:
                 restaurant.name = fixes_to_apply["name"]
-            if "street_address" in fixes_to_apply:
+            if "address" in fixes_to_apply:
                 restaurant.address = fixes_to_apply["address"]
+            if "service_level" in fixes_to_apply:
+                restaurant.service_level = fixes_to_apply["service_level"]
 
             db.session.commit()
             click.echo(f"   ✅ Fixed: {', '.join(fixes_to_apply.keys())}")
@@ -402,6 +584,13 @@ def _display_google_info(validation_result: dict) -> None:
         else:
             types_str = str(types_data)
         click.echo(f"   🏷️  Types: {types_str}")
+    if validation_result.get("google_service_level"):
+        service_level, confidence = validation_result["google_service_level"]
+        if service_level != "unknown":
+            from app.restaurants.services import get_service_level_display_info
+
+            display_info = get_service_level_display_info(service_level)
+            click.echo(f"   🍽️  Service Level: {display_info['display_name']} (confidence: {confidence:.2f})")
 
 
 def _process_restaurant_validation(restaurant: Restaurant, fix_mismatches: bool, dry_run: bool) -> tuple[str, bool]:
@@ -446,78 +635,44 @@ def _process_restaurant_validation(restaurant: Restaurant, fix_mismatches: bool,
         return "error", False
 
 
-def _display_validation_summary(
-    valid_count: int,
-    invalid_count: int,
-    error_count: int,
-    fixed_count: int,
-    mismatch_count: int,
-    total_restaurants: int,
-    missing_google_id: int,
-    with_google_id: int,
-    fix_mismatches: bool,
-    dry_run: bool,
-) -> None:
-    """Display validation summary."""
-    click.echo("\n📊 Validation Summary:")
-
-    # Restaurant counts
-    click.echo(f"   🍽️  Total restaurants: {total_restaurants}")
-    click.echo(f"   🌐 With Google Place ID: {with_google_id}")
-    click.echo(f"   📍 Missing Google Place ID: {missing_google_id}")
-
-    # Validation results
-    click.echo(f"   ✅ Valid: {valid_count}")
-    click.echo(f"   ❌ Invalid: {invalid_count}")
-    click.echo(f"   ⚠️  Cannot validate: {error_count}")
-
-    # Mismatch count
-    if mismatch_count > 0:
-        click.echo(f"   🔄 With mismatches: {mismatch_count}")
-
-    # Fixed count
-    if fix_mismatches:
-        if dry_run:
-            click.echo(f"   🔧 Would fix: {fixed_count} restaurants")
-        else:
-            click.echo(f"   🔧 Fixed: {fixed_count} restaurants")
-
-
-@click.command("validate")
-@click.option("--user-id", type=int, help="Specific user ID to validate restaurants for")
-@click.option("--username", type=str, help="Specific username to validate restaurants for")
-@click.option("--all-users", is_flag=True, help="Validate restaurants for all users")
-@click.option("--restaurant-id", type=int, help="Validate a specific restaurant by ID")
-@click.option("--fix-mismatches", is_flag=True, help="Automatically fix name/address mismatches from Google")
-@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
-@with_appcontext
-def validate_restaurants(
+def _handle_service_level_updates(
     user_id: int | None,
     username: str | None,
     all_users: bool,
     restaurant_id: int | None,
+    update_service_levels: bool,
+    dry_run: bool,
+) -> tuple[int, int]:
+    """Handle service level updates for restaurants without Google Place IDs.
+
+    Returns:
+        Tuple of (updated_count, total_count)
+    """
+    if not update_service_levels:
+        return 0, 0
+
+    restaurants_without_google_id = _get_restaurants_without_google_id(user_id, username, all_users, restaurant_id)
+    if restaurants_without_google_id:
+        click.echo(
+            f"🔄 Updating service levels for {len(restaurants_without_google_id)} restaurants without Google Place IDs..."
+        )
+        service_level_fixed_count = _update_service_levels_for_restaurants(restaurants_without_google_id, dry_run)
+        click.echo(f"✅ Updated service levels for {service_level_fixed_count} restaurants")
+        return service_level_fixed_count, len(restaurants_without_google_id)
+    else:
+        click.echo("ℹ️  No restaurants without Google Place IDs found for service level updates")
+        return 0, 0
+
+
+def _handle_restaurant_validation(
+    restaurants_to_validate: list[Restaurant],
+    restaurant_counts: dict[str, int],
     fix_mismatches: bool,
     dry_run: bool,
+    service_level_updated_count: int = 0,
+    service_level_total_count: int = 0,
 ) -> None:
-    """Validate restaurant information using Google Places API.
-
-    This command checks restaurant data against Google Places API to verify:
-    - Restaurant name accuracy
-    - Address correctness
-    - Business status (open/closed)
-    - Additional metadata
-
-    Examples:
-        flask restaurant validate --user-id 1
-        flask restaurant validate --username admin --dry-run
-        flask restaurant validate --all-users
-        flask restaurant validate --restaurant-id 123
-        flask restaurant validate --username admin --fix-mismatches
-    """
-    restaurants_to_validate, restaurant_counts = _get_restaurants_to_validate(
-        user_id, username, all_users, restaurant_id
-    )
-
+    """Handle restaurant validation with Google Places API."""
     if not restaurants_to_validate:
         click.echo("⚠️  No restaurants with Google Place IDs found to validate")
         # Still show summary even when no restaurants to validate
@@ -532,6 +687,8 @@ def validate_restaurants(
             restaurant_counts["with_google_id"],
             fix_mismatches,
             dry_run,
+            service_level_updated_count,
+            service_level_total_count,
         )
         return
 
@@ -576,4 +733,109 @@ def validate_restaurants(
         restaurant_counts["with_google_id"],
         fix_mismatches,
         dry_run,
+        service_level_updated_count,
+        service_level_total_count,
+    )
+
+
+def _display_validation_summary(
+    valid_count: int,
+    invalid_count: int,
+    error_count: int,
+    fixed_count: int,
+    mismatch_count: int,
+    total_restaurants: int,
+    missing_google_id: int,
+    with_google_id: int,
+    fix_mismatches: bool,
+    dry_run: bool,
+    service_level_updated_count: int = 0,
+    service_level_total_count: int = 0,
+) -> None:
+    """Display validation summary."""
+    click.echo("\n📊 Validation Summary:")
+
+    # Restaurant counts
+    click.echo(f"   🍽️  Total restaurants: {total_restaurants}")
+    click.echo(f"   🌐 With Google Place ID: {with_google_id}")
+    click.echo(f"   📍 Missing Google Place ID: {missing_google_id}")
+
+    # Validation results
+    click.echo(f"   ✅ Valid: {valid_count}")
+    click.echo(f"   ❌ Invalid: {invalid_count}")
+    click.echo(f"   ⚠️  Cannot validate: {error_count}")
+
+    # Mismatch count
+    if mismatch_count > 0:
+        click.echo(f"   🔄 With mismatches: {mismatch_count}")
+
+    # Fixed count
+    if fix_mismatches:
+        if dry_run:
+            click.echo(f"   🔧 Would fix: {fixed_count} restaurants")
+        else:
+            click.echo(f"   🔧 Fixed: {fixed_count} restaurants")
+
+    # Service level metrics
+    if service_level_total_count > 0:
+        click.echo("   🍽️  Service Level Updates:")
+        click.echo(f"      📊 Total without Google Place ID: {service_level_total_count}")
+        if dry_run:
+            click.echo(f"      🔧 Would update: {service_level_updated_count} restaurants")
+        else:
+            click.echo(f"      ✅ Updated: {service_level_updated_count} restaurants")
+
+
+@click.command("validate")
+@click.option("--user-id", type=int, help="Specific user ID to validate restaurants for")
+@click.option("--username", type=str, help="Specific username to validate restaurants for")
+@click.option("--all-users", is_flag=True, help="Validate restaurants for all users")
+@click.option("--restaurant-id", type=int, help="Validate a specific restaurant by ID")
+@click.option("--fix-mismatches", is_flag=True, help="Automatically fix name/address mismatches from Google")
+@click.option(
+    "--update-service-levels", is_flag=True, help="Update service levels for restaurants without Google Place IDs"
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
+@with_appcontext
+def validate_restaurants(
+    user_id: int | None,
+    username: str | None,
+    all_users: bool,
+    restaurant_id: int | None,
+    fix_mismatches: bool,
+    update_service_levels: bool,
+    dry_run: bool,
+) -> None:
+    """Validate restaurant information using Google Places API.
+
+    This command checks restaurant data against Google Places API to verify:
+    - Restaurant name accuracy
+    - Address correctness
+    - Business status (open/closed)
+    - Additional metadata
+
+    Examples:
+        flask restaurant validate --user-id 1
+        flask restaurant validate --username admin --dry-run
+        flask restaurant validate --all-users
+        flask restaurant validate --restaurant-id 123
+        flask restaurant validate --username admin --fix-mismatches
+    """
+    restaurants_to_validate, restaurant_counts = _get_restaurants_to_validate(
+        user_id, username, all_users, restaurant_id
+    )
+
+    # Handle service level updates
+    service_level_updated_count, service_level_total_count = _handle_service_level_updates(
+        user_id, username, all_users, restaurant_id, update_service_levels, dry_run
+    )
+
+    # Handle restaurant validation
+    _handle_restaurant_validation(
+        restaurants_to_validate,
+        restaurant_counts,
+        fix_mismatches,
+        dry_run,
+        service_level_updated_count,
+        service_level_total_count,
     )

@@ -121,11 +121,14 @@ def _configure_csrf_handlers(app: Flask) -> None:
                 response.headers.set("X-CSRFToken", generate_csrf())
             return response
 
-        # Exempt API routes from CSRF protection (only if CSRF is enabled)
+        # Configure CSRF validation for API routes
+        # API routes should validate CSRF tokens from headers
         with app.app_context():
             from .api import bp as api_bp
 
-            csrf.exempt(api_bp)
+            # Instead of exempting the entire API blueprint, we'll handle CSRF validation
+            # in the API routes themselves using a custom decorator or middleware
+            # This allows for more granular control over CSRF protection
 
         # Global CSRF error handler (only if CSRF is enabled)
         @app.errorhandler(CSRFError)
@@ -135,11 +138,11 @@ def _configure_csrf_handlers(app: Flask) -> None:
             # Log the CSRF error details for debugging
             app.logger.warning(f"CSRF error: {e} - Host: {request.host} - Path: {request.path}")
 
-            message = "The CSRF session token is missing."
+            message = "The CSRF session token is missing or invalid."
 
             # AJAX or API request
             if request.path.startswith("/api/") or request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                response = jsonify({"success": False, "message": message})
+                response = jsonify({"status": "error", "message": message, "error_type": "csrf_validation_failed"})
                 response.status_code = 403
                 return response
 
@@ -154,7 +157,6 @@ def init_app(app: Flask) -> None:
     db.init_app(app)
     jwt.init_app(app)
     login_manager.init_app(app)
-    csrf.init_app(app)
     migrate.init_app(app, db)
 
     # Initialize Flask-Session based on session type
@@ -193,25 +195,17 @@ def init_app(app: Flask) -> None:
 
     app.logger.info(f"Environment detection - AWS_LAMBDA_FUNCTION_NAME: {lambda_function_name}, is_lambda: {is_lambda}")
 
-    if is_lambda:
-        # For Lambda deployments, completely skip CSRF initialization
-        app.logger.info("Running in AWS Lambda - skipping CSRF protection entirely")
-        app.config.update(
-            WTF_CSRF_ENABLED=False,
-            WTF_CSRF_CHECK_DEFAULT=False,
-        )
-
-    else:
-        # For local development, initialize and enable CSRF protection
-        app.logger.info("Running locally - initializing CSRF protection")
-        csrf.init_app(app)
-        app.config.update(
-            WTF_CSRF_CHECK_DEFAULT=True,
-            WTF_CSRF_SSL_STRICT=False,
-            WTF_CSRF_TIME_LIMIT=3600,
-            WTF_CSRF_REFERRER_CHECK=False,
-            WTF_CSRF_SECRET_KEY=secret_key,
-        )
+    # Configure CSRF protection
+    app.logger.info("Enabling CSRF protection")
+    csrf.init_app(app)
+    app.config.update(
+        WTF_CSRF_ENABLED=True,
+        WTF_CSRF_CHECK_DEFAULT=True,
+        WTF_CSRF_SSL_STRICT=False,
+        WTF_CSRF_TIME_LIMIT=3600,
+        WTF_CSRF_REFERRER_CHECK=False,
+        WTF_CSRF_SECRET_KEY=secret_key,
+    )
 
     # Configure CSRF handlers
     _configure_csrf_handlers(app)

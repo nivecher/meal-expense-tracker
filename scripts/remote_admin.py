@@ -39,6 +39,16 @@ Examples:
     python scripts/remote_admin.py validate-restaurants --all-users --fix-mismatches
     python scripts/remote_admin.py validate-restaurants --restaurant-id 123
 
+    # Run migrations
+    python scripts/remote_admin.py run-migrations --dry-run
+    python scripts/remote_admin.py --confirm run-migrations
+
+    # Fix migration history for existing tables (if you get "already exists" errors)
+    python scripts/remote_admin.py --confirm run-migrations --fix-history
+
+    # Run migrations with specific target revision
+    python scripts/remote_admin.py --confirm run-migrations --target-revision 7943db7ca196
+
     # Initialize database (with confirmation)
     python scripts/remote_admin.py --confirm init-db --sample-data
 
@@ -364,7 +374,24 @@ def create_parser() -> argparse.ArgumentParser:
         "--fix-mismatches", action="store_true", help="Automatically fix name/address mismatches from Google"
     )
     validate_restaurants_parser.add_argument(
+        "--update-service-levels",
+        action="store_true",
+        help="Update service levels for restaurants without Google Place IDs",
+    )
+    validate_restaurants_parser.add_argument(
         "--dry-run", action="store_true", help="Show what would be fixed without making changes"
+    )
+
+    # Run migrations
+    migrate_parser = subparsers.add_parser("run-migrations", help="Run database migrations safely")
+    migrate_parser.add_argument(
+        "--dry-run", action="store_true", help="Show what migrations would be applied without running them"
+    )
+    migrate_parser.add_argument("--target-revision", type=str, help="Specific migration revision to run to (optional)")
+    migrate_parser.add_argument(
+        "--fix-history",
+        action="store_true",
+        help="Fix migration history for existing tables (use when you get 'already exists' errors)",
     )
 
     return parser
@@ -483,10 +510,23 @@ def _handle_validate_restaurants(client: RemoteAdminClient, args: argparse.Names
     # Add action parameters
     if args.fix_mismatches:
         params["fix_mismatches"] = args.fix_mismatches
+    if args.update_service_levels:
+        params["update_service_levels"] = args.update_service_levels
     if args.dry_run:
         params["dry_run"] = args.dry_run
 
     return client.invoke_operation("validate_restaurants", params, args.confirm)
+
+
+def _handle_run_migrations(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+    """Handle run-migrations command."""
+    params = {
+        "dry_run": args.dry_run,
+        "fix_history": args.fix_history,
+    }
+    if args.target_revision:
+        params["target_revision"] = args.target_revision
+    return client.invoke_operation("run_migrations", params, args.confirm)
 
 
 def _execute_command(client: RemoteAdminClient, args: argparse.Namespace) -> Optional[Dict[str, Any]]:
@@ -501,6 +541,7 @@ def _execute_command(client: RemoteAdminClient, args: argparse.Namespace) -> Opt
         "init-db": lambda: _handle_init_db(client, args),
         "db-maintenance": lambda: _handle_db_maintenance(client, args),
         "validate-restaurants": lambda: _handle_validate_restaurants(client, args),
+        "run-migrations": lambda: _handle_run_migrations(client, args),
     }
 
     handler = command_handlers.get(args.command)

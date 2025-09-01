@@ -9,15 +9,17 @@
 
 import { logger } from './core-utils.js';
 import { showErrorToast } from './notifications.js';
+import { get_api_csrf_token, add_csrf_to_headers } from './csrf-token.js';
 
 // ===== API UTILITIES =====
 
 /**
  * Get CSRF token from meta tag
+ * @deprecated Use get_api_csrf_token from csrf-token.js instead
  */
 function getCSRFToken() {
-  const metaTag = document.querySelector('meta[name="csrf-token"]');
-  return metaTag ? metaTag.getAttribute('content') : '';
+  console.warn('getCSRFToken is deprecated. Use get_api_csrf_token from csrf-token.js instead');
+  return get_api_csrf_token();
 }
 
 /**
@@ -26,13 +28,8 @@ function getCSRFToken() {
 async function apiRequest(url, options = {}) {
   const headers = new Headers(options.headers || {});
 
-  // Add CSRF token
-  if (!headers.has('X-CSRFToken')) {
-    const csrfToken = getCSRFToken();
-    if (csrfToken) {
-      headers.set('X-CSRFToken', csrfToken);
-    }
-  }
+  // Add CSRF token using the unified utility
+  add_csrf_to_headers(headers);
 
   // Handle JSON body
   if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
@@ -399,13 +396,8 @@ export async function apiRequestWithRecovery(url, options = {}) {
 
       const headers = new Headers(options.headers || {});
 
-      // Add CSRF token
-      if (!headers.has('X-CSRFToken')) {
-        const csrf_token = getCSRFToken();
-        if (csrf_token) {
-          headers.set('X-CSRFToken', csrf_token);
-        }
-      }
+      // Add CSRF token using the unified utility
+      add_csrf_to_headers(headers);
 
       // Handle JSON body
       let { body } = options;
