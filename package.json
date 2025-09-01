@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "description": "Flask-based meal expense tracking application",
   "private": true,
+  "type": "module",
   "scripts": {
     "format-html": "prettier --write \"app/templates/**/*.html\"",
     "format-html-check": "prettier --check \"app/templates/**/*.html\"",
@@ -12,6 +13,7 @@
     "install-deps": "npm install"
   },
   "devDependencies": {
+    "eslint-formatter-compact": "^8.40.0",
     "prettier": "^3.2.4"
   },
   "engines": {

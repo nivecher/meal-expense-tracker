@@ -91,7 +91,7 @@ export function enhanceCuisineBadge(badgeElement, options = {}) {
       // Create enhanced badge HTML
       const enhancedBadgeHtml = createCuisineBadge(cuisineData.name, {
         showIcon,
-        className: 'enhanced-cuisine-badge'
+        className: 'enhanced-cuisine-badge',
       });
 
       // Replace content with enhanced version

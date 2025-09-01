@@ -346,7 +346,7 @@ export function getCuisineIcon(cuisineName) {
  * getCuisineConstants() // returns array of all cuisine objects
  */
 export function getCuisineConstants() {
-  return CUISINE_CONSTANTS.map(cuisine => ({ ...cuisine })); // Return copies for safety
+  return CUISINE_CONSTANTS.map((cuisine) => ({ ...cuisine })); // Return copies for safety
 }
 
 /**

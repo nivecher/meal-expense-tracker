@@ -58,7 +58,7 @@ class GoogleMapsLoader {
 
       observer.observe(document.body, {
         childList: true,
-        subtree: true
+        subtree: true,
       });
 
       // Store observer reference for cleanup if needed

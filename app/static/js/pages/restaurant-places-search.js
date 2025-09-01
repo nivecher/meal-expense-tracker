@@ -263,7 +263,7 @@ async function handleAddRestaurantClick(restaurant) {
       showErrorToast('This restaurant already exists in your list. Please check your existing restaurants.');
     } else if (error.message && error.message.includes('Restaurant conflict handled')) {
       // Error was already handled by showConflictDialog, no need to show additional error
-      return;
+
     } else {
       // Generic error handling
       const userFriendlyMessage = error.message.includes('HTTP error')
@@ -344,9 +344,9 @@ function showExistingRestaurantModal(existsData, restaurant) {
         id: existsData.restaurant_id,
         name: existsData.restaurant_name,
         full_name: existsData.restaurant_name,
-        city: existsData.restaurant_city || null
-      }
-    }
+        city: existsData.restaurant_city || null,
+      },
+    },
   };
 
   // Use the enhanced conflict dialog
@@ -377,9 +377,9 @@ async function handleRestaurantSelect(restaurant) {
           existing_restaurant: {
             id: duplicate_check.restaurant_id,
             name: duplicate_check.restaurant_name,
-            full_name: duplicate_check.restaurant_name
-          }
-        }
+            full_name: duplicate_check.restaurant_name,
+          },
+        },
       };
       showConflictDialog(errorData, restaurant_data);
       return;
@@ -851,8 +851,8 @@ function storeGooglePlacesDataForEdit(googlePlacesData, restaurantId) {
     if (googlePlacesData && typeof googlePlacesData === 'object') {
       const dataToStore = {
         timestamp: Date.now(),
-        restaurantId: restaurantId,
-        googlePlacesData: googlePlacesData
+        restaurantId,
+        googlePlacesData,
       };
 
       sessionStorage.setItem('restaurantEditGooglePlacesData', JSON.stringify(dataToStore));

@@ -124,7 +124,7 @@ async function init() {
 
     // Dispatch initialization complete event
     document.dispatchEvent(new CustomEvent('app:initialized', {
-      detail: { timestamp: Date.now() }
+      detail: { timestamp: Date.now() },
     }));
 
     // Show welcome message if this is a fresh page load

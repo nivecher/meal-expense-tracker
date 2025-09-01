@@ -17,8 +17,6 @@ function getCSRFToken() {
   return null;
 }
 
-
-
 // Set field error with Bootstrap styling
 function setFieldError(fieldName, message) {
   const field = document.querySelector(`input[name="${fieldName}"]`);
@@ -37,7 +35,7 @@ function setFieldError(fieldName, message) {
 function enhanceAuthFormValidation(form) {
   // Custom validation messages for auth forms
   const inputs = form.querySelectorAll('input[required]');
-  inputs.forEach(input => {
+  inputs.forEach((input) => {
     input.addEventListener('invalid', (e) => {
       e.preventDefault();
 
@@ -70,8 +68,6 @@ function enhanceAuthFormValidation(form) {
   });
 }
 
-
-
 // Initialize auth forms - enhanced validation for auth-specific needs
 export function init() {
   console.log('Initializing auth forms...');
@@ -79,11 +75,11 @@ export function init() {
   // Find authentication forms specifically
   const authForms = document.querySelectorAll('#login-form, #register-form');
 
-  authForms.forEach(form => {
+  authForms.forEach((form) => {
     // Add enhanced validation for auth forms
     enhanceAuthFormValidation(form);
 
-    form.querySelectorAll('input').forEach(input => {
+    form.querySelectorAll('input').forEach((input) => {
       input.addEventListener('blur', () => {
         // Clear previous errors on focus out
         input.classList.remove('is-invalid');
@@ -110,7 +106,7 @@ export function init() {
   // Ensure CSRF tokens are present (the existing form system should handle this)
   const csrfToken = getCSRFToken();
   if (csrfToken) {
-    authForms.forEach(form => {
+    authForms.forEach((form) => {
       let csrfInput = form.querySelector('input[name="csrf_token"]');
       if (!csrfInput) {
         csrfInput = document.createElement('input');

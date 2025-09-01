@@ -15,7 +15,7 @@ class ModernAvatarManager {
       ['#fa709a', '#fee140'], // Orange gradient
       ['#a8edea', '#fed6e3'], // Teal gradient
       ['#ffecd2', '#fcb69f'], // Peach gradient
-      ['#ff9a9e', '#fecfef']  // Rose gradient
+      ['#ff9a9e', '#fecfef'],  // Rose gradient
     ];
 
     this.init();
@@ -44,7 +44,7 @@ class ModernAvatarManager {
     // Store avatar info
     this.avatars.set(avatarId, {
       element,
-      ...avatarData
+      ...avatarData,
     });
 
     // Add loading state
@@ -71,8 +71,8 @@ class ModernAvatarManager {
       email: element.dataset.email || '',
       size: {
         width: parseInt(computedStyle.width) || 32,
-        height: parseInt(computedStyle.height) || 32
-      }
+        height: parseInt(computedStyle.height) || 32,
+      },
     };
   }
 
@@ -152,7 +152,7 @@ class ModernAvatarManager {
     initialsElement.classList.add('avatar-initials', 'avatar-loaded');
 
     // Copy data attributes
-    Object.keys(element.dataset).forEach(key => {
+    Object.keys(element.dataset).forEach((key) => {
       initialsElement.dataset[key] = element.dataset[key];
     });
 
@@ -179,7 +179,7 @@ class ModernAvatarManager {
     }
 
     // Split by common separators and take first letters
-    const parts = source.split(/[\s\-_.]+/).filter(part => part.length > 0);
+    const parts = source.split(/[\s\-_.]+/).filter((part) => part.length > 0);
 
     if (parts.length >= 2) {
       // Use first letter of first two parts
@@ -187,10 +187,10 @@ class ModernAvatarManager {
     } else if (parts.length === 1 && parts[0].length >= 2) {
       // Use first two letters of single part
       return parts[0].slice(0, 2).toUpperCase();
-    } else {
-      // Fallback to first letter or 'U'
-      return (parts[0] || 'U')[0].toUpperCase();
     }
+    // Fallback to first letter or 'U'
+    return (parts[0] || 'U')[0].toUpperCase();
+
   }
 
   getColorForUser(identifier) {

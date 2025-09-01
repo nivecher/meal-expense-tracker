@@ -41,7 +41,7 @@ class TimezoneDetector {
           const position = await this.getCurrentPosition();
           const timezone = await this.getTimezoneFromCoordinates(
             position.coords.latitude,
-            position.coords.longitude
+            position.coords.longitude,
           );
 
           if (timezone && this.isValidTimezone(timezone)) {
@@ -86,7 +86,7 @@ class TimezoneDetector {
       const options = {
         timeout: 10000, // 10 second timeout
         enableHighAccuracy: false, // Faster, less battery drain
-        maximumAge: 300000 // Cache for 5 minutes
+        maximumAge: 300000, // Cache for 5 minutes
       };
 
       navigator.geolocation.getCurrentPosition(resolve, reject, options);
@@ -121,7 +121,7 @@ class TimezoneDetector {
       { bounds: { north: -10, south: -45, west: 110, east: 155 }, tz: 'Australia/Sydney' },
 
       // Default fallback
-      { bounds: { north: 90, south: -90, west: -180, east: 180 }, tz: 'UTC' }
+      { bounds: { north: 90, south: -90, west: -180, east: 180 }, tz: 'UTC' },
     ];
 
     for (const rule of timezoneRules) {
@@ -159,16 +159,16 @@ class TimezoneDetector {
         '-180': 'Europe/Moscow',     // UTC+3
         '-120': 'Europe/Berlin',     // UTC+2
         '-60': 'Europe/Paris',       // UTC+1
-        '0': isDST ? 'Europe/London' : 'UTC', // UTC
-        '60': 'Atlantic/Azores',     // UTC-1
-        '120': 'America/Sao_Paulo',  // UTC-2
-        '180': 'America/Argentina/Buenos_Aires', // UTC-3
-        '240': 'America/New_York',   // UTC-4 (or EST)
-        '300': 'America/Chicago',    // UTC-5 (or CST)
-        '360': 'America/Denver',     // UTC-6 (or MST)
-        '420': 'America/Los_Angeles', // UTC-7 (or PST)
-        '480': 'America/Anchorage',  // UTC-8
-        '540': 'Pacific/Honolulu',   // UTC-9
+        0: isDST ? 'Europe/London' : 'UTC', // UTC
+        60: 'Atlantic/Azores',     // UTC-1
+        120: 'America/Sao_Paulo',  // UTC-2
+        180: 'America/Argentina/Buenos_Aires', // UTC-3
+        240: 'America/New_York',   // UTC-4 (or EST)
+        300: 'America/Chicago',    // UTC-5 (or CST)
+        360: 'America/Denver',     // UTC-6 (or MST)
+        420: 'America/Los_Angeles', // UTC-7 (or PST)
+        480: 'America/Anchorage',  // UTC-8
+        540: 'Pacific/Honolulu',   // UTC-9
       };
 
       return offsetMap[maxOffset.toString()] || 'UTC';
@@ -244,11 +244,11 @@ class TimezoneDetector {
     // Show detection message
     if (detectedMessage) {
       const confidenceText = {
-        'high': 'automatically detected',
-        'medium': 'detected from location',
-        'low': 'estimated from system',
-        'very_low': 'guessed from browser',
-        'failed': 'detection failed'
+        high: 'automatically detected',
+        medium: 'detected from location',
+        low: 'estimated from system',
+        very_low: 'guessed from browser',
+        failed: 'detection failed',
       };
 
       detectedMessage.innerHTML = `
@@ -290,7 +290,7 @@ class TimezoneDetector {
     return {
       timezone: this.detectedTimezone,
       confidence: this.confidence,
-      methods: this.methods
+      methods: this.methods,
     };
   }
 }

@@ -96,14 +96,14 @@ class NavbarManager {
   toggleMobileMenu() {
     // Use Bootstrap's collapse functionality
     const bsCollapse = new bootstrap.Collapse(this.navbarCollapse, {
-      toggle: true
+      toggle: true,
     });
   }
 
   openMobileMenu() {
     if (!this.navbarCollapse) return;
     const bsCollapse = new bootstrap.Collapse(this.navbarCollapse, {
-      toggle: false
+      toggle: false,
     });
     bsCollapse.show();
   }
@@ -111,7 +111,7 @@ class NavbarManager {
   closeMobileMenu() {
     if (!this.navbarCollapse) return;
     const bsCollapse = new bootstrap.Collapse(this.navbarCollapse, {
-      toggle: false
+      toggle: false,
     });
     bsCollapse.hide();
   }

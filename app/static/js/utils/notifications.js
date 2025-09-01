@@ -20,8 +20,8 @@ const TOAST_CONFIG = {
     error: 'fa-exclamation-circle',
     danger: 'fa-exclamation-triangle',
     warning: 'fa-exclamation-triangle',
-    info: 'fa-info-circle'
-  }
+    info: 'fa-info-circle',
+  },
 };
 
 // Toast container management with responsive positioning
@@ -55,10 +55,10 @@ function getResponsiveContainerClass() {
   } else if (isTablet) {
     // Tablet: smaller width, bottom right
     return `${TOAST_CONFIG.POSITION_CLASS} bottom-0 end-0`;
-  } else {
-    // Desktop: top right
-    return `${TOAST_CONFIG.POSITION_CLASS} top-0 end-0`;
   }
+  // Desktop: top right
+  return `${TOAST_CONFIG.POSITION_CLASS} top-0 end-0`;
+
 }
 
 // Update container position on resize
@@ -73,7 +73,7 @@ function createToastElement(message, type, options = {}) {
     title = type.charAt(0).toUpperCase() + type.slice(1),
     showIcon = true,
     showHeader = true,
-    customClass = ''
+    customClass = '',
   } = options;
 
   // Validate inputs
@@ -182,7 +182,7 @@ function showToast(message, type = 'info', duration = TOAST_CONFIG.DEFAULT_DURAT
 
     const bsToast = new bootstrap.Toast(toast, {
       autohide: duration > 0,
-      delay: duration
+      delay: duration,
     });
 
     bsToast.show();
@@ -206,7 +206,7 @@ function showConfirmDialog({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   type = 'warning',
-  size = 'modal-sm'
+  size = 'modal-sm',
 } = {}) {
   return new Promise((resolve) => {
     // Bootstrap fallback
@@ -258,7 +258,7 @@ function showConfirmDialog({
     try {
       const modalInstance = new bootstrap.Modal(modal, {
         backdrop: 'static',
-        keyboard: true
+        keyboard: true,
       });
 
       modalInstance.show();
@@ -296,7 +296,7 @@ function showLoadingOverlay(message = 'Loading...', options = {}) {
     showSpinner = true,
     backgroundColor = 'rgba(0, 0, 0, 0.5)',
     zIndex = '9999',
-    allowClose = false
+    allowClose = false,
   } = options;
 
   const overlayId = `loading-overlay-${Date.now()}`;
@@ -352,7 +352,7 @@ function showLoadingOverlay(message = 'Loading...', options = {}) {
       } catch (error) {
         logger.warn('Error updating loading message:', error);
       }
-    }
+    },
   };
 }
 
@@ -375,7 +375,7 @@ function clearAllToasts() {
     const container = document.getElementById('toast-container');
     if (container) {
       const toasts = container.querySelectorAll('.toast');
-      toasts.forEach(toast => {
+      toasts.forEach((toast) => {
         const bsToast = bootstrap.Toast.getInstance(toast);
         if (bsToast) {
           bsToast.hide();
@@ -430,7 +430,7 @@ export {
   showLoadingOverlay,
   clearAllToasts,
   initNotifications,
-  TOAST_CONFIG
+  TOAST_CONFIG,
 };
 
 // Default export for backward compatibility
@@ -444,5 +444,5 @@ export default {
   showLoadingOverlay,
   clearAllToasts,
   initNotifications,
-  TOAST_CONFIG
+  TOAST_CONFIG,
 };

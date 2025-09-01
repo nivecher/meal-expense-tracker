@@ -750,7 +750,7 @@ function populateFormWithGooglePlacesData(googlePlacesData) {
       city: addressComponents.city || '',
       state: addressComponents.state || '',
       postal_code: addressComponents.postalCode || '',
-      country: addressComponents.country || ''
+      country: addressComponents.country || '',
     };
 
     console.log('Populating form with Google Places data:', formFields);
@@ -788,7 +788,7 @@ function extractAddressComponents(addressComponentsArray) {
     city: '',
     state: '',
     postalCode: '',
-    country: ''
+    country: '',
   };
 
   if (!Array.isArray(addressComponentsArray)) {
