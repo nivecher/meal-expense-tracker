@@ -249,10 +249,27 @@ class RemoteAdminClient:
             return
 
         output.append("\n📊 Summary:")
+
+        # Restaurant counts
+        total_restaurants = summary.get("total_restaurants", 0)
+        missing_google_id = summary.get("missing_google_id", 0)
+        with_google_id = summary.get("with_google_id", 0)
+
+        output.append(f"   🍽️  Total restaurants: {total_restaurants}")
+        output.append(f"   🌐 With Google Place ID: {with_google_id}")
+        output.append(f"   📍 Missing Google Place ID: {missing_google_id}")
+
+        # Validation results
         output.append(f"   ✅ Valid: {summary.get('valid_count', 0)}")
         output.append(f"   ❌ Invalid: {summary.get('invalid_count', 0)}")
         output.append(f"   ⚠️  Cannot validate: {summary.get('error_count', 0)}")
 
+        # Mismatch count
+        mismatch_count = summary.get("mismatch_count", 0)
+        if mismatch_count > 0:
+            output.append(f"   🔄 With mismatches: {mismatch_count}")
+
+        # Fixed count
         if summary.get("fixed_count", 0) > 0:
             if summary.get("dry_run"):
                 output.append(f"   🔧 Would fix: {summary.get('fixed_count', 0)} restaurants")

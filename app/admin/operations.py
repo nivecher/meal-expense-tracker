@@ -766,37 +766,53 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             logger.exception(f"Error getting target users: {e}")
             return {"success": False, "message": f"Failed to get users: {str(e)}"}, []
 
-    def _get_restaurants_to_validate(self, **kwargs) -> tuple[Optional[Dict[str, Any]], List]:
+    def _get_restaurants_to_validate(self, **kwargs) -> tuple[Optional[Dict[str, Any]], List, Dict[str, int]]:
         """Get restaurants to validate based on parameters."""
         try:
             from app.restaurants.models import Restaurant
 
             restaurant_id = kwargs.get("restaurant_id")
+            counts = {"total_restaurants": 0, "missing_google_id": 0, "with_google_id": 0}
 
             if restaurant_id:
                 restaurant = Restaurant.query.get(restaurant_id)
                 if not restaurant:
-                    return {"success": False, "message": f"Restaurant with ID {restaurant_id} not found"}, []
-                return None, [restaurant]
+                    return {"success": False, "message": f"Restaurant with ID {restaurant_id} not found"}, [], counts
+
+                counts["total_restaurants"] = 1
+                if restaurant.google_place_id:
+                    counts["with_google_id"] = 1
+                else:
+                    counts["missing_google_id"] = 1
+
+                return None, [restaurant] if restaurant.google_place_id else [], counts
             else:
                 error_response, users = self._get_target_users(**kwargs)
                 if error_response:
-                    return error_response, []
+                    return error_response, [], counts
 
                 restaurants_to_validate = []
                 for user in users:
-                    user_restaurants = (
-                        Restaurant.query.filter_by(user_id=user.id).filter(Restaurant.google_place_id.isnot(None)).all()
-                    )
-                    restaurants_to_validate.extend(user_restaurants)
+                    # Get all restaurants for count statistics
+                    all_user_restaurants = Restaurant.query.filter_by(user_id=user.id).all()
+                    counts["total_restaurants"] += len(all_user_restaurants)
 
-                return None, restaurants_to_validate
+                    # Get restaurants with Google Place IDs for validation
+                    user_restaurants_with_google_id = [r for r in all_user_restaurants if r.google_place_id]
+                    user_restaurants_without_google_id = [r for r in all_user_restaurants if not r.google_place_id]
+
+                    counts["with_google_id"] += len(user_restaurants_with_google_id)
+                    counts["missing_google_id"] += len(user_restaurants_without_google_id)
+
+                    restaurants_to_validate.extend(user_restaurants_with_google_id)
+
+                return None, restaurants_to_validate, counts
 
         except ImportError:
-            return {"success": False, "message": "Restaurant model not available"}, []
+            return {"success": False, "message": "Restaurant model not available"}, [], counts
         except Exception as e:
             logger.exception(f"Error getting restaurants to validate: {e}")
-            return {"success": False, "message": f"Failed to get restaurants: {str(e)}"}, []
+            return {"success": False, "message": f"Failed to get restaurants: {str(e)}"}, [], counts
 
     def _validate_restaurant_with_google(self, restaurant) -> Dict[str, Any]:
         """Validate restaurant using Google Places API."""
@@ -910,6 +926,7 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             "google_place_id": restaurant.google_place_id,
             "status": "error",
             "mismatches": [],
+            "has_mismatches": False,
             "fixed": False,
             "would_fix": False,
             "dry_run": dry_run,
@@ -924,6 +941,7 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             # Check for mismatches
             mismatches, fixes_to_apply = self._check_restaurant_mismatches(restaurant, validation_result)
             result["mismatches"] = mismatches
+            result["has_mismatches"] = len(mismatches) > 0
 
             if mismatches and fix_mismatches and fixes_to_apply:
                 fixed, fix_message = self._apply_restaurant_fixes(restaurant, fixes_to_apply, dry_run)
@@ -951,6 +969,7 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
         invalid_count = 0
         error_count = 0
         fixed_count = 0
+        mismatch_count = 0
 
         for restaurant in restaurants_to_validate:
             result = self._process_restaurant_validation(restaurant, fix_mismatches, dry_run)
@@ -966,11 +985,15 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             if result.get("fixed") or result.get("would_fix"):
                 fixed_count += 1
 
+            if result.get("has_mismatches"):
+                mismatch_count += 1
+
         summary = {
             "valid_count": valid_count,
             "invalid_count": invalid_count,
             "error_count": error_count,
             "fixed_count": fixed_count,
+            "mismatch_count": mismatch_count,
             "dry_run": dry_run,
             "total_restaurants": len(validation_results),
         }
@@ -993,7 +1016,7 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             dry_run = kwargs.get("dry_run", False)
 
             # Get restaurants to validate
-            error_response, restaurants_to_validate = self._get_restaurants_to_validate(**kwargs)
+            error_response, restaurants_to_validate, restaurant_counts = self._get_restaurants_to_validate(**kwargs)
             if error_response:
                 return error_response
 
@@ -1001,12 +1024,24 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
                 return {
                     "success": False,
                     "message": "No restaurants with Google Place IDs found to validate",
+                    "data": {
+                        "restaurant_counts": restaurant_counts,
+                        "summary": {
+                            "total_restaurants": restaurant_counts["total_restaurants"],
+                            "missing_google_id": restaurant_counts["missing_google_id"],
+                            "with_google_id": restaurant_counts["with_google_id"],
+                        },
+                    },
                 }
 
             # Process all restaurants
             validation_results, summary = self._process_all_restaurants(
                 restaurants_to_validate, fix_mismatches, dry_run
             )
+
+            # Merge restaurant counts into summary
+            summary.update(restaurant_counts)
+
             action_text = self._get_action_text(fix_mismatches, dry_run)
 
             return {

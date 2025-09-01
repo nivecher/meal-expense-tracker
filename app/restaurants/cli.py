@@ -291,35 +291,52 @@ def list_restaurants(
 
 def _get_restaurants_to_validate(
     user_id: int | None, username: str | None, all_users: bool, restaurant_id: int | None
-) -> list[Restaurant]:
+) -> tuple[list[Restaurant], dict[str, int]]:
     """Get list of restaurants to validate based on options."""
+    counts = {"total_restaurants": 0, "missing_google_id": 0, "with_google_id": 0}
+
     if restaurant_id:
         # Validate specific restaurant
         restaurant = Restaurant.query.get(restaurant_id)
         if not restaurant:
             click.echo(f"❌ Error: Restaurant with ID {restaurant_id} not found")
-            return []
+            return [], counts
+
+        counts["total_restaurants"] = 1
+        if restaurant.google_place_id:
+            counts["with_google_id"] = 1
+        else:
+            counts["missing_google_id"] = 1
+
         click.echo(f"🔍 Validating restaurant: {restaurant.name} (ID: {restaurant.id})")
-        return [restaurant]
+        return [restaurant] if restaurant.google_place_id else [], counts
     else:
         # Validate by user
         if not any([user_id, username, all_users]):
             click.echo("❌ Error: Must specify --user-id, --username, --all-users, or --restaurant-id")
-            return []
+            return [], counts
 
         users = _get_target_users(user_id, username, all_users)
         if not users:
-            return []
+            return [], counts
 
         restaurants_to_validate = []
         for user in users:
-            user_restaurants = (
-                Restaurant.query.filter_by(user_id=user.id).filter(Restaurant.google_place_id.isnot(None)).all()
-            )
-            restaurants_to_validate.extend(user_restaurants)
+            # Get all restaurants for count statistics
+            all_user_restaurants = Restaurant.query.filter_by(user_id=user.id).all()
+            counts["total_restaurants"] += len(all_user_restaurants)
+
+            # Get restaurants with Google Place IDs for validation
+            user_restaurants_with_google_id = [r for r in all_user_restaurants if r.google_place_id]
+            user_restaurants_without_google_id = [r for r in all_user_restaurants if not r.google_place_id]
+
+            counts["with_google_id"] += len(user_restaurants_with_google_id)
+            counts["missing_google_id"] += len(user_restaurants_without_google_id)
+
+            restaurants_to_validate.extend(user_restaurants_with_google_id)
 
         click.echo(f"🔍 Validating {len(restaurants_to_validate)} restaurants with Google Place IDs...")
-        return restaurants_to_validate
+        return restaurants_to_validate, counts
 
 
 def _check_restaurant_mismatches(restaurant: Restaurant, validation_result: dict) -> tuple[list[str], dict[str, str]]:
@@ -430,13 +447,35 @@ def _process_restaurant_validation(restaurant: Restaurant, fix_mismatches: bool,
 
 
 def _display_validation_summary(
-    valid_count: int, invalid_count: int, error_count: int, fixed_count: int, fix_mismatches: bool, dry_run: bool
+    valid_count: int,
+    invalid_count: int,
+    error_count: int,
+    fixed_count: int,
+    mismatch_count: int,
+    total_restaurants: int,
+    missing_google_id: int,
+    with_google_id: int,
+    fix_mismatches: bool,
+    dry_run: bool,
 ) -> None:
     """Display validation summary."""
     click.echo("\n📊 Validation Summary:")
+
+    # Restaurant counts
+    click.echo(f"   🍽️  Total restaurants: {total_restaurants}")
+    click.echo(f"   🌐 With Google Place ID: {with_google_id}")
+    click.echo(f"   📍 Missing Google Place ID: {missing_google_id}")
+
+    # Validation results
     click.echo(f"   ✅ Valid: {valid_count}")
     click.echo(f"   ❌ Invalid: {invalid_count}")
     click.echo(f"   ⚠️  Cannot validate: {error_count}")
+
+    # Mismatch count
+    if mismatch_count > 0:
+        click.echo(f"   🔄 With mismatches: {mismatch_count}")
+
+    # Fixed count
     if fix_mismatches:
         if dry_run:
             click.echo(f"   🔧 Would fix: {fixed_count} restaurants")
@@ -475,10 +514,25 @@ def validate_restaurants(
         flask restaurant validate --restaurant-id 123
         flask restaurant validate --username admin --fix-mismatches
     """
-    restaurants_to_validate = _get_restaurants_to_validate(user_id, username, all_users, restaurant_id)
+    restaurants_to_validate, restaurant_counts = _get_restaurants_to_validate(
+        user_id, username, all_users, restaurant_id
+    )
 
     if not restaurants_to_validate:
         click.echo("⚠️  No restaurants with Google Place IDs found to validate")
+        # Still show summary even when no restaurants to validate
+        _display_validation_summary(
+            0,
+            0,
+            0,
+            0,
+            0,
+            restaurant_counts["total_restaurants"],
+            restaurant_counts["missing_google_id"],
+            restaurant_counts["with_google_id"],
+            fix_mismatches,
+            dry_run,
+        )
         return
 
     if dry_run and fix_mismatches:
@@ -488,12 +542,21 @@ def validate_restaurants(
     invalid_count = 0
     error_count = 0
     fixed_count = 0
+    mismatch_count = 0
 
     for restaurant in restaurants_to_validate:
         status, fixed = _process_restaurant_validation(restaurant, fix_mismatches, dry_run)
 
         if status == "valid":
             valid_count += 1
+
+            # Check for mismatches
+            validation_result = _validate_restaurant_with_google(restaurant)
+            if validation_result["valid"] is True:
+                mismatches, _ = _check_restaurant_mismatches(restaurant, validation_result)
+                if mismatches:
+                    mismatch_count += 1
+
         elif status == "invalid":
             invalid_count += 1
         else:
@@ -502,4 +565,15 @@ def validate_restaurants(
         if fixed:
             fixed_count += 1
 
-    _display_validation_summary(valid_count, invalid_count, error_count, fixed_count, fix_mismatches, dry_run)
+    _display_validation_summary(
+        valid_count,
+        invalid_count,
+        error_count,
+        fixed_count,
+        mismatch_count,
+        restaurant_counts["total_restaurants"],
+        restaurant_counts["missing_google_id"],
+        restaurant_counts["with_google_id"],
+        fix_mismatches,
+        dry_run,
+    )
