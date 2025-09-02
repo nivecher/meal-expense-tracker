@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 
 from flask import (
+    Response,
     current_app,
     flash,
     jsonify,
@@ -19,7 +20,7 @@ from flask import (
 from flask_login import current_user, login_required
 from sqlalchemy import func, select
 
-from app.expenses.models import Expense
+from app.expenses.models import Expense, Tag
 from app.extensions import db
 from app.restaurants.models import Restaurant
 
@@ -272,3 +273,62 @@ def sticky_tables_demo():
 def error_handling_demo():
     """Demo page for enhanced restaurant error handling."""
     return render_template("test/error-handling-demo.html")
+
+
+@bp.route("/css/user-tags.css")
+@login_required
+def user_tag_css():
+    """Generate dynamic CSS with user's tag colors.
+
+    This route generates CSS that applies the user's custom tag colors
+    to tag elements. The CSS is cached by the browser but includes
+    cache-busting parameters to ensure updates when tags are modified.
+
+    Returns:
+        Response: CSS content with user's tag colors
+    """
+    # Get all tags for the current user with their last modified timestamps
+    user_tags = db.session.execute(select(Tag).where(Tag.user_id == current_user.id)).scalars().all()
+
+    # Generate CSS rules for each tag
+    css_rules = []
+    max_updated_at = None
+
+    for tag in user_tags:
+        # Create a CSS class for each tag using its ID
+        css_rule = f"""
+.tag-{tag.id} {{
+    background-color: {tag.color} !important;
+    color: white !important;
+}}"""
+        css_rules.append(css_rule)
+
+        # Track the most recent update time for cache busting
+        if tag.updated_at and (max_updated_at is None or tag.updated_at > max_updated_at):
+            max_updated_at = tag.updated_at
+
+    # Combine all CSS rules
+    css_content = "\n".join(css_rules)
+
+    # Add a comment with timestamp for cache busting
+    css_content = f"""/* User tag colors - Generated at {datetime.utcnow().isoformat()} */
+{css_content}"""
+
+    # Create ETag based on user ID, tag count, and last update time
+    etag_parts = [str(current_user.id), str(len(user_tags))]
+    if max_updated_at:
+        etag_parts.append(str(int(max_updated_at.timestamp())))
+    etag = f'"{hash("-".join(etag_parts))}"'
+
+    # Return CSS response with appropriate headers
+    response = Response(
+        css_content,
+        mimetype="text/css",
+        headers={
+            "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
+            "ETag": etag,  # ETag for cache validation
+            "Last-Modified": max_updated_at.strftime("%a, %d %b %Y %H:%M:%S GMT") if max_updated_at else None,
+        },
+    )
+
+    return response

@@ -12,7 +12,7 @@ class TestCSRFProtection:
         """Test that GET requests to API don't require CSRF tokens."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
-            sess["user_id"] = test_user.id
+            sess["_user_id"] = str(test_user.id)
 
         response = client.get("/api/v1/health")
         assert response.status_code == 200
@@ -21,7 +21,7 @@ class TestCSRFProtection:
         """Test that POST requests to API without CSRF token fail."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
-            sess["user_id"] = test_user.id
+            sess["_user_id"] = str(test_user.id)
 
         response = client.post(
             "/api/v1/expenses",
@@ -35,7 +35,7 @@ class TestCSRFProtection:
         """Test that POST requests to API with CSRF token succeed."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
-            sess["user_id"] = test_user.id
+            sess["_user_id"] = str(test_user.id)
 
         # Get CSRF token from response headers
         response = client.get("/api/v1/health")
@@ -52,7 +52,7 @@ class TestCSRFProtection:
         """Test that PUT requests to API with CSRF token succeed."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
-            sess["user_id"] = test_user.id
+            sess["_user_id"] = str(test_user.id)
 
         # Get CSRF token from response headers
         response = client.get("/api/v1/health")
@@ -69,7 +69,7 @@ class TestCSRFProtection:
         """Test that DELETE requests to API with CSRF token succeed."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
-            sess["user_id"] = test_user.id
+            sess["_user_id"] = str(test_user.id)
 
         # Get CSRF token from response headers
         response = client.get("/api/v1/health")
@@ -82,7 +82,7 @@ class TestCSRFProtection:
         """Test that API requests with invalid CSRF token fail."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
-            sess["user_id"] = test_user.id
+            sess["_user_id"] = str(test_user.id)
 
         response = client.post(
             "/api/v1/expenses",
@@ -96,7 +96,7 @@ class TestCSRFProtection:
         """Test that CSRF tokens are included in API response headers."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
-            sess["user_id"] = test_user.id
+            sess["_user_id"] = str(test_user.id)
 
         response = client.get("/api/v1/health")
         assert "X-CSRFToken" in response.headers

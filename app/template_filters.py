@@ -11,6 +11,7 @@ from app.constants.cuisines import (
 )
 from app.constants.meal_type_colors import get_meal_type_color
 from app.constants.meal_types import get_meal_type_icon
+from app.constants.order_types import get_order_type_css_class, get_order_type_icon
 
 
 def time_ago(value: datetime) -> str:
@@ -137,6 +138,30 @@ def meal_type_css_class_filter(meal_type: str) -> str:
     return get_meal_type_css_class(meal_type)
 
 
+def order_type_icon(order_type: str) -> str:
+    """Get the icon for an order type.
+
+    Args:
+        order_type: The order type name
+
+    Returns:
+        Font Awesome icon name or default question if not found
+    """
+    return get_order_type_icon(order_type)
+
+
+def order_type_css_class_filter(order_type: str) -> str:
+    """Get the CSS class for an order type using centralized approach.
+
+    Args:
+        order_type: The order type name
+
+    Returns:
+        CSS class name string
+    """
+    return get_order_type_css_class(order_type)
+
+
 def get_app_version() -> str:
     """Get the application version from git tags.
 
@@ -161,6 +186,8 @@ def init_app(app: Flask) -> None:
     app.add_template_filter(meal_type_color, name="meal_type_color")
     app.add_template_filter(meal_type_icon, name="meal_type_icon")
     app.add_template_filter(meal_type_css_class_filter, name="meal_type_css_class")
+    app.add_template_filter(order_type_icon, name="order_type_icon")
+    app.add_template_filter(order_type_css_class_filter, name="order_type_css_class")
     app.add_template_filter(restaurant_cuisine, name="restaurant_cuisine")
     app.add_template_filter(cuisine_icon, name="cuisine_icon")
     app.add_template_filter(cuisine_color, name="cuisine_color")

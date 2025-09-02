@@ -4,27 +4,32 @@ A modern web application that helps you track dining expenses, analyze spending 
 your culinary experiences.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.13.5-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.0+-green.svg)](https://flask.palletsprojects.com/)
 [![Terraform](https://img.shields.io/badge/terraform-%235835CC.svg?style=flat&logo=terraform&logoColor=white)](https://www.terraform.io/)
 
 ## ✨ Features
 
 - **Expense Tracking**
-- Log dining expenses with photos and receipts
-- Categorize by meal type and restaurant
-- Track spending patterns over time
+  - Log dining expenses with detailed categorization
+  - 9 meal types (breakfast, brunch, lunch, dinner, snacks, drinks, dessert, late night, groceries)
+  - Customizable expense categories with colors and icons
+  - Advanced filtering and sorting
+  - CSV export and bulk import capabilities
+  - Tag system for flexible organization
 
 - **Restaurant Management**
+  - Save and manage restaurant information
+  - Google Maps integration for location services
+  - Restaurant search and autocomplete functionality
+  - Track visit history and spending statistics
+  - Export and import restaurant data
 
-  - Save favorite dining spots
-  - Rate and review restaurants
-  - Track visit history
-
-- **Insights & Reporting**
-
-  - Visual spending analytics
-  - Budget tracking
-  - Exportable reports
+- **User Authentication & Security**
+  - Secure user registration and login
+  - Password change functionality
+  - Admin user management
+  - Role-based access control
 
 - **Google Maps Integration**
   - Smart API detection for modern and legacy Google Maps APIs
@@ -103,7 +108,7 @@ The application supports different environment configurations using `.env` files
 - Default environment for local development
   - Debug mode enabled
   - Uses SQLite database by default
-  - Run with: `flask run`
+  - Run with: `make run`
 
 1. **Testing** (`.env.test` optional)
 
@@ -139,10 +144,8 @@ The application supports different environment configurations using `.env` files
 1. Run the application with the desired environment:
 
    ```bash
-
    ## For development (default)
-   flask run
-
+   make run
    ```
 
 ### Environment Variables
@@ -189,46 +192,36 @@ You can check the current version in several ways:
 1. Clone the repository:
 
    ```bash
-
    git clone https://github.com/yourusername/meal-expense-tracker.git
    cd meal-expense-tracker
-
    ```
 
-1. **Run the setup script**
+2. **Set up the development environment**
 
    ```bash
-
-   chmod +x scripts/setup-local-dev.sh
-   ./scripts/setup-local-dev.sh
-
+   make setup
    ```
 
-1. Initialize the database:
+3. Initialize the database:
 
    ```bash
-
-   flask db upgrade
-
+   make db-upgrade
    ```
 
-1. Run the development server:
+4. Run the development server:
 
    ```bash
-
-   flask run
-
+   make run
    ```
 
 ### Running Tests
 
 ```bash
-
 ## Run all tests
-pytest
+make test
 
 ## Run tests with coverage report
-pytest --cov=app --cov-report=term-missing
+make test-cov
 
 ```
 
@@ -237,15 +230,11 @@ pytest --cov=app --cov-report=term-missing
 #### Python
 
 ```bash
+## Run all linters
+make lint
 
-## Run flake8
-flake8 app tests
-
-## Run black
-black app tests
-
-## Run isort
-isort app tests
+## Format code
+make format
 
 ```
 
@@ -260,17 +249,11 @@ The project uses ESLint for JavaScript linting with the following configuration:
 ##### Running JavaScript Linter
 
 ```bash
-
 ## Lint all JavaScript files
-yarn lint:js
-## or
 make lint-js
 
 ## Lint and fix auto-fixable issues
-yarn lint:js:fix
-## or (2)
 make lint-js-fix
-
 ```
 
 ##### Linting Modes
@@ -354,6 +337,8 @@ environment.
 ### Code Quality
 
 ```bash
+## Run all quality checks
+make quality
 
 ## Run linters
 make lint
@@ -366,7 +351,6 @@ make test
 
 ## Run tests with coverage
 make test-cov
-
 ```
 
 ### Pre-commit Hooks
@@ -442,19 +426,17 @@ To update the requirements:
 ### Common Development Tasks
 
 ```bash
-
-## Run tests (2)
+## Run tests
 make test
 
-## Run linters (2)
+## Run linters
 make lint
 
-## Format code (2)
+## Format code
 make format
 
 ## Check for security issues
 make security-check
-
 ```
 
 ## 📦 Packaging

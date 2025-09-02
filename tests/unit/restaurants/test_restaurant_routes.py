@@ -8,7 +8,7 @@ from flask import url_for
 from werkzeug.datastructures import FileStorage
 
 
-def test_list_restaurants(client, auth, test_restaurant):
+def test_list_restaurants(client, auth, test_restaurant, test_user):
     """Test listing all restaurants."""
     auth.login("testuser_1", "testpass")
     response = client.get(url_for("restaurants.list_restaurants"), follow_redirects=True)
@@ -49,7 +49,7 @@ def test_add_restaurant(client, test_user, session):
     assert b"New Test Restaurant" in response.data
 
 
-def test_view_restaurant(client, auth, test_restaurant):
+def test_view_restaurant(client, auth, test_restaurant, test_user):
     """Test viewing a restaurant's details."""
     auth.login("testuser_1", "testpass")
 
@@ -60,7 +60,7 @@ def test_view_restaurant(client, auth, test_restaurant):
     assert test_restaurant.city.encode() in response.data
 
 
-def test_edit_restaurant(client, auth, test_restaurant):
+def test_edit_restaurant(client, auth, test_restaurant, test_user):
     """Test editing a restaurant."""
     auth.login("testuser_1", "testpass")
 
@@ -82,7 +82,7 @@ def test_edit_restaurant(client, auth, test_restaurant):
     assert b"Updated Name" in response.data
 
 
-def test_delete_restaurant(client, auth, test_restaurant, session):
+def test_delete_restaurant(client, auth, test_restaurant, test_user, session):
     """Test deleting a restaurant."""
     auth.login("testuser_1", "testpass")
 
@@ -100,7 +100,7 @@ def test_delete_restaurant(client, auth, test_restaurant, session):
     assert Restaurant.query.get(test_restaurant.id) is None
 
 
-def test_import_restaurants_csv(client, auth, session):
+def test_import_restaurants_csv(client, auth, test_user, session):
     """Test importing restaurants from CSV."""
     auth.login("testuser_1", "testpass")
 
@@ -191,7 +191,7 @@ def test_export_restaurants(client, test_restaurant, test_user):
 
 
 # Test error cases
-def test_view_nonexistent_restaurant(client, auth):
+def test_view_nonexistent_restaurant(client, auth, test_user):
     """Test viewing a restaurant that doesn't exist."""
     auth.login("testuser_1", "testpass")
 
@@ -200,7 +200,7 @@ def test_view_nonexistent_restaurant(client, auth):
     assert response.status_code == 404
 
 
-def test_edit_nonexistent_restaurant(client, auth):
+def test_edit_nonexistent_restaurant(client, auth, test_user):
     """Test editing a restaurant that doesn't exist."""
     auth.login("testuser_1", "testpass")
 
@@ -252,7 +252,7 @@ def test_unauthorized_access(client, test_restaurant):
         assert b"Please log in to access this page." in response.data
 
 
-def test_restaurant_search_page(client, auth):
+def test_restaurant_search_page(client, auth, test_user):
     """Test the restaurant search page loads correctly."""
     auth.login("testuser_1", "testpass")
 
@@ -263,7 +263,7 @@ def test_restaurant_search_page(client, auth):
     assert b"map" in response.data.lower()
 
 
-def test_find_places_page(client, auth):
+def test_find_places_page(client, auth, test_user):
     """Test that the Find Places search page loads correctly."""
     auth.login("testuser_1", "testpass")
 
@@ -273,7 +273,7 @@ def test_find_places_page(client, auth):
     assert b"Find Restaurants" in response.data
 
 
-def test_get_place_details_invalid_id(client, auth):
+def test_get_place_details_invalid_id(client, auth, test_user):
     """Test getting details for an invalid place ID."""
     auth.login("testuser_1", "testpass")
 
@@ -291,7 +291,7 @@ def test_get_place_details_invalid_id(client, auth):
         assert b"Failed to fetch place details" in response.data
 
 
-def test_import_restaurants_invalid_file(client, auth):
+def test_import_restaurants_invalid_file(client, auth, test_user):
     """Test importing restaurants with invalid file type."""
     auth.login("testuser_1", "testpass")
 

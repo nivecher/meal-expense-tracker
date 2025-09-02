@@ -551,8 +551,8 @@ module "lambda" {
   extra_environment_variables = {
     SESSION_TYPE            = "dynamodb"
     SESSION_DYNAMODB_TABLE  = module.dynamodb.table_name
-    SESSION_DYNAMODB_REGION = var.aws_region
-    SESSION_TABLE_NAME      = module.dynamodb.table_name
+    SESSION_DYNAMODB_REGION = var.aws_region  # Optional: falls back to built-in AWS_REGION
+    SESSION_TIMEOUT         = "3600"  # 1 hour session timeout
     # Explicitly ensure no localhost endpoint is set (use AWS service)
     SESSION_DYNAMODB_ENDPOINT = ""
   }

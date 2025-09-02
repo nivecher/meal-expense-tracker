@@ -725,7 +725,7 @@ function handleGooglePlacesDataFromConflict() {
     const currentUrl = window.location.pathname;
     const restaurantIdMatch = currentUrl.match(/\/restaurants\/(\d+)\/edit/);
 
-    if (!restaurantIdMatch || parseInt(restaurantIdMatch[1]) !== parsedData.restaurantId) {
+    if (!restaurantIdMatch || parseInt(restaurantIdMatch[1], 10) !== parsedData.restaurantId) {
       console.log('Restaurant ID mismatch, ignoring stored Google Places data');
       return;
     }

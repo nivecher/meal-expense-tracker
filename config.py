@@ -92,15 +92,15 @@ class Config:
         self.SESSION_TYPE = "dynamodb"
 
         # Session table configuration with validation
-        table_name = os.getenv("SESSION_TABLE_NAME", "flask_sessions")
+        table_name = os.getenv("SESSION_DYNAMODB_TABLE", "flask_sessions")
         if not table_name or len(table_name.strip()) == 0:
-            raise ValueError("SESSION_TABLE_NAME cannot be empty when using DynamoDB sessions")
+            raise ValueError("SESSION_DYNAMODB_TABLE cannot be empty when using DynamoDB sessions")
         self.SESSION_DYNAMODB_TABLE = table_name.strip()
 
-        # AWS region configuration
-        region = os.getenv("AWS_REGION", "us-east-1")
+        # AWS region configuration - use SESSION_DYNAMODB_REGION with fallback to built-in AWS_REGION
+        region = os.getenv("SESSION_DYNAMODB_REGION") or os.getenv("AWS_REGION", "us-east-1")
         if not region or len(region.strip()) == 0:
-            raise ValueError("AWS_REGION must be specified for DynamoDB sessions")
+            raise ValueError("SESSION_DYNAMODB_REGION or AWS_REGION must be specified for DynamoDB sessions")
         self.SESSION_DYNAMODB_REGION = region.strip()
 
         # Explicitly configure DynamoDB to use AWS (not localhost)
@@ -108,8 +108,14 @@ class Config:
         import boto3
         from botocore.config import Config
 
-        # Create DynamoDB resource with explicit AWS configuration
-        boto_config = Config(region_name=region.strip(), retries={"max_attempts": 3, "mode": "adaptive"})
+        # Create DynamoDB resource with explicit AWS configuration and enhanced retry logic
+        boto_config = Config(
+            region_name=region.strip(),
+            retries={"max_attempts": 5, "mode": "adaptive", "total_max_attempts": 10},
+            connect_timeout=10,
+            read_timeout=30,
+        )
+
         # Optional endpoint for testing/LocalStack only
         endpoint_url = os.getenv("SESSION_DYNAMODB_ENDPOINT")
         if endpoint_url:
@@ -130,6 +136,13 @@ class Config:
         # Security settings
         self.SESSION_USE_SIGNER = True
         self.SESSION_PERMANENT = True
+
+        # Session timeout configuration (in seconds)
+        session_timeout = os.getenv("SESSION_TIMEOUT", "3600")  # Default 1 hour
+        try:
+            self.SESSION_TIMEOUT = int(session_timeout)
+        except ValueError:
+            self.SESSION_TIMEOUT = 3600  # Fallback to 1 hour
 
         # Key prefix for session isolation (optional)
         if key_prefix := os.getenv("SESSION_KEY_PREFIX"):

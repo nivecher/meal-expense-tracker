@@ -157,11 +157,11 @@ export class GoogleMapsRecovery {
 
   async initialize_with_fallback(api_key, libraries = ['places']) {
     try {
-      return await retry_manager.retry_with_backoff(
+      return retry_manager.retry_with_backoff(
         async(attempt) => {
           console.log(`Google Maps initialization attempt ${attempt}`);
 
-          return await this.load_google_maps_api(api_key, libraries);
+          return this.load_google_maps_api(api_key, libraries);
         },
         'google_maps_init',
         { max_attempts: 3, initial_delay_ms: 2000 },
@@ -302,7 +302,7 @@ export class FormRecovery {
             );
           }
 
-          return await response.json();
+          return response.json();
         },
         `form_submit_${endpoint}`,
         { max_attempts: 3, initial_delay_ms: 1000 },

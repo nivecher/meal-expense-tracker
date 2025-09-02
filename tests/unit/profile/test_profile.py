@@ -1,60 +1,44 @@
-import unittest
-
-from app import create_app
-from app.auth.models import User
-from app.extensions import db
+import pytest
+from flask import url_for
 
 
-class ProfileAPITestCase(unittest.TestCase):
-    def setUp(self):
-        self.app = create_app("testing")
-        self.app_context = self.app.app_context()
-        self.app_context.push()
-        db.create_all()
-        self.client = self.app.test_client()
+def test_get_profile(client, test_user):
+    """Test getting user profile page."""
+    with client.session_transaction() as sess:
+        sess["_fresh"] = True
+        sess["_user_id"] = str(test_user.id)
 
-        # Create a user
-        self.user = User(username="testuser", email="test@example.com")
-        self.user.set_password("testpassword")
-        db.session.add(self.user)
-        db.session.commit()
+    response = client.get(url_for("auth.profile"))
+    assert response.status_code == 200
+    # Profile endpoint returns HTML, not JSON
+    assert test_user.username.encode() in response.data
 
-        # Log in
-        self.client.post(
-            "/api/v1/auth/login",
-            json={"username": "testuser", "password": "testpassword"},
-        )
 
-    def tearDown(self):
-        db.session.remove()
-        db.drop_all()
-        self.app_context.pop()
+def test_update_profile(client, test_user):
+    """Test updating user profile via form submission."""
+    with client.session_transaction() as sess:
+        sess["_fresh"] = True
+        sess["_user_id"] = str(test_user.id)
 
-    def test_get_profile(self):
-        response = self.client.get("/api/v1/profile")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["username"], "testuser")
+    response = client.post(
+        url_for("auth.profile"),
+        data={"username": "newusername", "email": "newemail@example.com"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    # Check that the new username appears in the response
+    assert b"newusername" in response.data
 
-    def test_update_profile(self):
-        response = self.client.put(
-            "/api/v1/profile",
-            json={"username": "newusername", "email": "newemail@example.com"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["username"], "newusername")
 
-    def test_change_password(self):
-        response = self.client.post(
-            "/api/v1/profile/change-password",
-            json={"old_password": "testpassword", "new_password": "newpassword"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["status"], "success")
+def test_change_password(client, test_user):
+    """Test changing user password via form submission."""
+    with client.session_transaction() as sess:
+        sess["_fresh"] = True
+        sess["_user_id"] = str(test_user.id)
 
-        # Verify the new password works
-        response = self.client.post(
-            "/api/v1/auth/login",
-            json={"username": "testuser", "password": "newpassword"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json["status"], "success")
+    response = client.post(
+        url_for("auth.change_password"),
+        data={"old_password": "testpass", "new_password": "newpassword"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200

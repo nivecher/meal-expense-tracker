@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+    {% from 'macros/cuisine_helpers.html' import cuisine_badge %}
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -22,6 +23,7 @@
         <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" />
         <link href="{{ url_for('static', filename='css/components/table.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/components/service-level-badges.css') }}" rel="stylesheet" />
+        <link href="{{ url_for('static', filename='css/components/cuisine-badges.css') }}" rel="stylesheet" />
     </head>
     <body>
         {% include "includes/navbar.html" %}
@@ -37,10 +39,10 @@ include 'includes/breadcrumb.html' %}
     <div class="d-flex gap-2 flex-wrap">
         <!-- Primary Actions -->
         <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-primary">
-            <i class="fas fa-plus me-1"></i> <span class="d-none d-sm-inline">Add Restaurant</span><span class="d-sm-none">Add</span>
+            <i class="fas fa-plus me-2"></i> <span class="d-none d-sm-inline">Add Restaurant</span><span class="d-sm-none">Add</span>
         </a>
         <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary d-none d-md-inline-flex">
-            <i class="fas fa-search-location me-1"></i> Find Restaurants
+            <i class="fas fa-search-location me-2"></i> Find Restaurants
         </a>
         <!-- Mobile find button -->
         <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary d-md-none">
@@ -54,17 +56,17 @@ include 'includes/breadcrumb.html' %}
                 id="dataManagementDropdown"
                 data-bs-toggle="dropdown"
                 aria-expanded="false">
-                <i class="fas fa-database me-1"></i> <span class="d-none d-lg-inline">Data Management</span><span class="d-lg-none">Data</span>
+                <i class="fas fa-database me-2"></i> <span class="d-none d-lg-inline">Data Management</span><span class="d-lg-none">Data</span>
             </button>
             <ul class="dropdown-menu" aria-labelledby="dataManagementDropdown">
                 <li>
                     <a class="dropdown-item" href="{{ url_for('restaurants.export_restaurants', format='csv') }}">
-                        <i class="fas fa-file-csv me-1"></i> Export as CSV
+                        <i class="fas fa-file-csv me-2"></i> Export as CSV
                     </a>
                 </li>
                 <li>
                     <a class="dropdown-item" href="{{ url_for('restaurants.export_restaurants', format='json') }}">
-                        <i class="fas fa-file-code me-1"></i> Export as JSON
+                        <i class="fas fa-file-code me-2"></i> Export as JSON
                     </a>
                 </li>
                 <li>
@@ -72,7 +74,7 @@ include 'includes/breadcrumb.html' %}
                 </li>
                 <li>
                     <a class="dropdown-item" href="{{ url_for('restaurants.import_restaurants') }}">
-                        <i class="fas fa-file-import me-1"></i> Import Restaurants
+                        <i class="fas fa-file-import me-2"></i> Import Restaurants
                     </a>
                 </li>
             </ul>
@@ -111,11 +113,11 @@ include 'includes/breadcrumb.html' %}
     <div class="btn-group" role="group" aria-label="View Toggle">
         <input type="radio" class="btn-check" name="view-type" id="card-view" autocomplete="off" checked />
         <label class="btn btn-outline-primary" for="card-view" id="card-view-label">
-            <i class="fas fa-th-large me-1"></i> Cards
+            <i class="fas fa-th-large me-2"></i> Cards
         </label>
         <input type="radio" class="btn-check" name="view-type" id="table-view" autocomplete="off" />
         <label class="btn btn-outline-primary" for="table-view" id="table-view-label">
-            <i class="fas fa-table me-1"></i> Table
+            <i class="fas fa-table me-2"></i> Table
         </label>
     </div>
 </div>
@@ -201,10 +203,10 @@ include 'includes/breadcrumb.html' %}
                 </div>
                 <div class="col-md-2 d-flex align-items-end gap-2">
                     <button type="submit" class="btn btn-primary flex-fill" aria-label="Apply filters">
-                        <i class="fas fa-search me-1" aria-hidden="true"></i> Filter
+                        <i class="fas fa-search me-2" aria-hidden="true"></i> Filter
                     </button>
                     <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary" aria-label="Clear all filters">
-                        <i class="fas fa-times me-1" aria-hidden="true"></i> Clear
+                        <i class="fas fa-times me-2" aria-hidden="true"></i> Clear
                     </a>
                 </div>
             </form>
@@ -296,22 +298,22 @@ include 'includes/breadcrumb.html' %}
                         <!-- Left side: Icon and Title -->
                         <div class="d-flex align-items-start">
                             <!-- Restaurant Icon -->
-                            <div class="restaurant-icon me-2 flex-shrink-0">
+                            <div class="restaurant-icon me-2 flex-shrink-0 d-flex align-items-start">
                                 {% if restaurant.website %}
                                     <img
-                                        src="https://www.google.com/s2/favicons?domain={{ restaurant.website }}&sz=32"
+                                        src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ restaurant.website }}&size=32"
                                         alt="{{ restaurant.name }} icon"
                                         class="restaurant-favicon"
                                         width="32"
                                         height="32"
                                         loading="lazy"
-                                        onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                                        onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.style.marginTop='2px';"
                                         onload="this.style.opacity='1';"
-                                        style="opacity: 0; transition: opacity 0.2s;"
+                                        style="opacity: 0; transition: opacity 0.2s; margin-top: 2px;"
                                     />
-                                    <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px;"></i>
+                                    <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px; margin-top: 2px;"></i>
                                 {% else %}
-                                    <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 24px;"></i>
+                                    <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 24px; margin-top: 2px;"></i>
                                 {% endif %}
                             </div>
 
@@ -328,9 +330,7 @@ include 'includes/breadcrumb.html' %}
                                 </h5>
                                 {% if restaurant.cuisine %}
                                 <div class="mt-1">
-                                    <span class="badge bg-light text-dark border" style="font-size: 0.75rem;">
-                                        <i class="fas fa-utensils me-1 text-muted"></i>{{ restaurant.cuisine }}
-                                    </span>
+                                    {{ cuisine_badge(restaurant.cuisine, compact=true) }}
                                 </div>
                                 {% endif %}
                             </div>
@@ -353,7 +353,7 @@ include 'includes/breadcrumb.html' %}
                     {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code or
                     restaurant.country %}
                     <p class="card-text text-muted small mb-2">
-                        <i class="fas fa-map-marker-alt me-1"></i>
+                        <i class="fas fa-map-marker-alt me-2"></i>
                         {% set address_parts = [] %} {% if restaurant.address %} {% set _ =
                         address_parts.append(restaurant.address) %} {% endif %} {% if restaurant.city %} {% set _ =
                         address_parts.append(restaurant.city) %} {% endif %} {% if restaurant.state %} {% set _ =
@@ -363,18 +363,18 @@ include 'includes/breadcrumb.html' %}
                     </p>
                     {% endif %} {% if restaurant.phone %}
                     <p class="card-text text-muted small mb-2">
-                        <i class="fas fa-phone me-1"></i> {{ restaurant.phone }}
+                        <i class="fas fa-phone me-2"></i> {{ restaurant.phone }}
                     </p>
                     {% endif %} {% if restaurant.website %}
                     <p class="card-text text-muted small mb-2">
-                        <i class="fas fa-globe me-1"></i>
+                        <i class="fas fa-globe me-2"></i>
                         <a href="{{ restaurant.website }}" target="_blank" rel="noopener noreferrer" class="text-muted"
                             >{{ restaurant.website|truncate(45, '...') }}</a
                         >
                     </p>
                     {% endif %} {% if restaurant.email %}
                     <p class="card-text text-muted small mb-2">
-                        <i class="fas fa-envelope me-1"></i>
+                        <i class="fas fa-envelope me-2"></i>
                         <a href="mailto:{{ restaurant.email }}" class="text-muted"
                             >{{ restaurant.email|truncate(35, '...') }}</a
                         >
@@ -384,7 +384,7 @@ include 'includes/breadcrumb.html' %}
                     {% if restaurant.notes %}
                     <div class="card-text small mb-3">
                         <div class="text-muted">
-                            <i class="fas fa-sticky-note me-1"></i>
+                            <i class="fas fa-sticky-note me-2"></i>
                             <span class="fst-italic">{{ restaurant.notes|truncate(40, '...') }}</span>
                         </div>
                     </div>
@@ -392,11 +392,11 @@ include 'includes/breadcrumb.html' %}
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                         <div class="d-flex gap-3">
                             <span class="text-muted small">
-                                <i class="fas fa-receipt me-1"></i>
+                                <i class="fas fa-receipt me-2"></i>
                                 {{ restaurant.visit_count }} {{ 'expense' if restaurant.visit_count == 1 else 'expenses' }}
                             </span>
                             <span class="text-muted small">
-                                <i class="fas fa-dollar-sign me-1"></i>
+                                <i class="fas fa-dollar-sign me-2"></i>
                                 ${{ "%.2f"|format(restaurant.total_spent) if restaurant.total_spent is defined else '0.00'
                                 }}
                             </span>
@@ -435,7 +435,7 @@ include 'includes/breadcrumb.html' %}
                     </div>
                     {% if restaurant.last_visit %}
                     <div class="mt-2 text-muted small">
-                        <i class="far fa-calendar-alt me-1"></i>
+                        <i class="far fa-calendar-alt me-2"></i>
                         Last visited {{ restaurant.last_visit|time_ago }}
                     </div>
                     {% endif %}
@@ -455,7 +455,7 @@ include 'includes/breadcrumb.html' %}
             <h3>No restaurants found</h3>
             <p class="text-muted">You haven't added any restaurants yet.</p>
             <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-primary mt-2">
-                <i class="fas fa-plus me-1"></i> Add Your First Restaurant
+                <i class="fas fa-plus me-2"></i> Add Your First Restaurant
             </a>
         </div>
     </div>
@@ -477,18 +477,18 @@ include 'includes/breadcrumb.html' %}
             <div class="modal-body">
                 <p> Are you sure you want to delete <strong id="restaurantName"></strong>? </p>
                 <p class="text-danger">
-                    <i class="fas fa-exclamation-circle me-1"></i>
+                    <i class="fas fa-exclamation-circle me-2"></i>
                     This action cannot be undone. All associated expenses will also be deleted.
                 </p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i> Cancel
+                    <i class="fas fa-times me-2"></i> Cancel
                 </button>
                 <form id="deleteRestaurantForm" method="post" action="">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash me-1"></i> Delete Restaurant
+                        <i class="fas fa-trash me-2"></i> Delete Restaurant
                     </button>
                 </form>
             </div>
@@ -507,11 +507,12 @@ include 'includes/breadcrumb.html' %}
                                 <th data-sort="true" data-sort-type="text">Name</th>
                                 <th data-sort="true" data-sort-type="text">Location</th>
                                 <th data-sort="true" data-sort-type="text">Service Level</th>
+                                <th data-sort="true" data-sort-type="number">Rating</th>
                                 <th data-sort="true" data-sort-type="number">Visits</th>
                                 <th data-sort="true" data-sort-type="date">Last Visit</th>
-                                <th data-sort="true" data-sort-type="number">Rating</th>
+                                <th data-sort="true" data-sort-type="currency">Avg $ / Person</th>
                                 <th data-sort="true" data-sort-type="currency">Total Spent</th>
-                                <th class="text-end">Actions</th>
+                                <th class="text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -523,6 +524,13 @@ include 'includes/breadcrumb.html' %}
                         <tfoot class="table-secondary">
                             <tr>
                                 <td colspan="6" class="text-end fw-bold">Total:</td>
+                                <td class="fw-bold text-info amount-right">
+                                    {% if avg_price_per_person %}
+                                        ${{ "%.2f"|format(avg_price_per_person) }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
                                 <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_spent) if total_spent is defined else '0.00' }}</td>
                                 <td></td>
                             </tr>
@@ -766,6 +774,31 @@ include 'includes/breadcrumb.html' %}
                 window.location.href = currentUrl.toString();
             });
         }
+
+        // Improved favicon loading with better error handling
+        function setupFaviconLoading() {
+            const faviconImages = document.querySelectorAll('.restaurant-favicon, .restaurant-favicon-table');
+            faviconImages.forEach(img => {
+                // Add a more robust error handler
+                img.addEventListener('error', function() {
+                    // Silently handle the error without console spam
+                    this.style.display = 'none';
+                    const fallback = this.nextElementSibling;
+                    if (fallback && fallback.classList.contains('restaurant-fallback-icon')) {
+                        fallback.style.display = 'inline-block';
+                        fallback.style.marginTop = '2px';
+                    }
+                });
+
+                // Add load handler for smooth transition
+                img.addEventListener('load', function() {
+                    this.style.opacity = '1';
+                });
+            });
+        }
+
+        // Initialize favicon loading
+        setupFaviconLoading();
     });
 </script>
 <style>
@@ -781,6 +814,15 @@ include 'includes/breadcrumb.html' %}
     .restaurant-table th.sort-desc::after {
         content: " ↓";
         color: #007bff;
+    }
+
+    /* Favicon loading improvements */
+    .restaurant-favicon, .restaurant-favicon-table {
+        transition: opacity 0.3s ease-in-out;
+    }
+
+    .restaurant-fallback-icon, .restaurant-fallback-icon-table {
+        transition: all 0.2s ease-in-out;
     }
 </style>
 <!-- Cuisine badge component for restaurant displays -->

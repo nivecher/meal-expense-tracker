@@ -295,7 +295,7 @@ async function check_for_existing_restaurant(google_place_id) {
     credentials: 'same-origin',
   });
 
-  return await response.json();
+  return response.json();
 }
 
 async function process_new_restaurant_addition(restaurant, google_place_id) {
@@ -546,7 +546,7 @@ async function check_for_duplicate_restaurant(restaurant_data) {
     credentials: 'same-origin',
   });
 
-  return await response.json();
+  return response.json();
 }
 
 /**
@@ -667,7 +667,7 @@ async function submit_restaurant_data(restaurant_data) {
     showSuccessToastWithActions(
       result.message || 'Restaurant added successfully!',
       result.restaurant_id || null,
-      restaurant_data.name || 'Restaurant'
+      restaurant_data.name || 'Restaurant',
     );
   } else {
     throw new Error(result.message || 'Failed to add restaurant');

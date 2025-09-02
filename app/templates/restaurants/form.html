@@ -205,6 +205,8 @@
                                         {{ form.cuisine(class_="form-control" + (" is-invalid" if form.cuisine.errors else "") ) }}
                                         {% for error in form.cuisine.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
+                                </div>
+                                <div class="row g-3">
                                     <div class="col-md-3">
                                         <label for="service_level" class="form-label">Service Level</label>
                                         {{ form.service_level(class_="form-select" + (" is-invalid" if form.service_level.errors else "") ) }}

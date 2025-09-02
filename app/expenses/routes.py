@@ -518,10 +518,10 @@ def list_expenses() -> str:
 
     # Get filtered expenses using the service layer
     try:
-        expenses, total_amount = expense_services.get_user_expenses(current_user.id, filters)
+        expenses, total_amount, avg_price_per_person = expense_services.get_user_expenses(current_user.id, filters)
     except Exception as e:
         current_app.logger.error(f"Error filtering expenses: {str(e)}")
-        expenses, total_amount = [], 0.0
+        expenses, total_amount, avg_price_per_person = [], 0.0, None
 
     # Handle pagination or show all
     total_expenses = len(expenses)
@@ -551,6 +551,7 @@ def list_expenses() -> str:
         "expenses/list.html",
         expenses=paginated_expenses,
         total_amount=total_amount,
+        avg_price_per_person=avg_price_per_person,
         page=page,
         per_page=per_page,
         total_pages=total_pages,
@@ -760,6 +761,37 @@ def create_tag():
         return jsonify({"success": False, "message": "Failed to create tag"}), 500
 
 
+@bp.route("/tags/<int:tag_id>", methods=["PUT"])
+@login_required
+def update_tag(tag_id):
+    """Update an existing tag."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "No data provided"}), 400
+
+    name = data.get("name", "").strip()
+    color = data.get("color", "#6c757d")
+    description = data.get("description", "").strip()
+
+    if not name:
+        return jsonify({"success": False, "message": "Tag name is required"}), 400
+
+    try:
+        tag = expense_services.update_tag(current_user.id, tag_id, name, color, description)
+        if tag:
+            return (
+                jsonify({"success": True, "tag": tag.to_dict(), "message": f"Tag '{name}' updated successfully"}),
+                200,
+            )
+        else:
+            return jsonify({"success": False, "message": "Tag not found"}), 404
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error updating tag: {e}")
+        return jsonify({"success": False, "message": "Failed to update tag"}), 500
+
+
 @bp.route("/tags/<int:tag_id>", methods=["DELETE"])
 @login_required
 def delete_tag(tag_id):
@@ -881,10 +913,3 @@ def get_popular_tags():
     except Exception as e:
         current_app.logger.error(f"Error fetching popular tags: {e}")
         return jsonify({"success": False, "message": "Failed to fetch popular tags"}), 500
-
-
-@bp.route("/tags/demo")
-@login_required
-def tags_demo():
-    """Show the tags demo page."""
-    return render_template("expenses/tags_demo.html")

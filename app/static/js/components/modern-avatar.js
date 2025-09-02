@@ -61,7 +61,7 @@ class ModernAvatarManager {
 
     observer.observe(document.body, {
       childList: true,
-      subtree: true
+      subtree: true,
     });
   }
 
@@ -122,14 +122,14 @@ class ModernAvatarManager {
     }
 
     return {
-      src: src,
+      src,
       fallbackSrc: element.dataset.defaultSrc,
       alt: element.alt || '',
       username: element.dataset.username || this.extractUsernameFromAlt(element.alt),
       email: element.dataset.email || '',
       size: {
-        width: parseInt(computedStyle.width) || 32,
-        height: parseInt(computedStyle.height) || 32,
+        width: parseInt(computedStyle.width, 10) || 32,
+        height: parseInt(computedStyle.height, 10) || 32,
       },
     };
   }

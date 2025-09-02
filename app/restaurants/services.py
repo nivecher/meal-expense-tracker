@@ -5,7 +5,7 @@ import io
 from typing import Any, Dict, List, Optional, Tuple
 
 from flask import current_app
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from werkzeug.datastructures import FileStorage
 
@@ -67,6 +67,18 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
             func.count(Expense.id).label("visit_count"),
             func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
             func.max(Expense.date).label("last_visit"),
+            func.coalesce(
+                func.avg(
+                    case(
+                        (
+                            Expense.party_size.isnot(None) & (Expense.party_size > 1),
+                            Expense.amount / Expense.party_size,
+                        ),
+                        else_=None,
+                    )
+                ),
+                0,
+            ).label("avg_price_per_person"),
         )
         .outerjoin(
             Expense,
@@ -97,6 +109,7 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
                 "visit_count": row.visit_count,
                 "total_spent": float(row.total_spent) if row.total_spent else 0.0,
                 "last_visit": row.last_visit,
+                "avg_price_per_person": float(row.avg_price_per_person) if row.avg_price_per_person else 0.0,
             }
         )
         restaurants.append(restaurant)
@@ -105,10 +118,15 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
     total_visits = sum(r.get("visit_count", 0) for r in restaurants)
     total_spent = sum(r.get("total_spent", 0) for r in restaurants)
 
+    # Calculate overall average price per person
+    avg_prices = [r.get("avg_price_per_person", 0) for r in restaurants if r.get("avg_price_per_person", 0) > 0]
+    overall_avg_price_per_person = sum(avg_prices) / len(avg_prices) if avg_prices else 0.0
+
     stats = {
         "total_restaurants": total_restaurants,
         "total_visits": total_visits,
         "total_spent": total_spent,
+        "avg_price_per_person": overall_avg_price_per_person,
     }
     return restaurants, stats
 
@@ -183,6 +201,37 @@ def apply_restaurant_filters(stmt, filters: Dict[str, Any]):
     return stmt
 
 
+def _get_sort_field(sort_by: str):
+    """Get the appropriate sort field for restaurant sorting.
+
+    Args:
+        sort_by: Field to sort by
+
+    Returns:
+        SQLAlchemy sort field or None
+    """
+    sort_mapping = {
+        "name": Restaurant.name,
+        "city": Restaurant.city,
+        "cuisine": Restaurant.cuisine,
+        "rating": Restaurant.rating,
+        "visits": func.count(Expense.id),
+        "spent": func.coalesce(func.sum(Expense.amount), 0),
+        "last_visit": func.max(Expense.date),
+        "avg_price_per_person": func.coalesce(
+            func.avg(
+                case(
+                    (Expense.party_size.isnot(None) & (Expense.party_size > 1), Expense.amount / Expense.party_size),
+                    else_=None,
+                )
+            ),
+            0,
+        ),
+        "created_at": Restaurant.created_at,
+    }
+    return sort_mapping.get(sort_by)
+
+
 def apply_restaurant_sorting(stmt, sort_by: str, sort_order: str):
     """Apply sorting to the restaurant query.
 
@@ -194,30 +243,12 @@ def apply_restaurant_sorting(stmt, sort_by: str, sort_order: str):
     Returns:
         The modified select statement with sorting applied
     """
-    sort_field = None
+    sort_field = _get_sort_field(sort_by)
+    if not sort_field:
+        return stmt
+
     is_desc = sort_order.lower() == "desc"
-
-    if sort_by == "name":
-        sort_field = Restaurant.name
-    elif sort_by == "city":
-        sort_field = Restaurant.city
-    elif sort_by == "cuisine":
-        sort_field = Restaurant.cuisine
-    elif sort_by == "rating":
-        sort_field = Restaurant.rating
-    elif sort_by == "visits":
-        sort_field = func.count(Expense.id)
-    elif sort_by == "spent":
-        sort_field = func.coalesce(func.sum(Expense.amount), 0)
-    elif sort_by == "last_visit":
-        sort_field = func.max(Expense.date)
-    elif sort_by == "created_at":
-        sort_field = Restaurant.created_at
-
-    if sort_field:
-        return stmt.order_by(sort_field.desc() if is_desc else sort_field.asc())
-
-    return stmt
+    return stmt.order_by(sort_field.desc() if is_desc else sort_field.asc())
 
 
 def get_unique_cuisines(user_id: int) -> list[str]:
@@ -938,7 +969,7 @@ def delete_restaurant_by_id(restaurant_id: int, user_id: int) -> Tuple[bool, str
         raise e
 
 
-# TODO consider consolidating logic with get_restaurants_with_stats
+# Note: This logic could potentially be consolidated with get_restaurants_with_stats in future refactoring
 def calculate_expense_stats(restaurant_id: int, user_id: int) -> Dict[str, Any]:
     """Calculate expense statistics for a restaurant.
 
@@ -971,9 +1002,6 @@ def calculate_expense_stats(restaurant_id: int, user_id: int) -> Dict[str, Any]:
         "avg_per_visit": avg_per_visit,
         "last_visit": stats.last_visit if stats else None,
     }
-
-
-# ===== Service Level Validation Functions =====
 
 
 def detect_service_level_from_google_data(google_data: Dict[str, Any]) -> Tuple[str, float]:

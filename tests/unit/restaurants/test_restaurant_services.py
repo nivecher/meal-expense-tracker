@@ -103,11 +103,12 @@ Test Restaurant 1,Italian,123 Main St,Test City,TS,12345,123-456-7890,https://ex
         )
 
         # Import restaurants
-        success, message = import_restaurants_from_csv(file, test_user.id)
+        success, result_data = import_restaurants_from_csv(file, test_user.id)
 
         # Check results
         assert success is True
-        assert "1 restaurants imported successfully" in message
+        assert result_data["success_count"] == 1
+        assert "1 restaurants imported successfully" in result_data.get("message", "")
 
 
 def test_import_restaurants_invalid_csv(session, test_user):
@@ -127,11 +128,11 @@ Test Restaurant 1,Test City
         )
 
         # Import restaurants
-        success, message = import_restaurants_from_csv(file, test_user.id)
+        success, result_data = import_restaurants_from_csv(file, test_user.id)
 
         # Check results
         assert success is False
-        assert "Missing required fields" in message
+        assert "Missing required fields" in result_data.get("message", "")
 
 
 def test_import_restaurants_missing_columns(session, test_user):
@@ -155,11 +156,11 @@ Test Restaurant 1,123 Main St,Test City,TS,12345,123-456-7890,https://example1.c
         )
 
         # Import restaurants
-        success, message = import_restaurants_from_csv(file, test_user.id)
+        success, result_data = import_restaurants_from_csv(file, test_user.id)
 
         # Check results
         assert success is False
-        assert "Missing required columns" in message
+        assert "Missing required columns" in result_data.get("message", "")
 
 
 def test_import_restaurants_duplicate_restaurant(session, test_restaurant, test_user):
@@ -204,8 +205,9 @@ def test_import_restaurants_duplicate_restaurant(session, test_restaurant, test_
         )
 
         # Import restaurants
-        success, message = import_restaurants_from_csv(file, test_user.id)
+        success, result_data = import_restaurants_from_csv(file, test_user.id)
 
         # Check results - should indicate duplicate was skipped
         assert success is True
-        assert "0 restaurants imported successfully" in message
+        assert result_data["success_count"] == 0
+        assert result_data["skipped_count"] == 1

@@ -1,0 +1,159 @@
+---
+alwaysApply: true
+---
+
+# Spec-Driven Development Rule
+
+## Overview
+This rule enforces specification-driven development practices to ensure all features are properly documented, tracked, and implemented according to clear requirements.
+
+## Rule: Always Update Feature Status Before Implementation
+
+### When Adding New Features
+Before implementing any new feature, you MUST:
+
+1. **Update Feature Status**: Add the new feature to `docs/FEATURE_STATUS.md` with:
+   - Status: ⏳ Planned/Documented Only
+   - Implementation details: "Planned"
+   - Code Location: "TBD"
+   - Completion: 0%
+
+2. **Define Requirements**: Document the feature requirements including:
+   - User stories and acceptance criteria
+   - Technical requirements
+   - API endpoints (if applicable)
+   - Database changes (if applicable)
+   - UI/UX specifications
+
+3. **Create Implementation Plan**: Break down the feature into:
+   - Backend implementation tasks
+   - Frontend implementation tasks
+   - Testing requirements
+   - Documentation updates
+
+### When Modifying Existing Features
+When changing existing functionality, you MUST:
+
+1. **Review Current Status**: Check `docs/FEATURE_STATUS.md` for current implementation status
+2. **Update Status**: Modify the feature status if implementation changes
+3. **Document Changes**: Update completion percentage and implementation details
+4. **Update Code Locations**: Ensure all code locations are accurate
+
+### When Completing Features
+When finishing feature implementation, you MUST:
+
+1. **Update Status**: Change from 🚧 or ⏳ to ✅
+2. **Update Completion**: Set to 100%
+3. **Verify Code Locations**: Ensure all file paths and line numbers are accurate
+4. **Update Implementation Notes**: Add any important implementation details
+
+## Feature Status Categories
+
+### ✅ Fully Implemented
+- Feature is complete and functional
+- All acceptance criteria met
+- Properly tested
+- Documentation updated
+
+### 🚧 Partially Implemented
+- Feature exists but has limitations
+- Some acceptance criteria met
+- Needs completion or refinement
+- Include completion percentage (e.g., 60%)
+
+### ⏳ Planned/Documented Only
+- Feature is documented but not implemented
+- Requirements defined
+- Implementation plan created
+- Ready for development
+
+### ❌ Deprecated/Removed
+- Feature was removed or is no longer supported
+- Should not be implemented
+- May need cleanup of existing code
+
+## Implementation Checklist
+
+For each feature implementation:
+
+- [ ] Feature added to `docs/FEATURE_STATUS.md`
+- [ ] Requirements documented
+- [ ] Implementation plan created
+- [ ] Code implemented according to plan
+- [ ] Tests written and passing
+- [ ] Documentation updated
+- [ ] Feature status updated to ✅
+- [ ] Code locations verified and accurate
+
+## Code Location Requirements
+
+All features MUST include accurate code locations:
+
+- **Routes**: `app/{module}/routes.py:line_number`
+- **Models**: `app/{module}/models.py:line_number`
+- **Services**: `app/{module}/services.py:line_number`
+- **Templates**: `app/templates/{module}/template.html`
+- **Static Files**: `app/static/{type}/filename.ext`
+- **API Endpoints**: `app/api/routes.py:line_number`
+
+## Quality Standards
+
+Feature implementations must meet:
+
+- **TIGER Principles**: Safety, Performance, Developer Experience
+- **SOLID Principles**: Single responsibility, proper abstractions
+- **Code Quality**: Proper error handling, validation, logging
+- **Security**: Input validation, CSRF protection, authentication
+- **Testing**: Unit tests, integration tests, edge cases
+- **Documentation**: Clear comments, docstrings, README updates
+
+## Enforcement
+
+This rule is MANDATORY. Pull requests that add or modify features without updating `docs/FEATURE_STATUS.md` will be rejected.
+
+The feature status document serves as:
+- Single source of truth for implementation status
+- Development planning tool
+- Progress tracking mechanism
+- Onboarding resource for new developers
+- Stakeholder communication tool
+
+## Examples
+
+### Adding a New Feature
+```markdown
+| Feature | Status | Implementation | Code Location | Completion |
+|---------|--------|----------------|---------------|------------|
+| Receipt OCR | ⏳ | Planned | TBD | 0% |
+```
+
+### Updating During Implementation
+```markdown
+| Feature | Status | Implementation | Code Location | Completion |
+|---------|--------|----------------|---------------|------------|
+| Receipt OCR | 🚧 | Backend complete, UI in progress | `app/expenses/routes.py:750` | 70% |
+```
+
+### Completing Implementation
+```markdown
+| Feature | Status | Implementation | Code Location | Completion |
+|---------|--------|----------------|---------------|------------|
+| Receipt OCR | ✅ | Complete | `app/expenses/routes.py:750` | 100% |
+```
+
+## Integration with Development Workflow
+
+1. **Planning Phase**: Update feature status to ⏳
+2. **Development Phase**: Update to 🚧 with progress
+3. **Testing Phase**: Verify implementation matches requirements
+4. **Completion Phase**: Update to ✅ with final details
+5. **Review Phase**: Verify all documentation is accurate
+
+## Maintenance
+
+- **Weekly Reviews**: Check feature status accuracy
+- **Sprint Planning**: Use feature status for planning
+- **Release Notes**: Reference completed features
+- **Documentation**: Keep implementation details current
+
+This rule ensures that the meal expense tracker maintains high quality, well-documented features that meet user needs and technical requirements.

@@ -576,36 +576,3 @@ jobs:
                 text: `Workflow run: ${workflowUrl}\nVersion: ${VERSION}\nTag: ${TAG}`
               }
             });
-
-      - name: Send Slack Notification
-        if: success() || failure()
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*${{ steps.set_status.outputs.EMOJI }} Deployment ${{ steps.set_status.outputs.STATUS == 'succeeded' && 'Succeeded' || 'Failed' }}\n*\n*Version:* ${{ needs.version-tag.outputs.version || 'unknown' }}\n*Tag:* ${{ needs.version-tag.outputs.tag || 'unknown' }}\n*Environment:* ${{ steps.set_status.outputs.ENV }}\n*Repository:* <https://github.com/${{ github.repository }}|${{ github.repository }}>\n*Workflow:* <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
-                  }
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "View Workflow Run"
-                      },
-                      "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                    }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

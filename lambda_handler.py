@@ -142,9 +142,13 @@ def _validate_session_config(app: Flask) -> None:
     session_type = app.config.get("SESSION_TYPE")
 
     if session_type == "dynamodb":
+        table_name = os.environ.get("SESSION_DYNAMODB_TABLE")
+        # Use SESSION_DYNAMODB_REGION with fallback to built-in AWS_REGION
+        aws_region = os.environ.get("SESSION_DYNAMODB_REGION") or os.environ.get("AWS_REGION")
+
         required_configs = {
-            "SESSION_TABLE_NAME": os.environ.get("SESSION_TABLE_NAME"),
-            "AWS_REGION": os.environ.get("AWS_REGION"),
+            "SESSION_DYNAMODB_TABLE": table_name,
+            "SESSION_DYNAMODB_REGION/AWS_REGION": aws_region,
         }
 
         missing_configs = [key for key, value in required_configs.items() if not value]
@@ -157,22 +161,26 @@ def _validate_session_config(app: Flask) -> None:
         # Log session configuration for debugging
         logger.info("Lambda session configuration validated:")
         logger.info("  Type: %s", session_type)
-        logger.info("  Table: %s", required_configs["SESSION_TABLE_NAME"])
-        logger.info("  Region: %s", required_configs["AWS_REGION"])
+        logger.info("  Table: %s", table_name)
+        logger.info("  Region: %s", aws_region)
 
-        # Test DynamoDB table existence in Lambda environment
+        # Test DynamoDB table existence in Lambda environment with retry logic
         try:
             import boto3
+            from botocore.config import Config
 
-            dynamodb = boto3.resource("dynamodb", region_name=required_configs["AWS_REGION"])
-            table = dynamodb.Table(required_configs["SESSION_TABLE_NAME"])
+            # Configure boto3 with retry logic
+            boto_config = Config(region_name=aws_region, retries={"max_attempts": 3, "mode": "adaptive"})
+
+            dynamodb = boto3.resource("dynamodb", config=boto_config)
+            table = dynamodb.Table(table_name)
             table.load()  # This will fail if table doesn't exist
-            logger.info("DynamoDB session table verified: %s", required_configs["SESSION_TABLE_NAME"])
+            logger.info("DynamoDB session table verified: %s", table_name)
         except Exception as e:
             logger.error("DynamoDB session table validation failed: %s", str(e))
             logger.error("Ensure the DynamoDB table exists before Lambda deployment")
             # This is critical - raise the error to prevent Flask-Session from trying to create table
-            raise RuntimeError(f"DynamoDB session table '{required_configs['SESSION_TABLE_NAME']}' is not accessible")
+            raise RuntimeError(f"DynamoDB session table '{table_name}' is not accessible")
 
     elif session_type == "filesystem":
         logger.warning("Using filesystem sessions in Lambda - this may cause issues with session persistence")

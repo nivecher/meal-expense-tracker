@@ -24,116 +24,76 @@
     transition: all 0.2s ease-in-out;
 }
 
-/* Service level specific colors */
-.service-level-badge[data-service-level="fine_dining"] {
-    background-color: #dc3545 !important; /* Red for premium */
-    color: white !important;
-    border: 1px solid #dc3545;
-}
-
-.service-level-badge[data-service-level="fine_dining"]:hover {
-    background-color: #c82333 !important;
-    border-color: #c82333;
-}
-
-.service-level-badge[data-service-level="casual_dining"] {
-    background-color: #fd7e14 !important; /* Orange for casual */
-    color: white !important;
-    border: 1px solid #fd7e14;
-}
-
-.service-level-badge[data-service-level="casual_dining"]:hover {
-    background-color: #e8690b !important;
-    border-color: #e8690b;
-}
-
-.service-level-badge[data-service-level="fast_casual"] {
-    background-color: #198754 !important; /* Green for fast casual */
-    color: white !important;
-    border: 1px solid #198754;
-}
-
-.service-level-badge[data-service-level="fast_casual"]:hover {
-    background-color: #157347 !important;
-    border-color: #157347;
-}
-
-.service-level-badge[data-service-level="quick_service"] {
-    background-color: #6c757d !important; /* Gray for quick service */
-    color: white !important;
-    border: 1px solid #6c757d;
-}
-
-.service-level-badge[data-service-level="quick_service"]:hover {
-    background-color: #5c636a !important;
-    border-color: #5c636a;
-}
-
-.service-level-badge[data-service-level="unknown"] {
-    background-color: #f8f9fa !important; /* Light gray for unknown */
-    color: #6c757d !important;
-    border: 1px solid #dee2e6;
-}
-
-.service-level-badge[data-service-level="unknown"]:hover {
-    background-color: #e9ecef !important;
-    border-color: #adb5bd;
-}
-
-/* Small service level badge color styles */
+/* Service level specific colors (consistent for both badge sizes) */
+.service-level-badge[data-service-level="fine_dining"],
 .service-level-badge-sm[data-service-level="fine_dining"] {
     background-color: #dc3545 !important; /* Red for premium */
     color: white !important;
     border: 1px solid #dc3545;
 }
 
+.service-level-badge[data-service-level="fine_dining"]:hover,
 .service-level-badge-sm[data-service-level="fine_dining"]:hover {
     background-color: #c82333 !important;
     border-color: #c82333;
 }
 
+.service-level-badge[data-service-level="casual_dining"],
 .service-level-badge-sm[data-service-level="casual_dining"] {
     background-color: #fd7e14 !important; /* Orange for casual */
     color: white !important;
     border: 1px solid #fd7e14;
 }
 
+.service-level-badge[data-service-level="casual_dining"]:hover,
 .service-level-badge-sm[data-service-level="casual_dining"]:hover {
     background-color: #e8690b !important;
     border-color: #e8690b;
 }
 
+.service-level-badge[data-service-level="fast_casual"],
 .service-level-badge-sm[data-service-level="fast_casual"] {
     background-color: #198754 !important; /* Green for fast casual */
     color: white !important;
     border: 1px solid #198754;
 }
 
+.service-level-badge[data-service-level="fast_casual"]:hover,
 .service-level-badge-sm[data-service-level="fast_casual"]:hover {
     background-color: #157347 !important;
     border-color: #157347;
 }
 
+.service-level-badge[data-service-level="quick_service"],
 .service-level-badge-sm[data-service-level="quick_service"] {
     background-color: #6c757d !important; /* Gray for quick service */
     color: white !important;
     border: 1px solid #6c757d;
 }
 
+.service-level-badge[data-service-level="quick_service"]:hover,
 .service-level-badge-sm[data-service-level="quick_service"]:hover {
     background-color: #5c636a !important;
     border-color: #5c636a;
 }
 
+.service-level-badge[data-service-level="unknown"],
 .service-level-badge-sm[data-service-level="unknown"] {
     background-color: #f8f9fa !important; /* Light gray for unknown */
     color: #6c757d !important;
     border: 1px solid #dee2e6;
 }
 
+.service-level-badge[data-service-level="unknown"]:hover,
 .service-level-badge-sm[data-service-level="unknown"]:hover {
     background-color: #e9ecef !important;
     border-color: #adb5bd;
+}
+
+/* Small badge extra layout tweaks */
+.service-level-badge-sm {
+    white-space: nowrap; /* Prevent text wrapping */
+    min-width: fit-content; /* Allow badge to be wider if needed */
 }
 
 /* Icon styling */
@@ -182,13 +142,15 @@
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-    .service-level-badge[data-service-level="unknown"] {
+    .service-level-badge[data-service-level="unknown"],
+    .service-level-badge-sm[data-service-level="unknown"] {
         background-color: #495057 !important;
         color: #adb5bd !important;
         border-color: #6c757d;
     }
 
-    .service-level-badge[data-service-level="unknown"]:hover {
+    .service-level-badge[data-service-level="unknown"]:hover,
+    .service-level-badge-sm[data-service-level="unknown"]:hover {
         background-color: #343a40 !important;
         border-color: #495057;
     }

@@ -101,14 +101,18 @@ function setup_date_validation(elements) {
      * Clear all validation errors from the form
      */
   function clearValidationErrors() {
+    // Get the form element
+    const formElement = document.querySelector('form[method="get"]');
+    if (!formElement) return;
+
     // Remove error classes
-    const invalidInputs = form.querySelectorAll('.is-invalid');
+    const invalidInputs = formElement.querySelectorAll('.is-invalid');
     invalidInputs.forEach((input) => {
       input.classList.remove('is-invalid');
     });
 
     // Remove error messages
-    const errorMessages = form.querySelectorAll('.invalid-feedback');
+    const errorMessages = formElement.querySelectorAll('.invalid-feedback');
     errorMessages.forEach((message) => {
       message.remove();
     });

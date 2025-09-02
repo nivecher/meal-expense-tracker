@@ -37,6 +37,8 @@ class ExpenseSchema(Schema):
     amount = fields.Decimal(as_string=True, required=True)
     notes = fields.Str()
     meal_type = fields.Str()
+    order_type = fields.Str()
+    party_size = fields.Int(allow_none=True, validate=lambda x: x is None or 1 <= x <= 50)
     date = fields.Date(required=True)
     user_id = fields.Int(dump_only=True)
     restaurant_id = fields.Int(required=True)

@@ -4,6 +4,7 @@
 
 {% block head_extra %}
 <link href="{{ url_for('static', filename='css/forms.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/tagify-custom.css') }}" rel="stylesheet">
 <script src="{{ url_for('static', filename='js/components/timezone-detector.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/components/avatar-picker.js') }}" defer></script>
 <style>
@@ -574,6 +575,17 @@
                     <div id="timezone-detected" class="timezone-detection-result mt-2" style="display: none;"></div>
                 </div>
             </div>
+
+            <!-- Tag Management -->
+            <div class="form-group">
+                <label class="form-label">Tag Management</label>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#tagEditorModal">
+                        <i class="fas fa-tags me-1"></i>Manage Tags
+                    </button>
+                    <small class="text-muted">Create, edit, and organize your custom tags</small>
+                </div>
+            </div>
         </div>
 
         <!-- Form Actions -->
@@ -587,6 +599,9 @@
         </div>
     </form>
 </div>
+
+<!-- Include Tag Editor Modal -->
+{% include 'components/tag_editor_modal.html' %}
 
 <script>
 // Character counters
@@ -612,6 +627,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 100);
         }
     }
+
+    // Initialize tag manager
+    initializeTagManager();
 });
+
+async function initializeTagManager() {
+    try {
+        const { default: TagManager } = await import('/static/js/components/tag-manager.js');
+        window.tagManager = new TagManager();
+        window.tagManager.init();
+    } catch (error) {
+        console.error('Failed to load tag manager:', error);
+    }
+}
 </script>
 {% endblock content %}

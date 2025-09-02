@@ -72,7 +72,7 @@ const errorHandler = {
   wrap(fn, context = 'unknown') {
     return async(...args) => {
       try {
-        return await fn(...args);
+        return fn(...args);
       } catch (error) {
         logger.error(`Error in ${context}:`, error);
 
@@ -231,7 +231,7 @@ function delay(ms) {
 async function retry(fn, maxAttempts = 3, baseDelay = 1000) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await fn();
+      return fn();
     } catch (error) {
       if (attempt === maxAttempts) {
         throw error;

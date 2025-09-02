@@ -9,6 +9,44 @@
 
 import { logger } from './core-utils.js';
 
+// ===== DOM ELEMENT UTILITIES =====
+
+/**
+ * Creates a DOM element with defensive coding to prevent browser extension conflicts
+ * @param {string} tagName - The HTML tag name
+ * @param {Object} options - Element creation options
+ * @returns {HTMLElement} The created element
+ */
+export function createSafeElement(tagName, options = {}) {
+  const element = document.createElement(tagName);
+
+  // Ensure element has proper DOM properties for browser extensions
+  if (!element.tagName) {
+    console.warn(`Created ${tagName} element missing tagName property`);
+  }
+
+  // Apply options
+  if (options.className) {
+    element.className = options.className;
+  }
+  if (options.id) {
+    element.id = options.id;
+  }
+  if (options.textContent) {
+    element.textContent = options.textContent;
+  }
+  if (options.innerHTML) {
+    element.innerHTML = options.innerHTML;
+  }
+  if (options.attributes) {
+    Object.entries(options.attributes).forEach(([key, value]) => {
+      element.setAttribute(key, value);
+    });
+  }
+
+  return element;
+}
+
 // ===== TOAST NOTIFICATIONS =====
 
 /**

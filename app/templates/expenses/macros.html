@@ -56,6 +56,24 @@
         </div>
         <div class="row mb-3">
             <div class="col-md-6">
+                {{ form.order_type.label(class="form-label") }}
+                {{ form.order_type(class="form-select" + (' is-invalid' if form.order_type.errors else '') ) }}
+                {% if form.order_type.errors %}<div class="invalid-feedback">{{ form.order_type.errors[0] }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+                {{ form.party_size.label(class="form-label") }}
+                {{ form.party_size(class="form-control" + (' is-invalid' if form.party_size.errors else '') ) }}
+                {% if form.party_size.errors %}<div class="invalid-feedback">{{ form.party_size.errors[0] }}</div>{% endif %}
+                <div class="form-text">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Number of people for this meal (optional - used to calculate price per person)
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
                 {{ form.category_id.label(class="form-label") }}
                 <select name="{{ form.category_id.name }}"
                         id="{{ form.category_id.id }}"
@@ -84,25 +102,19 @@
         <div class="row mb-3">
             <div class="col-12">
                 {{ form.tags.label(class="form-label") }}
-                <div class="tags-input-container">
-                    <div class="tags-input-wrapper">
-                        <div class="tags-display" id="tagsDisplay">
-                            <!-- Tags will be displayed here as badges -->
-                        </div>
-                        <input type="text"
-                               id="tagsInput"
-                               class="form-control tags-input"
-                               placeholder="Type to add tags..."
-                               autocomplete="off">
-                    </div>
-                    <div class="tags-suggestions" id="tagsSuggestions" style="display: none;">
-                        <!-- Tag suggestions will appear here -->
-                    </div>
-                </div>
+                <input type="text"
+                       id="tagsInput"
+                       name="tags"
+                       placeholder="Type to add tags..."
+                       data-tags-input
+                       {% if expense and expense.tags %}value="{{ expense.tags|map(attribute='name')|join(',') }}"{% endif %}>
                 <div class="form-text">
                     <small class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
-                        Tags are automatically created and follow Jira-style naming (lowercase with hyphens)
+                        Press Enter to add tags, Backspace to remove. Tags are automatically created.
+                        <a href="{{ url_for('auth.profile') }}#tag-management" class="ms-2" target="_blank">
+                            <i class="fas fa-cog me-1"></i>Manage Tags
+                        </a>
                     </small>
                 </div>
                 {% if form.tags.errors %}<div class="invalid-feedback">{{ form.tags.errors[0] }}</div>{% endif %}
@@ -120,20 +132,23 @@
     </form>
 {% endmacro %}
 {% macro expense_scripts() %}
-    <!-- Tags CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/tags.css') }}">
+    <!-- Tagify CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.17.9/dist/tagify.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tagify-custom.css') }}">
+    <!-- Dynamic user tag colors -->
+    <link rel="stylesheet" href="{{ url_for('main.user_tag_css') }}">
 
     <!-- Expense form handler (handles form submission via Fetch API) -->
     <script type="module"
             src="{{ url_for('static', filename='js/pages/expense-form-handler.js') }}"></script>
-    <!-- Category and restaurant type handling -->
-    <script type="module"
-            src="{{ url_for('static', filename='js/pages/expense-form.js') }}"></script>
-    <!-- Tags input component -->
-    <script src="{{ url_for('static', filename='js/components/tags-input.js') }}"></script>
+    <!-- Category and restaurant type handling is now integrated into expense-form-handler.js -->
+    <!-- Tagify JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.17.9/dist/tagify.min.js"></script>
 
     <!-- Category dropdown enhancement -->
     <script>
+        // Extension error handling is now managed by extension-error-handler.js
+
         document.addEventListener('DOMContentLoaded', function() {
             const categorySelect = document.querySelector('[data-category-select]');
             if (categorySelect) {
@@ -154,14 +169,199 @@
                 updateCategoryStyle(); // Set initial style
             }
 
-            // Initialize tags input
-            const tagsContainer = document.querySelector('[data-tags-input]');
-            if (tagsContainer) {
-                const expenseId = tagsContainer.dataset.expenseId;
-                window.tagsInputInstance = new TagsInput(tagsContainer, {
-                    expenseId: expenseId ? parseInt(expenseId) : null
+            // Initialize Tagify with enhanced configuration
+            const tagsInput = document.querySelector('[data-tags-input]');
+            if (tagsInput) {
+                console.log('Initializing Tagify on element:', tagsInput);
+
+                // Make element extension-safe using the utility function
+                if (window.makeElementExtensionSafe) {
+                    window.makeElementExtensionSafe(tagsInput);
+                } else {
+                    // Fallback defensive properties
+                    tagsInput.setAttribute('data-autofill-safe', 'true');
+                }
+
+                try {
+                    window.tagifyInstance = new Tagify(tagsInput, {
+                    whitelist: [],
+                    maxTags: 15,
+                    enforceWhitelist: false,
+                    addTagOnBlur: true,
+                    duplicates: false,
+                    trim: true,
+                    // Add safety measures to prevent null value errors
+                    validate: (tagData) => {
+                        return tagData && tagData.value && tagData.value.trim().length > 0;
+                    },
+                    transformTag: (tagData) => {
+                        // Ensure all required properties exist
+                        return {
+                            value: tagData.value || '',
+                            id: tagData.id || null,
+                            color: tagData.color || null,
+                            title: tagData.title || tagData.value || ''
+                        };
+                    },
+                    dropdown: {
+                        maxItems: 15,
+                        classname: 'tags-dropdown',
+                        enabled: 0,
+                        closeOnSelect: false,
+                        highlightFirst: true,
+                        searchKeys: ['value', 'name']
+                    },
+                    templates: {
+                        tag: (tagData) => {
+                            // Ensure tagData has required properties
+                            if (!tagData || !tagData.value) {
+                                console.warn('Invalid tagData:', tagData);
+                                return '';
+                            }
+
+                            // Use tag ID for CSS class if available, otherwise fallback to color
+                            const tagId = tagData.id || null;
+                            const tagColor = tagData.color || '#6c757d';
+                            const cssClass = tagId ? `tag-${tagId}` : `tag-color-${Math.abs(tagData.value.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % 12 + 1}`;
+                            const inlineStyle = tagId ? '' : `style="background-color: ${tagColor}; color: white;"`;
+
+                            return `
+                                <tag title="${tagData.title || tagData.value}"
+                                     contenteditable='false'
+                                     spellcheck='false'
+                                     tabIndex="-1"
+                                     class="tagify__tag ${cssClass}"
+                                     ${inlineStyle}
+                                     data-tagify-tag="true"
+                                     data-autofill-safe="true"
+                                     data-extension-safe="true"
+                                     data-tag-id="${tagId || ''}"
+                                     data-tag-color="${tagColor}">
+                                    <x title='' class='tagify__tag__removeBtn' role='button' aria-label='remove tag'></x>
+                                    <div>
+                                        <span class='tagify__tag-text'>${tagData.value}</span>
+                                    </div>
+                                </tag>
+                            `;
+                        },
+                        dropdownItem: (tagData) => {
+                            // Ensure tagData has required properties
+                            if (!tagData || !tagData.value) {
+                                console.warn('Invalid tagData for dropdown:', tagData);
+                                return '';
+                            }
+
+                            const tagId = tagData.id || null;
+                            const tagColor = tagData.color || '#6c757d';
+                            const cssClass = tagId ? `tag-${tagId}` : `tag-color-${Math.abs(tagData.value.split('').reduce((a, b) => a + b.charCodeAt(0), 0)) % 12 + 1}`;
+                            const inlineStyle = tagId ? '' : `style="background-color: ${tagColor}; color: white;"`;
+
+                            return `
+                                <div class="tagify__dropdown__item" data-value="${tagData.value}">
+                                    <span class="tagify__tag ${cssClass}" ${inlineStyle} style="margin: 0; font-size: 0.7rem; padding: 0.2rem 0.4rem;">
+                                        ${tagData.value}
+                                    </span>
+                                    <span class="tagify__dropdown__item__text">${tagData.value}</span>
+                                </div>
+                            `;
+                        }
+                    }
                 });
+
+                // Load existing tags for autocomplete
+                fetch('/expenses/tags')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Initial tags response:', data); // Debug log
+                        if (data && data.success && Array.isArray(data.tags)) {
+                            const whitelist = data.tags.map(tag => ({
+                                value: tag.name || '',
+                                id: tag.id || null,
+                                color: tag.color || null
+                            })).filter(tag => tag.value); // Filter out empty values
+
+                            if (window.tagifyInstance && window.tagifyInstance.settings) {
+                                window.tagifyInstance.settings.whitelist = whitelist;
+                                console.log('Loaded tag whitelist:', whitelist);
+                            }
+                        } else {
+                            console.log('No initial tags found or invalid response structure');
+                        }
+                    })
+                    .catch(error => console.error('Error loading tags:', error));
+
+                // Handle input for suggestions
+                window.tagifyInstance.on('input', async (e) => {
+                    if (!e || !e.detail || !e.detail.value) {
+                        console.warn('Invalid input event:', e);
+                        return;
+                    }
+
+                    const query = e.detail.value;
+                    if (query.length < 2) return;
+
+                    try {
+                        const response = await fetch(`/expenses/tags/search?q=${encodeURIComponent(query)}`);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        console.log('Search response:', data); // Debug log
+
+                        if (data && data.success && Array.isArray(data.tags)) {
+                            const suggestions = data.tags.map(tag => ({
+                                value: tag.name || '',
+                                id: tag.id || null,
+                                color: tag.color || null
+                            })).filter(tag => tag.value); // Filter out empty values
+
+                            if (window.tagifyInstance && window.tagifyInstance.settings) {
+                                window.tagifyInstance.settings.whitelist = suggestions;
+                                if (window.tagifyInstance.dropdown) {
+                                    window.tagifyInstance.dropdown.show();
+                                }
+                            }
+                        } else {
+                            console.log('No tags found or invalid response structure');
+                        }
+                    } catch (error) {
+                        console.error('Error searching tags:', error);
+                    }
+                });
+
+                console.log('Tagify instance created:', window.tagifyInstance);
+
+                // Add global error handler for Tagify
+                window.tagifyInstance.on('error', (e) => {
+                    console.warn('Tagify error:', e.detail);
+                });
+
+                // Add safety wrapper for Tagify methods
+                const originalAddTags = window.tagifyInstance.addTags;
+                window.tagifyInstance.addTags = function(tags) {
+                    try {
+                        if (!tags) return this;
+                        const safeTags = Array.isArray(tags) ? tags.filter(tag => tag && tag.value) : [tags].filter(tag => tag && tag.value);
+                        return originalAddTags.call(this, safeTags);
+                    } catch (error) {
+                        console.error('Error adding tags:', error);
+                        return this;
+                    }
+                };
+
+                } catch (error) {
+                    console.error('Error initializing Tagify:', error);
+                }
+            } else {
+                console.warn('Tags input element not found');
             }
+
         });
     </script>
 {% endmacro %}

@@ -53,7 +53,7 @@ def get_user_expenses(user_id: int, filters: Dict[str, Any]) -> Tuple[List[Expen
         filters: Dictionary of filter parameters
 
     Returns:
-        Tuple of (expenses, total_amount)
+        Tuple of (expenses, total_amount, avg_price_per_person)
     """
     # Base query
     stmt = select(Expense).where(Expense.user_id == user_id)
@@ -71,7 +71,20 @@ def get_user_expenses(user_id: int, filters: Dict[str, Any]) -> Tuple[List[Expen
     # Calculate total
     total_amount = sum(expense.amount for expense in expenses) if expenses else 0.0
 
-    return expenses, total_amount
+    # Calculate average price per person
+    # Include all expenses where party_size is set (including single person)
+    # This matches what's displayed in the table
+    price_per_person_values = []
+    for expense in expenses:
+        if expense.party_size is not None and expense.party_size > 0:
+            # Include all expenses with party size set (single or multi-person)
+            price_per_person_values.append(float(expense.price_per_person))
+
+    avg_price_per_person = (
+        sum(price_per_person_values) / len(price_per_person_values) if price_per_person_values else None
+    )
+
+    return expenses, total_amount, avg_price_per_person
 
 
 def apply_filters(stmt, filters: Dict[str, Any]):
@@ -142,24 +155,35 @@ def apply_sorting(stmt, sort_by: str, sort_order: str):
     Returns:
         The modified select statement with sorting applied
     """
-    sort_field = None
     is_desc = sort_order.lower() == "desc"
+    sort_fields = []
 
     if sort_by == "date":
-        sort_field = Expense.date
+        # Primary sort by date, secondary sort by created_at for recently entered expenses
+        primary_field = Expense.date.desc() if is_desc else Expense.date.asc()
+        secondary_field = Expense.created_at.desc() if is_desc else Expense.created_at.asc()
+        sort_fields = [primary_field, secondary_field]
     elif sort_by == "amount":
-        sort_field = Expense.amount
+        sort_field = Expense.amount.desc() if is_desc else Expense.amount.asc()
+        sort_fields = [sort_field]
     elif sort_by == "meal_type":
-        sort_field = Expense.meal_type
+        sort_field = Expense.meal_type.desc() if is_desc else Expense.meal_type.asc()
+        sort_fields = [sort_field]
     elif sort_by == "category":
         # Sort by category name through the relationship
         stmt = stmt.join(Expense.category)
-        sort_field = Category.name
+        sort_field = Category.name.desc() if is_desc else Category.name.asc()
+        sort_fields = [sort_field]
     elif sort_by == "restaurant":
-        return stmt.order_by(Restaurant.name.desc() if is_desc else Restaurant.name.asc())
+        sort_field = Restaurant.name.desc() if is_desc else Restaurant.name.asc()
+        sort_fields = [sort_field]
+    elif sort_by == "created_at":
+        # Sort by created_at only
+        sort_field = Expense.created_at.desc() if is_desc else Expense.created_at.asc()
+        sort_fields = [sort_field]
 
-    if sort_field:
-        return stmt.order_by(sort_field.desc() if is_desc else sort_field.asc())
+    if sort_fields:
+        return stmt.order_by(*sort_fields)
 
     return stmt
 
@@ -322,7 +346,7 @@ def _validate_tags_list(tags_list: Any) -> Tuple[Optional[list[str]], Optional[s
     """Validate and clean tags list.
 
     Args:
-        tags_list: List of tags to validate
+        tags_list: List of tags to validate (can be strings or Tagify objects)
 
     Returns:
         A tuple of (cleaned_tags, error_message)
@@ -332,9 +356,15 @@ def _validate_tags_list(tags_list: Any) -> Tuple[Optional[list[str]], Optional[s
 
     processed_tags = []
     for tag in tags_list:
-        if not isinstance(tag, str):
-            return None, "All tags must be strings"
-        tag_clean = tag.strip()
+        # Handle Tagify format: {"value": "tag_name"}
+        if isinstance(tag, dict) and "value" in tag:
+            tag_name = tag["value"]
+        elif isinstance(tag, str):
+            tag_name = tag
+        else:
+            return None, f"Invalid tag format: {tag}"
+
+        tag_clean = tag_name.strip()
         if tag_clean:  # Only add non-empty tags
             processed_tags.append(tag_clean)
 
@@ -416,6 +446,8 @@ def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], 
             category_id=category_id,
             restaurant_id=restaurant_id,
             meal_type=form.meal_type.data or None,
+            order_type=form.order_type.data or None,
+            party_size=form.party_size.data,
         )
 
         db.session.add(expense)
@@ -494,6 +526,8 @@ def update_expense(expense: Expense, form: ExpenseForm) -> Tuple[Optional[Expens
         expense.category_id = category_id
         expense.restaurant_id = restaurant_id
         expense.meal_type = form.meal_type.data or None
+        expense.order_type = form.order_type.data or None
+        expense.party_size = form.party_size.data
 
         current_app.logger.info("Updated expense data: %s", expense)
         db.session.commit()
@@ -1476,6 +1510,53 @@ def create_tag(user_id: int, name: str, color: str = "#6c757d", description: str
     tag = Tag(name=normalized_name, color=color, description=description, user_id=user_id)
 
     db.session.add(tag)
+    db.session.commit()
+
+    return tag
+
+
+def update_tag(user_id: int, tag_id: int, name: str, color: str = "#6c757d", description: str = None) -> Optional[Tag]:
+    """Update an existing tag for a user.
+
+    Args:
+        user_id: ID of the user updating the tag
+        tag_id: ID of the tag to update
+        name: New name of the tag (will be normalized to Jira-style)
+        color: New hex color code for the tag
+        description: New optional description of the tag
+
+    Returns:
+        The updated Tag object, or None if not found
+
+    Raises:
+        ValueError: If tag name is invalid or already exists
+    """
+    if not name or not name.strip():
+        raise ValueError("Tag name is required")
+
+    # Find the tag
+    tag = Tag.query.filter_by(id=tag_id, user_id=user_id).first()
+    if not tag:
+        return None
+
+    # Normalize tag name to Jira-style
+    normalized_name = name.strip().lower().replace(" ", "-")
+    normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
+
+    if not normalized_name:
+        raise ValueError("Tag name must contain at least one alphanumeric character")
+
+    # Check if another tag with this name already exists for this user
+    existing_tag = Tag.query.filter(Tag.name == normalized_name, Tag.user_id == user_id, Tag.id != tag_id).first()
+    if existing_tag:
+        raise ValueError(f"Tag '{name}' already exists")
+
+    # Update the tag
+    tag.name = normalized_name
+    tag.color = color
+    tag.description = description
+    tag.updated_at = datetime.utcnow()
+
     db.session.commit()
 
     return tag

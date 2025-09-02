@@ -233,7 +233,7 @@ async function select_restaurant(place_id) {
 
     // Then fetch detailed information including service level from our backend
     const detailed_response = await fetch(`/restaurants/find-by-google-place?place_id=${place_id}`, {
-      credentials: 'same-origin' // Include cookies for authentication
+      credentials: 'same-origin', // Include cookies for authentication
     });
 
     if (!detailed_response.ok) {

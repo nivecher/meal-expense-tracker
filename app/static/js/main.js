@@ -7,12 +7,16 @@
  */
 
 import { initNotifications } from './utils/notifications.js';
+import { initExtensionErrorHandler, makeElementExtensionSafe } from './utils/extension-error-handler.js';
+
+// Extension error handling is now managed by extension-error-handler.js
+// Make extension safety utilities available globally
+window.makeElementExtensionSafe = makeElementExtensionSafe;
 
 // Enhanced page module loading with error handling
 const pageModules = {
   '/restaurants/add': () => import('./pages/restaurant-form.js'),
   '/restaurants/search': () => import('./pages/restaurant-search.js'),
-  '/expenses/add': () => import('./pages/expense-form.js'),
   '/expenses': () => import('./pages/expense-list.js'),
   '/restaurants': () => import('./pages/restaurant-list.js'),
 };
@@ -33,8 +37,12 @@ function initUI() {
   document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     anchor.addEventListener('click', (e) => {
       e.preventDefault();
-      const target = document.querySelector(anchor.getAttribute('href'));
-      target?.scrollIntoView({ behavior: 'smooth' });
+      const href = anchor.getAttribute('href');
+      // Only proceed if href contains an actual ID (not just '#')
+      if (href && href.length > 1) {
+        const target = document.querySelector(href);
+        target?.scrollIntoView({ behavior: 'smooth' });
+      }
     });
   });
 }

@@ -67,6 +67,14 @@ def _validate_dynamodb_session_config(app: Flask) -> None:
     if app.config.get("SESSION_TYPE") != "dynamodb":
         return
 
+    _validate_required_configs(app)
+    table_name = _validate_table_name_format(app)
+    _test_dynamodb_connection(app, table_name)
+    app.logger.info("DynamoDB session configuration validated successfully")
+
+
+def _validate_required_configs(app: Flask) -> None:
+    """Validate required DynamoDB session configuration parameters."""
     required_configs = {"SESSION_DYNAMODB_TABLE": "DynamoDB table name", "SESSION_DYNAMODB_REGION": "AWS region"}
 
     missing_configs = []
@@ -79,30 +87,53 @@ def _validate_dynamodb_session_config(app: Flask) -> None:
         app.logger.error(error_msg)
         raise ValueError(error_msg)
 
-    # Validate table name format
+
+def _validate_table_name_format(app: Flask) -> str:
+    """Validate DynamoDB table name format."""
     table_name = app.config.get("SESSION_DYNAMODB_TABLE", "")
     if not table_name.replace("-", "").replace("_", "").isalnum():
         raise ValueError(
             f"Invalid DynamoDB table name: {table_name}. Must contain only alphanumeric characters, hyphens, and underscores."
         )
+    return table_name
 
-    # Test DynamoDB connection to ensure we're using AWS (not localhost)
+
+def _test_dynamodb_connection(app: Flask, table_name: str) -> None:
+    """Test DynamoDB connection and permissions."""
     try:
         dynamodb_resource = app.config.get("SESSION_DYNAMODB")
         if dynamodb_resource:
-            # Test connection by attempting to describe the table
+            # Test connection by attempting to describe the table with retry logic
             table = dynamodb_resource.Table(table_name)
             table.load()  # This will raise an exception if table doesn't exist or connection fails
             app.logger.info("DynamoDB session table connection verified: %s", table_name)
             app.logger.info("Table status: %s", table.table_status)
+
+            # Test basic table operations to ensure permissions are correct
+            try:
+                _test_dynamodb_permissions(table)
+                app.logger.info("DynamoDB table permissions verified successfully")
+            except Exception as perm_error:
+                app.logger.warning("DynamoDB table permissions test failed: %s", str(perm_error))
+                app.logger.warning("This may indicate insufficient IAM permissions")
         else:
             app.logger.warning("SESSION_DYNAMODB resource not configured - Flask-Session will create its own")
     except Exception as e:
         app.logger.error("DynamoDB session table verification failed: %s", str(e))
         # Don't fail startup - let Flask-Session handle the error gracefully
         app.logger.info("Note: Ensure the DynamoDB table '%s' exists and is accessible", table_name)
+        app.logger.info("Check IAM permissions and network connectivity")
 
-    app.logger.info("DynamoDB session configuration validated successfully")
+
+def _test_dynamodb_permissions(table) -> None:
+    """Test DynamoDB table permissions."""
+    try:
+        # Try a simple scan operation to verify permissions
+        table.scan(Limit=1)
+        # Note: We can't access app logger from table object, so we'll log success at caller level
+    except Exception as perm_error:
+        # Note: We can't access app logger from table object, so we'll log warning at caller level
+        raise perm_error
 
 
 def _configure_csrf_handlers(app: Flask) -> None:

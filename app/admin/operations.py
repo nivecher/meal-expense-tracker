@@ -554,7 +554,7 @@ class InitializeDatabaseOperation(BaseAdminOperation):
             logger.warning("User model not available")
             return None, "User model not available - skipping sample data creation"
 
-    # TODO: confusion between expense categories and meal types
+    # Note: Review data model - potential confusion between expense categories and meal types
     def _create_default_categories(self, admin_user: User) -> str:
         """Create default expense categories for admin user.
 

@@ -61,13 +61,13 @@ class Tag(BaseModel):
     )
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="tags", lazy="joined", innerjoin=True)
+    user: Mapped["User"] = relationship("User", back_populates="tags", lazy="select")
     expense_tags: Mapped[list["ExpenseTag"]] = relationship(
         "ExpenseTag",
         back_populates="tag",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        lazy="dynamic",
+        lazy="select",
     )
 
     @property
@@ -75,9 +75,16 @@ class Tag(BaseModel):
         """Get the number of expenses using this tag."""
         if hasattr(self, "_expense_count"):
             return self._expense_count
-        if hasattr(self, "expense_tags") and hasattr(self.expense_tags, "count"):
-            return self.expense_tags.count()
-        return 0
+        try:
+            # Use a direct query to avoid relationship loading issues
+            from sqlalchemy import func
+
+            from app import db
+
+            count = db.session.query(func.count(ExpenseTag.id)).filter(ExpenseTag.tag_id == self.id).scalar()
+            return count or 0
+        except Exception:
+            return 0
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a dictionary representation of the tag.
@@ -149,9 +156,9 @@ class ExpenseTag(BaseModel):
     )
 
     # Relationships
-    expense: Mapped["Expense"] = relationship("Expense", back_populates="expense_tags", lazy="joined", innerjoin=True)
-    tag: Mapped["Tag"] = relationship("Tag", back_populates="expense_tags", lazy="joined", innerjoin=True)
-    user: Mapped["User"] = relationship("User", lazy="joined", innerjoin=True)
+    expense: Mapped["Expense"] = relationship("Expense", back_populates="expense_tags", lazy="select")
+    tag: Mapped["Tag"] = relationship("Tag", back_populates="expense_tags", lazy="select")
+    user: Mapped["User"] = relationship("User", lazy="select")
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a dictionary representation of the expense tag.
@@ -186,6 +193,8 @@ class Expense(BaseModel):
         amount: The amount of the expense (stored as Decimal with 2 decimal places)
         notes: Optional notes about the expense
         meal_type: Type of meal (e.g., breakfast, lunch, dinner)
+        order_type: Type of order (e.g., dine_in, takeout, delivery)
+        party_size: Number of people in the party (optional)
         date: Date and time of the expense
         user_id: ID of the user who made the expense
         restaurant_id: ID of the restaurant where the expense occurred
@@ -195,6 +204,7 @@ class Expense(BaseModel):
         - Amount is stored with 2 decimal places precision
         - All monetary values are handled using Python's Decimal for precision
         - Expenses are automatically sorted by date in descending order
+        - Party size is used to calculate price per person metrics
     """
 
     __tablename__ = "expense"
@@ -213,6 +223,17 @@ class Expense(BaseModel):
         nullable=True,
         index=True,
         comment="Type of meal (e.g., breakfast, lunch, dinner)",
+    )
+    order_type: Mapped[Optional[str]] = db.Column(
+        db.String(50),
+        nullable=True,
+        index=True,
+        comment="Type of order (e.g., dine_in, takeout, delivery)",
+    )
+    party_size: Mapped[Optional[int]] = db.Column(
+        db.Integer,
+        nullable=True,
+        comment="Number of people in the party (1-50)",
     )
     date: Mapped[datetime] = db.Column(
         db.DateTime(timezone=True),
@@ -255,9 +276,9 @@ class Expense(BaseModel):
     )
 
     # Relationships with explicit join conditions and loading strategies
-    user: Mapped["User"] = relationship("User", back_populates="expenses", lazy="joined", innerjoin=True)
-    restaurant: Mapped[Optional["Restaurant"]] = relationship("Restaurant", back_populates="expenses", lazy="joined")
-    category: Mapped[Optional["Category"]] = relationship("Category", back_populates="expenses", lazy="joined")
+    user: Mapped["User"] = relationship("User", back_populates="expenses", lazy="select")
+    restaurant: Mapped[Optional["Restaurant"]] = relationship("Restaurant", back_populates="expenses", lazy="select")
+    category: Mapped[Optional["Category"]] = relationship("Category", back_populates="expenses", lazy="select")
 
     # Tags relationship
     expense_tags: Mapped[list["ExpenseTag"]] = relationship(
@@ -265,7 +286,7 @@ class Expense(BaseModel):
         back_populates="expense",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        lazy="dynamic",
+        lazy="select",
     )
 
     @property
@@ -287,6 +308,20 @@ class Expense(BaseModel):
             return False
         return (datetime.now(timezone.utc) - self.date).days <= 7
 
+    @property
+    def price_per_person(self) -> Optional[Decimal]:
+        """Calculate the price per person for this expense."""
+        if self.amount is None or self.party_size is None or self.party_size <= 0:
+            return None
+        return (self.amount / self.party_size).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    @property
+    def formatted_price_per_person(self) -> Optional[str]:
+        """Return the price per person formatted as a currency string."""
+        if self.price_per_person is None:
+            return None
+        return f"${self.price_per_person:.2f}"
+
     def to_dict(self) -> Dict[str, Any]:
         """Return a dictionary representation of the expense.
 
@@ -301,8 +336,12 @@ class Expense(BaseModel):
             "amount": float(amount_decimal.quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)),
             "notes": self.notes,
             "meal_type": self.meal_type,
+            "order_type": self.order_type,
+            "party_size": self.party_size,
             "date": self.date.isoformat() if self.date else None,
             "formatted_amount": self.formatted_amount,
+            "price_per_person": float(self.price_per_person) if self.price_per_person is not None else None,
+            "formatted_price_per_person": self.formatted_price_per_person,
             "is_recent": self.is_recent,
             "receipt_image": self.receipt_image,
             "receipt_verified": self.receipt_verified,

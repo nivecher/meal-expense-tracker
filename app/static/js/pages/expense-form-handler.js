@@ -12,6 +12,9 @@ function initializeExpenseForm() {
   // Set up form submission handler
   form.addEventListener('submit', handleFormSubmit);
 
+  // Set up category and restaurant type handling
+  setupCategoryRestaurantHandling(form);
+
   // Check if we're editing an existing expense
   const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
   if (restaurantSelect) {
@@ -27,6 +30,38 @@ function initializeExpenseForm() {
       }
     }
   }
+}
+
+/**
+ * Set up category and restaurant type handling
+ */
+function setupCategoryRestaurantHandling(form) {
+  const categorySelect = form.querySelector('select[name="category_id"]');
+  const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
+
+  if (!categorySelect || !restaurantSelect) return;
+
+  // Track if category was manually changed
+  let categoryManuallyChanged = false;
+
+  // Function to update category based on restaurant type
+  function updateCategory(restaurantId) {
+    if (categoryManuallyChanged) return;
+    if (!restaurantId) return;
+
+    // Reset to default selection
+    categorySelect.value = '';
+  }
+
+  // Handle restaurant change
+  restaurantSelect.addEventListener('change', function() {
+    updateCategory(this.value);
+  });
+
+  // Track manual category changes
+  categorySelect.addEventListener('change', function() {
+    categoryManuallyChanged = this.value !== '';
+  });
 }
 
 // Initialize the form when the DOM is fully loaded
@@ -75,12 +110,12 @@ function validateFormData(formData) {
     errors.date = ['Please enter a valid date in YYYY-MM-DD format'];
   }
 
-  // Add tags to form data if available
-  const tagsInput = document.querySelector('[data-tags-input]');
-  if (tagsInput && window.tagsInputInstance) {
-    const tags = window.tagsInputInstance.getTags();
-    if (tags.length > 0) {
-      formData.append('tags', JSON.stringify(tags));
+  // Add tags to form data if available (Tagify)
+  if (window.tagifyInstance) {
+    const tags = window.tagifyInstance.value;
+    if (tags && tags.length > 0) {
+      const tagNames = tags.map((tag) => tag.value);
+      formData.append('tags', JSON.stringify(tagNames));
     }
   }
 

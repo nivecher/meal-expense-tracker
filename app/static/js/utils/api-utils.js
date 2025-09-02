@@ -74,10 +74,10 @@ async function apiRequest(url, options = {}) {
 
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
-      return await response.json();
+      return response.json();
     }
 
-    return await response.text();
+    return response.text();
   } catch (error) {
     logger.error('API request failed:', error);
 
@@ -544,7 +544,7 @@ function resetCircuitBreaker(key) {
  */
 export async function apiRequestEnhanced(url, options = {}) {
   try {
-    return await apiRequestWithRecovery(url, options);
+    return apiRequestWithRecovery(url, options);
   } catch (error) {
     // Log for monitoring
     console.error('API request failed with recovery:', {

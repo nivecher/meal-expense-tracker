@@ -21,7 +21,7 @@ TestClient = FlaskClient
 TestData = Dict[str, Any]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def app():
     """Create and configure a new app instance for testing."""
     app = create_app("testing")
@@ -39,7 +39,7 @@ def app():
         _db.drop_all()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def client(app):
     """A test client for the app."""
     return app.test_client()
@@ -58,7 +58,10 @@ def db(app):
 @pytest.fixture(scope="function")
 def test_user(db):
     """Create a test user."""
-    user = User(username="testuser", email="test@example.com", is_active=True)
+    import uuid
+
+    unique_id = str(uuid.uuid4())[:8]
+    user = User(username=f"testuser_{unique_id}", email=f"test_{unique_id}@example.com", is_active=True)
     user.set_password("testpass123")
     db.session.add(user)
     db.session.commit()
@@ -94,13 +97,11 @@ def test_restaurant(db, test_user):
 @pytest.fixture(scope="function")
 def auth_headers(client, test_user):
     """Get authentication headers for the test user."""
-    # Since we're not testing authentication here, we'll just create a mock token
-    # In a real test, you would use your actual authentication endpoint
-    from flask_jwt_extended import create_access_token
-
-    with client.application.app_context():
-        token = create_access_token(identity=test_user.id)
-        return {"Authorization": f"Bearer {token}"}
+    # Use session-based authentication for testing
+    with client.session_transaction() as sess:
+        sess["_fresh"] = True
+        sess["_user_id"] = str(test_user.id)
+    return {}
 
 
 class TestExpenseAPI:

@@ -58,5 +58,5 @@ export {
   get_csrf_token,
   get_csrf_token as getCSRFToken,
   get_api_csrf_token,
-  add_csrf_to_headers
+  add_csrf_to_headers,
 };

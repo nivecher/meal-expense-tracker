@@ -2,7 +2,10 @@
 <tr>
     <td>
         <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
-           class="text-decoration-none">{{ expense.date.strftime("%Y-%m-%d") }}</a>
+           class="text-decoration-none"
+           data-bs-toggle="tooltip"
+           data-bs-placement="top"
+           title="{{ expense.date.strftime('%A, %B %d, %Y') }}">{{ expense.date.strftime("%b %d %Y") }}</a>
     </td>
     <td>
         {% if expense.restaurant %}
@@ -11,7 +14,7 @@
                 <div class="restaurant-icon-table me-2 flex-shrink-0">
                     {% if expense.restaurant.website %}
                         <img
-                            src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website }}&sz=16"
+                            src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ expense.restaurant.website }}&size=16"
                             alt="{{ expense.restaurant.name }} icon"
                             class="restaurant-favicon-table"
                             width="16"
@@ -52,10 +55,53 @@
         </div>
     </td>
     <td>
-        {% from 'macros/category_helpers.html' import category_badge %}
-        {{ category_badge(expense.category, compact=true) }}
+        <div class="d-flex align-items-center">
+            {% if expense.order_type %}
+                <span class="order-type-badge compact text-dark">
+                    <i class="fas fa-{{ expense.order_type|order_type_icon }}"></i>{{ expense.order_type.replace('_', ' ').title() }}
+                </span>
+            {% else %}
+                <span class="text-muted">-</span>
+            {% endif %}
+        </div>
+    </td>
+    <td>
+        <div class="d-flex align-items-center">
+            {% if expense.party_size and expense.party_size > 1 %}
+                <span class="badge bg-info"
+                      data-bs-toggle="tooltip"
+                      data-bs-placement="top"
+                      title="Price per person: ${{ '%.2f'|format(expense.price_per_person) }}">
+                    <i class="fas fa-user me-1"></i>{{ expense.party_size }} people
+                </span>
+            {% elif expense.party_size and expense.party_size == 1 %}
+                <span class="badge bg-secondary">
+                    <i class="fas fa-user me-1"></i>1 person
+                </span>
+            {% else %}
+                <span class="text-muted">-<span>
+            {% endif %}
+        </div>
+    </td>
+    <td class="fw-bold text-info amount-right">
+        {% if expense.party_size and expense.party_size > 0 %}
+            ${{ "%.2f"|format(expense.price_per_person) }}
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
     </td>
     <td class="fw-bold text-success amount-right">${{ "%.2f"|format(expense.amount) }}</td>
+    <td>
+        {% if expense.tags %}
+            <div class="table-tags">
+                {% for tag in expense.tags %}
+                    {{ tag_badge(tag, compact=true) }}
+                {% endfor %}
+            </div>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
     <td>
         {% if expense.notes %}
             <span class="text-muted small" title="{{ expense.notes }}">
@@ -63,15 +109,6 @@
             </span>
         {% else %}
             <span class="text-muted">-</span>
-        {% endif %}
-
-        <!-- Tags -->
-        {% if expense.tags %}
-            <div class="table-tags mt-1">
-                {% for tag in expense.tags %}
-                    {{ tag_badge(tag, compact=true) }}
-                {% endfor %}
-            </div>
         {% endif %}
     </td>
     <td class="text-end">

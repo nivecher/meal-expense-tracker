@@ -9,6 +9,7 @@ from flask_wtf.file import FileField
 from wtforms import (
     DateField,
     DecimalField,
+    IntegerField,
     SelectField,
     StringField,
     SubmitField,
@@ -109,6 +110,28 @@ class ExpenseForm(FlaskForm):
             ("other", "Other"),
         ],
         validators=[Optional()],
+    )
+    order_type = SelectField(
+        "Order Type",
+        choices=[
+            ("", "Select an order type (optional)"),
+            ("dine_in", "Dine-In"),
+            ("takeout", "Takeout"),
+            ("delivery", "Delivery"),
+            ("drive_thru", "Drive-Thru"),
+            ("catering", "Catering"),
+            ("other", "Other"),
+        ],
+        validators=[Optional()],
+        render_kw={"class": "form-select"},
+    )
+    party_size = IntegerField(
+        "Party Size",
+        validators=[
+            Optional(),
+            NumberRange(min=1, max=50, message="Party size must be between 1 and 50"),
+        ],
+        render_kw={"class": "form-control", "min": "1", "max": "50"},
     )
     notes = TextAreaField("Notes", validators=[Optional()], render_kw={"rows": 3})
 

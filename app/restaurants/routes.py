@@ -72,6 +72,7 @@ def list_restaurants():
         "restaurants/list.html",
         restaurants=paginated_restaurants,
         total_spent=stats.get("total_spent", 0),
+        avg_price_per_person=stats.get("avg_price_per_person", 0),
         page=page,
         per_page=per_page,
         total_pages=total_pages,

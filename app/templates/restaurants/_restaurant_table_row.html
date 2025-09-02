@@ -1,24 +1,25 @@
+{% from 'macros/cuisine_helpers.html' import cuisine_badge %}
 <tr>
     <td>
-        <div class="d-flex align-items-center">
+        <div class="d-flex align-items-start">
             <!-- Restaurant Icon (small for table view) -->
-            <div class="restaurant-icon-table me-2 flex-shrink-0">
+            <div class="restaurant-icon-table me-2 flex-shrink-0 d-flex align-items-start" style="align-self: flex-start;">
                 {% if restaurant.website %}
                 <img
-                    src="https://www.google.com/s2/favicons?domain={{ restaurant.website }}&sz=16"
+                    src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ restaurant.website }}&size=28"
                     alt="{{ restaurant.name }} icon"
                     class="restaurant-favicon-table"
-                    width="16"
-                    height="16"
+                    width="28"
+                    height="28"
                     loading="lazy"
-                    onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.style.marginTop='2px';"
                     onload="this.style.opacity='1';"
-                    style="opacity: 0; transition: opacity 0.2s;" />
+                    style="opacity: 0; transition: opacity 0.2s; margin-top: 2px;" />
                 <i
                     class="fas fa-utensils text-primary restaurant-fallback-icon-table"
-                    style="display: none; font-size: 14px"></i>
+                    style="display: none; font-size: 24px; margin-top: 2px;"></i>
                 {% else %}
-                <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 14px"></i>
+                <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 24px; margin-top: 2px;"></i>
                 {% endif %}
             </div>
 
@@ -28,9 +29,9 @@
                     >{{ restaurant.name }}</a
                 >
                 {% if restaurant.cuisine %}
-                <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
-                    <span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>
-                </span>
+                <div class="mt-1">
+                    {{ cuisine_badge(restaurant.cuisine, compact=true) }}
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -66,6 +67,16 @@
         <span class="text-muted">-</span>
         {% endif %}
     </td>
+    <td>
+        {% if restaurant.rating %}
+        <span
+            class="badge bg-{{ 'success' if restaurant.rating >= 4 else 'warning' if restaurant.rating >= 3 else 'danger' }}">
+            {{ "%.1f"|format(restaurant.rating) }}
+        </span>
+        {% else %}
+        <span class="text-muted">No rating</span>
+        {% endif %}
+    </td>
     <td>{{ restaurant.visit_count }}</td>
     <td>
         {% if last_visit %}
@@ -79,20 +90,17 @@
         <span class="text-muted" data-sort-value="">No visits</span>
         {% endif %}
     </td>
-    <td>
-        {% if restaurant.rating %}
-        <span
-            class="badge bg-{{ 'success' if restaurant.rating >= 4 else 'warning' if restaurant.rating >= 3 else 'danger' }}">
-            {{ "%.1f"|format(restaurant.rating) }}
-        </span>
+    <td class="fw-bold text-info amount-right">
+        {% if restaurant.avg_price_per_person and restaurant.avg_price_per_person > 0 %}
+            ${{ "%.2f"|format(restaurant.avg_price_per_person) }}
         {% else %}
-        <span class="text-muted">No rating</span>
+            <span class="text-muted">-</span>
         {% endif %}
     </td>
     <td class="fw-bold text-success amount-right"
         >${{ "%.2f"|format(restaurant.total_spent) if restaurant.total_spent is defined else '0.00' }}</td
     >
-    <td class="actions">
+    <td class="actions text-center">
         <a
             href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
             class="btn btn-sm btn-outline-primary"

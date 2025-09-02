@@ -178,7 +178,7 @@ class GoogleMapsLoader {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         logger.debug(`Loading Google Maps API (attempt ${attempt}/${maxRetries})`);
-        return await this.load(apiKey, libraries, options);
+        return this.load(apiKey, libraries, options);
       } catch (error) {
         if (attempt === maxRetries) {
           throw error;
@@ -395,9 +395,9 @@ class GooglePlacesService {
 
     try {
       if (this.useModernAPI) {
-        return await this.searchUsingModernAPI(query, location);
+        return this.searchUsingModernAPI(query, location);
       }
-      return await this.searchUsingLegacyAPI(query, location);
+      return this.searchUsingLegacyAPI(query, location);
 
     } catch (error) {
       logger.error('Restaurant search failed:', error);

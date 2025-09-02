@@ -12,9 +12,8 @@ def test_index_redirects_to_login(client):
     assert "/auth/login" in response.headers["Location"]
 
 
-def test_index_with_expenses(client, auth):
+def test_index_with_expenses(client, auth, test_user):
     """Test index page with expenses."""
-    auth.register("testuser_1", "testpass")
     auth.login("testuser_1", "testpass")
     # Add a restaurant and expense
     client.post(
@@ -49,9 +48,8 @@ def test_index_with_expenses(client, auth):
     assert b"Test Restaurant" in response.data
 
 
-def test_index_sorting(client, auth):
+def test_index_sorting(client, auth, test_user):
     """Test index page sorting."""
-    auth.register("testuser_1", "testpass")
     auth.login("testuser_1", "testpass")
     # Add a restaurant and multiple expenses
     client.post(
@@ -100,9 +98,8 @@ def test_index_sorting(client, auth):
     assert b"35.50" in response.data
 
 
-def test_index_search(client, auth):
+def test_index_search(client, auth, test_user):
     """Test index page search functionality."""
-    auth.register("testuser_1", "testpass")
     auth.login("testuser_1", "testpass")
     # Add a restaurant and expense
     client.post(

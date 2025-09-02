@@ -336,16 +336,11 @@ resource "aws_lambda_function" "main" {
         # Security configuration
         ALLOWED_REFERRER_DOMAINS = "${var.server_name},${var.api_gateway_domain_name}"
 
-        # Session configuration
-        # SESSION_TYPE not set - let config.py auto-detect Lambda environment for signed cookies
-        SESSION_TABLE_NAME      = var.session_table_name
-        # Force dependency on DynamoDB table (for future use)
-        DYNAMODB_TABLE_ARN      = local.dynamodb_dependency
-
         # DynamoDB session configuration (available but not used in Lambda)
         SESSION_DYNAMODB_TABLE     = var.session_table_name
-        SESSION_DYNAMODB_REGION    = data.aws_region.current.name
+        SESSION_DYNAMODB_REGION    = data.aws_region.current.name  # Optional: falls back to built-in AWS_REGION
         SESSION_DYNAMODB_ENDPOINT  = "" # Use AWS default endpoint
+        SESSION_TIMEOUT            = "3600"  # 1 hour session timeout
 
         # X-Ray tracing is enabled via IAM permissions and X-Ray daemon
         # _X_AMZN_TRACE_ID is automatically set by Lambda when X-Ray tracing is enabled

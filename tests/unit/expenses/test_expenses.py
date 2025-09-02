@@ -13,18 +13,16 @@ from app.expenses.models import Expense  # noqa: E402
 from app.extensions import db  # noqa: E402
 
 
-def test_expenses_list(client, auth):
+def test_expenses_list(client, auth, test_user):
     """Test expenses list page."""
-    auth.register("testuser_1", "testpass", email="test1@example.com")
     auth.login("testuser_1", "testpass")
     response = client.get("/", follow_redirects=True)
     assert response.status_code == 200
     assert b"Meal Expenses" in response.data
 
 
-def test_add_expense(client, auth):
+def test_add_expense(client, auth, test_user):
     """Test adding an expense."""
-    auth.register("testuser_1", "testpass", email="test1@example.com")
     auth.login("testuser_1", "testpass")
     # Add a restaurant first
     client.post(
@@ -60,9 +58,8 @@ def test_add_expense(client, auth):
     assert b"25.50" in response.data
 
 
-def test_edit_expense(client, auth, app):
+def test_edit_expense(client, auth, test_user, app):
     """Test editing an expense."""
-    auth.register("testuser_1", "testpass", email="test1@example.com")
     auth.login("testuser_1", "testpass")
     # Add a restaurant first
     client.post(
@@ -126,7 +123,6 @@ def test_edit_expense(client, auth, app):
 def test_edit_expense_unauthorized(client, auth, app):
     """Test editing an expense without permission."""
     # Create first user and add an expense
-    auth.register("testuser_1", "testpass", email="test1@example.com")
     auth.login("testuser_1", "testpass")
     client.post(
         "/restaurants/add",
@@ -179,17 +175,15 @@ def test_edit_expense_unauthorized(client, auth, app):
         assert expense.amount == 25.50
 
 
-def test_edit_expense_not_found(client, auth):
+def test_edit_expense_not_found(client, auth, test_user):
     """Test editing a non-existent expense."""
-    auth.register("testuser_1", "testpass", email="test1@example.com")
     auth.login("testuser_1", "testpass")
     response = client.get("/expenses/999/edit", follow_redirects=True)
     assert response.status_code == 404
 
 
-def test_edit_expense_invalid_data(client, auth):
+def test_edit_expense_invalid_data(client, auth, test_user):
     """Test editing an expense with invalid data."""
-    auth.register("testuser_1", "testpass", email="test1@example.com")
     auth.login("testuser_1", "testpass")
     # Add a restaurant first
     client.post(
@@ -237,9 +231,8 @@ def test_edit_expense_invalid_data(client, auth):
     assert b"Invalid date format." in response.data or b"Invalid amount format." in response.data
 
 
-def test_delete_expense(client, auth):
+def test_delete_expense(client, auth, test_user):
     """Test deleting an expense."""
-    auth.register("testuser_1", "testpass", email="test1@example.com")
     auth.login("testuser_1", "testpass")
     # Add a restaurant first
     client.post(
@@ -277,9 +270,8 @@ def test_delete_expense(client, auth):
     assert FlashMessages.EXPENSE_DELETED.encode() in response.data
 
 
-def test_expense_filters(client, auth):
+def test_expense_filters(client, auth, test_user):
     """Test expense filtering."""
-    auth.register("testuser_1", "testpass", email="test1@example.com")
     auth.login("testuser_1", "testpass")
     # Add a restaurant first
     client.post(
@@ -336,9 +328,8 @@ def test_expense_filters(client, auth):
     assert b"35.50" in response.data
 
 
-def test_add_expense_with_restaurant_type(client, auth):
+def test_add_expense_with_restaurant_type(client, auth, test_user):
     """Test adding an expense with automatic category based on restaurant type."""
-    auth.register("testuser_1", "testpass", email="test1@example.com")
     auth.login("testuser_1", "testpass")
     # Add a cafe
     client.post(

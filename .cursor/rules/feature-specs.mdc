@@ -127,6 +127,7 @@ alwaysApply: true
 - Progressive Web App features
 - Service worker for offline support
 - Touch gesture support
+<<<<<<< Current (Your changes)
 
 # Feature Specifications and User Stories
 
@@ -253,3 +254,5 @@ alwaysApply: true
 - Progressive Web App features
 - Service worker for offline support
 - Touch gesture support
+=======
+>>>>>>> Incoming (Background Agent changes)

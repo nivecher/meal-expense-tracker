@@ -358,14 +358,24 @@ export class RestaurantSearch {
         // Get photo URL
         const photoUrl = this.getPhotoUrl(restaurant);
 
-        // Create restaurant card
+        // Create restaurant card with defensive coding
         const col = document.createElement('div');
         col.className = 'col-md-6 col-lg-4 mb-4';
+
+        // Ensure element has proper DOM properties for browser extensions
+        if (!col.tagName) {
+          console.warn('Created element missing tagName property');
+        }
 
         // Create card element
         const card = document.createElement('div');
         card.className = 'card h-100 restaurant-card';
         card.setAttribute('data-place-id', placeId);
+
+        // Ensure element has proper DOM properties for browser extensions
+        if (!card.tagName) {
+          console.warn('Created element missing tagName property');
+        }
 
         // Build card content
         const cardContent = `

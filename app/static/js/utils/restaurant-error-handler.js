@@ -346,7 +346,7 @@ export async function fetchWithRestaurantErrorHandling(url, options = {}) {
       throw new Error(errorData.message || `HTTP ${response.status}`);
     }
 
-    return await response.json();
+    return response.json();
   } catch (error) {
     if (error.message !== 'Restaurant conflict handled') {
       handleRestaurantError(error);

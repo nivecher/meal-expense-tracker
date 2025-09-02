@@ -26,6 +26,8 @@
     <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/cuisine-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/order-type-badges.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('main.user_tag_css') }}" rel="stylesheet" />
     </head>
     <body>
         {% include "includes/navbar.html" %}
@@ -40,7 +42,7 @@ include 'includes/breadcrumb.html' %}
     <div class="d-flex gap-2 flex-wrap">
         <!-- Primary Actions -->
         <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
-            <i class="fas fa-plus me-1"></i> <span class="d-none d-sm-inline">Add Expense</span><span class="d-sm-none">Add</span>
+            <i class="fas fa-plus me-2"></i> <span class="d-none d-sm-inline">Add Expense</span><span class="d-sm-none">Add</span>
         </a>
         <!-- Data Management Dropdown -->
         <div class="dropdown">
@@ -50,17 +52,17 @@ include 'includes/breadcrumb.html' %}
                 id="dataManagementDropdown"
                 data-bs-toggle="dropdown"
                 aria-expanded="false">
-                <i class="fas fa-database me-1"></i> <span class="d-none d-lg-inline">Data Management</span><span class="d-lg-none">Data</span>
+                <i class="fas fa-database me-2"></i> <span class="d-none d-lg-inline">Data Management</span><span class="d-lg-none">Data</span>
             </button>
             <ul class="dropdown-menu" aria-labelledby="dataManagementDropdown">
                 <li>
                     <a class="dropdown-item" href="{{ url_for('expenses.export_expenses', format='csv') }}">
-                        <i class="fas fa-file-csv me-1"></i> Export as CSV
+                        <i class="fas fa-file-csv me-2"></i> Export as CSV
                     </a>
                 </li>
                 <li>
                     <a class="dropdown-item" href="{{ url_for('expenses.export_expenses', format='json') }}">
-                        <i class="fas fa-file-code me-1"></i> Export as JSON
+                        <i class="fas fa-file-code me-2"></i> Export as JSON
                     </a>
                 </li>
                 <li>
@@ -68,7 +70,7 @@ include 'includes/breadcrumb.html' %}
                 </li>
                 <li>
                     <a class="dropdown-item" href="{{ url_for('expenses.import_expenses') }}">
-                        <i class="fas fa-file-import me-1"></i> Import Expenses
+                        <i class="fas fa-file-import me-2"></i> Import Expenses
                     </a>
                 </li>
             </ul>
@@ -107,11 +109,11 @@ include 'includes/breadcrumb.html' %}
     <div class="btn-group" role="group" aria-label="View Toggle">
         <input type="radio" class="btn-check" name="view-type" id="card-view" autocomplete="off" checked />
         <label class="btn btn-outline-primary" for="card-view" id="card-view-label">
-            <i class="fas fa-th-large me-1"></i> <span class="d-none d-sm-inline">Cards</span>
+            <i class="fas fa-th-large me-2"></i> <span class="d-none d-sm-inline">Cards</span>
         </label>
         <input type="radio" class="btn-check" name="view-type" id="table-view" autocomplete="off" />
         <label class="btn btn-outline-primary" for="table-view" id="table-view-label">
-            <i class="fas fa-table me-1"></i> <span class="d-none d-sm-inline">Table</span>
+            <i class="fas fa-table me-2"></i> <span class="d-none d-sm-inline">Table</span>
         </label>
     </div>
 </div>
@@ -171,10 +173,10 @@ include 'includes/breadcrumb.html' %}
                 </div>
                 <div class="col-md-4 d-flex align-items-end gap-2">
                     <button type="submit" class="btn btn-primary flex-fill" aria-label="Apply filters">
-                        <i class="fas fa-search me-1" aria-hidden="true"></i> Filter
+                        <i class="fas fa-search me-2" aria-hidden="true"></i> Filter
                     </button>
                     <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary" aria-label="Clear all filters">
-                        <i class="fas fa-times me-1" aria-hidden="true"></i> Clear
+                        <i class="fas fa-times me-2" aria-hidden="true"></i> Clear
                     </a>
                 </div>
             </form>
@@ -268,7 +270,7 @@ include 'includes/breadcrumb.html' %}
                             <div class="restaurant-icon me-2 flex-shrink-0">
                                 {% if expense.restaurant and expense.restaurant.website %}
                                     <img
-                                        src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website }}&sz=32"
+                                        src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ expense.restaurant.website }}&size=32"
                                         alt="{{ expense.restaurant.name }} icon"
                                         class="restaurant-favicon"
                                         width="32"
@@ -293,51 +295,96 @@ include 'includes/breadcrumb.html' %}
                                         {% endif %}
                                     </a>
                                 </h6>
+                                <!-- Cuisine Badge -->
+                                {% if expense.restaurant and expense.restaurant.cuisine %}
+                                    <div class="mb-1">
+                                        <span class="cuisine-badge compact {{ expense.restaurant.cuisine|cuisine_css_class }}">
+                                            <i class="fas fa-{{ expense.restaurant.cuisine|cuisine_icon }}"></i>{{ expense.restaurant.cuisine.title() }}
+                                        </span>
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
 
-                        <!-- Right side: Amount and Meal Type -->
+                        <!-- Right side: Amount and Badges -->
                         <div class="text-end">
                             <div class="fw-bold text-success fs-6 mb-1">
                                 ${{ "%.2f"|format(expense.amount) }}
                             </div>
-                            {% if expense.meal_type %}
-                            <div>
-                                <span class="meal-type-badge {{ expense.meal_type|meal_type_css_class }}">
+                            <div class="d-flex flex-column gap-1 align-items-end">
+                                {% if expense.meal_type %}
+                                <span class="meal-type-badge compact {{ expense.meal_type|meal_type_css_class }}">
                                     <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
                                 </span>
+                                {% endif %}
+                                {% if expense.order_type %}
+                                <span class="order-type-badge compact text-dark">
+                                    <i class="fas fa-{{ expense.order_type|order_type_icon }}"></i>{{ expense.order_type.replace('_', ' ').title() }}
+                                </span>
+                                {% endif %}
                             </div>
-                            {% endif %}
                         </div>
                     </div>
 
                     <div class="card-text small mb-3">
-                        <div class="text-muted mb-2">
-                            <i class="far fa-calendar-alt me-1"></i>
-                            {{ expense.date.strftime('%B %d, %Y') }}
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="text-muted">
+                                <i class="far fa-calendar-alt me-2"></i>
+                                {{ expense.date.strftime('%B %d, %Y') }}
+                            </div>
+                            {% if expense.notes %}
+                            <div class="text-muted">
+                                <i class="fas fa-sticky-note me-1"
+                                   data-bs-toggle="tooltip"
+                                   data-bs-placement="top"
+                                   title="{{ expense.notes }}"></i>
+                                <span class="fst-italic">Note</span>
+                            </div>
+                            {% endif %}
                         </div>
-                        {% if expense.notes %}
-                        <div class="text-muted">
-                            <i class="fas fa-sticky-note me-1"></i>
-                            <span class="fst-italic">{{ expense.notes|truncate(50, '...') }}</span>
-                        </div>
-                        {% endif %}
 
                         <!-- Tags -->
                         {% if expense.tags %}
-                        <div class="expense-tags">
+                        <div class="expense-tags mb-2">
                             {% for tag in expense.tags %}
                                 {{ tag_badge(tag) }}
                             {% endfor %}
                         </div>
+                        {% endif %}
+
+                        <!-- Party Size and Price Per Person -->
+                        {% if expense.party_size and expense.party_size > 1 %}
+                            <div class="d-flex flex-column align-items-end">
+                                <span class="badge bg-info text-white mb-1">
+                                    <i class="fas fa-users me-1"></i>{{ expense.party_size }} people
+                                </span>
+                                <span class="text-muted small">${{ "%.2f"|format(expense.price_per_person) }} / person</span>
+                            </div>
+                        {% elif expense.party_size and expense.party_size == 1 %}
+                            <div class="d-flex flex-column align-items-end">
+                                <span class="badge bg-info text-white">
+                                    <i class="fas fa-user me-1"></i>1 person
+                                </span>
+                            </div>
                         {% endif %}
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                         <div class="text-muted small">
                             {% if expense.restaurant %}
-                            <i class="fas fa-map-marker-alt me-1"></i>
-                            {% if expense.restaurant.city %}
+                            <i class="fas fa-map-marker-alt me-2"></i>
+                            {% if expense.restaurant.city and expense.restaurant.state %}
+                                <span class="me-2">{{ expense.restaurant.city }}, {{ expense.restaurant.state }}</span>
+                                {% if expense.restaurant.get_google_maps_url() %}
+                                    <a href="{{ expense.restaurant.get_google_maps_url() }}"
+                                       target="_blank"
+                                       class="text-decoration-none text-primary"
+                                       data-bs-toggle="tooltip"
+                                       title="View on Google Maps">
+                                        <i class="fas fa-map-marked-alt"></i>
+                                    </a>
+                                {% endif %}
+                            {% elif expense.restaurant.city %}
                                 {{ expense.restaurant.city }}
                             {% elif expense.restaurant.address %}
                                 {{ expense.restaurant.address|truncate(20, '...') }}
@@ -382,7 +429,7 @@ include 'includes/breadcrumb.html' %}
             <h3>No expenses found</h3>
             <p class="text-muted">You haven't added any expenses yet.</p>
             <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary mt-2">
-                <i class="fas fa-plus me-1"></i> Add Your First Expense
+                <i class="fas fa-plus me-2"></i> Add Your First Expense
             </a>
         </div>
     </div>
@@ -407,18 +454,18 @@ include 'includes/breadcrumb.html' %}
                     <!-- Details will be populated by JavaScript -->
                 </div>
                 <p class="text-danger">
-                    <i class="fas fa-exclamation-circle me-1"></i>
+                    <i class="fas fa-exclamation-circle me-2"></i>
                     This action cannot be undone.
                 </p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i> Cancel
+                    <i class="fas fa-times me-2"></i> Cancel
                 </button>
                 <form id="delete-expense-form" method="post" action="">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash me-1"></i> Delete Expense
+                        <i class="fas fa-trash me-2"></i> Delete Expense
                     </button>
                 </form>
             </div>
@@ -438,8 +485,11 @@ include 'includes/breadcrumb.html' %}
                                 <th data-sort="true" data-sort-type="text">Restaurant</th>
                                 <th data-sort="true" data-sort-type="text">Cuisine</th>
                                 <th data-sort="true" data-sort-type="text">Meal</th>
-                                <th data-sort="true" data-sort-type="text">Category</th>
+                                <th data-sort="true" data-sort-type="text">Order</th>
+                                <th data-sort="true" data-sort-type="number">Party Size</th>
+                                <th data-sort="true" data-sort-type="currency">Price / Person</th>
                                 <th data-sort="true" data-sort-type="currency">Amount</th>
+                                <th data-sort="true" data-sort-type="text">Tags</th>
                                 <th data-sort="true" data-sort-type="text">Notes</th>
                                 <th class="text-end">Actions</th>
                             </tr>
@@ -449,9 +499,16 @@ include 'includes/breadcrumb.html' %}
                         </tbody>
                         <tfoot class="table-secondary">
                             <tr>
-                                <td colspan="5" class="text-end fw-bold">Total:</td>
+                                <td colspan="6" class="text-end fw-bold">Total:</td>
+                                <td class="fw-bold text-info amount-right">
+                                    {% if avg_price_per_person %}
+                                        ${{ "%.2f"|format(avg_price_per_person) }}
+                                    {% else %}
+                                        <span class="text-muted">-</span
+                                    {% endif %}
+                                </td>
                                 <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_amount) }}</td>
-                                <td colspan="2"></td>
+                                <td colspan="3"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -485,6 +542,12 @@ include 'includes/breadcrumb.html' %}
 <script>
     // Toggle between card and table views
     document.addEventListener("DOMContentLoaded", function () {
+        // Initialize Bootstrap tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
         const cardView = document.getElementById("card-view");
         const tableView = document.getElementById("table-view");
         const cardViewContainer = document.getElementById("card-view-container");
@@ -613,12 +676,6 @@ include 'includes/breadcrumb.html' %}
             return container;
         }
 
-        // Initialize tooltips
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-
         // Simple table sorting for expense table
         const headers = document.querySelectorAll('.expense-table th[data-sort="true"]');
         headers.forEach((header) => {
@@ -628,13 +685,39 @@ include 'includes/breadcrumb.html' %}
             });
         });
 
+        // Set initial sort state based on URL parameters ve
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentSort = urlParams.get("sort") || "date";
+        const currentOrder = urlParams.get("order") || "desc";
+
+        headers.forEach((header) => {
+            const sortType = header.getAttribute("data-sort-type");
+            if (sortType === currentSort) {
+                header.classList.add(currentOrder === "desc" ? "sort-desc" : "sort-asc");
+            }
+        });
+
         function sortExpenseTable(header) {
+            const sortType = header.getAttribute("data-sort-type");
+            const isAscending = header.classList.contains("sort-asc");
+
+            // For date sorting, use server-side sorting to properly handle multi-field sorting (date + created_at)
+            if (sortType === "date") {
+                const newOrder = isAscending ? "desc" : "asc";
+                const currentUrl = new URL(window.location);
+                currentUrl.searchParams.set("sort", "date");
+                currentUrl.searchParams.set("order", newOrder);
+                // Reset to page 1 when sorting
+                currentUrl.searchParams.set("page", "1");
+                window.location.href = currentUrl.toString();
+                return;
+            }
+
+            // For other columns, use client-side sorting
             const table = header.closest("table");
             const tbody = table.querySelector("tbody");
             const rows = Array.from(tbody.querySelectorAll("tr"));
             const columnIndex = Array.from(header.parentNode.children).indexOf(header);
-            const sortType = header.getAttribute("data-sort-type");
-            const isAscending = header.classList.contains("sort-asc");
 
             // Remove existing sort classes
             headers.forEach((h) => h.classList.remove("sort-asc", "sort-desc"));
@@ -648,8 +731,6 @@ include 'includes/breadcrumb.html' %}
 
                 if (sortType === "currency" || sortType === "number") {
                     return isAscending ? bValue - aValue : aValue - bValue;
-                } else if (sortType === "date") {
-                    return isAscending ? new Date(bValue) - new Date(aValue) : new Date(aValue) - new Date(bValue);
                 } else {
                     return isAscending ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue);
                 }
@@ -705,6 +786,26 @@ include 'includes/breadcrumb.html' %}
     .expense-table th.sort-desc::after {
         content: " ↓";
         color: #007bff;
+    }
+
+    /* Make date column wider to accommodate new format and prevent wrapping */
+    .expense-table th:first-child,
+    .expense-table td:first-child {
+        min-width: 120px;
+        width: 120px;
+        white-space: nowrap;
+    }
+
+    /* Prevent meal type and order type badges from wrapping */
+    .expense-table td:nth-child(4), /* Meal column */
+    .expense-table td:nth-child(5) { /* Order column */
+        white-space: nowrap;
+    }
+
+    .expense-table td:nth-child(4) .meal-type-badge,
+    .expense-table td:nth-child(5) .order-type-badge {
+        white-space: nowrap;
+        display: inline-block;
     }
 </style>
     </body>
