@@ -333,7 +333,7 @@ resource "aws_lambda_function" "main" {
         ENABLE_AWS_SERVICES = "true"
         DATABASE_URL        = local.db_url
 
-        # Security configuration
+        # Security configuration - include both custom domain and API Gateway execution URL
         ALLOWED_REFERRER_DOMAINS = "${var.server_name},${var.api_gateway_domain_name}"
 
         # DynamoDB session configuration (available but not used in Lambda)
@@ -351,6 +351,9 @@ resource "aws_lambda_function" "main" {
 
         # Set Python path to include the layer
         PYTHONPATH = "/opt/python:/opt/python/lib/python3.13/site-packages"
+
+        # Database migration configuration
+        AUTO_MIGRATE = var.run_migrations ? "true" : "false"
 
         # Note: DB_URL will be constructed at runtime in the Lambda function for prod
       },

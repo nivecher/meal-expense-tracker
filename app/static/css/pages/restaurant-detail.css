@@ -262,6 +262,156 @@
 }
 
 /**
+ * Website URL wrapping fix
+ */
+.text-break {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+/**
+ * Restaurant Information Cards Layout
+ */
+.restaurant-info-cards .card {
+    border: 1px solid var(--bs-border-color);
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.restaurant-info-cards .card:hover {
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+
+.restaurant-info-cards .list-group-item {
+    border: none;
+    padding: 1rem 0;
+}
+
+.restaurant-info-cards .list-group-item:not(:last-child) {
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+}
+
+.restaurant-info-cards .list-group-item:first-child {
+    padding-top: 0.5rem;
+}
+
+.restaurant-info-cards .list-group-item:last-child {
+    padding-bottom: 0.5rem;
+}
+
+.restaurant-info-cards .list-group-item > div {
+    align-items: flex-start;
+}
+
+.restaurant-info-cards .list-group-item > div > i {
+    margin-top: 0.25rem;
+    width: 1.25rem;
+    text-align: center;
+}
+
+.restaurant-info-cards .list-group-item > div > div:first-child {
+    font-weight: 500;
+    color: var(--bs-secondary);
+    font-size: 0.8125rem;
+    margin-bottom: 0.375rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.restaurant-info-cards .list-group-item > div > div:last-child {
+    font-weight: 600;
+    color: var(--bs-body-color);
+    font-size: 0.9375rem;
+    line-height: 1.4;
+}
+
+/**
+ * Service Level Badge Styling
+ */
+/* Service level badge styles now handled by unified badge system */
+
+/**
+ * Contact Information Improvements
+ */
+.contact-info-list .list-group-item {
+    padding: 0.75rem 0;
+    border: none;
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+}
+
+.contact-info-list .list-group-item:first-child {
+    padding-top: 0.5rem;
+}
+
+.contact-info-list .list-group-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0.5rem;
+}
+
+.contact-info-list .list-group-item > div > i {
+    margin-top: 0.125rem;
+    width: 1.25rem;
+    text-align: center;
+    color: var(--bs-primary);
+}
+
+.contact-info-list a {
+    color: var(--bs-primary);
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.15s ease-in-out;
+}
+
+.contact-info-list a:hover {
+    color: var(--bs-primary);
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+}
+
+/**
+ * Location Section Improvements
+ */
+.location-section h6 {
+    font-weight: 600;
+    color: var(--bs-dark);
+    margin-bottom: 1rem;
+}
+
+.location-section address {
+    font-weight: 500;
+    color: var(--bs-body-color);
+}
+
+.location-section .btn-primary {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, #0056b3 100%);
+    border: none;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+}
+
+.location-section .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 123, 255, 0.25);
+}
+
+/**
+ * Address styling
+ */
+address {
+    font-style: normal;
+    line-height: 1.5;
+    margin-bottom: 0;
+}
+
+address div {
+    margin-bottom: 0.25rem;
+}
+
+address div:last-child {
+    margin-bottom: 0;
+}
+
+/**
  * Responsive adjustments
  */
 @media (max-width: 991.98px) {
@@ -291,6 +441,34 @@
 
     .action-buttons .btn {
         width: 100%;
+    }
+
+    /* Stack restaurant info cards on mobile */
+    .restaurant-info-cards .col-md-6 {
+        margin-bottom: 1rem;
+    }
+
+    .restaurant-info-cards .col-md-6:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Improved mobile button layout */
+    .location-section .d-flex {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .location-section .btn {
+        width: 100%;
+    }
+
+    /* Better mobile typography */
+    .restaurant-info-cards .list-group-item > div > div:first-child {
+        font-size: 0.75rem;
+    }
+
+    .restaurant-info-cards .list-group-item > div > div:last-child {
+        font-size: 0.875rem;
     }
 }
 

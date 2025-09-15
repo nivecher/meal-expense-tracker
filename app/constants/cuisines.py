@@ -54,10 +54,6 @@ CUISINE_COLORS = {
     "Peruvian": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
     "Argentinian": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
     "Breakfast & Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107 TODO handle alternatives better
-    "Breakfast and Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
-    "Breakfast&Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
-    "Breakfast - Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
-    "Breakfast": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
     "Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
     "Coffee House": "#92400e",  # Custom brown
     "Coffee Bar": "#92400e",  # Custom brown
@@ -65,6 +61,7 @@ CUISINE_COLORS = {
     "Deli": BOOTSTRAP_COLORS["teal"]["hex"],  # #20c997
     "Bakery": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
     "Ice Cream": "#e83e8c",  # Custom pink
+    "Pub": "#d97706",  # Amber/orange for pub establishments (beer-focused)
 }
 
 # Cuisine constants with colors and icons
@@ -84,7 +81,7 @@ CUISINE_CONSTANTS: List[CuisineData] = [
     {
         "name": "Japanese",
         "color": "#bc002d",  # Japanese Flag Red
-        "icon": "fish",  # Sushi/sashimi focus
+        "icon": "seedling",  # Fresh ingredients focus
         "description": "Japanese cuisine",
     },
     {
@@ -144,7 +141,7 @@ CUISINE_CONSTANTS: List[CuisineData] = [
     {
         "name": "Sushi",
         "color": "#e91e63",  # Bolder Pink (similar to Japanese)
-        "icon": "fish",
+        "icon": "circle",
         "description": "Sushi restaurants",
     },
     {
@@ -308,6 +305,12 @@ CUISINE_CONSTANTS: List[CuisineData] = [
         "color": "#ec4899",  # Bolder Pink
         "icon": "ice-cream",
         "description": "Ice cream and dessert shops",
+    },
+    {
+        "name": "Pub",
+        "color": "#d97706",  # Amber/orange for pub establishments
+        "icon": "beer",
+        "description": "Pub establishments serving beer, food, and casual dining",
     },
 ]
 

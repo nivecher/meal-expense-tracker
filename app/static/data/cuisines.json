@@ -1,0 +1,39 @@
+{
+  "cuisines": [
+    { "name": "American", "color": "#2563eb", "icon": "flag-usa" },
+    { "name": "Chinese", "color": "#dc2626", "icon": "bowl-rice" },
+    { "name": "Italian", "color": "#16a34a", "icon": "pizza-slice" },
+    { "name": "Mexican", "color": "#006847", "icon": "pepper-hot" },
+    { "name": "Japanese", "color": "#bc002d", "icon": "fish" },
+    { "name": "Indian", "color": "#f59e0b", "icon": "fire" },
+    { "name": "Thai", "color": "#059669", "icon": "leaf" },
+    { "name": "French", "color": "#7c3aed", "icon": "wine-glass" },
+    { "name": "Pizza", "color": "#16a34a", "icon": "pizza-slice" },
+    { "name": "Seafood", "color": "#0891b2", "icon": "shrimp" },
+    { "name": "Fast Food", "color": "#fbbf24", "icon": "hamburger" },
+    { "name": "Pub", "color": "#d97706", "icon": "beer" },
+    { "name": "Cafe", "color": "#92400e", "icon": "coffee" },
+    { "name": "Bar", "color": "#dc2626", "icon": "wine-glass" },
+    { "name": "Breakfast & Brunch", "color": "#ffc107", "icon": "sun" },
+    { "name": "Dessert", "color": "#ec4899", "icon": "ice-cream" },
+    { "name": "Other", "color": "#6b7280", "icon": "question" }
+  ],
+  "google_places_mapping": {
+    "mexican_restaurant": "Mexican",
+    "italian_restaurant": "Italian",
+    "chinese_restaurant": "Chinese",
+    "japanese_restaurant": "Japanese",
+    "indian_restaurant": "Indian",
+    "thai_restaurant": "Thai",
+    "french_restaurant": "French",
+    "american_restaurant": "American",
+    "pizza": "Pizza",
+    "seafood": "Seafood",
+    "fast_food_restaurant": "Fast Food",
+    "pub": "Pub",
+    "cafe": "Cafe",
+    "bar": "Bar",
+    "breakfast_restaurant": "Breakfast & Brunch",
+    "dessert_shop": "Dessert"
+  }
+}

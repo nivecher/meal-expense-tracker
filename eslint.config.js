@@ -27,9 +27,6 @@ export default [
         copyCoordinates: 'readonly',
         centerMapOnRestaurant: 'readonly',
         flatpickr: 'readonly', // Flatpickr date picker
-        showError: 'readonly', // Used in google-places-test.js
-        createMarker: 'readonly', // Used in google-places-test.js
-        displayResults: 'readonly', // Used in google-places-test.js
         // Add other globals that might be used in the application
         showAlert: 'readonly',
         urlViewMode: 'readonly',

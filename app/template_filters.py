@@ -1,6 +1,6 @@
 """Custom template filters for the application."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from flask import Flask
 
@@ -12,6 +12,13 @@ from app.constants.cuisines import (
 from app.constants.meal_type_colors import get_meal_type_color
 from app.constants.meal_types import get_meal_type_icon
 from app.constants.order_types import get_order_type_css_class, get_order_type_icon
+from app.utils.timezone_utils import (
+    format_current_time_for_user,
+    format_date_for_user,
+    format_datetime_for_user,
+    get_timezone_display_name,
+    time_ago_for_user,
+)
 
 
 def time_ago(value: datetime) -> str:
@@ -21,33 +28,20 @@ def time_ago(value: datetime) -> str:
         value: The datetime object to format
 
     Returns:
-        str: A human-readable relative time string
+        str: A human-readable relative time string in user's timezone
     """
-    if not value:
-        return "Never"
+    # Get user timezone from Flask context
+    user_timezone = None
+    try:
+        from flask_login import current_user
 
-    now = datetime.now(timezone.utc)
-    diff = now - value
+        if current_user and current_user.is_authenticated:
+            user_timezone = current_user.timezone
+    except Exception:  # nosec B110 - Intentional fallback when Flask-Login context unavailable
+        # Fall back to UTC if user context not available (e.g., CLI context)
+        pass
 
-    # Calculate time differences
-    seconds = int(diff.total_seconds())
-    minutes = seconds // 60
-    hours = minutes // 60
-    days = diff.days
-
-    if days > 365:
-        years = days // 365
-        return f"{years} year{'s' if years > 1 else ''} ago"
-    if days > 30:
-        months = days // 30
-        return f"{months} month{'s' if months > 1 else ''} ago"
-    if days > 0:
-        return f"{days} day{'s' if days > 1 else ''} ago"
-    if hours > 0:
-        return f"{hours} hour{'s' if hours > 1 else ''} ago"
-    if minutes > 0:
-        return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
-    return "Just now"
+    return time_ago_for_user(value, user_timezone)
 
 
 def meal_type_color(meal_type: str) -> str:
@@ -162,6 +156,89 @@ def order_type_css_class_filter(order_type: str) -> str:
     return get_order_type_css_class(order_type)
 
 
+def format_datetime_user_tz(value: datetime, format_str: str = "%B %d, %Y at %I:%M %p") -> str:
+    """Format a datetime for display in user's timezone.
+
+    Args:
+        value: The datetime object to format
+        format_str: Python strftime format string
+
+    Returns:
+        str: Formatted datetime string in user's timezone
+    """
+    # Get user timezone from Flask context
+    user_timezone = None
+    try:
+        from flask_login import current_user
+
+        if current_user and current_user.is_authenticated:
+            user_timezone = current_user.timezone
+    except Exception:  # nosec B110 - Intentional fallback when Flask-Login context unavailable
+        # Fall back to UTC if user context not available (e.g., CLI context)
+        pass
+
+    return format_datetime_for_user(value, user_timezone, format_str)
+
+
+def format_date_user_tz(value: datetime, format_str: str = "%B %d, %Y") -> str:
+    """Format a date for display in user's timezone.
+
+    Args:
+        value: The datetime object to format
+        format_str: Python strftime format string
+
+    Returns:
+        str: Formatted date string in user's timezone
+    """
+    # Get user timezone from Flask context
+    user_timezone = None
+    try:
+        from flask_login import current_user
+
+        if current_user and current_user.is_authenticated:
+            user_timezone = current_user.timezone
+    except Exception:  # nosec B110 - Intentional fallback when Flask-Login context unavailable
+        # Fall back to UTC if user context not available (e.g., CLI context)
+        pass
+
+    return format_date_for_user(value, user_timezone, format_str)
+
+
+def current_time_user_tz(format_str: str = "%B %d, %Y at %I:%M:%S %p %Z") -> str:
+    """Get current time formatted for user's timezone.
+
+    Args:
+        format_str: Python strftime format string
+
+    Returns:
+        str: Formatted current time string in user's timezone
+    """
+    # Get user timezone from Flask context
+    user_timezone = None
+    try:
+        from flask_login import current_user
+
+        if current_user and current_user.is_authenticated:
+            user_timezone = current_user.timezone
+    except Exception:  # nosec B110 - Intentional fallback when Flask-Login context unavailable
+        # Fall back to UTC if user context not available (e.g., CLI context)
+        pass
+
+    return format_current_time_for_user(user_timezone, format_str)
+
+
+def timezone_display_name(timezone_str: str) -> str:
+    """Get a human-readable display name for a timezone.
+
+    Args:
+        timezone_str: The timezone string (e.g., 'America/New_York')
+
+    Returns:
+        str: Human-readable timezone name
+    """
+    return get_timezone_display_name(timezone_str)
+
+
 def get_app_version() -> str:
     """Get the application version from git tags.
 
@@ -182,7 +259,13 @@ def init_app(app: Flask) -> None:
     Args:
         app: The Flask application instance.
     """
+    # Timezone-aware filters
     app.add_template_filter(time_ago, name="time_ago")
+    app.add_template_filter(format_datetime_user_tz, name="format_datetime_user_tz")
+    app.add_template_filter(format_date_user_tz, name="format_date_user_tz")
+    app.add_template_filter(timezone_display_name, name="timezone_display_name")
+
+    # Existing filters
     app.add_template_filter(meal_type_color, name="meal_type_color")
     app.add_template_filter(meal_type_icon, name="meal_type_icon")
     app.add_template_filter(meal_type_css_class_filter, name="meal_type_css_class")
@@ -195,3 +278,4 @@ def init_app(app: Flask) -> None:
 
     # Add template global functions
     app.add_template_global(get_app_version, name="get_app_version")
+    app.add_template_global(current_time_user_tz, name="current_time_user_tz")

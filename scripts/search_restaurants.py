@@ -115,11 +115,13 @@ def get_nearby_places(
         "location": location,
         "radius": min(radius, 50000),  # Max 50km
         "key": GOOGLE_MAPS_API_KEY,
-        "type": "restaurant",
     }
 
     if keyword:
         params["keyword"] = keyword
+    else:
+        # Use broader keyword search for food-related businesses
+        params["keyword"] = "food restaurant cafe bar"
 
     all_results: List[Dict[str, Any]] = []
     next_page_token = None

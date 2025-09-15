@@ -1,33 +1,14 @@
-<!doctype html>
-<html lang="en">
-    {% from 'macros/cuisine_helpers.html' import cuisine_badge %}
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="theme-color" content="#2c3e50" />
-        <meta name="description" content="Track and manage your meal expenses with our easy-to-use expense tracker" />
-        <meta name="keywords" content="meal expense tracker, food expenses, budget tracking, expense management" />
-        <meta name="author" content="Meal Expense Tracker" />
-        <meta name="csrf-token" content="{{ csrf_token() }}" />
+{% extends "base.html" %}
+    {% from 'macros/badge_helpers.html' import cuisine_badge %}
 
-        <title>Restaurants - Meal Expense Tracker</title>
+{% block title %}Restaurants - Meal Expense Tracker{% endblock %}
 
-        <!-- Favicon -->
-        <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicons/favicon.ico') }}" />
-
-        <!-- Styles -->
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/components/navbar.css') }}" rel="stylesheet" />
+{% block head_extra %}
         <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" />
         <link href="{{ url_for('static', filename='css/components/table.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/components/service-level-badges.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/components/cuisine-badges.css') }}" rel="stylesheet" />
-    </head>
-    <body>
-        {% include "includes/navbar.html" %}
-        <main class="container-fluid py-4">
+{% endblock head_extra %}
+
+{% block content %}
 
 <!-- Breadcrumb Navigation -->
 {% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'}, {'title': 'Restaurants'} ] %} {%
@@ -46,7 +27,7 @@ include 'includes/breadcrumb.html' %}
         </a>
         <!-- Mobile find button -->
         <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary d-md-none">
-            <i class="fas fa-search-location"></i>
+            <i class="fas fa-search-location me-1"></i><span class="d-none d-sm-inline">Find</span>
         </a>
         <!-- Data Management Dropdown -->
         <div class="dropdown">
@@ -56,7 +37,7 @@ include 'includes/breadcrumb.html' %}
                 id="dataManagementDropdown"
                 data-bs-toggle="dropdown"
                 aria-expanded="false">
-                <i class="fas fa-database me-2"></i> <span class="d-none d-lg-inline">Data Management</span><span class="d-lg-none">Data</span>
+                <i class="fas fa-database me-2"></i> <span class="d-none d-sm-inline">Data Management</span><span class="d-sm-none">Data</span>
             </button>
             <ul class="dropdown-menu" aria-labelledby="dataManagementDropdown">
                 <li>
@@ -83,47 +64,40 @@ include 'includes/breadcrumb.html' %}
 </div>
 
 <!-- Search & Filter + View Toggle Row -->
-{% set active_filters_count = (1 if search else 0) + (1 if cuisine else 0) + (1 if service_level else 0) + (1 if city else 0) + (1 if is_chain else 0) + (1 if rating_min else 0) + (1 if rating_max else 0) %}
-{% set show_filters = active_filters_count > 0 or request.args.get('filter_expanded') == '1' %}
-
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <!-- Search & Filter Collapsible Button -->
     <div class="d-flex align-items-center">
         <button
-            class="btn btn-outline-primary d-flex align-items-center {% if active_filters_count %}border-primary{% endif %}"
+            class="btn btn-outline-primary d-flex align-items-center "
             type="button"
             data-bs-toggle="collapse"
             data-bs-target="#filterCollapse"
-            aria-expanded="{% if show_filters %}true{% else %}false{% endif %}"
+            aria-expanded="false"
             aria-controls="filterCollapse">
             <i class="fas fa-filter me-2"></i>
             <span class="d-none d-sm-inline">Search & Filter</span>
             <span class="d-sm-none">Filter</span>
-            {% if active_filters_count %}
-                <span class="badge bg-primary ms-2">{{ active_filters_count }}</span>
-            {% endif %}
-            <i class="fas {% if show_filters %}fa-chevron-up{% else %}fa-chevron-down{% endif %} ms-2"></i>
+
+            <i class="fas fa-chevron-down ms-2"></i>
         </button>
-        {% if active_filters_count %}
-            <span class="badge bg-secondary ms-2 d-none d-md-inline">{{ restaurants|length }} result{{ 's' if restaurants|length != 1 else '' }}</span>
-        {% endif %}
+
     </div>
 
     <!-- View Toggle -->
     <div class="btn-group" role="group" aria-label="View Toggle">
         <input type="radio" class="btn-check" name="view-type" id="card-view" autocomplete="off" checked />
         <label class="btn btn-outline-primary" for="card-view" id="card-view-label">
-            <i class="fas fa-th-large me-2"></i> Cards
+            <i class="fas fa-th-large me-2"></i> <span class="d-none d-md-inline">Cards</span>
         </label>
         <input type="radio" class="btn-check" name="view-type" id="table-view" autocomplete="off" />
         <label class="btn btn-outline-primary" for="table-view" id="table-view-label">
-            <i class="fas fa-table me-2"></i> Table
+            <i class="fas fa-table me-2"></i> <span class="d-none d-md-inline">Table</span>
         </label>
     </div>
 </div>
 
 <!-- Collapsible Filter Form -->
-<div class="collapse {% if show_filters %}show{% endif %} mb-4" id="filterCollapse">
+<div class="collapse  mb-4" id="filterCollapse">
     <div class="card">
         <div class="card-body">
             <form method="get" class="row g-3" novalidate>
@@ -136,15 +110,15 @@ include 'includes/breadcrumb.html' %}
                         class="form-control"
                         id="search"
                         name="q"
-                        value="{{ search }}"
+                        value="{{ request.args.get('q', '') }}"
                         placeholder="Search restaurants, cuisines, cities, or notes" />
                 </div>
                 <div class="col-md-3">
                     <label for="cuisine" class="form-label">Cuisine</label>
                     <select class="form-control" id="cuisine" name="cuisine">
                         <option value="">All Cuisines</option>
-                        {% for cuisine_type in cuisines %}
-                        <option value="{{ cuisine_type }}" {{ 'selected' if cuisine == cuisine_type else '' }}>{{ cuisine_type }}</option>
+                        {% for cuisine in cuisines %}
+                        <option value="{{ cuisine }}" {% if request.args.get('cuisine') == cuisine %}selected{% endif %}>{{ cuisine }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -153,7 +127,7 @@ include 'includes/breadcrumb.html' %}
                     <select class="form-control" id="service_level" name="service_level">
                         <option value="">All Service Levels</option>
                         {% for level in service_levels %}
-                        <option value="{{ level }}" {{ 'selected' if service_level == level else '' }}>{{ level|replace('_', ' ')|title }}</option>
+                        <option value="{{ level }}" {% if request.args.get('service_level') == level %}selected{% endif %}>{{ level.replace('_', ' ').title() }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -162,8 +136,8 @@ include 'includes/breadcrumb.html' %}
                     <label for="city" class="form-label">City</label>
                     <select class="form-control" id="city" name="city">
                         <option value="">All Cities</option>
-                        {% for city_name in cities %}
-                        <option value="{{ city_name }}" {{ 'selected' if city == city_name else '' }}>{{ city_name }}</option>
+                        {% for city in cities %}
+                        <option value="{{ city }}" {% if request.args.get('city') == city %}selected{% endif %}>{{ city }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -171,8 +145,8 @@ include 'includes/breadcrumb.html' %}
                     <label for="is_chain" class="form-label">Chain</label>
                     <select class="form-control" id="is_chain" name="is_chain">
                         <option value="">All</option>
-                        <option value="true" {{ 'selected' if is_chain == 'true' else '' }}>Chain</option>
-                        <option value="false" {{ 'selected' if is_chain == 'false' else '' }}>Independent</option>
+                        <option value="true" {% if request.args.get('is_chain') == 'true' %}selected{% endif %}>Chain</option>
+                        <option value="false" {% if request.args.get('is_chain') == 'false' %}selected{% endif %}>Independent</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -185,7 +159,7 @@ include 'includes/breadcrumb.html' %}
                         min="1"
                         max="5"
                         step="0.1"
-                        value="{{ rating_min if rating_min and rating_min != 'None' else '' }}"
+                        value="{{ request.args.get('rating_min', '') }}"
                         placeholder="1.0" />
                 </div>
                 <div class="col-md-2">
@@ -198,7 +172,7 @@ include 'includes/breadcrumb.html' %}
                         min="1"
                         max="5"
                         step="0.1"
-                        value="{{ rating_max if rating_max and rating_max != 'None' else '' }}"
+                        value="{{ request.args.get('rating_max', '') }}"
                         placeholder="5.0" />
                 </div>
                 <div class="col-md-2 d-flex align-items-end gap-2">
@@ -214,16 +188,18 @@ include 'includes/breadcrumb.html' %}
     </div>
 </div>
 
-
-
 <!-- Pagination Controls -->
-{% if total_restaurants > 0 %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <!-- Results Summary -->
     <div class="d-flex align-items-center">
         <span class="text-muted">
-            Showing {{ restaurants|length }} of {{ total_restaurants }} restaurant{{ 's' if total_restaurants != 1 else '' }}
-            {% if total_spent > 0 %}
+            {% if per_page == -1 %}
+                Showing all {{ total_restaurants }} restaurant{{ 's' if total_restaurants != 1 else '' }}
+            {% else %}
+                Showing {{ page * per_page - per_page + 1 }}-{{ (page * per_page if page * per_page <= total_restaurants else total_restaurants) }} of {{ total_restaurants }} restaurants
+                (Page {{ page }} of {{ total_pages }})
+            {% endif %}
+            {% if total_spent %}
                 (Total Spent: ${{ "%.2f"|format(total_spent) }})
             {% endif %}
         </span>
@@ -234,62 +210,61 @@ include 'includes/breadcrumb.html' %}
         <!-- Items per page selector -->
         <div class="d-flex align-items-center">
             <label for="per_page" class="form-label mb-0 me-2 small text-muted">Show:</label>
-            <select id="per_page" name="per_page" class="form-select form-select-sm border-0 bg-light" style="width: auto; min-width: 80px;">
-                <option value="10" {{ 'selected' if per_page == 10 else '' }}>10</option>
-                <option value="25" {{ 'selected' if per_page == 25 else '' }}>25</option>
-                <option value="50" {{ 'selected' if per_page == 50 else '' }}>50</option>
-                <option value="100" {{ 'selected' if per_page == 100 else '' }}>100</option>
-                <option value="-1" {{ 'selected' if per_page == -1 else '' }}>All</option>
+            <select id="per_page" name="per_page" class="form-select form-select-sm border-0 bg-light per-page-select">
+                <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                <option value="-1" {% if per_page == -1 %}selected{% endif %}>All</option>
             </select>
         </div>
 
         <!-- Page navigation (only show if paginated) -->
-        {% if per_page != -1 and total_pages > 1 %}
+        {% if total_pages > 1 %}
         <div class="btn-group" role="group" aria-label="Page navigation">
             <!-- Previous page -->
             {% if page > 1 %}
-            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('restaurants.list_restaurants', page=page-1, per_page=per_page, q=search, cuisine=cuisine, service_level=service_level, city=city, is_chain=is_chain, rating_min=rating_min, rating_max=rating_max) }}" aria-label="Previous">
-                <i class="fas fa-chevron-left"></i>
+                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('restaurants.list_restaurants', page=page-1, per_page=per_page, q=search, meal_type=meal_type, category=category, start_date=start_date, end_date=end_date) }}" aria-label="Previous">
+                <i class="fas fa-chevron-left me-1"></i><span class="d-none d-sm-inline">Previous</span>
             </a>
             {% else %}
-            <button class="btn btn-outline-primary btn-sm" disabled>
-                <i class="fas fa-chevron-left"></i>
-            </button>
+                <span class="btn btn-outline-secondary btn-sm" aria-label="Previous page not available" role="button" tabindex="-1">
+                <i class="fas fa-chevron-left me-1"></i><span class="d-none d-sm-inline">Previous</span>
+                </span>
             {% endif %}
 
             <!-- Page numbers -->
-            {% for p in range(1, total_pages + 1) %}
-                {% if p == page %}
-                <button class="btn btn-primary btn-sm" disabled>{{ p }}</button>
-                {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
-                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('restaurants.list_restaurants', page=p, per_page=per_page, q=search, cuisine=cuisine, service_level=service_level, city=city, is_chain=is_chain, rating_min=rating_min, rating_max=rating_max) }}">{{ p }}</a>
-                {% elif p == 4 and page > 5 %}
-                <button class="btn btn-outline-primary btn-sm" disabled>...</button>
-                {% elif p == total_pages - 3 and page < total_pages - 4 %}
-                <button class="btn btn-outline-primary btn-sm" disabled>...</button>
+            {% for page_num in range(1, total_pages + 1) %}
+                {% if page_num %}
+                    {% if page_num != page %}
+                        <a class="btn btn-outline-primary btn-sm" href="{{ url_for('restaurants.list_restaurants', page=page_num, per_page=per_page, q=search, meal_type=meal_type, category=category, start_date=start_date, end_date=end_date) }}" aria-label="Go to page {{ page_num }}">{{ page_num }}</a>
+                    {% else %}
+                        <span class="btn btn-primary btn-sm" aria-label="Current page {{ page_num }}" role="button" tabindex="-1">{{ page_num }}</span>
+                    {% endif %}
+                {% else %}
+                    <span class="btn btn-outline-secondary btn-sm" aria-label="More pages available" role="button" tabindex="-1">...</span>
                 {% endif %}
             {% endfor %}
 
             <!-- Next page -->
             {% if page < total_pages %}
-            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('restaurants.list_restaurants', page=page+1, per_page=per_page, q=search, cuisine=cuisine, service_level=service_level, city=city, is_chain=is_chain, rating_min=rating_min, rating_max=rating_max) }}" aria-label="Next">
-                <i class="fas fa-chevron-right"></i>
+                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('restaurants.list_restaurants', page=page+1, per_page=per_page, q=search, meal_type=meal_type, category=category, start_date=start_date, end_date=end_date) }}" aria-label="Next">
+                <span class="d-none d-sm-inline">Next</span><i class="fas fa-chevron-right ms-1"></i>
             </a>
             {% else %}
-            <button class="btn btn-outline-primary btn-sm" disabled>
-                <i class="fas fa-chevron-right"></i>
-            </button>
+                <span class="btn btn-outline-secondary btn-sm" aria-label="Next page not available" role="button" tabindex="-1">
+                <span class="d-none d-sm-inline">Next</span><i class="fas fa-chevron-right ms-1"></i>
+                </span>
             {% endif %}
         </div>
         {% endif %}
     </div>
 </div>
-{% endif %}
 
 <!-- Restaurant List -->
-{% if restaurants %}
+
     <!-- Card View (responsive grid) -->
-    <div id="card-view-container" class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-3">
+    <div id="card-view-container" class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 mb-4">
         {% for restaurant in restaurants %}
         <div class="col">
             <div class="card h-100 shadow-sm">
@@ -298,23 +273,21 @@ include 'includes/breadcrumb.html' %}
                         <!-- Left side: Icon and Title -->
                         <div class="d-flex align-items-start">
                             <!-- Restaurant Icon -->
-                            <div class="restaurant-icon me-2 flex-shrink-0 d-flex align-items-start">
+                            <div class="restaurant-icon me-2 flex-shrink-0">
                                 {% if restaurant.website %}
                                     <img
-                                        src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ restaurant.website }}&size=32"
+                                        src="https://www.google.com/s2/favicons?domain={{ restaurant.website.replace('http://', '').replace('https://', '').replace('www.', '').split('/')[0] }}&sz=32"
+                                        data-website="{{ restaurant.website }}"
                                         alt="{{ restaurant.name }} icon"
                                         class="restaurant-favicon"
                                         width="32"
                                         height="32"
-                                        loading="lazy"
-                                        onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block'; this.nextElementSibling.style.marginTop='2px';"
+                                        onerror="handleFaviconError(this);"
                                         onload="this.style.opacity='1';"
-                                        style="opacity: 0; transition: opacity 0.2s; margin-top: 2px;"
+                                        style="opacity: 0; transition: opacity 0.2s ease-in-out;"
                                     />
-                                    <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px; margin-top: 2px;"></i>
-                                {% else %}
-                                    <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 24px; margin-top: 2px;"></i>
                                 {% endif %}
+                                <i class="fas fa-utensils text-primary restaurant-fallback-icon{% if restaurant.website %} d-none{% endif %}" style="font-size: 20px;"></i>
                             </div>
 
                             <!-- Title and Cuisine -->
@@ -328,11 +301,12 @@ include 'includes/breadcrumb.html' %}
                                         >{{ restaurant.name }}</a
                                     >
                                 </h5>
-                                {% if restaurant.cuisine %}
+
                                 <div class="mt-1">
-                                    {{ cuisine_badge(restaurant.cuisine, compact=true) }}
+                                    {% from 'macros/badge_helpers.html' import cuisine_badge %}
+                                    {{ cuisine_badge(restaurant.cuisine, size='sm') }}
                                 </div>
-                                {% endif %}
+
                             </div>
                         </div>
 
@@ -343,69 +317,65 @@ include 'includes/breadcrumb.html' %}
                                 <i class="fas fa-star"></i> {{ "%.1f"|format(restaurant.rating) }}
                             </span>
                             {% endif %}
+
                             {% if restaurant.service_level %}
-                                                            <span class="service-level-badge-sm" data-service-level="{{ restaurant.service_level }}">
-                                <i class="fas fa-concierge-bell"></i> {{ restaurant.service_level|replace('_', ' ')|title }}
-                            </span>
+                                {% from 'macros/badge_helpers.html' import service_level_badge %}
+                                {{ service_level_badge(restaurant.service_level, size='sm') }}
                             {% endif %}
+
                         </div>
                     </div>
-                    {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code or
-                    restaurant.country %}
+
                     <p class="card-text text-muted small mb-2">
                         <i class="fas fa-map-marker-alt me-2"></i>
-                        {% set address_parts = [] %} {% if restaurant.address %} {% set _ =
-                        address_parts.append(restaurant.address) %} {% endif %} {% if restaurant.city %} {% set _ =
-                        address_parts.append(restaurant.city) %} {% endif %} {% if restaurant.state %} {% set _ =
-                        address_parts.append(restaurant.state) %} {% endif %} {% if restaurant.postal_code %} {% set _ =
-                        address_parts.append(restaurant.postal_code) %} {% endif %} {% if restaurant.country %} {% set _ =
-                        address_parts.append(restaurant.country) %} {% endif %} {{ address_parts|join(", ") }}
+                        {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %}
+                            {% if restaurant.address %}<div>{{ restaurant.address }}</div>{% endif %}
+                            {% if restaurant.city or restaurant.state or restaurant.postal_code %}
+                                <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">No location</span>
+                        {% endif %}
                     </p>
-                    {% endif %} {% if restaurant.phone %}
+                    {% if restaurant.phone %}
                     <p class="card-text text-muted small mb-2">
                         <i class="fas fa-phone me-2"></i> {{ restaurant.phone }}
                     </p>
-                    {% endif %} {% if restaurant.website %}
+                    {% endif %}
+                    {% if restaurant.website %}
                     <p class="card-text text-muted small mb-2">
                         <i class="fas fa-globe me-2"></i>
                         <a href="{{ restaurant.website }}" target="_blank" rel="noopener noreferrer" class="text-muted"
-                            >{{ restaurant.website|truncate(45, '...') }}</a
-                        >
-                    </p>
-                    {% endif %} {% if restaurant.email %}
-                    <p class="card-text text-muted small mb-2">
-                        <i class="fas fa-envelope me-2"></i>
-                        <a href="mailto:{{ restaurant.email }}" class="text-muted"
-                            >{{ restaurant.email|truncate(35, '...') }}</a
+                            >{{ restaurant.website[:30] }}{% if restaurant.website|length > 30 %}...{% endif %}</a
                         >
                     </p>
                     {% endif %}
+
                     <!-- Notes preview -->
                     {% if restaurant.notes %}
                     <div class="card-text small mb-3">
                         <div class="text-muted">
                             <i class="fas fa-sticky-note me-2"></i>
-                            <span class="fst-italic">{{ restaurant.notes|truncate(40, '...') }}</span>
+                            <span class="fst-italic">{{ restaurant.notes }}</span>
                         </div>
                     </div>
                     {% endif %}
+
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                         <div class="d-flex gap-3">
                             <span class="text-muted small">
                                 <i class="fas fa-receipt me-2"></i>
-                                {{ restaurant.visit_count }} {{ 'expense' if restaurant.visit_count == 1 else 'expenses' }}
+                                {{ restaurant.visit_count }} visit{{ 's' if restaurant.visit_count != 1 else '' }}
                             </span>
                             <span class="text-muted small">
                                 <i class="fas fa-dollar-sign me-2"></i>
-                                ${{ "%.2f"|format(restaurant.total_spent) if restaurant.total_spent is defined else '0.00'
-                                }}
+                                ${{ "%.2f"|format(restaurant.total_spent) }}
                             </span>
                         </div>
                         <div class="d-flex gap-2">
-                            {% set maps_url = restaurant|google_maps_url %}
-                            {% if maps_url %}
+                            {% if restaurant.place_id %}
                             <a
-                                href="{{ maps_url }}"
+                                href="https://www.google.com/maps/search/?api=1&query={{ restaurant.name|urlencode }}&query_place_id={{ restaurant.place_id }}"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="btn btn-sm btn-outline-secondary"
@@ -414,12 +384,13 @@ include 'includes/breadcrumb.html' %}
                                 <i class="fas fa-map-marked-alt"></i>
                             </a>
                             {% endif %}
+
                             <a
                                 href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
                                 class="btn btn-sm btn-outline-primary"
                                 data-bs-toggle="tooltip"
                                 title="Add new expense">
-                                <i class="fas fa-plus"></i>
+                                <i class="fas fa-plus me-1"></i><span class="d-none d-sm-inline">Add Expense</span>
                             </a>
                             <button
                                 type="button"
@@ -429,37 +400,24 @@ include 'includes/breadcrumb.html' %}
                                 data-restaurant-id="{{ restaurant.id }}"
                                 data-restaurant-name="{{ restaurant.name }}"
                                 title="Delete restaurant">
-                                <i class="fas fa-trash"></i>
+                                <i class="fas fa-trash me-1"></i><span class="d-none d-sm-inline">Delete</span>
                             </button>
                         </div>
                     </div>
+
                     {% if restaurant.last_visit %}
                     <div class="mt-2 text-muted small">
                         <i class="far fa-calendar-alt me-2"></i>
                         Last visited {{ restaurant.last_visit|time_ago }}
                     </div>
                     {% endif %}
+
                 </div>
             </div>
         </div>
         {% endfor %}
-    </div>
 </div>
 
-
-
-{% else %}
-    <div class="text-center py-5">
-        <div class="mb-4">
-            <i class="fas fa-utensils fa-4x text-muted mb-3"></i>
-            <h3>No restaurants found</h3>
-            <p class="text-muted">You haven't added any restaurants yet.</p>
-            <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-primary mt-2">
-                <i class="fas fa-plus me-2"></i> Add Your First Restaurant
-            </a>
-        </div>
-    </div>
-{% endif %}
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteRestaurantModal" tabindex="-1" aria-labelledby="deleteRestaurantModalLabel">
     <div class="modal-dialog">
@@ -485,7 +443,7 @@ include 'includes/breadcrumb.html' %}
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                     <i class="fas fa-times me-2"></i> Cancel
                 </button>
-                <form id="deleteRestaurantForm" method="post" action="">
+                <form id="deleteRestaurantForm" method="post" action="" data-delete-url="{{ url_for('restaurants.delete_restaurant', restaurant_id=0).replace('/0', '') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <button type="submit" class="btn btn-danger">
                         <i class="fas fa-trash me-2"></i> Delete Restaurant
@@ -495,6 +453,7 @@ include 'includes/breadcrumb.html' %}
         </div>
     </div>
 </div>
+
 <!-- Table View (full width - break out with negative margins) -->
 <div id="table-view-container" class="d-none">
     <div class="restaurant-table-fullwidth">
@@ -517,8 +476,134 @@ include 'includes/breadcrumb.html' %}
                         </thead>
                         <tbody>
                             {% for restaurant in restaurants %}
-                            {% set last_visit = restaurant.last_visit %}
-                            {% include "restaurants/_restaurant_table_row.html" %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-start">
+                                        <!-- Restaurant Icon (small for table view) -->
+                                        <div class="restaurant-icon-table me-2 flex-shrink-0 d-flex align-items-center">
+                                            {% if restaurant.website %}
+                                                <img
+                                                    src="https://www.google.com/s2/favicons?domain={{ restaurant.website.replace('http://', '').replace('https://', '').replace('www.', '').split('/')[0] }}&sz=20"
+                                                    data-website="{{ restaurant.website }}"
+                                                    alt="{{ restaurant.name }} icon"
+                                                    class="restaurant-favicon-table"
+                                                    width="20"
+                                                    height="20"
+                                                    onerror="handleFaviconError(this);"
+                                                    onload="this.style.opacity='1';"
+                                                    style="opacity: 0; transition: opacity 0.2s ease-in-out;" />
+                                            <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 16px; display: none;"></i>
+                                            {% else %}
+                                                <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 16px;"></i>
+                                            {% endif %}
+                                        </div>
+
+                                        <!-- Restaurant Name and Cuisine -->
+                                        <div>
+                                            <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                                >{{ restaurant.name }}</a
+                                            >
+
+                                            <div class="mt-1">
+                                                {% from 'macros/badge_helpers.html' import cuisine_badge %}
+                                                {{ cuisine_badge(restaurant.cuisine, size='sm') }}
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div>
+                                                {% if restaurant.city or restaurant.state or restaurant.postal_code %}
+                                                    {{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}
+                                                {% else %}
+                                                    <span class="text-muted">No location</span>
+                                                {% endif %}
+                                        </div>
+                                        {% if restaurant.place_id %}
+                                        <a
+                                            href="https://www.google.com/maps/search/?api=1&query={{ restaurant.name|urlencode }}&query_place_id={{ restaurant.place_id }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="btn btn-sm btn-outline-secondary ms-2"
+                                            data-bs-toggle="tooltip"
+                                            title="View on Google Maps">
+                                            <i class="fas fa-map-marked-alt"></i>
+                                        </a>
+                                        {% endif %}
+
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if restaurant.service_level %}
+                                    {% from 'macros/badge_helpers.html' import service_level_badge %}
+                                    {{ service_level_badge(restaurant.service_level, size='sm') }}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if restaurant.rating %}
+                                    <span
+                                        class="badge {% if restaurant.rating >= 4.5 %}bg-success{% elif restaurant.rating >= 3.5 %}bg-warning{% else %}bg-danger{% endif %}">
+                                        {{ "%.1f"|format(restaurant.rating) }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ restaurant.visit_count }}</td>
+                                <td>
+                                    {% if restaurant.last_visit %}
+                                    <span
+                                        data-sort-value="{{ restaurant.last_visit.isoformat() }}"
+                                        data-bs-toggle="tooltip"
+                                        title="{{ restaurant.last_visit|format_datetime_user_tz('%B %d, %Y at %I:%M %p') }}">
+                                        {{ restaurant.last_visit|time_ago }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted" data-sort-value="">No visits</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold text-info amount-right">
+                                    {% if restaurant.visit_count > 0 and restaurant.total_spent > 0 %}
+                                        ${{ "%.2f"|format(restaurant.total_spent / restaurant.visit_count) }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold text-success amount-right"
+                                    >${{ "%.2f"|format(restaurant.total_spent) }}</td
+                                >
+                                <td class="actions text-center">
+                                    <a
+                                        href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                        class="btn btn-sm btn-outline-primary"
+                                        data-bs-toggle="tooltip"
+                                        title="View Details">
+                                        <i class="fas fa-eye me-1"></i><span class="d-none d-lg-inline">View</span>
+                                    </a>
+                                    <a
+                                        href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        data-bs-toggle="tooltip"
+                                        title="Edit">
+                                        <i class="fas fa-edit me-1"></i><span class="d-none d-lg-inline">Edit</span>
+                                    </a>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#deleteRestaurantModal"
+                                        data-restaurant-id="{{ restaurant.id }}"
+                                        data-restaurant-name="{{ restaurant.name }}"
+                                        data-bs-toggle="tooltip"
+                                        title="Delete">
+                                        <i class="fas fa-trash me-1"></i><span class="d-none d-lg-inline">Delete</span>
+                                    </button>
+                                </td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot class="table-secondary">
@@ -531,7 +616,7 @@ include 'includes/breadcrumb.html' %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_spent) if total_spent is defined else '0.00' }}</td>
+                                <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_spent) if total_spent else '0.00' }}</td>
                                 <td></td>
                             </tr>
                         </tfoot>
@@ -542,290 +627,9 @@ include 'includes/breadcrumb.html' %}
     </div>
 </div>
 
-        </main>
+{% endblock content %}
 
-        <!-- Footer -->
-        <footer class="footer mt-5 py-4 bg-light">
-            <div class="container-fluid">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <p class="mb-0">2025 Meal Expense Tracker. All rights reserved.</p>
-                    </div>
-                    <div class="col-md-6 text-md-end">
-                        <a href="#" class="text-muted me-3">About</a>
-                        <a href="#" class="text-muted me-3">Terms</a>
-                        <a href="#" class="text-muted me-3">Privacy</a>
-                        <a href="#" class="text-muted">Contact</a>
-                    </div>
-                </div>
-            </div>
-        </footer>
-
-        <!-- Scripts -->
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    // Toggle between card and table views
-    document.addEventListener("DOMContentLoaded", function () {
-        const cardView = document.getElementById("card-view");
-        const tableView = document.getElementById("table-view");
-        const cardViewContainer = document.getElementById("card-view-container");
-        const tableViewContainer = document.getElementById("table-view-container");
-
-        // Load saved view preference or default to card view
-        const savedView = localStorage.getItem("restaurantViewPreference") || "card";
-
-        if (savedView === "table") {
-            tableView.checked = true;
-            cardViewContainer.classList.add("d-none");
-            tableViewContainer.classList.remove("d-none");
-        }
-
-        // Add event listeners for view toggle
-        cardView.addEventListener("change", function () {
-            if (this.checked) {
-                cardViewContainer.classList.remove("d-none");
-                tableViewContainer.classList.add("d-none");
-                localStorage.setItem("restaurantViewPreference", "card");
-            }
-        });
-
-        tableView.addEventListener("change", function () {
-            if (this.checked) {
-                cardViewContainer.classList.add("d-none");
-                tableViewContainer.classList.remove("d-none");
-                localStorage.setItem("restaurantViewPreference", "table");
-            }
-        });
-    });
-
-    // Handle delete restaurant modal
-    document.addEventListener("DOMContentLoaded", function () {
-        const deleteModal = document.getElementById("deleteRestaurantModal");
-
-        if (deleteModal) {
-            // Set up the modal to show the restaurant name
-            deleteModal.addEventListener("show.bs.modal", function (event) {
-                const button = event.relatedTarget;
-                const restaurantId = button.getAttribute("data-restaurant-id");
-                const restaurantName = button.getAttribute("data-restaurant-name");
-
-                // Update the modal content
-                const modalTitle = deleteModal.querySelector(".modal-title");
-                const modalBody = deleteModal.querySelector("#restaurantName");
-                const deleteForm = document.getElementById("deleteRestaurantForm");
-
-                modalBody.textContent = restaurantName;
-                deleteForm.action = `/restaurants/delete/${restaurantId}`;
-            });
-
-            // Handle form submission with fetch
-            const deleteForm = document.getElementById("deleteRestaurantForm");
-            if (deleteForm) {
-                deleteForm.addEventListener("submit", function (e) {
-                    e.preventDefault();
-
-                    const formData = new FormData(deleteForm);
-                    const url = deleteForm.action;
-
-                    fetch(url, {
-                        method: "POST",
-                        body: formData,
-                        headers: {
-                            "X-CSRFToken": formData.get("csrf_token"),
-                        },
-                    })
-                        .then((response) => {
-                            if (response.redirected) {
-                                window.location.href = response.url;
-                            } else {
-                                return response.json().then((data) => {
-                                    if (data.error) {
-                                        showToast("Error", data.error, "danger");
-                                    } else {
-                                        window.location.reload();
-                                    }
-                                });
-                            }
-                        })
-                        .catch((error) => {
-                            console.error("Error:", error);
-                            showToast("Error", "An error occurred while deleting the restaurant.", "danger");
-                        });
-                });
-            }
-        }
-
-        // Helper function to show toast notifications
-        function showToast(title, message, type = "info") {
-            const toastContainer = document.getElementById("toastContainer") || createToastContainer();
-            const toastId = "toast-" + Date.now();
-            const toastHtml = `
-                    <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-                        <div class="d-flex">
-                            <div class="toast-body">
-                                <strong>${title}</strong><br>${message}
-                            </div>
-                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-                        </div>
-                    </div>
-                `;
-
-            toastContainer.insertAdjacentHTML("beforeend", toastHtml);
-            const toastElement = document.getElementById(toastId);
-            const toast = new bootstrap.Toast(toastElement);
-            toast.show();
-
-            // Remove the toast after it's hidden
-            toastElement.addEventListener("hidden.bs.toast", function () {
-                toastElement.remove();
-            });
-        }
-
-        function createToastContainer() {
-            const container = document.createElement("div");
-            container.id = "toastContainer";
-            container.className = "toast-container position-fixed bottom-0 end-0 p-3";
-            container.style.zIndex = "1100";
-            document.body.appendChild(container);
-            return container;
-        }
-
-        // Initialize tooltips for table view
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-
-        // Simple table sorting for restaurant table
-        const headers = document.querySelectorAll('.restaurant-table th[data-sort="true"]');
-        headers.forEach((header) => {
-            header.style.cursor = "pointer";
-            header.addEventListener("click", function () {
-                sortRestaurantTable(this);
-            });
-        });
-
-        function sortRestaurantTable(header) {
-            const table = header.closest("table");
-            const tbody = table.querySelector("tbody");
-            const rows = Array.from(tbody.querySelectorAll("tr"));
-            const columnIndex = Array.from(header.parentNode.children).indexOf(header);
-            const sortType = header.getAttribute("data-sort-type");
-            const isAscending = header.classList.contains("sort-asc");
-
-            // Remove existing sort classes
-            headers.forEach((h) => h.classList.remove("sort-asc", "sort-desc"));
-
-            // Add sort class to current header
-            header.classList.add(isAscending ? "sort-desc" : "sort-asc");
-
-            rows.sort((a, b) => {
-                const aValue = getRestaurantCellValue(a.cells[columnIndex], sortType);
-                const bValue = getRestaurantCellValue(b.cells[columnIndex], sortType);
-
-                if (sortType === "currency" || sortType === "number") {
-                    return isAscending ? bValue - aValue : aValue - bValue;
-                } else if (sortType === "date") {
-                    return isAscending ? new Date(bValue) - new Date(aValue) : new Date(aValue) - new Date(bValue);
-                } else {
-                    return isAscending ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue);
-                }
-            });
-
-            // Reorder rows
-            rows.forEach((row) => tbody.appendChild(row));
-        }
-
-        function getRestaurantCellValue(cell, sortType) {
-            if (sortType === "currency") {
-                const text = cell.textContent.trim();
-                return parseFloat(text.replace(/[$,]/g, "")) || 0;
-            } else if (sortType === "number") {
-                return parseFloat(cell.textContent.trim()) || 0;
-            } else if (sortType === "date") {
-                // Look for data-sort-value attribute first (for last visit column)
-                const spanWithSortValue = cell.querySelector("[data-sort-value]");
-                if (spanWithSortValue) {
-                    const sortValue = spanWithSortValue.getAttribute("data-sort-value");
-                    return sortValue || ""; // Return empty string for "No visits"
-                }
-                // Fallback to text content for other date columns
-                const link = cell.querySelector("a");
-                return link ? link.textContent.trim() : cell.textContent.trim();
-            } else {
-                return cell.textContent.trim().toLowerCase();
-            }
-        }
-
-        // Handle per_page selector changes
-        const perPageSelector = document.getElementById("per_page");
-        if (perPageSelector) {
-            perPageSelector.addEventListener("change", function() {
-                const newPerPage = this.value;
-                const currentUrl = new URL(window.location);
-
-                // Update per_page parameter
-                currentUrl.searchParams.set("per_page", newPerPage);
-
-                // Reset to page 1 when changing per_page
-                currentUrl.searchParams.set("page", "1");
-
-                // Navigate to the new URL
-                window.location.href = currentUrl.toString();
-            });
-        }
-
-        // Improved favicon loading with better error handling
-        function setupFaviconLoading() {
-            const faviconImages = document.querySelectorAll('.restaurant-favicon, .restaurant-favicon-table');
-            faviconImages.forEach(img => {
-                // Add a more robust error handler
-                img.addEventListener('error', function() {
-                    // Silently handle the error without console spam
-                    this.style.display = 'none';
-                    const fallback = this.nextElementSibling;
-                    if (fallback && fallback.classList.contains('restaurant-fallback-icon')) {
-                        fallback.style.display = 'inline-block';
-                        fallback.style.marginTop = '2px';
-                    }
-                });
-
-                // Add load handler for smooth transition
-                img.addEventListener('load', function() {
-                    this.style.opacity = '1';
-                });
-            });
-        }
-
-        // Initialize favicon loading
-        setupFaviconLoading();
-    });
-</script>
-<style>
-    .restaurant-table th[data-sort="true"]:hover {
-        background-color: #e9ecef;
-    }
-
-    .restaurant-table th.sort-asc::after {
-        content: " ↑";
-        color: #007bff;
-    }
-
-    .restaurant-table th.sort-desc::after {
-        content: " ↓";
-        color: #007bff;
-    }
-
-    /* Favicon loading improvements */
-    .restaurant-favicon, .restaurant-favicon-table {
-        transition: opacity 0.3s ease-in-out;
-    }
-
-    .restaurant-fallback-icon, .restaurant-fallback-icon-table {
-        transition: all 0.2s ease-in-out;
-    }
-</style>
-<!-- Cuisine badge component for restaurant displays -->
-<script type="module" src="{{ url_for('static', filename='js/components/cuisine-badge.js') }}"></script>
-    </body>
-</html>
+{% block extra_js %}
+<!-- Restaurant list functionality -->
+<script type="module" src="{{ url_for('static', filename='js/pages/restaurant-list.js') }}"></script>
+{% endblock extra_js %}

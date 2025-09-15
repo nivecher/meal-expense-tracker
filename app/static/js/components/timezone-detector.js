@@ -9,6 +9,7 @@ class TimezoneDetector {
     this.detectedTimezone = null;
     this.confidence = 'unknown';
     this.methods = [];
+    this.autoSaveEnabled = true; // Flag to prevent infinite loops
 
     this.init();
   }
@@ -126,7 +127,7 @@ class TimezoneDetector {
 
     for (const rule of timezoneRules) {
       if (lat <= rule.bounds.north && lat >= rule.bounds.south &&
-          lng >= rule.bounds.west && lng <= rule.bounds.east) {
+        lng >= rule.bounds.west && lng <= rule.bounds.east) {
         return rule.tz;
       }
     }
@@ -233,11 +234,15 @@ class TimezoneDetector {
     if (timezoneSelect) {
       const option = timezoneSelect.querySelector(`option[value="${this.detectedTimezone}"]`);
       if (option) {
+        const currentValue = timezoneSelect.value;
         timezoneSelect.value = this.detectedTimezone;
 
         // Trigger change event for any listeners
         const event = new Event('change', { bubbles: true });
         timezoneSelect.dispatchEvent(event);
+
+        // Don't auto-save to prevent infinite loops
+        // User can manually save the form if they want to update their timezone
       }
     }
 
@@ -252,10 +257,12 @@ class TimezoneDetector {
       };
 
       detectedMessage.innerHTML = `
-        <i class="fas fa-location-dot me-1"></i>
-        <span class="text-success">
-          ${this.detectedTimezone.replace('_', ' ')} ${confidenceText[this.confidence]}
-        </span>
+        <div class="alert alert-info">
+          <i class="fas fa-location-dot me-1"></i>
+          <span class="fw-bold">${this.detectedTimezone.replace('_', ' ')} ${confidenceText[this.confidence]}</span>
+          <br>
+          <small class="text-muted">Click "Save" below to update your timezone preference.</small>
+        </div>
       `;
       detectedMessage.style.display = 'block';
     }
@@ -265,6 +272,74 @@ class TimezoneDetector {
       detectButton.innerHTML = '<i class="fas fa-check me-1"></i>Detected';
       detectButton.disabled = true;
       detectButton.className = detectButton.className.replace('btn-outline-primary', 'btn-success');
+    }
+  }
+
+  // Save timezone via AJAX
+  async saveTimezone(timezone) {
+    try {
+      const response = await fetch('/auth/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: `timezone=${encodeURIComponent(timezone)}&csrf_token=${this.getCSRFToken()}`
+      });
+
+      if (response.ok) {
+        // Show success message
+        this.showSaveMessage('Timezone saved successfully!', 'success');
+        // Update the current time display without reloading the page
+        this.updateCurrentTimeDisplay();
+      } else {
+        this.showSaveMessage('Failed to save timezone. Please try again.', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving timezone:', error);
+      this.showSaveMessage('Error saving timezone. Please try again.', 'error');
+    }
+  }
+
+  // Show save message
+  showSaveMessage(message, type) {
+    const detectedMessage = document.getElementById('timezone-detected');
+    if (detectedMessage) {
+      const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+      detectedMessage.innerHTML = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+          <i class="fas fa-${type === 'success' ? 'check' : 'exclamation-triangle'} me-1"></i>
+          ${message}
+        </div>
+      `;
+      detectedMessage.style.display = 'block';
+    }
+  }
+
+  // Get CSRF token
+  getCSRFToken() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    return csrfToken ? csrfToken.getAttribute('content') : '';
+  }
+
+  // Update current time display without reloading page
+  async updateCurrentTimeDisplay() {
+    try {
+      // Fetch updated current time from server
+      const response = await fetch('/auth/profile', {
+        method: 'GET',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+
+      if (response.ok) {
+        // The page will be updated with the new timezone on next manual refresh
+        // For now, just show a message that the timezone was updated
+        console.log('Timezone updated successfully');
+      }
+    } catch (error) {
+      console.error('Error updating time display:', error);
     }
   }
 

@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from flask import Request, current_app
 from flask_wtf import FlaskForm
 from sqlalchemy import extract, func, or_, select
+from sqlalchemy.orm import joinedload
 from werkzeug.datastructures import FileStorage
 
 from app.constants.categories import get_default_categories
@@ -55,8 +56,12 @@ def get_user_expenses(user_id: int, filters: Dict[str, Any]) -> Tuple[List[Expen
     Returns:
         Tuple of (expenses, total_amount, avg_price_per_person)
     """
-    # Base query
-    stmt = select(Expense).where(Expense.user_id == user_id)
+    # Base query with eager loading of tags
+    stmt = (
+        select(Expense)
+        .options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag))
+        .where(Expense.user_id == user_id)
+    )
 
     # Apply filters
     stmt = apply_filters(stmt, filters)
@@ -66,7 +71,7 @@ def get_user_expenses(user_id: int, filters: Dict[str, Any]) -> Tuple[List[Expen
 
     # Execute query
     result = db.session.execute(stmt)
-    expenses = result.scalars().all()
+    expenses = result.scalars().unique().all()
 
     # Calculate total
     total_amount = sum(expense.amount for expense in expenses) if expenses else 0.0
@@ -318,10 +323,30 @@ def _process_date(date_value: Any) -> Tuple[Optional[date], Optional[str]]:
 
 
 def _process_amount(amount_value: Any) -> Tuple[Optional[Decimal], Optional[str]]:
-    """Process and validate amount from form data."""
+    """Process and validate amount from form data with smart amount support."""
     try:
-        amount_str = str(amount_value)
-        return Decimal(amount_str).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), None
+        amount_str = str(amount_value).strip()
+
+        # Remove any non-numeric characters except decimal point
+        clean_value = "".join(c for c in amount_str if c.isdigit() or c == ".")
+
+        # Handle smart amount conversion if no decimal point is present (like Quicken)
+        if "." not in clean_value and clean_value.isdigit() and len(clean_value) > 0:
+            # Simple rule: assume last 2 digits are cents
+            if len(clean_value) == 1:
+                # Single digit: 5 → 0.05
+                clean_value = f"0.0{clean_value}"
+            elif len(clean_value) == 2:
+                # Two digits: 50 → 0.50
+                clean_value = f"0.{clean_value}"
+            else:
+                # Three or more digits: 789 → 7.89, 1234 → 12.34
+                integer_part = clean_value[:-2]
+                cents_part = clean_value[-2:]
+                clean_value = f"{integer_part}.{cents_part}"
+
+        amount_decimal = Decimal(clean_value)
+        return amount_decimal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP), None
     except (ValueError, TypeError, InvalidOperation) as e:
         current_app.logger.error("Invalid amount: %s. Error: %s", amount_value, e)
         return None, f"Invalid amount: {amount_value}"
@@ -337,8 +362,12 @@ def _parse_tags_json(tags_data: str) -> Tuple[Optional[list], Optional[str]]:
         A tuple of (parsed_tags, error_message)
     """
     try:
-        return json.loads(tags_data), None
-    except json.JSONDecodeError:
+        current_app.logger.info(f"Attempting to parse JSON: {tags_data}")
+        parsed = json.loads(tags_data)
+        current_app.logger.info(f"Successfully parsed JSON: {parsed}")
+        return parsed, None
+    except json.JSONDecodeError as e:
+        current_app.logger.error(f"JSON decode error: {e}, data: {tags_data}")
         return None, "Invalid tags format"
 
 
@@ -383,8 +412,10 @@ def _process_tags(form: ExpenseForm) -> Tuple[Optional[list[str]], Optional[str]
     try:
         # Get tags from form data (sent as JSON string from JavaScript)
         tags_data = form.tags.data if hasattr(form, "tags") and form.tags.data else None
+        current_app.logger.info(f"Processing tags - raw data: {tags_data}")
 
         if not tags_data:
+            current_app.logger.info("No tags data found")
             return [], None  # No tags is valid
 
         # Parse JSON if it's a string
@@ -396,7 +427,9 @@ def _process_tags(form: ExpenseForm) -> Tuple[Optional[list[str]], Optional[str]
             tags_list = tags_data
 
         # Validate and clean tags
-        return _validate_tags_list(tags_list)
+        result = _validate_tags_list(tags_list)
+        current_app.logger.info(f"Tags processing result: {result}")
+        return result
 
     except Exception as e:
         current_app.logger.error(f"Error processing tags: {str(e)}")
@@ -563,7 +596,11 @@ def get_expense_by_id(expense_id: int, user_id: int) -> Optional[Expense]:
     Returns:
         The expense if found and belongs to the user, None otherwise
     """
-    return Expense.query.filter_by(id=expense_id, user_id=user_id).first()
+    return (
+        Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag))
+        .filter_by(id=expense_id, user_id=user_id)
+        .first()
+    )
 
 
 def get_expense_by_id_for_user(expense_id: int, user_id: int) -> Optional[Expense]:
@@ -589,7 +626,12 @@ def get_expenses_for_user(user_id: int) -> List[Expense]:
     Returns:
         List of expenses belonging to the user
     """
-    return Expense.query.filter_by(user_id=user_id).order_by(Expense.date.desc()).all()
+    return (
+        Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag))
+        .filter_by(user_id=user_id)
+        .order_by(Expense.date.desc())
+        .all()
+    )
 
 
 def create_expense_for_user(user_id: int, data: Dict[str, Any]) -> Expense:
@@ -1633,7 +1675,7 @@ def add_tags_to_expense(expense_id: int, user_id: int, tag_names: list[str]) -> 
     Returns:
         List of Tag objects that were added
     """
-    expense = Expense.query.get(expense_id)
+    expense = Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag)).get(expense_id)
     if not expense:
         raise ValueError("Expense not found")
 

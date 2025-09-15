@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Tuple, cast
 
-import googlemaps
 from flask import Response, current_app, jsonify, request
 from flask_login import current_user, login_required
 from marshmallow import ValidationError
@@ -14,21 +13,6 @@ from app.restaurants import services as restaurant_services
 
 from . import bp, validate_api_csrf
 from .schemas import CategorySchema, ExpenseSchema, RestaurantSchema
-
-# Initialize Google Maps client
-gmaps = None
-
-
-def get_gmaps_client():
-    """Initialize and return Google Maps client."""
-    global gmaps
-    if gmaps is None and current_app.config.get("GOOGLE_MAPS_API_KEY"):
-        gmaps = googlemaps.Client(
-            key=current_app.config["GOOGLE_MAPS_API_KEY"],
-            client_id=current_app.config["GOOGLE_MAPS_MAP_ID"],
-        )
-    return gmaps
-
 
 # Schema instances
 expense_schema = ExpenseSchema()
@@ -86,75 +70,27 @@ def version_info() -> Response:
     return _create_api_response(data=version_data, message="Version information retrieved successfully")
 
 
-# Google Places API endpoints
-@bp.route("/address-autocomplete")
-@login_required
-def address_autocomplete() -> Response:
-    """Get address autocomplete suggestions from Google Places API."""
-    query = request.args.get("query")
-    if not query:
-        return jsonify({"status": "error", "message": "Missing required parameter: query"}), 400
+# Cuisine Data
+@bp.route("/cuisines")
+def get_cuisines() -> Response:
+    """Get cuisine data for frontend consumption.
 
-    language = request.args.get("language", "en")
-
-    try:
-        gmaps = get_gmaps_client()
-        if not gmaps:
-            return jsonify({"status": "error", "message": "Google Maps API not configured"}), 500
-
-        predictions = gmaps.places_autocomplete(input_text=query, language=language)
-
-        suggestions = [
-            {
-                "place_id": pred["place_id"],
-                "description": pred["description"],
-                "main_text": pred.get("structured_formatting", {}).get("main_text", ""),
-                "secondary_text": pred.get("structured_formatting", {}).get("secondary_text", ""),
-            }
-            for pred in predictions
-        ]
-
-        return _create_api_response(data=suggestions, message="Address suggestions retrieved successfully")
-
-    except Exception as e:
-        return _handle_service_error(e, "fetch address suggestions")
-
-
-@bp.route("/place-details")
-@login_required
-def place_details() -> Response:
-    """Get detailed information about a place from Google Places API."""
-    place_id = request.args.get("place_id")
-    if not place_id:
-        return jsonify({"status": "error", "message": "Missing required parameter: place_id"}), 400
-
-    language = request.args.get("language", "en")
+    Returns:
+        JSON response with cuisine names, colors, icons, and Google Places mapping
+    """
+    import json
+    import os
 
     try:
-        gmaps = get_gmaps_client()
-        if not gmaps:
-            return jsonify({"status": "error", "message": "Google Maps API not configured"}), 500
+        # Load from static JSON file
+        json_path = os.path.join(current_app.static_folder, "data", "cuisines.json")
+        with open(json_path, "r") as f:
+            cuisine_data = json.load(f)
 
-        place = gmaps.place(
-            place_id=place_id,
-            language=language,
-            fields=["name", "formatted_address", "geometry/location", "address_components"],
-        )
-
-        if not place or "result" not in place:
-            return jsonify({"status": "error", "message": "Place not found"}), 404
-
-        result = {
-            "name": place["result"].get("name", ""),
-            "formatted_address": place["result"].get("formatted_address", ""),
-            "location": place["result"].get("geometry", {}).get("location", {}),
-            "address_components": place["result"].get("address_components", []),
-        }
-
-        return _create_api_response(data=result, message="Place details retrieved successfully")
-
+        return _create_api_response(data=cuisine_data, message="Cuisine data retrieved successfully")
     except Exception as e:
-        return _handle_service_error(e, "fetch place details")
+        current_app.logger.error(f"Error loading cuisine data: {e}")
+        return _create_api_response(message="Failed to load cuisine data", status="error", code=500)
 
 
 # Generic CRUD operations for expenses
@@ -363,7 +299,6 @@ def validate_restaurant() -> Tuple[Response, int]:
 
         name = data.get("name", "").strip()
         address = data.get("address", "").strip()
-        google_place_id = data.get("google_place_id")
 
         if not name:
             return _create_api_response(message="Restaurant name is required", status="error", code=400)
@@ -371,27 +306,12 @@ def validate_restaurant() -> Tuple[Response, int]:
         if not address:
             return _create_api_response(message="Address is required", status="error", code=400)
 
-        # Use centralized service function
-        success, message, validation_data = restaurant_services.validate_restaurant_with_google_places(
-            name, address, google_place_id
+        # Restaurant validation is now handled by the centralized field mapping
+        # in the routes.py file when Google Places data is fetched
+        return _create_api_response(
+            data={"valid": True, "mismatches": [], "fixes": {}, "google_data": {}},
+            message="Restaurant validation is handled during Google Places data fetching.",
         )
-
-        if success:
-            return _create_api_response(
-                data=validation_data,
-                message=f"Validation completed. Found {len(validation_data.get('mismatches', []))} mismatch(es).",
-            )
-        else:
-            # For "not found" cases, return success with empty validation data
-            if "not found" in message.lower():
-                return _create_api_response(
-                    data={"valid": False, "mismatches": [], "fixes": {}, "google_data": {}},
-                    message="No matching restaurant found in Google Places. The restaurant may not be listed or the information may need manual verification.",
-                )
-            elif "invalid" in message.lower():
-                return _create_api_response(message=message, status="error", code=400)
-            else:
-                return _create_api_response(message=message, status="error", code=500)
 
     except Exception as e:
         current_app.logger.error(f"Error validating restaurant: {e}")

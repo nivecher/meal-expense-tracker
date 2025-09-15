@@ -34,19 +34,30 @@ document.addEventListener('click', (event) => {
 
 ## Google Maps
 ```javascript
-// ✅ Async loading + simple autocomplete
+// ✅ Simple Google Maps loading
 async function setup_maps(api_key) {
   const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${api_key}`;
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${api_key}&libraries=places`;
   document.head.appendChild(script);
 
   return new Promise(resolve => script.onload = resolve);
 }
 
+// ✅ Modern autocomplete with input listeners
 function setup_autocomplete(input) {
-  return new google.maps.places.Autocomplete(input, {
-    types: ['establishment', 'geocode'],
-    fields: ['place_id', 'formatted_address', 'geometry']
+  input.addEventListener('input', async (e) => {
+    const query = e.target.value;
+    if (query.length < 2) return;
+
+    try {
+      const suggestions = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+        input: query,
+        types: ['establishment']
+      });
+      showSuggestions(suggestions);
+    } catch (error) {
+      console.error('Autocomplete error:', error);
+    }
   });
 }
 ```

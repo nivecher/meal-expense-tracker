@@ -247,34 +247,6 @@ def get_google_maps_id():
     return jsonify({"mapId": key})
 
 
-@bp.route("/test/google-places")
-@login_required
-def google_places_test():
-    """Test page for Google Places API integration.
-
-    This page provides a testing interface for the Google Places API functionality.
-    It allows users to search for places and view the results on a map.
-
-    Returns:
-        str: Rendered template for the Google Places test page.
-    """
-    return render_template("test/google_places_test.html", title="Google Places Test")
-
-
-@bp.route("/sticky-tables-demo")
-@login_required
-def sticky_tables_demo():
-    """Demo page for sticky table headers and frozen columns."""
-    return render_template("components/sticky_table_examples.html")
-
-
-@bp.route("/error-handling-demo")
-@login_required
-def error_handling_demo():
-    """Demo page for enhanced restaurant error handling."""
-    return render_template("test/error-handling-demo.html")
-
-
 @bp.route("/css/user-tags.css")
 @login_required
 def user_tag_css():
@@ -295,9 +267,9 @@ def user_tag_css():
     max_updated_at = None
 
     for tag in user_tags:
-        # Create a CSS class for each tag using its ID
+        # Create a CSS class for each tag using its ID with higher specificity
         css_rule = f"""
-.tag-{tag.id} {{
+.tag-badge.tag-{tag.id} {{
     background-color: {tag.color} !important;
     color: white !important;
 }}"""

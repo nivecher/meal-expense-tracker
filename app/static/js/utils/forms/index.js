@@ -38,6 +38,11 @@ async function handleFormSubmit(event) {
     return;
   }
 
+  // Skip auth forms - let them submit normally
+  if (form.id === 'login-form' || form.id === 'register-form') {
+    return;
+  }
+
   // Check for confirmation
   const confirmMessage = form.getAttribute('data-confirm');
   if (confirmMessage && !confirm(confirmMessage)) {

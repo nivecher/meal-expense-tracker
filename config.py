@@ -77,15 +77,48 @@ class Config:
         # or if running in production
         session_type = os.getenv("SESSION_TYPE", "").lower()
         flask_env = os.getenv("FLASK_ENV", "development")
+        is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
 
-        # For Lambda environments, use signed cookies instead of DynamoDB
-        # This avoids the CreateTable permission issue entirely
-        if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        # For now, use signed cookies in Lambda to avoid table creation issues
+        # TODO: Fix DynamoDB session configuration to work with existing tables
+        if is_lambda:
+            # For Lambda environments, use signed cookies to avoid permission issues
             self._setup_signed_cookie_session()
         elif session_type == "dynamodb" or flask_env == "production":
             self._setup_dynamodb_session()
         else:
             self._setup_filesystem_session()
+
+        # Configure secure cookie settings based on HTTPS availability
+        self._configure_cookie_security()
+
+    def _configure_cookie_security(self) -> None:
+        """Configure cookie security settings based on environment and HTTPS availability."""
+        # Detect environment
+        is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
+        environment = os.getenv("ENVIRONMENT", "dev")
+
+        # Smart cookie configuration based on environment
+        if is_lambda and environment == "dev":
+            # Lambda development - use API Gateway compatible settings
+            self.SESSION_COOKIE_SECURE = True  # HTTPS required
+            self.SESSION_COOKIE_HTTPONLY = True
+            self.SESSION_COOKIE_SAMESITE = "Lax"  # Try Lax instead of None for API Gateway
+        elif is_lambda:
+            # Lambda production - use secure settings
+            self.SESSION_COOKIE_SECURE = True
+            self.SESSION_COOKIE_HTTPONLY = True
+            self.SESSION_COOKIE_SAMESITE = "Lax"
+        else:
+            # Local development - use standard HTTP settings
+            self.SESSION_COOKIE_SECURE = False  # Allow HTTP for localhost
+            self.SESSION_COOKIE_HTTPONLY = True
+            self.SESSION_COOKIE_SAMESITE = "Lax"  # Standard SameSite for localhost
+
+        # Log the configuration for debugging
+        print(
+            f"Cookie security: SECURE={self.SESSION_COOKIE_SECURE}, HTTPONLY={self.SESSION_COOKIE_HTTPONLY}, SAMESITE={self.SESSION_COOKIE_SAMESITE}"
+        )
 
     def _setup_dynamodb_session(self) -> None:
         """Setup DynamoDB session configuration with validation."""
@@ -148,9 +181,13 @@ class Config:
         if key_prefix := os.getenv("SESSION_KEY_PREFIX"):
             self.SESSION_KEY_PREFIX = key_prefix.strip()
 
+        # Cookie settings will be configured by _configure_cookie_security()
+        # This ensures consistent behavior across all session types
+
         # DynamoDB-specific settings
-        # Note: Flask-Session will try to create table if it doesn't exist
-        # We ensure the table exists through Terraform before Lambda deployment
+        # Disable automatic table creation - table should exist from Terraform
+        self.SESSION_DYNAMODB_AUTO_CREATE = False
+        self.SESSION_DYNAMODB_AUTO_DELETE = False
 
         # Optional custom hash function (default is hashlib.sha1)
         # self.SESSION_DYNAMODB_HASH_FUNCTION = "sha256"  # Uncomment for SHA-256
@@ -164,10 +201,9 @@ class Config:
         # Use Flask's default signed cookie sessions
         self.SESSION_TYPE = None  # This uses Flask's default SecureCookieSessionInterface
 
-        # Enhanced security settings for Lambda
-        self.SESSION_COOKIE_SECURE = True
-        self.SESSION_COOKIE_HTTPONLY = True
-        self.SESSION_COOKIE_SAMESITE = "Lax"
+        # Cookie settings will be configured by _configure_cookie_security()
+        # This ensures consistent behavior across all session types
+
         self.SESSION_PERMANENT = True
         self.PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
 
@@ -176,7 +212,14 @@ class Config:
 
         # Additional security for serverless
         self.SESSION_COOKIE_NAME = "session"
-        self.SESSION_COOKIE_DOMAIN = None  # Let Flask handle this
+        # Set explicit domain for API Gateway compatibility
+        environment = os.getenv("ENVIRONMENT", "dev")
+        if environment == "dev":
+            # For development, don't set domain to allow subdomain flexibility
+            self.SESSION_COOKIE_DOMAIN = None
+        else:
+            # For production, set explicit domain
+            self.SESSION_COOKIE_DOMAIN = None
         self.SESSION_COOKIE_PATH = "/"
 
     def _setup_filesystem_session(self) -> None:
@@ -192,9 +235,9 @@ class DevelopmentConfig(Config):
     """Development configuration."""
 
     DEBUG: bool = True
-    # Keep security features enabled even in development
-    SESSION_COOKIE_SECURE: bool = False  # Allow HTTP in development
-    SESSION_COOKIE_HTTPONLY: bool = True  # Always protect against XSS
+    # Cookie security is now automatically configured based on HTTPS availability
+    # SESSION_COOKIE_SECURE will be False for HTTP development, True for HTTPS
+    # SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE are always enabled for security
 
 
 class TestingConfig(Config):

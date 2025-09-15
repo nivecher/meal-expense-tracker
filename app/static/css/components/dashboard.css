@@ -10,6 +10,121 @@
     box-shadow: 0 2px 15px rgba(0, 0, 0, 0.03);
 }
 
+/* Welcome Quick Actions */
+.welcome-quick-actions {
+    margin-top: 1.5rem;
+}
+
+.quick-actions-label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+.welcome-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.5rem;
+    text-decoration: none;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    text-align: center;
+    height: 100%;
+    min-height: 50px;
+    border: 1px solid #dee2e6;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.welcome-action-btn:hover {
+    text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.welcome-action-btn i {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    transition: transform 0.3s ease;
+}
+
+.welcome-action-btn:hover i {
+    transform: scale(1.1);
+}
+
+.welcome-action-btn span {
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+/* Welcome Action Button Variants - Blue Hover Theme */
+.welcome-action-blue {
+    color: #ffffff;
+    background: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.welcome-action-blue:hover {
+    color: #ffffff;
+    background: #0b5ed7;
+    border-color: #0a58ca;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.25);
+}
+
+.welcome-action-orange {
+    color: #ffffff;
+    background: #fd7e14;
+    border-color: #fd7e14;
+}
+
+.welcome-action-orange:hover {
+    color: #ffffff;
+    background: #0d6efd;
+    border-color: #0d6efd;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.25);
+}
+
+.welcome-action-gray {
+    color: #495057;
+    background: #ffffff;
+    border-color: #dee2e6;
+}
+
+.welcome-action-gray:hover {
+    color: #ffffff;
+    background: #0d6efd;
+    border-color: #0d6efd;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.25);
+}
+
+/* Help Link */
+.help-link {
+    color: #6c757d;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.help-link:hover {
+    color: #0d6efd;
+    background: #e3f2fd;
+    border-color: #0d6efd;
+    text-decoration: none;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.15);
+}
+
 .welcome-content h1 {
     font-weight: 700;
     color: #0d6efd;
@@ -100,16 +215,18 @@
     background: #ffffff;
     border-bottom: 1px solid #f1f3f4;
     border-radius: 1.25rem 1.25rem 0 0 !important;
-    padding: 1.5rem 2rem;
+    padding: 0.15rem 0.75rem;
 }
 
 .card-body {
-    padding: 2rem;
+    padding: 0.25rem;
 }
 
 .card-title {
     font-weight: 600;
     color: #212529;
+    margin-bottom: 0 !important;
+    font-size: 0.9rem;
 }
 
 /* Recent Expenses */
@@ -176,29 +293,7 @@
 
 
 
-/* Meal type colors following TIGER principles - predefined classes */
-.meal-type-badge {
-    padding: 0.2rem 0.6rem;
-    font-size: 0.7rem;
-    font-weight: 500;
-    border-radius: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-}
-
-.meal-type-badge i {
-    font-size: 0.65rem;
-}
-
-.meal-type-breakfast { background-color: #fff8e1; color: #f57c00; border: 1px solid #ffcc02; }
-.meal-type-lunch { background-color: #e8f5e8; color: #2e7d32; border: 1px solid #4caf50; }
-.meal-type-dinner { background-color: #fce4ec; color: #c2185b; border: 1px solid #e91e63; }
-.meal-type-snack { background-color: #f3e5f5; color: #7b1fa2; border: 1px solid #9c27b0; }
-.meal-type-brunch { background-color: #e1f5fe; color: #0277bd; border: 1px solid #03a9f4; }
-.meal-type-late-night { background-color: #f5f5f5; color: #616161; border: 1px solid #9e9e9e; }
+/* Dashboard-specific meal type badge adjustments (now handled by unified badge system) */
 
 .expense-amount {
     font-weight: 700;
@@ -290,19 +385,40 @@
     margin: 0 -15px;
 }
 
+/* Compact Quick Actions */
+.quick-actions-section .card-header {
+    padding: 0.25rem 0.75rem;
+}
+
+.quick-actions-section .card-body {
+    padding: 0.5rem 0.75rem;
+}
+
+.quick-actions-section .card-title {
+    font-size: 1.25rem;
+    margin-bottom: 0;
+    font-weight: 500;
+}
+
+
+
+
+
 .quick-action-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 1.75rem 1rem;
+    justify-content: center;
+    padding: 0.25rem 0.25rem;
     text-decoration: none;
     color: #495057;
-    border-radius: 1rem;
+    border-radius: 0.5rem;
     transition: all 0.3s ease;
     background: #ffffff;
     border: 1px solid #f1f3f4;
     text-align: center;
     height: 100%;
+    min-height: 40px;
 }
 
 .quick-action-btn:hover {
@@ -315,8 +431,8 @@
 }
 
 .quick-action-btn i {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
     transition: transform 0.3s ease;
 }
 
@@ -326,7 +442,8 @@
 
 .quick-action-btn div {
     font-weight: 500;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
+    line-height: 1.1;
 }
 
 /* Navigation Guide */
@@ -396,12 +513,43 @@
         font-size: 2rem;
     }
 
+
+
     .welcome-illustration {
         padding: 1rem;
     }
 
     .dashboard-icon {
         font-size: 5rem;
+    }
+
+    /* Welcome Quick Actions Mobile */
+    .welcome-quick-actions {
+        margin-top: 1rem;
+    }
+
+    .quick-actions-label {
+        font-size: 0.9rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .welcome-action-btn {
+        padding: 0.6rem 0.4rem;
+        min-height: 65px;
+    }
+
+    .welcome-action-btn i {
+        font-size: 1rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .welcome-action-btn span {
+        font-size: 0.7rem;
+    }
+
+    .help-link {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
     }
 
     .stats-section {
@@ -418,11 +566,11 @@
     }
 
     .card-body {
-        padding: 1.5rem;
+        padding: 0.5rem;
     }
 
     .card-header {
-        padding: 1rem 1.5rem;
+        padding: 0.25rem 0.75rem;
     }
 
     .expense-item,
@@ -437,7 +585,8 @@
     }
 
     .quick-action-btn {
-        padding: 1.25rem 0.75rem;
+        padding: 0.4rem 0.3rem;
+        min-height: 45px;
     }
 
     .quick-action-btn i {
@@ -472,6 +621,35 @@
 
     .welcome-content .lead {
         font-size: 1rem;
+    }
+
+    /* Welcome Quick Actions Small Mobile */
+    .welcome-quick-actions {
+        margin-top: 0.75rem;
+    }
+
+    .quick-actions-label {
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .welcome-action-btn {
+        padding: 0.5rem 0.3rem;
+        min-height: 60px;
+    }
+
+    .welcome-action-btn i {
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .welcome-action-btn span {
+        font-size: 0.65rem;
+    }
+
+    .help-link {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.6rem;
     }
 
     .stats-section {
@@ -581,29 +759,7 @@ body .container {
     font-size: 24px !important;
 }
 
-/* Cuisine badges for dashboard */
-.cuisine-badge-small .badge {
-    font-size: 0.65rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 0.5rem;
-}
-
-.cuisine-badge-small .badge i {
-    font-size: 0.6rem;
-}
-
-/* Meal type badges for dashboard - smaller to match help page */
-.dashboard .meal-type-badge {
-    padding: 0.15rem 0.4rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 0.5rem;
-}
-
-.dashboard .meal-type-badge i {
-    margin-right: 0.2rem;
-    font-size: 0.7rem;
-}
+/* Dashboard-specific badge adjustments (now handled by unified badge system) */
 
 /* Restaurant names styling for dashboard */
 .dashboard .restaurant-name,
@@ -617,26 +773,6 @@ body .container {
     font-size: 1.05rem;
 }
 
-/* Make dashboard cuisine badges match help page style */
-.dashboard .cuisine-badge.compact {
-    background-color: var(--cuisine-color) !important;
-    color: white !important;
-    border: 2px solid var(--cuisine-color) !important;
-    font-size: 0.7rem;
-    padding: 0.2rem 0.5rem;
-}
-
-.dashboard .cuisine-badge.compact:hover {
-    background-color: var(--cuisine-color) !important;
-    opacity: 0.9;
-    transform: scale(1.05);
-}
-
-.dashboard .cuisine-badge.compact i {
-    color: white !important;
-    opacity: 1;
-    font-size: 0.65rem;
-}
 
 /* Enhanced light styling for better consistency */
 
@@ -654,35 +790,11 @@ section {
     position: relative;
 }
 
-/* Visual connection between sections */
-.welcome-section::after {
-    content: '';
-    position: absolute;
-    bottom: -1rem;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 3px;
-    background: linear-gradient(135deg, #0d6efd 0%, #6610f2 100%);
-    border-radius: 2px;
-    opacity: 0.6;
-}
+
 
 /* Enhanced visual hierarchy */
 .stats-section .row {
     position: relative;
-}
-
-.stats-section .row::before {
-    content: '';
-    position: absolute;
-    top: -1.5rem;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 40px;
-    height: 2px;
-    background: #e9ecef;
-    border-radius: 1px;
 }
 
 /* Better visual flow */

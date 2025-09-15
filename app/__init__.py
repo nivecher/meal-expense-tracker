@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import Optional, Union
 
 from flask import Flask, jsonify, request
@@ -106,8 +105,24 @@ def _set_cache_control_headers(response, content_type: str) -> None:
 
 def _set_security_headers(response, content_type: str) -> None:
     """Set security headers for responses."""
-    # Security headers
+    # Essential security headers - always set for all responses
     response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    # Content Security Policy (replaces X-Frame-Options with better support)
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://code.jquery.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://maps.googleapis.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' https://maps.googleapis.com https://cdn.jsdelivr.net; "
+        "frame-ancestors 'none';"
+    )
+    response.headers["Content-Security-Policy"] = csp
+
+    # Additional security headers
+    response.headers["Permissions-Policy"] = "geolocation=(self), microphone=(), camera=()"
 
     # Remove deprecated headers if they exist
     response.headers.pop("Pragma", None)
@@ -116,7 +131,7 @@ def _set_security_headers(response, content_type: str) -> None:
     # Only add CSP for HTML responses to avoid unnecessary headers on static resources
     if content_type and "html" in content_type:
         response.headers["Content-Security-Policy"] = (
-            "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.jquery.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; connect-src 'self' https://maps.googleapis.com https://places.googleapis.com; object-src 'none'; base-uri 'self';"
+            "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.jquery.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; connect-src 'self' https://places.googleapis.com https://maps.googleapis.com https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';"
         )
 
 
@@ -174,6 +189,12 @@ def _initialize_components(app: Flask) -> None:
     init_template_filters(app)
     init_utils_filters(app)
     logger.debug("Template filters initialized")
+
+    # Initialize context processors
+    from .utils.context_processors import inject_user_context
+
+    app.context_processor(inject_user_context)
+    logger.debug("Context processors initialized")
 
     # Configure CORS
     _configure_cors(app)
@@ -267,26 +288,52 @@ def _register_blueprints(app: Flask) -> None:
 
 
 def _configure_cors(app: Flask) -> None:
-    """Configure CORS settings."""
-    # Get CORS configuration from environment
-    cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
-    cors_methods = os.getenv("CORS_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(",")
-    cors_allow_headers = os.getenv("CORS_ALLOW_HEADERS", "Content-Type,X-CSRFToken,X-Requested-With").split(",")
-    cors_expose_headers = os.getenv("CORS_EXPOSE_HEADERS", "Content-Length,X-CSRFToken").split(",")
+    """Configure CORS settings based on environment."""
+    import os
 
-    # Configure CORS
-    CORS(
-        app,
-        resources={
-            r"/*": {
-                "origins": cors_origins,
-                "methods": cors_methods,
-                "allow_headers": cors_allow_headers,
-                "expose_headers": cors_expose_headers,
-                "supports_credentials": False,
-            }
-        },
-    )
+    environment = os.getenv("ENVIRONMENT", "dev")
+    is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
+    if is_lambda and environment == "dev":
+        # Lambda development - use permissive settings for API Gateway
+        app.logger.info("Using permissive CORS configuration for Lambda development")
+        CORS(
+            app,
+            resources={
+                r"/*": {
+                    "origins": "*",  # Allow all origins
+                    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],  # All methods
+                    "allow_headers": "*",  # Allow all headers
+                    "expose_headers": [
+                        "Content-Length",
+                        "X-CSRFToken",
+                        "Set-Cookie",
+                        "Location",
+                    ],  # Expose important headers
+                    "supports_credentials": True,  # Enable credentials for session cookies
+                }
+            },
+        )
+    else:
+        # Local development or production - use standard settings
+        app.logger.info("Using standard CORS configuration")
+        cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+        cors_methods = os.getenv("CORS_METHODS", "GET,POST,PUT,DELETE,OPTIONS").split(",")
+        cors_allow_headers = os.getenv("CORS_ALLOW_HEADERS", "Content-Type,X-CSRFToken,X-Requested-With").split(",")
+        cors_expose_headers = os.getenv("CORS_EXPOSE_HEADERS", "Content-Length,X-CSRFToken").split(",")
+
+        # Configure CORS
+        CORS(
+            app,
+            resources={
+                r"/*": {
+                    "origins": cors_origins,
+                    "methods": cors_methods,
+                    "allow_headers": cors_allow_headers,
+                    "expose_headers": cors_expose_headers,
+                    "supports_credentials": False,  # Standard setting for local development
+                }
+            },
+        )
 
 
 def _log_registered_routes(app: Flask) -> None:

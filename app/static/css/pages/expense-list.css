@@ -1,0 +1,333 @@
+/* Expense List Page Styles */
+
+/* Table sorting styles */
+.expense-table th[data-sort="true"]:hover {
+    background-color: #e9ecef;
+}
+
+.expense-table th.sort-asc::after {
+    content: " ↑";
+    color: #007bff;
+}
+
+.expense-table th.sort-desc::after {
+    content: " ↓";
+    color: #007bff;
+}
+
+/* Make date column wider to accommodate new format and prevent wrapping */
+.expense-table th:first-child,
+.expense-table td:first-child {
+    min-width: 100px;
+    width: 100px;
+    white-space: nowrap;
+}
+
+/* Restaurant/Cuisine combined column - flexible width */
+.expense-table th:nth-child(2),
+.expense-table td:nth-child(2) {
+    min-width: 180px;
+    max-width: 250px;
+}
+
+/* Meal/Order combined column - compact stacked layout */
+.expense-table th:nth-child(3),
+.expense-table td:nth-child(3) {
+    width: 120px;
+    min-width: 120px;
+    white-space: nowrap;
+}
+
+/* Party Size column - compact */
+.expense-table th:nth-child(4),
+.expense-table td:nth-child(4) {
+    width: 100px;
+    min-width: 100px;
+    text-align: center;
+}
+
+/* Price per person column - compact */
+.expense-table th:nth-child(5),
+.expense-table td:nth-child(5) {
+    width: 100px;
+    min-width: 100px;
+    text-align: right;
+}
+
+/* Amount column - compact */
+.expense-table th:nth-child(6),
+.expense-table td:nth-child(6) {
+    width: 100px;
+    min-width: 100px;
+    text-align: right;
+}
+
+/* Badge styles now handled by unified badge system */
+
+/* Restaurant/Cuisine combined layout */
+.restaurant-cuisine-combined {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.restaurant-cuisine-combined .fw-medium {
+    font-size: 0.9rem;
+    line-height: 1.2;
+}
+
+/* Stacked meal/order layout */
+.meal-order-stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+}
+
+.meal-order-stacked .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    line-height: 1.2;
+}
+
+/* Tags/Notes combined layout */
+.tags-notes-combined {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: center;
+}
+
+/* Compact table cell padding */
+.expense-table td, .expense-table th {
+    padding: 0.5rem 0.75rem;
+    vertical-align: middle;
+}
+
+/* Reduce table row height for more compact display */
+.expense-table tbody tr {
+    height: 50px;
+}
+
+/* Compact action buttons */
+.expense-table .btn-group .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+/* Ensure amounts are right-aligned and compact */
+.amount-right {
+    text-align: right !important;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+}
+
+/* Compact table indicators for tags and notes */
+.table-tags-compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    background-color: #f8f9fa;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    cursor: help;
+    transition: background-color 0.2s ease;
+}
+
+.table-tags-compact:hover {
+    background-color: #e9ecef;
+}
+
+.table-tags-compact .tag-count {
+    background-color: #007bff;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.table-notes-compact {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background-color: #fff3cd;
+    border-radius: 50%;
+    cursor: help;
+    transition: background-color 0.2s ease;
+}
+
+.table-notes-compact:hover {
+    background-color: #ffeaa7;
+}
+
+/* Tags/Notes combined column - compact */
+.expense-table th:nth-child(7),
+.expense-table td:nth-child(7) {
+    width: 80px;
+    min-width: 80px;
+    text-align: center;
+}
+
+/* Actions column - compact but functional */
+.expense-table th:nth-child(8),
+.expense-table td:nth-child(8) {
+    width: 180px;
+    min-width: 180px;
+    text-align: right;
+}
+
+/* Improve sorting indicators */
+.expense-table th[data-sort="true"] {
+    position: relative;
+    user-select: none;
+}
+
+.expense-table th[data-sort="true"]:hover {
+    background-color: #e9ecef;
+}
+
+.expense-table th.sort-asc::after {
+    content: " ↑";
+    color: #007bff;
+    font-weight: bold;
+}
+
+.expense-table th.sort-desc::after {
+    content: " ↓";
+    color: #007bff;
+    font-weight: bold;
+}
+
+/* Favicon loading improvements */
+.restaurant-favicon, .restaurant-favicon-table {
+    transition: opacity 0.3s ease-in-out;
+}
+
+.restaurant-fallback-icon, .restaurant-fallback-icon-table {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Expense Card Layout Improvements */
+.card-body {
+    padding: 1rem;
+}
+
+/* Consistent badge spacing in cards */
+.card .d-flex.flex-column.gap-1 .badge {
+    margin-bottom: 0.25rem;
+}
+
+.card .d-flex.flex-column.gap-1 .badge:last-child {
+    margin-bottom: 0;
+}
+
+/* Compact badges - width of text only */
+.card .badge {
+    width: fit-content;
+    max-width: none;
+    white-space: nowrap;
+}
+
+/* Better alignment for left and right badge columns */
+.card .d-flex.flex-column.gap-1.align-items-start .badge,
+.card .d-flex.flex-column.gap-1.align-items-end .badge {
+    display: inline-block;
+}
+
+/* Horizontal badge layout for restaurant info */
+.card .d-flex.gap-2 .badge {
+    margin-bottom: 0;
+}
+
+/* Improved expense tags in cards */
+.expense-tags {
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+}
+
+/* Better party size display in cards */
+.card .badge.bg-info {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+}
+
+/* Reduced card bottom padding */
+.card-body .row:last-child {
+    margin-bottom: 0;
+}
+
+/* Better alignment for action buttons */
+.card .d-flex.gap-2.justify-content-end {
+    align-items: center;
+}
+
+/* Responsive adjustments for card layout */
+@media (max-width: 576px) {
+    .card-body .row .col-8,
+    .card-body .row .col-4 {
+        margin-bottom: 0.5rem;
+    }
+
+    .card-body .row .col-4:last-child {
+        margin-bottom: 0;
+    }
+}
+
+/* Responsive adjustments for compact table */
+@media (max-width: 1200px) {
+    .expense-table .btn-group .btn span {
+        display: none;
+    }
+
+    .expense-table .btn-group .btn {
+        padding: 0.25rem;
+        min-width: 32px;
+    }
+}
+
+@media (max-width: 992px) {
+    .expense-table th:nth-child(7), /* Tags/Notes combined column */
+    .expense-table td:nth-child(7) {
+        width: 60px;
+        min-width: 60px;
+    }
+
+    .expense-table th:nth-child(8), /* Actions column */
+    .expense-table td:nth-child(8) {
+        width: 120px;
+        min-width: 120px;
+    }
+}
+
+@media (max-width: 768px) {
+    .expense-table th:first-child,
+    .expense-table td:first-child {
+        min-width: 80px;
+        width: 80px;
+    }
+
+    .expense-table th:nth-child(2),
+    .expense-table td:nth-child(2) {
+        min-width: 140px;
+        max-width: 180px;
+    }
+
+    .meal-order-stacked .badge {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.4rem;
+    }
+
+    .restaurant-cuisine-combined .fw-medium {
+        font-size: 0.8rem;
+    }
+}

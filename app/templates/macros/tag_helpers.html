@@ -1,17 +1,17 @@
 {% macro tag_badge(tag, compact=false) %}
-    {% set color_class = 'tag-color-' + (tag.name|length % 12 + 1)|string %}
     {% set size_class = 'compact' if compact else '' %}
-    <span class="tag-badge {{ color_class }} {{ size_class }}">
+    <span class="tag-badge tag-badge-pretty tag-{{ tag.id }} {{ size_class }}"
+          data-tag-color="{{ tag.color }}"
+          data-tag-id="{{ tag.id }}">
         {{ tag.name }}
     </span>
 {% endmacro %}
 
 {% macro tag_badge_with_remove(tag, compact=false) %}
-    {% set color_class = 'tag-color-' + (tag.name|length % 12 + 1)|string %}
     {% set size_class = 'compact' if compact else '' %}
-    <span class="tag-badge {{ color_class }} {{ size_class }}" data-tag-name="{{ tag.name }}">
+    <span class="tag-badge tag-{{ tag.id }} {{ size_class }}" data-tag-name="{{ tag.name }}">
         {{ tag.name }}
-        <span class="tag-remove" onclick="this.closest('.tag-badge').remove(); this.tagsInput.removeTag('{{ tag.name }}');">
+        <span class="tag-remove" data-tag-name="{{ tag.name }}">
             ×
         </span>
     </span>
@@ -19,7 +19,7 @@
 
 {% macro tag_badge_custom_color(tag, color, compact=false) %}
     {% set size_class = 'compact' if compact else '' %}
-    <span class="tag-badge {{ size_class }}" style="background-color: {{ color }};">
+    <span class="tag-badge {{ size_class }} tag-badge-custom" data-tag-color="{{ color }}">
         {{ tag.name }}
     </span>
 {% endmacro %}

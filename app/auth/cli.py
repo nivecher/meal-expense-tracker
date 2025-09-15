@@ -24,6 +24,7 @@ def register_commands(app):
     user_cli.add_command(list_users)
     user_cli.add_command(create_user)
     user_cli.add_command(update_user)
+    user_cli.add_command(delete_user)
     user_cli.add_command(reset_admin_password)
 
 
@@ -473,3 +474,162 @@ def update_user(
 
     # Apply changes if any were made
     _confirm_and_apply_changes(user, changes)
+
+
+def _display_user_info(user: User) -> None:
+    """Display user information before deletion.
+
+    Args:
+        user: User object to display
+    """
+    click.echo(f"User to delete: {user.username} (ID: {user.id}, Email: {user.email})")
+    click.echo(f"  - Admin: {'Yes' if user.is_admin else 'No'}")
+    click.echo(f"  - Active: {'Yes' if user.is_active else 'No'}")
+
+
+def _check_related_data(user: User, no_cascade: bool, force: bool) -> bool:
+    """Check for related data and handle cascade options.
+
+    Args:
+        user: User object to check
+        no_cascade: Whether to prevent deletion with related data
+        force: Whether to skip confirmations
+
+    Returns:
+        bool: True if deletion should proceed, False otherwise
+    """
+    related_counts = _count_user_objects(user)
+    has_related_data = any(count > 0 for count in related_counts.values())
+
+    if has_related_data:
+        click.echo("\nRelated data found:")
+        for obj_type, count in related_counts.items():
+            if count > 0:
+                click.echo(f"  - {obj_type.capitalize()}: {count}")
+
+        if no_cascade:
+            click.echo(
+                "\nError: User has related data and --no-cascade flag is set. "
+                "Use --cascade to delete all related data, or remove the data first.",
+                err=True,
+            )
+            return False
+
+        if not force:
+            if not click.confirm(
+                f"\nThis will permanently delete the user and ALL {sum(related_counts.values())} related records. "
+                "This action cannot be undone. Are you sure you want to continue?"
+            ):
+                click.echo("Deletion cancelled.")
+                return False
+    else:
+        click.echo("\nNo related data found.")
+
+    return True
+
+
+def _confirm_deletion(user: User, force: bool) -> bool:
+    """Confirm user deletion.
+
+    Args:
+        user: User object to delete
+        force: Whether to skip confirmation
+
+    Returns:
+        bool: True if deletion should proceed, False otherwise
+    """
+    if not force:
+        if not click.confirm(f"\nAre you sure you want to delete user '{user.username}'?"):
+            click.echo("Deletion cancelled.")
+            return False
+    return True
+
+
+def _execute_user_deletion(user: User) -> None:
+    """Execute the actual user deletion.
+
+    Args:
+        user: User object to delete
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        # Store user info for confirmation message
+        username = user.username
+        user_id = user.id
+        email = user.email
+        related_counts = _count_user_objects(user)
+        has_related_data = any(count > 0 for count in related_counts.values())
+
+        # Delete the user (cascade will handle related data)
+        db.session.delete(user)
+        db.session.commit()
+
+        click.echo(f"Successfully deleted user: {username} (ID: {user_id}, Email: {email})")
+        if has_related_data:
+            click.echo(f"Also deleted {sum(related_counts.values())} related records.")
+
+    except IntegrityError as e:
+        db.session.rollback()
+        click.echo(f"Error deleting user: Database constraint violation - {str(e)}", err=True)
+    except Exception as e:
+        db.session.rollback()
+        click.echo(f"An unexpected error occurred: {str(e)}", err=True)
+
+
+@click.command("delete")
+@click.argument("user_identifier")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Skip confirmation prompts (use with caution)",
+)
+@click.option(
+    "--cascade",
+    is_flag=True,
+    default=True,
+    help="Delete all related data (expenses, restaurants, categories, tags) - default behavior",
+)
+@click.option(
+    "--no-cascade",
+    is_flag=True,
+    help="Prevent deletion if user has related data",
+)
+@with_appcontext
+def delete_user(
+    user_identifier: str,
+    force: bool = False,
+    cascade: bool = True,
+    no_cascade: bool = False,
+) -> None:
+    """Delete a user account and optionally all related data.
+
+    The user can be identified by their ID, username, or email address.
+
+    WARNING: This action cannot be undone! All user data will be permanently deleted.
+
+    Args:
+        user_identifier: User ID, username, or email address
+        force: Skip confirmation prompts (dangerous!)
+        cascade: Delete all related data (default: True)
+        no_cascade: Prevent deletion if user has related data
+    """
+    # Find the user
+    user = _find_user_by_identifier(user_identifier)
+    if not user:
+        click.echo(f"Error: No user found with identifier: {user_identifier}", err=True)
+        return
+
+    # Display user information
+    _display_user_info(user)
+
+    # Check related data and handle cascade options
+    if not _check_related_data(user, no_cascade, force):
+        return
+
+    # Confirm deletion
+    if not _confirm_deletion(user, force):
+        return
+
+    # Execute deletion
+    _execute_user_deletion(user)

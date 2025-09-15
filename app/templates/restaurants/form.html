@@ -5,105 +5,8 @@
 {% block styles %}
     {{ super() }}
     <!-- Select2 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
-          rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css"
-          rel="stylesheet" />
-    <style>
-        /* Form sections */
-        .form-section {
-            margin-bottom: 3rem;
-            padding-bottom: 2rem;
-            border-bottom: 2px solid #e9ecef;
-            background: #fafbfc;
-            border-radius: 8px;
-            padding: 2rem;
-            border: 1px solid #e9ecef;
-        }
 
-        /* Section headers with better spacing */
-        .section-header {
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        .section-header h5 {
-            margin-bottom: 0;
-            color: #495057;
-        }
-
-        /* Horizontal rule styling */
-        .section-divider {
-            border: none;
-            height: 2px;
-            background: linear-gradient(to right, #e9ecef, #dee2e6, #e9ecef);
-            margin: 2.5rem 0;
-            border-radius: 1px;
-        }
-
-        /* Last section styling (form actions) */
-        .form-section:last-child {
-            background: transparent;
-            border: none;
-            padding: 0;
-        }
-
-        /* Loading indicator */
-        #loading-indicator {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            padding: 0.5rem;
-            background-color: #0d6efd;
-            color: white;
-            z-index: 1060;
-            display: none;
-        }
-
-        /* Error container */
-        #error-container {
-            position: fixed;
-            top: 0;
-            right: 0;
-            padding: 1rem;
-            max-width: 400px;
-            z-index: 1060;
-        }
-
-        .form-section:last-child {
-            border-bottom: none;
-        }
-
-        /* Form controls */
-        .form-floating>label {
-            padding: 1rem 0.75rem;
-        }
-
-        /* Button styling */
-        .btn-outline-warning {
-            border-color: #ffc107;
-            color: #ffc107;
-        }
-
-        .btn-outline-warning:hover {
-            background-color: #ffc107;
-            border-color: #ffc107;
-            color: #000;
-        }
-
-        /* Input group button styling */
-        .input-group .btn {
-            border-left: 0;
-        }
-
-        .input-group .form-control:focus + .btn {
-            border-color: #86b7fe;
-            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/restaurant-form.css') }}">
 {% endblock styles %}
 {% block content %}
     <!-- Breadcrumb Navigation -->
@@ -141,8 +44,8 @@
                             </div>
                             <div class="alert alert-info mb-3">
                                 <i class="fas fa-info-circle me-2"></i>
-                                Start typing the restaurant's name to search with Google Places. Select a restaurant to automatically fill
-                                in the details.
+                                Search shows nearby restaurants first. Add a city/location to search elsewhere (e.g., "McDonald's Dallas, TX").
+                                Select a restaurant to automatically fill in the details.
                             </div>
                             <div class="row g-3">
                                 <div class="col-12">
@@ -150,7 +53,8 @@
                                     <input type="text"
                                            class="form-control"
                                            id="restaurant-search"
-                                           placeholder="Start typing restaurant name for autocomplete..."
+                                           data-restaurant-autocomplete
+                                           placeholder="Search restaurants (e.g., McDonald's or McDonald's Dallas, TX)..."
                                            autocomplete="off">
                                     <div id="restaurant-suggestions" class="mt-2"></div>
                                 </div>
@@ -180,8 +84,10 @@
                                         <button type="button"
                                                 class="btn btn-outline-primary btn-sm"
                                                 id="validate-restaurant-btn"
-                                                onclick="validateRestaurantData()"
+                                                data-action="validate-restaurant"
+                                                data-restaurant-id="{{ restaurant.id if restaurant else '' }}"
                                                 title="Validate restaurant information with Google Places"
+                                                aria-label="Validate restaurant information"
                                                 disabled>
                                             <i class="fas fa-check-circle me-1"></i> Validate
                                         </button>
@@ -202,7 +108,15 @@
                                     <!-- Price range removed - would be looked up dynamically from Google Places API -->
                                     <div class="col-md-6">
                                         <label for="cuisine" class="form-label">Cuisine</label>
-                                        {{ form.cuisine(class_="form-control" + (" is-invalid" if form.cuisine.errors else "") ) }}
+                                        <select name="cuisine" id="cuisine" class="form-select{{ ' is-invalid' if form.cuisine.errors else '' }}">
+                                            <option value="">Select Cuisine (Optional)</option>
+                                            {% for cuisine in cuisine_choices %}
+                                                <option value="{{ cuisine }}"
+                                                    {{ 'selected' if form.cuisine.data == cuisine else '' }}>
+                                                    {{ cuisine }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
                                         {% for error in form.cuisine.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                 </div>
@@ -242,8 +156,8 @@
                                         <i class="fas fa-address-card me-2 text-primary"></i>Contact Information
                                     </h5>
                                 </div>
-                                    <!-- Address Fields -->
-                                    <div class="row g-3">
+                                <!-- Address Fields -->
+                                <div class="row g-3">
                                         <div class="col-md-8">
                                             <label for="address" class="form-label">Street Address</label>
                                             {{ form.address(class_="form-control" + (" is-invalid" if form.address.errors else "") ,
@@ -303,8 +217,10 @@
                                                 <button type="button"
                                                         class="btn btn-outline-secondary"
                                                         id="open-website-btn"
-                                                        onclick="openWebsite()"
+                                                        data-action="open-website"
+                                                        data-website="{{ form.website.data or '' }}"
                                                         title="Open website in new tab"
+                                                        aria-label="Open restaurant website"
                                                         disabled>
                                                     <i class="fas fa-external-link-alt"></i>
                                                 </button>
@@ -324,7 +240,8 @@
                                                            aria-describedby="google-place-id-help">
                                                     <button class="btn btn-outline-secondary"
                                                             type="button"
-                                                            onclick="navigator.clipboard.writeText('{{ form.google_place_id.data }}')"
+                                                            data-action="copy-to-clipboard"
+                                                            data-text="{{ form.google_place_id.data }}"
                                                             data-bs-toggle="tooltip"
                                                             title="Copy to clipboard">
                                                         <i class="fas fa-copy"></i>
@@ -335,7 +252,7 @@
                                             <div class="col-12 mt-2 d-flex justify-content-end gap-2">
                                                 <button type="button"
                                                         class="btn btn-sm btn-outline-warning"
-                                                        onclick="clearPlaceId()"
+                                                        data-action="clear-place-id"
                                                         title="Clear Google Place ID">
                                                     <i class="fas fa-times me-1"></i> Clear Place ID
                                                 </button>
@@ -359,12 +276,11 @@
                                         <i class="fas fa-sticky-note me-2 text-primary"></i>Additional Information
                                     </h5>
                                 </div>
-                                    <div class="row g-3">
-                                        <div class="col-12">
-                                            <label for="notes" class="form-label">Notes</label>
-                                            {{ form.notes(class_="form-control" + (" is-invalid" if form.notes.errors else "") , rows="3", placeholder="Additional notes about the restaurant") }}
-                                            {% for error in form.notes.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                        </div>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label for="notes" class="form-label">Notes</label>
+                                        {{ form.notes(class_="form-control" + (" is-invalid" if form.notes.errors else "") , rows="3", placeholder="Additional notes about the restaurant") }}
+                                        {% for error in form.notes.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                 </div>
                             </div>
@@ -372,7 +288,7 @@
                             <hr class="section-divider">
 
                             <!-- Form Actions -->
-                            <div class="d-flex justify-content-between mt-4 pt-3">
+                            <div class="form-actions d-flex justify-content-between mt-4 pt-3">
                                     <div>
                                         <a href="{{ url_for('restaurants.list_restaurants') }}"
                                            class="btn btn-outline-secondary">
@@ -456,7 +372,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary d-none" id="apply-fixes-btn" onclick="applyAddressFixes()">
+                                                    <button type="button" class="btn btn-primary d-none" id="apply-fixes-btn" data-action="apply-address-fixes">
                         <i class="fas fa-sync-alt me-1"></i> Apply Fixes
                     </button>
                 </div>
@@ -466,22 +382,9 @@
 {% endblock content %}
 {% block scripts %}
     {{ super() }}
-    <!-- Google Maps API Configuration -->
-    <div id="google-maps-config"
-         data-api-key="{{ config.GOOGLE_MAPS_API_KEY or '' }}"
-         class="hidden"></div>
-    {% if config.GOOGLE_MAPS_API_KEY %}
-        <!-- Load Google Maps script directly -->
-        <script src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_MAPS_API_KEY }}&libraries=places&loading=async"
-                async
-                defer></script>
-        <!-- Load simple restaurant autocomplete -->
-        <script type="module"
-                src="{{ url_for('static', filename='js/utils/restaurant-autocomplete.js') }}"></script>
-    {% endif %}
-    <!-- Load restaurant form module -->
-    <script type="module"
-            src="{{ url_for('static', filename='js/pages/restaurant-form.js') }}"></script>
+    <!-- Load restaurant autocomplete (does not require client Maps JS) -->
+    <script type="module" src="{{ url_for('static', filename='js/components/restaurant-autocomplete.js') }}"></script>
+    <!-- Restaurant form module removed - using simplified autocomplete instead -->
 
     <!-- Form-specific JavaScript functions -->
     <script>
@@ -625,7 +528,7 @@
             showValidationLoading();
 
             try {
-                const response = await fetch('/api/restaurants/validate', {
+                const response = await fetch('/api/v1/restaurants/validate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -787,5 +690,7 @@
                 errorContainer.classList.add('d-none');
             }, 5000);
         }
+
+        // Restaurant autocomplete is automatically initialized by the module script
     </script>
 {% endblock scripts %}

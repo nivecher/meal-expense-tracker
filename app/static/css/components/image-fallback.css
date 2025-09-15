@@ -1,0 +1,156 @@
+/**
+ * Image fallback component styles
+ * Optimized to reduce layout shifts and improve performance
+ */
+
+/* Restaurant favicon containers - prevent layout shifts */
+.restaurant-icon {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Restaurant favicons - smooth opacity transition */
+.restaurant-favicon {
+    width: 32px;
+    height: 32px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    will-change: opacity;
+}
+
+/* Fallback icons - positioned absolutely to prevent layout shifts */
+.restaurant-fallback-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    font-size: 20px;
+    color: var(--bs-primary);
+    pointer-events: none;
+    opacity: 0.8;
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Show fallback when displayed */
+.restaurant-fallback-icon[style*="display: inline-block"],
+.restaurant-fallback-icon:not(.d-none) {
+    opacity: 1;
+}
+
+/* Show fallback icons when no website (not hidden by d-none) */
+.restaurant-fallback-icon:not(.d-none) {
+    display: inline-block;
+}
+
+/* Table view favicon containers */
+.restaurant-icon-table {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Table view favicons */
+.restaurant-favicon-table {
+    width: 20px;
+    height: 20px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    will-change: opacity;
+}
+
+/* Table view fallback icons */
+.restaurant-fallback-icon-table {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    font-size: 16px;
+    color: var(--bs-primary);
+    pointer-events: none;
+    opacity: 0.8;
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Show table fallback when displayed */
+.restaurant-fallback-icon-table[style*="display: inline-block"],
+.restaurant-fallback-icon-table:not(.d-none) {
+    opacity: 1;
+}
+
+/* Show table fallback icons when no website (not hidden by d-none) */
+.restaurant-fallback-icon-table:not(.d-none) {
+    display: inline-block;
+}
+
+/* Large fallback icons - visible by default when no image is present */
+.restaurant-fallback-icon-large {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-block;
+    font-size: 32px;
+    color: var(--bs-primary);
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Avatar containers - prevent layout shifts */
+.avatar-container {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    overflow: hidden;
+}
+
+/* Avatar images - smooth transitions */
+.avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    will-change: opacity;
+}
+
+/* Avatar fallbacks - positioned absolutely */
+.avatar-fallback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    font-size: 20px;
+    color: var(--bs-secondary);
+    pointer-events: none;
+}
+
+/* Optimize for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .restaurant-favicon,
+    .avatar-img {
+        transition: none;
+    }
+}
+
+/* Performance optimizations */
+.restaurant-favicon,
+.restaurant-fallback-icon,
+.avatar-img,
+.avatar-fallback {
+    contain: layout style paint;
+}

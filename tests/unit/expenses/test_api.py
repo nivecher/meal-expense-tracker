@@ -82,6 +82,7 @@ def test_restaurant(db, test_user):
     """Create a test restaurant."""
     restaurant = Restaurant(
         name="Test Restaurant",
+        type="restaurant",  # Add required field
         user_id=test_user.id,
         address="123 Test St",
         city="Test City",
@@ -157,7 +158,7 @@ class TestExpenseAPI:
         expense = Expense(
             amount=30.00,
             date=datetime.now(timezone.utc),
-            description="Dinner at Test Restaurant",
+            notes="Dinner at Test Restaurant",  # Use 'notes' instead of 'description'
             category_id=test_category.id,
             restaurant_id=test_restaurant.id,
             user_id=test_user.id,
@@ -170,7 +171,7 @@ class TestExpenseAPI:
         data = response.get_json()
         assert isinstance(data, list)
         assert len(data) >= 1
-        assert data[0]["description"] == "Dinner at Test Restaurant"
+        assert data[0]["notes"] == "Dinner at Test Restaurant"
 
     def test_get_expense(
         self,
@@ -189,7 +190,7 @@ class TestExpenseAPI:
             user_id=test_user.id,
             restaurant_id=test_restaurant.id,
             category_id=test_category.id,
-            description="Test expense",
+            notes="Test expense",  # Use 'notes' instead of 'description'
             meal_type="lunch",
         )
         db.session.add(expense)
@@ -199,7 +200,7 @@ class TestExpenseAPI:
         assert response.status_code == 200
         data = response.get_json()
         assert data["amount"] == "10.99"
-        assert data["description"] == "Test expense"
+        assert data["notes"] == "Test expense"
 
     def test_update_expense(
         self,
@@ -218,7 +219,7 @@ class TestExpenseAPI:
             user_id=test_user.id,
             restaurant_id=test_restaurant.id,
             category_id=test_category.id,
-            description="Original note",
+            notes="Original note",  # Use 'notes' instead of 'description'
             meal_type="lunch",
         )
         db.session.add(expense)
@@ -229,7 +230,7 @@ class TestExpenseAPI:
             "date": "2025-07-13",
             "restaurant_id": test_restaurant.id,
             "category_id": test_category.id,
-            "description": "Updated note",
+            "notes": "Updated note",  # Use 'notes' instead of 'description'
             "meal_type": "dinner",
         }
 
@@ -241,7 +242,7 @@ class TestExpenseAPI:
         assert response.status_code == 200
         data = response.get_json()
         assert data["amount"] == "12.99"
-        assert data["description"] == "Updated note"
+        assert data["notes"] == "Updated note"
         assert data["meal_type"] == "dinner"
 
     def test_delete_expense(

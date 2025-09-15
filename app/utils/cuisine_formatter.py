@@ -1,204 +1,142 @@
 """
-Backend cuisine formatting utilities for consistent cuisine type handling
-Provides validation and formatting following TIGER principles
+Cuisine type formatting utilities for Google Places data.
+
+This module provides consistent formatting for cuisine types across the application,
+following TIGER principles: Safety, Performance, Developer Experience.
 """
 
-import re
 from typing import Optional
 
-# Map of common cuisine types to standardized format
-CUISINE_STANDARDIZATION_MAP = {
-    "mexican": "Mexican",
-    "italian": "Italian",
-    "chinese": "Chinese",
-    "japanese": "Japanese",
-    "indian": "Indian",
-    "thai": "Thai",
-    "french": "French",
-    "american": "American",
-    "pizza": "Pizza",
-    "seafood": "Seafood",
-    "steakhouse": "Steakhouse",
-    "sushi": "Sushi",
-    "korean": "Korean",
-    "vietnamese": "Vietnamese",
-    "mediterranean": "Mediterranean",
-    "greek": "Greek",
-    "spanish": "Spanish",
-    "german": "German",
-    "british": "British",
-    "turkish": "Turkish",
-    "lebanese": "Lebanese",
-    "ethiopian": "Ethiopian",
-    "moroccan": "Moroccan",
-    "brazilian": "Brazilian",
-    "peruvian": "Peruvian",
-    "argentinian": "Argentinian",
-    "fast food": "Fast Food",
-    "fast-food": "Fast Food",
-    "fastfood": "Fast Food",
-    "fine dining": "Fine Dining",
-    "fine-dining": "Fine Dining",
-}
+from app.constants.cuisines import get_cuisine_data, get_cuisine_names
 
 
-def format_cuisine_type(cuisine_input: Optional[str], max_length: int = 100) -> Optional[str]:
+def format_cuisine_type(cuisine_type: Optional[str], max_length: int = 100) -> str:
     """
-    Format and standardize cuisine type input with proper capitalization.
+    Format cuisine type from Google Places data with proper capitalization.
 
     Args:
-        cuisine_input: Raw cuisine type string from user input or API
-        max_length: Maximum allowed length for cuisine string (default: 100)
+        cuisine_type: Raw cuisine type from Google Places or user input
+        max_length: Maximum length for cuisine string (default: 100)
 
     Returns:
-        Formatted cuisine type string or None if invalid/empty
+        Formatted cuisine type or empty string if invalid
 
-    Examples:
-        format_cuisine_type('mexican') -> 'Mexican'
-        format_cuisine_type('ITALIAN') -> 'Italian'
-        format_cuisine_type('fast-food') -> 'Fast Food'
-        format_cuisine_type('  thai  ') -> 'Thai'
-        format_cuisine_type('') -> None
-        format_cuisine_type(None) -> None
+    Example:
+        format_cuisine_type('mexican')  # returns 'Mexican'
+        format_cuisine_type('ITALIAN')  # returns 'Italian'
+        format_cuisine_type('chinese_restaurant')  # returns 'Chinese'
     """
     # Input validation - safety first
-    if not cuisine_input or not isinstance(cuisine_input, str):
-        return None
+    if not cuisine_type or not isinstance(cuisine_type, str):
+        return ""
 
-    # Sanitize and enforce bounds
-    trimmed = cuisine_input.strip()
-    if not trimmed or len(trimmed) > max_length:
-        return None
+    # Enforce bounds to prevent overflow
+    trimmed_input = cuisine_type.strip()
+    if len(trimmed_input) == 0 or len(trimmed_input) > max_length:
+        return ""
 
-    # Remove potentially harmful characters and normalize
-    cleaned = re.sub(r'[<>"\';]', "", trimmed)
-    if not cleaned:
-        return None
+    # Try to get cuisine data first (handles fuzzy matching)
+    cuisine_data = get_cuisine_data(trimmed_input)
+    if cuisine_data:
+        return cuisine_data["name"]
 
-    # Convert to lowercase for mapping
-    lower_cuisine = cleaned.lower()
-
-    # Check direct mapping first (most common cases)
-    if lower_cuisine in CUISINE_STANDARDIZATION_MAP:
-        return CUISINE_STANDARDIZATION_MAP[lower_cuisine]
-
-    # Handle compound cuisine types (e.g., "mexican-american", "asian fusion")
-    if "-" in lower_cuisine or " " in lower_cuisine:
-        return _format_compound_cuisine(lower_cuisine)
-
-    # Default: capitalize first letter of each word
-    return _capitalize_words(cleaned)
-
-
-def _format_compound_cuisine(cuisine: str) -> str:
-    """
-    Format compound cuisine types (e.g., "mexican-american", "asian fusion").
-
-    Args:
-        cuisine: Lowercase cuisine string containing separators
-
-    Returns:
-        Properly formatted compound cuisine string
-    """
-    # Split on common separators and format each part
-    parts = re.split(r"[-\s/]+", cuisine)
-    formatted_parts = []
-
-    for part in parts:
-        if part in CUISINE_STANDARDIZATION_MAP:
-            formatted_parts.append(CUISINE_STANDARDIZATION_MAP[part])
-        else:
-            formatted_parts.append(_capitalize_words(part))
-
-    return " ".join(formatted_parts)
+    # If no exact match, try to format the input
+    return _capitalize_words(trimmed_input)
 
 
 def _capitalize_words(text: str) -> str:
     """
-    Capitalize first letter of each word in a string.
+    Capitalize words in a string, handling common separators.
 
     Args:
-        text: Input string to capitalize
+        text: Input text to capitalize
 
     Returns:
-        String with each word capitalized
+        Properly capitalized text
+
+    Example:
+        _capitalize_words('mexican_restaurant')  # returns 'Mexican Restaurant'
+        _capitalize_words('fast-food')  # returns 'Fast Food'
     """
     if not text:
         return ""
 
-    # Handle special cases and preserve existing formatting for known words
+    # Split on whitespace, underscore, or dash
     words = text.split()
-    formatted_words = []
+    if not words:
+        # Handle case where text is just separators
+        words = text.replace("_", " ").replace("-", " ").split()
 
+    # Capitalize each word
+    capitalized_words = []
     for word in words:
-        # Handle common prepositions and articles (keep lowercase)
-        if word.lower() in ["and", "or", "of", "the", "a", "an", "in", "on", "at", "to", "for"]:
-            formatted_words.append(word.lower())
+        # Handle separators within words
+        if "_" in word or "-" in word:
+            sub_words = word.replace("_", " ").replace("-", " ").split()
+            capitalized_sub_words = [w.capitalize() for w in sub_words if w]
+            capitalized_words.extend(capitalized_sub_words)
         else:
-            # Capitalize first letter, preserve rest
-            formatted_words.append(word.capitalize())
+            capitalized_words.append(word.capitalize())
 
-    # Always capitalize first word
-    if formatted_words:
-        formatted_words[0] = formatted_words[0].capitalize()
-
-    return " ".join(formatted_words)
+    return " ".join(capitalized_words)
 
 
-def validate_cuisine_input(cuisine_input: Optional[str]) -> tuple[bool, Optional[str], Optional[str]]:
+def get_cuisine_display_name(cuisine_type: Optional[str]) -> str:
     """
-    Validate and format cuisine input for database storage.
+    Get display name for a cuisine type with fallback formatting.
 
     Args:
-        cuisine_input: Raw cuisine input from user
+        cuisine_type: Raw cuisine type
 
     Returns:
-        Tuple of (is_valid, formatted_cuisine, error_message)
-
-    Examples:
-        validate_cuisine_input('mexican') -> (True, 'Mexican', None)
-        validate_cuisine_input('') -> (True, None, None)
-        validate_cuisine_input('x' * 101) -> (False, None, 'Cuisine type too long (max 100 characters)')
-    """
-    # Allow empty/None cuisine (optional field)
-    if not cuisine_input:
-        return True, None, None
-
-    # Check length bounds
-    if len(cuisine_input.strip()) > 100:
-        return False, None, "Cuisine type too long (max 100 characters)"
-
-    # Format the cuisine
-    formatted = format_cuisine_type(cuisine_input)
-
-    if formatted is None:
-        return False, None, "Invalid cuisine type format"
-
-    return True, formatted, None
-
-
-def sanitize_cuisine_for_storage(restaurant_data: dict) -> dict:
-    """
-    Sanitize cuisine data in restaurant dictionary before database storage.
-
-    Args:
-        restaurant_data: Dictionary containing restaurant data
-
-    Returns:
-        Dictionary with sanitized cuisine field
+        Display-ready cuisine name
 
     Example:
-        data = {'name': 'Test', 'cuisine': 'mexican'}
-        sanitize_cuisine_for_storage(data) -> {'name': 'Test', 'cuisine': 'Mexican'}
+        get_cuisine_display_name('mexican')  # returns 'Mexican'
+        get_cuisine_display_name('unknown')  # returns 'Unknown'
     """
-    if not isinstance(restaurant_data, dict):
-        return restaurant_data
+    if not cuisine_type:
+        return "Unknown"
 
-    # Make a copy to avoid modifying original
-    sanitized_data = restaurant_data.copy()
+    formatted = format_cuisine_type(cuisine_type)
+    return formatted if formatted else "Unknown"
 
-    if "cuisine" in sanitized_data:
-        formatted_cuisine = format_cuisine_type(sanitized_data["cuisine"])
-        sanitized_data["cuisine"] = formatted_cuisine
 
-    return sanitized_data
+def validate_cuisine_type(cuisine_type: Optional[str]) -> bool:
+    """
+    Validate if a cuisine type is recognized or can be formatted.
+
+    Args:
+        cuisine_type: Cuisine type to validate
+
+    Returns:
+        True if cuisine is valid or can be formatted, False otherwise
+
+    Example:
+        validate_cuisine_type('Italian')  # returns True
+        validate_cuisine_type('xyz123')  # returns False
+    """
+    if not cuisine_type:
+        return False
+
+    # Check if it's a known cuisine
+    if get_cuisine_data(cuisine_type):
+        return True
+
+    # Check if it can be formatted (basic validation)
+    formatted = format_cuisine_type(cuisine_type)
+    return bool(formatted and len(formatted.strip()) > 0)
+
+
+def get_available_cuisine_types() -> list[str]:
+    """
+    Get list of all available cuisine types.
+
+    Returns:
+        List of available cuisine type names
+
+    Example:
+        cuisines = get_available_cuisine_types()
+        print(cuisines[:3])  # ['Chinese', 'Italian', 'Japanese']
+    """
+    return get_cuisine_names()

@@ -7,15 +7,13 @@
  */
 
 import { initNotifications } from './utils/notifications.js';
-import { initExtensionErrorHandler, makeElementExtensionSafe } from './utils/extension-error-handler.js';
+import { EventHandlers } from './components/event-handlers.js';
+import { StyleReplacer } from './utils/style-replacer.js';
 
-// Extension error handling is now managed by extension-error-handler.js
-// Make extension safety utilities available globally
-window.makeElementExtensionSafe = makeElementExtensionSafe;
 
 // Enhanced page module loading with error handling
 const pageModules = {
-  '/restaurants/add': () => import('./pages/restaurant-form.js'),
+  // '/restaurants/add': () => import('./pages/restaurant-form.js'), // Removed - using simplified autocomplete
   '/restaurants/search': () => import('./pages/restaurant-search.js'),
   '/expenses': () => import('./pages/expense-list.js'),
   '/restaurants': () => import('./pages/restaurant-list.js'),
@@ -23,15 +21,22 @@ const pageModules = {
 
 // Initialize essential UI components directly
 function initUI() {
-  // Bootstrap tooltips
-  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
-    new bootstrap.Tooltip(el);
-  });
+  // Bootstrap tooltips - check if bootstrap is available
+  if (typeof bootstrap !== 'undefined') {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+      new bootstrap.Tooltip(el);
+    });
 
-  // Bootstrap popovers
-  document.querySelectorAll('[data-bs-toggle="popover"]').forEach((el) => {
-    new bootstrap.Popover(el, { html: true });
-  });
+    // Bootstrap popovers
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach((el) => {
+      new bootstrap.Popover(el, { html: true });
+    });
+
+    // Bootstrap dropdowns - Initialize manually for reliability
+    document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach((el) => {
+      new bootstrap.Dropdown(el);
+    });
+  }
 
   // Smooth scrolling for anchor links
   document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
@@ -68,6 +73,12 @@ async function init() {
 
     // Initialize enhanced toast notifications
     initNotifications();
+
+    // Initialize event handlers (replaces inline onclick handlers)
+    new EventHandlers();
+
+    // Initialize style replacer (replaces inline styles) - DISABLED BY DEFAULT
+    // Uncomment to enable: new StyleReplacer({ enabled: true, verbose: false });
 
     // Load page-specific modules
     await loadPageModule();

@@ -108,7 +108,7 @@ app/
 │   │   │   ├── dashboard.js        # Dashboard interactions
 │   │   │   └── restaurant-form.js  # Restaurant form management
 │   │   ├── services/               # API and external service integration
-│   │   │   └── google-places.js    # Google Places API service
+│   │   │   └── cuisine-service.js  # Cuisine data service
 │   │   └── utils/                  # Utility modules
 │   │       ├── core-utils.js       # Core utility functions
 │   │       ├── google-maps.js      # Google Maps integration

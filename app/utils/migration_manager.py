@@ -7,12 +7,13 @@ with data preservation and rollback capabilities.
 
 import logging
 import os
+import time
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from flask import current_app
 from sqlalchemy import inspect, text
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DisconnectionError, OperationalError
 
 from app.extensions import db
 
@@ -39,11 +40,16 @@ class MigrationManager:
     - Data preservation during schema changes
     - Migration state tracking
     - Environment-specific behavior
+    - Retry logic with exponential backoff
+    - Connection pooling and timeout handling
     """
 
     def __init__(self, app=None):
         self.app = app
         self._migration_state = MigrationState.PENDING
+        self._max_retries = 3
+        self._retry_delay = 1.0  # seconds
+        self._connection_timeout = 30  # seconds
 
     def init_app(self, app):
         """Initialize with Flask app."""
@@ -54,6 +60,41 @@ class MigrationManager:
         if self.app:
             return self.app.app_context()
         return current_app.app_context()
+
+    def _retry_with_backoff(self, func, *args, **kwargs):
+        """Execute function with exponential backoff retry logic."""
+        last_exception = None
+
+        for attempt in range(self._max_retries + 1):
+            try:
+                return func(*args, **kwargs)
+            except (OperationalError, DisconnectionError) as e:
+                last_exception = e
+                if attempt < self._max_retries:
+                    delay = self._retry_delay * (2**attempt)
+                    logger.warning(f"Database operation failed (attempt {attempt + 1}/{self._max_retries + 1}): {e}")
+                    logger.info(f"Retrying in {delay} seconds...")
+                    time.sleep(delay)
+                else:
+                    logger.error(f"Database operation failed after {self._max_retries + 1} attempts: {e}")
+            except Exception as e:
+                # Don't retry for non-database errors
+                logger.error(f"Non-retryable error: {e}")
+                raise e
+
+        # If we get here, all retries failed
+        raise last_exception
+
+    def _ensure_database_connection(self):
+        """Ensure database connection is available with timeout."""
+        try:
+            # Test connection with timeout
+            db.session.execute(text("SELECT 1"))
+            db.session.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Database connection test failed: {e}")
+            return False
 
     def _copy_migrations_to_writable_location(self) -> str:
         """Copy migrations to a writable location in Lambda."""
@@ -89,27 +130,34 @@ class MigrationManager:
             return None
 
     def _get_database_info(self) -> Dict[str, Any]:
-        """Get basic database information."""
-        inspector = inspect(db.engine)
-        existing_tables = inspector.get_table_names()
+        """Get basic database information with retry logic."""
 
-        has_alembic_version = "alembic_version" in existing_tables
-        has_main_tables = any(table in existing_tables for table in ["user", "restaurant", "expense"])
+        def _get_info():
+            inspector = inspect(db.engine)
+            existing_tables = inspector.get_table_names()
 
-        return {
-            "existing_tables": existing_tables,
-            "has_alembic_version": has_alembic_version,
-            "has_main_tables": has_main_tables,
-        }
+            has_alembic_version = "alembic_version" in existing_tables
+            has_main_tables = any(table in existing_tables for table in ["user", "restaurant", "expense"])
+
+            return {
+                "existing_tables": existing_tables,
+                "has_alembic_version": has_alembic_version,
+                "has_main_tables": has_main_tables,
+            }
+
+        return self._retry_with_backoff(_get_info)
 
     def _get_current_revision(self, has_alembic_version: bool) -> Optional[str]:
-        """Get current revision from alembic_version table."""
+        """Get current revision from alembic_version table with retry logic."""
         if not has_alembic_version:
             return None
 
-        try:
+        def _get_revision():
             result = db.session.execute(text("SELECT version_num FROM alembic_version"))
             return result.scalar()
+
+        try:
+            return self._retry_with_backoff(_get_revision)
         except Exception as e:
             logger.warning(f"Could not read alembic_version: {e}")
             return None
@@ -284,7 +332,7 @@ class MigrationManager:
 
     def run_migrations(self, dry_run: bool = False, target_revision: Optional[str] = None) -> Dict[str, Any]:
         """
-        Run database migrations safely.
+        Run database migrations safely with retry logic.
 
         Args:
             dry_run: If True, show what would be migrated without running
@@ -295,6 +343,14 @@ class MigrationManager:
         """
         with self._get_app_context():
             try:
+                # Ensure database connection before starting
+                if not self._ensure_database_connection():
+                    return {
+                        "success": False,
+                        "message": "Database connection not available",
+                        "error": "Connection test failed",
+                    }
+
                 # Check current state first
                 state_info = self.check_migration_state()
 
@@ -317,26 +373,31 @@ class MigrationManager:
                         "dry_run": True,
                     }
 
-                # Run the actual migration
-                from flask_migrate import current, upgrade
+                # Run the actual migration with retry logic
+                def _run_upgrade():
+                    from flask_migrate import current, upgrade
 
-                current_rev = current()
-                logger.info(f"Current revision before upgrade: {current_rev}")
+                    current_rev = current()
+                    logger.info(f"Current revision before upgrade: {current_rev}")
 
-                # Run upgrade
-                upgrade()
+                    # Run upgrade
+                    upgrade()
 
-                new_rev = current()
-                logger.info(f"New revision after upgrade: {new_rev}")
+                    new_rev = current()
+                    logger.info(f"New revision after upgrade: {new_rev}")
 
-                return {
-                    "success": True,
-                    "message": f"Database migrations completed successfully. Revision: {current_rev} → {new_rev}",
-                    "data": {
+                    return {
                         "previous_revision": current_rev,
                         "new_revision": new_rev,
                         "target_revision": target_revision,
-                    },
+                    }
+
+                migration_data = self._retry_with_backoff(_run_upgrade)
+
+                return {
+                    "success": True,
+                    "message": f"Database migrations completed successfully. Revision: {migration_data['previous_revision']} → {migration_data['new_revision']}",
+                    "data": migration_data,
                 }
 
             except Exception as e:
@@ -349,6 +410,8 @@ class MigrationManager:
                         "Table already exists. This usually means the database has tables "
                         "but no migration history. Try running with fix_history=True."
                     )
+                elif "connection" in error_msg.lower():
+                    error_msg = f"Database connection issue: {error_msg}"
 
                 return {"success": False, "message": f"Migration failed: {error_msg}", "error": str(e)}
 

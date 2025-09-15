@@ -16,7 +16,6 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from sqlalchemy import func
-from sqlalchemy.exc import SQLAlchemyError
 
 from app.auth.models import User
 from app.extensions import db
@@ -284,6 +283,52 @@ def toggle_user_active(user_id: int):
     except Exception as e:
         current_app.logger.error(f"Error toggling active status for user {user_id}: {e}")
         flash("Error updating active status", "danger")
+        return redirect(url_for("admin.view_user", user_id=user_id))
+
+
+@bp.route("/users/<int:user_id>/delete", methods=["POST"])
+@login_required
+@admin_required
+@db_transaction(success_message="User deleted successfully", error_message="Failed to delete user")
+def delete_user(user_id: int):
+    """Delete a user account and all related data."""
+    try:
+        user = User.query.get_or_404(user_id)
+
+        # Prevent admin from deleting themselves
+        if user.id == current_user.id:
+            flash("You cannot delete your own account", "warning")
+            return redirect(url_for("admin.view_user", user_id=user_id))
+
+        # Store user info for confirmation message
+        username = user.username
+        display_name = user.get_display_name()
+
+        # Count related data for confirmation message
+        related_counts = {
+            "expenses": user.expenses.count(),
+            "restaurants": user.restaurants.count(),
+            "categories": user.categories.count(),
+        }
+        total_related = sum(related_counts.values())
+
+        # Delete the user (cascade will handle related data)
+        db.session.delete(user)
+
+        # Prepare success message
+        if total_related > 0:
+            flash(
+                f"User '{display_name}' ({username}) and {total_related} related records deleted successfully",
+                "success",
+            )
+        else:
+            flash(f"User '{display_name}' ({username}) deleted successfully", "success")
+
+        return redirect(url_for("admin.list_users"))
+
+    except Exception as e:
+        current_app.logger.error(f"Error deleting user {user_id}: {e}")
+        flash("Error deleting user", "danger")
         return redirect(url_for("admin.view_user", user_id=user_id))
 
 

@@ -20,7 +20,16 @@ class DuplicateGooglePlaceIdError(RestaurantValidationError):
     def __init__(self, google_place_id: str, existing_restaurant: Restaurant):
         self.google_place_id = google_place_id
         self.existing_restaurant = existing_restaurant
-        message = f"A restaurant with Google Place ID '{google_place_id}' already exists"
+
+        # Create message that clearly identifies the real conflict (Google Place ID)
+        location_str = (
+            f"{existing_restaurant.city}, {existing_restaurant.state}"
+            if existing_restaurant.city and existing_restaurant.state
+            else existing_restaurant.city or "unknown location"
+        )
+        # Keep user-facing text clean: emphasize name and location, omit Google ID
+        message = f"A restaurant already exists: '{existing_restaurant.name}' — {location_str}"
+
         super().__init__(message, field="google_place_id")
 
     def to_dict(self) -> dict:
@@ -47,8 +56,14 @@ class DuplicateRestaurantError(RestaurantValidationError):
         self.city = city
         self.existing_restaurant = existing_restaurant
 
-        location_str = f" in {city}" if city else ""
-        message = f"Restaurant '{name}'{location_str} already exists"
+        # Create user-friendly message with restaurant name and location
+        location_str = (
+            f"{existing_restaurant.city}, {existing_restaurant.state}"
+            if existing_restaurant.city and existing_restaurant.state
+            else existing_restaurant.city or "unknown location"
+        )
+        message = f"A restaurant named '{name}' in {location_str} already exists"
+
         super().__init__(message, field="name")
 
     def to_dict(self) -> dict:

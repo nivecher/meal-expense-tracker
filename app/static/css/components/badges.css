@@ -1,0 +1,550 @@
+/**
+ * Unified Badge System for Meal Expense Tracker
+ *
+ * This file consolidates all badge styles (meal types, cuisines, order types, service levels)
+ * into a consistent, maintainable system following TIGER principles:
+ * - Safety: Bounded, validated styles with fallbacks
+ * - Performance: Efficient CSS with minimal specificity conflicts
+ * - Developer Experience: Clear naming, consistent sizing, easy to use
+ *
+ * Usage:
+ * - Base class: .badge-unified
+ * - Size variants: .badge-sm, .badge-md (default), .badge-lg
+ * - Type classes: .meal-type, .cuisine, .order-type, .service-level
+ * - Color classes: Auto-generated from constants
+ */
+
+/* ===== BASE BADGE STYLES ===== */
+
+.badge-unified {
+    /* Core layout */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+
+    /* Typography */
+    font-weight: 500;
+    text-decoration: none;
+    text-transform: capitalize;
+    white-space: nowrap;
+
+    /* Visual design */
+    border: 1px solid transparent;
+    border-radius: 0.375rem; /* 6px - consistent with design system */
+
+    /* Interactions */
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+
+    /* Default colors (will be overridden by specific badge types) */
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-color: #dee2e6;
+}
+
+/* Icon styling within badges */
+.badge-unified i {
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+/* ===== SIZE VARIANTS ===== */
+
+/* Small badges - for compact spaces like tables */
+.badge-unified.badge-sm {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.6875rem; /* 11px */
+    line-height: 1.2;
+    border-radius: 0.25rem; /* 4px */
+}
+
+.badge-unified.badge-sm i {
+    font-size: 0.625rem; /* 10px */
+}
+
+/* Medium badges - default size */
+.badge-unified.badge-md,
+.badge-unified {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem; /* 12px */
+    line-height: 1.3;
+    border-radius: 0.375rem; /* 6px */
+}
+
+.badge-unified.badge-md i,
+.badge-unified i {
+    font-size: 0.6875rem; /* 11px */
+}
+
+/* Large badges - for emphasis */
+.badge-unified.badge-lg {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem; /* 14px */
+    line-height: 1.4;
+    border-radius: 0.5rem; /* 8px */
+}
+
+.badge-unified.badge-lg i {
+    font-size: 0.8125rem; /* 13px */
+}
+
+/* ===== HOVER EFFECTS ===== */
+
+.badge-unified:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.badge-unified.badge-sm:hover {
+    transform: translateY(-0.5px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== MEAL TYPE BADGES ===== */
+
+/* Breakfast - Warm sunrise orange */
+.badge-unified.meal-type.breakfast {
+    background-color: #fed7aa;
+    color: #9a3412;
+    border-color: #f97316;
+}
+
+.badge-unified.meal-type.breakfast i {
+    color: #ea580c;
+}
+
+/* Brunch - Rich coral */
+.badge-unified.meal-type.brunch {
+    background-color: #fecaca;
+    color: #991b1b;
+    border-color: #ef4444;
+}
+
+.badge-unified.meal-type.brunch i {
+    color: #dc2626;
+}
+
+/* Lunch - Fresh green */
+.badge-unified.meal-type.lunch {
+    background-color: #dcfce7;
+    color: #166534;
+    border-color: #22c55e;
+}
+
+.badge-unified.meal-type.lunch i {
+    color: #15803d;
+}
+
+/* Dinner - Deep blue */
+.badge-unified.meal-type.dinner {
+    background-color: #dbeafe;
+    color: #1e3a8a;
+    border-color: #3b82f6;
+}
+
+.badge-unified.meal-type.dinner i {
+    color: #2563eb;
+}
+
+/* Late Night - Dark slate */
+.badge-unified.meal-type.late-night {
+    background-color: #e2e8f0;
+    color: #334155;
+    border-color: #64748b;
+}
+
+.badge-unified.meal-type.late-night i {
+    color: #475569;
+}
+
+/* Snacks - Warm amber */
+.badge-unified.meal-type.snacks {
+    background-color: #fde68a;
+    color: #a16207;
+    border-color: #eab308;
+}
+
+.badge-unified.meal-type.snacks i {
+    color: #ca8a04;
+}
+
+/* Drinks - Cool teal */
+.badge-unified.meal-type.drinks {
+    background-color: #cffafe;
+    color: #0f766e;
+    border-color: #06b6d4;
+}
+
+.badge-unified.meal-type.drinks i {
+    color: #0e7490;
+}
+
+/* Dessert - Sweet pink */
+.badge-unified.meal-type.dessert {
+    background-color: #fce7f3;
+    color: #be185d;
+    border-color: #ec4899;
+}
+
+.badge-unified.meal-type.dessert i {
+    color: #db2777;
+}
+
+/* Default meal type */
+.badge-unified.meal-type.meal-type-default {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-color: #dee2e6;
+}
+
+/* ===== CUISINE BADGES ===== */
+
+.badge-unified.cuisine {
+    /* Cuisine badges use CSS custom properties for dynamic colors */
+    background-color: var(--cuisine-color, #6c757d);
+    color: white;
+    border-color: var(--cuisine-color, #6c757d);
+}
+
+.badge-unified.cuisine i {
+    color: white;
+    opacity: 0.9;
+}
+
+/* Specific cuisine colors for better performance (no CSS variables) */
+.badge-unified.cuisine.american {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.badge-unified.cuisine.japanese {
+    background-color: #6f42c1;
+    border-color: #6f42c1;
+}
+
+.badge-unified.cuisine.italian {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+.badge-unified.cuisine.mexican {
+    background-color: #fd7e14;
+    border-color: #fd7e14;
+}
+
+.badge-unified.cuisine.chinese {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.badge-unified.cuisine.fast-food {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #212529;
+}
+
+.badge-unified.cuisine.fast-food i {
+    color: #212529;
+}
+
+.badge-unified.cuisine.pizza {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+/* Default cuisine */
+.badge-unified.cuisine.cuisine-default {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+/* ===== ORDER TYPE BADGES ===== */
+
+/* Dine-in - Blue */
+.badge-unified.order-type.dine-in {
+    background-color: #e3f2fd;
+    color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.badge-unified.order-type.dine-in i {
+    color: #0d6efd;
+}
+
+/* Takeout - Green */
+.badge-unified.order-type.takeout {
+    background-color: #e8f5e8;
+    color: #198754;
+    border-color: #198754;
+}
+
+.badge-unified.order-type.takeout i {
+    color: #198754;
+}
+
+/* Delivery - Orange */
+.badge-unified.order-type.delivery {
+    background-color: #fff3e0;
+    color: #fd7e14;
+    border-color: #fd7e14;
+}
+
+.badge-unified.order-type.delivery i {
+    color: #fd7e14;
+}
+
+/* Drive-thru - Purple */
+.badge-unified.order-type.drive-thru {
+    background-color: #f3e5f5;
+    color: #6f42c1;
+    border-color: #6f42c1;
+}
+
+.badge-unified.order-type.drive-thru i {
+    color: #6f42c1;
+}
+
+/* Catering - Teal */
+.badge-unified.order-type.catering {
+    background-color: #e0f2f1;
+    color: #20c997;
+    border-color: #20c997;
+}
+
+.badge-unified.order-type.catering i {
+    color: #20c997;
+}
+
+/* Other - Gray */
+.badge-unified.order-type.other,
+.badge-unified.order-type.order-type-default {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-color: #6c757d;
+}
+
+/* ===== SERVICE LEVEL BADGES ===== */
+
+/* Fine Dining - Red */
+.badge-unified.service-level.fine-dining {
+    background-color: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+.badge-unified.service-level.fine-dining:hover {
+    background-color: #c82333;
+    border-color: #c82333;
+}
+
+/* Casual Dining - Orange */
+.badge-unified.service-level.casual-dining {
+    background-color: #fd7e14;
+    color: white;
+    border-color: #fd7e14;
+}
+
+.badge-unified.service-level.casual-dining:hover {
+    background-color: #e8690b;
+    border-color: #e8690b;
+}
+
+/* Fast Casual - Green */
+.badge-unified.service-level.fast-casual {
+    background-color: #198754;
+    color: white;
+    border-color: #198754;
+}
+
+.badge-unified.service-level.fast-casual:hover {
+    background-color: #157347;
+    border-color: #157347;
+}
+
+/* Quick Service - Yellow */
+.badge-unified.service-level.quick-service {
+    background-color: #ffc107;
+    color: #212529;
+    border-color: #ffc107;
+}
+
+.badge-unified.service-level.quick-service:hover {
+    background-color: #e0a800;
+    border-color: #e0a800;
+}
+
+/* Default service level */
+.badge-unified.service-level.service-level-default {
+    background-color: #6c757d;
+    color: white;
+    border-color: #6c757d;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+
+/* Mobile adjustments */
+@media (max-width: 576px) {
+    .badge-unified.badge-lg {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    .badge-unified.badge-lg i {
+        font-size: 0.6875rem;
+    }
+}
+
+/* ===== ACCESSIBILITY ===== */
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .badge-unified {
+        border-width: 2px;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .badge-unified {
+        transition: none;
+    }
+
+    .badge-unified:hover {
+        transform: none;
+    }
+}
+
+/* ===== DARK MODE SUPPORT ===== */
+
+@media (prefers-color-scheme: dark) {
+    .badge-unified.meal-type.breakfast {
+        background-color: #9a3412;
+        color: #fed7aa;
+        border-color: #ea580c;
+    }
+
+    .badge-unified.meal-type.breakfast i {
+        color: #fed7aa;
+    }
+
+    .badge-unified.meal-type.lunch {
+        background-color: #166534;
+        color: #dcfce7;
+        border-color: #15803d;
+    }
+
+    .badge-unified.meal-type.lunch i {
+        color: #dcfce7;
+    }
+
+    .badge-unified.meal-type.dinner {
+        background-color: #1e3a8a;
+        color: #dbeafe;
+        border-color: #2563eb;
+    }
+
+    .badge-unified.meal-type.dinner i {
+        color: #dbeafe;
+    }
+
+    /* Default badge in dark mode */
+    .badge-unified {
+        background-color: #495057;
+        color: #f8f9fa;
+        border-color: #6c757d;
+    }
+}
+
+/* ===== LEGACY COMPATIBILITY ===== */
+
+/* Support for existing class names during migration */
+.meal-type-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    font-weight: 500;
+    text-decoration: none;
+    text-transform: capitalize;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-color: #dee2e6;
+}
+
+.cuisine-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    font-weight: 500;
+    text-decoration: none;
+    text-transform: capitalize;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+    background-color: var(--cuisine-color, #6c757d);
+    color: white;
+    border-color: var(--cuisine-color, #6c757d);
+}
+
+.order-type-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    font-weight: 500;
+    text-decoration: none;
+    text-transform: capitalize;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-color: #dee2e6;
+}
+
+.service-level-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    font-weight: 500;
+    text-decoration: none;
+    text-transform: capitalize;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border-color: #dee2e6;
+}
+
+/* Compact variants */
+.meal-type-badge.compact,
+.cuisine-badge.compact,
+.order-type-badge.compact,
+.service-level-badge.compact {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    border-radius: 0.25rem;
+}
+
+.meal-type-badge.compact i,
+.cuisine-badge.compact i,
+.order-type-badge.compact i,
+.service-level-badge.compact i {
+    font-size: 0.625rem;
+}

@@ -16,6 +16,7 @@ def test_create_restaurant(session, test_user):
         phone="123-456-7890",
         website="http://test.com",
         cuisine="American",
+        type="restaurant",  # Add required field
     )
 
     session.add(restaurant)
@@ -34,7 +35,7 @@ def test_restaurant_required_fields(session, test_user):
     """Test that required fields are enforced."""
     # Missing name
     with pytest.raises(IntegrityError):
-        restaurant = Restaurant(user_id=test_user.id, city="Test City")
+        restaurant = Restaurant(user_id=test_user.id, city="Test City", type="restaurant")
         session.add(restaurant)
         session.commit()
 
@@ -42,7 +43,7 @@ def test_restaurant_required_fields(session, test_user):
 
     # Missing user_id
     with pytest.raises(IntegrityError):
-        restaurant = Restaurant(name="Test Restaurant", city="Test City")
+        restaurant = Restaurant(name="Test Restaurant", city="Test City", type="restaurant")
         session.add(restaurant)
         session.commit()
 
@@ -54,6 +55,7 @@ def test_restaurant_uniqueness(session, test_user):
         user_id=test_user.id,
         name="Test Restaurant",
         city="Test City",
+        type="restaurant",  # Add required field
     )
     session.add(restaurant1)
     session.commit()
@@ -64,6 +66,7 @@ def test_restaurant_uniqueness(session, test_user):
             user_id=test_user.id,
             name="Test Restaurant",
             city="Test City",
+            type="restaurant",  # Add required field
         )
         session.add(restaurant2)
         session.commit()
@@ -75,6 +78,7 @@ def test_restaurant_uniqueness(session, test_user):
         user_id=test_user.id,
         name="Different Restaurant",
         city="Test City",
+        type="restaurant",  # Add required field
     )
     session.add(restaurant3)
     session.commit()

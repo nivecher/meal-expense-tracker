@@ -132,7 +132,7 @@ class TagManager {
                 container.innerHTML = '';
                 tags.forEach(tag => {
                     const tagElement = document.createElement('span');
-                    tagElement.className = 'tag-badge tag-editable';
+                    tagElement.className = 'tag-badge tag-editable tag-badge-pretty';
                     tagElement.setAttribute('data-tag-id', tag.id);
                     tagElement.setAttribute('data-tag-name', tag.name);
                     tagElement.setAttribute('data-tag-color', tag.color);
@@ -330,5 +330,5 @@ if (document.readyState === 'loading') {
     window.tagManager.init();
 }
 
-// Export for module usage
-export default TagManager;
+// Make TagManager available globally
+window.TagManager = TagManager;

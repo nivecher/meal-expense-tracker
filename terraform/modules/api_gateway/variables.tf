@@ -76,3 +76,28 @@ variable "lambda_function_name" {
   type        = string
   default     = null
 }
+
+# CORS Configuration
+variable "api_cors_allow_origins" {
+  description = "List of allowed origins for CORS"
+  type        = list(string)
+  default     = ["*"]
+}
+
+variable "api_cors_allow_credentials" {
+  description = "Whether to allow credentials in CORS requests"
+  type        = bool
+  default     = false
+}
+
+variable "api_cors_allow_headers" {
+  description = "List of allowed headers for CORS"
+  type        = list(string)
+  default     = ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "Cache-Control", "X-CSRFToken"]
+}
+
+variable "api_cors_expose_headers" {
+  description = "List of headers to expose to JavaScript"
+  type        = list(string)
+  default     = ["Content-Length", "Content-Type", "X-CSRFToken", "Set-Cookie", "Location"]
+}

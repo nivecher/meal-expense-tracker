@@ -38,27 +38,14 @@ endblock title %} {% block content %}
                     <div id="alert-container">
                         <!-- Flash messages now handled by base template -->
                     </div>
-                    {% if is_edit and debug %}
-                    <div class="card mb-4">
-                        <div class="card-header bg-light">
-                            <h5 class="mb-0">Debug Information</h5>
-                        </div>
-                        <div class="card-body">
-                            <h6>Available Categories:</h6>
-                            <pre>{{ categories|map(attribute='name')|list|tojson(indent=2) }}</pre>
-                            <h6>Expense Data:</h6>
-                            <pre>Category ID: {{ expense.category_id }}</pre>
-                            <h6>Form Category Choices:</h6>
-                            <pre>{{ form.category_id.choices|tojson(indent=2) }}</pre>
-                            <h6>Form Category Data:</h6>
-                            <pre>{{ form.category_id.data }}</pre>
-                        </div>
-                    </div>
-                    {% endif %} {{ expense_form(form=form, expense=expense, is_edit=is_edit) }}
+ {{ expense_form(form=form, expense=expense, is_edit=is_edit) }}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Include Tag Management Modal -->
+{% include 'components/tag_editor_modal.html' %}
 
 {% endblock content %} {% block scripts %} {{ super() }} {{ expense_scripts() }} {% endblock scripts %}

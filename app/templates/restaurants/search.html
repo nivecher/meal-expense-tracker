@@ -98,16 +98,26 @@
                                     </td>
                                     <td>
                                         {% if restaurant.cuisine %}
-                                        <span class="cuisine-badge" data-cuisine="{{ restaurant.cuisine }}">
-                                            <span class="badge bg-light text-dark">{{ restaurant.cuisine }}</span>
-                                        </span>
+                                        {% from 'macros/badge_helpers.html' import cuisine_badge %}
+                                        {{ cuisine_badge(restaurant.cuisine, size='sm') }}
                                         {% else %}
                                         N/A
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if restaurant.city %} {{ restaurant.city }} {% if restaurant.state %}, {{
-                                        restaurant.state }}{% endif %} {% else %} N/A {% endif %}
+                                        <div class="d-flex align-items-start">
+                                            <i class="fas fa-map-marker-alt me-2 mt-1 flex-shrink-0 text-muted"></i>
+                                            <div class="flex-grow-1">
+                                                {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %}
+                                                    {% if restaurant.address %}<div class="small text-muted">{{ restaurant.address }}</div>{% endif %}
+                                                    {% if restaurant.city or restaurant.state or restaurant.postal_code %}
+                                                        <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="text-muted">N/A</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="text-end">
                                         <div
@@ -158,13 +168,27 @@
 </div>
 {% endblock content %} {% block scripts %} {{ super() }}
 <script>
-    // Initialize Google Maps API key if it's not already set
-    if (!window.GOOGLE_MAPS_API_KEY && "{{ google_maps_api_key }}") {
-        window.GOOGLE_MAPS_API_KEY = "{{ google_maps_api_key }}";
+// Auto-submit form when select values change
+document.addEventListener('DOMContentLoaded', function() {
+    // Cookie utility function
+    function setCookie(name, value, days = 365) {
+        const expires = new Date();
+        expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
     }
+
+    const form = document.querySelector('form');
+    if (form) {
+        form.querySelectorAll('select').forEach((select) => {
+            select.addEventListener('change', () => {
+                // Save page size preference to cookie if it's the per_page selector
+                if (select.name === 'per_page') {
+                    setCookie('restaurant_page_size', select.value);
+                }
+                form.submit();
+            });
+        });
+    }
+});
 </script>
-<script src="{{ url_for('static', filename='js/components/search-form.js' ) }}" defer></script>
-<script src="{{ url_for('static', filename='js/components/search.js' ) }}" defer></script>
-<!-- Cuisine badge component for restaurant displays -->
-<script type="module" src="{{ url_for('static', filename='js/components/cuisine-badge.js') }}"></script>
 {% endblock scripts %}

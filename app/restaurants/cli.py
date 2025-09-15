@@ -76,7 +76,6 @@ def _get_restaurants_without_google_id(
 
 def _update_service_levels_for_restaurants(restaurants: list[Restaurant], dry_run: bool) -> int:
     """Update service levels for restaurants using backend logic."""
-    from app.restaurants.services import detect_service_level_from_google_data
 
     fixed_count = 0
 
@@ -112,78 +111,11 @@ def _update_service_levels_for_restaurants(restaurants: list[Restaurant], dry_ru
 
 
 def _suggest_service_level_from_restaurant_data(restaurant: Restaurant) -> str | None:
-    """Suggest service level based on available restaurant data."""
-    name_lower = restaurant.name.lower()
+    """Suggest service level using centralized detection logic."""
+    from app.utils.service_level_detector import detect_service_level_from_name
 
-    # Quick service indicators
-    quick_service_keywords = [
-        "mcdonald",
-        "burger king",
-        "wendy",
-        "subway",
-        "kfc",
-        "taco bell",
-        "pizza hut",
-        "domino",
-        "chipotle",
-        "starbucks",
-        "dunkin",
-        "pizza",
-        "burger",
-        "sandwich",
-        "coffee",
-        "ice cream",
-        "donut",
-        "bakery",
-    ]
-
-    # Fast casual indicators
-    fast_casual_keywords = [
-        "panera",
-        "chipotle",
-        "qdoba",
-        "moe",
-        "noodles",
-        "panda express",
-        "five guys",
-        "shake shack",
-        "in-n-out",
-        "whataburger",
-    ]
-
-    # Fine dining indicators
-    fine_dining_keywords = [
-        "steakhouse",
-        "grill",
-        "bistro",
-        "cafe",
-        "restaurant",
-        "dining",
-        "kitchen",
-        "table",
-        "chef",
-        "gourmet",
-        "fine",
-        "upscale",
-    ]
-
-    # Check for quick service
-    for keyword in quick_service_keywords:
-        if keyword in name_lower:
-            return "quick_service"
-
-    # Check for fast casual
-    for keyword in fast_casual_keywords:
-        if keyword in name_lower:
-            return "fast_casual"
-
-    # Check for fine dining
-    for keyword in fine_dining_keywords:
-        if keyword in name_lower:
-            return "fine_dining"
-
-    # Default to casual dining if no specific indicators found
-    return "casual_dining"
+    detected_level = detect_service_level_from_name(restaurant.name)
+    return detected_level.value
 
 
 def _get_target_users(user_id: int | None, username: str | None, all_users: bool) -> list[User]:

@@ -21,96 +21,59 @@ from app.extensions import db
 from .forms import ChangePasswordForm, LoginForm, RegistrationForm
 
 
-def _handle_login_failure():
-    """Handle login failure for both AJAX and regular requests."""
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "message": "Invalid username or password",
-                    "errors": {"form": ["Invalid username or password"]},
-                }
-            ),
-            400,
-        )
-
-    flash("Invalid username or password", "error")
-    return redirect(url_for("auth.login", next=request.args.get("next")))
-
-
-def _handle_login_success(user, next_page):
-    """Handle successful login for both AJAX and regular requests."""
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify(
-            {
-                "success": True,
-                "message": "Logged in successfully",
-                "redirect": next_page,
-                "user": {"id": user.id, "username": user.username, "email": user.email},
-            }
-        )
-
-    return redirect(next_page)
-
-
-def _handle_form_validation_errors(form):
-    """Handle form validation errors for AJAX requests."""
-    if request.method == "POST" and request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        errors = {}
-        if form.errors:
-            for field, error_list in form.errors.items():
-                errors[field] = error_list
-
-        return jsonify({"success": False, "message": "Please correct the errors below", "errors": errors}), 400
-    return None
-
-
 @bp.route("/login", methods=["GET", "POST"])
 def login():
-    """Handle user login.
-
-    GET: Display the login form
-    POST: Process login form submission
-    """
-    # If user is already logged in, redirect to the next page or home
+    """Handle user login with standard Flask-Login patterns."""
+    # If user is already logged in, redirect to next page or home
     if current_user.is_authenticated:
         next_page = request.args.get("next")
-        if not next_page or not next_page.startswith("/"):
+        if not next_page:
+            next_page = url_for("main.index")
+        elif next_page.startswith("http"):
+            # Extract path from full URL for security
+            from urllib.parse import urlparse
+
+            parsed = urlparse(next_page)
+            next_page = parsed.path or url_for("main.index")
+        elif not next_page.startswith("/"):
             next_page = url_for("main.index")
         return redirect(next_page)
 
     form = LoginForm()
 
-    # Debug logging for form validation issues
-    current_app.logger.info(
-        f"Login attempt - Method: {request.method}, CSRF enabled: {current_app.config.get('WTF_CSRF_ENABLED', True)}"
-    )
-    if request.method == "POST":
-        current_app.logger.info(
-            f"Form data received: username={form.username.data}, remember_me={form.remember_me.data}"
-        )
-        current_app.logger.info(f"Form validation errors: {form.errors}")
-        current_app.logger.info(f"Form validate_on_submit: {form.validate_on_submit()}")
-
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
-        if user is None or not user.check_password(form.password.data):
-            return _handle_login_failure()
 
-        login_user(user, remember=form.remember_me.data)
+        if user and user.check_password(form.password.data):
+            login_user(user, remember=form.remember_me.data)
 
-        # Handle the 'next' parameter for redirection after login
-        next_page = request.args.get("next")
-        if not next_page or not next_page.startswith("/"):
-            next_page = url_for("main.index")
+            # Handle redirect after login
+            next_page = request.form.get("next") or request.args.get("next")
+            if not next_page:
+                next_page = url_for("main.index")
+            elif next_page.startswith("http"):
+                # Extract path from full URL for security
+                from urllib.parse import urlparse
 
-        return _handle_login_success(user, next_page)
+                parsed = urlparse(next_page)
+                next_page = parsed.path or url_for("main.index")
+            elif not next_page.startswith("/"):
+                next_page = url_for("main.index")
 
-    # Handle AJAX validation errors
-    validation_response = _handle_form_validation_errors(form)
-    if validation_response:
-        return validation_response
+            flash("Login successful!", "success")
+            # Ensure session is properly saved before redirect (important for Lambda/API Gateway)
+            from flask import session
+
+            session.permanent = True
+
+            # Regenerate CSRF token after login for security (important for Lambda/API Gateway)
+            from flask_wtf.csrf import generate_csrf
+
+            session["_csrf_token"] = generate_csrf()
+
+            return redirect(next_page)
+        else:
+            flash("Invalid username or password", "error")
 
     return render_template("auth/login.html", form=form, title="Login", now=datetime.now(timezone.utc))
 
@@ -161,46 +124,72 @@ def change_password():
     )
 
 
+def _handle_timezone_update():
+    """Handle timezone-only update via AJAX."""
+    new_timezone = request.form.get("timezone", "UTC").strip()
+
+    # Validate timezone
+    if new_timezone not in pytz.all_timezones:
+        new_timezone = "UTC"
+
+    current_user.timezone = new_timezone
+    db.session.commit()
+
+    current_app.logger.info(f"Timezone updated for user {current_user.id}: {new_timezone}")
+    return jsonify({"success": True, "message": "Timezone updated successfully"})
+
+
+def _handle_regular_profile_update():
+    """Handle regular profile update."""
+    current_user.first_name = request.form.get("first_name", "").strip() or None
+    current_user.last_name = request.form.get("last_name", "").strip() or None
+    current_user.display_name = request.form.get("display_name", "").strip() or None
+    current_user.bio = request.form.get("bio", "").strip() or None
+    current_user.phone = request.form.get("phone", "").strip() or None
+    current_user.timezone = request.form.get("timezone", "UTC").strip()
+    current_user.avatar_url = request.form.get("avatar_url", "").strip() or None
+
+    # Basic validation
+    if current_user.phone and len(current_user.phone) > 20:
+        flash("Phone number is too long (max 20 characters)", "error")
+        return redirect(url_for("auth.profile"))
+
+    if current_user.bio and len(current_user.bio) > 500:
+        flash("Bio is too long (max 500 characters)", "error")
+        return redirect(url_for("auth.profile"))
+
+    # Validate avatar URL if provided
+    if current_user.avatar_url and len(current_user.avatar_url) > 255:
+        flash("Avatar URL is too long (max 255 characters)", "error")
+        return redirect(url_for("auth.profile"))
+
+    # Validate timezone
+    if current_user.timezone not in pytz.all_timezones:
+        current_user.timezone = "UTC"
+        flash("Invalid timezone, defaulted to UTC", "warning")
+
+    db.session.commit()
+    flash("Profile updated successfully!", "success")
+    return redirect(url_for("auth.profile"))
+
+
 @bp.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
     """User profile management page."""
     if request.method == "POST":
         try:
-            # Update profile fields
-            current_user.first_name = request.form.get("first_name", "").strip() or None
-            current_user.last_name = request.form.get("last_name", "").strip() or None
-            current_user.display_name = request.form.get("display_name", "").strip() or None
-            current_user.bio = request.form.get("bio", "").strip() or None
-            current_user.phone = request.form.get("phone", "").strip() or None
-            current_user.timezone = request.form.get("timezone", "UTC").strip()
-            current_user.avatar_url = request.form.get("avatar_url", "").strip() or None
+            # Check if this is a timezone-only update (AJAX)
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest" and "timezone" in request.form:
+                return _handle_timezone_update()
 
-            # Basic validation
-            if current_user.phone and len(current_user.phone) > 20:
-                flash("Phone number is too long (max 20 characters)", "error")
-                return redirect(url_for("auth.profile"))
-
-            if current_user.bio and len(current_user.bio) > 500:
-                flash("Bio is too long (max 500 characters)", "error")
-                return redirect(url_for("auth.profile"))
-
-            # Validate avatar URL if provided
-            if current_user.avatar_url and len(current_user.avatar_url) > 255:
-                flash("Avatar URL is too long (max 255 characters)", "error")
-                return redirect(url_for("auth.profile"))
-
-            # Validate timezone
-            if current_user.timezone not in pytz.all_timezones:
-                current_user.timezone = "UTC"
-                flash("Invalid timezone, defaulted to UTC", "warning")
-
-            db.session.commit()
-            flash("Profile updated successfully!", "success")
-            return redirect(url_for("auth.profile"))
+            # Regular profile update
+            return _handle_regular_profile_update()
 
         except Exception as e:
             db.session.rollback()
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": False, "message": "Failed to update timezone"}), 500
             flash("Failed to update profile. Please try again.", "error")
             current_app.logger.error(f"Profile update failed for user {current_user.id}: {e}")
             return redirect(url_for("auth.profile"))
@@ -220,10 +209,23 @@ def profile():
         "Australia/Sydney",
     ]
 
+    # Get current time in user's timezone for the sanity check
+    from app.utils.timezone_utils import (
+        format_current_time_for_user,
+        get_timezone_display_name,
+    )
+
+    # Use the user's timezone, fall back to UTC if None/empty
+    user_timezone = current_user.timezone if current_user.timezone else "UTC"
+    current_time_user_tz = format_current_time_for_user(user_timezone, "%B %d, %Y at %I:%M:%S %p")
+    timezone_display = get_timezone_display_name(user_timezone)
+
     return render_template(
         "auth/profile.html",
         title="Profile",
         now=datetime.now(timezone.utc),
+        current_time_user_tz=current_time_user_tz,
+        timezone_display=timezone_display,
         common_timezones=common_timezones,
         all_timezones=sorted(pytz.all_timezones),
     )

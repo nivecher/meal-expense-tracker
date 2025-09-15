@@ -24,11 +24,16 @@ Flask SQLAlchemy 2.0 syntax should be used.
 
 Google Maps API Integration:
 
-- Use smart API detection with modern APIs when available, fallback to legacy APIs when needed
-- Prefer google.maps.places.Place.searchByText() over PlacesService.nearbySearch()
-- Use googlePlacesService abstraction layer for all Google Places operations
-- Support both modern (Place, PlaceAutocompleteElement, AutocompleteSuggestion) and legacy (PlacesService, AutocompleteService) APIs
-- Ensure graceful degradation and no deprecation warnings
+**See `.windsurf/rules/google-api-standards.md` for comprehensive Google API standards.**
+
+**Core Requirements:**
+
+- Use ONLY modern Google Places APIs - no legacy fallbacks
+- Use google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions() for autocomplete
+- Use google.maps.places.Place.fetchFields() for place details
+- NO deprecated APIs: AutocompleteService, PlacesService, or Autocomplete constructor
+- Keep it simple: direct API calls, minimal abstraction layers
+- Zero deprecation warnings - use latest stable APIs only
 
 Avoid putting embedded JavaScript in html templates. Include js files instead.
 

@@ -3,7 +3,9 @@
 import csv
 import io
 import json
+import re
 
+import requests
 from flask import (
     abort,
     current_app,
@@ -36,13 +38,751 @@ PER_PAGE = 10  # Number of restaurants per page
 SHOW_ALL = -1  # Special value to show all restaurants
 
 
+def _get_page_size_from_cookie(cookie_name="restaurant_page_size", default_size=PER_PAGE):
+    """Get page size from cookie with validation and fallback."""
+    try:
+        cookie_value = request.cookies.get(cookie_name)
+        if cookie_value:
+            page_size = int(cookie_value)
+            # Validate page size is in allowed values
+            if page_size in [10, 25, 50, 100, SHOW_ALL]:
+                return page_size
+    except (ValueError, TypeError):
+        pass
+    return default_size
+
+
+def _extract_location_from_query(query):
+    """Extract location information from search query.
+
+    Examples:
+    - "McDonald's Dallas, TX" -> ("McDonald's", "Dallas, TX")
+    - "Pizza near Austin" -> ("Pizza", "Austin")
+    - "Starbucks" -> ("Starbucks", None)
+    """
+    import re
+
+    # Pattern for explicit location indicators
+    location_patterns = [
+        r"(.+?)\s+in\s+(.+)$",  # "McDonald's in Dallas, TX"
+        r"(.+?)\s+near\s+(.+)$",  # "Pizza near Austin"
+        r"(.+?)\s+at\s+(.+)$",  # "Starbucks at Dallas"
+        r"(.+?)\s+(.+?,\s*[A-Z]{2})$",  # "McDonald's Dallas, TX"
+        r"(.+?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,?\s*[A-Z]{2,})$",  # "McDonald's Dallas TX"
+    ]
+
+    for pattern in location_patterns:
+        match = re.match(pattern, query.strip(), re.IGNORECASE)
+        if match:
+            business_name = match.group(1).strip()
+            location = match.group(2).strip()
+            return business_name, location
+
+    return query.strip(), None
+
+
+def _get_regional_bias_from_request():
+    """Get regional bias for Google Places API from request headers or configuration.
+
+    Returns:
+        str: Country code for regional bias (e.g., 'us', 'ca', 'uk')
+    """
+    # For now, default to 'us' since this is a US-focused app
+    # In the future, this could be enhanced with:
+    # - IP geolocation lookup
+    # - User profile settings
+    # - Accept-Language header parsing
+    return "us"
+
+
+def _build_search_params(query, cuisine, lat, lng, radius_miles, api_key):
+    """Build search parameters for Google Places API with smart location handling."""
+    # Extract location from query if present
+    business_query, extracted_location = _extract_location_from_query(query)
+
+    if extracted_location:
+        current_app.logger.info(f"Extracted location from query: '{business_query}' + '{extracted_location}'")
+
+    # Build the search query
+    search_query = business_query
+    if cuisine:
+        search_query += f" {cuisine} restaurant"
+
+    # Add extracted location to search query for better results
+    if extracted_location:
+        search_query += f" {extracted_location}"
+
+    if lat and lng:
+        # Explicit location provided - use nearby search
+        radius_meters = float(radius_miles) * 1609.34
+        url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+        params = {
+            "location": f"{lat},{lng}",
+            "radius": min(radius_meters, 50000),
+            "key": api_key,
+        }
+        # Use keyword search instead of type restriction for broader results
+        # This includes restaurants, cafes, food trucks, drink shops, etc.
+        if search_query and search_query.strip() != "restaurants":
+            params["keyword"] = search_query
+        else:
+            # If no specific query, search for food-related businesses
+            params["keyword"] = "food restaurant cafe bar"
+    else:
+        # No explicit location - use text search with location bias
+        url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+        params = {
+            "query": search_query,
+            "key": api_key,
+        }
+
+        # Add location bias if we extracted a location from the query
+        if extracted_location:
+            # Use text search with location in query for best results
+            params["query"] = search_query
+        else:
+            # For generic searches without location, try to add regional bias
+            # This helps prioritize nearby results without requiring exact location
+            region_bias = _get_regional_bias_from_request()
+            if region_bias:
+                params["region"] = region_bias
+
+    return url, params
+
+
+def _build_photo_urls(photos, api_key):
+    """Build photo URLs from Google Places photo references."""
+    photo_list = []
+    if photos:
+        for photo in photos[:3]:
+            photo_list.append(
+                {
+                    "photo_reference": photo.get("photo_reference"),
+                    "url": f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference={photo.get('photo_reference')}&key={api_key}",
+                }
+            )
+    return photo_list
+
+
+def _build_reviews_summary(reviews):
+    """Build reviews summary from Google Places reviews."""
+    reviews_list = []
+    if reviews:
+        for review in reviews[:3]:
+            text = review.get("text", "")
+            truncated_text = text[:200] + "..." if len(text) > 200 else text
+            reviews_list.append(
+                {
+                    "author_name": review.get("author_name"),
+                    "rating": review.get("rating"),
+                    "text": truncated_text,
+                    "time": review.get("time"),
+                }
+            )
+    return reviews_list
+
+
+def _get_place_details(place_id, api_key):
+    """Get detailed place information including address_components."""
+    if not place_id:
+        return None
+
+    try:
+        url = "https://maps.googleapis.com/maps/api/place/details/json"
+        params = {
+            "place_id": place_id,
+            "fields": "name,formatted_address,formatted_phone_number,website,rating,types,address_components,opening_hours,price_level,reviews,photos,geometry,vicinity,user_ratings_total,business_status",
+            "key": api_key,
+        }
+
+        response = requests.get(url, params=params, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("status") == "OK":
+            result = data.get("result", {})
+            current_app.logger.info(
+                f"Successfully fetched place details for {place_id}: name={result.get('name')}, place_id={result.get('place_id')}"
+            )
+            current_app.logger.info(f"Place details result keys: {list(result.keys())}")
+            return result
+        else:
+            current_app.logger.warning(f"Failed to get place details for {place_id}: {data.get('status')}")
+            return None
+
+    except Exception as e:
+        current_app.logger.error(f"Error fetching place details for {place_id}: {e}")
+        return None
+
+
+def _process_place_data(place, api_key):
+    """Process individual place data from Google Places API."""
+    # Parse address components to extract structured address data
+    address_data = parse_address_components(place.get("address_components", []))
+
+    # Debug: Log place data to see what fields are available
+    current_app.logger.info(f"Processing place data: place_id={place.get('place_id')}, name={place.get('name')}")
+    current_app.logger.info(f"Place object keys: {list(place.keys())}")
+
+    # Try different possible field names for place_id
+    place_id = place.get("place_id") or place.get("placeId") or place.get("id")
+    current_app.logger.info(f"Resolved place_id: {place_id}")
+
+    return {
+        "place_id": place_id,
+        "name": place.get("name", "Unknown"),
+        "formatted_address": place.get("formatted_address", ""),
+        "vicinity": place.get("vicinity", ""),
+        # Structured address data
+        "address": address_data.get("street_address"),
+        "city": address_data.get("city"),
+        "state": address_data.get("state"),
+        "postal_code": address_data.get("postal_code"),
+        "country": address_data.get("country"),
+        "address_components": place.get("address_components", []),
+        "rating": place.get("rating"),
+        "user_ratings_total": place.get("user_ratings_total"),
+        "price_level": place.get("price_level"),
+        "business_status": place.get("business_status"),
+        "types": place.get("types", []),
+        "geometry": place.get("geometry"),
+        "photos": _build_photo_urls(place.get("photos"), api_key),
+        "reviews": _build_reviews_summary(place.get("reviews")),
+        "opening_hours": place.get("opening_hours", {}),
+        "website": place.get("website"),
+        "formatted_phone_number": place.get("formatted_phone_number"),
+    }
+
+
+def _validate_search_params():
+    """Validate search parameters and return error response if invalid."""
+    query = request.args.get("query", "")
+    if not query:
+        return None, jsonify({"error": "Query parameter is required"}), 400
+
+    api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
+    if not api_key:
+        return None, jsonify({"error": "Google Maps API key not configured"}), 500
+
+    return (
+        {
+            "query": query,
+            "lat": request.args.get("lat"),
+            "lng": request.args.get("lng"),
+            "radius_miles": request.args.get("radius_miles", "5"),
+            "cuisine": request.args.get("cuisine", ""),
+            "min_rating": request.args.get("minRating"),
+            "max_price_level": request.args.get("maxPriceLevel"),
+            "max_results": int(request.args.get("maxResults", "20")),
+            "api_key": api_key,
+        },
+        None,
+        None,
+    )
+
+
+def _filter_place_by_criteria(place, min_rating, max_price_level):
+    """Filter place based on rating and price level criteria."""
+    if min_rating and place.get("rating", 0) < float(min_rating):
+        return False
+    if max_price_level and place.get("price_level", 0) > int(max_price_level):
+        return False
+    return True
+
+
+def _process_search_result_place(place, api_key):
+    """Process a single place from search results."""
+    # Debug: Log the raw place data from search results
+    current_app.logger.info(f"Raw place from search: place_id={place.get('place_id')}, name={place.get('name')}")
+
+    # Get detailed information including address_components
+    place_id = place.get("place_id")
+    if not place_id:
+        current_app.logger.warning(f"Place has no place_id, skipping: {place.get('name')}")
+        return None
+
+    detailed_place = _get_place_details(place_id, api_key)
+    if detailed_place:
+        # Preserve the original place_id from search results
+        detailed_place["place_id"] = place_id
+        return _process_place_data(detailed_place, api_key)
+    else:
+        # Fallback to basic place data if details fetch fails
+        return _process_place_data(place, api_key)
+
+
+@bp.route("/api/places/search", methods=["GET"])
+@login_required
+def search_places():
+    """Search for places using Google Places API with comprehensive data."""
+    # Validate parameters
+    params, error_response, status_code = _validate_search_params()
+    if error_response:
+        return error_response, status_code
+
+    try:
+        # Build search parameters and make API request
+        url, search_params = _build_search_params(
+            params["query"], params["cuisine"], params["lat"], params["lng"], params["radius_miles"], params["api_key"]
+        )
+        response = requests.get(url, params=search_params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        # Process results
+        results = []
+        if data.get("status") == "OK":
+            for place in data.get("results", [])[: params["max_results"]]:
+                if not _filter_place_by_criteria(place, params["min_rating"], params["max_price_level"]):
+                    continue
+
+                processed_place = _process_search_result_place(place, params["api_key"])
+                if processed_place:
+                    results.append(processed_place)
+
+        return jsonify(
+            {
+                "data": {
+                    "results": results,
+                    "search_params": {
+                        "query": params["query"],
+                        "lat": params["lat"],
+                        "lng": params["lng"],
+                        "radius_miles": float(params["radius_miles"]) if params["radius_miles"] else None,
+                        "cuisine": params["cuisine"],
+                        "min_rating": float(params["min_rating"]) if params["min_rating"] else None,
+                        "max_price_level": int(params["max_price_level"]) if params["max_price_level"] else None,
+                    },
+                },
+                "status": data.get("status"),
+            }
+        )
+
+    except requests.RequestException as e:
+        current_app.logger.error(f"Google Places API error: {e}")
+        return jsonify({"error": "Failed to fetch places data"}), 500
+
+
+@bp.route("/api/places/details/<place_id>", methods=["GET"])
+@login_required
+def get_place_details(place_id):
+    """Get place details using Google Places API with comprehensive field mapping."""
+    api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
+    if not api_key:
+        return jsonify({"error": "Google Maps API key not configured"}), 500
+
+    try:
+        # Make request to Google Places API with comprehensive fields
+        url = "https://maps.googleapis.com/maps/api/place/details/json"
+        params = {
+            "place_id": place_id,
+            "fields": "name,formatted_address,formatted_phone_number,website,rating,types,address_components,opening_hours,price_level,reviews,photos,geometry,editorial_summary,current_opening_hours,utc_offset,vicinity,url,place_id,plus_code,adr_address,international_phone_number,reviews,user_ratings_total",
+            "key": api_key,
+        }
+
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+
+        if data.get("status") == "OK":
+            place = data.get("result", {})
+
+            # Parse address components
+            address_data = parse_address_components(place.get("address_components", []))
+
+            # Determine cuisine and service level from types
+            cuisine, service_level = analyze_restaurant_types(place.get("types", []))
+
+            # If no cuisine detected from types, try name-based detection
+            if not cuisine:
+                cuisine = detect_cuisine_from_name(place.get("name", ""))
+                current_app.logger.info(f"Detected cuisine from name: {cuisine}")
+
+            # Map all fields comprehensively
+            mapped_data = {
+                # Basic Information
+                "name": place.get("name"),
+                "type": "restaurant",  # Default for Google Places restaurants
+                "description": generate_description(place),
+                # Location Information (parsed from address_components)
+                "address": address_data.get("street_address"),
+                "city": address_data.get("city"),
+                "state": address_data.get("state"),
+                "postal_code": address_data.get("postal_code"),
+                "country": address_data.get("country"),
+                # Contact Information
+                "phone": place.get("formatted_phone_number") or place.get("international_phone_number"),
+                "website": place.get("website"),
+                "email": None,  # Google Places doesn't provide email
+                "google_place_id": place_id,
+                # Business Details
+                "cuisine": cuisine,
+                "service_level": service_level,
+                "is_chain": detect_chain_restaurant(place.get("name", "")),
+                "rating": place.get("rating"),
+                "notes": generate_notes(place),
+                # Additional Google Data
+                "formatted_address": place.get("formatted_address"),
+                "types": place.get("types", []),
+                "address_components": place.get("address_components", []),
+                "price_level": place.get("price_level"),
+                "opening_hours": place.get("opening_hours", {}),
+                "geometry": place.get("geometry", {}),
+                "editorial_summary": place.get("editorial_summary", {}),
+                "user_ratings_total": place.get("user_ratings_total"),
+                "vicinity": place.get("vicinity"),
+                "url": place.get("url"),
+            }
+
+            return jsonify(mapped_data)
+        else:
+            return jsonify({"error": f"Google Places API error: {data.get('status')}"}), 400
+
+    except requests.RequestException as e:
+        current_app.logger.error(f"Google Places API error: {e}")
+        return jsonify({"error": "Failed to fetch place details"}), 500
+
+
+def parse_address_components(address_components):
+    """Parse Google Places address components into structured data."""
+    address_data = {"street_address": "", "city": "", "state": "", "postal_code": "", "country": ""}
+
+    for component in address_components:
+        types = component.get("types", [])
+        long_name = component.get("long_name", "")
+
+        if "street_number" in types:
+            address_data["street_address"] = long_name
+        elif "route" in types:
+            address_data["street_address"] += f" {long_name}"
+        elif "locality" in types or "sublocality" in types:
+            address_data["city"] = long_name
+        elif "administrative_area_level_1" in types:
+            address_data["state"] = long_name
+        elif "postal_code" in types:
+            address_data["postal_code"] = long_name
+        elif "country" in types:
+            address_data["country"] = long_name
+
+    return address_data
+
+
+def get_cuisine_choices():
+    """Get list of cuisine choices for dropdowns."""
+    return [
+        "American",
+        "Bar",
+        "Barbecue",
+        "Brazilian",
+        "Chinese",
+        "Ethiopian",
+        "Fast Food",
+        "French",
+        "German",
+        "Greek",
+        "Indian",
+        "Italian",
+        "Japanese",
+        "Korean",
+        "Lebanese",
+        "Mediterranean",
+        "Mexican",
+        "Moroccan",
+        "Peruvian",
+        "Pizza",
+        "Seafood",
+        "Spanish",
+        "Steakhouse",
+        "Sushi",
+        "Thai",
+        "Turkish",
+        "Vietnamese",
+    ]
+
+
+def _get_specific_cuisine_types():
+    """Get mapping of specific Google Places cuisine types to formatted names."""
+    return {
+        "chinese_restaurant": "Chinese",
+        "italian_restaurant": "Italian",
+        "japanese_restaurant": "Japanese",
+        "mexican_restaurant": "Mexican",
+        "indian_restaurant": "Indian",
+        "thai_restaurant": "Thai",
+        "french_restaurant": "French",
+        "korean_restaurant": "Korean",
+        "vietnamese_restaurant": "Vietnamese",
+        "mediterranean_restaurant": "Mediterranean",
+        "greek_restaurant": "Greek",
+        "spanish_restaurant": "Spanish",
+        "german_restaurant": "German",
+        "turkish_restaurant": "Turkish",
+        "lebanese_restaurant": "Lebanese",
+        "ethiopian_restaurant": "Ethiopian",
+        "moroccan_restaurant": "Moroccan",
+        "brazilian_restaurant": "Brazilian",
+        "peruvian_restaurant": "Peruvian",
+        "barbecue_restaurant": "Barbecue",
+        "pizza_restaurant": "Pizza",
+        "seafood_restaurant": "Seafood",
+        "sushi_restaurant": "Sushi",
+        "steak_house": "Steakhouse",
+        "fast_food_restaurant": "Fast Food",
+        "bar": "Bar",
+        "night_club": "Bar",
+    }
+
+
+def _detect_cuisine_from_types(types_lower):
+    """Detect cuisine from Google Places types array."""
+    # Check for specific cuisine restaurant types first
+    specific_cuisine_types = _get_specific_cuisine_types()
+
+    for google_type in types_lower:
+        if google_type in specific_cuisine_types:
+            cuisine = specific_cuisine_types[google_type]
+            current_app.logger.info(f"Detected specific cuisine type: {cuisine} from {google_type}")
+            return cuisine
+
+    # Check for broader patterns
+    cuisine_keywords = {
+        "italian": ["italian", "pizza", "pasta"],
+        "chinese": ["chinese"],
+        "japanese": ["japanese", "sushi", "ramen", "tempura", "bento"],
+        "mexican": ["mexican", "taco", "burrito", "enchilada"],
+        "indian": ["indian", "curry", "tandoori"],
+        "thai": ["thai"],
+        "mediterranean": ["mediterranean", "greek", "lebanese", "falafel"],
+        "french": ["french", "bistro"],
+        "seafood": ["seafood", "fish", "oyster", "lobster"],
+        "barbecue": ["barbecue", "bbq", "smokehouse"],
+        "american": ["american", "burger", "steakhouse", "sandwich", "fast_food"],
+        "vegetarian": ["vegetarian", "vegan"],
+        "dessert": ["dessert", "ice_cream", "bakery", "pastry"],
+        "coffee": ["coffee", "cafe", "espresso"],
+        "bar": ["night_club", "cocktail_bar", "wine_bar"],
+    }
+
+    for cuisine_name, keywords in cuisine_keywords.items():
+        if any(keyword in types_lower for keyword in keywords):
+            cuisine = cuisine_name.title()
+            current_app.logger.info(f"Detected cuisine from keywords: {cuisine}")
+            return cuisine
+
+    # Special handling for bar/pub establishments
+    if any(bar_type in types_lower for bar_type in ["bar", "pub", "brewery"]):
+        food_types = ["restaurant", "food", "meal_delivery", "meal_takeaway"]
+        if any(food_type in types_lower for food_type in food_types):
+            # Has both bar and restaurant characteristics - classify as Pub
+            current_app.logger.info("Detected as pub establishment (bar + restaurant)")
+            return "Pub"
+        else:
+            # Primarily a bar without food service
+            current_app.logger.info("Detected as primarily a bar establishment")
+            return "Bar"
+
+    return None
+
+
+def _detect_service_level_from_types(types_lower):
+    """Detect service level from Google Places types array."""
+    # Fast food places should be classified as quick service
+    if "fast_food" in types_lower or "fast_food_restaurant" in types_lower:
+        return "quick_service"
+    # Fast casual is counter service but higher quality
+    elif "fast_casual" in types_lower or "fast_casual_restaurant" in types_lower:
+        return "fast_casual"
+    # Fine dining is upscale with full service
+    elif "fine_dining" in types_lower or "upscale" in types_lower or "fine_dining_restaurant" in types_lower:
+        return "fine_dining"
+    # Regular restaurants are casual dining (full service, sit-down)
+    elif "restaurant" in types_lower:
+        return "casual_dining"
+    else:
+        return "casual_dining"  # Default to casual dining
+
+
+def analyze_restaurant_types(types):
+    """Analyze Google Places types to determine cuisine and service level."""
+    current_app.logger.info(f"Analyzing restaurant types: {types}")
+
+    types_lower = [t.lower() for t in types]
+    current_app.logger.info(f"Types lower: {types_lower}")
+
+    # Detect cuisine from types
+    cuisine = _detect_cuisine_from_types(types_lower)
+
+    if not cuisine:
+        current_app.logger.info("No cuisine detected from types, will try name-based detection")
+
+    # Detect service level
+    service_level = _detect_service_level_from_types(types_lower)
+    current_app.logger.info(f"Detected service level: {service_level}")
+
+    return cuisine, service_level
+
+
+def _matches_cuisine_pattern(name_lower: str, pattern: str) -> bool:
+    """Return True when pattern matches as a whole word; for multi-word patterns,
+    fallback to substring. Prevents false matches like 'bar' in 'barbecue'."""
+    tokenized = not any(ch.isspace() for ch in pattern)
+    if tokenized and pattern.isalpha():
+        return re.search(rf"\b{re.escape(pattern)}\b", name_lower) is not None
+    return pattern in name_lower
+
+
+def detect_cuisine_from_name(name):
+    """Detect cuisine type from restaurant name."""
+    if not name:
+        return None
+
+    name_lower = name.lower()
+
+    # Cuisine detection patterns
+    cuisine_patterns = {
+        "japanese": ["sushi", "ramen", "tempura", "bento", "japanese", "hibachi", "teppanyaki"],
+        "chinese": ["chinese", "dim sum", "wok", "kung pao", "szechuan", "cantonese"],
+        "italian": ["pizza", "pasta", "italian", "ristorante", "trattoria", "osteria"],
+        "mexican": ["mexican", "taco", "burrito", "enchilada", "quesadilla", "fajita"],
+        "indian": ["indian", "curry", "tandoori", "masala", "biryani"],
+        "thai": ["thai", "pad thai", "tom yum", "green curry"],
+        "mediterranean": ["mediterranean", "greek", "lebanese", "falafel", "kebab"],
+        "american": [
+            "american",
+            "burger",
+            "steakhouse",
+            "diner",
+            "arbys",
+            "mcdonalds",
+            "burger king",
+            "wendys",
+            "subway",
+            "kfc",
+            "taco bell",
+            "dominos",
+            "pizza hut",
+            "chipotle",
+            "panera",
+            "olive garden",
+            "applebee",
+            "chilis",
+            "outback",
+            "red lobster",
+            "buffalo wild wings",
+        ],
+        "french": ["french", "bistro", "brasserie", "creperie"],
+        "seafood": ["seafood", "fish", "oyster", "lobster", "crab", "shrimp"],
+        "barbecue": ["barbecue", "bbq", "smokehouse", "pit"],
+        "vegetarian": ["vegetarian", "vegan", "plant-based"],
+        "dessert": ["dessert", "ice cream", "bakery", "pastry", "cake"],
+        "coffee": ["coffee", "cafe", "espresso", "latte", "starbucks", "dunkin", "tim hortons", "peets", "caribou"],
+        "pub": ["pub", "grill", "gastropub", "sports bar", "tavern"],  # Pub patterns
+        "bar": ["cocktail bar", "wine bar"],  # More specific bar patterns
+    }
+
+    for cuisine_name, patterns in cuisine_patterns.items():
+        if any(_matches_cuisine_pattern(name_lower, pattern) for pattern in patterns):
+            # Special handling for bar/pub establishments
+            if cuisine_name == "bar":
+                # Check if name also contains restaurant/food indicators
+                food_indicators = ["restaurant", "grill", "kitchen", "food", "eatery", "dining", "cafe", "bistro"]
+                if any(indicator in name_lower for indicator in food_indicators):
+                    # Has food indicators - classify as Pub instead of Bar
+                    return "Pub"
+            elif cuisine_name == "pub":
+                # Pub patterns already indicate food+drink combination
+                return "Pub"
+            return cuisine_name.title()
+
+    return None
+
+
+# TODO find a better way
+def detect_chain_restaurant(name):
+    """Detect if restaurant is likely a chain based on name patterns."""
+    chain_indicators = [
+        "mcdonald",
+        "burger king",
+        "wendy",
+        "subway",
+        "kfc",
+        "taco bell",
+        "domino",
+        "pizza hut",
+        "chipotle",
+        "panera",
+        "olive garden",
+        "applebee",
+        "chili",
+        "outback",
+        "red lobster",
+        "buffalo wild wings",
+        "starbucks",
+        "dunkin",
+        "tim hortons",
+        "peet",
+        "caribou",
+    ]
+
+    name_lower = name.lower()
+    return any(indicator in name_lower for indicator in chain_indicators)
+
+
+def generate_description(place):
+    """Generate a description from Google Places data."""
+    parts = []
+
+    # Use editorial summary if available
+    if place.get("editorial_summary", {}).get("overview"):
+        parts.append(place.get("editorial_summary", {}).get("overview"))
+
+    if place.get("rating"):
+        rating = place.get("rating")
+        user_ratings_total = place.get("user_ratings_total")
+        if user_ratings_total:
+            parts.append(f"Google Rating: {rating}/5 ({user_ratings_total} reviews)")
+        else:
+            parts.append(f"Google Rating: {rating}/5")
+
+    if place.get("price_level"):
+        price_levels = {1: "$", 2: "$$", 3: "$$$", 4: "$$$$"}
+        parts.append(f"Price Level: {price_levels.get(place.get('price_level'), 'N/A')}")
+
+    if place.get("types"):
+        # Filter out generic types and show interesting ones
+        interesting_types = [
+            t.replace("_", " ").title()
+            for t in place.get("types")
+            if t not in ["establishment", "food", "point_of_interest"]
+        ]
+        if interesting_types:
+            parts.append(f"Categories: {', '.join(interesting_types[:3])}")
+
+    return " | ".join(parts) if parts else "Restaurant from Google Places"
+
+
+def generate_notes(place):
+    """Generate notes from Google Places data."""
+    notes = []
+
+    if place.get("price_level"):
+        price_levels = {1: "Budget-friendly", 2: "Moderate pricing", 3: "Upscale", 4: "Premium"}
+        notes.append(price_levels.get(place.get("price_level"), ""))
+
+    return " | ".join(notes) if notes else None
+
+
 @bp.route("/")
 @login_required
 def list_restaurants():
     """Show a list of all restaurants with pagination."""
     # Get pagination parameters with type hints
     page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", PER_PAGE, type=int)
+    # Check for per_page in URL params first, then cookie, then default
+    per_page = request.args.get("per_page", type=int)
+    if per_page is None:
+        per_page = _get_page_size_from_cookie("restaurant_page_size", PER_PAGE)
 
     # Get all restaurants and stats
     restaurants, stats = services.get_restaurants_with_stats(current_user.id, request.args)
@@ -88,6 +828,93 @@ def list_restaurants():
     )
 
 
+def _create_ajax_success_response(restaurant, is_new):
+    """Create AJAX success response for restaurant creation."""
+    if is_new:
+        return (
+            jsonify(
+                {
+                    "status": "success",
+                    "message": "Restaurant added successfully!",
+                    "restaurant_id": restaurant.id,
+                    "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=restaurant.id),
+                }
+            ),
+            201,  # Created
+        )
+
+    # Restaurant already exists - return 409 Conflict
+    return (
+        jsonify(
+            {
+                "status": "conflict",
+                "message": (
+                    f"A restaurant with the name '{restaurant.name}' in "
+                    f"'{restaurant.city or 'unknown location'}' already exists."
+                ),
+                "restaurant_id": restaurant.id,
+                "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=restaurant.id),
+            }
+        ),
+        409,  # Conflict
+    )
+
+
+def _create_ajax_error_response(exception, restaurant_id=None):
+    """Create AJAX error response for restaurant creation errors."""
+    if isinstance(exception, (DuplicateGooglePlaceIdError, DuplicateRestaurantError)):
+        return (
+            jsonify(
+                {
+                    "status": "conflict",
+                    "message": exception.message,
+                    "restaurant_id": exception.existing_restaurant.id,
+                    "redirect_url": url_for(
+                        "restaurants.restaurant_details", restaurant_id=exception.existing_restaurant.id
+                    ),
+                }
+            ),
+            409,  # Conflict
+        )
+
+    # Generic error
+    return jsonify({"status": "error", "message": f"Error saving restaurant: {str(exception)}"}), 400
+
+
+def _handle_restaurant_creation_success(restaurant, is_new, is_ajax):
+    """Handle successful restaurant creation based on request type."""
+    if is_ajax:
+        return _create_ajax_success_response(restaurant, is_new)
+
+    # Regular form submission - redirect without flash messages
+    if is_new:
+        return redirect(url_for("restaurants.list_restaurants"))
+    return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
+
+
+def _handle_restaurant_creation_error(exception, is_ajax):
+    """Handle restaurant creation errors based on request type."""
+    if is_ajax:
+        return _create_ajax_error_response(exception)
+
+    # Regular form submission - flash message
+    if isinstance(exception, (DuplicateGooglePlaceIdError, DuplicateRestaurantError)):
+        flash(exception.message, "warning")
+    else:
+        flash(f"Error saving restaurant: {str(exception)}", "error")
+
+    return None
+
+
+def _process_restaurant_form_submission(form, is_ajax):
+    """Process restaurant form submission and return appropriate response."""
+    try:
+        restaurant, is_new = services.create_restaurant(current_user.id, form)
+        return _handle_restaurant_creation_success(restaurant, is_new, is_ajax)
+    except (DuplicateGooglePlaceIdError, DuplicateRestaurantError, Exception) as e:
+        return _handle_restaurant_creation_error(e, is_ajax)
+
+
 @bp.route("/add", methods=["GET", "POST"])
 @login_required
 def add_restaurant():
@@ -99,52 +926,17 @@ def add_restaurant():
     """
     form = RestaurantForm()
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
     if form.validate_on_submit():
-        try:
-            restaurant, is_new = services.create_restaurant(current_user.id, form)
-            if is_ajax:
-                if is_new:
-                    return (
-                        jsonify(
-                            {
-                                "status": "success",
-                                "message": "Restaurant added successfully!",
-                                "redirect_url": url_for("restaurants.list_restaurants"),
-                            }
-                        ),
-                        200,
-                    )
-                return (
-                    jsonify(
-                        {
-                            "status": "info",
-                            "message": (
-                                f"A restaurant with the name '{restaurant.name}' in "
-                                f"'{restaurant.city or 'unknown location'}' already exists."
-                            ),
-                            "redirect_url": url_for("restaurants.restaurant_details", restaurant_id=restaurant.id),
-                        }
-                    ),
-                    200,
-                )
+        response = _process_restaurant_form_submission(form, is_ajax)
+        if response:
+            return response
 
-            # Regular form submission handling - redirect without flash messages
-            # Success/error feedback should be handled by the destination page
-            if is_new:
-                return redirect(url_for("restaurants.list_restaurants"))
-            else:
-                return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))
-
-        except Exception as e:
-            if is_ajax:
-                return jsonify({"status": "error", "message": f"Error saving restaurant: {str(e)}"}), 400
-            flash(f"Error saving restaurant: {str(e)}", "error")
-
-    # Handle form validation errors
+    # Handle form validation errors for AJAX requests
     if request.method == "POST" and is_ajax:
         return jsonify({"status": "error", "message": "Form validation failed", "errors": form.errors}), 400
 
-    return render_template("restaurants/form.html", form=form, is_edit=False)
+    return render_template("restaurants/form.html", form=form, is_edit=False, cuisine_choices=get_cuisine_choices())
 
 
 @bp.route("/<int:restaurant_id>", methods=["GET", "POST"])
@@ -238,7 +1030,9 @@ def edit_restaurant(restaurant_id):
         # Pre-populate form with existing data
         form = RestaurantForm(obj=restaurant)
 
-    return render_template("restaurants/form.html", form=form, is_edit=True, restaurant=restaurant)
+    return render_template(
+        "restaurants/form.html", form=form, is_edit=True, restaurant=restaurant, cuisine_choices=get_cuisine_choices()
+    )
 
 
 @bp.route("/delete/<int:restaurant_id>", methods=["POST"])
@@ -503,12 +1297,17 @@ def find_places():
     """
     # Check if Google Maps API key is configured
     google_maps_api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
+    google_maps_map_id = current_app.config.get("GOOGLE_MAPS_MAP_ID")
     if not google_maps_api_key:
         current_app.logger.warning("Google Maps API key is not configured")
         flash("Google Maps integration is not properly configured. Please contact support.", "warning")
 
     # Render the Google Places search template
-    return render_template("restaurants/places_search.html", google_maps_api_key=google_maps_api_key or "")
+    return render_template(
+        "restaurants/places_search.html",
+        google_maps_api_key=google_maps_api_key or "",
+        google_maps_map_id=google_maps_map_id or "",
+    )
 
 
 def _validate_google_places_request():
@@ -801,7 +1600,10 @@ def search_restaurants():
     """
     query = request.args.get("q", "").strip()
     page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 10, type=int)
+    # Check for per_page in URL params first, then cookie, then default
+    per_page = request.args.get("per_page", type=int)
+    if per_page is None:
+        per_page = _get_page_size_from_cookie("restaurant_page_size", 10)
     sort = request.args.get("sort", "name")
     order = request.args.get("order", "asc")
 
@@ -861,108 +1663,3 @@ def search_restaurants():
         per_page=per_page,
         google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY"),
     )
-
-
-@bp.route("/find-by-google-place", methods=["GET"])
-@login_required
-def find_by_google_place():
-    """Find restaurant details by Google Place ID.
-
-    Query Parameters:
-        place_id: Google Place ID to look up
-
-    Returns:
-        JSON response with restaurant details or error message
-    """
-    place_id = request.args.get("place_id")
-    if not place_id:
-        return jsonify({"error": "Missing place_id parameter"}), 400
-
-    try:
-        # Initialize Google Places client
-        import googlemaps
-        from flask import current_app
-
-        gmaps = googlemaps.Client(key=current_app.config["GOOGLE_MAPS_API_KEY"])
-
-        # Get place details
-        place = gmaps.place(
-            place_id=place_id,
-            fields=[
-                "name",
-                "formatted_address",
-                "formatted_phone_number",
-                "website",
-                "geometry",
-                "opening_hours",
-                "priceLevel",
-                "rating",
-                "userRatingsTotal",
-                "photos",
-                "types",
-                "url",
-                "address_components",
-            ],
-        )
-
-        if not place or "result" not in place:
-            return jsonify({"error": "Place not found"}), 404
-
-        # Format the response
-        result = place["result"]
-        address_components = {
-            "street_number": "",
-            "route": "",
-            "locality": "",
-            "administrative_area_level_1": "",
-            "postal_code": "",
-            "country": "",
-        }
-
-        # Parse address components if available
-        if "address_components" in result:
-            for component in result["address_components"]:
-                for address_type in component["types"]:
-                    if address_type in address_components:
-                        address_components[address_type] = component["long_name"]
-
-        # Detect service level from Google Places data
-        from app.restaurants.services import (
-            detect_service_level_from_google_data,
-            get_service_level_display_info,
-        )
-
-        google_places_data = {
-            "price_level": result.get("priceLevel"),
-            "types": result.get("types", []),
-            "rating": result.get("rating"),
-            "user_ratings_total": result.get("userRatingsTotal"),
-        }
-
-        service_level, confidence = detect_service_level_from_google_data(google_places_data)
-
-        # Build the response
-        response = {
-            "name": result.get("name", ""),
-            "address": f"{address_components['street_number']} {address_components['route']}".strip(),
-            "city": address_components["locality"],
-            "state": address_components["administrative_area_level_1"],
-            "postal_code": address_components["postal_code"],
-            "country": address_components["country"],
-            "phone": result.get("formatted_phone_number", ""),
-            "website": result.get("website", ""),
-            "google_place_id": place_id,
-            "rating": result.get("rating"),
-            "price_level": result.get("priceLevel"),
-            "types": result.get("types", []),
-            "service_level": service_level,
-            "service_level_display": get_service_level_display_info(service_level)["display_name"],
-            "service_level_description": get_service_level_display_info(service_level)["description"],
-            "service_level_confidence": round(confidence, 2),
-        }
-
-        return jsonify(response)
-
-    except Exception as e:
-        current_app.logger.error(f"Error fetching Google Place details: {str(e)}")
-        return jsonify({"error": "Failed to fetch place details"}), 500

@@ -104,13 +104,8 @@ resource "aws_apigatewayv2_api" "main" {
 
   # CORS configuration for Flask Lambda deployment
   cors_configuration {
-    # Must specify exact origins when allow_credentials = true
-    # Note: API Gateway execution URL will be handled by Lambda CORS headers
-    allow_origins = [
-      "https://${var.api_domain_name}",                                # Custom domain
-      "http://localhost:5000",                                        # Local dev
-      "http://127.0.0.1:5000"                                        # Local dev
-    ]
+    # Allow specific origins for credentials support
+    allow_origins = var.api_cors_allow_origins
 
     # HTTP methods for Flask application
     allow_methods = [
@@ -120,28 +115,16 @@ resource "aws_apigatewayv2_api" "main" {
       "PUT",
       "PATCH",
       "DELETE",
+      "HEAD"
     ]
 
-    # Headers needed for Flask forms and sessions (including CSRF protection)
-    allow_headers = [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "X-CSRFToken",
-      "Accept",
-      "Origin",
-      "Cache-Control"
-    ]
+    allow_headers = var.api_cors_allow_headers
 
     # Headers to expose to JavaScript
-    expose_headers = [
-      "Content-Length",
-      "Content-Type",
-      "X-CSRFToken"
-    ]
+    expose_headers = var.api_cors_expose_headers
 
-    # REQUIRED for Flask sessions/cookies to work (even with DynamoDB)
-    allow_credentials = true
+    # Enable/disable credentials for cookie forwarding
+    allow_credentials = var.api_cors_allow_credentials
 
     # Cache preflight requests for 1 hour
     max_age = 3600

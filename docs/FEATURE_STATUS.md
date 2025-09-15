@@ -85,17 +85,18 @@ This document serves as the single source of truth for the implementation status
 
 ### 6. Google Maps Integration
 
-| Feature                   | Status | Implementation | Code Location                           | Completion |
-| ------------------------- | ------ | -------------- | --------------------------------------- | ---------- |
-| Google Places API         | ✅     | Complete       | `app/static/js/utils/google-maps.js`    | 100%       |
-| Address Autocomplete      | ✅     | Complete       | `app/api/routes.py:90`                  | 100%       |
-| Place Details             | ✅     | Complete       | `app/api/routes.py:123`                 | 100%       |
-| Restaurant Search         | ✅     | Complete       | `app/restaurants/routes.py:492`         | 100%       |
-| Google Places Integration | ✅     | Complete       | `app/restaurants/routes.py:693`         | 100%       |
-| Map Display               | ✅     | Complete       | `app/templates/restaurants/`            | 100%       |
-| API Key Management        | ✅     | Complete       | `app/main/routes.py:222`                | 100%       |
-| Fallback Handling         | ✅     | Complete       | `app/static/js/utils/error-recovery.js` | 100%       |
-| Modern API Detection      | ✅     | Complete       | `app/static/js/utils/google-maps.js`    | 100%       |
+| Feature                   | Status | Implementation | Code Location                                       | Completion |
+| ------------------------- | ------ | -------------- | --------------------------------------------------- | ---------- |
+| Google Places API         | ✅     | Complete       | `app/static/js/utils/google-maps.js`                | 100%       |
+| Address Autocomplete      | ✅     | Complete       | `app/api/routes.py:90`                              | 100%       |
+| Place Details             | ✅     | Complete       | `app/api/routes.py:123`                             | 100%       |
+| Restaurant Search         | ✅     | Complete       | `app/restaurants/routes.py:40`                      | 100%       |
+| Google Places Integration | ✅     | Complete       | `app/restaurants/routes.py:693`                     | 100%       |
+| Map-Based Search          | ✅     | Complete       | `app/static/js/components/map-restaurant-search.js` | 100%       |
+| Map Display               | ✅     | Complete       | `app/templates/restaurants/places_search.html`      | 100%       |
+| API Key Management        | ✅     | Complete       | `app/main/routes.py:222`                            | 100%       |
+| Fallback Handling         | ✅     | Complete       | `app/static/js/utils/error-recovery.js`             | 100%       |
+| Modern API Detection      | ✅     | Complete       | `app/static/js/utils/google-maps.js`                | 100%       |
 
 ### 7. Reporting & Analytics
 

@@ -12,7 +12,7 @@
         Back to Dashboard
     </a>
 </div>
-{% endblock %}
+{% endblock page_actions %}
 
 {% block admin_content %}
 <!-- Filters -->
@@ -166,6 +166,14 @@
                                                     <i class="fas fa-user-{{ 'times' if user.is_active else 'check' }}"></i>
                                                 </button>
                                             </form>
+                                            <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                        title="Delete User"
+                                                        data-confirm="Are you sure you want to permanently delete {{ user.get_display_name() }}? This action cannot be undone and will delete all related data (expenses, restaurants, categories).">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -201,7 +209,7 @@
                                     {% endif %}
                                 {% else %}
                                     <li class="page-item disabled">
-                                        <span class="page-link">…</span>
+                                        <span class="page-link" aria-label="More pages available">…</span>
                                     </li>
                                 {% endif %}
                             {% endfor %}
@@ -237,4 +245,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock admin_content %}

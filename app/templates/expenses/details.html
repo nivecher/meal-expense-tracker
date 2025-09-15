@@ -1,14 +1,43 @@
 {% extends "base.html" %}
+{% from 'macros/tag_helpers.html' import tag_badge %}
 {% block title %}Expense Details - Meal Expense Tracker{% endblock title %}
 {% block styles %}
 {{ super() }}
 <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
-<link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
-<link href="{{ url_for('static', filename='css/components/order-type-badges.css') }}" rel="stylesheet" />
-<link href="{{ url_for('static', filename='css/components/cuisine-badges.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
-<link href="{{ url_for('main.user_tag_css') }}" rel="stylesheet" />
+<link href="{{ url_for('static', filename='css/tags.css') }}" rel="stylesheet" />
+<link href="{{ url_for('static', filename='css/tagify-pretty.css') }}" rel="stylesheet" />
 {% endblock styles %}
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Apply colors to all tag badges on the page
+    const tagBadges = document.querySelectorAll('.tag-badge[data-tag-color]');
+    tagBadges.forEach(badge => {
+        const color = badge.getAttribute('data-tag-color');
+        if (color) {
+            // Use setProperty with !important to ensure styles are applied
+            badge.style.setProperty('background-color', color, 'important');
+            badge.style.setProperty('color', 'white', 'important');
+            badge.style.setProperty('border-radius', '20px', 'important');
+            badge.style.setProperty('padding', '4px 12px', 'important');
+            badge.style.setProperty('font-size', '0.8rem', 'important');
+            badge.style.setProperty('font-weight', '500', 'important');
+            badge.style.setProperty('box-shadow', '0 2px 4px rgba(0, 0, 0, 0.1)', 'important');
+            badge.style.setProperty('transition', 'all 0.2s ease', 'important');
+            badge.style.setProperty('border', 'none', 'important');
+            badge.style.setProperty('display', 'inline-flex', 'important');
+            badge.style.setProperty('align-items', 'center', 'important');
+            badge.style.setProperty('margin', '2px', 'important');
+            badge.style.setProperty('line-height', '1.2', 'important');
+        }
+    });
+});
+</script>
+    <!-- Expense detail functionality -->
+    <script type="module" src="{{ url_for('static', filename='js/pages/expense-detail.js') }}"></script>
+{% endblock scripts %}
 {% block content %}
 <!-- Breadcrumb Navigation -->
 {% set breadcrumb_items = [
@@ -29,7 +58,7 @@
                         <div class="me-3 flex-shrink-0">
                             {% if expense.restaurant and expense.restaurant.website %}
                                 <img
-                                    src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ expense.restaurant.website }}&size=32"
+                                    src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website|replace('https://', '')|replace('http://', '')|replace('www.', '') }}&sz=32"
                                     alt="{{ expense.restaurant.name }} icon"
                                     class="restaurant-favicon"
                                     width="32"
@@ -41,16 +70,15 @@
                                 />
                                 <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 28px;"></i>
                             {% else %}
-                                <i class="fas fa-utensils text-primary" style="font-size: 28px;"></i>
+                                <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 28px;"></i>
                             {% endif %}
                         </div>
                         <div class="flex-grow-1">
                             <h1 class="h4 mb-1 fw-bold">{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}</h1>
                             <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
                                 {% if expense.restaurant and expense.restaurant.cuisine %}
-                                    <span class="cuisine-badge {{ expense.restaurant.cuisine|cuisine_css_class }} compact">
-                                        <i class="fas fa-{{ expense.restaurant.cuisine|cuisine_icon }}"></i>{{ expense.restaurant.cuisine.title() }}
-                                    </span>
+                                    {% from 'macros/badge_helpers.html' import cuisine_badge %}
+                                    {{ cuisine_badge(expense.restaurant.cuisine, size='sm') }}
                                 {% endif %}
                             </div>
                             <!-- Location with Google Maps link -->
@@ -96,7 +124,7 @@
                         </div>
                         <!-- Date -->
                         <div class="text-muted small">
-                            <i class="fas fa-calendar me-1"></i>{{ expense.date.strftime("%B %d, %Y") }}
+                            <i class="fas fa-calendar me-1"></i>{{ expense.date|format_date_user_tz("%B %d, %Y") }}
                         </div>
                     </div>
                 </div>
@@ -122,9 +150,8 @@
                             <label class="form-label text-muted small mb-1">Meal Type</label>
                             <div class="d-flex align-items-center">
                                 {% if expense.meal_type %}
-                                    <span class="meal-type-badge {{ expense.meal_type|meal_type_css_class }}">
-                                        <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
-                                    </span>
+                                    {% from 'macros/badge_helpers.html' import meal_type_badge %}
+                                    {{ meal_type_badge(expense.meal_type) }}
                                 {% else %}
                                     <span class="text-muted small">Not specified</span>
                                 {% endif %}
@@ -206,9 +233,7 @@
                     {% if expense.tags %}
                         <div class="d-flex flex-wrap gap-2">
                             {% for tag in expense.tags %}
-                                <span class="tag-badge tag-{{ tag.id }}">
-                                    <i class="fas fa-tag me-1"></i>{{ tag.name }}
-                                </span>
+                                {{ tag_badge(tag) }}
                             {% endfor %}
                         </div>
                     {% else %}
@@ -247,13 +272,13 @@
                         <div class="col-12 col-md-6">
                             <label class="form-label text-muted small">Created</label>
                             <div class="text-muted">
-                                <i class="fas fa-calendar-plus me-1"></i>{{ expense.created_at.strftime("%B %d, %Y %I:%M %p") }}
+                                <i class="fas fa-calendar-plus me-1"></i>{{ expense.created_at|format_datetime_user_tz("%B %d, %Y %I:%M %p") }}
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label text-muted small">Last Updated</label>
                             <div class="text-muted">
-                                <i class="fas fa-edit me-1"></i>{{ expense.updated_at.strftime("%B %d, %Y %I:%M %p") }}
+                                <i class="fas fa-edit me-1"></i>{{ expense.updated_at|format_datetime_user_tz("%B %d, %Y %I:%M %p") }}
                             </div>
                         </div>
 
@@ -300,7 +325,7 @@
                                 data-expense-id="{{ expense.id }}"
                                 data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
                                 data-expense-amount="{{ '%.2f'|format(expense.amount) }}"
-                                data-expense-date="{{ expense.date.strftime('%B %d, %Y') }}">
+                                data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}">
                             <i class="fas fa-trash me-1"></i>Delete Expense
                         </button>
                     </div>
@@ -321,7 +346,7 @@
                         <div class="me-3 flex-shrink-0">
                             {% if expense.restaurant.website %}
                                 <img
-                                    src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ expense.restaurant.website }}&size=32"
+                                    src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website|replace('https://', '')|replace('http://', '')|replace('www.', '') }}&sz=32"
                                     alt="{{ expense.restaurant.name }} icon"
                                     class="restaurant-favicon"
                                     width="32"
@@ -333,16 +358,15 @@
                                 />
                                 <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px;"></i>
                             {% else %}
-                                <i class="fas fa-utensils text-primary" style="font-size: 24px;"></i>
+                                <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 24px;"></i>
                             {% endif %}
                         </div>
                         <div class="flex-grow-1">
                             <h6 class="mb-1 fw-bold">{{ expense.restaurant.name }}</h6>
                             {% if expense.restaurant.cuisine %}
                                 <div class="d-flex justify-content-end">
-                                    <span class="cuisine-badge {{ expense.restaurant.cuisine|cuisine_css_class }}">
-                                        <i class="fas fa-{{ expense.restaurant.cuisine|cuisine_icon }}"></i>{{ expense.restaurant.cuisine.title() }}
-                                    </span>
+                                    {% from 'macros/badge_helpers.html' import cuisine_badge %}
+                                    {{ cuisine_badge(expense.restaurant.cuisine) }}
                                 </div>
                             {% endif %}
                         </div>
@@ -427,79 +451,3 @@
 
 
 {% endblock content %}
-
-{% block scripts %}
-{{ super() }}
-<script>
-    // Delete expense modal functionality
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize Bootstrap tooltips
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-
-        const deleteModal = document.getElementById("deleteExpenseModal");
-
-        if (deleteModal) {
-            deleteModal.addEventListener("show.bs.modal", function (event) {
-                const button = event.relatedTarget;
-                const expenseId = button.getAttribute("data-expense-id");
-                const expenseDescription = button.getAttribute("data-expense-description");
-                const expenseAmount = button.getAttribute("data-expense-amount");
-                const expenseDate = button.getAttribute("data-expense-date");
-
-                // Update modal content
-                const detailsDiv = deleteModal.querySelector("#delete-expense-details");
-                detailsDiv.innerHTML = `
-                    <div class="alert alert-light">
-                        <strong>Restaurant:</strong> ${expenseDescription}<br>
-                        <strong>Amount:</strong> $${expenseAmount}<br>
-                        <strong>Date:</strong> ${expenseDate}
-                    </div>
-                `;
-
-                // Update form action
-                const form = deleteModal.querySelector("#delete-expense-form");
-                form.action = `/expenses/${expenseId}/delete`;
-            });
-        }
-
-                // Setup extension error handling
-        setupExtensionErrorHandling();
-    });
-
-    async function setupExtensionErrorHandling() {
-        try {
-            const { default: ExtensionErrorHandler } = await import('/static/js/components/extension-error-handler.js');
-            window.extensionErrorHandler = new ExtensionErrorHandler();
-            window.extensionErrorHandler.init();
-        } catch (error) {
-            console.error('Failed to load extension error handler:', error);
-        }
-    }
-
-    // Handle browser extension errors gracefully
-    window.addEventListener('error', function(event) {
-        // Check if this is a browser extension error
-        if (event.filename && event.filename.includes('bootstrap-autofill-overlay.js')) {
-            console.warn('Browser extension error detected and ignored:', event.message);
-            event.preventDefault();
-            return false;
-        }
-    });
-
-    // Handle unhandled promise rejections from extensions
-    window.addEventListener('unhandledrejection', function(event) {
-        if (event.reason && event.reason.stack && event.reason.stack.includes('bootstrap-autofill-overlay.js')) {
-            console.warn('Browser extension promise rejection detected and ignored:', event.reason);
-            event.preventDefault();
-        }
-    });
-
-
-</script>
-
-<!-- Cuisine badge component for restaurant displays -->
-<script type="module" src="{{ url_for('static', filename='js/components/cuisine-badge.js') }}"></script>
-{% endblock scripts %}

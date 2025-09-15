@@ -1,6 +1,7 @@
 /* Main CSS file for Meal Expense Tracker */
 @import url("../css/components/table.css");
 @import url("../css/components/avatar.css");
+@import url("../css/components/inline-styles-replacement.css");
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 /* Category Badge Classes */
@@ -187,7 +188,6 @@ body {
   display: flex;
   flex-direction: column;
   /* Bootstrap CSS compatibility overrides */
-  -webkit-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -378,116 +378,10 @@ p {
   background-color: #fff;
 }
 
-/* Navigation */
-.navbar {
-  background-color: var(--white);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  position: relative;
-  z-index: 1000;
-}
-
-.navbar-brand {
-  font-weight: 600;
-  font-size: 1.3rem;
-  color: var(--gray-800);
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.4rem 0;
-  transition: color 0.2s ease;
-}
-
-.navbar-brand i {
-  font-size: 1.2em;
-  color: var(--accent-color);
-  transition: transform 0.2s ease;
-}
-
-.navbar-brand:hover {
-  color: var(--primary-color);
-}
-
-.navbar-brand:hover i {
-  transform: scale(1.1);
-}
-
-.navbar-toggler {
-  border: 1px solid var(--gray-300);
-  padding: 0.4rem 0.75rem;
-  border-radius: 0.5rem;
-  background-color: transparent;
-  transition: all 0.2s ease;
-}
-
-.navbar-toggler:hover {
-  background-color: var(--gray-100);
-  border-color: var(--gray-400);
-}
-
-.navbar-toggler:focus {
-  box-shadow: 0 0 0 0.2rem rgba(0, 0, 0, 0.03);
-  outline: none;
-}
-
-.navbar-toggler-icon {
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(0, 0, 0, 0.6)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-  width: 1.25em;
-  height: 1.25em;
-}
-
-.navbar-nav .nav-link {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  color: #1a1a1a; /* Even darker text for better contrast */
-  text-decoration: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 600;
-  border-radius: 0.375rem;
-  margin: 0.125rem 0.25rem;
-  font-size: 0.9375rem;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
-}
-
-.navbar-nav .nav-link i {
-  font-size: 1.1em;
-  width: 1.25rem;
-  text-align: center;
-}
-
-.navbar-nav .nav-link:hover,
-.navbar-nav .nav-link:focus {
-  color: var(--primary-color);
-  background-color: var(--gray-100);
-}
-
-.navbar-nav .nav-link.active {
-  color: var(--primary-color);
-  font-weight: 500;
-  background-color: transparent;
-  position: relative;
-}
-
-.navbar-nav .nav-link.active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 1rem;
-  right: 1rem;
-  height: 2px;
-  background-color: var(--primary-color);
-  border-radius: 2px;
-}
+/* Navigation styles moved to components/navbar.css */
 
 /* Dropdown Menu Styling */
-.dropdown-menu {
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border-radius: 0.75rem;
-  padding: 0.5rem 0;
-  margin-top: 0.5rem;
-  background-color: #ffffff;
-}
+/* .dropdown-menu moved to navbar.css */
 
 .dropdown-item {
   padding: 0.5rem 1.25rem;
@@ -545,10 +439,7 @@ p {
   margin: 0.5rem 0;
 }
 
-.navbar-toggler {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 0.5rem 0.75rem;
-}
+/* .navbar-toggler moved to navbar.css */
 
 .navbar-toggler:focus {
   box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.25);
@@ -741,6 +632,78 @@ body {
   outline: none;
 }
 
+/* Accessibility improvements for pagination */
+.btn[tabindex="-1"] {
+  /* Ensure disabled-style buttons are not focusable */
+  pointer-events: none;
+}
+
+.btn[aria-label*="not available"] {
+  /* Visual styling for unavailable pagination buttons */
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn[aria-label*="current page"] {
+  /* Ensure current page button is visually distinct */
+  font-weight: 600;
+}
+
+/* Accessibility improvements for navigation */
+.navbar-nav[role="menubar"] {
+  /* Ensure menubar styling is consistent */
+  display: flex;
+  flex-direction: row;
+}
+
+.navbar-nav[role="menubar"] .nav-item[role="none"] {
+  /* Ensure nav items don't interfere with menubar structure */
+  position: relative;
+}
+
+.nav-link[role="menuitem"] {
+  /* Ensure menuitem links are properly styled */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-link[role="menuitem"][aria-haspopup="true"] {
+  /* Visual indicator for dropdown menu items */
+  position: relative;
+}
+
+.nav-link[role="menuitem"][aria-haspopup="true"]::after {
+  /* Add dropdown indicator */
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+  margin-left: 0.5rem;
+  opacity: 0.7;
+}
+
+/* Override Bootstrap's text-align properties for better browser compatibility */
+/* Higher specificity to override Bootstrap CDN CSS */
+table th,
+.table th,
+thead th,
+tbody th,
+.table thead th,
+.table tbody th {
+  text-align: -webkit-match-parent !important;
+  text-align: match-parent !important;
+  text-align: inherit !important;
+}
+
+/* Ensure table headers inherit text alignment properly */
+.table thead th,
+table thead th {
+  text-align: inherit !important;
+}
+
 /* Smooth scrolling for anchor links */
 html {
   scroll-behavior: smooth;
@@ -765,116 +728,10 @@ footer {
   --bs-bg-opacity: 1;
 }
 
-/* Navigation */
-.navbar {
-  background-color: var(--white);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  position: relative;
-  z-index: 1000;
-}
-
-.navbar-brand {
-  font-weight: 600;
-  font-size: 1.3rem;
-  color: var(--gray-800);
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.4rem 0;
-  transition: color 0.2s ease;
-}
-
-.navbar-brand i {
-  font-size: 1.2em;
-  color: var(--accent-color);
-  transition: transform 0.2s ease;
-}
-
-.navbar-brand:hover {
-  color: var(--primary-color);
-}
-
-.navbar-brand:hover i {
-  transform: scale(1.1);
-}
-
-.navbar-toggler {
-  border: 1px solid var(--gray-300);
-  padding: 0.4rem 0.75rem;
-  border-radius: 0.5rem;
-  background-color: transparent;
-  transition: all 0.2s ease;
-}
-
-.navbar-toggler:hover {
-  background-color: var(--gray-100);
-  border-color: var(--gray-400);
-}
-
-.navbar-toggler:focus {
-  box-shadow: 0 0 0 0.2rem rgba(0, 0, 0, 0.03);
-  outline: none;
-}
-
-.navbar-toggler-icon {
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(0, 0, 0, 0.6)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-  width: 1.25em;
-  height: 1.25em;
-}
-
-.navbar-nav .nav-link {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  color: #1a1a1a; /* Even darker text for better contrast */
-  text-decoration: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 600;
-  border-radius: 0.375rem;
-  margin: 0.125rem 0.25rem;
-  font-size: 0.9375rem;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
-}
-
-.navbar-nav .nav-link i {
-  font-size: 1.1em;
-  width: 1.25rem;
-  text-align: center;
-}
-
-.navbar-nav .nav-link:hover,
-.navbar-nav .nav-link:focus {
-  color: var(--primary-color);
-  background-color: var(--gray-100);
-}
-
-.navbar-nav .nav-link.active {
-  color: var(--primary-color);
-  font-weight: 500;
-  background-color: transparent;
-  position: relative;
-}
-
-.navbar-nav .nav-link.active::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 1rem;
-  right: 1rem;
-  height: 2px;
-  background-color: var(--primary-color);
-  border-radius: 2px;
-}
+/* Navigation styles moved to components/navbar.css */
 
 /* Dropdown Menu Styling */
-.dropdown-menu {
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border-radius: 0.75rem;
-  padding: 0.5rem 0;
-  margin-top: 0.5rem;
-  background-color: #ffffff;
-}
+/* .dropdown-menu moved to navbar.css */
 
 .dropdown-item {
   padding: 0.5rem 1.25rem;
@@ -932,10 +789,7 @@ footer {
   margin: 0.5rem 0;
 }
 
-.navbar-toggler {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 0.5rem 0.75rem;
-}
+/* .navbar-toggler moved to navbar.css */
 
 .navbar-toggler:focus {
   box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.25);
@@ -1044,10 +898,7 @@ footer {
     padding: 0.5rem 1rem !important;
   }
 
-  .dropdown-menu {
-    margin-left: 1rem;
-    margin-top: 0.25rem;
-  }
+  /* .dropdown-menu moved to navbar.css */
 }
 
 /* Theme Toggle */

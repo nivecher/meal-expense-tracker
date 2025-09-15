@@ -57,7 +57,7 @@ class ExpenseForm(FlaskForm):
     )
 
     def validate_amount(self, field):
-        """Validate and convert amount to Decimal."""
+        """Validate and convert amount to Decimal with smart amount support."""
         if not field.data:
             return
 
@@ -66,12 +66,32 @@ class ExpenseForm(FlaskForm):
             if isinstance(field.data, str):
                 # Remove any non-numeric characters except decimal point and negative sign
                 clean_value = "".join(c for c in field.data if c.isdigit() or c in ".-")
+
+                # Handle smart amount conversion if no decimal point is present (like Quicken)
+                if "." not in clean_value and clean_value.isdigit() and len(clean_value) > 0:
+                    # Simple rule: assume last 2 digits are cents
+                    if len(clean_value) == 1:
+                        # Single digit: 5 → 0.05
+                        clean_value = f"0.0{clean_value}"
+                    elif len(clean_value) == 2:
+                        # Two digits: 50 → 0.50
+                        clean_value = f"0.{clean_value}"
+                    else:
+                        # Three or more digits: 789 → 7.89, 1234 → 12.34
+                        integer_part = clean_value[:-2]
+                        cents_part = clean_value[-2:]
+                        clean_value = f"{integer_part}.{cents_part}"
+
                 field.data = Decimal(clean_value)
             elif not isinstance(field.data, Decimal):
                 field.data = Decimal(str(field.data))
 
             # Ensure we have exactly 2 decimal places
             field.data = field.data.quantize(Decimal("0.01"))
+
+            # Validate minimum amount
+            if field.data <= 0:
+                raise ValidationError("Amount must be greater than 0")
 
         except (ValueError, InvalidOperation) as e:
             current_app.logger.error(f"Error converting amount to Decimal: {e}")

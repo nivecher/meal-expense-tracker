@@ -8,7 +8,7 @@ def test_blueprint_registration(app):
     # Check that all expected blueprints are registered
     # Get base blueprint names (without nested names)
     base_blueprints = {name.split(".")[0] for name in blueprints.keys()}
-    expected_blueprints = {"auth", "expenses", "main", "restaurants", "api", "reports"}
+    expected_blueprints = {"auth", "expenses", "main", "restaurants", "api", "reports", "admin", "errors"}
 
     # Debug routes are part of the main blueprint, not a separate debug blueprint
     # So we don't add "debug" to expected blueprints
@@ -57,4 +57,3 @@ def test_blueprint_initialization(app):
         assert "restaurants" in app.blueprints, "Restaurants blueprint not registered"
         assert "api" in app.blueprints, "API blueprint not registered"
         assert "reports" in app.blueprints, "Reports blueprint not registered"
-        assert "errors" in app.blueprints, "Errors blueprint not registered"

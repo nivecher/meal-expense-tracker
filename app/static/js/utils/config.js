@@ -8,33 +8,20 @@
 const config_cache = {};
 
 /**
- * Get Google Maps configuration from HTML data attributes
- * @returns {Object} Configuration object with apiKey and mapId
+ * Get Google Maps configuration from global variable
+ * @returns {Object} Configuration object with apiKey
  */
 export function getGoogleMapsConfig() {
   if (config_cache.googleMaps) {
     return config_cache.googleMaps;
   }
 
-  const config_element = document.getElementById('google-maps-global-config');
-  if (!config_element) {
-    console.warn('Google Maps config element not found');
-    return { apiKey: '', mapId: '' };
-  }
-
   const config = {
-    apiKey: config_element.dataset.apiKey || '',
-    mapId: config_element.dataset.mapId || '',
+    apiKey: window.GOOGLE_MAPS_API_KEY || '',
   };
 
   // Cache the configuration
   config_cache.googleMaps = config;
-
-  // Log for debugging (following the original behavior)
-  console.log('Google Maps API Key:', config.apiKey ? 'Key loaded' : 'No API key found');
-  if (config.mapId) {
-    console.log('Google Maps Map ID loaded');
-  }
 
   return config;
 }

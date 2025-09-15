@@ -1,14 +1,12 @@
 {% extends "base.html" %}
 {% from 'macros/category_helpers.html' import hex_to_rgb %}
-{% from 'macros/cuisine_helpers.html' import cuisine_badge %}
+{% from 'macros/badge_helpers.html' import cuisine_badge %}
 
 {% block title %}Dashboard - Meal Expense Tracker{% endblock %}
 
 {% block head_extra %}
 <link href="{{ url_for('static', filename='css/components/dashboard.css') }}" rel="stylesheet" />
-<link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
-<link href="{{ url_for('static', filename='css/components/cuisine-badges.css') }}" rel="stylesheet" />
-{% endblock %}
+{% endblock head_extra %}
 
 {% block content %}
 <div class="dashboard">
@@ -18,7 +16,7 @@
             <div class="col-xl-9 col-lg-8">
                 <div class="welcome-content">
                     <h1 class="display-5 fw-bold mb-3">
-                        <i class="fas fa-chart-line me-3 text-primary"></i>
+                        <i class="fas fa-home me-3 text-primary"></i>
                         <span class="text-primary">Welcome to</span><br>
                         <span class="text-dark">Meal Expense Tracker</span>
                     </h1>
@@ -26,31 +24,68 @@
                         Track your dining expenses, discover spending patterns, and manage your restaurant visits all in one place.
                         Get insights into your food budget and make informed decisions about your dining choices.
                     </p>
-                    <div class="welcome-actions">
-                        <!-- First row - Primary actions -->
-                        <div class="d-flex flex-wrap gap-3 mb-3">
-                            <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary btn-lg">
-                                <i class="fas fa-plus me-2"></i>Add Expense
-                            </a>
-                            <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-outline-primary btn-lg">
-                                <i class="fas fa-utensils me-2"></i>Add Restaurant
-                            </a>
-                        </div>
-                        <!-- Second row - View actions -->
-                        <div class="d-flex flex-wrap gap-3">
-                            <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary btn-lg">
-                                <i class="fas fa-receipt me-2"></i>View Expenses
-                            </a>
-                            <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary btn-lg">
-                                <i class="fas fa-list me-2"></i>View Restaurants
-                            </a>
-                        </div>
+                    <!-- Help Link below description -->
+                    <div class="mb-3">
+                        <a href="{{ url_for('main.help_page') }}" class="help-link">
+                            <i class="fas fa-question-circle me-2"></i>Need help? Check out our guide
+                        </a>
                     </div>
                 </div>
             </div>
             <div class="col-xl-3 col-lg-4 text-center">
                 <div class="welcome-illustration">
                     <i class="fas fa-chart-pie dashboard-icon text-primary"></i>
+                </div>
+            </div>
+        </div>
+    </section>
+
+<!-- Quick Actions Section -->
+<section class="quick-actions-section mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-bolt me-2 text-primary"></i>Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-6 col-md-2">
+                        <a href="{{ url_for('expenses.add_expense') }}" class="quick-action-btn">
+                            <i class="fas fa-plus mb-1"></i>
+                            <div>Add Expense</div>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <a href="{{ url_for('restaurants.add_restaurant') }}" class="quick-action-btn">
+                            <i class="fas fa-utensils mb-1"></i>
+                            <div>Add Restaurant</div>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <a href="{{ url_for('expenses.list_expenses') }}" class="quick-action-btn">
+                            <i class="fas fa-receipt mb-1"></i>
+                            <div>View Expenses</div>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <a href="{{ url_for('restaurants.list_restaurants') }}" class="quick-action-btn">
+                            <i class="fas fa-list mb-1"></i>
+                            <div>View Restaurants</div>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <a href="{{ url_for('expenses.import_expenses') }}" class="quick-action-btn">
+                            <i class="fas fa-file-import mb-1"></i>
+                            <div>Import Expenses</div>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <a href="{{ url_for('restaurants.find_places') }}" class="quick-action-btn">
+                            <i class="fas fa-search-location mb-1"></i>
+                            <div>Find Places</div>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -140,32 +175,29 @@
                                                 <div class="restaurant-icon me-2 flex-shrink-0">
                                                     {% if restaurant_website %}
                                                         <img
-                                                            src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ restaurant_website }}&size=28"
+                                                            src="https://www.google.com/s2/favicons?domain={{ restaurant_website|replace('https://', '')|replace('http://', '')|replace('www.', '') }}&sz=28"
                                                             alt="{{ restaurant_name }} icon"
                                                             class="restaurant-favicon"
                                                             width="28"
                                                             height="28"
-                                                            loading="lazy"
                                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
                                                             onload="this.style.opacity='1';"
                                                             style="opacity: 0; transition: opacity 0.2s;"
                                                         />
-                                                        <i class="fas fa-store text-muted restaurant-fallback-icon" style="display: none;"></i>
+                                                        <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px;"></i>
                                                     {% else %}
-                                                        <i class="fas fa-store text-muted restaurant-fallback-icon"></i>
+                                                        <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 24px;"></i>
                                                     {% endif %}
                                                 </div>
                                                 {{ restaurant_name or 'Unknown Restaurant' }}
                                             </div>
                                             <div class="expense-details">
                                                 <span class="expense-date text-muted">
-                                                    {{ expense.date.strftime('%b %d, %Y') }}
+                                                    {{ expense.date|format_date_user_tz('%b %d, %Y') }}
                                                 </span>
                                                 {% if expense.meal_type %}
-                                                    <span class="meal-type-badge {{ expense.meal_type|meal_type_css_class }}">
-                                                        <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>
-                                                        {{ expense.meal_type|title }}
-                                                    </span>
+                                                    {% from 'macros/badge_helpers.html' import meal_type_badge %}
+                                                    {{ meal_type_badge(expense.meal_type, size='sm') }}
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -212,19 +244,18 @@
                                                 <div class="restaurant-icon me-2 flex-shrink-0">
                                                                                                         {% if restaurant[2] %}
                                                         <img
-                                                            src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ restaurant[2] }}&size=28"
+                                                            src="https://www.google.com/s2/favicons?domain={{ restaurant[2]|replace('https://', '')|replace('http://', '')|replace('www.', '') }}&sz=28"
                                                             alt="{{ restaurant[1] }} icon"
                                                             class="restaurant-favicon"
                                                             width="28"
                                                             height="28"
-                                                            loading="lazy"
                                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
                                                             onload="this.style.opacity='1';"
                                                             style="opacity: 0; transition: opacity 0.2s;"
                                                         />
-                                                        <i class="fas fa-store-alt text-muted restaurant-fallback-icon" style="display: none;"></i>
+                                                        <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px;"></i>
                                                     {% else %}
-                                                        <i class="fas fa-store-alt text-muted restaurant-fallback-icon"></i>
+                                                        <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 24px;"></i>
                                                     {% endif %}
                                                 </div>
                                                 {{ restaurant[1] }}
@@ -232,7 +263,7 @@
                                             <div class="restaurant-stats d-flex align-items-center gap-2">
                                                 <span class="visit-count">{{ restaurant[4] }} visits</span>
                                                 {% if restaurant[3] %}
-                                                    {{ cuisine_badge(restaurant[3], compact=true) }}
+                                                    {{ cuisine_badge(restaurant[3], size='sm') }}
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -258,66 +289,7 @@
         </div>
     </div>
 
-<!-- Quick Actions -->
-<section class="quick-actions-section mb-3">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-bolt me-2 text-primary"></i>Quick Actions
-                </h5>
-            </div>
-            <div class="card-body">
-                <!-- Top row: Expense actions -->
-                <div class="row g-3 mb-3">
-                    <div class="col-4 col-lg-4 col-md-4">
-                        <a href="{{ url_for('expenses.add_expense') }}" class="quick-action-btn">
-                            <i class="fas fa-plus mb-2"></i>
-                            <div>Add Expense</div>
-                        </a>
-                    </div>
-                    <div class="col-4 col-lg-4 col-md-4">
-                        <a href="{{ url_for('expenses.list_expenses') }}" class="quick-action-btn">
-                            <i class="fas fa-receipt mb-2"></i>
-                            <div>View Expenses</div>
-                        </a>
-                    </div>
-                    <div class="col-4 col-lg-4 col-md-4">
-                        <a href="{{ url_for('expenses.import_expenses') }}" class="quick-action-btn">
-                            <i class="fas fa-file-import mb-2"></i>
-                            <div>Import Expenses</div>
-                        </a>
-                    </div>
-                </div>
-                <!-- Bottom row: Restaurant actions -->
-                <div class="row g-3">
-                    <div class="col-3 col-lg-3 col-md-3">
-                        <a href="{{ url_for('restaurants.add_restaurant') }}" class="quick-action-btn">
-                            <i class="fas fa-utensils mb-2"></i>
-                            <div>Add Restaurant</div>
-                        </a>
-                    </div>
-                    <div class="col-3 col-lg-3 col-md-3">
-                        <a href="{{ url_for('restaurants.list_restaurants') }}" class="quick-action-btn">
-                            <i class="fas fa-list mb-2"></i>
-                            <div>View Restaurants</div>
-                        </a>
-                    </div>
-                    <div class="col-3 col-lg-3 col-md-3">
-                        <a href="{{ url_for('restaurants.import_restaurants') }}" class="quick-action-btn">
-                            <i class="fas fa-file-upload mb-2"></i>
-                            <div>Import Restaurants</div>
-                        </a>
-                    </div>
-                    <div class="col-3 col-lg-3 col-md-3">
-                        <a href="{{ url_for('restaurants.find_places') }}" class="quick-action-btn">
-                            <i class="fas fa-search-location mb-2"></i>
-                            <div>Find New Places</div>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+
 
 <!-- Navigation Guide -->
 <section class="navigation-guide">

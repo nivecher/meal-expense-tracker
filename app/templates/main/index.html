@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block styles %}
 {{ super() }}
-<link href="{{ url_for('static', filename='css/components/meal-type-badges.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
 {% endblock styles %}
 {% block content %}
@@ -196,7 +195,7 @@
                                 <a
                                     href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
                                     class="text-decoration-none"
-                                    >{{ expense.date.strftime("%Y-%m-%d") }}</a
+                                    >{{ expense.date|format_date_user_tz("%Y-%m-%d") }}</a
                                 >
                             </td>
                             <td>
@@ -220,9 +219,8 @@
                             </td>
                             <td>
                                 {% if expense.meal_type %}
-                                <span class="meal-type-badge compact {{ expense.meal_type|meal_type_css_class }}">
-                                    <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
-                                </span>
+                                {% from 'macros/badge_helpers.html' import meal_type_badge %}
+                                {{ meal_type_badge(expense.meal_type, size='sm') }}
                                 {% else %} - {% endif %}
                             </td>
                             <td>

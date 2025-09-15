@@ -4,16 +4,16 @@
 .tag-badge {
     display: inline-flex;
     align-items: center;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
-    font-size: 0.75rem;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
     font-weight: 500;
-    border: 1px solid;
-    background-color: rgba(var(--tag-color-rgb), 1);
+    border: none;
     color: white;
-    border-color: rgba(var(--tag-color-rgb), 0.8);
     transition: all 0.2s ease;
-    margin: 0.125rem;
+    margin: 2px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    line-height: 1.2;
 }
 
 .tag-badge i {
@@ -23,9 +23,10 @@
 
 /* Compact version for table rows */
 .tag-badge.compact {
-    padding: 0.125rem 0.375rem;
+    padding: 3px 8px;
     font-size: 0.7rem;
-    margin: 0.0625rem;
+    margin: 1px;
+    border-radius: 15px;
 }
 
 .tag-badge.compact i {
@@ -35,17 +36,17 @@
 
 /* Hover effects */
 .tag-badge:hover {
-    background-color: rgba(var(--tag-color-rgb), 0.9);
     transform: scale(1.05);
     text-decoration: none;
     color: white;
+    opacity: 0.9;
 }
 
-/* Default fallback styling when no color is provided */
-.tag-badge:not([style*="--tag-color-rgb"]) {
+/* Default fallback styling when no color class is provided */
+.tag-badge:not([class*="tag-"]) {
     background-color: #6c757d;
     color: white;
-    border-color: #5a6268;
+    border: none;
 }
 
 /* Tag container for multiple tags */

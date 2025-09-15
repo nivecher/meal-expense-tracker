@@ -190,7 +190,7 @@
                         <div class="alert alert-warning">
                             <h5 class="alert-heading"><i class="fas fa-exclamation-circle me-2"></i>Import Warnings</h5>
                             <p class="mb-3">The following items were skipped during import:</p>
-                            <div class="warning-list" style="max-height: 200px; overflow-y: auto;">
+                            <div class="warning-list scrollable-container-sm">
                                 <ul class="mb-0">
                                     {% for warning in warnings[:10] %}
                                     <li class="mb-1"><small>{{ warning }}</small></li>
@@ -213,7 +213,7 @@
                                 <small class="text-muted">Showing first 10 errors of {{ errors|length }} total errors.</small>
                             </div>
                             {% endif %}
-                            <div class="error-list" style="max-height: 300px; overflow-y: auto;">
+                            <div class="error-list scrollable-container-md">
                                 <ul class="mb-0">
                                     {% for error in errors[:10] %}
                                     <li class="mb-1"><code>{{ error }}</code></li>
@@ -231,7 +231,7 @@
                             </div>
                             <div class="collapse mt-3" id="allErrors">
                                 <div class="card card-body">
-                                    <div style="max-height: 400px; overflow-y: auto;">
+                                    <div class="scrollable-container-lg">
                                         <ul class="mb-0">
                                             {% for error in errors %}
                                             <li class="mb-1"><code>{{ error }}</code></li>

@@ -46,6 +46,20 @@ PER_PAGE = 10  # Number of expenses per page
 SHOW_ALL = -1  # Special value to show all expenses
 
 
+def _get_page_size_from_cookie(cookie_name="expense_page_size", default_size=PER_PAGE):
+    """Get page size from cookie with validation and fallback."""
+    try:
+        cookie_value = request.cookies.get(cookie_name)
+        if cookie_value:
+            page_size = int(cookie_value)
+            # Validate page size is in allowed values
+            if page_size in [10, 25, 50, 100, SHOW_ALL]:
+                return page_size
+    except (ValueError, TypeError):
+        pass
+    return default_size
+
+
 def _sort_categories_by_default_order(categories: list[Category]) -> list[Category]:
     """Sort categories according to the default definition order."""
     default_categories = get_default_categories()
@@ -130,7 +144,7 @@ def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
 
     form = ExpenseForm(
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
-        restaurant_choices=[(None, "Select a restaurant (optional)")] + restaurants,
+        restaurant_choices=[(None, "Select a restaurant")] + restaurants,
         restaurant_id=normalized_restaurant_id,
     )
     return form, is_ajax
@@ -231,6 +245,8 @@ def add_expense() -> ResponseReturnValue:
 
     if request.method == "POST":
         current_app.logger.info("Processing POST request")
+        current_app.logger.info("Form data: %s", request.form.to_dict())
+        current_app.logger.info("Tags data: %s", request.form.get("tags"))
 
         # Create form with submitted data
         form = ExpenseForm(
@@ -403,7 +419,7 @@ def _init_expense_form(categories: list[tuple[int, str, str, str]], restaurants:
     """Initialize an expense form with the given choices."""
     return ExpenseForm(
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
-        restaurant_choices=[(None, "Select a restaurant (optional)")] + restaurants,
+        restaurant_choices=[(None, "Select a restaurant")] + restaurants,
     )
 
 
@@ -442,10 +458,12 @@ def _reinitialize_form_with_data(
 ) -> ExpenseForm:
     """Reinitialize form with submitted data and choices."""
     form_data = request.form.to_dict()
+    current_app.logger.info("Edit form data: %s", form_data)
+    current_app.logger.info("Edit tags data: %s", request.form.get("tags"))
     return ExpenseForm(
         data=form_data,
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
-        restaurant_choices=[(None, "Select a restaurant (optional)")] + restaurants,
+        restaurant_choices=[(None, "Select a restaurant")] + restaurants,
     )
 
 
@@ -511,7 +529,10 @@ def list_expenses() -> str:
     """
     # Get pagination parameters with type hints
     page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", PER_PAGE, type=int)
+    # Check for per_page in URL params first, then cookie, then default
+    per_page = request.args.get("per_page", type=int)
+    if per_page is None:
+        per_page = _get_page_size_from_cookie("expense_page_size", PER_PAGE)
 
     # Extract filters from request using the service layer
     filters = expense_services.get_expense_filters(request)

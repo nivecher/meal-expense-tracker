@@ -3,17 +3,12 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <!-- Theme color for supported browsers (not Firefox) -->
-        <meta name="theme-color" content="#2c3e50" media="(prefers-color-scheme: dark)" />
-        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+        <!-- Theme color removed - causing compatibility warnings -->
         <meta name="description" content="Track and manage your meal expenses with our easy-to-use expense tracker" />
         <meta name="keywords" content="meal expense tracker, food expenses, budget tracking, expense management" />
         <meta name="author" content="Meal Expense Tracker" />
         <meta name="csrf-token" content="{{ csrf_token() }}" />
         <!-- Bootstrap Icons -->
-        <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
         <title> {% block title %} Meal Expense Tracker {% endblock title %} </title>
         <!-- Favicon -->
         <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicons/favicon.ico') }}" />
@@ -38,34 +33,17 @@
             width="180"
             height="180" />
         <link rel="manifest" href="{{ url_for('static', filename='img/favicons/site.webmanifest') }}" />
-        <!-- Google Maps API Configuration -->
-        <div
-            id="google-maps-global-config"
-            data-api-key="{{ config.get('GOOGLE_MAPS_API_KEY', '') }}"
-            data-map-id="{{ config.get('GOOGLE_MAPS_MAP_ID', '') }}"
-            data-language="en"
-            data-region="US"
-            data-libraries="places,geometry"
-            class="visually-hidden-permanent">
-        </div>
-        <!-- Styles -->
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet"
-              onerror="this.onerror=null; this.href='https://use.fontawesome.com/releases/v6.6.0/css/all.css';" />
+        <!-- Centralized Dependencies -->
+        {% include 'includes/dependencies.html' %}
         <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet" />
+        <link href="{{ url_for('static', filename='css/components/navbar.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/components/search.css') }}" rel="stylesheet" />
+        <link href="{{ url_for('static', filename='css/components/badges.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/forms.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/utilities.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/components/navbar.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/loading.css') }}" rel="stylesheet" />
-        <!-- Google Places CSS -->
-        <link href="{{ url_for('static', filename='css/components/google-places.css') }}" rel="stylesheet" />
-        <!-- Select2 CSS -->
-        <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-        <link
-            href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css"
-            rel="stylesheet" />
+        <!-- Google Places CSS removed - not needed for direct API calls -->
         {% if config.DEBUG %}
         <script type="module" src="{{ url_for('static', filename='js/utils/debug.js') }}"></script>
         {% endif %}
@@ -109,20 +87,6 @@
                 </div>
             </div>
         </footer>
-        <!-- JavaScript Libraries -->
-        <!-- jQuery (required for Select2 and other plugins) -->
-        <script
-            src="https://code.jquery.com/jquery-3.7.1.min.js"
-            integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
-            crossorigin="anonymous"></script>
-        <!-- Select2 JS -->
-        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-        <!-- Bootstrap Bundle with Popper -->
-        <script
-            src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-            integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
-            crossorigin="anonymous"
-            defer></script>
         <!-- Application Configuration -->
         <div
             id="app-config"
@@ -134,8 +98,7 @@
                     "version": "{{ get_app_version() }}"
                 },
                 "googleMaps": {
-                    "apiKey": "{{ config.GOOGLE_MAPS_API_KEY or "" }}",
-                    "libraries": ["places"]
+                    "apiKey": "{{ config.GOOGLE_MAPS_API_KEY or "" }}"
                 },
                 "colors": {
                     "gray": "#6c757d",
@@ -157,13 +120,14 @@
         <script type="module" src="{{ url_for('static', filename='js/utils/select2-init.js') }}" defer></script>
         {% if config.DEBUG %}
         <script type="module" src="{{ url_for('static', filename='js/utils/debug.js') }}" defer></script>
+        <!-- Console warning filter for development -->
+        <script src="{{ url_for('static', filename='js/utils/console-filter.js') }}"></script>
         {% endif %}
-        <!-- Page-specific scripts -->
+itting        <!-- Page-specific scripts -->
         {% block scripts %} {% endblock scripts %} {% block extra_js %} {% endblock extra_js %}
 
         <!-- Initialize page modules -->
         <!-- Load configuration utility -->
-        <script type="module" src="{{ url_for('static', filename='js/utils/config.js') }}"></script>
         <!-- Table sort component -->
         <script type="module" src="{{ url_for('static', filename='js/components/table-sort.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/components/sticky-tables.js') }}" defer></script>
@@ -172,24 +136,12 @@
         <script type="module" src="{{ url_for('static', filename='js/components/navbar.js') }}" defer></script>
 
         <!-- Font Awesome fallback -->
-        <script>
-            // Check if Font Awesome loaded, if not, try alternative CDN
-            document.addEventListener('DOMContentLoaded', function() {
-                const testIcon = document.createElement('i');
-                testIcon.className = 'fas fa-check';
-                testIcon.style.display = 'none';
-                document.body.appendChild(testIcon);
+        <script type="module" src="{{ url_for('static', filename='js/utils/fontawesome-fallback.js') }}"></script>
+        <!-- Image fallback handling -->
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/components/image-fallback.css') }}">
+        <script type="module" src="{{ url_for('static', filename='js/components/image-fallback.js') }}"></script>
 
-                const computedStyle = window.getComputedStyle(testIcon);
-                if (computedStyle.fontFamily.indexOf('Font Awesome') === -1) {
-                    console.warn('Font Awesome failed to load, trying fallback...');
-                    const fallbackLink = document.createElement('link');
-                    fallbackLink.rel = 'stylesheet';
-                    fallbackLink.href = 'https://use.fontawesome.com/releases/v6.6.0/css/all.css';
-                    document.head.appendChild(fallbackLink);
-                }
-                document.body.removeChild(testIcon);
-            });
-        </script>
+        <!-- Lazy loading optimizer -->
+        <script type="module" src="{{ url_for('static', filename='js/utils/lazy-loading-optimizer.js') }}"></script>
     </body>
 </html>

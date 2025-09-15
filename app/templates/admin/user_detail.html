@@ -135,6 +135,15 @@
                                 {{ 'Deactivate' if user.is_active else 'Activate' }} Account
                             </button>
                         </form>
+
+                        <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-danger w-100 mb-2"
+                                    data-confirm="Are you sure you want to permanently delete {{ user.get_display_name() }}? This action cannot be undone and will delete all related data ({{ stats.expense_count }} expenses, {{ stats.restaurant_count }} restaurants, {{ stats.category_count }} categories).">
+                                <i class="fas fa-trash me-1"></i>
+                                Delete User
+                            </button>
+                        </form>
                     {% else %}
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-1"></i>
@@ -160,13 +169,13 @@
                 <div class="mb-2">
                     <small class="text-muted">Created:</small>
                     <div class="fw-bold">
-                        {{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'Unknown' }}
+                        {{ user.created_at|format_datetime_user_tz('%Y-%m-%d %H:%M') if user.created_at else 'Unknown' }}
                     </div>
                 </div>
                 <div class="mb-2">
                     <small class="text-muted">Last Updated:</small>
                     <div class="fw-bold">
-                        {{ user.updated_at.strftime('%Y-%m-%d %H:%M') if user.updated_at else 'Unknown' }}
+                        {{ user.updated_at|format_datetime_user_tz('%Y-%m-%d %H:%M') if user.updated_at else 'Unknown' }}
                     </div>
                 </div>
                 {% if user.timezone %}

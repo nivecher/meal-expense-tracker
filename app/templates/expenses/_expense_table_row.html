@@ -5,83 +5,58 @@
            class="text-decoration-none"
            data-bs-toggle="tooltip"
            data-bs-placement="top"
-           title="{{ expense.date.strftime('%A, %B %d, %Y') }}">{{ expense.date.strftime("%b %d %Y") }}</a>
+           title="{{ expense.date|format_datetime_user_tz('%A, %B %d, %Y') }}">{{ expense.date|format_date_user_tz("%b %d %Y") }}</a>
     </td>
     <td>
         {% if expense.restaurant %}
-            <div class="d-flex align-items-center">
-                <!-- Restaurant Icon (small for table view) -->
-                <div class="restaurant-icon-table me-2 flex-shrink-0">
-                    {% if expense.restaurant.website %}
-                        <img
-                            src="https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={{ expense.restaurant.website }}&size=16"
-                            alt="{{ expense.restaurant.name }} icon"
-                            class="restaurant-favicon-table"
-                            width="16"
-                            height="16"
-                            onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
-                        />
-                        <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="display: none; font-size: 14px;"></i>
-                    {% else %}
-                        <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 14px;"></i>
-                    {% endif %}
-                </div>
+            <div class="restaurant-cuisine-combined">
+                <div class="d-flex align-items-center mb-1">
+                    <!-- Restaurant Icon (small for table view) -->
+                    <div class="restaurant-icon-table me-2 flex-shrink-0 d-flex align-items-center">
+                        {% if expense.restaurant.website %}
+                            <img
+                                src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website.replace('http://', '').replace('https://', '').replace('www.', '').split('/')[0] }}&sz=20"
+                                data-website="{{ expense.restaurant.website }}"
+                                alt="{{ expense.restaurant.name }} icon"
+                                class="restaurant-favicon-table"
+                                width="20"
+                                height="20"
+                                onerror="handleFaviconError(this);"
+                                onload="this.style.opacity='1';"
+                            />
+                        {% endif %}
+                        <i class="fas fa-utensils text-primary restaurant-fallback-icon-table{% if expense.restaurant.website %} d-none{% endif %}"></i>
+                    </div>
 
-                <!-- Restaurant Name -->
-                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
-                   class="text-decoration-none">{{ expense.restaurant.name }}</a>
+                    <!-- Restaurant Name -->
+                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
+                       class="text-decoration-none fw-medium">{{ expense.restaurant.name }}</a>
+                </div>
+                <!-- Cuisine Badge -->
+                <div>
+                    {% from 'macros/badge_helpers.html' import cuisine_badge %}
+                    {{ cuisine_badge(expense.restaurant.cuisine, size='sm') }}
+                </div>
             </div>
         {% else %}
             <span class="text-muted">-</span>
         {% endif %}
     </td>
     <td>
-        {% from 'macros/cuisine_helpers.html' import cuisine_badge %}
-        {% if expense.restaurant and expense.restaurant.cuisine %}
-            {{ cuisine_badge(expense.restaurant.cuisine, compact=true) }}
-        {% else %}
-            <span class="text-muted">-</span>
-        {% endif %}
-    </td>
-    <td>
-        <div class="d-flex align-items-center">
+        <div class="meal-order-stacked">
             {% if expense.meal_type %}
-                <span class="meal-type-badge compact {{ expense.meal_type|meal_type_css_class }}">
-                    <i class="fas fa-{{ expense.meal_type|meal_type_icon }}"></i>{{ expense.meal_type.title() }}
-                </span>
-            {% else %}
-                <span class="text-muted me-2">Expense</span>
+                {% from 'macros/badge_helpers.html' import meal_type_badge %}
+                <div class="mb-1">{{ meal_type_badge(expense.meal_type, size='sm') }}</div>
             {% endif %}
-        </div>
-    </td>
-    <td>
-        <div class="d-flex align-items-center">
             {% if expense.order_type %}
-                <span class="order-type-badge compact text-dark">
-                    <i class="fas fa-{{ expense.order_type|order_type_icon }}"></i>{{ expense.order_type.replace('_', ' ').title() }}
-                </span>
-            {% else %}
-                <span class="text-muted">-</span>
+                {% from 'macros/badge_helpers.html' import order_type_badge %}
+                <div>{{ order_type_badge(expense.order_type, size='sm') }}</div>
             {% endif %}
         </div>
     </td>
     <td>
-        <div class="d-flex align-items-center">
-            {% if expense.party_size and expense.party_size > 1 %}
-                <span class="badge bg-info"
-                      data-bs-toggle="tooltip"
-                      data-bs-placement="top"
-                      title="Price per person: ${{ '%.2f'|format(expense.price_per_person) }}">
-                    <i class="fas fa-user me-1"></i>{{ expense.party_size }} people
-                </span>
-            {% elif expense.party_size and expense.party_size == 1 %}
-                <span class="badge bg-secondary">
-                    <i class="fas fa-user me-1"></i>1 person
-                </span>
-            {% else %}
-                <span class="text-muted">-<span>
-            {% endif %}
-        </div>
+        {% from 'macros/badge_helpers.html' import party_size_badge %}
+        {{ party_size_badge(expense.party_size, expense.price_per_person, size='sm') }}
     </td>
     <td class="fw-bold text-info amount-right">
         {% if expense.party_size and expense.party_size > 0 %}
@@ -91,25 +66,29 @@
         {% endif %}
     </td>
     <td class="fw-bold text-success amount-right">${{ "%.2f"|format(expense.amount) }}</td>
-    <td>
-        {% if expense.tags %}
-            <div class="table-tags">
-                {% for tag in expense.tags %}
-                    {{ tag_badge(tag, compact=true) }}
-                {% endfor %}
-            </div>
-        {% else %}
-            <span class="text-muted">-</span>
-        {% endif %}
-    </td>
-    <td>
-        {% if expense.notes %}
-            <span class="text-muted small" title="{{ expense.notes }}">
-                {{ expense.notes|truncate(30, '...') }}
-            </span>
-        {% else %}
-            <span class="text-muted">-</span>
-        {% endif %}
+    <td class="text-center">
+        <div class="tags-notes-combined">
+            {% if expense.tags %}
+                <div class="table-tags-compact mb-1"
+                     data-bs-toggle="tooltip"
+                     data-bs-placement="top"
+                     title="{% for tag in expense.tags %}{{ tag.name }}{% if not loop.last %}, {% endif %}{% endfor %}">
+                    <i class="fas fa-tags text-primary"></i>
+                    <span class="tag-count">{{ expense.tags|length }}</span>
+                </div>
+            {% endif %}
+            {% if expense.notes %}
+                <div class="table-notes-compact"
+                     data-bs-toggle="tooltip"
+                     data-bs-placement="top"
+                     title="{{ expense.notes }}">
+                    <i class="fas fa-sticky-note text-warning"></i>
+                </div>
+            {% endif %}
+            {% if not expense.tags and not expense.notes %}
+                <span class="text-muted">-</span>
+            {% endif %}
+        </div>
     </td>
     <td class="text-end">
         <div class="btn-group" role="group">
@@ -117,13 +96,13 @@
                class="btn btn-sm btn-outline-primary"
                data-bs-toggle="tooltip"
                title="View Details">
-                <i class="fas fa-eye"></i>
+                <i class="fas fa-eye me-1"></i><span class="d-none d-lg-inline">View</span>
             </a>
             <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
                class="btn btn-sm btn-outline-secondary"
                data-bs-toggle="tooltip"
                title="Edit">
-                <i class="fas fa-edit"></i>
+                <i class="fas fa-edit me-1"></i><span class="d-none d-lg-inline">Edit</span>
             </a>
             <button type="button"
                     class="btn btn-sm btn-outline-danger"
@@ -132,10 +111,10 @@
                     data-expense-id="{{ expense.id }}"
                     data-expense-description="{{ expense.meal_type.title() if expense.meal_type else 'Expense' }}"
                     data-expense-amount="{{ "%.2f"|format(expense.amount) }}"
-                    data-expense-date="{{ expense.date.strftime('%b %d, %Y') }}"
-                    data-bs-toggle="tooltip"
+                    data-expense-date="{{ expense.date|format_date_user_tz('%b %d, %Y') }}"
+                    data-tooltip="true"
                     title="Delete">
-                <i class="fas fa-trash"></i>
+                <i class="fas fa-trash me-1"></i><span class="d-none d-lg-inline">Delete</span>
             </button>
         </div>
     </td>

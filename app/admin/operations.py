@@ -1049,7 +1049,7 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
     def _get_restaurants_without_google_id(self, **kwargs) -> List[Restaurant]:
         """Get restaurants without Google Place IDs for service level updates."""
         try:
-            from app.restaurants.models import Restaurant
+            pass
 
             # Handle specific restaurant case
             restaurant_id = kwargs.get("restaurant_id")

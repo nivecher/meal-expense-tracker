@@ -209,10 +209,6 @@ Current implementations:
 - **Restaurant List**: Uses `table-sticky-frozen` for wide restaurant data
 - **Search Results**: Uses `table-sticky-header` for search results
 
-## Demo Page
-
-Visit `/sticky-tables-demo` to see interactive examples of all three table types with sample data.
-
 ## Troubleshooting
 
 ### Common Issues

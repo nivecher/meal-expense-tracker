@@ -1,7 +1,5 @@
-import pytest
 from flask import url_for
 
-from app.auth.models import User
 from app.expenses.models import Category
 
 

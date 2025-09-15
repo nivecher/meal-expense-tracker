@@ -18,7 +18,7 @@ import logging
 import secrets
 import shlex
 import string
-import subprocess
+import subprocess  # nosec B404 - Used for safe git operations with proper parameterization
 from typing import Any, Dict, List, Optional, Tuple
 
 # Configure logging
@@ -49,7 +49,7 @@ def _run_git_command(args: List[str], cwd: Optional[str] = None) -> Tuple[bool, 
 
     try:
         logger.debug("Running git command: %s", " ".join(shlex.quote(arg) for arg in cmd))
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 - Safe subprocess call with shell=False and proper parameterization
             cmd,
             capture_output=True,
             text=True,

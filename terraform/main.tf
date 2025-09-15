@@ -461,6 +461,22 @@ module "api_gateway" {
   cert_domain     = local.cert_domain     # Wildcard certificate for subdomains
   api_domain_name = local.api_domain_name # Full domain name (e.g., api.dev.example.com)
 
+  # CORS configuration for cookie support
+  api_cors_allow_origins = [
+    "https://${local.api_domain_name}",
+    "http://localhost:5000",
+    "https://localhost:5000"
+  ]
+  api_cors_allow_credentials = true
+  api_cors_allow_headers = ["*"]
+  api_cors_expose_headers = [
+    "Content-Length",
+    "Content-Type",
+    "X-CSRFToken",
+    "Set-Cookie",
+    "Location"
+  ]
+
   tags = merge(local.tags, {
     Name = "${var.app_name}-${var.environment}-api"
   })
@@ -526,7 +542,7 @@ module "lambda" {
   dynamodb_table_arn = module.dynamodb.table_arn
 
   # API Gateway integration
-  api_gateway_domain_name   = module.api_gateway.domain_target_domain_name
+  api_gateway_domain_name   = module.api_gateway.api_endpoint  # Use actual API Gateway execution URL
   api_gateway_execution_arn = module.api_gateway.api_execution_arn
 
   # Runtime configuration

@@ -28,10 +28,7 @@
     background-color: rgba(var(--bs-primary-rgb), 0.05);
 }
 
-.restaurant-table .cuisine-badge {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-}
+/* Cuisine badge styles now handled by unified badge system */
 
 .restaurant-table .actions {
     white-space: nowrap;
@@ -180,8 +177,8 @@
 
 /* Table view icon styles (smaller) */
 .restaurant-icon-table {
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -198,4 +195,5 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    font-size: 16px;
 }

@@ -30,8 +30,12 @@ class FlashMessages:
     CATEGORY_DELETE_ERROR = "An error occurred while deleting the category."
 
     # User messages
-    PASSWORD_UPDATED = "Your password has been updated successfully!"
-    PASSWORD_UPDATE_ERROR = "An error occurred while updating your password."
+    PASSWORD_UPDATED = (
+        "Your password has been updated successfully!"  # nosec B105 - User-facing message, not a password
+    )
+    PASSWORD_UPDATE_ERROR = (
+        "An error occurred while updating your password."  # nosec B105 - User-facing message, not a password
+    )
     PROFILE_UPDATED = "Your profile has been updated successfully!"
     PROFILE_UPDATE_ERROR = "An error occurred while updating your profile."
 
@@ -43,9 +47,9 @@ class FlashMessages:
     REGISTRATION_SUCCESS = "Registration successful! You can now log in."
     REGISTRATION_ERROR = "An error occurred during registration. Please try again."
     EMAIL_ALREADY_EXISTS = "An account with this email already exists."
-    INVALID_TOKEN = "Invalid or expired token."
-    PASSWORD_RESET_SENT = "If an account exists with this email, password reset instructions have been sent."
-    PASSWORD_RESET = "Your password has been successfully reset. Please log in with your new credentials."
+    INVALID_TOKEN = "Invalid or expired token."  # nosec B105 - User-facing message, not a password
+    PASSWORD_RESET_SENT = "If an account exists with this email, password reset instructions have been sent."  # nosec B105 - User-facing message, not a password
+    PASSWORD_RESET = "Your password has been successfully reset. Please log in with your new credentials."  # nosec B105 - User-facing message, not a password
 
     # Additional messages for test compatibility
     FIELDS_REQUIRED = "Please fill out all fields."

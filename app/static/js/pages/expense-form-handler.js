@@ -110,14 +110,7 @@ function validateFormData(formData) {
     errors.date = ['Please enter a valid date in YYYY-MM-DD format'];
   }
 
-  // Add tags to form data if available (Tagify)
-  if (window.tagifyInstance) {
-    const tags = window.tagifyInstance.value;
-    if (tags && tags.length > 0) {
-      const tagNames = tags.map((tag) => tag.value);
-      formData.append('tags', JSON.stringify(tagNames));
-    }
-  }
+  // Tags will be added during form submission, not validation
 
   console.log('Validation errors:', errors);
   return Object.keys(errors).length === 0 ? null : errors;
@@ -129,6 +122,16 @@ async function handleFormSubmit(event) {
 
   const form_elements = cache_form_elements(event.target);
   const form_data = new FormData(form_elements.form);
+
+  // Add tags to form data if available (Tagify)
+  const tagsInput = document.getElementById('tagsInput');
+  if (tagsInput && window.tagifyInstance) {
+    const selectedTags = window.tagifyInstance.value;
+    if (selectedTags && selectedTags.length > 0) {
+      const tagsJson = JSON.stringify(selectedTags.map(tag => tag.value));
+      form_data.set('tags', tagsJson); // Use set() to replace any existing value
+    }
+  }
 
   clear_previous_errors(form_elements.alertContainer);
 
