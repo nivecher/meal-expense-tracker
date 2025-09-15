@@ -3,10 +3,12 @@
 
 {% block title %}Restaurants - Meal Expense Tracker{% endblock %}
 
-{% block head_extra %}
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" />
-        <link href="{{ url_for('static', filename='css/components/table.css') }}" rel="stylesheet" />
-{% endblock head_extra %}
+{% block styles %}
+    <link href="{{ url_for('static', filename='css/components/navbar.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/unified-table.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" rel="stylesheet" />
+{% endblock styles %}
 
 {% block content %}
 
@@ -19,15 +21,15 @@ include 'includes/breadcrumb.html' %}
     <h1 class="h3 mb-0"> <i class="fas fa-utensils text-primary me-2"></i>My Restaurants </h1>
     <div class="d-flex gap-2 flex-wrap">
         <!-- Primary Actions -->
-        <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-primary">
-            <i class="fas fa-plus me-2"></i> <span class="d-none d-sm-inline">Add Restaurant</span><span class="d-sm-none">Add</span>
+        <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-primary" data-bs-toggle="tooltip" title="Add a new restaurant">
+            <i class="fas fa-plus me-2"></i>Add Restaurant
         </a>
-        <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary d-none d-md-inline-flex">
-            <i class="fas fa-search-location me-2"></i> Find Restaurants
+        <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary d-none d-md-inline-flex" data-bs-toggle="tooltip" title="Search for restaurants using Google Places">
+            <i class="fas fa-search-location me-2"></i> Find Places
         </a>
         <!-- Mobile find button -->
-        <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary d-md-none">
-            <i class="fas fa-search-location me-1"></i><span class="d-none d-sm-inline">Find</span>
+        <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary d-md-none" data-bs-toggle="tooltip" title="Find places">
+            <i class="fas fa-search-location me-1"></i>Find
         </a>
         <!-- Data Management Dropdown -->
         <div class="dropdown">
@@ -37,7 +39,7 @@ include 'includes/breadcrumb.html' %}
                 id="dataManagementDropdown"
                 data-bs-toggle="dropdown"
                 aria-expanded="false">
-                <i class="fas fa-database me-2"></i> <span class="d-none d-sm-inline">Data Management</span><span class="d-sm-none">Data</span>
+                <i class="fas fa-database me-2"></i>Data Management
             </button>
             <ul class="dropdown-menu" aria-labelledby="dataManagementDropdown">
                 <li>
@@ -68,15 +70,15 @@ include 'includes/breadcrumb.html' %}
     <!-- Search & Filter Collapsible Button -->
     <div class="d-flex align-items-center">
         <button
-            class="btn btn-outline-primary d-flex align-items-center "
+            class="btn btn-outline-primary d-flex align-items-center"
             type="button"
             data-bs-toggle="collapse"
             data-bs-target="#filterCollapse"
             aria-expanded="false"
-            aria-controls="filterCollapse">
-            <i class="fas fa-filter me-2"></i>
-            <span class="d-none d-sm-inline">Search & Filter</span>
-            <span class="d-sm-none">Filter</span>
+            aria-controls="filterCollapse"
+            data-tooltip="true"
+            title="Show search and filter options">
+            <i class="fas fa-filter me-2"></i>Search & Filter
 
             <i class="fas fa-chevron-down ms-2"></i>
         </button>
@@ -86,12 +88,12 @@ include 'includes/breadcrumb.html' %}
     <!-- View Toggle -->
     <div class="btn-group" role="group" aria-label="View Toggle">
         <input type="radio" class="btn-check" name="view-type" id="card-view" autocomplete="off" checked />
-        <label class="btn btn-outline-primary" for="card-view" id="card-view-label">
-            <i class="fas fa-th-large me-2"></i> <span class="d-none d-md-inline">Cards</span>
+        <label class="btn btn-outline-primary" for="card-view" id="card-view-label" data-bs-toggle="tooltip" title="Card view - shows restaurants in card format">
+            <i class="fas fa-th-large me-2"></i>Cards
         </label>
         <input type="radio" class="btn-check" name="view-type" id="table-view" autocomplete="off" />
-        <label class="btn btn-outline-primary" for="table-view" id="table-view-label">
-            <i class="fas fa-table me-2"></i> <span class="d-none d-md-inline">Table</span>
+        <label class="btn btn-outline-primary" for="table-view" id="table-view-label" data-bs-toggle="tooltip" title="Table view - shows restaurants in table format">
+            <i class="fas fa-table me-2"></i>Table
         </label>
     </div>
 </div>
@@ -276,14 +278,13 @@ include 'includes/breadcrumb.html' %}
                             <div class="restaurant-icon me-2 flex-shrink-0">
                                 {% if restaurant.website %}
                                     <img
-                                        src="https://www.google.com/s2/favicons?domain={{ restaurant.website.replace('http://', '').replace('https://', '').replace('www.', '').split('/')[0] }}&sz=32"
+                                        src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                         data-website="{{ restaurant.website }}"
+                                        data-size="32"
                                         alt="{{ restaurant.name }} icon"
                                         class="restaurant-favicon"
                                         width="32"
                                         height="32"
-                                        onerror="handleFaviconError(this);"
-                                        onload="this.style.opacity='1';"
                                         style="opacity: 0; transition: opacity 0.2s ease-in-out;"
                                     />
                                 {% endif %}
@@ -381,7 +382,7 @@ include 'includes/breadcrumb.html' %}
                                 class="btn btn-sm btn-outline-secondary"
                                 data-bs-toggle="tooltip"
                                 title="View on Google Maps">
-                                <i class="fas fa-map-marked-alt"></i>
+                                <i class="fas fa-map-marked-alt me-1"></i><span class="d-none d-sm-inline">Maps</span>
                             </a>
                             {% endif %}
 
@@ -390,18 +391,19 @@ include 'includes/breadcrumb.html' %}
                                 class="btn btn-sm btn-outline-primary"
                                 data-bs-toggle="tooltip"
                                 title="Add new expense">
-                                <i class="fas fa-plus me-1"></i><span class="d-none d-sm-inline">Add Expense</span>
+                                <i class="fas fa-plus me-1"></i><span class="d-none d-lg-inline">Add Expense</span>
                             </a>
-                            <button
-                                type="button"
-                                class="btn btn-sm btn-outline-danger"
-                                data-bs-toggle="modal"
-                                data-bs-target="#deleteRestaurantModal"
-                                data-restaurant-id="{{ restaurant.id }}"
-                                data-restaurant-name="{{ restaurant.name }}"
-                                title="Delete restaurant">
-                                <i class="fas fa-trash me-1"></i><span class="d-none d-sm-inline">Delete</span>
-                            </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#deleteRestaurantModal"
+                                        data-restaurant-id="{{ restaurant.id }}"
+                                        data-restaurant-name="{{ restaurant.name }}"
+                                        data-tooltip="true"
+                                        title="Delete restaurant">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                         </div>
                     </div>
 
@@ -460,7 +462,7 @@ include 'includes/breadcrumb.html' %}
         <div class="card">
             <div class="card-body p-0">
                 <div class="table-sticky-frozen">
-                    <table class="table table-hover align-middle restaurant-table mb-0">
+                    <table id="restaurantTable" class="table table-hover align-middle restaurant-table mb-0">
                         <thead class="table-light">
                             <tr>
                                 <th data-sort="true" data-sort-type="text">Name</th>
@@ -469,8 +471,8 @@ include 'includes/breadcrumb.html' %}
                                 <th data-sort="true" data-sort-type="number">Rating</th>
                                 <th data-sort="true" data-sort-type="number">Visits</th>
                                 <th data-sort="true" data-sort-type="date">Last Visit</th>
-                                <th data-sort="true" data-sort-type="currency">Avg $ / Person</th>
-                                <th data-sort="true" data-sort-type="currency">Total Spent</th>
+                                <th data-sort="true" data-sort-type="currency" class="text-end">Avg $ / Person</th>
+                                <th data-sort="true" data-sort-type="currency" class="text-end">Total Spent</th>
                                 <th class="text-center">Actions</th>
                             </tr>
                         </thead>
@@ -483,14 +485,13 @@ include 'includes/breadcrumb.html' %}
                                         <div class="restaurant-icon-table me-2 flex-shrink-0 d-flex align-items-center">
                                             {% if restaurant.website %}
                                                 <img
-                                                    src="https://www.google.com/s2/favicons?domain={{ restaurant.website.replace('http://', '').replace('https://', '').replace('www.', '').split('/')[0] }}&sz=20"
+                                                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                                     data-website="{{ restaurant.website }}"
+                                                    data-size="20"
                                                     alt="{{ restaurant.name }} icon"
                                                     class="restaurant-favicon-table"
                                                     width="20"
                                                     height="20"
-                                                    onerror="handleFaviconError(this);"
-                                                    onload="this.style.opacity='1';"
                                                     style="opacity: 0; transition: opacity 0.2s ease-in-out;" />
                                             <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 16px; display: none;"></i>
                                             {% else %}
@@ -529,7 +530,7 @@ include 'includes/breadcrumb.html' %}
                                             class="btn btn-sm btn-outline-secondary ms-2"
                                             data-bs-toggle="tooltip"
                                             title="View on Google Maps">
-                                            <i class="fas fa-map-marked-alt"></i>
+                                            <i class="fas fa-map-marked-alt me-1"></i><span class="d-none d-lg-inline">Maps</span>
                                         </a>
                                         {% endif %}
 
@@ -553,17 +554,22 @@ include 'includes/breadcrumb.html' %}
                                     <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ restaurant.visit_count }}</td>
-                                <td>
+                                <td data-sort-value="{{ restaurant.visit_count }}">
+                                    {% if restaurant.visit_count > 0 %}
+                                        {{ restaurant.visit_count }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td data-sort-value="{% if restaurant.last_visit %}{{ restaurant.last_visit.isoformat() }}{% else %}1970-01-01T00:00:00{% endif %}">
                                     {% if restaurant.last_visit %}
                                     <span
-                                        data-sort-value="{{ restaurant.last_visit.isoformat() }}"
                                         data-bs-toggle="tooltip"
                                         title="{{ restaurant.last_visit|format_datetime_user_tz('%B %d, %Y at %I:%M %p') }}">
                                         {{ restaurant.last_visit|time_ago }}
                                     </span>
                                     {% else %}
-                                    <span class="text-muted" data-sort-value="">No visits</span>
+                                    <span class="text-muted">No visits</span>
                                     {% endif %}
                                 </td>
                                 <td class="fw-bold text-info amount-right">
@@ -598,9 +604,9 @@ include 'includes/breadcrumb.html' %}
                                         data-bs-target="#deleteRestaurantModal"
                                         data-restaurant-id="{{ restaurant.id }}"
                                         data-restaurant-name="{{ restaurant.name }}"
-                                        data-bs-toggle="tooltip"
+                                        data-tooltip="true"
                                         title="Delete">
-                                        <i class="fas fa-trash me-1"></i><span class="d-none d-lg-inline">Delete</span>
+                                        <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
                             </tr>
@@ -630,6 +636,7 @@ include 'includes/breadcrumb.html' %}
 {% endblock content %}
 
 {% block extra_js %}
-<!-- Restaurant list functionality -->
+<!-- Table sorting functionality -->
+<script src="{{ url_for('static', filename='js/components/table-sorting.js') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/pages/restaurant-list.js') }}"></script>
 {% endblock extra_js %}

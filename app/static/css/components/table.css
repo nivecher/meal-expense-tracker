@@ -1,6 +1,7 @@
 /* Table Styles */
 
 /* Sticky/Frozen Table Headers */
+
 .table-sticky-header {
     position: relative;
     max-height: 70vh; /* Limit table height to enable scrolling */
@@ -19,10 +20,11 @@
     z-index: 10;
     background-color: var(--gray-100, #f8f9fa);
     border-bottom: 2px solid var(--border-color, #dee2e6);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 /* Frozen columns (first column stays fixed during horizontal scroll) */
+
 .table-frozen-columns {
     position: relative;
     overflow-x: auto;
@@ -48,6 +50,7 @@
 }
 
 /* Enhanced sticky table with both vertical and horizontal freezing */
+
 .table-sticky-frozen {
     position: relative;
     max-height: 70vh;
@@ -68,7 +71,7 @@
     z-index: 10;
     background-color: var(--gray-100, #f8f9fa);
     border-bottom: 2px solid var(--border-color, #dee2e6);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .table-sticky-frozen .table th:first-child,
@@ -86,12 +89,14 @@
 }
 
 /* Hover effects for frozen tables */
+
 .table-sticky-frozen tbody tr:hover td:first-child,
 .table-frozen-columns tbody tr:hover td:first-child {
     background-color: var(--gray-50, #f8f9fa);
 }
 
 /* Custom scrollbar styling for better UX */
+
 .table-sticky-header::-webkit-scrollbar,
 .table-frozen-columns::-webkit-scrollbar,
 .table-sticky-frozen::-webkit-scrollbar {
@@ -120,7 +125,9 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
+
+@media (width <= 768px) {
+
     .table-sticky-header,
     .table-sticky-frozen {
         max-height: 60vh;
@@ -135,9 +142,9 @@
 }
 
 /* Sortable table headers */
+
 th[data-sort="true"] {
     position: relative;
-    -webkit-user-select: none;
     user-select: none;
     transition: background-color 0.2s ease;
 }
@@ -162,31 +169,29 @@ th[data-sort="true"]:hover .sort-indicator {
 }
 
 /* Responsive table */
+
 .table-responsive {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
 
 /* Hover effect for table rows */
+
 .table-hover tbody tr {
     transition: background-color 0.15s ease;
 }
 
 /* Ensure table cells have proper spacing */
+
 .table td, .table th {
     vertical-align: middle;
     padding: 0.75rem;
 }
 
 /* Style for the active sort column */
+
 th[aria-sort] {
     background-color: #e9ecef;
 }
 
-th[aria-sort="ascending"] .sort-indicator::before {
-    content: "↑";
-}
-
-th[aria-sort="descending"] .sort-indicator::before {
-    content: "↓";
-}
+/* Server-side sorting styles removed - not used in this application */

@@ -1,4 +1,5 @@
 /* Admin Base Page Styles */
+
 /* Following TIGER principles: Safety, Performance, Developer Experience */
 
 .admin-sidebar {
@@ -48,7 +49,7 @@
 
 .action-buttons .btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .table-actions {
@@ -68,15 +69,15 @@
 .admin-stats-card:hover {
     transform: translateY(-2px);
     transition: transform 0.2s ease-in-out;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 8px rgb(0 0 0 / 10%);
 }
 
 .card {
     border: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
     transition: box-shadow 0.2s ease-in-out;
 }
 
 .card:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 8px rgb(0 0 0 / 15%);
 }

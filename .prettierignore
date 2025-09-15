@@ -48,3 +48,6 @@ app/templates/expenses/_expense_table_row.html
 app/templates/expenses/macros.html
 app/templates/restaurants/detail.html
 app/templates/restaurants/form.html
+app/templates/restaurants/list.html
+app/templates/expenses/list.html
+app/templates/auth/profile.html

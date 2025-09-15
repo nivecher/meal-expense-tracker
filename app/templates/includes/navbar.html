@@ -1,5 +1,5 @@
-{# Main Navigation - Responsive Design #}
-{% from 'macros/avatar_helpers.html' import user_avatar_navbar, user_avatar_dropdown %}
+{# Main Navigation - Responsive Design #} {% from 'macros/avatar_helpers.html' import user_avatar_navbar,
+user_avatar_dropdown %}
 <nav class="navbar navbar-expand-lg navbar-light sticky-top">
     <div class="container">
         <!-- Brand -->
@@ -117,10 +117,7 @@
                         </a>
                     </li>
                     <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('restaurants.find_places') }}"
-                            role="menuitem">
+                        <a class="dropdown-item" href="{{ url_for('restaurants.find_places') }}" role="menuitem">
                             <i class="fas fa-search-location" aria-hidden="true"></i>
                             <span>Find Restaurants</span>
                         </a>
@@ -333,10 +330,7 @@
                         </a>
                     </li>
                     <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('restaurants.find_places') }}"
-                            role="menuitem">
+                        <a class="dropdown-item" href="{{ url_for('restaurants.find_places') }}" role="menuitem">
                             <i class="fas fa-search-location" aria-hidden="true"></i>
                             <span>Find Places</span>
                         </a>
@@ -444,23 +438,22 @@
         </div>
 
         <!-- User Dropdown (Right-aligned) -->
-        <div class="navbar-nav-user">
+        <div class="navbar-nav-user" role="menubar">
             {% if current_user.is_authenticated %}
             <div class="nav-item dropdown" role="none">
                 <a
                     class="nav-link dropdown-toggle d-flex align-items-center"
                     href="#"
                     id="userDropdown"
-                    role="menuitem"
+                    role="button"
                     aria-haspopup="true"
-                    aria-expanded="false">
+                    aria-expanded="false"
+                    aria-label="User menu">
                     {{ user_avatar_navbar(current_user) }}
                 </a>
                 <div class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown" role="menu">
                     <!-- User Info -->
-                    <div class="user-info" role="none">
-                        {{ user_avatar_dropdown(current_user) }}
-                    </div>
+                    <div class="user-info" role="none"> {{ user_avatar_dropdown(current_user) }} </div>
                     <div class="dropdown-divider" role="separator"></div>
                     <!-- Menu Items -->
                     <div class="px-2" role="group">

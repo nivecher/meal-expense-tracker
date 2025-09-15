@@ -2,6 +2,16 @@
  * Initialize flash messages as toasts
  * @param {Array} messages - Array of message objects with type and message properties
  */
+
+function processMessages(messages) {
+  messages.forEach((msg, index) => {
+    setTimeout(() => {
+      window.showToast(msg.message, msg.type, 5000);
+    }, index * 300);
+    console.log('Flash message:', msg);
+  });
+}
+
 export function initFlashMessages(messages) {
   if (!Array.isArray(messages) || messages.length === 0) return;
 
@@ -16,14 +26,5 @@ export function initFlashMessages(messages) {
     document.head.appendChild(script);
   } else {
     processMessages(messages);
-  }
-
-  function processMessages(messages) {
-    messages.forEach((msg, index) => {
-      setTimeout(() => {
-        window.showToast(msg.message, msg.type, 5000);
-      }, index * 300);
-      console.log('Flash message:', msg);
-    });
   }
 }

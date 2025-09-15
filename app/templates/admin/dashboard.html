@@ -1,7 +1,5 @@
-{% extends "admin/base.html" %}
-{% from 'macros/avatar_helpers.html' import user_avatar_simple %}
-
-{% block admin_content %}
+{% extends "admin/base.html" %} {% from 'macros/avatar_helpers.html' import user_avatar_simple %} {% block admin_content
+%}
 <!-- System Statistics -->
 <div class="row mb-4">
     <div class="col-md-3">
@@ -39,9 +37,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-info-circle me-2"></i>System Status
-                </h5>
+                <h5 class="card-title mb-0"> <i class="fas fa-info-circle me-2"></i>System Status </h5>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -52,9 +48,9 @@
                                 <div class="fw-bold">Email Service</div>
                                 <div class="text-muted">
                                     {% if email_enabled %}
-                                        <span class="text-success">Enabled (AWS SES)</span>
+                                    <span class="text-success">Enabled (AWS SES)</span>
                                     {% else %}
-                                        <span class="text-warning">Disabled</span>
+                                    <span class="text-warning">Disabled</span>
                                     {% endif %}
                                 </div>
                             </div>
@@ -80,9 +76,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-bolt me-2"></i>Quick Actions
-                </h5>
+                <h5 class="card-title mb-0"> <i class="fas fa-bolt me-2"></i>Quick Actions </h5>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -99,7 +93,9 @@
                         </a>
                     </div>
                     <div class="col-md-4">
-                        <a href="{{ url_for('admin.list_users', admin_only=True) }}" class="btn btn-warning btn-lg w-100 mb-3">
+                        <a
+                            href="{{ url_for('admin.list_users', admin_only=True) }}"
+                            class="btn btn-warning btn-lg w-100 mb-3">
                             <i class="fas fa-user-shield me-2"></i>
                             View Admins
                         </a>
@@ -115,85 +111,88 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">
-                    <i class="fas fa-clock me-2"></i>Recent Users
-                </h5>
-                <a href="{{ url_for('admin.list_users') }}" class="btn btn-sm btn-outline-primary">
-                    View All Users
-                </a>
+                <h5 class="card-title mb-0"> <i class="fas fa-clock me-2"></i>Recent Users </h5>
+                <a href="{{ url_for('admin.list_users') }}" class="btn btn-sm btn-outline-primary"> View All Users </a>
             </div>
             <div class="card-body">
                 {% if recent_users %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>User</th>
-                                    <th>Email</th>
-                                    <th>Status</th>
-                                    <th>Role</th>
-                                    <th>Joined</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for user in recent_users %}
-                                <tr>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            {{ user_avatar_simple(user, size='md', class='me-3') }}
-                                            <div>
-                                                <div class="fw-bold">{{ user.get_display_name() }}</div>
-                                                <small class="text-muted">@{{ user.username }}</small>
-                                            </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Role</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in recent_users %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {{ user_avatar_simple(user, size='md', class='me-3') }}
+                                        <div>
+                                            <div class="fw-bold">{{ user.get_display_name() }}</div>
+                                            <small class="text-muted">@{{ user.username }}</small>
                                         </div>
-                                    </td>
-                                    <td>{{ user.email }}</td>
-                                    <td>
-                                        {% if user.is_active %}
-                                            <span class="badge bg-success user-status-badge">Active</span>
-                                        {% else %}
-                                            <span class="badge bg-danger user-status-badge">Inactive</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if user.is_admin %}
-                                            <span class="badge bg-warning user-status-badge">Admin</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary user-status-badge">User</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">
-                                            {{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'Unknown' }}
-                                        </small>
-                                    </td>
-                                    <td class="table-actions">
-                                        <a href="{{ url_for('admin.view_user', user_id=user.id) }}"
-                                           class="btn btn-sm btn-outline-primary" title="View Details">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        {% if user.id != current_user.id %}
-                                            <form method="POST" action="{{ url_for('admin.toggle_user_admin', user_id=user.id) }}" class="d-inline">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                                <button type="submit" class="btn btn-sm btn-outline-warning"
-                                                        title="Toggle Admin"
-                                                        data-confirm="Are you sure you want to change admin status for {{ user.get_display_name() }}?">
-                                                    <i class="fas fa-user-shield"></i>
-                                                </button>
-                                            </form>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                                    </div>
+                                </td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    {% if user.is_active %}
+                                    <span class="badge bg-success user-status-badge">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-danger user-status-badge">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.is_admin %}
+                                    <span class="badge bg-warning user-status-badge">Admin</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary user-status-badge">User</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'Unknown' }}
+                                    </small>
+                                </td>
+                                <td class="table-actions">
+                                    <a
+                                        href="{{ url_for('admin.view_user', user_id=user.id) }}"
+                                        class="btn btn-sm btn-outline-primary"
+                                        title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if user.id != current_user.id %}
+                                    <form
+                                        method="POST"
+                                        action="{{ url_for('admin.toggle_user_admin', user_id=user.id) }}"
+                                        class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                        <button
+                                            type="submit"
+                                            class="btn btn-sm btn-outline-warning"
+                                            title="Toggle Admin"
+                                            data-confirm="Are you sure you want to change admin status for {{ user.get_display_name() }}?">
+                                            <i class="fas fa-user-shield"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
                 {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">No users found</p>
-                    </div>
+                <div class="text-center py-4">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No users found</p>
+                </div>
                 {% endif %}
             </div>
         </div>

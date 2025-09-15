@@ -3,17 +3,19 @@
  */
 
 /* Pretty rounded tags */
+
 .tagify-tag-pretty {
     border-radius: 20px !important;
     padding: 4px 12px !important;
     font-size: 0.8rem !important;
     font-weight: 500 !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 2px 4px rgb(0 0 0 / 10%) !important;
     transition: all 0.2s ease !important;
     line-height: 1.2 !important;
 }
 
 /* Pretty rounded remove button */
+
 .tagify-tag-pretty .tagify__tag__removeBtn {
     border-radius: 50% !important;
     width: 18px !important;
@@ -27,33 +29,37 @@
 
 .tagify-tag-pretty .tagify__tag__removeBtn:hover {
     opacity: 1 !important;
-    background-color: rgba(255, 255, 255, 0.2) !important;
+    background-color: rgb(255 255 255 / 20%) !important;
 }
 
 /* Hover effects for pretty tags */
+
 .tagify-tag-pretty:hover {
     transform: translateY(-1px) !important;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+    box-shadow: 0 4px 8px rgb(0 0 0 / 15%) !important;
 }
 
 /* Ensure user tag colors override default styles */
+
 .tagify__tag[class*="tag-"] {
     background-image: none !important;
     border: none !important;
 }
 
 /* User tag colors from dynamic CSS */
+
 .tagify__tag[class*="tag-"] .tagify__tag-text {
     color: inherit !important;
 }
 
 /* Pretty tag badges for modal display */
+
 .tag-badge-pretty {
     border-radius: 20px !important;
     padding: 4px 12px !important;
     font-size: 0.8rem !important;
     font-weight: 500 !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 2px 4px rgb(0 0 0 / 10%) !important;
     transition: all 0.2s ease !important;
     color: #fff !important;
     border: none !important;
@@ -65,17 +71,18 @@
 
 .tag-badge-pretty:hover {
     transform: translateY(-2px) !important;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+    box-shadow: 0 4px 8px rgb(0 0 0 / 15%) !important;
     opacity: 0.9 !important;
 }
 
 /* Tag preview in modal */
+
 #tagPreview {
     border-radius: 20px !important;
     padding: 4px 12px !important;
     font-size: 0.8rem !important;
     font-weight: 500 !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 2px 4px rgb(0 0 0 / 10%) !important;
     transition: all 0.2s ease !important;
     color: #fff !important;
     border: none !important;

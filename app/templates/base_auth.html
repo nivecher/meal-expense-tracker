@@ -42,18 +42,16 @@
     <body class="d-flex flex-column min-vh-100">
         <main class="flex-grow-1">
             <!-- Flash Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="flash-messages mb-0">
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                                <div class="alert-message">{{ message }}</div>
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %} {% block content %} {% endblock content %}
+            {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %}
+            <div class="flash-messages mb-0">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    <div class="alert-message">{{ message }}</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %} {% endwith %} {% block content %} {% endblock content %}
         </main>
         <footer class="footer mt-auto py-3 bg-light">
             <div class="container text-center">
@@ -64,197 +62,200 @@
         <script src="{{ url_for('static', filename='js/main.js') }}" type="module"></script>
         <!-- Simple auth form handler -->
         <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Add error logging that persists across redirects
-            window.addEventListener('error', function(e) {
-                console.error('Global error:', e.error, e.filename, e.lineno);
-                localStorage.setItem('lastError', JSON.stringify({
-                    error: e.error?.toString(),
-                    filename: e.filename,
-                    lineno: e.lineno,
-                    timestamp: new Date().toISOString()
-                }));
-            });
+            document.addEventListener("DOMContentLoaded", function () {
+                // Add error logging that persists across redirects
+                window.addEventListener("error", function (e) {
+                    console.error("Global error:", e.error, e.filename, e.lineno);
+                    localStorage.setItem(
+                        "lastError",
+                        JSON.stringify({
+                            error: e.error?.toString(),
+                            filename: e.filename,
+                            lineno: e.lineno,
+                            timestamp: new Date().toISOString(),
+                        })
+                    );
+                });
 
-            // Check for previous errors
-            const lastError = localStorage.getItem('lastError');
-            if (lastError) {
-                console.log('Previous error found:', lastError);
-                // Clear it after logging
-                localStorage.removeItem('lastError');
-            }
-            // Helper function to display validation errors
-            function displayValidationErrors(form, errors) {
-                // Clear existing errors
-                form.querySelectorAll('.text-danger').forEach(el => el.remove());
-                form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+                // Check for previous errors
+                const lastError = localStorage.getItem("lastError");
+                if (lastError) {
+                    console.log("Previous error found:", lastError);
+                    // Clear it after logging
+                    localStorage.removeItem("lastError");
+                }
+                // Helper function to display validation errors
+                function displayValidationErrors(form, errors) {
+                    // Clear existing errors
+                    form.querySelectorAll(".text-danger").forEach((el) => el.remove());
+                    form.querySelectorAll(".is-invalid").forEach((el) => el.classList.remove("is-invalid"));
 
-                // Display new errors
-                for (const [fieldName, errorMessages] of Object.entries(errors)) {
-                    const field = form.querySelector(`[name="${fieldName}"]`);
-                    if (field) {
-                        field.classList.add('is-invalid');
-                        const errorDiv = document.createElement('div');
-                        errorDiv.className = 'text-danger mt-1';
-                        errorDiv.textContent = Array.isArray(errorMessages) ? errorMessages[0] : errorMessages;
-                        field.parentNode.appendChild(errorDiv);
+                    // Display new errors
+                    for (const [fieldName, errorMessages] of Object.entries(errors)) {
+                        const field = form.querySelector(`[name="${fieldName}"]`);
+                        if (field) {
+                            field.classList.add("is-invalid");
+                            const errorDiv = document.createElement("div");
+                            errorDiv.className = "text-danger mt-1";
+                            errorDiv.textContent = Array.isArray(errorMessages) ? errorMessages[0] : errorMessages;
+                            field.parentNode.appendChild(errorDiv);
+                        }
                     }
                 }
-            }
 
-            // Helper function to show error message
-            function showErrorMessage(message) {
-                // Remove existing alerts
-                document.querySelectorAll('.alert-danger').forEach(el => el.remove());
+                // Helper function to show error message
+                function showErrorMessage(message) {
+                    // Remove existing alerts
+                    document.querySelectorAll(".alert-danger").forEach((el) => el.remove());
 
-                // Create and show error alert
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
-                alertDiv.innerHTML = `
+                    // Create and show error alert
+                    const alertDiv = document.createElement("div");
+                    alertDiv.className = "alert alert-danger alert-dismissible fade show mt-3";
+                    alertDiv.innerHTML = `
                     ${message}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `;
 
-                // Find the form container and prepend the alert
-                const container = document.querySelector('.container') || document.body;
-                container.insertBefore(alertDiv, container.firstChild);
-            }
+                    // Find the form container and prepend the alert
+                    const container = document.querySelector(".container") || document.body;
+                    container.insertBefore(alertDiv, container.firstChild);
+                }
 
-            // Simple form submission handler for auth forms
-            const authForms = document.querySelectorAll('#login-form, #register-form');
+                // Simple form submission handler for auth forms
+                const authForms = document.querySelectorAll("#login-form, #register-form");
 
-            authForms.forEach(form => {
-                form.addEventListener('submit', async function(e) {
-                    // Temporarily disable JavaScript form handling to test normal form submission
-                    console.log('Form submission intercepted by JavaScript - allowing normal submission');
-                    return; // Allow normal form submission
+                authForms.forEach((form) => {
+                    form.addEventListener("submit", async function (e) {
+                        // Temporarily disable JavaScript form handling to test normal form submission
+                        console.log("Form submission intercepted by JavaScript - allowing normal submission");
+                        return; // Allow normal form submission
 
-                    e.preventDefault();
+                        e.preventDefault();
 
-                    const submitBtn = form.querySelector('input[type="submit"], button[type="submit"]');
-                    const originalText = submitBtn.value || submitBtn.textContent;
+                        const submitBtn = form.querySelector('input[type="submit"], button[type="submit"]');
+                        const originalText = submitBtn.value || submitBtn.textContent;
 
-                    // Show loading state
-                    submitBtn.disabled = true;
-                    if (submitBtn.tagName === 'INPUT') {
-                        submitBtn.value = 'Processing...';
-                    } else {
-                        submitBtn.textContent = 'Processing...';
-                    }
-
-                    try {
-                        console.log('=== FORM SUBMISSION STARTING ===');
-                        console.log('Form action:', form.action || window.location.pathname);
-                        console.log('Form method:', form.method);
-
-                        const formData = new FormData(form);
-
-                        // Log form data for debugging
-                        console.log('Form data entries:');
-                        for (let [key, value] of formData.entries()) {
-                            console.log(`  ${key}: ${key === 'password' ? '[REDACTED]' : value}`);
+                        // Show loading state
+                        submitBtn.disabled = true;
+                        if (submitBtn.tagName === "INPUT") {
+                            submitBtn.value = "Processing...";
+                        } else {
+                            submitBtn.textContent = "Processing...";
                         }
 
-                        // Include CSRF token only if available in form (local dev)
-                        const csrfInput = form.querySelector('input[name="csrf_token"]');
-                        if (csrfInput && csrfInput.value) {
-                            formData.set('csrf_token', csrfInput.value);
-                            console.log('CSRF token added from form input');
-                        } else {
-                            // For Lambda deployment, add empty CSRF token to satisfy form validation
-                            formData.set('csrf_token', '');
-                            console.log('Added empty CSRF token for Lambda deployment');
-                        }
-                        // Note: For Lambda deployment, CSRF is disabled entirely
+                        try {
+                            console.log("=== FORM SUBMISSION STARTING ===");
+                            console.log("Form action:", form.action || window.location.pathname);
+                            console.log("Form method:", form.method);
 
-                        console.log('=== MAKING FETCH REQUEST ===');
-                        const url = form.action || window.location.pathname;
-                        console.log('Request URL:', url);
+                            const formData = new FormData(form);
 
-                        const response = await fetch(url, {
-                            method: 'POST',
-                            body: formData,
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        });
-
-                        console.log('=== RESPONSE RECEIVED ===');
-                        console.log('Response status:', response.status);
-                        console.log('Response ok:', response.ok);
-                        console.log('Response URL:', response.url);
-                        console.log('Response headers:', [...response.headers.entries()]);
-
-                        // Try to get response body for debugging
-                        const responseText = await response.clone().text();
-                        console.log('Response body preview:', responseText.substring(0, 500));
-
-                        if (response.ok) {
-                            // Check if it's a redirect (successful login/registration)
-                            if (response.redirected || response.url !== window.location.href) {
-                                window.location.href = response.url;
-                                return;
+                            // Log form data for debugging
+                            console.log("Form data entries:");
+                            for (let [key, value] of formData.entries()) {
+                                console.log(`  ${key}: ${key === "password" ? "[REDACTED]" : value}`);
                             }
 
-                            // Try to parse as JSON for API responses
-                            const contentType = response.headers.get('content-type');
-                            if (contentType && contentType.includes('application/json')) {
-                                const data = await response.json();
-                                if (data.redirect) {
-                                    window.location.href = data.redirect;
+                            // Include CSRF token only if available in form (local dev)
+                            const csrfInput = form.querySelector('input[name="csrf_token"]');
+                            if (csrfInput && csrfInput.value) {
+                                formData.set("csrf_token", csrfInput.value);
+                                console.log("CSRF token added from form input");
+                            } else {
+                                // For Lambda deployment, add empty CSRF token to satisfy form validation
+                                formData.set("csrf_token", "");
+                                console.log("Added empty CSRF token for Lambda deployment");
+                            }
+                            // Note: For Lambda deployment, CSRF is disabled entirely
+
+                            console.log("=== MAKING FETCH REQUEST ===");
+                            const url = form.action || window.location.pathname;
+                            console.log("Request URL:", url);
+
+                            const response = await fetch(url, {
+                                method: "POST",
+                                body: formData,
+                                headers: {
+                                    "X-Requested-With": "XMLHttpRequest",
+                                },
+                            });
+
+                            console.log("=== RESPONSE RECEIVED ===");
+                            console.log("Response status:", response.status);
+                            console.log("Response ok:", response.ok);
+                            console.log("Response URL:", response.url);
+                            console.log("Response headers:", [...response.headers.entries()]);
+
+                            // Try to get response body for debugging
+                            const responseText = await response.clone().text();
+                            console.log("Response body preview:", responseText.substring(0, 500));
+
+                            if (response.ok) {
+                                // Check if it's a redirect (successful login/registration)
+                                if (response.redirected || response.url !== window.location.href) {
+                                    window.location.href = response.url;
                                     return;
                                 }
-                                if (data.success) {
-                                    window.location.reload();
-                                    return;
-                                }
-                            }
 
-                            // For HTML responses, reload the page to show any messages
-                            window.location.reload();
-                        } else {
-                            // Handle error responses
-                            console.error('Response failed with status:', response.status);
-                            console.error('Response headers:', [...response.headers.entries()]);
-                            debugger; // Pause here to examine the response
-
-                            const contentType = response.headers.get('content-type');
-                            if (contentType && contentType.includes('application/json')) {
-                                try {
-                                    const errorData = await response.json();
-                                    console.error('Form validation errors:', errorData);
-
-                                    // Display validation errors
-                                    if (errorData.errors) {
-                                        displayValidationErrors(form, errorData.errors);
-                                    } else if (errorData.message) {
-                                        showErrorMessage(errorData.message);
+                                // Try to parse as JSON for API responses
+                                const contentType = response.headers.get("content-type");
+                                if (contentType && contentType.includes("application/json")) {
+                                    const data = await response.json();
+                                    if (data.redirect) {
+                                        window.location.href = data.redirect;
+                                        return;
                                     }
-                                    return;
-                                } catch (e) {
-                                    console.error('Failed to parse error response:', e);
+                                    if (data.success) {
+                                        window.location.reload();
+                                        return;
+                                    }
                                 }
-                            }
 
-                            console.error('Form submission failed:', response.status, response.statusText);
-                            // Don't reload to preserve error info for debugging
+                                // For HTML responses, reload the page to show any messages
+                                window.location.reload();
+                            } else {
+                                // Handle error responses
+                                console.error("Response failed with status:", response.status);
+                                console.error("Response headers:", [...response.headers.entries()]);
+                                debugger; // Pause here to examine the response
+
+                                const contentType = response.headers.get("content-type");
+                                if (contentType && contentType.includes("application/json")) {
+                                    try {
+                                        const errorData = await response.json();
+                                        console.error("Form validation errors:", errorData);
+
+                                        // Display validation errors
+                                        if (errorData.errors) {
+                                            displayValidationErrors(form, errorData.errors);
+                                        } else if (errorData.message) {
+                                            showErrorMessage(errorData.message);
+                                        }
+                                        return;
+                                    } catch (e) {
+                                        console.error("Failed to parse error response:", e);
+                                    }
+                                }
+
+                                console.error("Form submission failed:", response.status, response.statusText);
+                                // Don't reload to preserve error info for debugging
+                            }
+                        } catch (error) {
+                            console.error("Form submission error:", error);
+                            debugger; // This will pause execution to see the error
+                            alert("An error occurred. Please try again.");
+                        } finally {
+                            // Restore button state
+                            submitBtn.disabled = false;
+                            if (submitBtn.tagName === "INPUT") {
+                                submitBtn.value = originalText;
+                            } else {
+                                submitBtn.textContent = originalText;
+                            }
                         }
-                    } catch (error) {
-                        console.error('Form submission error:', error);
-                        debugger; // This will pause execution to see the error
-                        alert('An error occurred. Please try again.');
-                    } finally {
-                        // Restore button state
-                        submitBtn.disabled = false;
-                        if (submitBtn.tagName === 'INPUT') {
-                            submitBtn.value = originalText;
-                        } else {
-                            submitBtn.textContent = originalText;
-                        }
-                    }
+                    });
                 });
             });
-        });
         </script>
         {% block scripts %} {% endblock scripts %}
     </body>

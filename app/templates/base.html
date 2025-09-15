@@ -54,18 +54,16 @@
         {% include "includes/navbar.html" %}
         <main class="container py-4">
             <!-- Flash Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="flash-messages mb-4">
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                                <div class="alert-message">{{ message }}</div>
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
+            {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %}
+            <div class="flash-messages mb-4">
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    <div class="alert-message">{{ message }}</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %} {% endwith %}
             <!-- Toast Container -->
             <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3"> </div>
             {% block content %} {% endblock content %}
@@ -122,14 +120,14 @@
         <script type="module" src="{{ url_for('static', filename='js/utils/debug.js') }}" defer></script>
         <!-- Console warning filter for development -->
         <script src="{{ url_for('static', filename='js/utils/console-filter.js') }}"></script>
-        {% endif %}
-itting        <!-- Page-specific scripts -->
+        {% endif %} itting
+        <!-- Page-specific scripts -->
         {% block scripts %} {% endblock scripts %} {% block extra_js %} {% endblock extra_js %}
 
         <!-- Initialize page modules -->
         <!-- Load configuration utility -->
         <!-- Table sort component -->
-        <script type="module" src="{{ url_for('static', filename='js/components/table-sort.js') }}" defer></script>
+        <!-- <script type="module" src="{{ url_for('static', filename='js/components/table-sort.js') }}" defer></script> -->
         <script type="module" src="{{ url_for('static', filename='js/components/sticky-tables.js') }}" defer></script>
         <!-- Navbar components -->
         <script type="module" src="{{ url_for('static', filename='js/components/modern-avatar.js') }}" defer></script>
@@ -138,10 +136,13 @@ itting        <!-- Page-specific scripts -->
         <!-- Font Awesome fallback -->
         <script type="module" src="{{ url_for('static', filename='js/utils/fontawesome-fallback.js') }}"></script>
         <!-- Image fallback handling -->
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/components/image-fallback.css') }}">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/components/image-fallback.css') }}" />
         <script type="module" src="{{ url_for('static', filename='js/components/image-fallback.js') }}"></script>
 
         <!-- Lazy loading optimizer -->
         <script type="module" src="{{ url_for('static', filename='js/utils/lazy-loading-optimizer.js') }}"></script>
+
+        <!-- Robust favicon handling -->
+        <script type="module" src="{{ url_for('static', filename='js/utils/robust-favicon-handler.js') }}"></script>
     </body>
 </html>

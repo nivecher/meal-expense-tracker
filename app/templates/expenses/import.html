@@ -11,7 +11,9 @@
                     <div class="mb-4">
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <h3 class="h5 mb-0">Quick Start</h3>
-                            <a href="{{ url_for('expenses.export_expenses', format='csv') }}" class="btn btn-sm btn-outline-primary">
+                            <a
+                                href="{{ url_for('expenses.export_expenses', format='csv') }}"
+                                class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-download me-1"></i>Sample CSV
                             </a>
                         </div>
@@ -19,28 +21,41 @@
                         <div class="alert alert-primary">
                             <i class="fas fa-upload me-2"></i>
                             <strong>Upload a CSV or JSON file with expense data.</strong>
-                            Required: <code>date</code> and <code>amount</code> columns.
-                            Optional: restaurant, category, meal type, notes.
+                            Required: <code>date</code> and <code>amount</code> columns. Optional: restaurant, category,
+                            meal type, notes.
                         </div>
 
                         <!-- Expandable Sections -->
                         <div class="accordion" id="importAccordion">
-
                             <!-- Required Fields -->
                             <div class="accordion-item">
                                 <h2 class="accordion-header" id="headingRequired">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                            data-bs-target="#collapseRequired" aria-expanded="false" aria-controls="collapseRequired">
+                                    <button
+                                        class="accordion-button collapsed"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#collapseRequired"
+                                        aria-expanded="false"
+                                        aria-controls="collapseRequired">
                                         <i class="fas fa-asterisk text-danger me-2"></i>
                                         <strong>Required Fields</strong>
                                     </button>
                                 </h2>
-                                <div id="collapseRequired" class="accordion-collapse collapse"
-                                     aria-labelledby="headingRequired" data-bs-parent="#importAccordion">
+                                <div
+                                    id="collapseRequired"
+                                    class="accordion-collapse collapse"
+                                    aria-labelledby="headingRequired"
+                                    data-bs-parent="#importAccordion">
                                     <div class="accordion-body">
                                         <ul class="mb-0">
-                                            <li><code>date</code> - Expense date (YYYY-MM-DD, M/D/YYYY, Excel serial dates)</li>
-                                            <li><code>amount</code> - Amount (24.77, $24.77, (24.77) for expenses, +$24.77 for reimbursements)</li>
+                                            <li
+                                                ><code>date</code> - Expense date (YYYY-MM-DD, M/D/YYYY, Excel serial
+                                                dates)</li
+                                            >
+                                            <li
+                                                ><code>amount</code> - Amount (24.77, $24.77, (24.77) for expenses,
+                                                +$24.77 for reimbursements)</li
+                                            >
                                         </ul>
                                     </div>
                                 </div>
@@ -49,19 +64,33 @@
                             <!-- Optional Fields -->
                             <div class="accordion-item">
                                 <h2 class="accordion-header" id="headingOptional">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                            data-bs-target="#collapseOptional" aria-expanded="false" aria-controls="collapseOptional">
+                                    <button
+                                        class="accordion-button collapsed"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#collapseOptional"
+                                        aria-expanded="false"
+                                        aria-controls="collapseOptional">
                                         <i class="fas fa-plus-circle text-success me-2"></i>
                                         <strong>Optional Fields</strong>
                                     </button>
                                 </h2>
-                                <div id="collapseOptional" class="accordion-collapse collapse"
-                                     aria-labelledby="headingOptional" data-bs-parent="#importAccordion">
+                                <div
+                                    id="collapseOptional"
+                                    class="accordion-collapse collapse"
+                                    aria-labelledby="headingOptional"
+                                    data-bs-parent="#importAccordion">
                                     <div class="accordion-body">
                                         <ul class="mb-0">
-                                            <li><code>restaurant_name</code> - Restaurant name (auto-creates if new)</li>
+                                            <li
+                                                ><code>restaurant_name</code> - Restaurant name (auto-creates if
+                                                new)</li
+                                            >
                                             <li><code>restaurant_address</code> - Address (prevents duplicates)</li>
-                                            <li><code>category_name</code> - Category ("Parent:Child" format supported)</li>
+                                            <li
+                                                ><code>category_name</code> - Category ("Parent:Child" format
+                                                supported)</li
+                                            >
                                             <li><code>meal_type</code> - breakfast, lunch, dinner, snacks</li>
                                             <li><code>notes</code> - Additional details</li>
                                         </ul>
@@ -72,33 +101,41 @@
                             <!-- Smart Features -->
                             <div class="accordion-item">
                                 <h2 class="accordion-header" id="headingFeatures">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                            data-bs-target="#collapseFeatures" aria-expanded="false" aria-controls="collapseFeatures">
+                                    <button
+                                        class="accordion-button collapsed"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#collapseFeatures"
+                                        aria-expanded="false"
+                                        aria-controls="collapseFeatures">
                                         <i class="fas fa-magic text-primary me-2"></i>
                                         <strong>Smart Import Features</strong>
                                     </button>
                                 </h2>
-                                <div id="collapseFeatures" class="accordion-collapse collapse"
-                                     aria-labelledby="headingFeatures" data-bs-parent="#importAccordion">
+                                <div
+                                    id="collapseFeatures"
+                                    class="accordion-collapse collapse"
+                                    aria-labelledby="headingFeatures"
+                                    data-bs-parent="#importAccordion">
                                     <div class="accordion-body">
                                         <div class="row">
                                             <div class="col-md-6">
                                                 <h6>Flexible Column Names</h6>
                                                 <small class="text-muted">
-                                                    <strong>Date:</strong> postedOn, transaction_date, expense_date<br>
-                                                    <strong>Amount:</strong> cost, price, total, value<br>
-                                                    <strong>Restaurant:</strong> payee, vendor, merchant, location<br>
-                                                    <strong>Category:</strong> usage_category, type<br>
+                                                    <strong>Date:</strong> postedOn, transaction_date, expense_date<br />
+                                                    <strong>Amount:</strong> cost, price, total, value<br />
+                                                    <strong>Restaurant:</strong> payee, vendor, merchant, location<br />
+                                                    <strong>Category:</strong> usage_category, type<br />
                                                     <strong>Notes:</strong> description, memo, comment
                                                 </small>
                                             </div>
                                             <div class="col-md-6">
                                                 <h6>Smart Processing</h6>
                                                 <small class="text-muted">
-                                                    • Multiple date formats (ISO, US, European, Excel)<br>
-                                                    • Currency symbols and thousands separators<br>
-                                                    • Duplicate detection and prevention<br>
-                                                    • Restaurant matching and disambiguation<br>
+                                                    • Multiple date formats (ISO, US, European, Excel)<br />
+                                                    • Currency symbols and thousands separators<br />
+                                                    • Duplicate detection and prevention<br />
+                                                    • Restaurant matching and disambiguation<br />
                                                     • Hierarchical category mapping
                                                 </small>
                                             </div>
@@ -110,14 +147,22 @@
                             <!-- Format Examples -->
                             <div class="accordion-item">
                                 <h2 class="accordion-header" id="headingExamples">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                            data-bs-target="#collapseExamples" aria-expanded="false" aria-controls="collapseExamples">
+                                    <button
+                                        class="accordion-button collapsed"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#collapseExamples"
+                                        aria-expanded="false"
+                                        aria-controls="collapseExamples">
                                         <i class="fas fa-list-alt text-info me-2"></i>
                                         <strong>Format Examples</strong>
                                     </button>
                                 </h2>
-                                <div id="collapseExamples" class="accordion-collapse collapse"
-                                     aria-labelledby="headingExamples" data-bs-parent="#importAccordion">
+                                <div
+                                    id="collapseExamples"
+                                    class="accordion-collapse collapse"
+                                    aria-labelledby="headingExamples"
+                                    data-bs-parent="#importAccordion">
                                     <div class="accordion-body">
                                         <div class="row">
                                             <div class="col-md-6">
@@ -136,7 +181,6 @@
                                     </div>
                                 </div>
                             </div>
-
                         </div>
                     </div>
                     <form
@@ -170,16 +214,20 @@
                             <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Import Summary</h5>
                             <div class="row">
                                 <div class="col-md-3">
-                                    <strong>Processed:</strong> {{ import_summary.get('success_count', 0) + import_summary.get('error_count', 0) }} rows
+                                    <strong>Processed:</strong> {{ import_summary.get('success_count', 0) +
+                                    import_summary.get('error_count', 0) }} rows
                                 </div>
                                 <div class="col-md-3">
-                                    <strong class="text-success">Imported:</strong> {{ import_summary.get('success_count', 0) }}
+                                    <strong class="text-success">Imported:</strong> {{
+                                    import_summary.get('success_count', 0) }}
                                 </div>
                                 <div class="col-md-3">
-                                    <strong class="text-warning">Skipped:</strong> {{ import_summary.get('skipped_count', 0) }}
+                                    <strong class="text-warning">Skipped:</strong> {{
+                                    import_summary.get('skipped_count', 0) }}
                                 </div>
                                 <div class="col-md-3">
-                                    <strong class="text-danger">Errors:</strong> {{ import_summary.get('error_count', 0) }}
+                                    <strong class="text-danger">Errors:</strong> {{ import_summary.get('error_count', 0)
+                                    }}
                                 </div>
                             </div>
                         </div>
@@ -194,9 +242,10 @@
                                 <ul class="mb-0">
                                     {% for warning in warnings[:10] %}
                                     <li class="mb-1"><small>{{ warning }}</small></li>
-                                    {% endfor %}
-                                    {% if warnings|length > 10 %}
-                                    <li class="text-muted mt-2"><em>... and {{ warnings|length - 10 }} more warnings</em></li>
+                                    {% endfor %} {% if warnings|length > 10 %}
+                                    <li class="text-muted mt-2"
+                                        ><em>... and {{ warnings|length - 10 }} more warnings</em></li
+                                    >
                                     {% endif %}
                                 </ul>
                             </div>
@@ -207,25 +256,36 @@
                         {% if errors %}
                         <div class="alert alert-danger">
                             <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Import Errors</h5>
-                            <p class="mb-3">The following errors occurred during import. Please fix these issues in your file and try again:</p>
+                            <p class="mb-3"
+                                >The following errors occurred during import. Please fix these issues in your file and
+                                try again:</p
+                            >
                             {% if errors|length > 10 %}
                             <div class="mb-3">
-                                <small class="text-muted">Showing first 10 errors of {{ errors|length }} total errors.</small>
+                                <small class="text-muted"
+                                    >Showing first 10 errors of {{ errors|length }} total errors.</small
+                                >
                             </div>
                             {% endif %}
                             <div class="error-list scrollable-container-md">
                                 <ul class="mb-0">
                                     {% for error in errors[:10] %}
                                     <li class="mb-1"><code>{{ error }}</code></li>
-                                    {% endfor %}
-                                    {% if errors|length > 10 %}
-                                    <li class="text-muted mt-2"><em>... and {{ errors|length - 10 }} more errors</em></li>
+                                    {% endfor %} {% if errors|length > 10 %}
+                                    <li class="text-muted mt-2"
+                                        ><em>... and {{ errors|length - 10 }} more errors</em></li
+                                    >
                                     {% endif %}
                                 </ul>
                             </div>
                             {% if errors|length > 10 %}
                             <div class="mt-3">
-                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#allErrors" aria-expanded="false">
+                                <button
+                                    class="btn btn-sm btn-outline-secondary"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#allErrors"
+                                    aria-expanded="false">
                                     <i class="fas fa-list me-1"></i> Show All {{ errors|length }} Errors
                                 </button>
                             </div>
@@ -246,12 +306,30 @@
                             <div class="mt-3 p-3 bg-light rounded">
                                 <h6><i class="fas fa-lightbulb me-2"></i>Common Solutions:</h6>
                                 <ul class="mb-0 small">
-                                    <li><strong>"Amount is required":</strong> Check that your amount column has data and is named correctly (amount, cost, price, etc.)</li>
-                                    <li><strong>"Date is required":</strong> Ensure your date column exists and uses supported formats (M/D/YYYY, YYYY-MM-DD)</li>
-                                    <li><strong>"Invalid amount format":</strong> Use formats like: 24.77, $24.77, (24.77), +$24.77</li>
-                                    <li><strong>"Invalid date format":</strong> Use: 8/30/2025, 2025-08-30, or similar supported formats</li>
-                                    <li><strong>"matches multiple existing restaurants":</strong> Add an address column to disambiguate restaurants with the same name</li>
-                                    <li><strong>"not found. Please provide an address":</strong> Add an address column to create new restaurant entries</li>
+                                    <li
+                                        ><strong>"Amount is required":</strong> Check that your amount column has data
+                                        and is named correctly (amount, cost, price, etc.)</li
+                                    >
+                                    <li
+                                        ><strong>"Date is required":</strong> Ensure your date column exists and uses
+                                        supported formats (M/D/YYYY, YYYY-MM-DD)</li
+                                    >
+                                    <li
+                                        ><strong>"Invalid amount format":</strong> Use formats like: 24.77, $24.77,
+                                        (24.77), +$24.77</li
+                                    >
+                                    <li
+                                        ><strong>"Invalid date format":</strong> Use: 8/30/2025, 2025-08-30, or similar
+                                        supported formats</li
+                                    >
+                                    <li
+                                        ><strong>"matches multiple existing restaurants":</strong> Add an address column
+                                        to disambiguate restaurants with the same name</li
+                                    >
+                                    <li
+                                        ><strong>"not found. Please provide an address":</strong> Add an address column
+                                        to create new restaurant entries</li
+                                    >
                                 </ul>
                             </div>
                         </div>
@@ -262,8 +340,7 @@
                             <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-success">
                                 <i class="fas fa-check me-1"></i> View Imported Expenses
                             </a>
-                            {{ form.submit(class_="btn btn-primary") }}
-                            {% else %}
+                            {{ form.submit(class_="btn btn-primary") }} {% else %}
                             <!-- Show normal submit when no import happened yet -->
                             {{ form.submit(class_="btn btn-primary") }}
                             <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary">
@@ -320,7 +397,7 @@
         });
 
         // Clear validation states when form is reset or page loads
-        form.addEventListener("reset", function() {
+        form.addEventListener("reset", function () {
             fileInput.classList.remove("is-invalid", "is-valid");
             form.classList.remove("was-validated");
         });

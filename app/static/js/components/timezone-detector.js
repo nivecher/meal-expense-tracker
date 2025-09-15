@@ -282,9 +282,9 @@ class TimezoneDetector {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'X-Requested-With': 'XMLHttpRequest'
+          'X-Requested-With': 'XMLHttpRequest',
         },
-        body: `timezone=${encodeURIComponent(timezone)}&csrf_token=${this.getCSRFToken()}`
+        body: `timezone=${encodeURIComponent(timezone)}&csrf_token=${this.getCSRFToken()}`,
       });
 
       if (response.ok) {
@@ -329,8 +329,8 @@ class TimezoneDetector {
       const response = await fetch('/auth/profile', {
         method: 'GET',
         headers: {
-          'X-Requested-With': 'XMLHttpRequest'
-        }
+          'X-Requested-With': 'XMLHttpRequest',
+        },
       });
 
       if (response.ok) {

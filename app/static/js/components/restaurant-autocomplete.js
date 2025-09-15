@@ -44,7 +44,7 @@ class RestaurantAutocomplete {
       cuisineFilter.innerHTML = '<option value="">All Cuisines</option>';
 
       // Add cuisine options
-      cuisineNames.forEach(name => {
+      cuisineNames.forEach((name) => {
         const option = document.createElement('option');
         option.value = name.toLowerCase();
         option.textContent = name;
@@ -154,14 +154,14 @@ class RestaurantAutocomplete {
     try {
       // Build query parameters
       const params = new URLSearchParams({
-        query: query
+        query,
       });
 
       const response = await fetch(`/restaurants/api/places/search?${params.toString()}`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -181,7 +181,7 @@ class RestaurantAutocomplete {
         placeId: place.place_id || place.placeId || '',
         title: place.name || place.title || '',
         description: place.formatted_address || place.vicinity || place.address || '',
-      })).filter(s => s.placeId && s.title);
+      })).filter((s) => s.placeId && s.title);
 
       return suggestions;
     } catch (error) {
@@ -215,9 +215,9 @@ class RestaurantAutocomplete {
     this.suggestionsContainer.style.display = 'block';
 
     // Add click handlers
-    this.suggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
+    this.suggestionsContainer.querySelectorAll('.suggestion-item').forEach((item) => {
       item.addEventListener('click', () => {
-        const placeId = item.dataset.placeId;
+        const { placeId } = item.dataset;
         this.selectRestaurant(placeId);
       });
     });
@@ -241,7 +241,7 @@ class RestaurantAutocomplete {
   }
 
   clearSelection() {
-    this.suggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
+    this.suggestionsContainer.querySelectorAll('.suggestion-item').forEach((item) => {
       item.classList.remove('selected');
     });
   }
@@ -257,7 +257,7 @@ class RestaurantAutocomplete {
 
   selectCurrentSuggestion() {
     if (this.selectedIndex >= 0 && this.selectedIndex < this.suggestions.length) {
-      const placeId = this.suggestions[this.selectedIndex].placeId;
+      const { placeId } = this.suggestions[this.selectedIndex];
       this.selectRestaurant(placeId);
     }
   }
@@ -288,8 +288,8 @@ class RestaurantAutocomplete {
       const response = await fetch(`/restaurants/api/places/details/${placeId}`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
       if (!response.ok) {
@@ -327,7 +327,7 @@ class RestaurantAutocomplete {
         formatted_phone_number: place.phone || '',
         types: place.types || [],
         address_components: place.address_components || [],
-        place_id: placeId
+        place_id: placeId,
       };
     } catch (error) {
       throw new Error(`Details error: ${error.message}`);
@@ -359,23 +359,23 @@ class RestaurantAutocomplete {
       'restaurant-notes': restaurantData.notes,
 
       // Restaurant form field IDs (without prefix)
-      'name': restaurantData.name,
-      'type': restaurantData.type,
-      'description': restaurantData.description,
-      'address': restaurantData.address,
-      'city': restaurantData.city,
-      'state': restaurantData.state,
-      'postal_code': restaurantData.postal_code,
-      'country': restaurantData.country,
-      'phone': restaurantData.phone,
-      'website': restaurantData.website,
-      'email': restaurantData.email,
-      'google_place_id': restaurantData.google_place_id,
-      'cuisine': restaurantData.cuisine,
-      'service_level': restaurantData.service_level,
-      'is_chain': restaurantData.is_chain,
-      'rating': restaurantData.rating,
-      'notes': restaurantData.notes
+      name: restaurantData.name,
+      type: restaurantData.type,
+      description: restaurantData.description,
+      address: restaurantData.address,
+      city: restaurantData.city,
+      state: restaurantData.state,
+      postal_code: restaurantData.postal_code,
+      country: restaurantData.country,
+      phone: restaurantData.phone,
+      website: restaurantData.website,
+      email: restaurantData.email,
+      google_place_id: restaurantData.google_place_id,
+      cuisine: restaurantData.cuisine,
+      service_level: restaurantData.service_level,
+      is_chain: restaurantData.is_chain,
+      rating: restaurantData.rating,
+      notes: restaurantData.notes,
     };
 
     console.log('Field mappings:', fieldMappings);
@@ -398,8 +398,8 @@ class RestaurantAutocomplete {
           field.checked = Boolean(value);
         } else if (field.type === 'select-one') {
           // For select fields, try to find matching option
-          const option = Array.from(field.options).find(opt =>
-            opt.value === value || opt.text.toLowerCase() === String(value).toLowerCase()
+          const option = Array.from(field.options).find((opt) =>
+            opt.value === value || opt.text.toLowerCase() === String(value).toLowerCase(),
           );
           if (option) {
             field.value = option.value;

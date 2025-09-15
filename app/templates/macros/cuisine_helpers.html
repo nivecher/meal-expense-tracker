@@ -1,12 +1,5 @@
-{# Cuisine Helpers Macros
-
-   This file provides cuisine-specific macros for the meal expense tracker.
-   It re-exports the cuisine_badge macro from badge_helpers.html for backward compatibility.
-#}
-
-{% from 'macros/badge_helpers.html' import cuisine_badge as _cuisine_badge %}
-
-{# Re-export the cuisine_badge macro for backward compatibility #}
-{% macro cuisine_badge(cuisine_name, size='md', show_icon=true, link_url='') -%}
-    {{ _cuisine_badge(cuisine_name, size, show_icon, link_url) }}
-{%- endmacro %}
+{# Cuisine Helpers Macros This file provides cuisine-specific macros for the meal expense tracker. It re-exports the
+cuisine_badge macro from badge_helpers.html for backward compatibility. #} {% from 'macros/badge_helpers.html' import
+cuisine_badge as _cuisine_badge %} {# Re-export the cuisine_badge macro for backward compatibility #} {% macro
+cuisine_badge(cuisine_name, size='md', show_icon=true, link_url='') -%} {{ _cuisine_badge(cuisine_name, size, show_icon,
+link_url) }} {%- endmacro %}

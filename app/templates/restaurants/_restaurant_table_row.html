@@ -5,19 +5,19 @@
             <!-- Restaurant Icon (small for table view) -->
             <div class="restaurant-icon-table me-2 flex-shrink-0 d-flex align-items-center">
                 {% if restaurant.website %}
-                    <img
-                        src="https://www.google.com/s2/favicons?domain={{ restaurant.website.replace('http://', '').replace('https://', '').replace('www.', '').split('/')[0] }}&sz=20"
-                        data-website="{{ restaurant.website }}"
-                        alt="{{ restaurant.name }} icon"
-                        class="restaurant-favicon-table"
-                        width="20"
-                        height="20"
-                        onerror="handleFaviconError(this);"
-                        onload="this.style.opacity='1';"
-                        style="opacity: 0; transition: opacity 0.2s ease-in-out;"
-                    />
+                <img
+                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                    data-website="{{ restaurant.website }}"
+                    data-size="20"
+                    alt="{{ restaurant.name }} icon"
+                    class="restaurant-favicon-table"
+                    width="20"
+                    height="20"
+                    style="opacity: 0; transition: opacity 0.2s ease-in-out" />
                 {% endif %}
-                <i class="fas fa-utensils text-primary restaurant-fallback-icon-table{% if restaurant.website %} d-none{% endif %}" style="font-size: 16px;"></i>
+                <i
+                    class="fas fa-utensils text-primary restaurant-fallback-icon-table{% if restaurant.website %} d-none{% endif %}"
+                    style="font-size: 16px"></i>
             </div>
 
             <!-- Restaurant Name and Cuisine -->
@@ -27,8 +27,8 @@
                 >
                 {% if restaurant.cuisine %}
                 <div class="mt-1">
-                    {% from 'macros/badge_helpers.html' import cuisine_badge %}
-                    {{ cuisine_badge(restaurant.cuisine, size='sm') }}
+                    {% from 'macros/badge_helpers.html' import cuisine_badge %} {{ cuisine_badge(restaurant.cuisine,
+                    size='sm') }}
                 </div>
                 {% endif %}
             </div>
@@ -38,13 +38,12 @@
         <div class="d-flex align-items-start">
             <i class="fas fa-map-marker-alt me-2 mt-1 flex-shrink-0 text-muted"></i>
             <div class="flex-grow-1">
-                {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %}
-                    {% if restaurant.address %}<div class="small text-muted">{{ restaurant.address }}</div>{% endif %}
-                    {% if restaurant.city or restaurant.state or restaurant.postal_code %}
-                        <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
-                    {% endif %}
-                {% else %}
-                    <span class="text-muted">-</span>
+                {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %} {% if
+                restaurant.address %}<div class="small text-muted">{{ restaurant.address }}</div>{% endif %} {% if
+                restaurant.city or restaurant.state or restaurant.postal_code %}
+                <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
+                {% endif %} {% else %}
+                <span class="text-muted">-</span>
                 {% endif %}
             </div>
             {% set maps_url = restaurant|google_maps_url %} {% if maps_url %}
@@ -61,10 +60,8 @@
         </div>
     </td>
     <td>
-        {% if restaurant.service_level %}
-        {% from 'macros/badge_helpers.html' import service_level_badge %}
-        {{ service_level_badge(restaurant.service_level, size='sm') }}
-        {% else %}
+        {% if restaurant.service_level %} {% from 'macros/badge_helpers.html' import service_level_badge %} {{
+        service_level_badge(restaurant.service_level, size='sm') }} {% else %}
         <span class="text-muted">-</span>
         {% endif %}
     </td>
@@ -78,24 +75,28 @@
         <span class="text-muted">No rating</span>
         {% endif %}
     </td>
-    <td>{{ restaurant.visit_count }}</td>
-    <td>
+    <td data-sort-value="{{ restaurant.visit_count }}">
+        {% if restaurant.visit_count > 0 %}
+            {{ restaurant.visit_count }}
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td data-sort-value="{% if last_visit %}{{ last_visit.isoformat() }}{% else %}1970-01-01T00:00:00{% endif %}">
         {% if last_visit %}
         <span
-            data-sort-value="{{ last_visit.isoformat() }}"
             data-bs-toggle="tooltip"
             title="{{ last_visit|format_datetime_user_tz('%B %d, %Y at %I:%M %p') }}">
             {{ last_visit|time_ago }}
         </span>
         {% else %}
-        <span class="text-muted" data-sort-value="">No visits</span>
+        <span class="text-muted">No visits</span>
         {% endif %}
     </td>
     <td class="fw-bold text-info amount-right">
-        {% if restaurant.avg_price_per_person and restaurant.avg_price_per_person > 0 %}
-            ${{ "%.2f"|format(restaurant.avg_price_per_person) }}
-        {% else %}
-            <span class="text-muted">-</span>
+        {% if restaurant.avg_price_per_person and restaurant.avg_price_per_person > 0 %} ${{
+        "%.2f"|format(restaurant.avg_price_per_person) }} {% else %}
+        <span class="text-muted">-</span>
         {% endif %}
     </td>
     <td class="fw-bold text-success amount-right"
@@ -107,14 +108,14 @@
             class="btn btn-sm btn-outline-primary"
             data-bs-toggle="tooltip"
             title="View Details">
-            <i class="fas fa-eye me-1"></i><span class="d-none d-lg-inline">View</span>
+            <i class="fas fa-eye"></i>
         </a>
         <a
             href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
             class="btn btn-sm btn-outline-secondary"
             data-bs-toggle="tooltip"
             title="Edit">
-            <i class="fas fa-edit me-1"></i><span class="d-none d-lg-inline">Edit</span>
+            <i class="fas fa-edit"></i>
         </a>
         <button
             type="button"
@@ -125,7 +126,7 @@
             data-restaurant-name="{{ restaurant.name }}"
             data-tooltip="true"
             title="Delete">
-            <i class="fas fa-trash me-1"></i><span class="d-none d-lg-inline">Delete</span>
+            <i class="fas fa-trash"></i>
         </button>
     </td>
 </tr>

@@ -1,16 +1,18 @@
 /* Dashboard Styles - Light, Modern, Sleek Design */
 
 /* Welcome Section */
+
 .welcome-section {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
     border: 1px solid #e9ecef;
     border-radius: 1.25rem;
-    padding: 2rem 2rem;
-    margin: 0 -15px 1rem -15px;
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.03);
+    padding: 2rem;
+    margin: 0 -15px 1rem;
+    box-shadow: 0 2px 15px rgb(0 0 0 / 3%);
 }
 
 /* Welcome Quick Actions */
+
 .welcome-quick-actions {
     margin-top: 1.5rem;
 }
@@ -35,14 +37,14 @@
     height: 100%;
     min-height: 50px;
     border: 1px solid #dee2e6;
-    background: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
 }
 
 .welcome-action-btn:hover {
     text-decoration: none;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
 }
 
 .welcome-action-btn i {
@@ -62,46 +64,48 @@
 }
 
 /* Welcome Action Button Variants - Blue Hover Theme */
+
 .welcome-action-blue {
-    color: #ffffff;
+    color: #fff;
     background: #0d6efd;
     border-color: #0d6efd;
 }
 
 .welcome-action-blue:hover {
-    color: #ffffff;
+    color: #fff;
     background: #0b5ed7;
     border-color: #0a58ca;
-    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.25);
+    box-shadow: 0 4px 15px rgb(13 110 253 / 25%);
 }
 
 .welcome-action-orange {
-    color: #ffffff;
+    color: #fff;
     background: #fd7e14;
     border-color: #fd7e14;
 }
 
 .welcome-action-orange:hover {
-    color: #ffffff;
+    color: #fff;
     background: #0d6efd;
     border-color: #0d6efd;
-    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.25);
+    box-shadow: 0 4px 15px rgb(13 110 253 / 25%);
 }
 
 .welcome-action-gray {
     color: #495057;
-    background: #ffffff;
+    background: #fff;
     border-color: #dee2e6;
 }
 
 .welcome-action-gray:hover {
-    color: #ffffff;
+    color: #fff;
     background: #0d6efd;
     border-color: #0d6efd;
-    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.25);
+    box-shadow: 0 4px 15px rgb(13 110 253 / 25%);
 }
 
 /* Help Link */
+
 .help-link {
     color: #6c757d;
     text-decoration: none;
@@ -122,7 +126,7 @@
     border-color: #0d6efd;
     text-decoration: none;
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.15);
+    box-shadow: 0 2px 8px rgb(13 110 253 / 15%);
 }
 
 .welcome-content h1 {
@@ -146,21 +150,22 @@
 }
 
 @keyframes float {
-    0%, 100% { transform: translateY(0px); }
+    0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
 }
 
 /* Stats Cards */
+
 .stats-section {
-    margin: 0 -15px 2rem -15px;
+    margin: 0 -15px 2rem;
     padding: 0 15px;
 }
 
 .stats-card {
-    background: #ffffff;
+    background: #fff;
     border-radius: 1.25rem;
     padding: 1.75rem 1.25rem;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 12px rgb(0 0 0 / 6%);
     border: 1px solid #f1f3f4;
     transition: all 0.3s ease;
     text-align: center;
@@ -169,7 +174,7 @@
 
 .stats-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 6px 25px rgb(0 0 0 / 12%);
     border-color: #e9ecef;
 }
 
@@ -197,22 +202,23 @@
 }
 
 /* Cards */
+
 .card {
     border: 1px solid #f1f3f4;
     border-radius: 1.25rem;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 12px rgb(0 0 0 / 6%);
     transition: all 0.3s ease;
-    background: #ffffff;
+    background: #fff;
 }
 
 .card:hover {
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 6px 25px rgb(0 0 0 / 10%);
     border-color: #e9ecef;
     transform: translateY(-1px);
 }
 
 .card-header {
-    background: #ffffff;
+    background: #fff;
     border-bottom: 1px solid #f1f3f4;
     border-radius: 1.25rem 1.25rem 0 0 !important;
     padding: 0.15rem 0.75rem;
@@ -230,13 +236,14 @@
 }
 
 /* Recent Expenses */
+
 .recent-expenses-list {
     max-height: 520px;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden auto;
 }
 
 /* Clickable expense links */
+
 .expense-item-link {
     text-decoration: none;
     color: inherit;
@@ -267,7 +274,7 @@
     margin: 0 -0.5rem;
     padding-left: 1.5rem;
     padding-right: 1.5rem;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 4%);
 }
 
 .expense-info {
@@ -302,13 +309,14 @@
 }
 
 /* Top Restaurants */
+
 .top-restaurants-list {
     max-height: 520px;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden auto;
 }
 
 /* Clickable restaurant links */
+
 .restaurant-item-link {
     text-decoration: none;
     color: inherit;
@@ -339,7 +347,7 @@
     margin: 0 -0.5rem;
     padding-left: 1.5rem;
     padding-right: 1.5rem;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 4%);
 }
 
 .restaurant-info {
@@ -369,6 +377,7 @@
 }
 
 /* Empty States */
+
 .empty-state {
     padding: 3rem 1rem;
 }
@@ -379,13 +388,15 @@
 }
 
 /* Quick Actions */
+
 .quick-actions-section .card {
-    background: #ffffff;
+    background: #fff;
     border: 1px solid #f1f3f4;
     margin: 0 -15px;
 }
 
 /* Compact Quick Actions */
+
 .quick-actions-section .card-header {
     padding: 0.25rem 0.75rem;
 }
@@ -409,12 +420,12 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0.25rem 0.25rem;
+    padding: 0.25rem;
     text-decoration: none;
     color: #495057;
     border-radius: 0.5rem;
     transition: all 0.3s ease;
-    background: #ffffff;
+    background: #fff;
     border: 1px solid #f1f3f4;
     text-align: center;
     height: 100%;
@@ -425,7 +436,7 @@
     color: #0d6efd;
     background: #f8f9fa;
     transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(13, 110, 253, 0.15);
+    box-shadow: 0 4px 20px rgb(13 110 253 / 15%);
     text-decoration: none;
     border-color: #e9ecef;
 }
@@ -447,8 +458,9 @@
 }
 
 /* Navigation Guide */
+
 .navigation-guide .card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
     border: 1px solid #f1f3f4;
     margin: 0 -15px;
 }
@@ -485,7 +497,9 @@
 }
 
 /* Better horizontal utilization for quick actions */
-@media (min-width: 1400px) {
+
+@media (width >= 1400px) {
+
     .quick-action-btn {
         padding: 2rem 1.25rem;
     }
@@ -501,7 +515,9 @@
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+
+@media (width <= 768px) {
+
     .welcome-section {
         padding: 2rem 1.5rem;
         text-align: center;
@@ -524,6 +540,7 @@
     }
 
     /* Welcome Quick Actions Mobile */
+
     .welcome-quick-actions {
         margin-top: 1rem;
     }
@@ -553,7 +570,7 @@
     }
 
     .stats-section {
-        margin: 0 0 2rem 0;
+        margin: 0 0 2rem;
         padding: 0;
     }
 
@@ -604,6 +621,7 @@
     }
 
     /* Better mobile layout for 7 buttons */
+
     .quick-actions-section .row {
         justify-content: center;
     }
@@ -613,7 +631,8 @@
     }
 }
 
-@media (max-width: 576px) {
+@media (width <= 576px) {
+
     .welcome-section {
         padding: 1.5rem 1rem;
         margin: 0;
@@ -624,6 +643,7 @@
     }
 
     /* Welcome Quick Actions Small Mobile */
+
     .welcome-quick-actions {
         margin-top: 0.75rem;
     }
@@ -653,7 +673,7 @@
     }
 
     .stats-section {
-        margin: 0 0 1.5rem 0;
+        margin: 0 0 1.5rem;
     }
 
     .stats-card {
@@ -690,13 +710,16 @@
 }
 
 /* Layout Improvements */
+
 /* Main content grid improvements */
+
 .row.g-4.mb-4 {
-    margin: 0 -15px 2rem -15px;
+    margin: 0 -15px 2rem;
     padding: 0 15px;
 }
 
 /* Prevent horizontal overflow */
+
 .expense-info,
 .restaurant-info {
     min-width: 0;
@@ -713,18 +736,22 @@
 }
 
 /* Light theme consistency */
+
 body .container {
     max-width: 1200px;
 }
 
 /* Better full-width utilization */
+
 .container {
     padding-left: 1rem;
     padding-right: 1rem;
 }
 
 /* Enhanced layout for larger screens */
-@media (min-width: 1200px) {
+
+@media (width >= 1200px) {
+
     .welcome-section {
         padding: 3rem 2.5rem;
     }
@@ -743,6 +770,7 @@ body .container {
 }
 
 /* Restaurant Icons */
+
 .restaurant-favicon {
     border-radius: 4px;
     object-fit: cover;
@@ -762,6 +790,7 @@ body .container {
 /* Dashboard-specific badge adjustments (now handled by unified badge system) */
 
 /* Restaurant names styling for dashboard */
+
 .dashboard .restaurant-name,
 .dashboard .expense-restaurant {
     font-size: 1.05rem;
@@ -777,6 +806,7 @@ body .container {
 /* Enhanced light styling for better consistency */
 
 /* Improved contrast and readability */
+
 .text-muted {
     color: #6c757d !important;
 }
@@ -786,6 +816,7 @@ body .container {
 }
 
 /* Consistent section spacing and alignment */
+
 section {
     position: relative;
 }
@@ -793,11 +824,13 @@ section {
 
 
 /* Enhanced visual hierarchy */
+
 .stats-section .row {
     position: relative;
 }
 
 /* Better visual flow */
+
 .quick-actions-section {
     position: relative;
 }

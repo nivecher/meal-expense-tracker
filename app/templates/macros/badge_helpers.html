@@ -1,170 +1,103 @@
-{# Unified Badge System Macros
+{# Unified Badge System Macros This file provides standardized macros for all badge types in the meal expense tracker.
+Following TIGER principles: Safety, Performance, Developer Experience Usage: - meal_type_badge(meal_type, size='md',
+show_icon=true) - cuisine_badge(cuisine_name, size='md', show_icon=true, link_url='') - order_type_badge(order_type,
+size='md', show_icon=true) - service_level_badge(service_level, size='md') #} {# Helper function to convert hex color to
+RGB values #} {% macro hex_to_rgb(hex_color) -%} {%- if hex_color and hex_color.startswith('#') and hex_color|length ==
+7 -%} {%- set r = hex_color[1:3]|int(16) -%} {%- set g = hex_color[3:5]|int(16) -%} {%- set b = hex_color[5:7]|int(16)
+-%} {{- r }}, {{ g }}, {{ b -}} {%- else -%} 108, 117, 125 {%- endif -%} {%- endmacro %} {# Meal Type Badge Macro #} {%
+macro meal_type_badge(meal_type, size='md', show_icon=true) -%} {%- if meal_type -%} {%- set meal_type_lower =
+meal_type.lower().strip() -%} {%- set css_class = meal_type_lower|meal_type_css_class -%} {%- set icon =
+meal_type_lower|meal_type_icon if show_icon else '' -%} {%- set display_name = meal_type.title() -%} {%- set size_class
+= 'badge-sm' if size == 'sm' else 'badge-lg' if size == 'lg' else 'badge-md' -%}
 
-   This file provides standardized macros for all badge types in the meal expense tracker.
-   Following TIGER principles: Safety, Performance, Developer Experience
+<span class="badge-unified meal-type {{ css_class }} {{ size_class }}">
+    {%- if show_icon and icon -%}
+    <i class="fas fa-{{ icon }}"></i>
+    {%- endif -%} {{ display_name }}
+</span>
+{%- else -%}
+<span class="text-muted">-</span>
+{%- endif -%} {%- endmacro %} {# Cuisine Badge Macro #} {% macro cuisine_badge(cuisine_name, size='md', show_icon=true,
+link_url='') -%} {%- if cuisine_name -%} {%- set cuisine_color = cuisine_name|cuisine_color -%} {%- set cuisine_icon =
+cuisine_name|cuisine_icon if show_icon else '' -%} {%- set cuisine_css_class = cuisine_name|cuisine_css_class -%} {%-
+set rgb_values = hex_to_rgb(cuisine_color) -%} {%- set size_class = 'badge-sm' if size == 'sm' else 'badge-lg' if size
+== 'lg' else 'badge-md' -%} {%- if link_url -%}
+<a
+    href="{{ link_url }}"
+    class="badge-unified cuisine {{ cuisine_css_class }} {{ size_class }}"
+    data-cuisine="{{ cuisine_name }}"
+    style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }};">
+    {%- if show_icon and cuisine_icon -%}
+    <i class="fas fa-{{ cuisine_icon }}"></i>
+    {%- endif -%} {{ cuisine_name }}
+</a>
+{%- else -%}
+<span
+    class="badge-unified cuisine {{ cuisine_css_class }} {{ size_class }}"
+    data-cuisine="{{ cuisine_name }}"
+    style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }};">
+    {%- if show_icon and cuisine_icon -%}
+    <i class="fas fa-{{ cuisine_icon }}"></i>
+    {%- endif -%} {{ cuisine_name }}
+</span>
+{%- endif -%} {%- else -%}
+<span class="text-muted">-</span>
+{%- endif -%} {%- endmacro %} {# Order Type Badge Macro #} {% macro order_type_badge(order_type, size='md',
+show_icon=true) -%} {%- if order_type -%} {%- set order_type_lower = order_type.lower().strip() -%} {%- set css_class =
+order_type_lower|order_type_css_class -%} {%- set icon = order_type_lower|order_type_icon if show_icon else '' -%} {%-
+set display_name = order_type.replace('_', ' ').title() -%} {%- set size_class = 'badge-sm' if size == 'sm' else
+'badge-lg' if size == 'lg' else 'badge-md' -%}
 
-   Usage:
-   - meal_type_badge(meal_type, size='md', show_icon=true)
-   - cuisine_badge(cuisine_name, size='md', show_icon=true, link_url='')
-   - order_type_badge(order_type, size='md', show_icon=true)
-   - service_level_badge(service_level, size='md')
-#}
+<span class="badge-unified order-type {{ css_class }} {{ size_class }}">
+    {%- if show_icon and icon -%}
+    <i class="fas fa-{{ icon }}"></i>
+    {%- endif -%} {{ display_name }}
+</span>
+{%- else -%}
+<span class="text-muted">-</span>
+{%- endif -%} {%- endmacro %} {# Service Level Badge Macro #} {% macro service_level_badge(service_level, size='md') -%}
+{%- if service_level -%} {%- set service_level_normalized = service_level.lower().strip().replace(' ', '-') -%} {%- set
+display_name = service_level.replace('_', ' ').title() -%} {%- set size_class = 'badge-sm' if size == 'sm' else
+'badge-lg' if size == 'lg' else 'badge-md' -%}
 
-{# Helper function to convert hex color to RGB values #}
-{% macro hex_to_rgb(hex_color) -%}
-    {%- if hex_color and hex_color.startswith('#') and hex_color|length == 7 -%}
-        {%- set r = hex_color[1:3]|int(16) -%}
-        {%- set g = hex_color[3:5]|int(16) -%}
-        {%- set b = hex_color[5:7]|int(16) -%}
-        {{- r }}, {{ g }}, {{ b -}}
-    {%- else -%}
-        108, 117, 125
-    {%- endif -%}
-{%- endmacro %}
-
-{# Meal Type Badge Macro #}
-{% macro meal_type_badge(meal_type, size='md', show_icon=true) -%}
-    {%- if meal_type -%}
-        {%- set meal_type_lower = meal_type.lower().strip() -%}
-        {%- set css_class = meal_type_lower|meal_type_css_class -%}
-        {%- set icon = meal_type_lower|meal_type_icon if show_icon else '' -%}
-        {%- set display_name = meal_type.title() -%}
-
-        {%- set size_class = 'badge-sm' if size == 'sm' else 'badge-lg' if size == 'lg' else 'badge-md' -%}
-
-        <span class="badge-unified meal-type {{ css_class }} {{ size_class }}">
-            {%- if show_icon and icon -%}
-                <i class="fas fa-{{ icon }}"></i>
-            {%- endif -%}
-            {{ display_name }}
-        </span>
-    {%- else -%}
-        <span class="text-muted">-</span>
-    {%- endif -%}
-{%- endmacro %}
-
-{# Cuisine Badge Macro #}
-{% macro cuisine_badge(cuisine_name, size='md', show_icon=true, link_url='') -%}
-    {%- if cuisine_name -%}
-        {%- set cuisine_color = cuisine_name|cuisine_color -%}
-        {%- set cuisine_icon = cuisine_name|cuisine_icon if show_icon else '' -%}
-        {%- set cuisine_css_class = cuisine_name|cuisine_css_class -%}
-        {%- set rgb_values = hex_to_rgb(cuisine_color) -%}
-
-        {%- set size_class = 'badge-sm' if size == 'sm' else 'badge-lg' if size == 'lg' else 'badge-md' -%}
-
-        {%- if link_url -%}
-            <a href="{{ link_url }}"
-               class="badge-unified cuisine {{ cuisine_css_class }} {{ size_class }}"
-               data-cuisine="{{ cuisine_name }}"
-               style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }};">
-                {%- if show_icon and cuisine_icon -%}
-                    <i class="fas fa-{{ cuisine_icon }}"></i>
-                {%- endif -%}
-                {{ cuisine_name }}
-            </a>
-        {%- else -%}
-            <span class="badge-unified cuisine {{ cuisine_css_class }} {{ size_class }}"
-                  data-cuisine="{{ cuisine_name }}"
-                  style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }};">
-                {%- if show_icon and cuisine_icon -%}
-                    <i class="fas fa-{{ cuisine_icon }}"></i>
-                {%- endif -%}
-                {{ cuisine_name }}
-            </span>
-        {%- endif -%}
-    {%- else -%}
-        <span class="text-muted">-</span>
-    {%- endif -%}
-{%- endmacro %}
-
-{# Order Type Badge Macro #}
-{% macro order_type_badge(order_type, size='md', show_icon=true) -%}
-    {%- if order_type -%}
-        {%- set order_type_lower = order_type.lower().strip() -%}
-        {%- set css_class = order_type_lower|order_type_css_class -%}
-        {%- set icon = order_type_lower|order_type_icon if show_icon else '' -%}
-        {%- set display_name = order_type.replace('_', ' ').title() -%}
-
-        {%- set size_class = 'badge-sm' if size == 'sm' else 'badge-lg' if size == 'lg' else 'badge-md' -%}
-
-        <span class="badge-unified order-type {{ css_class }} {{ size_class }}">
-            {%- if show_icon and icon -%}
-                <i class="fas fa-{{ icon }}"></i>
-            {%- endif -%}
-            {{ display_name }}
-        </span>
-    {%- else -%}
-        <span class="text-muted">-</span>
-    {%- endif -%}
-{%- endmacro %}
-
-{# Service Level Badge Macro #}
-{% macro service_level_badge(service_level, size='md') -%}
-    {%- if service_level -%}
-        {%- set service_level_normalized = service_level.lower().strip().replace(' ', '-') -%}
-        {%- set display_name = service_level.replace('_', ' ').title() -%}
-
-        {%- set size_class = 'badge-sm' if size == 'sm' else 'badge-lg' if size == 'lg' else 'badge-md' -%}
-
-        <span class="badge-unified service-level {{ service_level_normalized }} {{ size_class }}"
-              data-service-level="{{ service_level }}">
-            {{ display_name }}
-        </span>
-    {%- else -%}
-        <span class="text-muted">-</span>
-    {%- endif -%}
-{%- endmacro %}
-
-{# Party Size Badge Macro (for expense tables) #}
-{% macro party_size_badge(party_size, price_per_person=None, size='sm') -%}
-    {%- if party_size and party_size > 0 -%}
-        {%- set size_class = 'badge-sm' if size == 'sm' else 'badge-lg' if size == 'lg' else 'badge-md' -%}
-        {%- set bg_class = 'bg-info' if party_size > 1 else 'bg-secondary' -%}
-
-        {%- if party_size > 1 and price_per_person -%}
-            <span class="badge {{ bg_class }} {{ size_class }}"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  title="Price per person: ${{ '%.2f'|format(price_per_person) }}">
-                <i class="fas fa-user me-1"></i>{{ party_size }} people
-            </span>
-        {%- else -%}
-            <span class="badge {{ bg_class }} {{ size_class }}">
-                <i class="fas fa-user me-1"></i>{{ party_size }} person{{ 's' if party_size > 1 else '' }}
-            </span>
-        {%- endif -%}
-    {%- else -%}
-        <span class="text-muted">-</span>
-    {%- endif -%}
-{%- endmacro %}
-
-{# Generic Badge Macro for custom use cases #}
-{% macro generic_badge(text, color='secondary', size='md', icon='', link_url='') -%}
-    {%- set size_class = 'badge-sm' if size == 'sm' else 'badge-lg' if size == 'lg' else 'badge-md' -%}
-    {%- set bg_class = 'bg-' + color -%}
-
-    {%- if link_url -%}
-        <a href="{{ link_url }}" class="badge {{ bg_class }} {{ size_class }}">
-            {%- if icon -%}
-                <i class="fas fa-{{ icon }} me-1"></i>
-            {%- endif -%}
-            {{ text }}
-        </a>
-    {%- else -%}
-        <span class="badge {{ bg_class }} {{ size_class }}">
-            {%- if icon -%}
-                <i class="fas fa-{{ icon }} me-1"></i>
-            {%- endif -%}
-            {{ text }}
-        </span>
-    {%- endif -%}
-{%- endmacro %}
-
-{# Badge Group Macro for displaying multiple badges together #}
-{% macro badge_group(badges, separator=' ') -%}
-    {%- for badge in badges -%}
-        {{ badge }}
-        {%- if not loop.last -%}{{ separator }}{%- endif -%}
-    {%- endfor -%}
-{%- endmacro %}
+<span
+    class="badge-unified service-level {{ service_level_normalized }} {{ size_class }}"
+    data-service-level="{{ service_level }}">
+    {{ display_name }}
+</span>
+{%- else -%}
+<span class="text-muted">-</span>
+{%- endif -%} {%- endmacro %} {# Party Size Badge Macro (for expense tables) #} {% macro party_size_badge(party_size,
+price_per_person=None, size='sm') -%} {%- if party_size and party_size > 0 -%} {%- set size_class = 'badge-sm' if size
+== 'sm' else 'badge-lg' if size == 'lg' else 'badge-md' -%} {%- set bg_class = 'bg-info' if party_size > 1 else
+'bg-secondary' -%} {%- if party_size > 1 and price_per_person -%}
+<span
+    class="badge {{ bg_class }} {{ size_class }}"
+    data-bs-toggle="tooltip"
+    data-bs-placement="top"
+    title="Price per person: ${{ '%.2f'|format(price_per_person) }}">
+    <i class="fas fa-user me-1"></i>{{ party_size }} people
+</span>
+{%- else -%}
+<span class="badge {{ bg_class }} {{ size_class }}">
+    <i class="fas fa-user me-1"></i>{{ party_size }} person{{ 's' if party_size > 1 else '' }}
+</span>
+{%- endif -%} {%- else -%}
+<span class="text-muted">-</span>
+{%- endif -%} {%- endmacro %} {# Generic Badge Macro for custom use cases #} {% macro generic_badge(text,
+color='secondary', size='md', icon='', link_url='') -%} {%- set size_class = 'badge-sm' if size == 'sm' else 'badge-lg'
+if size == 'lg' else 'badge-md' -%} {%- set bg_class = 'bg-' + color -%} {%- if link_url -%}
+<a href="{{ link_url }}" class="badge {{ bg_class }} {{ size_class }}">
+    {%- if icon -%}
+    <i class="fas fa-{{ icon }} me-1"></i>
+    {%- endif -%} {{ text }}
+</a>
+{%- else -%}
+<span class="badge {{ bg_class }} {{ size_class }}">
+    {%- if icon -%}
+    <i class="fas fa-{{ icon }} me-1"></i>
+    {%- endif -%} {{ text }}
+</span>
+{%- endif -%} {%- endmacro %} {# Badge Group Macro for displaying multiple badges together #} {% macro
+badge_group(badges, separator=' ') -%} {%- for badge in badges -%} {{ badge }} {%- if not loop.last -%}{{ separator
+}}{%- endif -%} {%- endfor -%} {%- endmacro %}

@@ -38,7 +38,7 @@ endblock title %} {% block content %}
                     <div id="alert-container">
                         <!-- Flash messages now handled by base template -->
                     </div>
- {{ expense_form(form=form, expense=expense, is_edit=is_edit) }}
+                    {{ expense_form(form=form, expense=expense, is_edit=is_edit) }}
                 </div>
             </div>
         </div>
@@ -46,6 +46,5 @@ endblock title %} {% block content %}
 </div>
 
 <!-- Include Tag Management Modal -->
-{% include 'components/tag_editor_modal.html' %}
-
-{% endblock content %} {% block scripts %} {{ super() }} {{ expense_scripts() }} {% endblock scripts %}
+{% include 'components/tag_editor_modal.html' %} {% endblock content %} {% block scripts %} {{ super() }} {{
+expense_scripts() }} {% endblock scripts %}

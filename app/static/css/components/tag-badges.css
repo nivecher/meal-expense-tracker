@@ -1,4 +1,5 @@
 /* Tag Badge Styles */
+
 /* Following TIGER principles: Safety, Performance, Developer Experience */
 
 .tag-badge {
@@ -12,7 +13,7 @@
     color: white;
     transition: all 0.2s ease;
     margin: 2px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
     line-height: 1.2;
 }
 
@@ -22,6 +23,7 @@
 }
 
 /* Compact version for table rows */
+
 .tag-badge.compact {
     padding: 3px 8px;
     font-size: 0.7rem;
@@ -35,6 +37,7 @@
 }
 
 /* Hover effects */
+
 .tag-badge:hover {
     transform: scale(1.05);
     text-decoration: none;
@@ -43,6 +46,7 @@
 }
 
 /* Default fallback styling when no color class is provided */
+
 .tag-badge:not([class*="tag-"]) {
     background-color: #6c757d;
     color: white;
@@ -50,6 +54,7 @@
 }
 
 /* Tag container for multiple tags */
+
 .expense-tags {
     display: flex;
     flex-wrap: wrap;

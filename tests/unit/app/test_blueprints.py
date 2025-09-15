@@ -27,8 +27,9 @@ def test_blueprint_registration(app):
 
     assert any(endpoint.startswith("restaurants.") for endpoint in url_rules), "Restaurants routes not found"
 
-    # Check for debug route in main blueprint
-    assert "main.debug_routes" in url_rules, "Debug routes not found in main blueprint"
+    # Check for main blueprint routes
+    assert "main.index" in url_rules, "Main index route not found"
+    assert "main.about" in url_rules, "Main about route not found"
 
 
 def test_blueprint_initialization(app):

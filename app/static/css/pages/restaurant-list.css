@@ -1,4 +1,5 @@
 /* View mode toggle */
+
 .view-mode-toggle .btn {
     border-radius: 0.25rem;
 }
@@ -19,13 +20,14 @@
 }
 
 /* Table view styles */
+
 .restaurant-table tbody tr {
     cursor: pointer;
     transition: background-color 0.15s ease;
 }
 
 .restaurant-table tbody tr:hover {
-    background-color: rgba(var(--bs-primary-rgb), 0.05);
+    background-color: rgb(var(--bs-primary-rgb), 0.05);
 }
 
 /* Cuisine badge styles now handled by unified badge system */
@@ -40,6 +42,7 @@
 }
 
 /* Custom styles for the restaurant list */
+
 .restaurant-card {
     height: 100%;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -47,18 +50,22 @@
 }
 
 /* Set minimum width for restaurant cards */
+
 #card-view-container .col {
     min-width: 320px; /* Increased from 280px */
 }
 
 /* Ensure cards don't get too narrow on very wide screens */
-@media (min-width: 1400px) {
+
+@media (width >= 1400px) {
+
     #card-view-container .col {
         min-width: 380px; /* Increased from 320px */
     }
 }
 
-@media (min-width: 1800px) {
+@media (width >= 1800px) {
+
     #card-view-container .col {
         min-width: 420px; /* Increased from 350px */
     }
@@ -66,7 +73,7 @@
 
 .restaurant-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 10%);
 }
 
 .restaurant-card .card-img-top {
@@ -135,6 +142,7 @@
     color: var(--bs-secondary);
 }
 
+
 .summary-card {
     border-left: 4px solid var(--bs-primary);
     transition: all 0.3s ease;
@@ -142,18 +150,20 @@
 
 .summary-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.05);
+    box-shadow: 0 0.25rem 0.5rem rgb(0 0 0 / 5%);
 }
 
 /* Table uses full width naturally with container-fluid */
 
 /* Restaurant name link hover effect */
+
 .restaurant-name-link:hover {
     color: var(--bs-primary) !important;
     transition: color 0.2s ease;
 }
 
 /* Restaurant icon styles */
+
 .restaurant-icon {
     width: 32px;
     height: 32px;
@@ -164,7 +174,7 @@
 
 .restaurant-favicon {
     border-radius: 4px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid rgb(0 0 0 / 10%);
     background-color: white;
 }
 
@@ -176,6 +186,7 @@
 }
 
 /* Table view icon styles (smaller) */
+
 .restaurant-icon-table {
     width: 24px;
     height: 24px;
@@ -186,7 +197,7 @@
 
 .restaurant-favicon-table {
     border-radius: 2px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    border: 1px solid rgb(0 0 0 / 10%);
     background-color: white;
 }
 
@@ -197,3 +208,5 @@
     justify-content: center;
     font-size: 16px;
 }
+
+/* Table sorting styles now handled by unified-table.css */

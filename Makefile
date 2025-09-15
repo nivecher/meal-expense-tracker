@@ -962,9 +962,9 @@ requirements: check-pip-tools
 	@echo "Updating requirements files..."
 	@scripts/update_requirements.sh
 
-## Install development environment
-.PHONY: dev-setup
-dev-setup: check-pip-tools requirements
+## Install development environment (legacy - use main dev-setup)
+.PHONY: dev-setup-legacy
+dev-setup-legacy: check-pip-tools requirements
 	@echo "Setting up development environment..."
 	pip install -c constraints.txt -r requirements.txt -r requirements-dev.txt
 
@@ -1260,7 +1260,7 @@ deps-resolve: check-env
 
 ## Complete development setup
 .PHONY: dev-setup
-dev-setup: setup check-env health-check
+dev-setup: check-pip-tools requirements setup check-env health-check
 	@echo "\n\033[1m=== Development Setup Complete ===\033[0m"
 	@echo "✅ Development environment ready!"
 	@echo "Next steps:"

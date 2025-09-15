@@ -1,25 +1,16 @@
-{% macro tag_badge(tag, compact=false) %}
-    {% set size_class = 'compact' if compact else '' %}
-    <span class="tag-badge tag-badge-pretty tag-{{ tag.id }} {{ size_class }}"
-          data-tag-color="{{ tag.color }}"
-          data-tag-id="{{ tag.id }}">
-        {{ tag.name }}
-    </span>
-{% endmacro %}
-
-{% macro tag_badge_with_remove(tag, compact=false) %}
-    {% set size_class = 'compact' if compact else '' %}
-    <span class="tag-badge tag-{{ tag.id }} {{ size_class }}" data-tag-name="{{ tag.name }}">
-        {{ tag.name }}
-        <span class="tag-remove" data-tag-name="{{ tag.name }}">
-            ×
-        </span>
-    </span>
-{% endmacro %}
-
-{% macro tag_badge_custom_color(tag, color, compact=false) %}
-    {% set size_class = 'compact' if compact else '' %}
-    <span class="tag-badge {{ size_class }} tag-badge-custom" data-tag-color="{{ color }}">
-        {{ tag.name }}
-    </span>
+{% macro tag_badge(tag, compact=false) %} {% set size_class = 'compact' if compact else '' %}
+<span
+    class="tag-badge tag-badge-pretty tag-{{ tag.id }} {{ size_class }}"
+    data-tag-color="{{ tag.color }}"
+    data-tag-id="{{ tag.id }}">
+    {{ tag.name }}
+</span>
+{% endmacro %} {% macro tag_badge_with_remove(tag, compact=false) %} {% set size_class = 'compact' if compact else '' %}
+<span class="tag-badge tag-{{ tag.id }} {{ size_class }}" data-tag-name="{{ tag.name }}">
+    {{ tag.name }}
+    <span class="tag-remove" data-tag-name="{{ tag.name }}"> × </span>
+</span>
+{% endmacro %} {% macro tag_badge_custom_color(tag, color, compact=false) %} {% set size_class = 'compact' if compact
+else '' %}
+<span class="tag-badge {{ size_class }} tag-badge-custom" data-tag-color="{{ color }}"> {{ tag.name }} </span>
 {% endmacro %}

@@ -490,6 +490,11 @@ def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], 
         if tags:
             _add_tags_to_expense(expense.id, user_id, tags)
 
+        # Recalculate restaurant statistics since we added a new expense
+        from app.restaurants.services import recalculate_restaurant_statistics
+
+        recalculate_restaurant_statistics(user_id)
+
         return expense, None
 
     except Exception as e:
@@ -569,6 +574,11 @@ def update_expense(expense: Expense, form: ExpenseForm) -> Tuple[Optional[Expens
         if tags is not None:  # Allow empty list to clear tags
             _add_tags_to_expense(expense.id, expense.user_id, tags)
 
+        # Recalculate restaurant statistics since we updated an expense
+        from app.restaurants.services import recalculate_restaurant_statistics
+
+        recalculate_restaurant_statistics(expense.user_id)
+
         return expense, None
 
     except Exception as e:
@@ -583,7 +593,14 @@ def delete_expense(expense: Expense) -> None:
     Args:
         expense: The expense to delete
     """
+    user_id = expense.user_id
     db.session.delete(expense)
+    db.session.commit()
+
+    # Recalculate restaurant statistics since we deleted an expense
+    from app.restaurants.services import recalculate_restaurant_statistics
+
+    recalculate_restaurant_statistics(user_id)
 
 
 def get_expense_by_id(expense_id: int, user_id: int) -> Optional[Expense]:
@@ -650,7 +667,6 @@ def create_expense_for_user(user_id: int, data: Dict[str, Any]) -> Expense:
         user_id=user_id,
         amount=data.get("amount"),
         date=data.get("date"),
-        description=data.get("description"),
         category_id=data.get("category_id"),
         restaurant_id=data.get("restaurant_id"),
         notes=data.get("notes"),
@@ -678,16 +694,21 @@ def update_expense_for_user(expense: Expense, data: Dict[str, Any]) -> Expense:
         expense.amount = data["amount"]
     if "date" in data:
         expense.date = data["date"]
-    if "description" in data:
-        expense.description = data["description"]
     if "category_id" in data:
         expense.category_id = data["category_id"]
     if "restaurant_id" in data:
         expense.restaurant_id = data["restaurant_id"]
     if "notes" in data:
         expense.notes = data["notes"]
+    if "meal_type" in data:
+        expense.meal_type = data["meal_type"]
 
     db.session.commit()
+
+    # Recalculate restaurant statistics since we updated an expense
+    from app.restaurants.services import recalculate_restaurant_statistics
+
+    recalculate_restaurant_statistics(expense.user_id)
 
     return expense
 
@@ -699,8 +720,14 @@ def delete_expense_for_user(expense: Expense) -> None:
     Args:
         expense: The expense to delete
     """
+    user_id = expense.user_id
     db.session.delete(expense)
     db.session.commit()
+
+    # Recalculate restaurant statistics since we deleted an expense
+    from app.restaurants.services import recalculate_restaurant_statistics
+
+    recalculate_restaurant_statistics(user_id)
 
 
 def get_filter_options(user_id: int) -> Dict[str, Any]:

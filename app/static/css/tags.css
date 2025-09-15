@@ -1,6 +1,7 @@
 /* Tag System Styles */
 
 /* Tags Input Container */
+
 .tags-input-container {
     position: relative;
     border: 1px solid #ced4da;
@@ -11,7 +12,7 @@
 
 .tags-input-container:focus-within {
     border-color: #86b7fe;
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    box-shadow: 0 0 0 0.25rem rgb(13 110 253 / 25%);
 }
 
 .tags-input-wrapper {
@@ -23,6 +24,7 @@
 }
 
 /* Tags Display Area */
+
 .tags-display {
     display: flex;
     flex-wrap: wrap;
@@ -32,6 +34,7 @@
 }
 
 /* Individual Tag Badge - Base styling only */
+
 .tag-badge {
     display: inline-flex;
     align-items: center;
@@ -52,6 +55,7 @@
 }
 
 /* Default background color only when no custom color class is present */
+
 .tag-badge:not([class*="tag-"]) {
     background-color: #6c757d;
 }
@@ -59,7 +63,7 @@
 .tag-badge:hover {
     opacity: 0.8;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .tag-badge .tag-remove {
@@ -69,7 +73,7 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: rgb(255 255 255 / 20%);
     color: inherit;
     font-size: 10px;
     cursor: pointer;
@@ -78,10 +82,11 @@
 }
 
 .tag-badge .tag-remove:hover {
-    background-color: rgba(255, 255, 255, 0.3);
+    background-color: rgb(255 255 255 / 30%);
 }
 
 /* Tags Input Field */
+
 .tags-input {
     border: none !important;
     outline: none !important;
@@ -100,6 +105,7 @@
 }
 
 /* Tags Suggestions Dropdown */
+
 .tags-suggestions {
     position: absolute;
     top: 100%;
@@ -109,7 +115,7 @@
     border: 1px solid #ced4da;
     border-top: none;
     border-radius: 0 0 0.375rem 0.375rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px rgb(0 0 0 / 10%);
     z-index: 1000;
     max-height: 200px;
     overflow-y: auto;
@@ -155,14 +161,22 @@
 }
 
 /* Tag Colors - These old classes are deprecated in favor of user-specific tag-{id} classes */
+
 /* The user_tag_css route now generates dynamic CSS with tag-{id} classes */
 
 /* Tags in Expense Lists */
+
 .expense-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
+    padding-left: 0;
+}
+
+/* Ensure wrapped tags maintain proper indentation */
+.expense-tags .tag-badge {
+    margin-left: 0;
 }
 
 .expense-tags .tag-badge {
@@ -172,6 +186,7 @@
 }
 
 /* Tags in Table View */
+
 .table-tags {
     display: flex;
     flex-wrap: wrap;
@@ -185,6 +200,7 @@
 }
 
 /* Tags Filter */
+
 .tags-filter {
     display: flex;
     flex-wrap: wrap;
@@ -204,7 +220,7 @@
 
 .tags-filter .tag-badge.active {
     opacity: 1;
-    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
+    box-shadow: 0 0 0 2px rgb(13 110 253 / 25%);
 }
 
 .tags-filter .tag-badge:hover {
@@ -212,7 +228,9 @@
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+
+@media (width <= 768px) {
+
     .tags-input-wrapper {
         padding: 0.25rem 0.5rem;
         min-height: 36px;
@@ -234,15 +252,18 @@
 }
 
 /* Animation for tag addition/removal */
+
 .tag-badge {
     animation: tagSlideIn 0.2s ease-out;
 }
 
 @keyframes tagSlideIn {
+
     from {
         opacity: 0;
         transform: translateY(-10px) scale(0.9);
     }
+
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -250,6 +271,7 @@
 }
 
 /* Loading state for tags */
+
 .tags-loading {
     display: inline-flex;
     align-items: center;
@@ -265,6 +287,7 @@
 }
 
 /* Empty state */
+
 .tags-empty {
     display: flex;
     align-items: center;
@@ -276,6 +299,7 @@
 }
 
 /* Tag management modal */
+
 .tag-management-modal .tag-list {
     max-height: 300px;
     overflow-y: auto;
@@ -306,6 +330,7 @@
 }
 
 /* Tag color picker */
+
 .tag-color-picker {
     display: flex;
     flex-wrap: wrap;

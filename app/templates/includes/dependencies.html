@@ -1,84 +1,92 @@
-{#
-Centralized dependency management for CSS and JS libraries
-This file ensures consistent versions across all templates
-#}
-
-{# Bootstrap CSS - Latest CDN version 5.3.7 #}
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
+{# Centralized dependency management for CSS and JS libraries This file ensures consistent versions across all templates
+#} {# Bootstrap CSS - Latest CDN version 5.3.7 #}
+<link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr"
+    crossorigin="anonymous" />
 
 {# Bootstrap Icons - Latest stable version #}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 
-{# Bootstrap compatibility fixes removed - using latest CDN Bootstrap 5.3.7 #}
-
-{# Font Awesome - Latest stable version #}
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet"
-      onerror="this.onerror=null; this.href='https://use.fontawesome.com/releases/v6.6.0/css/all.css';" />
+{# Bootstrap compatibility fixes removed - using latest CDN Bootstrap 5.3.7 #} {# Font Awesome - Latest stable version
+#}
+<link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
+    rel="stylesheet"
+    onerror="this.onerror=null; this.href='https://use.fontawesome.com/releases/v6.6.0/css/all.css';" />
 
 {# Select2 CSS - Latest stable version #}
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
 {# Select2 Bootstrap Theme - Compatible with Bootstrap 5.3.4 #}
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<link
+    href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css"
+    rel="stylesheet" />
 
 {# Consolidated inline styles #}
 <link href="{{ url_for('static', filename='css/inline-styles.css') }}" rel="stylesheet" />
 
-{# JavaScript Dependencies #}
-{# jQuery (required for Select2 and other plugins) - Must load first #}
-<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+{# JavaScript Dependencies #} {# jQuery (required for Select2 and other plugins) - Must load first #}
+<script
+    src="https://code.jquery.com/jquery-3.7.1.min.js"
+    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+    crossorigin="anonymous"></script>
 
 {# Fix jQuery form submission override issue #}
 <script>
-// Fix jQuery overriding HTMLFormElement.prototype.submit
-// This ensures native form submission works properly
-(function() {
-    // Store the original submit method
-    const originalSubmit = HTMLFormElement.prototype.submit;
+    // Fix jQuery overriding HTMLFormElement.prototype.submit
+    // This ensures native form submission works properly
+    (function () {
+        // Store the original submit method
+        const originalSubmit = HTMLFormElement.prototype.submit;
 
-    // Override the prototype to restore native functionality
-    HTMLFormElement.prototype.submit = function() {
-        // Create a temporary form and submit it using native method
-        const tempForm = document.createElement('form');
-        tempForm.method = this.method || 'GET';
-        tempForm.action = this.action;
-        tempForm.style.display = 'none';
+        // Override the prototype to restore native functionality
+        HTMLFormElement.prototype.submit = function () {
+            // Create a temporary form and submit it using native method
+            const tempForm = document.createElement("form");
+            tempForm.method = this.method || "GET";
+            tempForm.action = this.action;
+            tempForm.style.display = "none";
 
-        // Copy all form data
-        const inputs = this.querySelectorAll('input, select, textarea');
-        inputs.forEach(input => {
-            const newInput = input.cloneNode(true);
-            tempForm.appendChild(newInput);
-        });
+            // Copy all form data
+            const inputs = this.querySelectorAll("input, select, textarea");
+            inputs.forEach((input) => {
+                const newInput = input.cloneNode(true);
+                tempForm.appendChild(newInput);
+            });
 
-        document.body.appendChild(tempForm);
+            document.body.appendChild(tempForm);
 
-        // Use the original native submit method
-        originalSubmit.call(tempForm);
+            // Use the original native submit method
+            originalSubmit.call(tempForm);
 
-        document.body.removeChild(tempForm);
-    };
-})();
+            document.body.removeChild(tempForm);
+        };
+    })();
 </script>
 
 {# Select2 JS - Latest stable version (requires jQuery) #}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 {# Bootstrap Bundle with Popper - Latest CDN version 5.3.7 #}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js" integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q" crossorigin="anonymous"></script>
+<script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
+    crossorigin="anonymous"></script>
 
 {# Chart.js - For analytics and stats pages #}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 {# Google Maps API Configuration #}
 <script type="application/json" id="google-maps-config">
-{
-    "apiKey": "{{ config.get('GOOGLE_MAPS_API_KEY', '') }}"
-}
+    {
+        "apiKey": "{{ config.get('GOOGLE_MAPS_API_KEY', '') }}"
+    }
 </script>
 <script type="module">
     // Load Google Maps configuration from JSON script tag
-    const configScript = document.getElementById('google-maps-config');
+    const configScript = document.getElementById("google-maps-config");
     if (configScript) {
         const config = JSON.parse(configScript.textContent);
         window.GOOGLE_MAPS_API_KEY = config.apiKey;

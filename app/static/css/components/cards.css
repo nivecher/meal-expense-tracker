@@ -1,20 +1,21 @@
 /* Card styles */
+
 .card {
     border: none;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 5%);
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
     margin-bottom: 1.5rem;
 }
 
 .card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 8px rgb(0 0 0 / 10%);
 }
 
 .card-header {
     background-color: #f8f9fa;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid rgb(0 0 0 / 5%);
     padding: 1rem 1.25rem;
 }
 
@@ -29,11 +30,12 @@
 
 .card-footer {
     background-color: #f8f9fa;
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    border-top: 1px solid rgb(0 0 0 / 5%);
     padding: 0.75rem 1.25rem;
 }
 
 /* Card variants */
+
 .card-primary {
     border-top: 3px solid var(--primary-color);
 }
@@ -51,6 +53,7 @@
 }
 
 /* Restaurant card specific styles */
+
 .restaurant-card .card-img-top {
     height: 160px;
     object-fit: cover;

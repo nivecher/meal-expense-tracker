@@ -33,7 +33,7 @@ class CuisineService {
       console.error('Failed to load cuisine data:', error);
       // Fallback to minimal data
       this.cuisineData = [
-        { name: "Other", color: "#6b7280", icon: "question" }
+        { name: 'Other', color: '#6b7280', icon: 'question' },
       ];
       this.googlePlacesMapping = {};
       return { cuisines: this.cuisineData, google_places_mapping: this.googlePlacesMapping };
@@ -70,9 +70,9 @@ class CuisineService {
       return null;
     }
 
-    return this.cuisineData.find(cuisine =>
-      cuisine.name.toLowerCase() === name.toLowerCase()
-    ) || { name: "Other", color: "#6b7280", icon: "question" };
+    return this.cuisineData.find((cuisine) =>
+      cuisine.name.toLowerCase() === name.toLowerCase(),
+    ) || { name: 'Other', color: '#6b7280', icon: 'question' };
   }
 
   /**
@@ -80,7 +80,7 @@ class CuisineService {
    * @returns {Array<string>} Array of cuisine names
    */
   getCuisineNames() {
-    return this.cuisineData ? this.cuisineData.map(c => c.name) : ['Other'];
+    return this.cuisineData ? this.cuisineData.map((c) => c.name) : ['Other'];
   }
 }
 

@@ -1,51 +1,42 @@
-{% extends "base.html" %}
-{% from 'macros/tag_helpers.html' import tag_badge %}
-{% block title %}Expense Details - Meal Expense Tracker{% endblock title %}
-{% block styles %}
-{{ super() }}
+{% extends "base.html" %} {% from 'macros/tag_helpers.html' import tag_badge %} {% block title %}Expense Details - Meal
+Expense Tracker{% endblock title %} {% block styles %} {{ super() }}
 <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/tags.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/tagify-pretty.css') }}" rel="stylesheet" />
-{% endblock styles %}
-{% block scripts %}
-{{ super() }}
+{% endblock styles %} {% block scripts %} {{ super() }}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Apply colors to all tag badges on the page
-    const tagBadges = document.querySelectorAll('.tag-badge[data-tag-color]');
-    tagBadges.forEach(badge => {
-        const color = badge.getAttribute('data-tag-color');
-        if (color) {
-            // Use setProperty with !important to ensure styles are applied
-            badge.style.setProperty('background-color', color, 'important');
-            badge.style.setProperty('color', 'white', 'important');
-            badge.style.setProperty('border-radius', '20px', 'important');
-            badge.style.setProperty('padding', '4px 12px', 'important');
-            badge.style.setProperty('font-size', '0.8rem', 'important');
-            badge.style.setProperty('font-weight', '500', 'important');
-            badge.style.setProperty('box-shadow', '0 2px 4px rgba(0, 0, 0, 0.1)', 'important');
-            badge.style.setProperty('transition', 'all 0.2s ease', 'important');
-            badge.style.setProperty('border', 'none', 'important');
-            badge.style.setProperty('display', 'inline-flex', 'important');
-            badge.style.setProperty('align-items', 'center', 'important');
-            badge.style.setProperty('margin', '2px', 'important');
-            badge.style.setProperty('line-height', '1.2', 'important');
-        }
+    document.addEventListener("DOMContentLoaded", function () {
+        // Apply colors to all tag badges on the page
+        const tagBadges = document.querySelectorAll(".tag-badge[data-tag-color]");
+        tagBadges.forEach((badge) => {
+            const color = badge.getAttribute("data-tag-color");
+            if (color) {
+                // Use setProperty with !important to ensure styles are applied
+                badge.style.setProperty("background-color", color, "important");
+                badge.style.setProperty("color", "white", "important");
+                badge.style.setProperty("border-radius", "20px", "important");
+                badge.style.setProperty("padding", "4px 12px", "important");
+                badge.style.setProperty("font-size", "0.8rem", "important");
+                badge.style.setProperty("font-weight", "500", "important");
+                badge.style.setProperty("box-shadow", "0 2px 4px rgba(0, 0, 0, 0.1)", "important");
+                badge.style.setProperty("transition", "all 0.2s ease", "important");
+                badge.style.setProperty("border", "none", "important");
+                badge.style.setProperty("display", "inline-flex", "important");
+                badge.style.setProperty("align-items", "center", "important");
+                badge.style.setProperty("margin", "2px", "important");
+                badge.style.setProperty("line-height", "1.2", "important");
+            }
+        });
     });
-});
 </script>
-    <!-- Expense detail functionality -->
-    <script type="module" src="{{ url_for('static', filename='js/pages/expense-detail.js') }}"></script>
-{% endblock scripts %}
-{% block content %}
+<!-- Expense detail functionality -->
+<script type="module" src="{{ url_for('static', filename='js/pages/expense-detail.js') }}"></script>
+{% endblock scripts %} {% block content %}
 <!-- Breadcrumb Navigation -->
-{% set breadcrumb_items = [
-    {'url': url_for('main.index'), 'title': 'Dashboard'},
-    {'url': url_for('expenses.list_expenses'), 'title': 'Expenses'},
-    {'title': 'Expense Details'}
-] %}
-{% include 'includes/breadcrumb.html' %}
+{% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'}, {'url':
+url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Details'} ] %} {% include
+'includes/breadcrumb.html' %}
 
 <div class="container py-4">
     <!-- Compact Header Banner -->
@@ -57,52 +48,61 @@ document.addEventListener('DOMContentLoaded', function() {
                         <!-- Restaurant Icon/Logo -->
                         <div class="me-3 flex-shrink-0">
                             {% if expense.restaurant and expense.restaurant.website %}
-                                <img
-                                    src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website|replace('https://', '')|replace('http://', '')|replace('www.', '') }}&sz=32"
-                                    alt="{{ expense.restaurant.name }} icon"
-                                    class="restaurant-favicon"
-                                    width="32"
-                                    height="32"
-                                    loading="lazy"
-                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
-                                    onload="this.style.opacity='1';"
-                                    style="opacity: 0; transition: opacity 0.2s;"
-                                />
-                                <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 28px;"></i>
+                            <img
+                                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                data-website="{{ expense.restaurant.website }}"
+                                data-size="32"
+                                alt="{{ expense.restaurant.name }} icon"
+                                class="restaurant-favicon"
+                                width="32"
+                                height="32"
+                                loading="lazy"
+                                style="opacity: 0; transition: opacity 0.2s" />
+                            <i
+                                class="fas fa-utensils text-primary restaurant-fallback-icon"
+                                style="display: none; font-size: 28px"></i>
                             {% else %}
-                                <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 28px;"></i>
+                            <i
+                                class="fas fa-utensils text-primary restaurant-fallback-icon"
+                                style="font-size: 28px"></i>
                             {% endif %}
                         </div>
                         <div class="flex-grow-1">
-                            <h1 class="h4 mb-1 fw-bold">{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}</h1>
+                            <h1 class="h4 mb-1 fw-bold"
+                                >{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}</h1
+                            >
                             <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
-                                {% if expense.restaurant and expense.restaurant.cuisine %}
-                                    {% from 'macros/badge_helpers.html' import cuisine_badge %}
-                                    {{ cuisine_badge(expense.restaurant.cuisine, size='sm') }}
-                                {% endif %}
+                                {% if expense.restaurant and expense.restaurant.cuisine %} {% from
+                                'macros/badge_helpers.html' import cuisine_badge %} {{
+                                cuisine_badge(expense.restaurant.cuisine, size='sm') }} {% endif %}
+                                {% if expense.restaurant and expense.restaurant.service_level %} {% from
+                                'macros/badge_helpers.html' import service_level_badge %} {{
+                                service_level_badge(expense.restaurant.service_level, size='sm') }} {% endif %}
                             </div>
                             <!-- Location with Google Maps link -->
                             {% if expense.restaurant %}
-                                <div class="d-flex align-items-center text-muted small">
-                                    <i class="fas fa-map-marker-alt me-1"></i>
-                                    {% if expense.restaurant.city and expense.restaurant.state %}
-                                        <span class="me-2">{{ expense.restaurant.city }}, {{ expense.restaurant.state }}</span>
-                                        <a href="{{ expense.restaurant.get_google_maps_url() }}"
-                                           target="_blank"
-                                           class="text-decoration-none text-primary small">
-                                            <i class="fab fa-google me-1"></i>View on Maps
-                                        </a>
-                                    {% elif expense.restaurant.address %}
-                                        <span class="me-2">{{ expense.restaurant.address|truncate(30, '...') }}</span>
-                                        <a href="{{ expense.restaurant.get_google_maps_url() }}"
-                                           target="_blank"
-                                           class="text-decoration-none text-primary small">
-                                            <i class="fab fa-google me-1"></i>View on Maps
-                                        </a>
-                                    {% else %}
-                                        <span>Location not specified</span>
-                                    {% endif %}
-                                </div>
+                            <div class="d-flex align-items-center text-muted small">
+                                <i class="fas fa-map-marker-alt me-1"></i>
+                                {% if expense.restaurant.city and expense.restaurant.state %}
+                                <span class="me-2">{{ expense.restaurant.city }}, {{ expense.restaurant.state }}</span>
+                                <a
+                                    href="{{ expense.restaurant.get_google_maps_url() }}"
+                                    target="_blank"
+                                    class="text-decoration-none text-primary small">
+                                    <i class="fab fa-google me-1"></i>View on Maps
+                                </a>
+                                {% elif expense.restaurant.address %}
+                                <span class="me-2">{{ expense.restaurant.address|truncate(30, '...') }}</span>
+                                <a
+                                    href="{{ expense.restaurant.get_google_maps_url() }}"
+                                    target="_blank"
+                                    class="text-decoration-none text-primary small">
+                                    <i class="fab fa-google me-1"></i>View on Maps
+                                </a>
+                                {% else %}
+                                <span>Location not specified</span>
+                                {% endif %}
+                            </div>
                             {% endif %}
                         </div>
                     </div>
@@ -113,13 +113,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="mb-1">
                             <div class="display-5 fw-bold text-success">${{ "%.2f"|format(expense.amount) }}</div>
                             {% if expense.party_size and expense.party_size > 1 %}
-                                <div class="text-muted small">
-                                    <i class="fas fa-users me-1"></i>{{ expense.party_size }} people • ${{ "%.2f"|format(expense.price_per_person) }}/person
-                                </div>
+                            <div class="text-muted small">
+                                <i class="fas fa-users me-1"></i>{{ expense.party_size }} people • ${{
+                                "%.2f"|format(expense.price_per_person) }}/person
+                            </div>
                             {% elif expense.party_size and expense.party_size == 1 %}
-                                <div class="text-muted small">
-                                    <i class="fas fa-user me-1"></i>1 person
-                                </div>
+                            <div class="text-muted small"> <i class="fas fa-user me-1"></i>1 person </div>
                             {% endif %}
                         </div>
                         <!-- Date -->
@@ -139,9 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <!-- Order Information Card -->
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white py-2">
-                    <h6 class="mb-0">
-                        <i class="fas fa-shopping-cart text-primary me-2"></i>Order Information
-                    </h6>
+                    <h6 class="mb-0"> <i class="fas fa-shopping-cart text-primary me-2"></i>Order Information </h6>
                 </div>
                 <div class="card-body py-3">
                     <div class="row g-3">
@@ -149,11 +146,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-6 col-md-4">
                             <label class="form-label text-muted small mb-1">Meal Type</label>
                             <div class="d-flex align-items-center">
-                                {% if expense.meal_type %}
-                                    {% from 'macros/badge_helpers.html' import meal_type_badge %}
-                                    {{ meal_type_badge(expense.meal_type) }}
-                                {% else %}
-                                    <span class="text-muted small">Not specified</span>
+                                {% if expense.meal_type %} {% from 'macros/badge_helpers.html' import meal_type_badge %}
+                                {{ meal_type_badge(expense.meal_type) }} {% else %}
+                                <span class="text-muted small">Not specified</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -163,11 +158,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             <label class="form-label text-muted small mb-1">Order Type</label>
                             <div class="d-flex align-items-center">
                                 {% if expense.order_type %}
-                                    <span class="order-type-badge text-dark">
-                                        <i class="fas fa-{{ expense.order_type|order_type_icon }}"></i>{{ expense.order_type.replace('_', ' ').title() }}
-                                    </span>
+                                <span class="order-type-badge text-dark">
+                                    <i class="fas fa-{{ expense.order_type|order_type_icon }}"></i>{{
+                                    expense.order_type.replace('_', ' ').title() }}
+                                </span>
                                 {% else %}
-                                    <span class="text-muted small">Not specified</span>
+                                <span class="text-muted small">Not specified</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -177,11 +173,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             <label class="form-label text-muted small mb-1">Party Size</label>
                             <div class="d-flex align-items-center">
                                 {% if expense.party_size %}
-                                    <span class="badge bg-info text-white">
-                                        <i class="fas fa-user me-1"></i>{{ expense.party_size }} {{ 'person' if expense.party_size == 1 else 'people' }}
-                                    </span>
+                                <span class="badge bg-info text-white">
+                                    <i class="fas fa-user me-1"></i>{{ expense.party_size }} {{ 'person' if
+                                    expense.party_size == 1 else 'people' }}
+                                </span>
                                 {% else %}
-                                    <span class="text-muted small">Not specified</span>
+                                <span class="text-muted small">Not specified</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -192,9 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <!-- Expense Information Card -->
             <div class="card shadow-sm mb-3">
                 <div class="card-header bg-white py-2">
-                    <h6 class="mb-0">
-                        <i class="fas fa-info-circle text-primary me-2"></i>Expense Information
-                    </h6>
+                    <h6 class="mb-0"> <i class="fas fa-info-circle text-primary me-2"></i>Expense Information </h6>
                 </div>
                 <div class="card-body py-3">
                     <div class="row g-3">
@@ -202,8 +197,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-12 col-md-6">
                             <label class="form-label text-muted small mb-1">Category</label>
                             <div class="d-flex align-items-center">
-                                {% from 'macros/category_helpers.html' import category_badge %}
-                                {{ category_badge(expense.category) }}
+                                {% from 'macros/category_helpers.html' import category_badge %} {{
+                                category_badge(expense.category) }}
                             </div>
                         </div>
 
@@ -225,21 +220,17 @@ document.addEventListener('DOMContentLoaded', function() {
             <!-- Tags Section - Display Only -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-tags text-primary me-2"></i>Tags
-                    </h5>
+                    <h5 class="mb-0"> <i class="fas fa-tags text-primary me-2"></i>Tags </h5>
                 </div>
                 <div class="card-body">
                     {% if expense.tags %}
-                        <div class="d-flex flex-wrap gap-2">
-                            {% for tag in expense.tags %}
-                                {{ tag_badge(tag) }}
-                            {% endfor %}
-                        </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for tag in expense.tags %} {{ tag_badge(tag) }} {% endfor %}
+                    </div>
                     {% else %}
-                        <div class="text-muted">
-                            <i class="fas fa-info-circle me-1"></i>No tags assigned to this expense.
-                        </div>
+                    <div class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>No tags assigned to this expense.
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -248,9 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
             {% if expense.notes %}
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-sticky-note text-primary me-2"></i>Notes
-                    </h5>
+                    <h5 class="mb-0"> <i class="fas fa-sticky-note text-primary me-2"></i>Notes </h5>
                 </div>
                 <div class="card-body">
                     <div class="bg-light p-3 rounded">
@@ -263,22 +252,22 @@ document.addEventListener('DOMContentLoaded', function() {
             <!-- Details Section -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-info-circle text-primary me-2"></i>Details
-                    </h5>
+                    <h5 class="mb-0"> <i class="fas fa-info-circle text-primary me-2"></i>Details </h5>
                 </div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label text-muted small">Created</label>
                             <div class="text-muted">
-                                <i class="fas fa-calendar-plus me-1"></i>{{ expense.created_at|format_datetime_user_tz("%B %d, %Y %I:%M %p") }}
+                                <i class="fas fa-calendar-plus me-1"></i>{{
+                                expense.created_at|format_datetime_user_tz("%B %d, %Y %I:%M %p") }}
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label text-muted small">Last Updated</label>
                             <div class="text-muted">
-                                <i class="fas fa-edit me-1"></i>{{ expense.updated_at|format_datetime_user_tz("%B %d, %Y %I:%M %p") }}
+                                <i class="fas fa-edit me-1"></i>{{ expense.updated_at|format_datetime_user_tz("%B %d, %Y
+                                %I:%M %p") }}
                             </div>
                         </div>
 
@@ -286,9 +275,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-12 col-md-6">
                             <label class="form-label text-muted small">Receipt</label>
                             <div>
-                                <a href="{{ url_for('static', filename=expense.receipt_image) }}"
-                                   target="_blank"
-                                   class="btn btn-outline-primary btn-sm">
+                                <a
+                                    href="{{ url_for('static', filename=expense.receipt_image) }}"
+                                    target="_blank"
+                                    class="btn btn-outline-primary btn-sm">
                                     <i class="fas fa-receipt me-1"></i>View Receipt
                                 </a>
                             </div>
@@ -304,28 +294,27 @@ document.addEventListener('DOMContentLoaded', function() {
             <!-- Action Buttons Card -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-bolt text-primary me-2"></i>Actions
-                    </h5>
+                    <h5 class="mb-0"> <i class="fas fa-bolt text-primary me-2"></i>Actions </h5>
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        <a href="{{ url_for('expenses.list_expenses') }}"
-                           class="btn btn-outline-secondary">
+                        <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary">
                             <i class="fas fa-arrow-left me-1"></i>Back to List
                         </a>
-                        <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
-                           class="btn btn-outline-primary">
+                        <a
+                            href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+                            class="btn btn-outline-primary">
                             <i class="fas fa-edit me-1"></i>Edit Expense
                         </a>
-                        <button type="button"
-                                class="btn btn-outline-danger"
-                                data-bs-toggle="modal"
-                                data-bs-target="#deleteExpenseModal"
-                                data-expense-id="{{ expense.id }}"
-                                data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
-                                data-expense-amount="{{ '%.2f'|format(expense.amount) }}"
-                                data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}">
+                        <button
+                            type="button"
+                            class="btn btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#deleteExpenseModal"
+                            data-expense-id="{{ expense.id }}"
+                            data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
+                            data-expense-amount="{{ '%.2f'|format(expense.amount) }}"
+                            data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}">
                             <i class="fas fa-trash me-1"></i>Delete Expense
                         </button>
                     </div>
@@ -336,80 +325,85 @@ document.addEventListener('DOMContentLoaded', function() {
             {% if expense.restaurant %}
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-white py-3">
-                    <h5 class="mb-0">
-                        <i class="fas fa-utensils text-primary me-2"></i>Restaurant Information
-                    </h5>
+                    <h5 class="mb-0"> <i class="fas fa-utensils text-primary me-2"></i>Restaurant Information </h5>
                 </div>
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
                         <!-- Restaurant Icon/Logo -->
                         <div class="me-3 flex-shrink-0">
                             {% if expense.restaurant.website %}
-                                <img
-                                    src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website|replace('https://', '')|replace('http://', '')|replace('www.', '') }}&sz=32"
-                                    alt="{{ expense.restaurant.name }} icon"
-                                    class="restaurant-favicon"
-                                    width="32"
-                                    height="32"
-                                    loading="lazy"
-                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
-                                    onload="this.style.opacity='1';"
-                                    style="opacity: 0; transition: opacity 0.2s;"
-                                />
-                                <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px;"></i>
+                            <img
+                                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                data-website="{{ expense.restaurant.website }}"
+                                data-size="32"
+                                alt="{{ expense.restaurant.name }} icon"
+                                class="restaurant-favicon"
+                                width="32"
+                                height="32"
+                                loading="lazy"
+                                style="opacity: 0; transition: opacity 0.2s" />
+                            <i
+                                class="fas fa-utensils text-primary restaurant-fallback-icon"
+                                style="display: none; font-size: 24px"></i>
                             {% else %}
-                                <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 24px;"></i>
+                            <i
+                                class="fas fa-utensils text-primary restaurant-fallback-icon"
+                                style="font-size: 24px"></i>
                             {% endif %}
                         </div>
                         <div class="flex-grow-1">
                             <h6 class="mb-1 fw-bold">{{ expense.restaurant.name }}</h6>
-                            {% if expense.restaurant.cuisine %}
-                                <div class="d-flex justify-content-end">
-                                    {% from 'macros/badge_helpers.html' import cuisine_badge %}
-                                    {{ cuisine_badge(expense.restaurant.cuisine) }}
-                                </div>
+                            {% if expense.restaurant.cuisine or expense.restaurant.service_level %}
+                            <div class="d-flex justify-content-end gap-2">
+                                {% if expense.restaurant.cuisine %}
+                                    {% from 'macros/badge_helpers.html' import cuisine_badge %} {{
+                                    cuisine_badge(expense.restaurant.cuisine) }}
+                                {% endif %}
+                                {% if expense.restaurant.service_level %}
+                                    {% from 'macros/badge_helpers.html' import service_level_badge %} {{
+                                    service_level_badge(expense.restaurant.service_level) }}
+                                {% endif %}
+                            </div>
                             {% endif %}
                         </div>
                     </div>
 
                     {% if expense.restaurant.address or expense.restaurant.city %}
-                        <div class="mb-3">
-                            <div class="text-muted small">
-                                <i class="fas fa-map-marker-alt me-1"></i>
-                                {% if expense.restaurant.address %}
-                                    {{ expense.restaurant.address }}
-                                    {% if expense.restaurant.city and expense.restaurant.state %}
-                                        <br>{{ expense.restaurant.city }}, {{ expense.restaurant.state }}
-                                    {% endif %}
-                                {% elif expense.restaurant.city and expense.restaurant.state %}
-                                    {{ expense.restaurant.city }}, {{ expense.restaurant.state }}
-                                {% endif %}
-                            </div>
-                            {% if expense.restaurant.get_google_maps_url() %}
-                                <a href="{{ expense.restaurant.get_google_maps_url() }}"
-                                   target="_blank"
-                                   class="text-decoration-none text-primary small">
-                                    <i class="fab fa-google me-1"></i>View on Google Maps
-                                </a>
-                            {% endif %}
+                    <div class="mb-3">
+                        <div class="text-muted small">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                            {% if expense.restaurant.address %} {{ expense.restaurant.address }} {% if
+                            expense.restaurant.city and expense.restaurant.state %}
+                            <br />{{ expense.restaurant.city }}, {{ expense.restaurant.state }} {% endif %} {% elif
+                            expense.restaurant.city and expense.restaurant.state %} {{ expense.restaurant.city }}, {{
+                            expense.restaurant.state }} {% endif %}
                         </div>
+                        {% if expense.restaurant.get_google_maps_url() %}
+                        <a
+                            href="{{ expense.restaurant.get_google_maps_url() }}"
+                            target="_blank"
+                            class="text-decoration-none text-primary small">
+                            <i class="fab fa-google me-1"></i>View on Google Maps
+                        </a>
+                        {% endif %}
+                    </div>
                     {% endif %}
 
                     <div class="d-grid gap-2">
-                        <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
-                           class="btn btn-outline-primary btn-sm">
+                        <a
+                            href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
+                            class="btn btn-outline-primary btn-sm">
                             <i class="fas fa-eye me-1"></i>View Restaurant Details
                         </a>
-                        <a href="{{ url_for('expenses.add_expense', restaurant_id=expense.restaurant.id) }}"
-                           class="btn btn-success btn-sm">
+                        <a
+                            href="{{ url_for('expenses.add_expense', restaurant_id=expense.restaurant.id) }}"
+                            class="btn btn-success btn-sm">
                             <i class="fas fa-plus me-1"></i>Add Another Expense
                         </a>
                     </div>
                 </div>
             </div>
             {% endif %}
-
-
         </div>
     </div>
 </div>
@@ -422,7 +416,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h5 class="modal-title" id="deleteExpenseModalLabel">
                     <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to delete this expense?</p>
@@ -448,6 +446,5 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
-
 
 {% endblock content %}

@@ -3,46 +3,79 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="tagEditorModalLabel">
-                    <i class="fas fa-tags me-2"></i>Manage Tags
-                </h5>
+                <h5 class="modal-title" id="tagEditorModalLabel"> <i class="fas fa-tags me-2"></i>Manage Tags </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form id="tagEditorForm">
-                    <input type="hidden" id="tagId" name="tag_id">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" id="tagId" name="tag_id" />
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 
                     <!-- Create/Edit Tag Form -->
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="card-header">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-plus me-2"></i>Create New Tag
-                                    </h6>
+                                    <h6 class="mb-0"> <i class="fas fa-plus me-2"></i>Create New Tag </h6>
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
                                         <label for="tagName" class="form-label">Tag Name</label>
-                                        <input type="text" class="form-control" id="tagName" name="name" required>
-                                        <div class="form-text">Tag names will be normalized (lowercase, spaces to hyphens)</div>
+                                        <input type="text" class="form-control" id="tagName" name="name" required />
+                                        <div class="form-text"
+                                            >Tag names will be normalized (lowercase, spaces to hyphens)</div
+                                        >
                                     </div>
 
                                     <div class="mb-3">
                                         <label for="tagColor" class="form-label">Tag Color</label>
                                         <div class="row">
                                             <div class="col-md-6">
-                                                <input type="color" class="form-control form-control-color" id="tagColor" name="color" value="#6c757d">
+                                                <input
+                                                    type="color"
+                                                    class="form-control form-control-color"
+                                                    id="tagColor"
+                                                    name="color"
+                                                    value="#6c757d" />
                                             </div>
                                             <div class="col-md-6">
                                                 <div class="d-flex flex-wrap gap-2">
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary color-preset" data-color="#667eea">Purple</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary color-preset" data-color="#f093fb">Pink</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary color-preset" data-color="#4facfe">Blue</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary color-preset" data-color="#43e97b">Green</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary color-preset" data-color="#fa709a">Coral</button>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary color-preset" data-color="#ff8a80">Orange</button>
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                                        data-color="#667eea"
+                                                        >Purple</button
+                                                    >
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                                        data-color="#f093fb"
+                                                        >Pink</button
+                                                    >
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                                        data-color="#4facfe"
+                                                        >Blue</button
+                                                    >
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                                        data-color="#43e97b"
+                                                        >Green</button
+                                                    >
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                                        data-color="#fa709a"
+                                                        >Coral</button
+                                                    >
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                                        data-color="#ff8a80"
+                                                        >Orange</button
+                                                    >
                                                 </div>
                                             </div>
                                         </div>
@@ -50,7 +83,11 @@
 
                                     <div class="mb-3">
                                         <label for="tagDescription" class="form-label">Description (Optional)</label>
-                                        <textarea class="form-control" id="tagDescription" name="description" rows="2"></textarea>
+                                        <textarea
+                                            class="form-control"
+                                            id="tagDescription"
+                                            name="description"
+                                            rows="2"></textarea>
                                     </div>
 
                                     <div class="mb-3">
@@ -64,7 +101,11 @@
                                         <button type="button" class="btn btn-primary" id="saveTagBtn">
                                             <i class="fas fa-save me-1"></i> Save Tag
                                         </button>
-                                        <button type="button" class="btn btn-outline-danger" id="deleteTagBtn" style="display: none;">
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-danger"
+                                            id="deleteTagBtn"
+                                            style="display: none">
                                             <i class="fas fa-trash me-1"></i> Delete Tag
                                         </button>
                                         <button type="button" class="btn btn-outline-secondary" id="resetFormBtn">
@@ -79,9 +120,7 @@
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="card-header">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-list me-2"></i>All Your Tags
-                                    </h6>
+                                    <h6 class="mb-0"> <i class="fas fa-list me-2"></i>All Your Tags </h6>
                                 </div>
                                 <div class="card-body">
                                     <div id="allTagsContainer" class="d-flex flex-wrap gap-2">

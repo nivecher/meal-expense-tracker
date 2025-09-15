@@ -6,12 +6,10 @@
 
 {% block styles %}
     <link href="{{ url_for('static', filename='css/components/navbar.css') }}" rel="stylesheet" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" />
-    <link href="{{ url_for('static', filename='css/components/table.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/unified-table.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/tags.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
-    <link href="{{ url_for('static', filename='css/tagify-pretty.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/pages/expense-list.css') }}" rel="stylesheet" />
 {% endblock styles %}
 
@@ -42,7 +40,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-    <!-- Expense list functionality -->
+    <!-- Table sorting functionality -->
+    <script src="{{ url_for('static', filename='js/components/table-sorting.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/pages/expense-list.js') }}"></script>
 {% endblock scripts %}
 
@@ -60,10 +59,8 @@ document.addEventListener('DOMContentLoaded', function() {
             </h1>
             <div class="d-flex gap-2 flex-wrap">
                 <!-- Primary Actions -->
-                <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
-                    <i class="fas fa-plus me-2"></i>
-                    <span class="d-none d-sm-inline">Add Expense</span>
-                    <span class="d-sm-none">Add</span>
+                <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary" data-bs-toggle="tooltip" title="Add a new expense">
+                    <i class="fas fa-plus me-2"></i>Add Expense
                 </a>
                 <!-- Data Management Dropdown -->
                 <div class="dropdown">
@@ -73,9 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         id="dataManagementDropdown"
                         data-bs-toggle="dropdown"
                         aria-expanded="false">
-                        <i class="fas fa-database me-2"></i>
-                        <span class="d-none d-sm-inline">Data Management</span>
-                        <span class="d-sm-none">Data</span>
+                        <i class="fas fa-database me-2"></i>Data Management
                     </button>
                     <ul class="dropdown-menu" aria-labelledby="dataManagementDropdown">
                         <li>
@@ -114,10 +109,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     data-bs-toggle="collapse"
                     data-bs-target="#filterCollapse"
                     aria-expanded="{% if show_filters %}true{% else %}false{% endif %}"
-                    aria-controls="filterCollapse">
-                    <i class="fas fa-filter me-2"></i>
-                    <span class="d-none d-sm-inline">Search & Filter</span>
-                    <span class="d-sm-none">Filter</span>
+                    aria-controls="filterCollapse"
+                    data-tooltip="true"
+                    title="Show search and filter options">
+                    <i class="fas fa-filter me-2"></i>Search & Filter
                     {% if active_filters_count %}
                         <span class="badge bg-primary ms-2">{{ active_filters_count }}</span>
                     {% endif %}
@@ -131,12 +126,12 @@ document.addEventListener('DOMContentLoaded', function() {
             <!-- View Toggle -->
             <div class="btn-group" role="group" aria-label="View Toggle">
                 <input type="radio" class="btn-check" name="view-type" id="card-view" autocomplete="off" checked />
-                <label class="btn btn-outline-primary" for="card-view" id="card-view-label">
-                    <i class="fas fa-th-large me-2"></i> <span class="d-none d-md-inline">Cards</span>
+                <label class="btn btn-outline-primary" for="card-view" id="card-view-label" data-bs-toggle="tooltip" title="Card view - shows expenses in card format">
+                    <i class="fas fa-th-large me-2"></i>Cards
                 </label>
                 <input type="radio" class="btn-check" name="view-type" id="table-view" autocomplete="off" />
-                <label class="btn btn-outline-primary" for="table-view" id="table-view-label">
-                    <i class="fas fa-table me-2"></i> <span class="d-none d-md-inline">Table</span>
+                <label class="btn btn-outline-primary" for="table-view" id="table-view-label" data-bs-toggle="tooltip" title="Table view - shows expenses in table format">
+                    <i class="fas fa-table me-2"></i>Table
                 </label>
             </div>
         </div>
@@ -163,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <select class="form-control" id="meal_type" name="meal_type">
                                 <option value="">All Meal Types</option>
                                 {% for type in meal_types %}
-                                    <option value="{{ type }}" {{ 'selected' if meal_type == type else '' }}>{{ type.title() }}</option>
+                                    <option value="{{ type }}"{% if meal_type == type %} selected{% endif %}>{{ type.title() }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -172,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <select class="form-control" id="category" name="category">
                                 <option value="">All Categories</option>
                                 {% for cat in categories %}
-                                    <option value="{{ cat }}" {{ 'selected' if category == cat else '' }}>{{ cat }}</option>
+                                    <option value="{{ cat }}"{% if category == cat %} selected{% endif %}>{{ cat }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -298,14 +293,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                             <div class="restaurant-icon me-2 flex-shrink-0">
                                                 {% if expense.restaurant and expense.restaurant.website %}
                                                     <img
-                                                        src="https://www.google.com/s2/favicons?domain={{ expense.restaurant.website.replace('http://', '').replace('https://', '').replace('www.', '').split('/')[0] }}&sz=32"
+                                                        src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                                         data-website="{{ expense.restaurant.website }}"
+                                                        data-size="32"
                                                         alt="{{ expense.restaurant.name }} icon"
                                                         class="restaurant-favicon"
                                                         width="32"
                                                         height="32"
-                                                        onerror="handleFaviconError(this);"
-                                                        onload="this.style.opacity='1';"
+                                                        style="opacity: 0; transition: opacity 0.2s ease-in-out;"
                                                     />
                                                 {% endif %}
                                                 <i class="fas fa-utensils text-primary restaurant-fallback-icon{% if expense.restaurant and expense.restaurant.website %} d-none{% endif %}"></i>
@@ -366,13 +361,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
                                 <!-- Middle Row: Tags + Note -->
                                 {% if expense.tags or expense.notes %}
-                                    <div class="row mb-3">
+                                    <div class="row mb-1">
                                         <div class="col-8">
                                             {% if expense.tags %}
-                                                <div class="expense-tags">
-                                                    {% for tag in expense.tags %}
-                                                        {{ tag_badge(tag) }}
-                                                    {% endfor %}
+                                                <div class="d-flex align-items-start">
+                                                    <i class="fas fa-tags me-2 text-muted mt-1"></i>
+                                                    <div class="expense-tags">
+                                                        {% for tag in expense.tags %}
+                                                            {{ tag_badge(tag) }}
+                                                        {% endfor %}
+                                                    </div>
                                                 </div>
                                             {% endif %}
                                         </div>
@@ -391,7 +389,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 {% endif %}
 
                                 <!-- Bottom Row: Location/Date (Left) + Actions (Right) -->
-                                <div class="row pt-2 border-top">
+                                <div class="row pt-0 border-top">
                                     <div class="col-8">
                                         <div class="text-muted small">
                                             {% if expense.restaurant %}
@@ -428,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                class="btn btn-sm btn-outline-primary"
                                                data-bs-toggle="tooltip"
                                                title="Edit expense">
-                                                <i class="fas fa-edit me-1"></i><span class="d-none d-sm-inline">Edit</span>
+                                                <i class="fas fa-edit"></i>
                                             </a>
                                             <button type="button"
                                                     class="btn btn-sm btn-outline-danger"
@@ -438,8 +436,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
                                                     data-expense-amount="{{ '%.2f'|format(expense.amount) }}"
                                                     data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}"
+                                                    data-tooltip="true"
                                                     title="Delete expense">
-                                                <i class="fas fa-trash me-1"></i><span class="d-none d-sm-inline">Delete</span>
+                                                <i class="fas fa-trash"></i>
                                             </button>
                                         </div>
                                     </div>
@@ -456,16 +455,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="card">
                         <div class="card-body p-0">
                             <div class="table-sticky-frozen">
-                                <table class="table table-hover align-middle expense-table mb-0">
+                                <table id="expenseTable" class="table table-hover align-middle expense-table mb-0">
                                     <thead class="table-light">
                                         <tr>
-                                            <th data-sort="true" data-sort-type="date">Date</th>
+                                            <th data-sort="true" data-sort-type="date">Date / Tags</th>
                                             <th data-sort="true" data-sort-type="text">Restaurant</th>
-                                            <th data-sort="true" data-sort-type="text">Meal / Order</th>
-                                            <th data-sort="true" data-sort-type="number">Party Size</th>
-                                            <th data-sort="true" data-sort-type="currency">Price / Person</th>
-                                            <th data-sort="true" data-sort-type="currency">Amount</th>
-                                            <th data-sort="true" data-sort-type="text">Tags / Notes</th>
+                                            <th data-sort="true" data-sort-type="text">Meal</th>
+                                            <th data-sort="true" data-sort-type="text">Order</th>
+                                            <th data-sort="true" data-sort-type="number" class="text-center">Party</th>
+                                            <th data-sort="true" data-sort-type="currency" class="text-end">Price / Person</th>
+                                            <th data-sort="true" data-sort-type="currency" class="text-end">Amount</th>
                                             <th class="text-end">Actions</th>
                                         </tr>
                                     </thead>
@@ -474,7 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </tbody>
                                     <tfoot class="table-secondary">
                                         <tr>
-                                            <td colspan="4" class="text-end fw-bold">Total:</td>
+                                            <td colspan="5" class="text-end fw-bold">Total:</td>
                                             <td class="fw-bold text-info amount-right">
                                                 {% if avg_price_per_person %}
                                                     ${{ "%.2f"|format(avg_price_per_person) }}
@@ -483,7 +482,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 {% endif %}
                                             </td>
                                             <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_amount) }}</td>
-                                            <td colspan="2"></td>
+                                            <td></td>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -544,23 +543,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
         </div>
-
-        <!-- Footer -->
-        <footer class="footer mt-5 py-4 bg-light">
-            <div class="container-fluid">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <p class="mb-0">2025 Meal Expense Tracker. All rights reserved.</p>
-                    </div>
-                    <div class="col-md-6 text-md-end">
-                        <a href="#" class="text-muted me-3">About</a>
-                        <a href="#" class="text-muted me-3">Terms</a>
-                        <a href="#" class="text-muted me-3">Privacy</a>
-                        <a href="#" class="text-muted">Contact</a>
-                    </div>
-                </div>
-            </div>
-        </footer>
 
     </main>
 {% endblock content %}

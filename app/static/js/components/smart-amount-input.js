@@ -58,7 +58,7 @@ export function initSmartAmountInput(input) {
       // Limit decimal part to 2 digits
       const limitedDecimal = decimalPart.substring(0, 2);
 
-      return integerPart + (limitedDecimal ? '.' + limitedDecimal : '');
+      return integerPart + (limitedDecimal ? `.${limitedDecimal}` : '');
     }
 
     // No decimal point - assume it's cents (like Quicken)
@@ -75,12 +75,12 @@ export function initSmartAmountInput(input) {
       return `0.0${numericValue}`;
     } else if (numericValue.length === 2) {
       return `0.${numericValue}`;
-    } else {
-      // 3+ digits: place decimal before last 2 digits
-      const integerPart = numericValue.slice(0, -2);
-      const centsPart = numericValue.slice(-2);
-      return `${integerPart}.${centsPart}`;
     }
+    // 3+ digits: place decimal before last 2 digits
+    const integerPart = numericValue.slice(0, -2);
+    const centsPart = numericValue.slice(-2);
+    return `${integerPart}.${centsPart}`;
+
   }
 
   /**
@@ -111,23 +111,23 @@ export function initSmartAmountInput(input) {
       input.value = formattedValue;
       lastValidValue = formattedValue;
 
-                // Try to maintain cursor position (only for text inputs)
-                if (input.type === 'text' || input.type === 'tel') {
-                    try {
-                        // If cursor was at the end, keep it at the end
-                        if (cursorPosition >= rawValue.length) {
-                            input.setSelectionRange(formattedValue.length, formattedValue.length);
-                        } else {
-                            // Otherwise, try to maintain relative position
-                            const relativePosition = cursorPosition / rawValue.length;
-                            const newPosition = Math.round(relativePosition * formattedValue.length);
-                            input.setSelectionRange(newPosition, newPosition);
-                        }
-                    } catch (e) {
-                        // Ignore cursor positioning errors for number inputs
-                        console.debug('Could not set cursor position:', e.message);
-                    }
-                }
+      // Try to maintain cursor position (only for text inputs)
+      if (input.type === 'text' || input.type === 'tel') {
+        try {
+          // If cursor was at the end, keep it at the end
+          if (cursorPosition >= rawValue.length) {
+            input.setSelectionRange(formattedValue.length, formattedValue.length);
+          } else {
+            // Otherwise, try to maintain relative position
+            const relativePosition = cursorPosition / rawValue.length;
+            const newPosition = Math.round(relativePosition * formattedValue.length);
+            input.setSelectionRange(newPosition, newPosition);
+          }
+        } catch (e) {
+          // Ignore cursor positioning errors for number inputs
+          console.debug('Could not set cursor position:', e.message);
+        }
+      }
     } else if (formattedValue !== lastValidValue) {
       lastValidValue = formattedValue;
     }
@@ -178,7 +178,7 @@ export function initSmartAmountInput(input) {
     // Prevent multiple decimal points
     if (char === '.' && input.value.includes('.')) {
       event.preventDefault();
-      return;
+
     }
   }
 
@@ -205,7 +205,8 @@ export function initSmartAmountInput(input) {
   input.addEventListener('paste', handlePaste);
 
   // Store reference to cleanup function
-  input._smartAmountCleanup = function() {
+  input.dataset.smartAmountCleanup = 'true';
+  const cleanupFunction = function() {
     input.removeEventListener('input', handleInput);
     input.removeEventListener('blur', handleBlur);
     input.removeEventListener('keydown', handleKeydown);
@@ -215,6 +216,12 @@ export function initSmartAmountInput(input) {
       clearTimeout(typingTimeout);
     }
   };
+
+  // Store cleanup function in a way that doesn't trigger linting errors
+  if (!window.smartAmountCleanupFunctions) {
+    window.smartAmountCleanupFunctions = new WeakMap();
+  }
+  window.smartAmountCleanupFunctions.set(input, cleanupFunction);
 
   // Initialize with current value if it exists
   if (input.value) {
@@ -233,7 +240,7 @@ export function initSmartAmountInputs() {
   // Find all amount input fields
   const amountInputs = document.querySelectorAll('input[name="amount"], input[id*="amount"], input[data-smart-amount]');
 
-  amountInputs.forEach(input => {
+  amountInputs.forEach((input) => {
     initSmartAmountInput(input);
   });
 }
@@ -243,9 +250,13 @@ export function initSmartAmountInputs() {
  * @param {HTMLInputElement} input - The input element to cleanup
  */
 export function cleanupSmartAmountInput(input) {
-  if (input && input._smartAmountCleanup) {
-    input._smartAmountCleanup();
-    delete input._smartAmountCleanup;
+  if (input && window.smartAmountCleanupFunctions) {
+    const cleanupFunction = window.smartAmountCleanupFunctions.get(input);
+    if (cleanupFunction) {
+      cleanupFunction();
+      window.smartAmountCleanupFunctions.delete(input);
+    }
+    input.removeAttribute('data-smart-amount-cleanup');
   }
 }
 

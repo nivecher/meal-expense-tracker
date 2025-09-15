@@ -26,20 +26,20 @@
                         </div>
                         <div class="col-md-2">
                             <select name="sort" class="form-select" aria-label="Sort by">
-                                <option value="name" {% if sort == "name" %}selected{% endif %}>Sort by Name</option>
-                                <option value="city" {% if sort == "city" %}selected{% endif %}>Sort by City</option>
-                                <option value="cuisine" {% if sort == "cuisine" %}selected{% endif %}
+                                <option value="name" {% if sort="" ="name" %}selected{% endif %}>Sort by Name</option>
+                                <option value="city" {% if sort="" ="city" %}selected{% endif %}>Sort by City</option>
+                                <option value="cuisine" {% if sort="" ="cuisine" %}selected{% endif %}
                                     >Sort by Cuisine</option
                                 >
-                                <option value="created_at" {% if sort == "created_at" %}selected{% endif %}>
+                                <option value="created_at" {% if sort="" ="created_at" %}selected{% endif %}>
                                     Sort by Date Added
                                 </option>
                             </select>
                         </div>
                         <div class="col-md-2">
                             <select name="order" class="form-select" aria-label="Sort order">
-                                <option value="asc" {% if order == "asc" %}selected{% endif %}>Ascending</option>
-                                <option value="desc" {% if order == "desc" %}selected{% endif %}>Descending</option>
+                                <option value="asc" {% if order="" ="asc" %}selected{% endif %}>Ascending</option>
+                                <option value="desc" {% if order="" ="desc" %}selected{% endif %}>Descending</option>
                             </select>
                         </div>
                         <div class="col-12">
@@ -49,13 +49,13 @@
                                         name="per_page"
                                         class="form-select form-select-sm d-inline-block w-auto"
                                         aria-label="Results per page">
-                                        <option value="10" {% if per_page == "10" %}selected{% endif %}
+                                        <option value="10" {% if per_page="" ="10" %}selected{% endif %}
                                             >10 per page</option
                                         >
-                                        <option value="25" {% if per_page == "25" %}selected{% endif %}
+                                        <option value="25" {% if per_page="" ="25" %}selected{% endif %}
                                             >25 per page</option
                                         >
-                                        <option value="50" {% if per_page == "50" %}selected{% endif %}
+                                        <option value="50" {% if per_page="" ="50" %}selected{% endif %}
                                             >50 per page</option
                                         >
                                     </select>
@@ -97,24 +97,26 @@
                                         >
                                     </td>
                                     <td>
-                                        {% if restaurant.cuisine %}
-                                        {% from 'macros/badge_helpers.html' import cuisine_badge %}
-                                        {{ cuisine_badge(restaurant.cuisine, size='sm') }}
-                                        {% else %}
-                                        N/A
-                                        {% endif %}
+                                        {% if restaurant.cuisine %} {% from 'macros/badge_helpers.html' import
+                                        cuisine_badge %} {{ cuisine_badge(restaurant.cuisine, size='sm') }} {% else %}
+                                        N/A {% endif %}
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-start">
                                             <i class="fas fa-map-marker-alt me-2 mt-1 flex-shrink-0 text-muted"></i>
                                             <div class="flex-grow-1">
-                                                {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %}
-                                                    {% if restaurant.address %}<div class="small text-muted">{{ restaurant.address }}</div>{% endif %}
-                                                    {% if restaurant.city or restaurant.state or restaurant.postal_code %}
-                                                        <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
-                                                    {% endif %}
-                                                {% else %}
-                                                    <span class="text-muted">N/A</span>
+                                                {% if restaurant.address or restaurant.city or restaurant.state or
+                                                restaurant.postal_code %} {% if restaurant.address %}<div
+                                                    class="small text-muted"
+                                                    >{{ restaurant.address }}</div
+                                                >{% endif %} {% if restaurant.city or restaurant.state or
+                                                restaurant.postal_code %}
+                                                <div
+                                                    >{{ [restaurant.city, restaurant.state,
+                                                    restaurant.postal_code]|select|join(", ") }}</div
+                                                >
+                                                {% endif %} {% else %}
+                                                <span class="text-muted">N/A</span>
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -168,27 +170,27 @@
 </div>
 {% endblock content %} {% block scripts %} {{ super() }}
 <script>
-// Auto-submit form when select values change
-document.addEventListener('DOMContentLoaded', function() {
-    // Cookie utility function
-    function setCookie(name, value, days = 365) {
-        const expires = new Date();
-        expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-        document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
-    }
+    // Auto-submit form when select values change
+    document.addEventListener("DOMContentLoaded", function () {
+        // Cookie utility function
+        function setCookie(name, value, days = 365) {
+            const expires = new Date();
+            expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+            document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+        }
 
-    const form = document.querySelector('form');
-    if (form) {
-        form.querySelectorAll('select').forEach((select) => {
-            select.addEventListener('change', () => {
-                // Save page size preference to cookie if it's the per_page selector
-                if (select.name === 'per_page') {
-                    setCookie('restaurant_page_size', select.value);
-                }
-                form.submit();
+        const form = document.querySelector("form");
+        if (form) {
+            form.querySelectorAll("select").forEach((select) => {
+                select.addEventListener("change", () => {
+                    // Save page size preference to cookie if it's the per_page selector
+                    if (select.name === "per_page") {
+                        setCookie("restaurant_page_size", select.value);
+                    }
+                    form.submit();
+                });
             });
-        });
-    }
-});
+        }
+    });
 </script>
 {% endblock scripts %}

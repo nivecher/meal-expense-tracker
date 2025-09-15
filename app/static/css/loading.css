@@ -3,26 +3,25 @@
    ====================== */
 
 /* Loading Overlay */
+
 .loading-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(255, 255, 255, 0.85);
+    inset: 0;
+    background-color: rgb(255 255 255 / 85%);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
-    -webkit-backdrop-filter: blur(2px);
     backdrop-filter: blur(2px);
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 /* Dark mode adjustments for loading overlay */
+
 @media (prefers-color-scheme: dark) {
+
     .loading-overlay {
-        background-color: rgba(0, 0, 0, 0.8);
+        background-color: rgb(0 0 0 / 80%);
     }
 
     .loading-overlay span {
@@ -31,6 +30,7 @@
 }
 
 /* Loading Spinner */
+
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
@@ -43,6 +43,7 @@
 }
 
 /* Loading Text */
+
 .loading-overlay span {
     font-size: 1.1rem;
     font-weight: 500;
@@ -53,6 +54,7 @@
 /* Loading Skeletons */
 
 /* Base Skeleton Styles */
+
 .skeleton {
     position: relative;
     background-color: var(--gray-200);
@@ -61,10 +63,13 @@
 }
 
 /* Skeleton Animation */
+
 @keyframes shimmer {
+
     0% {
         transform: translateX(-100%);
     }
+
     100% {
         transform: translateX(100%);
     }
@@ -73,22 +78,21 @@
 .skeleton::after {
     content: '';
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    inset: 0;
     background: linear-gradient(
         90deg,
-        rgba(255, 255, 255, 0) 0%,
-        rgba(255, 255, 255, 0.4) 50%,
-        rgba(255, 255, 255, 0) 100%
+        rgb(255 255 255 / 0%) 0%,
+        rgb(255 255 255 / 40%) 50%,
+        rgb(255 255 255 / 0%) 100%
     );
     animation: shimmer 1.5s infinite;
     z-index: 1;
 }
 
 /* Dark mode adjustments */
+
 @media (prefers-color-scheme: dark) {
+
     .skeleton {
         background-color: var(--gray-700);
     }
@@ -96,14 +100,15 @@
     .skeleton::after {
         background: linear-gradient(
             90deg,
-            rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.1) 50%,
-            rgba(255, 255, 255, 0) 100%
+            rgb(255 255 255 / 0%) 0%,
+            rgb(255 255 255 / 10%) 50%,
+            rgb(255 255 255 / 0%) 100%
         );
     }
 }
 
 /* Skeleton Text */
+
 .skeleton-text {
     width: 100%;
     height: 1rem;
@@ -117,6 +122,7 @@
 }
 
 /* Skeleton Title */
+
 .skeleton-title {
     width: 50%;
     height: 1.5rem;
@@ -125,6 +131,7 @@
 }
 
 /* Skeleton Avatar */
+
 .skeleton-avatar {
     width: 3rem;
     height: 3rem;
@@ -132,6 +139,7 @@
 }
 
 /* Skeleton Image */
+
 .skeleton-img {
     width: 100%;
     height: 0;
@@ -141,6 +149,7 @@
 }
 
 /* Skeleton Button */
+
 .skeleton-btn {
     width: 100%;
     height: 2.5rem;
@@ -148,6 +157,7 @@
 }
 
 /* Skeleton Card */
+
 .skeleton-card {
     padding: 1.5rem;
     border-radius: 0.5rem;
@@ -157,6 +167,7 @@
 }
 
 /* Skeleton List */
+
 .skeleton-list {
     display: flex;
     flex-direction: column;
@@ -176,6 +187,7 @@
 }
 
 /* Skeleton Table */
+
 .skeleton-table {
     width: 100%;
     border-collapse: collapse;
@@ -197,6 +209,7 @@
 }
 
 /* Skeleton Grid */
+
 .skeleton-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -204,21 +217,18 @@
 }
 
 /* Loading States */
+
 .loading {
     position: relative;
     pointer-events: none;
-    -webkit-user-select: none;
     user-select: none;
 }
 
 .loading::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.7);
+    inset: 0;
+    background: rgb(255 255 255 / 70%);
     z-index: 10;
     border-radius: inherit;
 }
@@ -243,13 +253,16 @@
 }
 
 /* Dark mode adjustments for loading states */
+
 @media (prefers-color-scheme: dark) {
+
     .loading::after {
-        background: rgba(15, 23, 42, 0.7);
+        background: rgb(15 23 42 / 70%);
     }
 }
 
 /* Pulse Animation */
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -260,12 +273,14 @@
 }
 
 /* Skeleton Wrapper */
+
 .skeleton-wrapper {
     position: relative;
     overflow: hidden;
 }
 
 /* Skeleton Content */
+
 .skeleton-content {
     display: flex;
     flex-direction: column;
@@ -277,6 +292,7 @@
 }
 
 /* Skeleton with Image */
+
 .skeleton-with-image {
     display: flex;
     flex-direction: column;
@@ -289,7 +305,9 @@
 }
 
 /* Responsive Adjustments */
-@media (max-width: 767.98px) {
+
+@media (width <= 767.98px) {
+
     .skeleton-grid {
         grid-template-columns: 1fr;
     }

@@ -1,147 +1,155 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to {{ app_name }}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background-color: #28a745;
-            color: white;
-            padding: 20px;
-            text-align: center;
-            border-radius: 8px 8px 0 0;
-        }
-        .content {
-            background-color: #f8f9fa;
-            padding: 30px;
-            border-radius: 0 0 8px 8px;
-        }
-        .password-box {
-            background-color: #fff;
-            border: 2px solid #28a745;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-        }
-        .password {
-            font-family: 'Courier New', monospace;
-            font-size: 18px;
-            font-weight: bold;
-            color: #28a745;
-            background-color: #d4edda;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        .info {
-            background-color: #d1ecf1;
-            border: 1px solid #bee5eb;
-            border-radius: 4px;
-            padding: 15px;
-            margin: 20px 0;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #dee2e6;
-            color: #6c757d;
-            font-size: 14px;
-        }
-        .btn {
-            display: inline-block;
-            padding: 12px 24px;
-            background-color: #28a745;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        .features {
-            background-color: #fff;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .features ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        .features li {
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .features li:before {
-            content: "✓ ";
-            color: #28a745;
-            font-weight: bold;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>Welcome to {{ app_name }}!</h1>
-        <p>Your account has been created</p>
-    </div>
-
-    <div class="content">
-        <h2>Hello {{ username }}!</h2>
-
-        <p>Welcome to {{ app_name }}! Your account has been created by an administrator. Below are your login credentials:</p>
-
-        <div class="password-box">
-            <h3>Your Login Credentials</h3>
-            <p><strong>Username:</strong> {{ username }}</p>
-            <p><strong>Password:</strong></p>
-            <div class="password">{{ new_password }}</div>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Welcome to {{ app_name }}</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .header {
+                background-color: #28a745;
+                color: white;
+                padding: 20px;
+                text-align: center;
+                border-radius: 8px 8px 0 0;
+            }
+            .content {
+                background-color: #f8f9fa;
+                padding: 30px;
+                border-radius: 0 0 8px 8px;
+            }
+            .password-box {
+                background-color: #fff;
+                border: 2px solid #28a745;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+                text-align: center;
+            }
+            .password {
+                font-family: "Courier New", monospace;
+                font-size: 18px;
+                font-weight: bold;
+                color: #28a745;
+                background-color: #d4edda;
+                padding: 10px;
+                border-radius: 4px;
+                margin: 10px 0;
+            }
+            .info {
+                background-color: #d1ecf1;
+                border: 1px solid #bee5eb;
+                border-radius: 4px;
+                padding: 15px;
+                margin: 20px 0;
+            }
+            .footer {
+                text-align: center;
+                margin-top: 30px;
+                padding-top: 20px;
+                border-top: 1px solid #dee2e6;
+                color: #6c757d;
+                font-size: 14px;
+            }
+            .btn {
+                display: inline-block;
+                padding: 12px 24px;
+                background-color: #28a745;
+                color: white;
+                text-decoration: none;
+                border-radius: 4px;
+                margin: 10px 0;
+            }
+            .features {
+                background-color: #fff;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+            }
+            .features ul {
+                list-style-type: none;
+                padding: 0;
+            }
+            .features li {
+                padding: 8px 0;
+                border-bottom: 1px solid #eee;
+            }
+            .features li:before {
+                content: "✓ ";
+                color: #28a745;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>Welcome to {{ app_name }}!</h1>
+            <p>Your account has been created</p>
         </div>
 
-        <div class="info">
-            <strong>🔐 Security Notice:</strong>
-            <ul>
-                <li>This is a temporary password</li>
-                <li>Please change it after your first login</li>
-                <li>Keep your credentials secure</li>
-            </ul>
+        <div class="content">
+            <h2>Hello {{ username }}!</h2>
+
+            <p
+                >Welcome to {{ app_name }}! Your account has been created by an administrator. Below are your login
+                credentials:</p
+            >
+
+            <div class="password-box">
+                <h3>Your Login Credentials</h3>
+                <p><strong>Username:</strong> {{ username }}</p>
+                <p><strong>Password:</strong></p>
+                <div class="password">{{ new_password }}</div>
+            </div>
+
+            <div class="info">
+                <strong>🔐 Security Notice:</strong>
+                <ul>
+                    <li>This is a temporary password</li>
+                    <li>Please change it after your first login</li>
+                    <li>Keep your credentials secure</li>
+                </ul>
+            </div>
+
+            <div class="features">
+                <h3>What you can do with {{ app_name }}:</h3>
+                <ul>
+                    <li>Track your meal expenses</li>
+                    <li>Manage restaurant information</li>
+                    <li>Generate expense reports</li>
+                    <li>Export your data</li>
+                    <li>Set up categories and tags</li>
+                </ul>
+            </div>
+
+            <p>To get started:</p>
+            <ol>
+                <li>Log in using the credentials above</li>
+                <li>Change your password in your profile settings</li>
+                <li>Start adding your first expense!</li>
+            </ol>
+
+            <p
+                >If you have any questions or need help getting started, please don't hesitate to contact our support
+                team.</p
+            >
+
+            <p
+                >Welcome aboard!<br />
+                The {{ app_name }} Team</p
+            >
         </div>
 
-        <div class="features">
-            <h3>What you can do with {{ app_name }}:</h3>
-            <ul>
-                <li>Track your meal expenses</li>
-                <li>Manage restaurant information</li>
-                <li>Generate expense reports</li>
-                <li>Export your data</li>
-                <li>Set up categories and tags</li>
-            </ul>
+        <div class="footer">
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p>&copy; 2024 {{ app_name }}. All rights reserved.</p>
         </div>
-
-        <p>To get started:</p>
-        <ol>
-            <li>Log in using the credentials above</li>
-            <li>Change your password in your profile settings</li>
-            <li>Start adding your first expense!</li>
-        </ol>
-
-        <p>If you have any questions or need help getting started, please don't hesitate to contact our support team.</p>
-
-        <p>Welcome aboard!<br>
-        The {{ app_name }} Team</p>
-    </div>
-
-    <div class="footer">
-        <p>This is an automated message. Please do not reply to this email.</p>
-        <p>&copy; 2024 {{ app_name }}. All rights reserved.</p>
-    </div>
-</body>
+    </body>
 </html>

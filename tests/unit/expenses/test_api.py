@@ -127,7 +127,9 @@ class TestExpenseAPI:
         )
 
         assert response.status_code == 201, f"Unexpected status code: {response.status_code}"
-        data = response.get_json()
+        response_data = response.get_json()
+        assert "data" in response_data
+        data = response_data["data"]
         assert "id" in data
         assert data["amount"] == "25.50"
         assert data["notes"] == "Test expense"
@@ -168,7 +170,9 @@ class TestExpenseAPI:
 
         response = client.get("/api/v1/expenses", headers=auth_headers)
         assert response.status_code == 200
-        data = response.get_json()
+        response_data = response.get_json()
+        assert "data" in response_data
+        data = response_data["data"]
         assert isinstance(data, list)
         assert len(data) >= 1
         assert data[0]["notes"] == "Dinner at Test Restaurant"
@@ -198,7 +202,9 @@ class TestExpenseAPI:
 
         response = client.get(f"/api/v1/expenses/{expense.id}", headers=auth_headers)
         assert response.status_code == 200
-        data = response.get_json()
+        response_data = response.get_json()
+        assert "data" in response_data
+        data = response_data["data"]
         assert data["amount"] == "10.99"
         assert data["notes"] == "Test expense"
 
@@ -240,7 +246,9 @@ class TestExpenseAPI:
             headers=auth_headers,
         )
         assert response.status_code == 200
-        data = response.get_json()
+        response_data = response.get_json()
+        assert "data" in response_data
+        data = response_data["data"]
         assert data["amount"] == "12.99"
         assert data["notes"] == "Updated note"
         assert data["meal_type"] == "dinner"

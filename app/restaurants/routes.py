@@ -973,7 +973,12 @@ def restaurant_details(restaurant_id):
             # Form validation failed
             for field, errors in form.errors.items():
                 for error in errors:
-                    flash(f"{getattr(form, field).label.text}: {error}", "danger")
+                    field_obj = getattr(form, field, None)
+                    if field_obj and hasattr(field_obj, "label") and field_obj.label:
+                        field_name = field_obj.label.text
+                    else:
+                        field_name = field.replace("_", " ").title()
+                    flash(f"{field_name}: {error}", "danger")
 
             # Pre-populate form with submitted data
             form = RestaurantForm(data=request.form)

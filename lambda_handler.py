@@ -8,11 +8,10 @@ import json
 import logging
 import os
 import time
-from typing import Any, Dict, Optional, TypedDict, Union, cast
+from typing import Any, Dict, Optional, TypedDict
 
 import awsgi
 from flask import Flask
-from flask.wrappers import Response as FlaskResponse
 
 from app import create_app
 
@@ -100,9 +99,6 @@ def _convert_apigw_v2_to_v1(event: Dict[str, Any]) -> Dict[str, Any]:
     if cookies:
         cookie_header = "; ".join(cookies)
         headers["Cookie"] = cookie_header
-        print("=== CONVERTED COOKIES ===")
-        print(f"Converted {len(cookies)} cookies to Cookie header: {cookie_header}")
-        print("=== END CONVERTED COOKIES ===")
 
     # Convert v2.0 event to v1.0 format
     v1_event = {
@@ -463,35 +459,11 @@ def _handle_health_check() -> Dict[str, Any]:
         }
 
 
-def _handle_cookie_test() -> Dict[str, Any]:
-    """DEBUG: Test cookie setting functionality."""
-    print("=== COOKIE TEST ENDPOINT CALLED ===")
-
-    # Test cookie with minimal settings - NO HttpOnly to test browser access
-    test_cookie = "test_cookie=hello_world; Path=/; Secure"
-    return {
-        "statusCode": 200,
-        "body": json.dumps(
-            {
-                "message": "Cookie test endpoint",
-                "cookie_set": "test_cookie=hello_world",
-                "timestamp": time.time(),
-            }
-        ),
-        "headers": {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-        },
-        "cookies": [test_cookie],  # HTTP API format
-    }
-
-
 def _handle_cors_preflight() -> Dict[str, Any]:
     """Handle CORS preflight OPTIONS requests with environment-aware settings."""
     environment = os.getenv("ENVIRONMENT", "dev")
     if environment == "dev":
-        # TEMPORARY: Disable CORS completely for dev to test cookie issue
-        print("DEBUG: Skipping CORS preflight headers for dev environment")
+        # Disable CORS completely for dev environment
         return {
             "statusCode": 200,
             "headers": {
@@ -528,12 +500,11 @@ def _process_awsgi_response(response: Dict[str, Any], event: Dict[str, Any] = No
 
     headers = {str(k): str(v) for k, v in headers.items()}
 
-    # TEMPORARY: Disable CORS entirely to test if it's blocking cookies
+    # Environment-specific CORS handling
     environment = os.getenv("ENVIRONMENT", "dev")
     if environment == "dev":
-        # Development - DISABLE CORS completely to test cookie issue
-        print("DEBUG: Skipping CORS headers entirely for dev environment")
-        # Don't add any CORS headers at all
+        # Development - disable CORS for simplified testing
+        pass
     else:
         # Production - use standard settings
         headers.update(
@@ -571,45 +542,6 @@ def _run_auto_migration() -> None:
         lambda_handler._migration_checked = True
 
 
-def _debug_cookies(event: Dict[str, Any]) -> None:
-    """Debug cookie handling for API Gateway."""
-    print("=== COOKIE DEBUGGING ===")
-    if "cookies" in event:
-        print(f"Received {len(event['cookies'])} cookies from API Gateway:")
-        for cookie in event["cookies"]:
-            print(f"  Received cookie: {cookie}")
-    else:
-        print("No 'cookies' field in event")
-
-    # Check headers for cookies
-    headers = event.get("headers", {})
-    cookie_header = headers.get("cookie") or headers.get("Cookie")
-    if cookie_header:
-        print(f"Cookie header: {cookie_header}")
-    else:
-        print("No cookie header found")
-
-    # Log all headers for debugging
-    print(f"All headers: {json.dumps(headers, indent=2)}")
-    print("=== END COOKIE DEBUGGING ===")
-
-
-def _debug_response_cookies(headers: Dict[str, str]) -> None:
-    """Debug outgoing cookies in response."""
-    print("=== RESPONSE COOKIE DEBUGGING ===")
-    set_cookie_headers = [v for k, v in headers.items() if k.lower() == "set-cookie"]
-    if set_cookie_headers:
-        print(f"Sending {len(set_cookie_headers)} Set-Cookie headers:")
-        for cookie in set_cookie_headers:
-            print(f"  Set-Cookie: {cookie}")
-    else:
-        print("No Set-Cookie headers in response")
-
-    # Log all response headers for debugging
-    print(f"All response headers: {json.dumps(headers, indent=2)}")
-    print("=== END RESPONSE COOKIE DEBUGGING ===")
-
-
 def _extract_cookies_from_headers(headers: Dict[str, str]) -> list[str]:
     """Extract Set-Cookie headers and convert to HTTP API cookies format."""
     cookies = []
@@ -619,21 +551,12 @@ def _extract_cookies_from_headers(headers: Dict[str, str]) -> list[str]:
         if header_name.lower() == "set-cookie":
             cookies.append(header_value)
 
-    print("=== EXTRACTED COOKIES ===")
-    print(f"Found {len(cookies)} cookies for HTTP API format:")
-    for cookie in cookies:
-        print(f"  Cookie: {cookie}")
-    print("=== END EXTRACTED COOKIES ===")
-
     return cookies
 
 
 def _handle_http_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handle HTTP API events."""
     app = get_or_create_app()
-
-    # DEBUG: Log incoming cookies from API Gateway
-    _debug_cookies(event)
 
     try:
         # Handle CORS preflight requests for OPTIONS method
@@ -673,9 +596,6 @@ def _handle_http_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         # Process and enhance response headers
         headers = _process_awsgi_response(response, event)
-
-        # DEBUG: Log outgoing cookies in response
-        _debug_response_cookies(headers)
 
         # Convert Set-Cookie headers to HTTP API cookies format
         cookies = _extract_cookies_from_headers(headers)
@@ -727,10 +647,6 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     # Handle health check requests
     if event.get("path") == "/health" or event.get("rawPath") == "/health":
         return _handle_health_check()
-
-    # DEBUG: Handle cookie test endpoint
-    if event.get("path") == "/cookie-test" or event.get("rawPath") == "/cookie-test":
-        return _handle_cookie_test()
 
     # Auto-migrate on first request (if enabled)
     _run_auto_migration()

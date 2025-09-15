@@ -1,4 +1,5 @@
 /* Home page specific styles */
+
 .hero {
     padding: 4rem 0;
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -28,12 +29,12 @@
     height: 100%;
     transition: transform 0.3s ease;
     background-color: white;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    border: 1px solid rgb(0 0 0 / 5%);
 }
 
 .feature-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 20px rgb(0 0 0 / 10%);
 }
 
 .feature-icon {
@@ -48,7 +49,9 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
+
+@media (width <= 768px) {
+
     .hero {
         padding: 3rem 0;
         text-align: center;

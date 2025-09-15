@@ -1,28 +1,23 @@
-{% extends "base.html" %}
-{% from 'macros/category_helpers.html' import hex_to_rgb %}
-{% from 'macros/badge_helpers.html' import cuisine_badge %}
-
-{% block title %}Dashboard - Meal Expense Tracker{% endblock %}
-
-{% block head_extra %}
+{% extends "base.html" %} {% from 'macros/category_helpers.html' import hex_to_rgb %} {% from
+'macros/badge_helpers.html' import cuisine_badge %} {% block title %}Dashboard - Meal Expense Tracker{% endblock %} {%
+block head_extra %}
 <link href="{{ url_for('static', filename='css/components/dashboard.css') }}" rel="stylesheet" />
-{% endblock head_extra %}
-
-{% block content %}
+{% endblock head_extra %} {% block content %}
 <div class="dashboard">
-<!-- Welcome Section -->
-<section class="welcome-section mb-3">
+    <!-- Welcome Section -->
+    <section class="welcome-section mb-3">
         <div class="row align-items-center">
             <div class="col-xl-9 col-lg-8">
                 <div class="welcome-content">
                     <h1 class="display-5 fw-bold mb-3">
                         <i class="fas fa-home me-3 text-primary"></i>
-                        <span class="text-primary">Welcome to</span><br>
+                        <span class="text-primary">Welcome to</span><br />
                         <span class="text-dark">Meal Expense Tracker</span>
                     </h1>
-<p class="lead text-muted mb-3">
-                        Track your dining expenses, discover spending patterns, and manage your restaurant visits all in one place.
-                        Get insights into your food budget and make informed decisions about your dining choices.
+                    <p class="lead text-muted mb-3">
+                        Track your dining expenses, discover spending patterns, and manage your restaurant visits all in
+                        one place. Get insights into your food budget and make informed decisions about your dining
+                        choices.
                     </p>
                     <!-- Help Link below description -->
                     <div class="mb-3">
@@ -40,13 +35,11 @@
         </div>
     </section>
 
-<!-- Quick Actions Section -->
-<section class="quick-actions-section mb-3">
+    <!-- Quick Actions Section -->
+    <section class="quick-actions-section mb-3">
         <div class="card">
             <div class="card-header">
-                <h6 class="card-title mb-0">
-                    <i class="fas fa-bolt me-2 text-primary"></i>Quick Actions
-                </h6>
+                <h6 class="card-title mb-0"> <i class="fas fa-bolt me-2 text-primary"></i>Quick Actions </h6>
             </div>
             <div class="card-body">
                 <div class="row g-2">
@@ -91,8 +84,8 @@
         </div>
     </section>
 
-<!-- Quick Stats Cards -->
-<section class="stats-section mb-3">
+    <!-- Quick Stats Cards -->
+    <section class="stats-section mb-3">
         <div class="row g-4">
             <!-- Total Expenses -->
             <div class="col-6 col-md-3">
@@ -148,75 +141,73 @@
         </div>
     </section>
 
-<!-- Main Content Grid -->
-<div class="row g-4 mb-3">
+    <!-- Main Content Grid -->
+    <div class="row g-4 mb-3">
         <!-- Recent Expenses -->
         <div class="col-lg-6">
             <div class="card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-clock me-2 text-primary"></i>Recent Expenses
-                    </h5>
+                    <h5 class="card-title mb-0"> <i class="fas fa-clock me-2 text-primary"></i>Recent Expenses </h5>
                     <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-sm btn-outline-primary">
                         View All
                     </a>
                 </div>
                 <div class="card-body">
                     {% if recent_expenses %}
-                        <div class="recent-expenses-list">
-                            {% for expense_row in recent_expenses %}
-                                {% set expense = expense_row[0] %}
-                                {% set restaurant_name = expense_row[1] %}
-                                {% set restaurant_website = expense_row[2] %}
-                                <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}" class="expense-item-link">
-                                    <div class="expense-item">
-                                        <div class="expense-info">
-                                            <div class="expense-restaurant d-flex align-items-center">
-                                                <div class="restaurant-icon me-2 flex-shrink-0">
-                                                    {% if restaurant_website %}
-                                                        <img
-                                                            src="https://www.google.com/s2/favicons?domain={{ restaurant_website|replace('https://', '')|replace('http://', '')|replace('www.', '') }}&sz=28"
-                                                            alt="{{ restaurant_name }} icon"
-                                                            class="restaurant-favicon"
-                                                            width="28"
-                                                            height="28"
-                                                            onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
-                                                            onload="this.style.opacity='1';"
-                                                            style="opacity: 0; transition: opacity 0.2s;"
-                                                        />
-                                                        <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px;"></i>
-                                                    {% else %}
-                                                        <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 24px;"></i>
-                                                    {% endif %}
-                                                </div>
-                                                {{ restaurant_name or 'Unknown Restaurant' }}
-                                            </div>
-                                            <div class="expense-details">
-                                                <span class="expense-date text-muted">
-                                                    {{ expense.date|format_date_user_tz('%b %d, %Y') }}
-                                                </span>
-                                                {% if expense.meal_type %}
-                                                    {% from 'macros/badge_helpers.html' import meal_type_badge %}
-                                                    {{ meal_type_badge(expense.meal_type, size='sm') }}
-                                                {% endif %}
-                                            </div>
+                    <div class="recent-expenses-list">
+                        {% for expense_row in recent_expenses %} {% set expense = expense_row[0] %} {% set
+                        restaurant_name = expense_row[1] %} {% set restaurant_website = expense_row[2] %}
+                        <a
+                            href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
+                            class="expense-item-link">
+                            <div class="expense-item">
+                                <div class="expense-info">
+                                    <div class="expense-restaurant d-flex align-items-center">
+                                        <div class="restaurant-icon me-2 flex-shrink-0">
+                                            {% if restaurant_website %}
+                                            <img
+                                                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                                data-website="{{ restaurant_website }}"
+                                                data-size="28"
+                                                alt="{{ restaurant_name }} icon"
+                                                class="restaurant-favicon"
+                                                width="28"
+                                                height="28"
+                                                style="opacity: 0; transition: opacity 0.2s" />
+                                            <i
+                                                class="fas fa-utensils text-primary restaurant-fallback-icon"
+                                                style="display: none; font-size: 24px"></i>
+                                            {% else %}
+                                            <i
+                                                class="fas fa-utensils text-primary restaurant-fallback-icon"
+                                                style="font-size: 24px"></i>
+                                            {% endif %}
                                         </div>
-                                        <div class="expense-amount">
-                                            ${{ "%.2f"|format(expense.amount) }}
-                                        </div>
+                                        {{ restaurant_name or 'Unknown Restaurant' }}
                                     </div>
-                                </a>
-                            {% endfor %}
-                        </div>
+                                    <div class="expense-details">
+                                        <span class="expense-date text-muted">
+                                            {{ expense.date|format_date_user_tz('%b %d, %Y') }}
+                                        </span>
+                                        {% if expense.meal_type %} {% from 'macros/badge_helpers.html' import
+                                        meal_type_badge %} {{ meal_type_badge(expense.meal_type, size='sm') }} {% endif
+                                        %}
+                                    </div>
+                                </div>
+                                <div class="expense-amount"> ${{ "%.2f"|format(expense.amount) }} </div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
                     {% else %}
-                        <div class="empty-state text-center py-4">
-                            <i class="fas fa-receipt empty-icon text-muted mb-3"></i>
-                            <h6 class="text-muted mb-3">No expenses recorded yet</h6>
-                            <p class="text-muted mb-3">Start tracking your dining expenses to see them here.</p>
-                            <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
-                                <i class="fas fa-plus me-2"></i>Add Your First Expense
-                            </a>
-                        </div>
+                    <div class="empty-state text-center py-4">
+                        <i class="fas fa-receipt empty-icon text-muted mb-3"></i>
+                        <h6 class="text-muted mb-3">No expenses recorded yet</h6>
+                        <p class="text-muted mb-3">Start tracking your dining expenses to see them here.</p>
+                        <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Add Your First Expense
+                        </a>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -226,107 +217,109 @@
         <div class="col-lg-6">
             <div class="card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-trophy me-2 text-warning"></i>Top Restaurants
-                    </h5>
+                    <h5 class="card-title mb-0"> <i class="fas fa-trophy me-2 text-warning"></i>Top Restaurants </h5>
                     <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-sm btn-outline-primary">
                         View All
                     </a>
                 </div>
                 <div class="card-body">
                     {% if top_restaurants %}
-                        <div class="top-restaurants-list">
-                            {% for restaurant in top_restaurants %}
-                                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant[0]) }}" class="restaurant-item-link">
-                                    <div class="restaurant-item">
-                                        <div class="restaurant-info">
-                                            <div class="restaurant-name d-flex align-items-center">
-                                                <div class="restaurant-icon me-2 flex-shrink-0">
-                                                                                                        {% if restaurant[2] %}
-                                                        <img
-                                                            src="https://www.google.com/s2/favicons?domain={{ restaurant[2]|replace('https://', '')|replace('http://', '')|replace('www.', '') }}&sz=28"
-                                                            alt="{{ restaurant[1] }} icon"
-                                                            class="restaurant-favicon"
-                                                            width="28"
-                                                            height="28"
-                                                            onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
-                                                            onload="this.style.opacity='1';"
-                                                            style="opacity: 0; transition: opacity 0.2s;"
-                                                        />
-                                                        <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="display: none; font-size: 24px;"></i>
-                                                    {% else %}
-                                                        <i class="fas fa-utensils text-primary restaurant-fallback-icon" style="font-size: 24px;"></i>
-                                                    {% endif %}
-                                                </div>
-                                                {{ restaurant[1] }}
-                                            </div>
-                                            <div class="restaurant-stats d-flex align-items-center gap-2">
-                                                <span class="visit-count">{{ restaurant[4] }} visits</span>
-                                                {% if restaurant[3] %}
-                                                    {{ cuisine_badge(restaurant[3], size='sm') }}
-                                                {% endif %}
-                                            </div>
+                    <div class="top-restaurants-list">
+                        {% for restaurant in top_restaurants %}
+                        <a
+                            href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant[0]) }}"
+                            class="restaurant-item-link">
+                            <div class="restaurant-item">
+                                <div class="restaurant-info">
+                                    <div class="restaurant-name d-flex align-items-center">
+                                        <div class="restaurant-icon me-2 flex-shrink-0">
+                                            {% if restaurant[2] %}
+                                            <img
+                                                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                                data-website="{{ restaurant[2] }}"
+                                                data-size="28"
+                                                alt="{{ restaurant[1] }} icon"
+                                                class="restaurant-favicon"
+                                                width="28"
+                                                height="28"
+                                                style="opacity: 0; transition: opacity 0.2s" />
+                                            <i
+                                                class="fas fa-utensils text-primary restaurant-fallback-icon"
+                                                style="display: none; font-size: 24px"></i>
+                                            {% else %}
+                                            <i
+                                                class="fas fa-utensils text-primary restaurant-fallback-icon"
+                                                style="font-size: 24px"></i>
+                                            {% endif %}
                                         </div>
-                                        <div class="restaurant-total">
-                                            ${{ "%.2f"|format(restaurant[5]) }}
-                                        </div>
+                                        {{ restaurant[1] }}
                                     </div>
-                                </a>
-                            {% endfor %}
-                        </div>
+                                    <div class="restaurant-stats d-flex align-items-center gap-2">
+                                        <span class="visit-count">{{ restaurant[4] }} visits</span>
+                                        {% if restaurant[3] %} {{ cuisine_badge(restaurant[3], size='sm') }} {% endif %}
+                                    </div>
+                                </div>
+                                <div class="restaurant-total"> ${{ "%.2f"|format(restaurant[5]) }} </div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
                     {% else %}
-                        <div class="empty-state text-center py-4">
-                            <i class="fas fa-utensils empty-icon text-muted mb-3"></i>
-                            <h6 class="text-muted mb-3">No restaurants yet</h6>
-                            <p class="text-muted mb-3">Add restaurants to track your favorite dining spots.</p>
-                            <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-primary">
-                                <i class="fas fa-plus me-2"></i>Add Restaurant
-                            </a>
-                        </div>
+                    <div class="empty-state text-center py-4">
+                        <i class="fas fa-utensils empty-icon text-muted mb-3"></i>
+                        <h6 class="text-muted mb-3">No restaurants yet</h6>
+                        <p class="text-muted mb-3">Add restaurants to track your favorite dining spots.</p>
+                        <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Add Restaurant
+                        </a>
+                    </div>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 
-
-
-<!-- Navigation Guide -->
-<section class="navigation-guide">
+    <!-- Navigation Guide -->
+    <section class="navigation-guide">
         <div class="card bg-light">
             <div class="card-body">
-                <h5 class="card-title">
-                    <i class="fas fa-compass me-2 text-primary"></i>Getting Started
-                </h5>
+                <h5 class="card-title"> <i class="fas fa-compass me-2 text-primary"></i>Getting Started </h5>
                 <div class="row g-4 mt-2">
                     <div class="col-md-4">
                         <div class="guide-step">
                             <div class="step-number">1</div>
                             <h6>Add Restaurants</h6>
-                            <p class="text-muted">Start by adding your favorite restaurants or discover new ones using our restaurant search.</p>
+                            <p class="text-muted"
+                                >Start by adding your favorite restaurants or discover new ones using our restaurant
+                                search.</p
+                            >
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="guide-step">
                             <div class="step-number">2</div>
                             <h6>Track Expenses</h6>
-                            <p class="text-muted">Log your dining expenses with details like meal type, amount, and notes for each visit.</p>
+                            <p class="text-muted"
+                                >Log your dining expenses with details like meal type, amount, and notes for each
+                                visit.</p
+                            >
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="guide-step">
                             <div class="step-number">3</div>
                             <h6>Analyze Spending</h6>
-                            <p class="text-muted">Review your spending patterns, discover your top restaurants, and manage your food budget.</p>
+                            <p class="text-muted"
+                                >Review your spending patterns, discover your top restaurants, and manage your food
+                                budget.</p
+                            >
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-</section>
+    </section>
 </div>
-{% endblock %}
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script type="module" src="{{ url_for('static', filename='js/pages/dashboard.js') }}"></script>
 {% endblock %}

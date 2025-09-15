@@ -11,6 +11,51 @@ import { logger } from './core-utils.js';
 import { showErrorToast } from './notifications.js';
 import { get_api_csrf_token, add_csrf_to_headers } from './csrf-token.js';
 
+// ===== CIRCUIT BREAKER FUNCTIONS =====
+
+function getCircuitBreakerState(key) {
+  try {
+    const stored = localStorage.getItem(`circuit_breaker_${key}`);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.warn('Failed to read circuit breaker state:', error);
+  }
+
+  return {
+    failure_count: 0,
+    last_failure: 0,
+    is_open: false,
+  };
+}
+
+function recordCircuitBreakerFailure(key) {
+  try {
+    const state = getCircuitBreakerState(key);
+    state.failure_count++;
+    state.last_failure = Date.now();
+
+    // Open circuit breaker after 5 failures
+    if (state.failure_count >= 5) {
+      state.is_open = true;
+      console.warn(`Circuit breaker opened for ${key}`);
+    }
+
+    localStorage.setItem(`circuit_breaker_${key}`, JSON.stringify(state));
+  } catch (error) {
+    console.warn('Failed to record circuit breaker failure:', error);
+  }
+}
+
+function resetCircuitBreaker(key) {
+  try {
+    localStorage.removeItem(`circuit_breaker_${key}`);
+  } catch (error) {
+    console.warn('Failed to reset circuit breaker:', error);
+  }
+}
+
 // ===== API UTILITIES =====
 
 /**
@@ -488,54 +533,10 @@ export async function apiRequestWithRecovery(url, options = {}) {
       const delay_ms = base_delay + jitter;
 
       console.log(`Retrying in ${Math.round(delay_ms)}ms...`);
-      await new Promise((resolve) => setTimeout(resolve, delay_ms));
+      await new Promise((resolve) => {
+        setTimeout(resolve, delay_ms);
+      });
     }
-  }
-}
-
-/**
- * Circuit breaker implementation
- */
-function getCircuitBreakerState(key) {
-  try {
-    const stored = localStorage.getItem(`circuit_breaker_${key}`);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (error) {
-    console.warn('Failed to read circuit breaker state:', error);
-  }
-
-  return {
-    failure_count: 0,
-    last_failure: 0,
-    is_open: false,
-  };
-}
-
-function recordCircuitBreakerFailure(key) {
-  try {
-    const state = getCircuitBreakerState(key);
-    state.failure_count++;
-    state.last_failure = Date.now();
-
-    // Open circuit breaker after 5 failures
-    if (state.failure_count >= 5) {
-      state.is_open = true;
-      console.warn(`Circuit breaker opened for ${key}`);
-    }
-
-    localStorage.setItem(`circuit_breaker_${key}`, JSON.stringify(state));
-  } catch (error) {
-    console.warn('Failed to record circuit breaker failure:', error);
-  }
-}
-
-function resetCircuitBreaker(key) {
-  try {
-    localStorage.removeItem(`circuit_breaker_${key}`);
-  } catch (error) {
-    console.warn('Failed to reset circuit breaker:', error);
   }
 }
 

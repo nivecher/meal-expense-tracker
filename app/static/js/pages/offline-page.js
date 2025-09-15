@@ -3,6 +3,21 @@
  * Handles offline page functionality with proper HTML-JS separation
  */
 
+function checkConnection() {
+  const statusEl = document.getElementById('status');
+  if (!statusEl) return;
+
+  if (navigator.onLine) {
+    statusEl.innerHTML = '<span class="connection-status online"></span>Connection restored!';
+    // Optionally reload the page or redirect
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  } else {
+    statusEl.innerHTML = '<span class="connection-status offline"></span>Still offline...';
+  }
+}
+
 function init() {
   // Event delegation for offline page actions
   document.addEventListener('click', (event) => {
@@ -17,21 +32,6 @@ function init() {
 
   // Initial check
   checkConnection();
-}
-
-function checkConnection() {
-  const statusEl = document.getElementById('status');
-  if (!statusEl) return;
-
-  if (navigator.onLine) {
-    statusEl.innerHTML = '<span class="connection-status online"></span>Connection restored!';
-    // Optionally reload the page or redirect
-    setTimeout(() => {
-      window.location.reload();
-    }, 2000);
-  } else {
-    statusEl.innerHTML = '<span class="connection-status offline"></span>Still offline...';
-  }
 }
 
 // Handle online/offline events

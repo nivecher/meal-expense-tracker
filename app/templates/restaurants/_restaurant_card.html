@@ -16,21 +16,20 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
                 <h5 class="card-title mb-1">{{ restaurant.name }}</h5>
-                {% if restaurant.cuisine %}
-                {% from 'macros/badge_helpers.html' import cuisine_badge %}
-                {{ cuisine_badge(restaurant.cuisine, size='sm') }}
-                {% endif %}
+                {% if restaurant.cuisine %} {% from 'macros/badge_helpers.html' import cuisine_badge %} {{
+                cuisine_badge(restaurant.cuisine, size='sm') }} {% endif %}
             </div>
             <div class="restaurant-meta mb-2 d-flex align-items-start">
                 <i class="fas fa-map-marker-alt me-2 mt-1 flex-shrink-0"></i>
                 <div class="flex-grow-1">
-                    {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %}
-                        {% if restaurant.address %}<div>{{ restaurant.address }}</div>{% endif %}
-                        {% if restaurant.city or restaurant.state or restaurant.postal_code %}
-                            <div class="text-muted small">{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
-                        {% endif %}
-                    {% else %}
-                        <span class="text-muted">No location</span>
+                    {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %} {% if
+                    restaurant.address %}<div>{{ restaurant.address }}</div>{% endif %} {% if restaurant.city or
+                    restaurant.state or restaurant.postal_code %}
+                    <div class="text-muted small"
+                        >{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div
+                    >
+                    {% endif %} {% else %}
+                    <span class="text-muted">No location</span>
                     {% endif %}
                 </div>
             </div>
@@ -64,8 +63,7 @@
                     class="btn btn-outline-primary btn-sm">
                     <i class="fas fa-eye me-1"></i> View Details
                 </a>
-                {% set maps_url = restaurant|google_maps_url %}
-                {% if maps_url %}
+                {% set maps_url = restaurant|google_maps_url %} {% if maps_url %}
                 <a
                     href="{{ maps_url }}"
                     target="_blank"

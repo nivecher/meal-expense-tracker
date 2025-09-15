@@ -4,6 +4,7 @@
  */
 
 /* Restaurant favicon containers - prevent layout shifts */
+
 .restaurant-icon {
     position: relative;
     width: 32px;
@@ -14,6 +15,7 @@
 }
 
 /* Restaurant favicons - smooth opacity transition */
+
 .restaurant-favicon {
     width: 32px;
     height: 32px;
@@ -23,6 +25,7 @@
 }
 
 /* Fallback icons - positioned absolutely to prevent layout shifts */
+
 .restaurant-fallback-icon {
     position: absolute;
     top: 50%;
@@ -37,17 +40,20 @@
 }
 
 /* Show fallback when displayed */
+
 .restaurant-fallback-icon[style*="display: inline-block"],
 .restaurant-fallback-icon:not(.d-none) {
     opacity: 1;
 }
 
 /* Show fallback icons when no website (not hidden by d-none) */
+
 .restaurant-fallback-icon:not(.d-none) {
     display: inline-block;
 }
 
 /* Table view favicon containers */
+
 .restaurant-icon-table {
     position: relative;
     width: 20px;
@@ -58,6 +64,7 @@
 }
 
 /* Table view favicons */
+
 .restaurant-favicon-table {
     width: 20px;
     height: 20px;
@@ -67,6 +74,7 @@
 }
 
 /* Table view fallback icons */
+
 .restaurant-fallback-icon-table {
     position: absolute;
     top: 50%;
@@ -81,17 +89,20 @@
 }
 
 /* Show table fallback when displayed */
+
 .restaurant-fallback-icon-table[style*="display: inline-block"],
 .restaurant-fallback-icon-table:not(.d-none) {
     opacity: 1;
 }
 
 /* Show table fallback icons when no website (not hidden by d-none) */
+
 .restaurant-fallback-icon-table:not(.d-none) {
     display: inline-block;
 }
 
 /* Large fallback icons - visible by default when no image is present */
+
 .restaurant-fallback-icon-large {
     position: absolute;
     top: 50%;
@@ -106,6 +117,7 @@
 }
 
 /* Avatar containers - prevent layout shifts */
+
 .avatar-container {
     position: relative;
     width: 40px;
@@ -118,6 +130,7 @@
 }
 
 /* Avatar images - smooth transitions */
+
 .avatar-img {
     width: 100%;
     height: 100%;
@@ -128,6 +141,7 @@
 }
 
 /* Avatar fallbacks - positioned absolutely */
+
 .avatar-fallback {
     position: absolute;
     top: 50%;
@@ -140,7 +154,9 @@
 }
 
 /* Optimize for reduced motion */
+
 @media (prefers-reduced-motion: reduce) {
+
     .restaurant-favicon,
     .avatar-img {
         transition: none;
@@ -148,6 +164,7 @@
 }
 
 /* Performance optimizations */
+
 .restaurant-favicon,
 .restaurant-fallback-icon,
 .avatar-img,

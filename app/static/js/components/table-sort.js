@@ -157,6 +157,7 @@ export class TableSort {
 }
 
 // Initialize table sort when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  new TableSort('.restaurant-table');
-});
+// Disabled - using custom table-sorting.js instead
+// document.addEventListener('DOMContentLoaded', () => {
+//   new TableSort('.restaurant-table');
+// });

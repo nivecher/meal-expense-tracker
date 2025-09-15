@@ -8,6 +8,127 @@ import { getLogger } from './logger.js';
 
 const logger = getLogger('RestaurantErrorHandler');
 
+// Error handler functions - defined first
+function showDuplicateRestaurantModal(existingRestaurant, googlePlaceId = null) {
+  // Create modal HTML
+  const modalHtml = `
+    <div class="modal fade" id="duplicateRestaurantModal" tabindex="-1" aria-labelledby="duplicateRestaurantModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="duplicateRestaurantModalLabel">Restaurant Already Exists</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-warning" role="alert">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              A restaurant with this information already exists in our database.
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h6 class="mb-0">Existing Restaurant Details</h6>
+              </div>
+              <div class="card-body">
+                <p><strong>Name:</strong> ${existingRestaurant.name}</p>
+                <p><strong>Address:</strong> ${existingRestaurant.address || 'Not provided'}</p>
+                ${existingRestaurant.phone ? `<p><strong>Phone:</strong> ${existingRestaurant.phone}</p>` : ''}
+                ${existingRestaurant.website ? `<p><strong>Website:</strong> <a href="${existingRestaurant.website}" target="_blank">${existingRestaurant.website}</a></p>` : ''}
+                ${googlePlaceId ? `<p><strong>Google Place ID:</strong> ${googlePlaceId}</p>` : ''}
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <p class="text-muted small">
+                If this is the same restaurant, you can use the existing entry.
+                If it's different, please modify the information to make it unique.
+              </p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="window.location.href='/restaurants/${existingRestaurant.id}'">
+              View Existing Restaurant
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Remove existing modal if present
+  const existingModal = document.getElementById('duplicateRestaurantModal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Add modal to page
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // Show modal
+  const modal = new bootstrap.Modal(document.getElementById('duplicateRestaurantModal'));
+  modal.show();
+
+  // Clean up modal when hidden
+  document.getElementById('duplicateRestaurantModal').addEventListener('hidden.bs.modal', () => {
+    document.getElementById('duplicateRestaurantModal').remove();
+  });
+}
+
+function handleGenericError(message, context) {
+  logger.error('Generic restaurant error:', message, context);
+  showErrorToast(message);
+}
+
+function handleDuplicateGooglePlaceIdError(error, context) {
+  const { existing_restaurant, google_place_id } = error.details || {};
+
+  logger.warn('Duplicate Google Place ID detected:', { existing_restaurant, google_place_id });
+
+  // Show modal with existing restaurant details
+  showDuplicateRestaurantModal(existing_restaurant, google_place_id);
+}
+
+function handleDuplicateRestaurantError(error, context) {
+  const { existing_restaurant } = error.details || {};
+
+  logger.warn('Duplicate restaurant detected:', { existing_restaurant });
+
+  // Show modal with existing restaurant details
+  showDuplicateRestaurantModal(existing_restaurant);
+}
+
+function handleValidationError(error, context) {
+  const { field_errors } = error.details || {};
+
+  logger.warn('Restaurant validation error:', { field_errors });
+
+  if (field_errors && Object.keys(field_errors).length > 0) {
+    const errorMessages = Object.values(field_errors).flat();
+    showErrorToast(`Validation failed: ${errorMessages.join(', ')}`);
+  } else {
+    showErrorToast('Please check your input and try again.');
+  }
+}
+
+function handleStructuredError(errorResponse, context) {
+  const { error } = errorResponse;
+
+  switch (error.code) {
+    case 'DUPLICATE_GOOGLE_PLACE_ID':
+      return handleDuplicateGooglePlaceIdError(error, context);
+
+    case 'DUPLICATE_RESTAURANT':
+      return handleDuplicateRestaurantError(error, context);
+
+    case 'VALIDATION_ERROR':
+      return handleValidationError(error, context);
+
+    default:
+      return handleGenericError(error.message || 'An error occurred', context);
+  }
+}
+
 /**
  * Handle restaurant-related errors with specific error type handling
  * @param {Error|Object} error - The error object or response
@@ -36,330 +157,56 @@ export function handleRestaurantError(error, context = {}) {
 }
 
 /**
- * Handle structured error responses from the API
- * @param {Object} errorResponse - Structured error response
+ * Handle network errors specifically
+ * @param {Error} error - Network error
  * @param {Object} context - Additional context
  */
-function handleStructuredError(errorResponse, context) {
-  const { error } = errorResponse;
+export function handleNetworkError(error, context = {}) {
+  logger.error('Network error:', error, context);
 
-  switch (error.code) {
-    case 'DUPLICATE_GOOGLE_PLACE_ID':
-      return handleDuplicateGooglePlaceIdError(error, context);
-
-    case 'DUPLICATE_RESTAURANT':
-      return handleDuplicateRestaurantError(error, context);
-
-    case 'VALIDATION_ERROR':
-      return handleValidationError(error, context);
-
-    default:
-      return handleGenericError(error.message || 'Unknown error occurred', context);
+  if (!navigator.onLine) {
+    showErrorToast('No internet connection. Please check your network and try again.');
+  } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+    showErrorToast('Unable to connect to the server. Please try again later.');
+  } else {
+    showErrorToast('A network error occurred. Please try again.');
   }
 }
 
 /**
- * Handle duplicate Google Place ID error with user-friendly options
- * @param {Object} error - The duplicate Google Place ID error
+ * Handle timeout errors
+ * @param {Error} error - Timeout error
  * @param {Object} context - Additional context
  */
-function handleDuplicateGooglePlaceIdError(error, context) {
-  logger.info('Handling duplicate Google Place ID error:', error);
-
-  const { existing_restaurant, google_place_id } = error;
-
-  // Create and show a modal with options
-  showDuplicateRestaurantModal({
-    title: 'Restaurant Already Exists',
-    message: `You already have "${existing_restaurant.full_name}" in your restaurants.`,
-    details: `This restaurant has the same Google Place ID (${google_place_id.slice(0, 20)}...).`,
-    existing_restaurant,
-    actions: [
-      {
-        label: 'View Existing Restaurant',
-        class: 'btn-primary',
-        action: () => {
-          window.location.href = `/restaurants/${existing_restaurant.id}`;
-        },
-      },
-      {
-        label: 'Add Expense to This Restaurant',
-        class: 'btn-success',
-        action: () => {
-          window.location.href = `/expenses/add?restaurant_id=${existing_restaurant.id}`;
-        },
-      },
-      {
-        label: 'Cancel',
-        class: 'btn-secondary',
-        action: () => {
-          // Just close the modal
-        },
-      },
-    ],
-  });
-
-  return true; // Indicate error was handled
+export function handleTimeoutError(error, context = {}) {
+  logger.error('Timeout error:', error, context);
+  showWarningToast('The request timed out. Please try again.');
 }
 
 /**
- * Handle duplicate restaurant (name/city) error
- * @param {Object} error - The duplicate restaurant error
+ * Handle server errors (5xx)
+ * @param {Object} response - Server response
  * @param {Object} context - Additional context
  */
-function handleDuplicateRestaurantError(error, context) {
-  logger.info('Handling duplicate restaurant error:', error);
+export function handleServerError(response, context = {}) {
+  logger.error('Server error:', response, context);
 
-  const { existing_restaurant, name, city } = error;
+  const status = response.status || 500;
+  const message = response.statusText || 'Internal Server Error';
 
-  showDuplicateRestaurantModal({
-    title: 'Similar Restaurant Found',
-    message: `You already have a restaurant named "${name}"${city ? ` in ${city}` : ''}.`,
-    details: 'This might be the same restaurant you\'re trying to add.',
-    existing_restaurant,
-    actions: [
-      {
-        label: 'View Existing Restaurant',
-        class: 'btn-primary',
-        action: () => {
-          window.location.href = `/restaurants/${existing_restaurant.id}`;
-        },
-      },
-      {
-        label: 'Add Anyway',
-        class: 'btn-warning',
-        action: () => {
-          // Allow user to proceed with creation
-          showWarningToast('You can modify the restaurant name or location to make it unique.');
-        },
-      },
-      {
-        label: 'Cancel',
-        class: 'btn-secondary',
-        action: () => {
-          // Just close the modal
-        },
-      },
-    ],
-  });
-
-  return true;
+  showErrorToast(`Server error (${status}): ${message}. Please try again later.`);
 }
 
 /**
- * Handle validation errors
- * @param {Object} error - The validation error
+ * Handle client errors (4xx)
+ * @param {Object} response - Client error response
  * @param {Object} context - Additional context
  */
-function handleValidationError(error, context) {
-  logger.warn('Handling validation error:', error);
+export function handleClientError(response, context = {}) {
+  logger.warn('Client error:', response, context);
 
-  const message = error.message || 'Please check your input and try again.';
+  const status = response.status || 400;
+  const message = response.statusText || 'Bad Request';
 
-  if (error.field) {
-    // Highlight the specific field if possible
-    const fieldElement = document.querySelector(`[name="${error.field}"], #${error.field}`);
-    if (fieldElement) {
-      fieldElement.classList.add('is-invalid');
-      fieldElement.focus();
-
-      // Remove invalid class after a delay
-      setTimeout(() => {
-        fieldElement.classList.remove('is-invalid');
-      }, 5000);
-    }
-  }
-
-  showErrorToast(message, 5000);
-  return true;
-}
-
-/**
- * Handle generic errors
- * @param {string} message - Error message
- * @param {Object} context - Additional context
- */
-function handleGenericError(message, context) {
-  logger.error('Handling generic error:', message, context);
-
-  // Extract meaningful error from common error patterns
-  let userMessage = message;
-
-  if (message.includes('Google Place ID')) {
-    userMessage = 'This restaurant already exists in your list. Please choose a different restaurant or search for the existing one.';
-  } else if (message.includes('already exists')) {
-    userMessage = 'A similar restaurant already exists. Please check your existing restaurants or modify the details.';
-  } else if (message.includes('Failed to save')) {
-    userMessage = 'Unable to save the restaurant. Please check your connection and try again.';
-  } else if (message.includes('Failed to add')) {
-    userMessage = 'Unable to add the restaurant. Please check your connection and try again.';
-  }
-
-  showErrorToast(userMessage, 5000);
-  return false; // Indicate generic handling
-}
-
-/**
- * Show a modal for duplicate restaurant conflicts
- * @param {Object} options - Modal configuration
- */
-function showDuplicateRestaurantModal(options) {
-  const {
-    title,
-    message,
-    details,
-    existing_restaurant,
-    actions = [],
-  } = options;
-
-  // Create modal HTML
-  const modalId = 'duplicateRestaurantModal';
-  const modalHtml = `
-    <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="${modalId}Label">
-              <i class="fas fa-exclamation-triangle text-warning me-2"></i>
-              ${title}
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-warning" role="alert">
-              <strong>${message}</strong>
-              ${details ? `<br><small class="text-muted">${details}</small>` : ''}
-            </div>
-
-            ${existing_restaurant ? `
-              <div class="card mt-3">
-                <div class="card-body">
-                  <h6 class="card-title">
-                    <i class="fas fa-utensils me-2"></i>
-                    ${existing_restaurant.full_name}
-                  </h6>
-                  <div class="d-flex gap-2 mt-2">
-                    <a href="/restaurants/${existing_restaurant.id}" class="btn btn-sm btn-outline-primary">
-                      <i class="fas fa-eye me-1"></i>
-                      View Details
-                    </a>
-                    <a href="/expenses/add?restaurant_id=${existing_restaurant.id}" class="btn btn-sm btn-outline-success">
-                      <i class="fas fa-plus me-1"></i>
-                      Add Expense
-                    </a>
-                  </div>
-                </div>
-              </div>
-            ` : ''}
-          </div>
-          <div class="modal-footer">
-            ${actions.map((action) => `
-              <button type="button" class="btn ${action.class}" data-action="${action.label}">
-                ${action.label}
-              </button>
-            `).join('')}
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Remove existing modal if any
-  const existingModal = document.getElementById(modalId);
-  if (existingModal) {
-    existingModal.remove();
-  }
-
-  // Add modal to DOM
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-  const modalElement = document.getElementById(modalId);
-
-  // Add event listeners for action buttons
-  actions.forEach((action) => {
-    const button = modalElement.querySelector(`[data-action="${action.label}"]`);
-    if (button && action.action) {
-      button.addEventListener('click', () => {
-        action.action();
-        // Close modal after action (unless it's a navigation action)
-        if (!action.label.includes('View') && !action.label.includes('Add Expense')) {
-          const bsModal = bootstrap.Modal.getInstance(modalElement);
-          if (bsModal) bsModal.hide();
-        }
-      });
-    }
-  });
-
-  // Show modal
-  const bsModal = new bootstrap.Modal(modalElement);
-  bsModal.show();
-
-  // Clean up modal after hiding
-  modalElement.addEventListener('hidden.bs.modal', () => {
-    modalElement.remove();
-  });
-}
-
-/**
- * Parse error response from fetch
- * @param {Response} response - Fetch response
- * @returns {Promise<Object>} Parsed error object
- */
-export async function parseErrorResponse(response) {
-  try {
-    const errorData = await response.json();
-    return {
-      status: response.status,
-      error: errorData.error || { message: errorData.message || 'Unknown error' },
-      message: errorData.message,
-    };
-  } catch (parseError) {
-    logger.warn('Failed to parse error response:', parseError);
-    return {
-      status: response.status,
-      error: { message: `HTTP ${response.status}: ${response.statusText}` },
-      message: `HTTP ${response.status}: ${response.statusText}`,
-    };
-  }
-}
-
-/**
- * Enhanced fetch wrapper with restaurant error handling
- * @param {string} url - Request URL
- * @param {Object} options - Fetch options
- * @returns {Promise<Object>} Response data
- */
-export async function fetchWithRestaurantErrorHandling(url, options = {}) {
-  try {
-    const response = await fetch(url, options);
-
-    if (!response.ok) {
-      const errorData = await parseErrorResponse(response);
-
-      // Handle specific HTTP status codes
-      if (response.status === 409) {
-        // Conflict - likely duplicate restaurant
-        handleRestaurantError(errorData);
-        throw new Error('Restaurant conflict handled');
-      }
-
-      throw new Error(errorData.message || `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  } catch (error) {
-    if (error.message !== 'Restaurant conflict handled') {
-      handleRestaurantError(error);
-    }
-    throw error;
-  }
-}
-
-// Export for global access
-if (typeof window !== 'undefined') {
-  window.RestaurantErrorHandler = {
-    handleRestaurantError,
-    parseErrorResponse,
-    fetchWithRestaurantErrorHandling,
-  };
+  showWarningToast(`Request error (${status}): ${message}. Please check your input.`);
 }

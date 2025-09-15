@@ -1,168 +1,109 @@
-{# Avatar Helper Macros #}
-{# Standardized avatar display with generated icons and username support #}
+{# Avatar Helper Macros #} {# Standardized avatar display with generated icons and username support #} {% macro
+user_avatar(user, size='md', show_username=true, show_email=false, class='') %} {# User avatar component with consistent
+styling and fallback to generated initials Args: user: User object with username, email, avatar_url, etc. size: Size
+variant ('sm', 'md', 'lg', 'xl') show_username: Whether to show username next to avatar show_email: Whether to show
+email (only if show_username is true) class: Additional CSS classes #} {% set size_classes = { 'sm': 'avatar-sm', 'md':
+'avatar-md', 'lg': 'avatar-lg', 'xl': 'avatar-xl' } %} {% set size_px = { 'sm': 24, 'md': 32, 'lg': 48, 'xl': 64 } %} {%
+set size_class = size_classes.get(size, 'avatar-md') %} {% set size_pixels = size_px.get(size, 32) %}
 
-{% macro user_avatar(user, size='md', show_username=true, show_email=false, class='') %}
-    {#
-    User avatar component with consistent styling and fallback to generated initials
+<div class="avatar-container d-flex align-items-center {{ class }}">
+    <img
+        src="{{ user.avatar_url or '' }}"
+        alt="{{ user.username }}"
+        class="rounded-circle {{ size_class }}"
+        width="{{ size_pixels }}"
+        height="{{ size_pixels }}"
+        loading="lazy"
+        data-avatar
+        data-username="{{ user.username }}"
+        data-email="{{ user.email }}"
+        data-initials="{{ user.get_initials() }}"
+        data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+    <div
+        class="avatar-initials {{ size_class }}"
+        style="display: none; width: {{ size_pixels }}px; height: {{ size_pixels }}px;">
+        {{ user.get_initials() }}
+    </div>
 
-    Args:
-        user: User object with username, email, avatar_url, etc.
-        size: Size variant ('sm', 'md', 'lg', 'xl')
-        show_username: Whether to show username next to avatar
-        show_email: Whether to show email (only if show_username is true)
-        class: Additional CSS classes
-    #}
-
-    {% set size_classes = {
-        'sm': 'avatar-sm',
-        'md': 'avatar-md',
-        'lg': 'avatar-lg',
-        'xl': 'avatar-xl'
-    } %}
-
-    {% set size_px = {
-        'sm': 24,
-        'md': 32,
-        'lg': 48,
-        'xl': 64
-    } %}
-
-    {% set size_class = size_classes.get(size, 'avatar-md') %}
-    {% set size_pixels = size_px.get(size, 32) %}
-
-    <div class="avatar-container d-flex align-items-center {{ class }}">
-        <img
-            src="{{ user.avatar_url or '' }}"
-            alt="{{ user.username }}"
-            class="rounded-circle {{ size_class }}"
-            width="{{ size_pixels }}"
-            height="{{ size_pixels }}"
-            loading="lazy"
-            data-avatar
-            data-username="{{ user.username }}"
-            data-email="{{ user.email }}"
-            data-initials="{{ user.get_initials() }}"
-            data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
-            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-        />
-        <div class="avatar-initials {{ size_class }}" style="display: none; width: {{ size_pixels }}px; height: {{ size_pixels }}px;">
-            {{ user.get_initials() }}
-        </div>
-
-        {% if show_username %}
-            <div class="avatar-user-info ms-2">
-                <div class="avatar-username">{{ user.username }}</div>
-                {% if show_email and user.email %}
-                    <div class="avatar-email text-muted small">{{ user.email }}</div>
-                {% endif %}
-            </div>
+    {% if show_username %}
+    <div class="avatar-user-info ms-2">
+        <div class="avatar-username">{{ user.username }}</div>
+        {% if show_email and user.email %}
+        <div class="avatar-email text-muted small">{{ user.email }}</div>
         {% endif %}
     </div>
-{% endmacro %}
+    {% endif %}
+</div>
+{% endmacro %} {% macro user_avatar_simple(user, size='md', class='') %} {# Simple avatar without username - for compact
+displays Args: user: User object size: Size variant ('sm', 'md', 'lg', 'xl') class: Additional CSS classes #} {% set
+size_px = { 'sm': 24, 'md': 32, 'lg': 48, 'xl': 64 } %} {% set size_pixels = size_px.get(size, 32) %}
 
-{% macro user_avatar_simple(user, size='md', class='') %}
-    {#
-    Simple avatar without username - for compact displays
-
-    Args:
-        user: User object
-        size: Size variant ('sm', 'md', 'lg', 'xl')
-        class: Additional CSS classes
-    #}
-
-    {% set size_px = {
-        'sm': 24,
-        'md': 32,
-        'lg': 48,
-        'xl': 64
-    } %}
-
-    {% set size_pixels = size_px.get(size, 32) %}
-
-    <div class="avatar-container {{ class }}">
-        <img
-            src="{{ user.avatar_url or '' }}"
-            alt="{{ user.username }}"
-            class="rounded-circle"
-            width="{{ size_pixels }}"
-            height="{{ size_pixels }}"
-            loading="lazy"
-            data-avatar
-            data-username="{{ user.username }}"
-            data-email="{{ user.email }}"
-            data-initials="{{ user.get_initials() }}"
-            data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
-            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-        />
-        <div class="avatar-initials" style="display: none; width: {{ size_pixels }}px; height: {{ size_pixels }}px;">
-            {{ user.get_initials() }}
-        </div>
+<div class="avatar-container {{ class }}">
+    <img
+        src="{{ user.avatar_url or '' }}"
+        alt="{{ user.username }}"
+        class="rounded-circle"
+        width="{{ size_pixels }}"
+        height="{{ size_pixels }}"
+        loading="lazy"
+        data-avatar
+        data-username="{{ user.username }}"
+        data-email="{{ user.email }}"
+        data-initials="{{ user.get_initials() }}"
+        data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+    <div class="avatar-initials" style="display: none; width: {{ size_pixels }}px; height: {{ size_pixels }}px;">
+        {{ user.get_initials() }}
     </div>
-{% endmacro %}
+</div>
+{% endmacro %} {% macro user_avatar_dropdown(user, class='') %} {# Avatar for dropdown menus with user info Args: user:
+User object class: Additional CSS classes #}
 
-{% macro user_avatar_dropdown(user, class='') %}
-    {#
-    Avatar for dropdown menus with user info
-
-    Args:
-        user: User object
-        class: Additional CSS classes
-    #}
-
-    <div class="avatar-container d-flex align-items-center {{ class }}">
-        <img
-            src="{{ user.avatar_url or '' }}"
-            alt="{{ user.username }}"
-            class="rounded-circle avatar-md"
-            width="36"
-            height="36"
-            loading="lazy"
-            data-avatar
-            data-username="{{ user.username }}"
-            data-email="{{ user.email }}"
-            data-initials="{{ user.get_initials() }}"
-            data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
-            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-        />
-        <div class="avatar-initials avatar-md" style="display: none; width: 36px; height: 36px;">
-            {{ user.get_initials() }}
-        </div>
-
-        <div class="avatar-user-info ms-3">
-            <div class="avatar-username fw-semibold">{{ user.username }}</div>
-            <div class="avatar-email text-muted small">{{ user.email }}</div>
-        </div>
+<div class="avatar-container d-flex align-items-center {{ class }}">
+    <img
+        src="{{ user.avatar_url or '' }}"
+        alt="{{ user.username }}"
+        class="rounded-circle avatar-md"
+        width="36"
+        height="36"
+        loading="lazy"
+        data-avatar
+        data-username="{{ user.username }}"
+        data-email="{{ user.email }}"
+        data-initials="{{ user.get_initials() }}"
+        data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+    <div class="avatar-initials avatar-md" style="display: none; width: 36px; height: 36px">
+        {{ user.get_initials() }}
     </div>
-{% endmacro %}
 
-{% macro user_avatar_navbar(user, class='') %}
-    {#
-    Avatar for navbar with responsive username display
-
-    Args:
-        user: User object
-        class: Additional CSS classes
-    #}
-
-    <div class="avatar-container d-flex align-items-center {{ class }}">
-        <img
-            src="{{ user.avatar_url or '' }}"
-            alt="{{ user.username }}"
-            class="rounded-circle avatar-md"
-            width="32"
-            height="32"
-            loading="lazy"
-            data-avatar
-            data-username="{{ user.username }}"
-            data-email="{{ user.email }}"
-            data-initials="{{ user.get_initials() }}"
-            data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
-            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-        />
-        <div class="avatar-initials avatar-md" style="display: none; width: 32px; height: 32px;">
-            {{ user.get_initials() }}
-        </div>
-
-        <span class="avatar-username ms-2 d-none d-md-inline">{{ user.username }}</span>
+    <div class="avatar-user-info ms-3">
+        <div class="avatar-username fw-semibold">{{ user.username }}</div>
+        <div class="avatar-email text-muted small">{{ user.email }}</div>
     </div>
+</div>
+{% endmacro %} {% macro user_avatar_navbar(user, class='') %} {# Avatar for navbar with responsive username display
+Args: user: User object class: Additional CSS classes #}
+
+<div class="avatar-container d-flex align-items-center {{ class }}">
+    <img
+        src="{{ user.avatar_url or '' }}"
+        alt="{{ user.username }}"
+        class="rounded-circle avatar-md"
+        width="32"
+        height="32"
+        loading="lazy"
+        data-avatar
+        data-username="{{ user.username }}"
+        data-email="{{ user.email }}"
+        data-initials="{{ user.get_initials() }}"
+        data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
+        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+    <div class="avatar-initials avatar-md" style="display: none; width: 32px; height: 32px">
+        {{ user.get_initials() }}
+    </div>
+
+    <span class="avatar-username ms-2 d-none d-md-inline">{{ user.username }}</span>
+</div>
 {% endmacro %}

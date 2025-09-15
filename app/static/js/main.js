@@ -8,8 +8,6 @@
 
 import { initNotifications } from './utils/notifications.js';
 import { EventHandlers } from './components/event-handlers.js';
-import { StyleReplacer } from './utils/style-replacer.js';
-
 
 // Enhanced page module loading with error handling
 const pageModules = {
@@ -150,11 +148,11 @@ async function init() {
     if (window.showSuccessToast && !sessionStorage.getItem('app-initialized')) {
       sessionStorage.setItem('app-initialized', 'true');
       setTimeout(() => {
-        window.showInfoToast('Application ready! 🎉', 2000, { showHeader: false });
+        window.showInfoToast('Application ready! 🎉', 'Info', 2000);
       }, 500);
     }
 
-    console.log('✅ Application initialized successfully');
+    console.warn('✅ Application initialized successfully');
 
   } catch (error) {
     console.error('❌ Failed to initialize application:', error);

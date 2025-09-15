@@ -51,7 +51,7 @@ def create_test_expense(client, restaurant_id, category_id, **kwargs):
         "restaurant_id": str(restaurant_id),
         "category_id": str(category_id),
         "date": today.strftime("%Y-%m-%d"),
-        "meal_type": "Lunch",
+        "meal_type": "lunch",
         "amount": "25.50",
         "notes": "Test expense",
     }
@@ -121,6 +121,7 @@ def test_expense_restaurant_association(client, app, auth, test_user, dining_cat
     # Refresh objects from database
     db_user = User.query.get(test_user.id)
     restaurant = Restaurant.query.get(restaurant.id)
+    category = Category.query.get(dining_category.id)
 
     # Verify user association
     assert expense in db_user.expenses, "Expense not associated with user"
@@ -129,7 +130,7 @@ def test_expense_restaurant_association(client, app, auth, test_user, dining_cat
     assert expense in restaurant.expenses, "Expense not associated with restaurant"
 
     # Verify category association
-    assert expense in expense.category.expenses, "Expense not associated with category"
+    assert expense in category.expenses, "Expense not associated with category"
 
 
 def test_invalid_expense_creation(client, app, auth, test_user, dining_category):
@@ -137,11 +138,14 @@ def test_invalid_expense_creation(client, app, auth, test_user, dining_category)
     # Login
     client = auth.login("testuser_1", "testpass")
 
+    # Refresh the category object to avoid DetachedInstanceError
+    category = Category.query.get(dining_category.id)
+
     # Try to create an expense with invalid data
     response = create_test_expense(
         client,
         restaurant_id=999,  # Non-existent restaurant
-        category_id=dining_category.id,
+        category_id=category.id,
         date="invalid-date",
         amount="0",
     )
@@ -179,7 +183,7 @@ def test_expense_editing_with_restaurant(client, app, auth, test_user):
         data={
             "restaurant_id": 1,
             "date": today.strftime("%Y-%m-%d"),
-            "meal_type": "Lunch",
+            "meal_type": "lunch",
             "amount": "25.50",
             "notes": "Test expense",
         },
@@ -192,7 +196,7 @@ def test_expense_editing_with_restaurant(client, app, auth, test_user):
         data={
             "restaurant_id": 1,
             "date": tomorrow.strftime("%Y-%m-%d"),
-            "meal_type": "Dinner",
+            "meal_type": "dinner",
             "amount": "35.50",
             "notes": "Updated expense",
         },
@@ -245,7 +249,7 @@ def test_expense_deletion_with_restaurant(client, app, auth, test_user):
         data={
             "restaurant_id": 1,
             "date": today.strftime("%Y-%m-%d"),
-            "meal_type": "Lunch",
+            "meal_type": "lunch",
             "amount": "25.50",
             "notes": "Test expense",
         },
@@ -301,7 +305,7 @@ def test_expense_export(client, app, auth, test_user):
         data={
             "restaurant_id": 1,
             "date": today.strftime("%Y-%m-%d"),
-            "meal_type": "Lunch",
+            "meal_type": "lunch",
             "amount": "25.50",
             "notes": "Test expense",
         },

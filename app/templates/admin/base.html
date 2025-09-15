@@ -1,13 +1,7 @@
-{% extends "base.html" %}
-
-{% block title %}{{ title }} - Admin{% endblock %}
-
-{% block extra_head %}
-    <!-- Admin base styles -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-base.css') }}">
-{% endblock extra_head %}
-
-{% block content %}
+{% extends "base.html" %} {% block title %}{{ title }} - Admin{% endblock %} {% block extra_head %}
+<!-- Admin base styles -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/admin-base.css') }}" />
+{% endblock extra_head %} {% block content %}
 <div class="container-fluid">
     <div class="row">
         <!-- Admin Sidebar -->
@@ -18,15 +12,17 @@
                 </h6>
                 <ul class="nav flex-column">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}"
-                           href="{{ url_for('admin.dashboard') }}">
+                        <a
+                            class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}"
+                            href="{{ url_for('admin.dashboard') }}">
                             <i class="fas fa-tachometer-alt me-2"></i>
                             Dashboard
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'admin.list_users' %}active{% endif %}"
-                           href="{{ url_for('admin.list_users') }}">
+                        <a
+                            class="nav-link {% if request.endpoint == 'admin.list_users' %}active{% endif %}"
+                            href="{{ url_for('admin.list_users') }}">
                             <i class="fas fa-users me-2"></i>
                             User Management
                         </a>
@@ -57,24 +53,22 @@
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
             <div class="admin-content">
                 <!-- Page Header -->
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <div
+                    class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">{{ title }}</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        {% block page_actions %}{% endblock %}
-                    </div>
+                    <div class="btn-toolbar mb-2 mb-md-0"> {% block page_actions %}{% endblock %} </div>
                 </div>
 
                 <!-- Flash Messages -->
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                                {{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
+                {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %} {% for category,
+                message in messages %}
+                <div
+                    class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show"
+                    role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %} {% endif %} {% endwith %}
 
                 <!-- Page Content -->
                 {% block admin_content %}{% endblock %}
@@ -82,30 +76,28 @@
         </main>
     </div>
 </div>
-{% endblock content %}
-
-{% block extra_js %}
+{% endblock content %} {% block extra_js %}
 <script>
-// Admin-specific JavaScript
-document.addEventListener('DOMContentLoaded', function() {
-    // Confirm dangerous actions
-    document.querySelectorAll('[data-confirm]').forEach(function(element) {
-        element.addEventListener('click', function(e) {
-            const message = this.getAttribute('data-confirm');
-            if (!confirm(message)) {
-                e.preventDefault();
-            }
+    // Admin-specific JavaScript
+    document.addEventListener("DOMContentLoaded", function () {
+        // Confirm dangerous actions
+        document.querySelectorAll("[data-confirm]").forEach(function (element) {
+            element.addEventListener("click", function (e) {
+                const message = this.getAttribute("data-confirm");
+                if (!confirm(message)) {
+                    e.preventDefault();
+                }
+            });
         });
-    });
 
-    // Auto-dismiss alerts after 5 seconds
-    setTimeout(function() {
-        const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(function(alert) {
-            const bsAlert = new bootstrap.Alert(alert);
-            bsAlert.close();
-        });
-    }, 5000);
-});
+        // Auto-dismiss alerts after 5 seconds
+        setTimeout(function () {
+            const alerts = document.querySelectorAll(".alert");
+            alerts.forEach(function (alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+    });
 </script>
 {% endblock extra_js %}

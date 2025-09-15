@@ -39,7 +39,7 @@ export class EnhancedRestaurantSearch {
       language: lang,
       country: countryCode,
       useMiles: milesCountries.includes(countryCode),
-      unit: milesCountries.includes(countryCode) ? 'miles' : 'km'
+      unit: milesCountries.includes(countryCode) ? 'miles' : 'km',
     };
   }
 
@@ -62,7 +62,7 @@ export class EnhancedRestaurantSearch {
       cuisineFilter.innerHTML = '<option value="">Any cuisine</option>';
 
       // Add cuisine options
-      cuisineNames.forEach(name => {
+      cuisineNames.forEach((name) => {
         const option = document.createElement('option');
         option.value = name.toLowerCase();
         option.textContent = name;
@@ -245,7 +245,7 @@ export class EnhancedRestaurantSearch {
 
   bindEvents() {
     // Search mode toggle
-    this.container.querySelectorAll('input[name="searchMode"]').forEach(radio => {
+    this.container.querySelectorAll('input[name="searchMode"]').forEach((radio) => {
       radio.addEventListener('change', (e) => {
         this.switchSearchMode(e.target.value);
       });
@@ -269,7 +269,7 @@ export class EnhancedRestaurantSearch {
     });
 
     // Enter key on inputs
-    this.container.querySelectorAll('input[type="text"]').forEach(input => {
+    this.container.querySelectorAll('input[type="text"]').forEach((input) => {
       input.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
           this.performSearch();
@@ -282,7 +282,7 @@ export class EnhancedRestaurantSearch {
     this.searchMode = mode;
 
     // Hide all mode content
-    this.container.querySelectorAll('.search-mode-content').forEach(content => {
+    this.container.querySelectorAll('.search-mode-content').forEach((content) => {
       content.classList.add('d-none');
     });
 
@@ -294,7 +294,7 @@ export class EnhancedRestaurantSearch {
     const buttonTexts = {
       nearby: 'Search Nearby Restaurants',
       text: 'Search Restaurants',
-      address: 'Search Near Address'
+      address: 'Search Near Address',
     };
     searchBtnText.textContent = buttonTexts[mode];
   }
@@ -324,7 +324,7 @@ export class EnhancedRestaurantSearch {
       const position = await this.getCurrentPosition();
       this.currentLocation = {
         lat: position.coords.latitude,
-        lng: position.coords.longitude
+        lng: position.coords.longitude,
       };
 
       statusDiv.classList.remove('alert-info');
@@ -358,7 +358,7 @@ export class EnhancedRestaurantSearch {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 300000 // 5 minutes
+        maximumAge: 300000, // 5 minutes
       });
     });
   }
@@ -396,7 +396,7 @@ export class EnhancedRestaurantSearch {
             throw new Error('Please enter a search query.');
           }
           searchParams = {
-            query: query,
+            query,
             lat: this.currentLocation?.lat,
             lng: this.currentLocation?.lng,
           };
@@ -450,8 +450,8 @@ export class EnhancedRestaurantSearch {
     return {
       cuisine: this.container.querySelector('#cuisine-filter').value,
       minRating: parseFloat(this.container.querySelector('#min-rating').value) || undefined,
-      maxPriceLevel: parseInt(this.container.querySelector('#max-price').value) || undefined,
-      maxResults: parseInt(this.container.querySelector('#max-results').value) || 20,
+      maxPriceLevel: parseInt(this.container.querySelector('#max-price').value, 10) || undefined,
+      maxResults: parseInt(this.container.querySelector('#max-results').value, 10) || 20,
     };
   }
 
@@ -493,7 +493,7 @@ export class EnhancedRestaurantSearch {
       return;
     }
 
-    const resultsHtml = results.results.map(restaurant => {
+    const resultsHtml = results.results.map((restaurant) => {
       // Parse address for better display
       const address = this.parseAddress(restaurant);
 
@@ -577,8 +577,8 @@ export class EnhancedRestaurantSearch {
         : `${restaurant.city}, ${restaurant.state}`;
 
       return {
-        street: street,
-        cityStateZip: cityState
+        street,
+        cityStateZip: cityState,
       };
     }
 
@@ -604,20 +604,20 @@ export class EnhancedRestaurantSearch {
       const beforeState = formatted.substring(0, stateIndex).trim();
 
       // Try to find city before state
-      const parts = beforeState.split(',').map(p => p.trim());
+      const parts = beforeState.split(',').map((p) => p.trim());
       if (parts.length > 0) {
         const street = parts[0];
         const city = parts.length > 1 ? parts[parts.length - 1] : '';
 
         return {
-          street: street,
-          cityStateZip: city ? `${city}, ${afterState}` : afterState
+          street,
+          cityStateZip: city ? `${city}, ${afterState}` : afterState,
         };
       }
     }
 
     // Split by commas and clean up
-    const parts = formatted.split(',').map(part => part.trim());
+    const parts = formatted.split(',').map((part) => part.trim());
 
     if (parts.length >= 4) {
       // Format: "Street, City, State ZIP, Country"
@@ -626,8 +626,8 @@ export class EnhancedRestaurantSearch {
       const stateZip = parts[2];
 
       return {
-        street: street,
-        cityStateZip: `${city}, ${stateZip}`
+        street,
+        cityStateZip: `${city}, ${stateZip}`,
       };
     } else if (parts.length === 3) {
       // Format: "Street, City, State ZIP" or "Street, City, Country"
@@ -641,16 +641,16 @@ export class EnhancedRestaurantSearch {
       if (stateRegex.test(lastPart)) {
         // Contains state information
         return {
-          street: street,
-          cityStateZip: `${city}, ${lastPart}`
-        };
-      } else {
-        // Might be country or other info, include it anyway for completeness
-        return {
-          street: street,
-          cityStateZip: `${city}, ${lastPart}`
+          street,
+          cityStateZip: `${city}, ${lastPart}`,
         };
       }
+      // Might be country or other info, include it anyway for completeness
+      return {
+        street,
+        cityStateZip: `${city}, ${lastPart}`,
+      };
+
     } else if (parts.length === 2) {
       // Format: "Street, City State" or "Street, City"
       const street = parts[0];
@@ -662,32 +662,32 @@ export class EnhancedRestaurantSearch {
         const cityOnly = cityState.replace(/\s+[A-Z]{2}\s+\d{5}(-\d{4})?$/, '');
         const stateZip = cityState.match(/\s+([A-Z]{2}\s+\d{5}(-\d{4})?)$/)[1];
         return {
-          street: street,
-          cityStateZip: `${cityOnly}, ${stateZip}`
+          street,
+          cityStateZip: `${cityOnly}, ${stateZip}`,
         };
       }
 
       return {
-        street: street,
-        cityStateZip: cityState
-      };
-    } else {
-      // Single part or fallback - try to extract any state information
-      const stateMatch = formatted.match(/\b([A-Z]{2})\b/);
-      if (stateMatch) {
-        const beforeState = formatted.substring(0, stateMatch.index).trim();
-        const afterState = formatted.substring(stateMatch.index).trim();
-        return {
-          street: beforeState,
-          cityStateZip: afterState
-        };
-      }
-
-      return {
-        street: formatted,
-        cityStateZip: ''
+        street,
+        cityStateZip: cityState,
       };
     }
+    // Single part or fallback - try to extract any state information
+    const stateMatch = formatted.match(/\b([A-Z]{2})\b/);
+    if (stateMatch) {
+      const beforeState = formatted.substring(0, stateMatch.index).trim();
+      const afterState = formatted.substring(stateMatch.index).trim();
+      return {
+        street: beforeState,
+        cityStateZip: afterState,
+      };
+    }
+
+    return {
+      street: formatted,
+      cityStateZip: '',
+    };
+
   }
 }
 

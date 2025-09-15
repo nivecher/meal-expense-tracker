@@ -1,7 +1,9 @@
 /* Standardized Avatar Components */
+
 /* Consistent avatar display with generated icons and responsive username support */
 
 /* Avatar Container */
+
 .avatar-container {
   position: relative;
   display: inline-flex;
@@ -9,6 +11,7 @@
 }
 
 /* Avatar Size Variants */
+
 .avatar-sm {
   width: 24px;
   height: 24px;
@@ -34,22 +37,24 @@
 }
 
 /* Avatar Image Styling */
+
 .avatar-container img[data-avatar] {
   border-radius: 50%;
   object-fit: cover;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+  border: 2px solid rgb(255 255 255 / 90%);
   flex-shrink: 0;
 }
 
 .avatar-container img[data-avatar]:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
   border-color: var(--bs-primary);
 }
 
 /* Generated Initials Avatar */
+
 .avatar-container .avatar-initials {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -58,9 +63,9 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgb(102 126 234 / 30%);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  border: 2px solid rgb(255 255 255 / 90%);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   flex-shrink: 0;
@@ -68,11 +73,12 @@
 
 .avatar-container .avatar-initials:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-  border-color: rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 12px rgb(102 126 234 / 40%);
+  border-color: rgb(255 255 255 / 100%);
 }
 
 /* User Info Display */
+
 .avatar-user-info {
   display: flex;
   flex-direction: column;
@@ -100,6 +106,7 @@
 }
 
 /* Navbar Specific Avatar Styling */
+
 .navbar .avatar-container {
   margin-right: 0.5rem;
 }
@@ -115,6 +122,7 @@
 }
 
 /* Dropdown Specific Avatar Styling */
+
 .dropdown-menu .avatar-container {
   margin-bottom: 0.5rem;
 }
@@ -142,6 +150,7 @@
 }
 
 /* Loading State */
+
 .avatar-loading {
   background: linear-gradient(90deg, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%);
   background-size: 200% 100%;
@@ -153,12 +162,9 @@
 .avatar-loading::after {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 2px;
-  right: 2px;
-  bottom: 2px;
+  inset: 2px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgb(255 255 255 / 30%);
   animation: avatar-shimmer 2s infinite ease-in-out;
 }
 
@@ -169,6 +175,7 @@
 }
 
 /* Error State */
+
 .avatar-error {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
@@ -178,28 +185,33 @@
   font-weight: 600;
   font-size: 0.875rem;
   border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 8px rgb(102 126 234 / 30%);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .avatar-error:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgb(102 126 234 / 40%);
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+
+@media (width <= 768px) {
+
   /* Hide username on small screens for compact display */
+
   .avatar-container .avatar-username {
     display: none;
   }
 
   /* Show username only in dropdowns on mobile */
+
   .dropdown-menu .avatar-username {
     display: block;
   }
 
   /* Adjust avatar sizes for mobile */
+
   .avatar-container.avatar-lg {
     width: 40px;
     height: 40px;
@@ -213,8 +225,10 @@
   }
 }
 
-@media (max-width: 576px) {
+@media (width <= 576px) {
+
   /* Further reduce sizes on very small screens */
+
   .avatar-container.avatar-md {
     width: 28px;
     height: 28px;
@@ -229,6 +243,7 @@
 }
 
 /* Animations */
+
 @keyframes avatar-pulse {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -240,13 +255,15 @@
 }
 
 /* Hover Effects */
+
 .avatar-container:hover img[data-avatar],
 .avatar-container:hover .avatar-initials {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
 }
 
 /* Focus States for Accessibility */
+
 .avatar-container:focus-within img[data-avatar],
 .avatar-container:focus-within .avatar-initials {
   outline: 2px solid var(--bs-primary);
@@ -254,6 +271,7 @@
 }
 
 /* Dark Theme Support */
+
 [data-theme="dark"] .avatar-container .avatar-username {
   color: var(--bs-body-color);
 }
@@ -263,9 +281,9 @@
 }
 
 [data-theme="dark"] .avatar-container img[data-avatar] {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgb(255 255 255 / 20%);
 }
 
 [data-theme="dark"] .avatar-container .avatar-initials {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgb(255 255 255 / 20%);
 }

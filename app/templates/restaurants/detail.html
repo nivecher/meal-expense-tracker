@@ -32,14 +32,14 @@
                                     <div class="restaurant-icon me-3 flex-shrink-0">
                                         {% if restaurant.website %}
                                             <img
-                                                src="https://www.google.com/s2/favicons?domain={{ restaurant.website|replace('https://', '')|replace('http://', '')|replace('www.', '') }}&sz=32"
+                                                src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                                data-website="{{ restaurant.website }}"
+                                                data-size="32"
                                                 alt="{{ restaurant.name }} icon"
                                                 class="restaurant-favicon"
                                                 width="32"
                                                 height="32"
                                                 loading="lazy"
-                                                onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';"
-                                                onload="this.style.opacity='1';"
                                                 style="opacity: 0; transition: opacity 0.2s;"
                                             />
                                             <i class="fas fa-utensils text-primary restaurant-fallback-icon restaurant-fallback-icon-large" style="display: none; font-size: 32px;"></i>

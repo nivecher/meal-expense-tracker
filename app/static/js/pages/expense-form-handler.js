@@ -3,176 +3,6 @@
  */
 
 /**
- * Initialize the expense form
- */
-function initializeExpenseForm() {
-  const form = document.getElementById('expenseForm');
-  if (!form) return;
-
-  // Set up form submission handler
-  form.addEventListener('submit', handleFormSubmit);
-
-  // Set up category and restaurant type handling
-  setupCategoryRestaurantHandling(form);
-
-  // Check if we're editing an existing expense
-  const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
-  if (restaurantSelect) {
-    // If there's a data-restaurant-id attribute, use it to set the selected option
-    const { restaurantId } = restaurantSelect.dataset;
-    if (restaurantId) {
-      const optionToSelect = restaurantSelect.querySelector(`option[value="${restaurantId}"]`);
-      if (optionToSelect) {
-        optionToSelect.selected = true;
-        console.log('Set selected restaurant:', restaurantId);
-      } else {
-        console.warn('Could not find restaurant option with value:', restaurantId);
-      }
-    }
-  }
-}
-
-/**
- * Set up category and restaurant type handling
- */
-function setupCategoryRestaurantHandling(form) {
-  const categorySelect = form.querySelector('select[name="category_id"]');
-  const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
-
-  if (!categorySelect || !restaurantSelect) return;
-
-  // Track if category was manually changed
-  let categoryManuallyChanged = false;
-
-  // Function to update category based on restaurant type
-  function updateCategory(restaurantId) {
-    if (categoryManuallyChanged) return;
-    if (!restaurantId) return;
-
-    // Reset to default selection
-    categorySelect.value = '';
-  }
-
-  // Handle restaurant change
-  restaurantSelect.addEventListener('change', function() {
-    updateCategory(this.value);
-  });
-
-  // Track manual category changes
-  categorySelect.addEventListener('change', function() {
-    categoryManuallyChanged = this.value !== '';
-  });
-}
-
-// Initialize the form when the DOM is fully loaded
-document.addEventListener('DOMContentLoaded', initializeExpenseForm);
-
-/**
- * Handle form submission with Fetch API
- * @param {Event} event - The form submission event
- */
-/**
- * Validate form data before submission
- * @param {FormData} formData - The form data to validate
- * @returns {Object|null} Validation errors or null if valid
- */
-function validateFormData(formData) {
-  const errors = {};
-  const requiredFields = ['amount', 'restaurant_id', 'date'];
-
-  requiredFields.forEach((field) => {
-    const value = formData.get(field);
-    console.log(`Validating ${field}:`, value);
-
-    // Special handling for restaurant_id which should be a number > 0
-    if (field === 'restaurant_id') {
-      const restaurantId = parseInt(value, 10);
-      if (isNaN(restaurantId) || restaurantId <= 0) {
-        errors[field] = ['Please select a valid restaurant'];
-      }
-    }
-    // Standard required field validation
-    else if (!value || (typeof value === 'string' && value.trim() === '')) {
-      const fieldName = field.replace(/_/g, ' ');
-      errors[field] = [`Please enter a valid ${fieldName}`];
-    }
-  });
-
-  // Additional validation for amount
-  const amount = parseFloat(formData.get('amount'));
-  if (!isNaN(amount) && amount <= 0) {
-    errors.amount = ['Please enter an amount greater than 0'];
-  }
-
-  // Additional validation for date format (YYYY-MM-DD)
-  const dateValue = formData.get('date');
-  if (dateValue && !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-    errors.date = ['Please enter a valid date in YYYY-MM-DD format'];
-  }
-
-  // Tags will be added during form submission, not validation
-
-  console.log('Validation errors:', errors);
-  return Object.keys(errors).length === 0 ? null : errors;
-}
-
-async function handleFormSubmit(event) {
-  event.preventDefault();
-  console.log('Form submission started');
-
-  const form_elements = cache_form_elements(event.target);
-  const form_data = new FormData(form_elements.form);
-
-  // Add tags to form data if available (Tagify)
-  const tagsInput = document.getElementById('tagsInput');
-  if (tagsInput && window.tagifyInstance) {
-    const selectedTags = window.tagifyInstance.value;
-    if (selectedTags && selectedTags.length > 0) {
-      const tagsJson = JSON.stringify(selectedTags.map(tag => tag.value));
-      form_data.set('tags', tagsJson); // Use set() to replace any existing value
-    }
-  }
-
-  clear_previous_errors(form_elements.alertContainer);
-
-  const validation_result = validate_form_data(form_data);
-  if (!validation_result.isValid) {
-    handle_validation_errors(form_elements.form, validation_result.errors, form_data);
-    return;
-  }
-
-  await process_form_submission(form_elements, form_data);
-}
-
-function cache_form_elements(form) {
-  return {
-    form,
-    submitButton: form.querySelector('button[type="submit"]'),
-    alertContainer: document.getElementById('alert-container'),
-  };
-}
-
-function clear_previous_errors(alert_container) {
-  if (alert_container) {
-    alert_container.innerHTML = '';
-  }
-}
-
-function validate_form_data(form_data) {
-  const validation_errors = validateFormData(form_data);
-  return {
-    isValid: !validation_errors,
-    errors: validation_errors,
-  };
-}
-
-function handle_validation_errors(form, errors, form_data) {
-  console.error('Client-side validation failed:', errors);
-  console.log('Form data being validated:', Object.fromEntries(form_data.entries()));
-  showFormErrors(form, errors);
-}
-
-/**
  * Display form validation errors
  * @param {HTMLFormElement} form - The form element
  * @param {Object} errors - Object containing error messages
@@ -190,7 +20,7 @@ function showFormErrors(form, errors) {
   });
 
   // Show general errors at the top of the form
-  if (errors._error || (typeof errors === 'object' && !Array.isArray(errors) && Object.keys(errors).length > 0)) {
+  if (errors.errorKey || (typeof errors === 'object' && !Array.isArray(errors) && Object.keys(errors).length > 0)) {
     const errorContainer = form.querySelector('#formErrors') || document.createElement('div');
     if (!errorContainer.id) {
       errorContainer.id = 'formErrors';
@@ -203,8 +33,8 @@ function showFormErrors(form, errors) {
     errorContainer.classList.remove('d-none');
 
     // Add new error messages
-    if (errors._error) {
-      const errorMessages = Array.isArray(errors._error) ? errors._error : [errors._error];
+    if (errors.errorKey) {
+      const errorMessages = Array.isArray(errors.errorKey) ? errors.errorKey : [errors.errorKey];
       errorMessages.forEach((msg) => {
         const p = document.createElement('p');
         p.className = 'mb-0';
@@ -217,7 +47,7 @@ function showFormErrors(form, errors) {
   // Show field-specific errors
   Object.entries(errors).forEach(([fieldName, errorMessages]) => {
     // Skip non-field specific errors
-    if (fieldName === '_error' || fieldName === 'status' || fieldName === 'message') {
+    if (fieldName === 'errorKey' || fieldName === 'status' || fieldName === 'message') {
       return;
     }
 
@@ -263,58 +93,90 @@ function showFormErrors(form, errors) {
   }
 }
 
-// Helper functions for form submission processing
-async function process_form_submission(form_elements, form_data) {
-  const { form, submitButton } = form_elements;
-  const original_button_text = submitButton?.innerHTML;
+// Utility functions - defined first
+function validateFormDataInternal(formData) {
+  const errors = {};
+  const requiredFields = ['amount', 'restaurant_id', 'date'];
 
-  try {
-    set_loading_state(submitButton);
+  requiredFields.forEach((field) => {
+    const value = formData.get(field);
+    console.log(`Validating ${field}:`, value);
 
-    const prepared_data = prepare_form_data_for_submission(form, form_data);
-    log_submission_details(form, prepared_data);
-
-    const response = await submit_form_to_server(form, prepared_data);
-    const result = await response.json();
-
-    console.log('Response data:', result);
-
-    if (response.ok && result.success) {
-      handle_successful_submission(result);
-    } else {
-      handle_submission_error(form, response, result);
+    // Special handling for restaurant_id which should be a number > 0
+    if (field === 'restaurant_id') {
+      const restaurantId = parseInt(value, 10);
+      if (isNaN(restaurantId) || restaurantId <= 0) {
+        errors[field] = ['Please select a valid restaurant'];
+      }
+    } else if (!value || (typeof value === 'string' && value.trim() === '')) {
+      const fieldName = field.replace(/_/g, ' ');
+      errors[field] = [`Please enter a valid ${fieldName}`];
     }
+  });
 
-  } catch (error) {
-    handle_submission_exception(form, error);
-  } finally {
-    restore_button_state(submitButton, original_button_text);
+  // Additional validation for amount
+  const amount = parseFloat(formData.get('amount'));
+  if (!isNaN(amount) && amount <= 0) {
+    errors.amount = ['Please enter an amount greater than 0'];
+  }
+
+  // Additional validation for date format (YYYY-MM-DD)
+  const dateValue = formData.get('date');
+  if (dateValue && !/^\d{4}-\d{2}-\d{2}$/u.test(dateValue)) {
+    errors.date = ['Please enter a valid date in YYYY-MM-DD format'];
+  }
+
+  // Tags will be added during form submission, not validation
+
+  console.log('Validation errors:', errors);
+  return Object.keys(errors).length === 0 ? null : errors;
+}
+
+function validateFormData(formData) {
+  const validationErrors = validateFormDataInternal(formData);
+  return {
+    isValid: !validationErrors,
+    errors: validationErrors,
+  };
+}
+
+function cacheFormElements(form) {
+  return {
+    form,
+    submitButton: form.querySelector('button[type="submit"]'),
+    alertContainer: document.getElementById('alert-container'),
+  };
+}
+
+function clearPreviousErrors(alertContainer) {
+  if (alertContainer) {
+    alertContainer.innerHTML = '';
   }
 }
 
-function set_loading_state(submit_button) {
-  if (submit_button) {
-    submit_button.disabled = true;
-    submit_button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+function setLoadingState(submitButton) {
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
   }
 }
 
-function prepare_form_data_for_submission(form, form_data) {
-  console.log('Submitting form data:', Object.fromEntries(form_data.entries()));
+function prepareFormDataForSubmission(form, formData) {
+  console.log('Submitting form data:', Object.fromEntries(formData.entries()));
 
-  const csrf_token = document.querySelector('input[name="csrf_token"]')?.value;
+  const csrfToken = document.querySelector('input[name="csrf_token"]')?.value;
 
   // Add CSRF token if not already in form
-  if (csrf_token && !form_data.has('csrf_token')) {
-    form_data.append('csrf_token', csrf_token);
+  if (csrfToken && !formData.has('csrf_token')) {
+    formData.append('csrf_token', csrfToken);
   }
 
-  return form_data;
+  return formData;
 }
 
-function log_submission_details(form, form_data) {
-  const form_data_obj = Object.fromEntries(form_data.entries());
-  console.log('Form data being sent:', form_data_obj);
+function logSubmissionDetails(form, formData) {
+  const formDataObj = Object.fromEntries(formData.entries());
+  console.log('Form data being sent:', formDataObj);
   console.log('Sending request to:', form.action);
   console.log('Request method:', 'POST');
   console.log('Request headers:', {
@@ -323,10 +185,10 @@ function log_submission_details(form, form_data) {
   });
 }
 
-async function submit_form_to_server(form, form_data) {
+async function submitFormToServer(form, formData) {
   const response = await fetch(form.action, {
     method: 'POST',
-    body: form_data,
+    body: formData,
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
       Accept: 'application/json',
@@ -337,21 +199,11 @@ async function submit_form_to_server(form, form_data) {
   return response;
 }
 
-function handle_successful_submission(result) {
-  console.log('Form submission successful');
-
-  show_success_alert(result);
-
-  const redirect_url = result.redirect || result.redirect_url || '/expenses';
-  console.log('Form submitted successfully, redirecting to:', redirect_url);
-  window.location.href = redirect_url;
-}
-
-function show_success_alert(result) {
-  const alert_container = document.getElementById('alert-container');
-  if (alert_container) {
+function showSuccessAlert(result) {
+  const alertContainer = document.getElementById('alert-container');
+  if (alertContainer) {
     const message = result.message || 'Expense added successfully!';
-    alert_container.innerHTML = `
+    alertContainer.innerHTML = `
       <div class="alert alert-success alert-dismissible fade show" role="alert">
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -360,7 +212,17 @@ function show_success_alert(result) {
   }
 }
 
-function handle_submission_error(form, response, result) {
+function handleSuccessfulSubmission(result) {
+  console.log('Form submission successful');
+
+  showSuccessAlert(result);
+
+  const redirectUrl = result.redirect || result.redirect_url || '/expenses';
+  console.log('Form submitted successfully, redirecting to:', redirectUrl);
+  window.location.href = redirectUrl;
+}
+
+function handleSubmissionError(form, response, result) {
   console.error('Form submission failed with status:', response.status);
 
   if (result.errors) {
@@ -368,25 +230,153 @@ function handle_submission_error(form, response, result) {
     showFormErrors(form, result.errors);
   } else if (result.message) {
     console.error('Server error:', result.message);
-    showFormErrors(form, { _error: [result.message] });
+    showFormErrors(form, { errorKey: [result.message] });
   } else {
     console.error('No error details provided in response');
     showFormErrors(form, {
-      _error: [`An error occurred (${response.status}): ${response.statusText || 'Unknown error'}`],
+      errorKey: [`An error occurred (${response.status}): ${response.statusText || 'Unknown error'}`],
     });
   }
 }
 
-function handle_submission_exception(form, error) {
+function handleSubmissionException(form, error) {
   console.error('Error during form submission:', error);
   showFormErrors(form, {
-    _error: ['An error occurred while submitting the form. Please try again.'],
+    errorKey: ['An error occurred while submitting the form. Please try again.'],
   });
 }
 
-function restore_button_state(submit_button, original_text) {
-  if (submit_button && original_text) {
-    submit_button.disabled = false;
-    submit_button.innerHTML = original_text;
+function restoreButtonState(submitButton, originalText) {
+  if (submitButton && originalText) {
+    submitButton.disabled = false;
+    submitButton.innerHTML = originalText;
   }
 }
+
+function handleValidationErrors(form, errors, formData) {
+  console.error('Client-side validation failed:', errors);
+  console.log('Form data being validated:', Object.fromEntries(formData.entries()));
+  showFormErrors(form, errors);
+}
+
+async function processFormSubmission(formElements, formData) {
+  const { form, submitButton } = formElements;
+  const originalButtonText = submitButton?.innerHTML;
+
+  try {
+    setLoadingState(submitButton);
+
+    const preparedData = prepareFormDataForSubmission(form, formData);
+    logSubmissionDetails(form, preparedData);
+
+    const response = await submitFormToServer(form, preparedData);
+    const result = await response.json();
+
+    console.log('Response data:', result);
+
+    if (response.ok && result.success) {
+      handleSuccessfulSubmission(result);
+    } else {
+      handleSubmissionError(form, response, result);
+    }
+
+  } catch (error) {
+    handleSubmissionException(form, error);
+  } finally {
+    restoreButtonState(submitButton, originalButtonText);
+  }
+}
+
+// Main form handling functions
+async function handleFormSubmit(event) {
+  event.preventDefault();
+  console.log('Form submission started');
+
+  const formElements = cacheFormElements(event.target);
+  const formData = new FormData(formElements.form);
+
+  // Add tags to form data if available (Tagify)
+  const tagsInput = document.getElementById('tagsInput');
+  if (tagsInput && window.tagifyInstance) {
+    const selectedTags = window.tagifyInstance.value;
+    if (selectedTags && selectedTags.length > 0) {
+      const tagsJson = JSON.stringify(selectedTags.map((tag) => tag.value));
+      formData.set('tags', tagsJson); // Use set() to replace any existing value
+    }
+  }
+
+  clearPreviousErrors(formElements.alertContainer);
+
+  const validationResult = validateFormData(formData);
+  if (!validationResult.isValid) {
+    handleValidationErrors(formElements.form, validationResult.errors, formData);
+    return;
+  }
+
+  await processFormSubmission(formElements, formData);
+}
+
+/**
+ * Set up category and restaurant type handling
+ */
+function setupCategoryRestaurantHandling(form) {
+  const categorySelect = form.querySelector('select[name="category_id"]');
+  const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
+
+  if (!categorySelect || !restaurantSelect) return;
+
+  // Track if category was manually changed
+  let categoryManuallyChanged = false;
+
+  // Function to update category based on restaurant type
+  function updateCategory(restaurantId) {
+    if (categoryManuallyChanged) return;
+    if (!restaurantId) return;
+
+    // Reset to default selection
+    categorySelect.value = '';
+  }
+
+  // Handle restaurant change
+  restaurantSelect.addEventListener('change', function() {
+    updateCategory(this.value);
+  });
+
+  // Track manual category changes
+  categorySelect.addEventListener('change', function() {
+    categoryManuallyChanged = this.value !== '';
+  });
+}
+
+/**
+ * Initialize the expense form
+ */
+function initializeExpenseForm() {
+  const form = document.getElementById('expenseForm');
+  if (!form) return;
+
+  // Set up form submission handler
+  form.addEventListener('submit', handleFormSubmit);
+
+  // Set up category and restaurant type handling
+  setupCategoryRestaurantHandling(form);
+
+  // Check if we're editing an existing expense
+  const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
+  if (restaurantSelect) {
+    // If there's a data-restaurant-id attribute, use it to set the selected option
+    const { restaurantId } = restaurantSelect.dataset;
+    if (restaurantId) {
+      const optionToSelect = restaurantSelect.querySelector(`option[value="${restaurantId}"]`);
+      if (optionToSelect) {
+        optionToSelect.selected = true;
+        console.log('Set selected restaurant:', restaurantId);
+      } else {
+        console.warn('Could not find restaurant option with value:', restaurantId);
+      }
+    }
+  }
+}
+
+// Initialize the form when the DOM is fully loaded
+document.addEventListener('DOMContentLoaded', initializeExpenseForm);

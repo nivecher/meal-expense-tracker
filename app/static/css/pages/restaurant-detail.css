@@ -5,6 +5,7 @@
 /**
  * Base container and layout
  */
+
 .restaurant-detail-container {
     min-height: 100vh;
 }
@@ -12,36 +13,41 @@
 /* Header styling */
 
 /* Enhanced card styling */
+
 .card {
     border: none;
     border-radius: 12px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 8%);
     transition: box-shadow 0.15s ease-in-out;
 }
 
 .card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
 }
 
 .card-header {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    border-bottom: 1px solid rgb(0 0 0 / 8%);
     border-radius: 12px 12px 0 0 !important;
     font-weight: 600;
 }
 
 /* Stats grid styling */
+
 .quick-stats .h4 {
     font-weight: 700;
     margin-bottom: 0.25rem;
 }
 
 /* Responsive adjustments */
-@media (max-width: 991.98px) {
+
+@media (width <= 991.98px) {
+
     .card-body {
         padding: 1.5rem !important;
     }
 
     /* Stack columns on mobile */
+
     .row.g-4 > .col-md-4 {
         margin-bottom: 1rem;
     }
@@ -50,6 +56,7 @@
 /**
  * Left column - Restaurant details
  */
+
 .restaurant-details {
     background: var(--card-bg);
     border-radius: var(--card-border-radius);
@@ -62,6 +69,7 @@
 /**
  * Right column - Expense summary and recent transactions
  */
+
 .expense-summary {
     position: sticky;
     top: 1rem;
@@ -75,17 +83,18 @@
 /**
  * Card components
  */
+
 .card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--card-border-radius);
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+    box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 5%);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 10%);
 }
 
 .card-header {
@@ -109,6 +118,7 @@
 /**
  * List group styles
  */
+
 .list-group {
     border-radius: var(--border-radius);
     overflow: hidden;
@@ -117,7 +127,7 @@
 .list-group-item {
     padding: 0.75rem 1.25rem;
     border: 1px solid var(--border-color);
-    border-width: 0 0 1px 0;
+    border-width: 0 0 1px;
     background-color: var(--card-bg);
     transition: background-color 0.15s ease;
 }
@@ -145,6 +155,7 @@
 /**
  * Summary statistics
  */
+
 .summary-stats {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -177,6 +188,7 @@
 /**
  * Recent transactions
  */
+
 .recent-transactions .transaction-item {
     display: flex;
     justify-content: space-between;
@@ -211,6 +223,7 @@
 /**
  * Map container
  */
+
 .map-container {
     height: 300px;
     background: var(--gray-100);
@@ -234,6 +247,7 @@
 /**
  * Action buttons
  */
+
 .action-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -244,6 +258,7 @@
 /**
  * Loading state
  */
+
 .loading-state {
     display: flex;
     flex-direction: column;
@@ -264,6 +279,7 @@
 /**
  * Website URL wrapping fix
  */
+
 .text-break {
     word-break: break-word !important;
     overflow-wrap: break-word !important;
@@ -272,14 +288,15 @@
 /**
  * Restaurant Information Cards Layout
  */
+
 .restaurant-info-cards .card {
     border: 1px solid var(--bs-border-color);
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 7.5%);
     transition: box-shadow 0.15s ease-in-out;
 }
 
 .restaurant-info-cards .card:hover {
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0.25rem 0.5rem rgb(0 0 0 / 10%);
 }
 
 .restaurant-info-cards .list-group-item {
@@ -328,11 +345,13 @@
 /**
  * Service Level Badge Styling
  */
+
 /* Service level badge styles now handled by unified badge system */
 
 /**
  * Contact Information Improvements
  */
+
 .contact-info-list .list-group-item {
     padding: 0.75rem 0;
     border: none;
@@ -371,6 +390,7 @@
 /**
  * Location Section Improvements
  */
+
 .location-section h6 {
     font-weight: 600;
     color: var(--bs-dark);
@@ -391,12 +411,13 @@
 
 .location-section .btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 123, 255, 0.25);
+    box-shadow: 0 0.25rem 0.5rem rgb(0 123 255 / 25%);
 }
 
 /**
  * Address styling
  */
+
 address {
     font-style: normal;
     line-height: 1.5;
@@ -414,7 +435,9 @@ address div:last-child {
 /**
  * Responsive adjustments
  */
-@media (max-width: 991.98px) {
+
+@media (width <= 991.98px) {
+
     .restaurant-detail-main {
         grid-template-columns: 1fr;
     }
@@ -429,7 +452,8 @@ address div:last-child {
     }
 }
 
-@media (max-width: 767.98px) {
+@media (width <= 767.98px) {
+
     .summary-stats {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -444,6 +468,7 @@ address div:last-child {
     }
 
     /* Stack restaurant info cards on mobile */
+
     .restaurant-info-cards .col-md-6 {
         margin-bottom: 1rem;
     }
@@ -453,6 +478,7 @@ address div:last-child {
     }
 
     /* Improved mobile button layout */
+
     .location-section .d-flex {
         flex-direction: column;
         gap: 0.5rem;
@@ -463,6 +489,7 @@ address div:last-child {
     }
 
     /* Better mobile typography */
+
     .restaurant-info-cards .list-group-item > div > div:first-child {
         font-size: 0.75rem;
     }
@@ -475,11 +502,14 @@ address div:last-child {
 /**
  * Animations
  */
+
 @keyframes fadeIn {
+
     from {
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);

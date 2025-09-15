@@ -1,10 +1,6 @@
-{% extends "base.html" %}
-{% block title %} Expense Details {% endblock title %}
-{% block styles %}
-{{ super() }}
+{% extends "base.html" %} {% block title %} Expense Details {% endblock title %} {% block styles %} {{ super() }}
 <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
-{% endblock styles %}
-{% block content %}
+{% endblock styles %} {% block content %}
 <!-- Breadcrumb Navigation -->
 {% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'}, {'url':
 url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Details'} ] %} {% include
@@ -57,8 +53,8 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                             {% endif %} {% if expense.category %}
                             <p>
                                 <strong>Category:</strong>
-                                {% from 'macros/category_helpers.html' import category_badge %}
-                                {{ category_badge(expense.category) }}
+                                {% from 'macros/category_helpers.html' import category_badge %} {{
+                                category_badge(expense.category) }}
                             </p>
                             {% endif %}
                         </div>

@@ -43,7 +43,7 @@ export class MapRestaurantSearch {
       language: lang,
       country: countryCode,
       useMiles: milesCountries.includes(countryCode),
-      unit: milesCountries.includes(countryCode) ? 'miles' : 'km'
+      unit: milesCountries.includes(countryCode) ? 'miles' : 'km',
     };
   }
 
@@ -336,7 +336,7 @@ export class MapRestaurantSearch {
       const addButton = e.target.closest('[data-action="add-restaurant"]');
       if (addButton) {
         e.stopPropagation(); // Prevent card selection
-        const placeId = addButton.dataset.placeId;
+        const { placeId } = addButton.dataset;
         if (placeId && placeId !== 'null' && placeId !== 'undefined') {
           this.addToMyRestaurants(placeId);
         } else {
@@ -347,7 +347,7 @@ export class MapRestaurantSearch {
 
     // Add change listeners to filter controls for immediate re-search
     const filterControls = this.container.querySelectorAll('#cuisine-filter, #min-rating, #max-price');
-    filterControls.forEach(control => {
+    filterControls.forEach((control) => {
       control.addEventListener('change', () => {
         // Re-search when filters change (works with or without search query)
         this.performSearch();
@@ -383,7 +383,7 @@ export class MapRestaurantSearch {
       const position = await this.getCurrentPosition();
       this.currentLocation = {
         lat: position.coords.latitude,
-        lng: position.coords.longitude
+        lng: position.coords.longitude,
       };
 
       // Update map center (let fitMapToMarkers handle the zoom)
@@ -428,7 +428,7 @@ export class MapRestaurantSearch {
       const position = await this.getCurrentPosition();
       this.currentLocation = {
         lat: position.coords.latitude,
-        lng: position.coords.longitude
+        lng: position.coords.longitude,
       };
 
       // Update map center and add location marker
@@ -466,7 +466,7 @@ export class MapRestaurantSearch {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 300000 // 5 minutes
+        maximumAge: 300000, // 5 minutes
       });
     });
   }
@@ -495,7 +495,7 @@ export class MapRestaurantSearch {
       const mapCenter = this.map.getCenter();
       const searchLocation = {
         lat: mapCenter.lat(),
-        lng: mapCenter.lng()
+        lng: mapCenter.lng(),
       };
 
       // Build search parameters with proper filter application
@@ -511,7 +511,7 @@ export class MapRestaurantSearch {
       };
 
       // Remove empty parameters
-      Object.keys(searchParams).forEach(key => {
+      Object.keys(searchParams).forEach((key) => {
         if (searchParams[key] === '' || searchParams[key] === undefined) {
           delete searchParams[key];
         }
@@ -542,7 +542,7 @@ export class MapRestaurantSearch {
     return {
       cuisine: this.container.querySelector('#cuisine-filter').value,
       minRating: parseFloat(this.container.querySelector('#min-rating').value) || undefined,
-      maxPriceLevel: parseInt(this.container.querySelector('#max-price').value) || undefined,
+      maxPriceLevel: parseInt(this.container.querySelector('#max-price').value, 10) || undefined,
       maxResults: 20,
     };
   }
@@ -625,15 +625,15 @@ export class MapRestaurantSearch {
 
     const position = {
       lat: restaurant.geometry.location.lat,
-      lng: restaurant.geometry.location.lng
+      lng: restaurant.geometry.location.lng,
     };
 
     // Use AdvancedMarkerElement with numbered content
     const marker = new google.maps.marker.AdvancedMarkerElement({
-      position: position,
+      position,
       map: this.map,
       title: restaurant.name,
-      content: this.createNumberedMarkerContent(index + 1, 'red')
+      content: this.createNumberedMarkerContent(index + 1, 'red'),
     });
 
     // Add click listener
@@ -718,7 +718,7 @@ export class MapRestaurantSearch {
 
     // Contact information
     const phone = restaurant.formatted_phone_number;
-    const website = restaurant.website;
+    const { website } = restaurant;
 
     return `
       <div class="card h-100 restaurant-card" data-index="${index}" style="cursor: pointer; position: relative;">
@@ -829,8 +829,8 @@ export class MapRestaurantSearch {
         : `${restaurant.city}, ${restaurant.state}`;
 
       return {
-        street: street,
-        cityStateZip: cityState
+        street,
+        cityStateZip: cityState,
       };
     }
 
@@ -856,20 +856,20 @@ export class MapRestaurantSearch {
       const beforeState = formatted.substring(0, stateIndex).trim();
 
       // Try to find city before state
-      const parts = beforeState.split(',').map(p => p.trim());
+      const parts = beforeState.split(',').map((p) => p.trim());
       if (parts.length > 0) {
         const street = parts[0];
         const city = parts.length > 1 ? parts[parts.length - 1] : '';
 
         return {
-          street: street,
-          cityStateZip: city ? `${city}, ${afterState}` : afterState
+          street,
+          cityStateZip: city ? `${city}, ${afterState}` : afterState,
         };
       }
     }
 
     // Split by commas and clean up
-    const parts = formatted.split(',').map(part => part.trim());
+    const parts = formatted.split(',').map((part) => part.trim());
 
     if (parts.length >= 4) {
       // Format: "Street, City, State ZIP, Country"
@@ -878,8 +878,8 @@ export class MapRestaurantSearch {
       const stateZip = parts[2];
 
       return {
-        street: street,
-        cityStateZip: `${city}, ${stateZip}`
+        street,
+        cityStateZip: `${city}, ${stateZip}`,
       };
     } else if (parts.length === 3) {
       // Format: "Street, City, State ZIP" or "Street, City, Country"
@@ -893,16 +893,16 @@ export class MapRestaurantSearch {
       if (stateRegex.test(lastPart)) {
         // Contains state information
         return {
-          street: street,
-          cityStateZip: `${city}, ${lastPart}`
-        };
-      } else {
-        // Might be country or other info, include it anyway for completeness
-        return {
-          street: street,
-          cityStateZip: `${city}, ${lastPart}`
+          street,
+          cityStateZip: `${city}, ${lastPart}`,
         };
       }
+      // Might be country or other info, include it anyway for completeness
+      return {
+        street,
+        cityStateZip: `${city}, ${lastPart}`,
+      };
+
     } else if (parts.length === 2) {
       // Format: "Street, City State" or "Street, City"
       const street = parts[0];
@@ -914,32 +914,32 @@ export class MapRestaurantSearch {
         const cityOnly = cityState.replace(/\s+[A-Z]{2}\s+\d{5}(-\d{4})?$/, '');
         const stateZip = cityState.match(/\s+([A-Z]{2}\s+\d{5}(-\d{4})?)$/)[1];
         return {
-          street: street,
-          cityStateZip: `${cityOnly}, ${stateZip}`
+          street,
+          cityStateZip: `${cityOnly}, ${stateZip}`,
         };
       }
 
       return {
-        street: street,
-        cityStateZip: cityState
-      };
-    } else {
-      // Single part or fallback - try to extract any state information
-      const stateMatch = formatted.match(/\b([A-Z]{2})\b/);
-      if (stateMatch) {
-        const beforeState = formatted.substring(0, stateMatch.index).trim();
-        const afterState = formatted.substring(stateMatch.index).trim();
-        return {
-          street: beforeState,
-          cityStateZip: afterState
-        };
-      }
-
-      return {
-        street: formatted,
-        cityStateZip: ''
+        street,
+        cityStateZip: cityState,
       };
     }
+    // Single part or fallback - try to extract any state information
+    const stateMatch = formatted.match(/\b([A-Z]{2})\b/);
+    if (stateMatch) {
+      const beforeState = formatted.substring(0, stateMatch.index).trim();
+      const afterState = formatted.substring(stateMatch.index).trim();
+      return {
+        street: beforeState,
+        cityStateZip: afterState,
+      };
+    }
+
+    return {
+      street: formatted,
+      cityStateZip: '',
+    };
+
   }
 
   getOpeningStatus(openingHours) {
@@ -950,7 +950,7 @@ export class MapRestaurantSearch {
     const openNow = openingHours.open_now;
     const weekdayText = openingHours.weekday_text;
 
-    let status = { badge: false, hoursText: '' };
+    const status = { badge: false, hoursText: '' };
 
     if (typeof openNow === 'boolean') {
       status.badge = true;
@@ -999,7 +999,7 @@ export class MapRestaurantSearch {
       card.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
-        inline: 'nearest'
+        inline: 'nearest',
       });
     }
 
@@ -1013,7 +1013,7 @@ export class MapRestaurantSearch {
     if (restaurant.geometry && restaurant.geometry.location) {
       this.map.setCenter({
         lat: restaurant.geometry.location.lat,
-        lng: restaurant.geometry.location.lng
+        lng: restaurant.geometry.location.lng,
       });
       this.map.setZoom(16);
     }
@@ -1024,7 +1024,7 @@ export class MapRestaurantSearch {
 
   clearSelection() {
     // Clear card selection
-    this.container.querySelectorAll('.restaurant-card').forEach(card => {
+    this.container.querySelectorAll('.restaurant-card').forEach((card) => {
       card.classList.remove('border-primary', 'shadow-lg');
       card.style.transform = 'scale(1)';
     });
@@ -1041,7 +1041,7 @@ export class MapRestaurantSearch {
   }
 
   clearMarkers() {
-    this.markers.forEach(marker => {
+    this.markers.forEach((marker) => {
       marker.setMap(null);
     });
     this.markers = [];
@@ -1091,7 +1091,7 @@ export class MapRestaurantSearch {
       position: this.currentLocation,
       map: this.map,
       content: currentLocationElement,
-      title: 'Your Location'
+      title: 'Your Location',
     });
   }
 
@@ -1135,7 +1135,7 @@ export class MapRestaurantSearch {
       const position = await this.getCurrentPosition();
       this.currentLocation = {
         lat: position.coords.latitude,
-        lng: position.coords.longitude
+        lng: position.coords.longitude,
       };
 
       // Center map on current location
@@ -1182,7 +1182,7 @@ export class MapRestaurantSearch {
     if (this.markers.length === 0) return;
 
     const bounds = new google.maps.LatLngBounds();
-    this.markers.forEach(marker => {
+    this.markers.forEach((marker) => {
       let position;
       if (marker.getPosition) {
         // Regular Marker

@@ -198,10 +198,9 @@ head_extra %} {{ super() }}
                                 <div>
                                     <h6 class="mb-1">{{ expense.description }}</h6>
                                     <small class="text-muted">
-                                        {{ expense.date.strftime("%b %d, %Y") }} {% if expense.category %} •
-                                        {% from 'macros/category_helpers.html' import category_badge %}
-                                        {{ category_badge(expense.category, compact=true) }}
-                                        {% endif %}
+                                        {{ expense.date.strftime("%b %d, %Y") }} {% if expense.category %} • {% from
+                                        'macros/category_helpers.html' import category_badge %} {{
+                                        category_badge(expense.category, compact=true) }} {% endif %}
                                     </small>
                                 </div>
                                 <span

@@ -22,6 +22,54 @@ from app.utils.service_level_detector import (
 )
 
 
+def recalculate_restaurant_statistics(user_id: int) -> None:
+    """Recalculate statistics for all restaurants belonging to a user.
+
+    This function should be called whenever expenses are created, updated, or deleted
+    to ensure restaurant statistics are up to date.
+
+    Args:
+        user_id: The ID of the user whose restaurant statistics should be recalculated
+    """
+    # Get all restaurants for the user with their current statistics
+    stmt = (
+        select(
+            Restaurant,
+            func.count(Expense.id).label("visit_count"),
+            func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
+            func.max(Expense.date).label("last_visit"),
+            func.coalesce(
+                case(
+                    (
+                        func.sum(Expense.party_size).isnot(None) & (func.sum(Expense.party_size) > 0),
+                        func.sum(Expense.amount) / func.sum(Expense.party_size),
+                    ),
+                    else_=None,
+                ),
+                0,
+            ).label("avg_price_per_person"),
+        )
+        .outerjoin(
+            Expense,
+            (Expense.restaurant_id == Restaurant.id) & (Expense.user_id == user_id),
+        )
+        .where(Restaurant.user_id == user_id)
+        .group_by(Restaurant.id)
+    )
+
+    result = db.session.execute(stmt).all()
+
+    # Update each restaurant with new statistics
+    for row in result:
+        restaurant = row.Restaurant
+        restaurant.visit_count = row.visit_count
+        restaurant.total_spent = float(row.total_spent) if row.total_spent else 0.0
+        restaurant.last_visit = row.last_visit
+        restaurant.avg_price_per_person = float(row.avg_price_per_person) if row.avg_price_per_person else 0.0
+
+    db.session.commit()
+
+
 def get_restaurant_filters(args: Dict[str, Any]) -> Dict[str, Any]:
     """Extract and validate filter parameters from the request.
 
@@ -67,14 +115,12 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
             func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
             func.max(Expense.date).label("last_visit"),
             func.coalesce(
-                func.avg(
-                    case(
-                        (
-                            Expense.party_size.isnot(None) & (Expense.party_size > 1),
-                            Expense.amount / Expense.party_size,
-                        ),
-                        else_=None,
-                    )
+                case(
+                    (
+                        func.sum(Expense.party_size).isnot(None) & (func.sum(Expense.party_size) > 0),
+                        func.sum(Expense.amount) / func.sum(Expense.party_size),
+                    ),
+                    else_=None,
                 ),
                 0,
             ).label("avg_price_per_person"),

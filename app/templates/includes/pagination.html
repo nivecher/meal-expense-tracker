@@ -3,7 +3,7 @@ object from Flask-SQLAlchemy - endpoint: The name of the route to generate URLs 
 (dict) Additional URL parameters to include in the URL path - query_params: (dict) Query parameters to include in the
 URL - aria_label: (string) ARIA label for the navigation element #} {% if pagination.pages > 1 %} {% set query_params =
 query_params or {} %} {% set url_kwargs = url_kwargs or {} %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/components/pagination.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/components/pagination.css') }}" />
 <nav aria-label="{{ aria_label|default('Pagination') }}" class="mt-4">
     <ul class="pagination justify-content-center mb-0">
         {# Previous page link #} {% if pagination.has_prev %}
@@ -17,7 +17,9 @@ query_params or {} %} {% set url_kwargs = url_kwargs or {} %}
         </li>
         {% else %}
         <li class="page-item disabled">
-            <span class="page-link" aria-label="Previous page not available"> <span class="arrow prev"></span> Previous </span>
+            <span class="page-link" aria-label="Previous page not available">
+                <span class="arrow prev"></span> Previous
+            </span>
         </li>
         {% endif %} {# Page numbers #} {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1,
         left_current=2, right_current=3) %} {% if page_num %} {% if page_num == pagination.page %}
@@ -36,7 +38,7 @@ query_params or {} %} {% set url_kwargs = url_kwargs or {} %}
                 >{{ page_num }}</a
             >
         </li>
-        {% endif %}         {% else %}
+        {% endif %} {% else %}
         <li class="page-item disabled">
             <span class="page-link" aria-label="More pages available">
                 <span class="ellipsis">...</span>

@@ -1,6 +1,7 @@
 /* Restaurant Form Page Styles */
 
 /* Form sections */
+
 .form-section {
     margin-bottom: 3rem;
     padding-bottom: 2rem;
@@ -12,6 +13,7 @@
 }
 
 /* Section headers with better spacing */
+
 .section-header {
     margin-bottom: 1.5rem;
     padding-bottom: 0.75rem;
@@ -24,6 +26,7 @@
 }
 
 /* Horizontal rule styling */
+
 .section-divider {
     border: none;
     height: 2px;
@@ -33,6 +36,7 @@
 }
 
 /* Form actions section styling */
+
 .form-actions {
     background: transparent;
     border: none;
@@ -41,6 +45,7 @@
 }
 
 /* Loading indicator */
+
 #loading-indicator {
     position: fixed;
     top: 0;
@@ -55,6 +60,7 @@
 }
 
 /* Error container */
+
 #error-container {
     position: fixed;
     top: 0;
@@ -65,11 +71,13 @@
 }
 
 /* Form controls */
+
 .form-floating>label {
     padding: 1rem 0.75rem;
 }
 
 /* Button styling */
+
 .btn-outline-warning {
     border-color: #ffc107;
     color: #ffc107;
@@ -82,11 +90,12 @@
 }
 
 /* Input group button styling */
+
 .input-group .btn {
     border-left: 0;
 }
 
 .input-group .form-control:focus + .btn {
     border-color: #86b7fe;
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    box-shadow: 0 0 0 0.25rem rgb(13 110 253 / 25%);
 }
