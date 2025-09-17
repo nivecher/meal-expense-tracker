@@ -112,6 +112,9 @@ tfsec-results.*
 .tfsec/
 .tfsec.log
 
+# Security scanning
+bandit-report.json
+
 # Terraform
 .terraform/
 terraform.tfstate*
