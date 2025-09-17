@@ -1,0 +1,375 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.0.0)'
+        required: true
+        type: string
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - prod
+
+env:
+  APP_NAME: meal-expense-tracker
+  PYTHON_VERSION: '3.13'
+  NODE_VERSION: '20'
+  PYTHONPATH: ${{ github.workspace }}
+  FLASK_ENV: test
+  TESTING: 'true'
+  
+  # Deployment settings
+  ENV: ${{ github.event.inputs.environment || 'staging' }}
+  TF_ENV: ${{ github.event.inputs.environment || 'staging' }}
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ vars.ECR_REGISTRY || '123456789012.dkr.ecr.us-east-1.amazonaws.com' }}
+  
+  # Release settings
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+# Required permissions for the workflow
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+  checks: write
+  statuses: write
+  security-events: write
+  packages: read
+
+jobs:
+  # Quality gate - comprehensive testing and linting
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite: ['unit', 'integration', 'lint', 'security']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for proper versioning
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: 'requirements*.txt'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make
+
+      - name: Set up cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            venv/
+            ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-
+            ${{ runner.os }}-pip-
+
+      - name: Create virtual environment and install dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Setup Node.js (for frontend linting)
+        if: matrix.test-suite == 'lint'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Node dependencies
+        if: matrix.test-suite == 'lint'
+        run: |
+          if [ -f package.json ]; then
+            if [ -f package-lock.json ]; then 
+              npm ci
+            else 
+              npm install
+            fi
+          else
+            echo "No package.json found, skipping npm dependencies"
+          fi
+
+      - name: Run unit tests
+        if: matrix.test-suite == 'unit'
+        run: |
+          source venv/bin/activate
+          make test-unit
+
+      - name: Run integration tests
+        if: matrix.test-suite == 'integration'
+        run: |
+          source venv/bin/activate
+          make test-integration
+
+      - name: Run linting and formatting checks
+        if: matrix.test-suite == 'lint'
+        run: |
+          source venv/bin/activate
+          make lint
+
+      - name: Run security checks
+        if: matrix.test-suite == 'security'
+        run: |
+          source venv/bin/activate
+          make security-check
+
+      - name: Upload coverage reports
+        if: matrix.test-suite == 'unit'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  # Enhanced security scanning
+  security-scan:
+    name: Security Scan
+    needs: quality-gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-extended,security-and-quality
+          tools: latest
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      - name: Install security tools
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+          pip install semgrep detect-secrets
+
+      - name: Run Semgrep
+        run: semgrep --config=p/ci --error-on-findings .
+
+      - name: Run Grype vulnerability scan
+        run: |
+          GRYPE_DB_AUTO_UPDATE=false /usr/local/bin/grype dir:. --fail-on high
+
+      - name: Detect secrets
+        run: |
+          detect-secrets scan --update .secrets.baseline
+          detect-secrets audit .secrets.baseline --report --fail
+
+  # Build and push Docker image for release
+  build-release:
+    name: Build Release Image
+    needs: [quality-gate, security-scan]
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: 'requirements*.txt'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make
+
+      - name: Create virtual environment and install dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=${{ env.RELEASE_TAG }}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+          labels: |
+            org.opencontainers.image.version=${{ env.RELEASE_TAG }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploy to staging environment
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [quality-gate, security-scan, build-release]
+    if: ${{ github.event.inputs.environment == 'staging' || github.event.inputs.environment == '' }}
+    environment: staging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          role-duration-seconds: 3600
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+          terraform_wrapper: false
+
+      - name: Deploy to staging
+        run: |
+          make TF_ENV=staging tf-init
+          make TF_ENV=staging tf-plan
+          make TF_ENV=staging tf-apply
+
+      - name: Verify Deployment
+        run: |
+          LOAD_BALANCER_DNS=$(aws cloudformation describe-stacks \
+            --stack-name staging-stack \
+            --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
+
+  # Deploy to production environment
+  deploy-prod:
+    name: Deploy to Production
+    needs: [quality-gate, security-scan, build-release, deploy-staging]
+    if: ${{ github.event.inputs.environment == 'prod' }}
+    environment: prod
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          role-duration-seconds: 3600
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+          terraform_wrapper: false
+
+      - name: Deploy to production
+        run: |
+          make TF_ENV=prod tf-init
+          make TF_ENV=prod tf-plan
+          make TF_ENV=prod tf-apply
+
+      - name: Verify Deployment
+        run: |
+          LOAD_BALANCER_DNS=$(aws cloudformation describe-stacks \
+            --stack-name prod-stack \
+            --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
+
+  # Notify deployment status
+  notify:
+    name: Notify
+    needs: [deploy-staging, deploy-prod]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set environment status
+        id: set_status
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "STATUS=succeeded" >> $GITHUB_OUTPUT
+            echo "COLOR=good" >> $GITHUB_OUTPUT
+            echo "EMOJI=✅" >> $GITHUB_OUTPUT
+          else
+            echo "STATUS=failed" >> $GITHUB_OUTPUT
+            echo "COLOR=danger" >> $GITHUB_OUTPUT
+            echo "EMOJI=❌" >> $GITHUB_OUTPUT
+          fi
+          echo "ENV=${{ github.event.inputs.environment || 'staging' }}" >> $GITHUB_OUTPUT
+
+      - name: Send Deployment Status
+        uses: actions/github-script@v7
+        if: success() || failure()
+        env:
+          VERSION: ${{ env.RELEASE_TAG }}
+        with:
+          script: |
+            const { STATUS, COLOR, ENV, EMOJI, VERSION } = process.env;
+            const repo = context.repo;
+            const workflowRunId = context.runId;
+            const workflowUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${workflowRunId}`;
+
+            // Update PR check status
+            await github.rest.checks.create({
+              ...repo,
+              name: `Release Deployment to ${ENV}`,
+              head_sha: context.sha,
+              status: 'completed',
+              conclusion: STATUS === 'succeeded' ? 'success' : 'failure',
+              details_url: workflowUrl,
+              output: {
+                title: `Release Deployment ${STATUS} - Version ${VERSION}`,
+                summary: `Release deployment to ${ENV} ${STATUS} - Version ${VERSION}`,
+                text: `Workflow run: ${workflowUrl}\nVersion: ${VERSION}`
+              }
+            });

@@ -30,6 +30,7 @@
 
 .navbar {
   min-height: var(--navbar-height);
+  -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   background: var(--navbar-bg);
   box-shadow: var(--shadow);

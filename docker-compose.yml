@@ -1,43 +1,28 @@
+# ============================================
+# Simplified Docker Compose Configuration
+# ============================================
+
 services:
   # Development web server
   web:
-    build:
-      context: .
-      target: development
-    platform: linux/amd64
+    image: meal-expense-tracker:dev
     ports:
       - '8000:5000'
     volumes:
       - .:/app
       - app_instance:/app/instance
     environment:
-      # Flask configuration
       - FLASK_APP=wsgi:app
       - FLASK_ENV=development
       - FLASK_DEBUG=1
       - PYTHONUNBUFFERED=1
-
-      # Database configuration
-      - DATABASE_URL=postgresql+psycopg2://${DB_USERNAME:-mealuser}:${DB_PASSWORD:-mealpassword}@db:${DB_PORT:-5433}/${DB_NAME:-meal_expenses}
+      - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5432/meal_expenses
       - DB_ENGINE=postgresql
       - DB_HOST=db
-      - DB_PORT=${DB_PORT:-5433}
-      - DB_NAME=${DB_NAME:-meal_expenses}
-      - DB_USERNAME=${DB_USERNAME:-mealuser}
-      - DB_PASSWORD=${DB_PASSWORD:-mealpassword}
-
-      # Admin user configuration (override in production!)
-      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
-      - DEFAULT_ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL:-admin@example.com}
-      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-admin123}
-
-      # Security settings (override in production!)
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-me}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt-secret-key-change-me}
-
-      # CORS settings for development
-      - CORS_ORIGINS=*
-
+      - DB_PORT=5432
+      - DB_USERNAME=mealuser
+      - DB_PASSWORD=mealpassword
+      - DB_NAME=meal_expenses
     depends_on:
       db:
         condition: service_healthy
@@ -47,67 +32,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    # Entrypoint script will handle database initialization before starting the app
-    command: gunicorn --bind 0.0.0.0:5000 --worker-class gevent --workers 4 --timeout 120 wsgi:app
-
-  # AWS Lambda emulation for local testing
-  lambda:
-    build:
-      context: .
-      target: production
-    platform: linux/amd64
-    ports:
-      - '9000:8080' # AWS Lambda Runtime Interface Emulator listens on 8080
-    environment:
-      - AWS_LAMBDA_FUNCTION_MEMORY_SIZE=1024
-      - AWS_LAMBDA_FUNCTION_TIMEOUT=30
-      - AWS_LAMBDA_FUNCTION_HANDLER=lambda.handler
-      - AWS_LAMBDA_EVENT_BODY={}
-      - DATABASE_URL=postgresql+psycopg2://mealuser:mealpassword@db:5433/meal_expenses
-      - PYTHONUNBUFFERED=1
-      - FLASK_APP=app
-      - FLASK_ENV=production
-    volumes:
-      - .:/var/task
-      - ./instance:/tmp/instance
-    depends_on:
-      db:
-        condition: service_healthy
-    # Use the AWS Lambda Runtime Interface Emulator (RIE) for local testing
-    command: ['/entry.sh']
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/2015-03-31/functions/function/invocations', '-d', '{}']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # LocalStack for AWS services emulation
-  localstack:
-    image: localstack/localstack:latest
-    platform: linux/amd64
-    ports:
-      - '4566:4566' # LocalStack Gateway
-      - '4510-4559:4510-4559' # External services port range
-    environment:
-      - SERVICES=apigateway,lambda,s3,secretsmanager,ssm,kms,dynamodb
-      - DEBUG=1
-      - DATA_DIR=/tmp/localstack/data
-      - LAMBDA_EXECUTOR=docker
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - HOST_TMP_FOLDER=${TMPDIR:-/tmp/}localstack
-    volumes:
-      - '${TMPDIR:-/tmp/}/localstack:/tmp/localstack'
-      - '/var/run/docker.sock:/var/run/docker.sock'
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:4566/health']
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # PostgreSQL database
   db:
     image: postgres:16
-    platform: linux/amd64
     environment:
       - POSTGRES_USER=mealuser
       - POSTGRES_PASSWORD=mealpassword
@@ -115,18 +43,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - '5433:5432'
+      - '5432:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U mealuser -d meal_expenses']
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # Adminer for database management (optional)
+  # Database admin interface (optional)
   adminer:
     image: adminer:latest
-    platform: linux/amd64
-    restart: always
     ports:
       - '8081:8080'
     depends_on:

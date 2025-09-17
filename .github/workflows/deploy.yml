@@ -1,34 +1,4 @@
-name: CI/CD Pipeline
-
-# Global environment variables
-env:
-  # Application settings
-  APP_NAME: meal-expense-tracker
-  PYTHON_VERSION: '3.13' # Using 3.13 as specified in pyproject.toml
-  PYTHONPATH: ${{ github.workspace }}
-  FLASK_APP: wsgi:app
-  FLASK_ENV: test
-  TESTING: 'true'
-  NODE_VERSION: '20'
-
-  # Deployment settings
-  ENV: ${{ github.event.inputs.environment || 'dev' }}
-  TF_ENV: ${{ github.event.inputs.environment || 'dev' }}
-  AWS_REGION: us-east-1
-  ECR_REGISTRY: ${{ vars.ECR_REGISTRY || '123456789012.dkr.ecr.us-east-1.amazonaws.com' }}
-
-  # Cache settings
-  CACHE_VERSION: v3
-
-# Required permissions for the workflow
-permissions:
-  contents: read
-  id-token: write
-  actions: read
-  checks: write
-  statuses: write
-  security-events: write # Required for CodeQL
-  packages: read # Required for package caching
+name: Deploy
 
 on:
   push:
@@ -36,9 +6,7 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**.md'
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
+      - '.gitignore'
   workflow_dispatch:
     inputs:
       environment:
@@ -50,17 +18,45 @@ on:
           - dev
           - staging
           - prod
-      terraform_apply:
-        description: 'Run terraform apply?'
+      skip_tests:
+        description: 'Skip tests (use with caution)'
         required: false
         type: boolean
         default: false
+
+env:
+  APP_NAME: meal-expense-tracker
+  PYTHON_VERSION: '3.13'
+  NODE_VERSION: '20'
+  PYTHONPATH: ${{ github.workspace }}
+  FLASK_ENV: test
+  TESTING: 'true'
+  
+  # Deployment settings
+  ENV: ${{ github.event.inputs.environment || 'dev' }}
+  TF_ENV: ${{ github.event.inputs.environment || 'dev' }}
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ vars.ECR_REGISTRY || '123456789012.dkr.ecr.us-east-1.amazonaws.com' }}
+  
+  # Cache settings
+  CACHE_VERSION: v3
+
+# Required permissions for the workflow
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+  checks: write
+  statuses: write
+  security-events: write
+  packages: read
 
 jobs:
   # Quality gate - comprehensive testing and linting
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_tests }}
     strategy:
       fail-fast: false
       matrix:
@@ -156,6 +152,7 @@ jobs:
   security-scan:
     name: Security Scan
     needs: quality-gate
+    if: ${{ !inputs.skip_tests }}
     runs-on: ubuntu-latest
 
     steps:
@@ -193,8 +190,8 @@ jobs:
   version-tag:
     name: Version & Tag
     needs: [quality-gate, security-scan]
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && !inputs.skip_tests }}
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -254,10 +251,11 @@ jobs:
             echo "Created and pushed tag: $TAG"
           fi
 
+  # Build and push Docker image
   build:
     name: Build and Push
     needs: [quality-gate, security-scan, version-tag]
-    if: github.event_name != 'pull_request' && needs.version-tag.result == 'success'
+    if: ${{ github.event_name != 'pull_request' && (needs.version-tag.result == 'success' || inputs.skip_tests) }}
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'dev' }}
 
@@ -270,7 +268,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-          cache-dependency-path: '**/poetry.lock'
+          cache-dependency-path: 'requirements*.txt'
 
       - name: Install system dependencies
         run: |
@@ -294,19 +292,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
-          driver-opts: image=moby/buildkit:latest
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -315,11 +300,11 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=raw,value=${{ needs.version-tag.outputs.version }}
+            type=raw,value=${{ needs.version-tag.outputs.version || 'dev' }}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=long
           labels: |
-            org.opencontainers.image.version=${{ needs.version-tag.outputs.version }}
+            org.opencontainers.image.version=${{ needs.version-tag.outputs.version || 'dev' }}
             org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push Docker image
@@ -332,11 +317,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    name: Deploy
-    needs: [quality-gate, security-scan, version-tag, build]
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'dev')
-    environment: ${{ github.event.inputs.environment || 'dev' }}
+  # Deploy to development environment
+  deploy-dev:
+    name: Deploy to Dev
+    needs: [quality-gate, security-scan, build]
+    if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'dev') }}
+    environment: dev
     runs-on: ubuntu-latest
 
     steps:
@@ -352,172 +338,115 @@ jobs:
           role-duration-seconds: 3600
 
       - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+          terraform_wrapper: false
+
+      - name: Deploy to dev
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip
-          wget https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-          sudo unzip terraform_1.5.7_linux_amd64.zip -d /usr/local/bin/
-          terraform --version
-
-      - name: Deploy to ${{ github.event.inputs.environment }}
-        run: |
-          make TF_ENV=${{ github.event.inputs.environment }} tf-init
-          if [ "${{ github.event.inputs.terraform_apply }}" = "true" ]; then
-            make TF_ENV=${{ github.event.inputs.environment }} tf-apply
-          fi
-
-      # - name: Configure AWS Credentials
-      #   uses: aws-actions/configure-aws-credentials@v2
-      #   with:
-      #     role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-role
-      #     aws-region: ${{ env.AWS_REGION }}
-      #     role-session-name: GitHubActions-Deploy
-
-      # - name: Login to Amazon ECR
-      #   id: login-ecr
-      #   uses: aws-actions/amazon-ecr-login@v1
-
-      # - name: Set up Docker Buildx
-      #   uses: docker/setup-buildx-action@v2
-
-      # - name: Build and push Docker image
-      #   uses: docker/build-push-action@v4
-      #   with:
-      #     context: .
-      #     push: true
-      #     tags: |
-      #       ${{ env.ECR_REGISTRY }}/${{ env.APP_NAME }}:${{ github.sha }}
-      #       ${{ env.ECR_REGISTRY }}/${{ env.APP_NAME }}:${{ env.ENV }}-latest
-      #     cache-from: type=gha
-      #     cache-to: type=gha,mode=max
-      #     build-args: |
-      #       BUILDKIT_INLINE_CACHE=1
-      #       ENVIRONMENT=${{ env.ENV }}
-
-      # - name: Deploy to ECS
-      #   run: |
-      #     ECS_SERVICE="${{ env.APP_NAME }}-${{ env.ENV }}"
-
-      #     # Update the ECS service with the new task definition
-      #     aws ecs update-service \
-      #       --cluster ${{ env.ENV }}-cluster \
-      #       --service $ECS_SERVICE \
-      #       --force-new-deployment \
-      #       --region ${{ env.AWS_REGION }}
-
-      #     # Wait for the service to stabilize
-      #     aws ecs wait services-stable \
-      #       --cluster ${{ env.ENV }}-cluster \
-      #       --services $ECS_SERVICE \
-      #       --region ${{ env.AWS_REGION }}
-
-      # - name: Run Database Migrations
-      #   run: |
-      #     TASK_DEFINITION=$(aws ecs describe-services \
-      #       --cluster ${{ env.ENV }}-cluster \
-      #       --services ${{ env.APP_NAME }}-${{ env.ENV }} \
-      #       --query 'services[0].taskDefinition' \
-      #       --output text \
-      #       --region ${{ env.AWS_REGION }})
-
-      #     aws ecs run-task \
-      #       --cluster ${{ env.ENV }}-cluster \
-      #       --task-definition $TASK_DEFINITION \
-      #       --launch-type FARGATE \
-      #       --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.SUBNET_IDS }}],securityGroups=[${{ secrets.SECURITY_GROUP_IDS }}],assignPublicIp=ENABLED}" \
-      #       --overrides '{"containerOverrides":[{"name":"app","command":["flask","db","upgrade"]}]}'
+          make TF_ENV=dev tf-init
+          make TF_ENV=dev tf-plan
+          make TF_ENV=dev tf-apply
 
       - name: Verify Deployment
         run: |
           LOAD_BALANCER_DNS=$(aws cloudformation describe-stacks \
-            --stack-name ${{ env.ENV }}-stack \
+            --stack-name dev-stack \
             --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
             --output text \
             --region ${{ env.AWS_REGION }})
 
           curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
 
-  terraform:
-    name: Terraform (${{ github.event.inputs.environment || 'dev' }})
-    needs: [quality-gate, security-scan, version-tag]
-    if: github.event_name == 'push' || github.event.inputs.terraform_apply == 'true'
-    environment: ${{ github.event.inputs.environment || 'dev' }}
+  # Deploy to staging environment
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [quality-gate, security-scan, build, deploy-dev]
+    if: ${{ github.event_name != 'pull_request' && github.event.inputs.environment == 'staging' }}
+    environment: staging
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-      actions: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.7
-          terraform_wrapper: false
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-Terraform-${{ github.run_id }}
+          role-session-name: GitHubActions-${{ github.run_id }}
           role-duration-seconds: 3600
 
-      - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
-          tflint_version: v0.51.1
+          terraform_version: 1.7.5
+          terraform_wrapper: false
 
-      - name: Run TFLint
+      - name: Deploy to staging
         run: |
-          cd terraform
-          tflint --init
-          tflint --format=compact --recursive
+          make TF_ENV=staging tf-init
+          make TF_ENV=staging tf-plan
+          make TF_ENV=staging tf-apply
 
-      - name: Terraform Format
+      - name: Verify Deployment
         run: |
-          cd terraform
-          terraform fmt -check -recursive -diff
+          LOAD_BALANCER_DNS=$(aws cloudformation describe-stacks \
+            --stack-name staging-stack \
+            --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
 
-      - name: Terraform Init
-        run: |
-          cd terraform
-          terraform init -backend-config=environments/${{ env.TF_ENV }}/backend.tfvars \
-                        -backend-config="key=${{ env.TF_ENV }}/terraform.tfstate"
+          curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
 
-      - name: Terraform Validate
-        run: |
-          cd terraform
-          terraform validate
+  # Deploy to production environment
+  deploy-prod:
+    name: Deploy to Production
+    needs: [quality-gate, security-scan, build, deploy-staging]
+    if: ${{ github.event_name != 'pull_request' && github.event.inputs.environment == 'prod' }}
+    environment: prod
+    runs-on: ubuntu-latest
 
-      - name: Terraform Plan
-        id: plan
-        run: |
-          cd terraform
-          terraform plan \
-            -var-file=environments/${{ env.TF_ENV }}/variables.tfvars \
-            -out=tfplan \
-            -input=false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          name: tfplan-${{ github.sha }}
-          path: terraform/tfplan
-          if-no-files-found: error
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          role-duration-seconds: 3600
 
-      - name: Terraform Apply
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.ENV == 'dev' || github.event.inputs.terraform_apply == 'true'
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+          terraform_wrapper: false
+
+      - name: Deploy to production
         run: |
-          cd terraform
-          terraform apply -auto-approve tfplan
+          make TF_ENV=prod tf-init
+          make TF_ENV=prod tf-plan
+          make TF_ENV=prod tf-apply
 
+      - name: Verify Deployment
+        run: |
+          LOAD_BALANCER_DNS=$(aws cloudformation describe-stacks \
+            --stack-name prod-stack \
+            --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
+            --output text \
+            --region ${{ env.AWS_REGION }})
+
+          curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
+
+  # Notify deployment status
   notify:
     name: Notify
-    needs: [deploy, terraform, version-tag]
+    needs: [deploy-dev, deploy-staging, deploy-prod, version-tag]
     if: always()
     runs-on: ubuntu-latest
     steps:

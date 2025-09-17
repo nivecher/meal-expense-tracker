@@ -168,6 +168,7 @@
 }
 
 html {
+  -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
@@ -203,6 +204,7 @@ body {
   flex-direction: column;
 
   /* Bootstrap CSS compatibility overrides */
+  -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
@@ -245,6 +247,7 @@ p {
   text-align: center;
   white-space: nowrap;
   vertical-align: middle;
+  -webkit-user-select: none;
   user-select: none;
   border: 1px solid transparent;
   padding: var(--btn-padding-y) var(--btn-padding-x);

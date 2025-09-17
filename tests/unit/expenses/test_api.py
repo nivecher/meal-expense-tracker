@@ -17,7 +17,7 @@ from app.extensions import db as _db
 from app.restaurants.models import Restaurant
 
 # Type aliases
-TestClient = FlaskClient
+TestClient = FlaskClient  # noqa: D101
 TestData = Dict[str, Any]
 
 

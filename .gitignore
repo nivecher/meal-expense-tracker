@@ -12,6 +12,7 @@ Python-3.13.0/
 
 # Build artifacts
 dist/
+bin/
 
 # Version files
 !.python-version  # Explicitly track Python version for development tools

@@ -11,7 +11,7 @@ types-toml==0.10.8.20240310            # Type stubs for toml (TOML parsing and s
 # Web and API Framework type stubs
 types-WTForms==3.2.1.20250602          # Type stubs for WTForms (form validation and rendering)
 types-Flask-Migrate==4.1.0.20250112    # Type stubs for Flask-Migrate (database migrations for Flask)
-tivatetypes-Flask-Cors>=6.0.0.20250520       # Type stubs for Flask-Cors (CORS support for Flask APIs)
+types-Flask-Cors>=6.0.0.20250520       # Type stubs for Flask-Cors (CORS support for Flask APIs)
 # Note: types-Flask-Limiter is not available. Consider adding type hints in code.
 
 # Database type stubs

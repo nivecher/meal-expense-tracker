@@ -450,7 +450,7 @@ def _handle_expense_update(
             return _handle_update_error(error, is_ajax)
         return _handle_update_success(expense.id, is_ajax)
 
-    return _handle_validation_errors(form, is_ajax)
+    return _handle_validation_errors(form, expense, is_ajax)
 
 
 def _reinitialize_form_with_data(
@@ -487,11 +487,11 @@ def _handle_update_success(expense_id: int, is_ajax: bool) -> ResponseReturnValu
     return redirect(url_for("expenses.expense_details", expense_id=expense_id))
 
 
-def _handle_validation_errors(form: ExpenseForm, is_ajax: bool) -> ResponseReturnValue:
+def _handle_validation_errors(form: ExpenseForm, expense: Expense, is_ajax: bool) -> ResponseReturnValue:
     """Handle form validation errors."""
     if is_ajax and form.errors:
         return {"success": False, "errors": form.errors}, 400
-    return render_template("expenses/form.html", form=form, is_edit=True), 400
+    return render_template("expenses/form.html", form=form, expense=expense, is_edit=True), 400
 
 
 def _render_expense_form(

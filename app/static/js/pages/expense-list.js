@@ -52,7 +52,6 @@ function setCookie(name, value, days) {
   document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
 }
 
-
 // Initialize Bootstrap tooltips
 function initTooltips() {
   if (typeof bootstrap !== 'undefined') {
@@ -70,11 +69,11 @@ function initTooltips() {
 
     // Fix tooltip stuck issue on dropdown buttons
     const dropdownButtons = document.querySelectorAll('[data-bs-toggle="dropdown"]');
-    dropdownButtons.forEach(button => {
-      button.addEventListener('show.bs.dropdown', function() {
+    dropdownButtons.forEach((button) => {
+      button.addEventListener('show.bs.dropdown', () => {
         // Hide any visible tooltips when dropdown opens
         const tooltips = document.querySelectorAll('.tooltip');
-        tooltips.forEach(tooltip => {
+        tooltips.forEach((tooltip) => {
           if (tooltip.parentNode) {
             tooltip.parentNode.removeChild(tooltip);
           }
@@ -199,7 +198,7 @@ function initPagination() {
   // Handle page size change
   const perPageSelect = document.getElementById('per_page');
   if (perPageSelect) {
-    perPageSelect.addEventListener('change', function(e) {
+    perPageSelect.addEventListener('change', (e) => {
       const newPerPage = e.target.value;
 
       // Save page size preference to cookie
@@ -215,7 +214,6 @@ function initPagination() {
     });
   }
 }
-
 
 // Favicon loading functionality
 function initFaviconLoading() {

@@ -1353,8 +1353,6 @@ def _validate_google_places_request():
     # Return both the data and CSRF token as a dictionary
     return {"data": data, "csrf_token": csrf_token}, None
 
-    return (data, csrf_token), None
-
 
 def _prepare_restaurant_form(data, csrf_token):
     """Prepare and validate the restaurant form with the provided data.
@@ -1584,7 +1582,6 @@ def add_from_google_places():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Unexpected error in add_from_google_places: {str(e)}", exc_info=True)
-        return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
         return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
 
 

@@ -69,8 +69,19 @@ def _fix_content_type_headers(response) -> str:
     """Fix content-type headers for different file types."""
     content_type = response.headers.get("Content-Type")
 
+    # Fix CSS and JavaScript file content-type headers
+    if request.path and any(request.path.endswith(ext) for ext in [".css", ".js"]):
+        mime_type_map = {
+            ".css": "text/css; charset=utf-8",
+            ".js": "text/javascript; charset=utf-8",
+        }
+        for ext, mime_type in mime_type_map.items():
+            if request.path.endswith(ext):
+                response.headers["Content-Type"] = mime_type
+                return mime_type
+
     # Fix font file content-type headers (no charset for fonts)
-    if request.path and any(request.path.endswith(ext) for ext in [".woff2", ".woff", ".ttf", ".eot", ".otf"]):
+    elif request.path and any(request.path.endswith(ext) for ext in [".woff2", ".woff", ".ttf", ".eot", ".otf"]):
         font_type_map = {
             ".woff2": "font/woff2",
             ".woff": "font/woff",

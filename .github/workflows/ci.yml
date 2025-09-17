@@ -2,12 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths-ignore:
       - 'docs/**'
       - '**.md'
+      - '.gitignore'
   pull_request:
-    branches: [main]
+    branches: [main, develop]
     types: [opened, synchronize, reopened]
 
 env:

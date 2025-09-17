@@ -81,7 +81,9 @@ class TestGooglePlaceIdConstraint:
         error = exc_info.value
         assert error.google_place_id == google_place_id
         assert error.existing_restaurant.id == existing.id
-        assert "Google Place ID" in error.message
+        # The error message intentionally omits "Google Place ID" from user-facing text
+        assert "Existing Restaurant" in error.message
+        assert "Test City" in error.message
 
     def test_validate_restaurant_uniqueness_name_city_duplicate(self, session, test_user):
         """Test validation function catches name/city duplicates."""

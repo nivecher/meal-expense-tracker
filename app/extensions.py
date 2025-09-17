@@ -278,4 +278,4 @@ def load_user(user_id: str) -> Optional[Any]:
     # Lazy import to avoid circular imports
     from app.auth.models import User
 
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))

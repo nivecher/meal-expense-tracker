@@ -85,10 +85,16 @@ async function init() {
     document.querySelectorAll('.alert-dismissible').forEach((alert) => {
       setTimeout(() => {
         try {
-          new bootstrap.Alert(alert).close();
+          // Check if element still exists in DOM before trying to close
+          if (alert && alert.parentNode) {
+            new bootstrap.Alert(alert).close();
+          }
         } catch (error) {
           console.warn('Error closing alert:', error);
-          alert.remove(); // Fallback removal
+          // Safe fallback removal
+          if (alert && alert.parentNode) {
+            alert.remove();
+          }
         }
       }, 5000);
     });

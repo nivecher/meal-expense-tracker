@@ -624,7 +624,7 @@ def delete_user(
     _display_user_info(user)
 
     # Check related data and handle cascade options
-    if not _check_related_data(user, no_cascade, force):
+    if not _check_related_data(user, not cascade, force):
         return
 
     # Confirm deletion

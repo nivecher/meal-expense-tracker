@@ -30,6 +30,7 @@ body {
   background-color: #f8f9fa;
   margin: 0;
   padding: 0;
+  -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
@@ -76,6 +77,7 @@ th {
 /* Backdrop filter with vendor prefixes */
 
 .backdrop-blur {
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 

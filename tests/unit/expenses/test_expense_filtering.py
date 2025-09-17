@@ -12,7 +12,6 @@ from unittest.mock import Mock
 
 import pytest
 
-from app.expenses.models import Expense
 from app.expenses.services import (
     apply_filters,
     apply_sorting,
@@ -110,7 +109,7 @@ class TestGetUserExpenses:
         """Create sample expense objects for testing."""
         expenses = []
         for i in range(3):
-            expense = Mock(spec=Expense)
+            expense = Mock()
             expense.id = i + 1
             expense.amount = Decimal(f"{10 + i}.00")
             expense.date = date(2025, 1, i + 1)

@@ -240,7 +240,7 @@ class DevelopmentConfig(Config):
     # SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE are always enabled for security
 
 
-class TestingConfig(Config):
+class TestingConfig(Config):  # noqa: D101
     """Testing configuration."""
 
     TESTING: bool = True

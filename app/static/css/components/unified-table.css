@@ -4,6 +4,7 @@
 .table th[data-sort="true"] {
     position: relative;
     cursor: pointer;
+    -webkit-user-select: none;
     user-select: none;
     vertical-align: bottom;
 }

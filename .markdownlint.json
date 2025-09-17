@@ -91,6 +91,7 @@
       "pip",
       "Docker",
       "Terraform",
+      "terraform",
       "CloudFormation",
       "CI/CD",
       "OpenAPI",
