@@ -1,5 +1,4 @@
 /* Form styles */
-
 .form-control {
     border-radius: 4px;
     padding: 0.5rem 0.75rem;
@@ -9,7 +8,7 @@
 
 .form-control:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.25rem rgb(52 152 219 / 25%);
+    box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.25);
 }
 
 .form-label {

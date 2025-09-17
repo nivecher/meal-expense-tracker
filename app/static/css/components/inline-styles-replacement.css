@@ -7,7 +7,6 @@
  */
 
 /* Layout and Sizing Utilities */
-
 .amount-min-width {
     min-width: 80px;
 }
@@ -26,7 +25,6 @@
 }
 
 /* Restaurant Icon Styles */
-
 .restaurant-fallback-icon {
     display: none;
     font-size: 24px;
@@ -43,7 +41,6 @@
 }
 
 /* Restaurant Icon Opacity Transitions */
-
 .restaurant-icon-opacity {
     opacity: 0;
     transition: opacity 0.2s;
@@ -62,7 +59,6 @@
 }
 
 /* Scrollable Containers */
-
 .scrollable-container-sm {
     max-height: 200px;
     overflow-y: auto;
@@ -85,7 +81,6 @@
 .table-col-200 { min-width: 200px; }
 
 /* Avatar Styles */
-
 .avatar-initials {
     display: none;
 }
@@ -101,26 +96,22 @@
 }
 
 /* Tag Styles */
-
 .tag-badge-custom {
     background-color: var(--tag-color, #6c757d);
     color: white;
 }
 
 /* Button States */
-
 .btn-hidden {
     display: none;
 }
 
 /* Icon Sizes */
-
 .icon-size-2rem {
     font-size: 2rem;
 }
 
 /* Dynamic Color Systems */
-
 /* Cuisine badge styles now handled by unified badge system */
 
 .category-badge {
@@ -129,21 +120,17 @@
 }
 
 /* Progress Bar Dynamic Width */
-
 .progress-bar-dynamic {
     width: var(--progress-width, 0%);
 }
 
 /* Timezone Detection */
-
 .timezone-detection-result {
     display: none;
 }
 
 /* Responsive Utilities */
-
-@media (width <= 768px) {
-
+@media (max-width: 768px) {
     .per-page-select {
         min-width: 60px;
     }

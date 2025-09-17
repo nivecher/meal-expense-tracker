@@ -3,7 +3,7 @@
 .duplicate-restaurant-modal .modal-content {
     border: none;
     border-radius: 0.75rem;
-    box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 15%);
+    box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.15);
 }
 
 .duplicate-restaurant-modal .modal-header {
@@ -44,7 +44,7 @@
 }
 
 .duplicate-restaurant-modal .card:hover {
-    box-shadow: 0 0.125rem 0.5rem rgb(0 0 0 / 10%);
+    box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.1);
     border-color: #007bff;
 }
 
@@ -80,7 +80,6 @@
 }
 
 /* Animation for modal entrance */
-
 .duplicate-restaurant-modal.fade .modal-dialog {
     transform: translate(0, -50px);
     transition: transform 0.3s ease-out;
@@ -91,7 +90,6 @@
 }
 
 /* Enhanced alert styling */
-
 .duplicate-restaurant-modal .alert strong {
     color: #856404;
 }
@@ -102,9 +100,7 @@
 }
 
 /* Responsive adjustments */
-
-@media (width <= 576px) {
-
+@media (max-width: 576px) {
     .duplicate-restaurant-modal .modal-dialog {
         margin: 1rem;
     }
@@ -132,13 +128,11 @@
 }
 
 /* Focus management */
-
 .duplicate-restaurant-modal .btn:focus {
-    box-shadow: 0 0 0 0.2rem rgb(0 123 255 / 25%);
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
 /* Loading state */
-
 .duplicate-restaurant-modal .btn.loading {
     position: relative;
     color: transparent;
@@ -153,14 +147,13 @@
     left: 50%;
     margin-left: -8px;
     margin-top: -8px;
-    border: 2px solid #fff;
+    border: 2px solid #ffffff;
     border-radius: 50%;
     border-top-color: transparent;
     animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-
     to {
         transform: rotate(360deg);
     }

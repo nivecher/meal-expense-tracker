@@ -1,7 +1,6 @@
 /* Enhanced Toast Notifications - Responsive & Accessible */
 
 /* Base toast container styles */
-
 .toast-container {
     z-index: 1090;
     position: fixed;
@@ -10,15 +9,12 @@
 }
 
 /* Individual toast pointer events */
-
 .toast-container .toast {
     pointer-events: auto;
 }
 
 /* Desktop positioning - top right */
-
-@media (width >= 1025px) {
-
+@media (min-width: 1025px) {
     .toast-container {
         top: 1rem;
         right: 1rem;
@@ -27,9 +23,7 @@
 }
 
 /* Tablet positioning - bottom right */
-
-@media (width >= 769px) and (width <= 1024px) {
-
+@media (min-width: 769px) and (max-width: 1024px) {
     .toast-container {
         bottom: 1rem;
         right: 1rem;
@@ -38,9 +32,7 @@
 }
 
 /* Mobile positioning - full width bottom */
-
-@media (width <= 768px) {
-
+@media (max-width: 768px) {
     .toast-container {
         bottom: 0;
         left: 0;
@@ -56,27 +48,26 @@
 }
 
 /* Enhanced toast styles */
-
 .toast {
     border: none;
     border-radius: 12px;
-    box-shadow: 0 8px 32px rgb(0 0 0 / 10%), 0 2px 8px rgb(0 0 0 / 5%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05);
     margin-bottom: 0.75rem;
     overflow: hidden;
     opacity: 0.98;
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     transition: all 0.2s ease-in-out;
     max-width: 100%;
-    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 .toast:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgb(0 0 0 / 15%), 0 4px 12px rgb(0 0 0 / 10%);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Toast header improvements */
-
 .toast-header {
     border: none;
     font-weight: 600;
@@ -99,7 +90,6 @@
 }
 
 /* Toast body improvements */
-
 .toast-body {
     padding: 1rem;
     line-height: 1.5;
@@ -107,13 +97,11 @@
 }
 
 /* Icons in toast body */
-
 .toast-body i {
     vertical-align: middle;
 }
 
 /* Toast variants with better colors */
-
 .toast.bg-success,
 .toast.bg-success .toast-header {
     background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
@@ -145,14 +133,11 @@
 }
 
 /* Enhanced animations */
-
 @keyframes slideInRight {
-
     from {
         transform: translateX(100%);
         opacity: 0;
     }
-
     to {
         transform: translateX(0);
         opacity: 1;
@@ -160,12 +145,10 @@
 }
 
 @keyframes slideOutRight {
-
     from {
         transform: translateX(0);
         opacity: 1;
     }
-
     to {
         transform: translateX(100%);
         opacity: 0;
@@ -173,12 +156,10 @@
 }
 
 @keyframes slideInUp {
-
     from {
         transform: translateY(100%);
         opacity: 0;
     }
-
     to {
         transform: translateY(0);
         opacity: 1;
@@ -186,12 +167,10 @@
 }
 
 @keyframes slideOutDown {
-
     from {
         transform: translateY(0);
         opacity: 1;
     }
-
     to {
         transform: translateY(100%);
         opacity: 0;
@@ -199,9 +178,7 @@
 }
 
 /* Desktop animations */
-
-@media (width >= 769px) {
-
+@media (min-width: 769px) {
     .toast.show {
         animation: slideInRight 0.4s ease-out forwards;
     }
@@ -212,9 +189,7 @@
 }
 
 /* Mobile animations */
-
-@media (width <= 768px) {
-
+@media (max-width: 768px) {
     .toast.show {
         animation: slideInUp 0.4s ease-out forwards;
     }
@@ -225,8 +200,8 @@
 }
 
 /* Loading overlay improvements */
-
 .loading-overlay {
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
 }
 
@@ -235,12 +210,10 @@
 }
 
 @keyframes fadeInScale {
-
     from {
         opacity: 0;
         transform: scale(0.9);
     }
-
     to {
         opacity: 1;
         transform: scale(1);
@@ -248,29 +221,24 @@
 }
 
 /* Accessibility improvements */
-
 .toast:focus-within {
     outline: 2px solid #007bff;
     outline-offset: 2px;
 }
 
 /* High contrast mode support */
-
 @media (prefers-contrast: high) {
-
     .toast {
-        border: 2px solid currentcolor;
+        border: 2px solid currentColor;
     }
 
     .toast-header {
-        border-bottom: 1px solid currentcolor;
+        border-bottom: 1px solid currentColor;
     }
 }
 
 /* Reduced motion support */
-
 @media (prefers-reduced-motion: reduce) {
-
     .toast,
     .toast.show,
     .toast.hide,
@@ -285,11 +253,9 @@
 }
 
 /* Dark mode support */
-
 @media (prefers-color-scheme: dark) {
-
     .toast {
-        box-shadow: 0 8px 32px rgb(255 255 255 / 10%), 0 2px 8px rgb(255 255 255 / 5%);
+        box-shadow: 0 8px 32px rgba(255, 255, 255, 0.1), 0 2px 8px rgba(255, 255, 255, 0.05);
     }
 
     .loading-overlay > div {
