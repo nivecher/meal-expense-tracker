@@ -16,6 +16,7 @@ from app.restaurants.exceptions import (
 )
 from app.restaurants.models import Restaurant
 from app.utils.cuisine_formatter import format_cuisine_type
+from app.utils.geo_utils import calculate_distance_km, validate_coordinates
 from app.utils.service_level_detector import (
     ServiceLevelDetector,
     detect_restaurant_service_level,
@@ -679,6 +680,10 @@ def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Optiona
             cuisine=row.get("cuisine", "").strip() or None,
             service_level=row.get("service_level", "").strip() or None,
             rating=safe_import_float(row.get("rating")),
+            price_level=safe_import_int(row.get("price_level")),
+            primary_type=row.get("primary_type", "").strip() or None,
+            latitude=safe_import_float(row.get("latitude")),
+            longitude=safe_import_float(row.get("longitude")),
             is_chain=safe_import_bool(row.get("is_chain")),
             google_place_id=google_place_id,
             notes=row.get("notes", "").strip() or None,
@@ -859,6 +864,10 @@ def export_restaurants_for_user(user_id: int) -> List[Dict[str, Any]]:
             "service_level": r.service_level or "",
             "website": r.website or "",
             "rating": safe_float(r.rating) if r.rating is not None else "",
+            "price_level": r.price_level if r.price_level is not None else "",
+            "primary_type": r.primary_type or "",
+            "latitude": safe_float(r.latitude) if r.latitude is not None else "",
+            "longitude": safe_float(r.longitude) if r.longitude is not None else "",
             "is_chain": bool(r.is_chain) if r.is_chain is not None else "",
             "google_place_id": r.google_place_id or "",
             "notes": r.notes or "",
@@ -912,6 +921,10 @@ def create_restaurant_for_user(user_id: int, data: Dict[str, Any]) -> Restaurant
         cuisine=data.get("cuisine"),
         service_level=data.get("service_level"),
         rating=data.get("rating"),
+        price_level=data.get("price_level"),
+        primary_type=data.get("primary_type"),
+        latitude=data.get("latitude"),
+        longitude=data.get("longitude"),
         is_chain=data.get("is_chain", False),
         notes=data.get("notes"),
     )
@@ -951,6 +964,10 @@ def update_restaurant_for_user(restaurant: Restaurant, data: Dict[str, Any]) -> 
         "cuisine",
         "service_level",
         "rating",
+        "price_level",
+        "primary_type",
+        "latitude",
+        "longitude",
         "is_chain",
         "notes",
     ]
@@ -1139,3 +1156,84 @@ def get_service_level_display_info(service_level: str) -> Dict[str, str]:
             "display_name": "Unknown",
             "description": "Service level could not be determined",
         }
+
+
+def search_restaurants_by_location(
+    user_id: int, latitude: float, longitude: float, radius_km: float = 10.0, limit: int = 50
+) -> List[Dict[str, Any]]:
+    """
+    Search for restaurants within a specified radius of a location.
+
+    Args:
+        user_id: ID of the user whose restaurants to search
+        latitude: Center latitude for search
+        longitude: Center longitude for search
+        radius_km: Search radius in kilometers (default: 10km)
+        limit: Maximum number of results to return (default: 50)
+
+    Returns:
+        List of restaurant dictionaries with distance information
+    """
+    if not validate_coordinates(latitude, longitude):
+        raise ValueError("Invalid coordinates provided")
+
+    if radius_km <= 0:
+        raise ValueError("Radius must be positive")
+
+    if limit <= 0:
+        raise ValueError("Limit must be positive")
+
+    # Get all restaurants for the user that have coordinates
+    restaurants = db.session.scalars(
+        select(Restaurant).where(
+            Restaurant.user_id == user_id, Restaurant.latitude.isnot(None), Restaurant.longitude.isnot(None)
+        )
+    ).all()
+
+    results = []
+
+    for restaurant in restaurants:
+        # Calculate distance
+        distance = calculate_distance_km(latitude, longitude, restaurant.latitude, restaurant.longitude)
+
+        # Check if within radius
+        if distance <= radius_km:
+            restaurant_dict = {
+                "id": restaurant.id,
+                "name": restaurant.name,
+                "address": restaurant.address,
+                "city": restaurant.city,
+                "state": restaurant.state,
+                "cuisine": restaurant.cuisine,
+                "service_level": restaurant.service_level,
+                "rating": restaurant.rating,
+                "price_level": restaurant.price_level,
+                "latitude": restaurant.latitude,
+                "longitude": restaurant.longitude,
+                "distance_km": round(distance, 2),
+                "distance_miles": round(distance * 0.621371, 2),
+            }
+            results.append(restaurant_dict)
+
+    # Sort by distance (closest first)
+    results.sort(key=lambda x: x["distance_km"])
+
+    # Apply limit
+    return results[:limit]
+
+
+def get_restaurants_with_coordinates(user_id: int) -> List[Restaurant]:
+    """
+    Get all restaurants for a user that have coordinates stored.
+
+    Args:
+        user_id: ID of the user
+
+    Returns:
+        List of restaurants with coordinates
+    """
+    return db.session.scalars(
+        select(Restaurant)
+        .where(Restaurant.user_id == user_id, Restaurant.latitude.isnot(None), Restaurant.longitude.isnot(None))
+        .order_by(Restaurant.name)
+    ).all()

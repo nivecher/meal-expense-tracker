@@ -12,8 +12,7 @@ from typing import TYPE_CHECKING, Optional
 
 from flask import Flask, current_app
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session as SQLAlchemySession
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import scoped_session
 
 from .extensions import db
 
@@ -43,15 +42,7 @@ __all__ = [
 # Initialize SQLAlchemy engine
 engine: Optional[Engine] = None
 
-# Create a thread-local session factory without binding to an engine yet
-db_session_factory: ScopedSession = scoped_session(
-    sessionmaker(
-        autocommit=False,
-        autoflush=False,
-        bind=None,  # Will be set in init_database
-        class_=SQLAlchemySession,
-    )
-)
+# Session factory will be created in init_database when engine is available
 
 
 def _is_lambda_environment() -> bool:

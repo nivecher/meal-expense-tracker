@@ -22,9 +22,15 @@
 
             <!-- Restaurant Name and Cuisine -->
             <div>
-                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                    >{{ restaurant.name }}</a
-                >
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                        >{{ restaurant.name }}</a
+                    >
+                    {% if restaurant.price_level is not none %}
+                    <span class="text-muted">•</span>
+                    {% from 'macros/badge_helpers.html' import price_level_badge %} {{
+                    price_level_badge(restaurant.price_level, size='sm') }} {% endif %}
+                </div>
                 {% if restaurant.cuisine %}
                 <div class="mt-1">
                     {% from 'macros/badge_helpers.html' import cuisine_badge %} {{ cuisine_badge(restaurant.cuisine,
@@ -76,17 +82,13 @@
         {% endif %}
     </td>
     <td data-sort-value="{{ restaurant.visit_count }}">
-        {% if restaurant.visit_count > 0 %}
-            {{ restaurant.visit_count }}
-        {% else %}
-            <span class="text-muted">-</span>
+        {% if restaurant.visit_count > 0 %} {{ restaurant.visit_count }} {% else %}
+        <span class="text-muted">-</span>
         {% endif %}
     </td>
     <td data-sort-value="{% if last_visit %}{{ last_visit.isoformat() }}{% else %}1970-01-01T00:00:00{% endif %}">
         {% if last_visit %}
-        <span
-            data-bs-toggle="tooltip"
-            title="{{ last_visit|format_datetime_user_tz('%B %d, %Y at %I:%M %p') }}">
+        <span data-bs-toggle="tooltip" title="{{ last_visit|format_datetime_user_tz('%B %d, %Y at %I:%M %p') }}">
             {{ last_visit|time_ago }}
         </span>
         {% else %}

@@ -38,6 +38,8 @@ Examples:
     python scripts/remote_admin.py validate-restaurants --username admin --dry-run
     python scripts/remote_admin.py validate-restaurants --all-users --fix-mismatches
     python scripts/remote_admin.py validate-restaurants --restaurant-id 123
+    python scripts/remote_admin.py validate-restaurants --find-place-id --dry-run
+    python scripts/remote_admin.py validate-restaurants --find-place-id --closest --dry-run
 
     # Run migrations
     python scripts/remote_admin.py run-migrations --dry-run
@@ -381,6 +383,12 @@ def create_parser() -> argparse.ArgumentParser:
     validate_restaurants_parser.add_argument(
         "--dry-run", action="store_true", help="Show what would be fixed without making changes"
     )
+    validate_restaurants_parser.add_argument(
+        "--find-place-id", action="store_true", help="Find Google Place ID matches for restaurants without one"
+    )
+    validate_restaurants_parser.add_argument(
+        "--closest", action="store_true", help="Automatically select closest match when multiple options are found"
+    )
 
     # Run migrations
     migrate_parser = subparsers.add_parser("run-migrations", help="Run database migrations safely")
@@ -514,6 +522,10 @@ def _handle_validate_restaurants(client: RemoteAdminClient, args: argparse.Names
         params["update_service_levels"] = args.update_service_levels
     if args.dry_run:
         params["dry_run"] = args.dry_run
+    if args.find_place_id:
+        params["find_place_id"] = args.find_place_id
+    if args.closest:
+        params["closest"] = args.closest
 
     return client.invoke_operation("validate_restaurants", params, args.confirm)
 

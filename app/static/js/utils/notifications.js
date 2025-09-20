@@ -1,182 +1,170 @@
 /**
  * Enhanced Toast Notification System
- * Consolidated, responsive, and accessible notifications
+ * Provides centralized notification management with Bootstrap toasts
  *
- * @module notifications
- * @version 3.0.0
+ * @version 1.0.0
  * @author Meal Expense Tracker Team
  */
 
-import { logger } from './core-utils.js';
-
-// Constants for better maintainability
-const TOAST_CONFIG = {
-  MAX_TOASTS: 5,
-  DEFAULT_DURATION: 3000,
-  POSITION_CLASS: 'toast-container position-fixed p-3',
-  Z_INDEX: '1090',
-  ICONS: {
+/**
+ * Get icon class for toast type
+ * @param {string} type - Toast type (success, error, warning, info)
+ * @returns {string} Font Awesome icon class
+ */
+function getIconForType(type) {
+  const icons = {
     success: 'fa-check-circle',
+    danger: 'fa-exclamation-circle',
     error: 'fa-exclamation-circle',
-    danger: 'fa-exclamation-triangle',
     warning: 'fa-exclamation-triangle',
     info: 'fa-info-circle',
-  },
-};
-
-// Get responsive container class based on screen size
-function getResponsiveContainerClass() {
-  const isMobile = window.innerWidth <= 768;
-  return isMobile ? 'top-0 start-0 w-100' : 'top-0 end-0';
+  };
+  return icons[type] || icons.info;
 }
 
-// Update container position on resize
-function updateContainerPosition(container) {
-  if (container) {
-    container.className = `${TOAST_CONFIG.POSITION_CLASS} ${getResponsiveContainerClass()}`;
-  }
-}
-
-// Toast container management with responsive positioning
-function getOrCreateToastContainer() {
+/**
+ * Create toast container if it doesn't exist
+ * @returns {HTMLElement} Toast container element
+ */
+function createToastContainer() {
   let container = document.getElementById('toast-container');
-
   if (!container) {
     container = document.createElement('div');
     container.id = 'toast-container';
-    container.className = `${TOAST_CONFIG.POSITION_CLASS} ${getResponsiveContainerClass()}`;
-    container.style.zIndex = TOAST_CONFIG.Z_INDEX;
-    container.setAttribute('aria-live', 'polite');
-    container.setAttribute('aria-label', 'Notifications');
+    container.className = 'toast-container position-fixed top-0 end-0 p-3';
+    container.style.zIndex = '9999';
     document.body.appendChild(container);
-
-    // Add responsive listener
-    window.addEventListener('resize', () => updateContainerPosition(container));
   }
-
   return container;
 }
 
-// Clean up old toasts to prevent memory leaks
-function cleanupOldToasts() {
-  const container = document.getElementById('toast-container');
-  if (!container) return;
+/**
+ * Show a toast notification
+ * @param {string} title - Toast title
+ * @param {string} message - Toast message
+ * @param {string} type - Toast type (success, error, warning, info)
+ * @param {number} duration - Auto-hide duration in ms (0 = no auto-hide)
+ * @param {Array} actions - Optional action buttons
+ */
+export function showToast(title, message, type = 'info', duration = 5000, actions = null) {
+  const toastContainer = createToastContainer();
+  const toastId = `toast-${Date.now()}`;
 
-  const toasts = container.querySelectorAll('.toast');
-  if (toasts.length > TOAST_CONFIG.MAX_TOASTS) {
-    const toastsToRemove = Array.from(toasts).slice(0, toasts.length - TOAST_CONFIG.MAX_TOASTS);
-    toastsToRemove.forEach((toast) => {
-      const bsToast = bootstrap.Toast.getInstance(toast);
-      if (bsToast) {
-        bsToast.dispose();
-      }
-      toast.remove();
-    });
+  // Determine styling based on type
+  const bgClass = `bg-${type}`;
+  const textClass = type === 'warning' ? 'text-dark' : 'text-white';
+  const iconClass = getIconForType(type);
+
+  // Build actions HTML if provided
+  let actionsHtml = '';
+  if (actions && Array.isArray(actions)) {
+    actionsHtml = `<div class="mt-2">${
+      actions.map((action) =>
+        `<button class="btn btn-sm ${action.class || 'btn-outline-light'} me-2"
+                 onclick="${action.onclick || ''}">${action.text}</button>`,
+      ).join('')
+    }</div>`;
   }
-}
 
-// Create toast element with proper structure
-function createToastElement(id, type, title, message, duration) {
-  const iconClass = TOAST_CONFIG.ICONS[type] || TOAST_CONFIG.ICONS.info;
-
-  return `
-    <div id="${id}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-      <div class="d-flex">
-        <div class="toast-body d-flex align-items-center">
-          <i class="fas ${iconClass} me-2"></i>
-          <div>
-            ${title ? `<strong>${title}</strong><br>` : ''}
-            ${message}
-          </div>
-        </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+  const toastHtml = `
+    <div id="${toastId}" class="toast ${bgClass} ${textClass}" role="alert"
+         aria-live="assertive" aria-atomic="true">
+      <div class="toast-header ${bgClass} ${textClass}">
+        <i class="fas ${iconClass} me-2"></i>
+        <strong class="me-auto">${title}</strong>
+        <button type="button" class="btn-close ${type === 'warning' ? 'btn-close-dark' : 'btn-close-white'}"
+                data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+      <div class="toast-body">
+        ${message}
+        ${actionsHtml}
       </div>
     </div>
   `;
+
+  toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+  const toastElement = document.getElementById(toastId);
+  const toast = new bootstrap.Toast(toastElement, {
+    autohide: duration > 0,
+    delay: duration,
+  });
+
+  toast.show();
+
+  // Clean up after toast is hidden
+  toastElement.addEventListener('hidden.bs.toast', () => {
+    toastElement.remove();
+  });
+
+  return toast;
 }
 
-// Show toast notification
-export function showToast(title, message, type = 'info', duration = TOAST_CONFIG.DEFAULT_DURATION) {
-  try {
-    // Validate inputs
-    if (!message) {
-      console.warn('showToast: message is required');
-      return;
-    }
-
-    // Clean up old toasts
-    cleanupOldToasts();
-
-    // Get or create container
-    const container = getOrCreateToastContainer();
-    if (!container) {
-      console.error('Failed to create toast container');
-      return;
-    }
-
-    // Create unique ID
-    const toastId = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Create toast HTML
-    const toastHtml = createToastElement(toastId, type, title, message, duration);
-    container.insertAdjacentHTML('beforeend', toastHtml);
-
-    // Get toast element
-    const toastElement = document.getElementById(toastId);
-    if (!toastElement) {
-      console.error('Failed to create toast element');
-      return;
-    }
-
-    // Initialize Bootstrap toast
-    const toast = new bootstrap.Toast(toastElement, {
-      autohide: true,
-      delay: duration,
-    });
-
-    // Add event listeners
-    toastElement.addEventListener('hidden.bs.toast', () => {
-      toastElement.remove();
-    });
-
-    // Show toast
-    toast.show();
-
-    // Log for debugging
-    logger.info(`Toast shown: ${type} - ${title || 'No title'}: ${message}`);
-
-  } catch (error) {
-    console.error('Error showing toast:', error);
-    logger.error('Failed to show toast', { error: error.message, title, message, type });
-  }
-}
-
-// Convenience functions for different toast types
-export function showSuccessToast(message, title = 'Success', duration = TOAST_CONFIG.DEFAULT_DURATION) {
-  showToast(title, message, 'success', duration);
-}
-
-export function showErrorToast(message, title = 'Error', duration = TOAST_CONFIG.DEFAULT_DURATION) {
-  showToast(title, message, 'danger', duration);
-}
-
-export function showWarningToast(message, title = 'Warning', duration = TOAST_CONFIG.DEFAULT_DURATION) {
-  showToast(title, message, 'warning', duration);
-}
-
-export function showInfoToast(message, title = 'Info', duration = TOAST_CONFIG.DEFAULT_DURATION) {
-  showToast(title, message, 'info', duration);
-}
-
-// Initialize notifications system
+/**
+ * Initialize the notification system
+ * Sets up global toast functions and ensures toast container exists
+ */
 export function initNotifications() {
-  // Make toast functions globally available
-  window.showToast = showToast;
-  window.showSuccessToast = showSuccessToast;
-  window.showErrorToast = showErrorToast;
-  window.showWarningToast = showWarningToast;
-  window.showInfoToast = showInfoToast;
+  // Ensure toast container exists
+  createToastContainer();
 
-  // Log initialization
-  logger.info('Notifications system initialized');
+  // Set up global toast functions
+  window.showSuccessToast = (message, title = 'Success', duration = 4000) => {
+    showToast(title, message, 'success', duration);
+  };
+
+  window.showErrorToast = (message, title = 'Error', duration = 0) => {
+    showToast(title, message, 'danger', duration);
+  };
+
+  window.showWarningToast = (message, title = 'Warning', duration = 7000) => {
+    showToast(title, message, 'warning', duration);
+  };
+
+  window.showInfoToast = (message, title = 'Info', duration = 5000) => {
+    showToast(title, message, 'info', duration);
+  };
+
+  // Legacy compatibility
+  window.showToast = showToast;
+}
+
+/**
+ * Show success notification
+ * @param {string} message - Success message
+ * @param {string} title - Optional title (default: 'Success')
+ * @param {number} duration - Auto-hide duration (default: 4000ms)
+ */
+export function showSuccess(message, title = 'Success', duration = 4000) {
+  return showToast(title, message, 'success', duration);
+}
+
+/**
+ * Show error notification
+ * @param {string} message - Error message
+ * @param {string} title - Optional title (default: 'Error')
+ * @param {number} duration - Auto-hide duration (default: 0 = no auto-hide)
+ */
+export function showError(message, title = 'Error', duration = 0) {
+  return showToast(title, message, 'danger', duration);
+}
+
+/**
+ * Show warning notification
+ * @param {string} message - Warning message
+ * @param {string} title - Optional title (default: 'Warning')
+ * @param {number} duration - Auto-hide duration (default: 7000ms)
+ */
+export function showWarning(message, title = 'Warning', duration = 7000) {
+  return showToast(title, message, 'warning', duration);
+}
+
+/**
+ * Show info notification
+ * @param {string} message - Info message
+ * @param {string} title - Optional title (default: 'Info')
+ * @param {number} duration - Auto-hide duration (default: 5000ms)
+ */
+export function showInfo(message, title = 'Info', duration = 5000) {
+  return showToast(title, message, 'info', duration);
 }

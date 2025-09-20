@@ -4,7 +4,8 @@
           novalidate
           action="{% if is_edit %}{{ url_for('expenses.edit_expense', expense_id=expense.id) }}{% else %}{{ url_for('expenses.add_expense', restaurant_id=request.view_args.get('restaurant_id') ) if request.view_args and request.view_args.get('restaurant_id') else url_for('expenses.add_expense') }}{% endif %}"
           data-ajax
-          data-validate>
+          data-validate
+          data-extension-safe="true">
         {% if form %}
             {{ form.hidden_tag() }}
         {% else %}
@@ -115,6 +116,7 @@
                        placeholder="Type to add tags..."
                        {% if expense and expense.tags %}
                            value="{{ expense.tags|map(attribute='name')|join(', ') }}"
+                           data-existing-tags="{{ expense.tags|map(attribute='to_dict')|list|tojson }}"
                        {% endif %}>
                 <div class="form-text" id="tags-help">
                     <small class="text-muted">
@@ -140,6 +142,9 @@
     </form>
 {% endmacro %}
 {% macro expense_scripts() %}
+    <!-- Extension Error Suppressor - MUST LOAD FIRST -->
+    <script src="{{ url_for('static', filename='js/extension-error-suppressor.js') }}"></script>
+
     <!-- Tagify CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.17.9/dist/tagify.css">
     <!-- Pretty Tagify styling with rounded edges -->

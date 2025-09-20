@@ -55,7 +55,7 @@ export class MapRestaurantSearch {
     this.getCurrentLocation();
   }
 
-  async loadGoogleMaps() {
+  async loadGoogleMaps() { // eslint-disable-line require-await
     if (window.google && window.google.maps) {
       return; // Already loaded
     }
@@ -70,7 +70,7 @@ export class MapRestaurantSearch {
     });
   }
 
-  async waitForGoogleMaps() {
+  async waitForGoogleMaps() { // eslint-disable-line require-await
     // Wait for Google Maps API to be fully loaded including marker library
     return new Promise((resolve) => {
       const checkGoogleMaps = () => {
@@ -401,7 +401,7 @@ export class MapRestaurantSearch {
         statusDiv.classList.add('d-none');
       }, 3000);
 
-    } catch (error) {
+    } catch {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
       statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
@@ -444,7 +444,7 @@ export class MapRestaurantSearch {
         statusDiv.classList.add('d-none');
       }, 3000);
 
-    } catch (error) {
+    } catch {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
       statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
@@ -503,7 +503,7 @@ export class MapRestaurantSearch {
         query: searchQuery,
         lat: searchLocation.lat,
         lng: searchLocation.lng,
-        radius_miles: radius,
+        radiusMiles: radius,
         cuisine: filters.cuisine || '',
         minRating: filters.minRating || '',
         maxPriceLevel: filters.maxPriceLevel || '',
@@ -526,7 +526,7 @@ export class MapRestaurantSearch {
       // Call callback
       this.options.onResults(results);
 
-    } catch (error) {
+    } catch {
       console.error('Search error:', error);
       this.options.onError(error);
       this.showError(error.message);
@@ -848,7 +848,7 @@ export class MapRestaurantSearch {
 
     if (states && states.length > 0) {
       // Found state abbreviation, try to parse around it
-      const state = states[0];
+      const [state] = states;
       const stateIndex = formatted.indexOf(state);
 
       // Extract everything after the state (should include city)
@@ -858,7 +858,7 @@ export class MapRestaurantSearch {
       // Try to find city before state
       const parts = beforeState.split(',').map((p) => p.trim());
       if (parts.length > 0) {
-        const street = parts[0];
+        const [street] = parts;
         const city = parts.length > 1 ? parts[parts.length - 1] : '';
 
         return {
@@ -873,9 +873,7 @@ export class MapRestaurantSearch {
 
     if (parts.length >= 4) {
       // Format: "Street, City, State ZIP, Country"
-      const street = parts[0];
-      const city = parts[1];
-      const stateZip = parts[2];
+      const [street, city, stateZip] = parts;
 
       return {
         street,
@@ -883,9 +881,7 @@ export class MapRestaurantSearch {
       };
     } else if (parts.length === 3) {
       // Format: "Street, City, State ZIP" or "Street, City, Country"
-      const street = parts[0];
-      const city = parts[1];
-      const lastPart = parts[2];
+      const [street, city, lastPart] = parts;
 
       // Check if last part contains state abbreviation or full state name
       const stateRegex = /\b[A-Z]{2}\b|\b(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming)\b/i;
@@ -905,14 +901,14 @@ export class MapRestaurantSearch {
 
     } else if (parts.length === 2) {
       // Format: "Street, City State" or "Street, City"
-      const street = parts[0];
-      const cityState = parts[1];
+      const [street] = parts;
+      const [, cityState] = parts;
 
       // Try to extract state from cityState if it's in format "City State ZIP"
       const stateMatch = cityState.match(/\b([A-Z]{2})\s+\d{5}(-\d{4})?$/);
       if (stateMatch) {
         const cityOnly = cityState.replace(/\s+[A-Z]{2}\s+\d{5}(-\d{4})?$/, '');
-        const stateZip = cityState.match(/\s+([A-Z]{2}\s+\d{5}(-\d{4})?)$/)[1];
+        const [, stateZip] = cityState.match(/\s+([A-Z]{2}\s+\d{5}(-\d{4})?)$/);
         return {
           street,
           cityStateZip: `${cityOnly}, ${stateZip}`,
@@ -972,7 +968,7 @@ export class MapRestaurantSearch {
         // Extract just the hours part (after the day name and colon)
         const hoursMatch = todaysHours.match(/:\s*(.+)$/);
         if (hoursMatch) {
-          status.hoursText = hoursMatch[1];
+          [, status.hoursText] = hoursMatch;
         }
       }
     }
@@ -1159,7 +1155,7 @@ export class MapRestaurantSearch {
         }, 3000);
       }
 
-    } catch (error) {
+    } catch {
       console.warn('Could not get current location:', error);
 
       // Show error message
@@ -1189,7 +1185,7 @@ export class MapRestaurantSearch {
         position = marker.getPosition();
       } else if (marker.position) {
         // AdvancedMarkerElement
-        position = marker.position;
+        position = marker.position; // eslint-disable-line prefer-destructuring
       }
 
       if (position) {
@@ -1236,7 +1232,7 @@ export class MapRestaurantSearch {
     if (window.addToMyRestaurants && typeof window.addToMyRestaurants === 'function') {
       try {
         window.addToMyRestaurants(placeId);
-      } catch (error) {
+      } catch {
         console.error('Error calling global addToMyRestaurants:', error);
       }
     } else {

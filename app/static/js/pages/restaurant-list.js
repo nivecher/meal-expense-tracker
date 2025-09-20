@@ -50,7 +50,6 @@ function setCookie(name, value, days) {
   document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
 }
 
-
 // View toggle functionality
 function initViewToggle() {
   const cardView = document.getElementById('card-view');
@@ -149,7 +148,6 @@ function initDeleteRestaurant() {
   });
 }
 
-
 // Pagination functionality
 function initPagination() {
   const paginationLinks = document.querySelectorAll('.pagination a');
@@ -167,7 +165,7 @@ function initPagination() {
   // Handle page size change
   const perPageSelect = document.getElementById('per_page');
   if (perPageSelect) {
-    perPageSelect.addEventListener('change', function(e) {
+    perPageSelect.addEventListener('change', (e) => {
       const newPerPage = e.target.value;
 
       // Save page size preference to cookie
@@ -196,23 +194,23 @@ function initTooltips() {
   if (typeof bootstrap !== 'undefined') {
     // Handle standard tooltip triggers
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    const tooltipList = tooltipTriggerList.map((tooltipTriggerEl) => {
+    tooltipTriggerList.map((tooltipTriggerEl) => {
       return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
     // Handle custom tooltip triggers (for elements that also have other data-bs-toggle attributes)
     const customTooltipTriggerList = [].slice.call(document.querySelectorAll('[data-tooltip="true"]'));
-    const customTooltipList = customTooltipTriggerList.map((tooltipTriggerEl) => {
+    customTooltipTriggerList.map((tooltipTriggerEl) => {
       return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
     // Fix tooltip stuck issue on dropdown buttons
     const dropdownButtons = document.querySelectorAll('[data-bs-toggle="dropdown"]');
-    dropdownButtons.forEach(button => {
-      button.addEventListener('show.bs.dropdown', function() {
+    dropdownButtons.forEach((button) => {
+      button.addEventListener('show.bs.dropdown', () => {
         // Hide any visible tooltips when dropdown opens
         const tooltips = document.querySelectorAll('.tooltip');
-        tooltips.forEach(tooltip => {
+        tooltips.forEach((tooltip) => {
           if (tooltip.parentNode) {
             tooltip.parentNode.removeChild(tooltip);
           }

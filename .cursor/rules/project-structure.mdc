@@ -1,0 +1,58 @@
+---
+alwaysApply: true
+description: "Project structure and development patterns for the meal expense tracker"
+---
+
+# Project Structure and Development Patterns
+
+## Core Application Architecture
+
+The meal expense tracker follows a Flask-based web application structure:
+
+### Key Directories
+- [app/](mdc:app/) - Main application code
+- [app/restaurants/](mdc:app/restaurants/) - Restaurant management module
+- [app/expenses/](mdc:app/expenses/) - Expense tracking module
+- [app/templates/](mdc:app/templates/) - Jinja2 templates
+- [app/static/](mdc:app/static/) - Static assets (CSS, JS, images)
+- [tests/](mdc:tests/) - Test suite
+- [scripts/](mdc:scripts/) - Utility scripts
+- [terraform/](mdc:terraform/) - Infrastructure as code
+
+### Database Structure
+- Uses SQLAlchemy ORM with Alembic migrations
+- Main models in [app/restaurants/models.py](mdc:app/restaurants/models.py)
+- Database migrations in `migrations/` directory
+
+### API Integration
+- Google Places API integration for restaurant data
+- RESTful API endpoints for frontend consumption
+- Service layer pattern for business logic
+
+### Configuration Files
+- [pyproject.toml](mdc:pyproject.toml) - Project configuration and dependencies
+- [.flake8](mdc:.flake8) - Code quality and complexity rules
+- [wsgi.py](mdc:wsgi.py) - WSGI application entry point
+
+## Development Patterns
+
+### TIGER Principles
+- **T**esting: Unit tests with pytest
+- **I**nterfaces: Clear service layer abstractions
+- **G**enerality: Reusable utility functions
+- **E**xamples: Well-documented code with examples
+- **R**efactoring: Continuous improvement and simplification
+
+### Code Quality
+- Follow complexity rules (max complexity = 10)
+- Use type hints and proper error handling
+- Maintain clean separation of concerns
+- Follow Flask best practices
+
+### Testing Strategy
+- Unit tests for business logic
+- Integration tests for API endpoints
+- End-to-end tests for critical workflows
+- Test coverage monitoring
+
+This structure ensures maintainable, scalable, and well-tested code following industry best practices.

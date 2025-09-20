@@ -1,0 +1,22 @@
+# act configuration file
+# This file configures act to run GitHub Actions locally
+
+# Use specific Docker images for different platforms
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+-P ubuntu-22.04=catthehacker/ubuntu:act-22.04
+-P ubuntu-20.04=catthehacker/ubuntu:act-20.04
+
+# Container architecture
+--container-architecture linux/amd64
+
+# Artifact server path
+--artifact-server-path /tmp/artifacts
+
+# Environment file
+--env-file .env.local
+
+# Verbose output for debugging
+--verbose
+
+# Bind mounts for better performance
+--bind

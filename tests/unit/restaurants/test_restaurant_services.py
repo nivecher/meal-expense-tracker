@@ -188,10 +188,11 @@ def test_import_restaurants_duplicate_restaurant(session, test_restaurant, test_
             ],
         )
 
-        # Mock the import to return 0 successes (duplicate)
+        # Mock the import to return 0 successes, 1 skipped (duplicate)
         mock_import.return_value = (
-            0,
-            [f"Restaurant '{test_restaurant.name}' already exists"],
+            0,  # success_count
+            1,  # skipped_count
+            [],  # errors (no actual errors, just skipped)
         )
 
         # Create a test CSV file
@@ -208,6 +209,7 @@ def test_import_restaurants_duplicate_restaurant(session, test_restaurant, test_
         success, result_data = import_restaurants_from_csv(file, test_user.id)
 
         # Check results - should indicate duplicate was skipped
+        # With no errors, this should be successful
         assert success is True
         assert result_data["success_count"] == 0
         assert result_data["skipped_count"] == 1

@@ -12,6 +12,7 @@ Python-3.13.0/
 
 # Build artifacts
 dist/
+bin/
 
 # Version files
 !.python-version  # Explicitly track Python version for development tools
@@ -52,6 +53,7 @@ env/
 .env.*.local
 !.env.example
 .flaskenv
+flask_session/
 
 # Docker
 docker-compose.override.yml
@@ -110,6 +112,9 @@ node_modules/
 tfsec-results.*
 .tfsec/
 .tfsec.log
+
+# Security scanning
+bandit-report.json
 
 # Terraform
 .terraform/

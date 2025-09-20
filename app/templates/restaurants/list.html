@@ -311,12 +311,17 @@ include 'includes/breadcrumb.html' %}
                             </div>
                         </div>
 
-                        <!-- Right side: Rating and Service Level -->
+                        <!-- Right side: Rating, Price Level, and Service Level -->
                         <div class="d-flex flex-column align-items-end">
                             {% if restaurant.rating %}
                             <span class="badge bg-warning text-dark mb-1">
                                 <i class="fas fa-star"></i> {{ "%.1f"|format(restaurant.rating) }}
                             </span>
+                            {% endif %}
+
+                            {% if restaurant.price_level is not none %}
+                                {% from 'macros/badge_helpers.html' import price_level_badge %}
+                                {{ price_level_badge(restaurant.price_level, size='sm') }}
                             {% endif %}
 
                             {% if restaurant.service_level %}
@@ -501,9 +506,16 @@ include 'includes/breadcrumb.html' %}
 
                                         <!-- Restaurant Name and Cuisine -->
                                         <div>
-                                            <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                                                >{{ restaurant.name }}</a
-                                            >
+                                            <div class="d-flex align-items-center gap-2">
+                                                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                                    >{{ restaurant.name }}</a
+                                                >
+                                                {% if restaurant.price_level is not none %}
+                                                    <span class="text-muted">•</span>
+                                                    {% from 'macros/badge_helpers.html' import price_level_badge %}
+                                                    {{ price_level_badge(restaurant.price_level, size='sm') }}
+                                                {% endif %}
+                                            </div>
 
                                             <div class="mt-1">
                                                 {% from 'macros/badge_helpers.html' import cuisine_badge %}

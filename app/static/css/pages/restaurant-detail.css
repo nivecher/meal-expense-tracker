@@ -7,7 +7,7 @@
  */
 
 .restaurant-detail-container {
-    min-height: 100vh;
+  min-height: 100vh;
 }
 
 /* Header styling */
@@ -15,42 +15,41 @@
 /* Enhanced card styling */
 
 .card {
-    border: none;
-    border-radius: 12px;
-    box-shadow: 0 2px 4px rgb(0 0 0 / 8%);
-    transition: box-shadow 0.15s ease-in-out;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 8%);
+  transition: box-shadow 0.15s ease-in-out;
 }
 
 .card:hover {
-    box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
 }
 
 .card-header {
-    border-bottom: 1px solid rgb(0 0 0 / 8%);
-    border-radius: 12px 12px 0 0 !important;
-    font-weight: 600;
+  border-bottom: 1px solid rgb(0 0 0 / 8%);
+  border-radius: 12px 12px 0 0 !important;
+  font-weight: 600;
 }
 
 /* Stats grid styling */
 
 .quick-stats .h4 {
-    font-weight: 700;
-    margin-bottom: 0.25rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
 }
 
 /* Responsive adjustments */
 
 @media (width <= 991.98px) {
+  .card-body {
+    padding: 1.5rem !important;
+  }
 
-    .card-body {
-        padding: 1.5rem !important;
-    }
+  /* Stack columns on mobile */
 
-    /* Stack columns on mobile */
-
-    .row.g-4 > .col-md-4 {
-        margin-bottom: 1rem;
-    }
+  .row.g-4 > .col-md-4 {
+    margin-bottom: 1rem;
+  }
 }
 
 /**
@@ -58,12 +57,12 @@
  */
 
 .restaurant-details {
-    background: var(--card-bg);
-    border-radius: var(--card-border-radius);
-    box-shadow: var(--card-shadow);
-    padding: 1.5rem;
-    height: 100%;
-    overflow: hidden;
+  background: var(--card-bg);
+  border-radius: var(--card-border-radius);
+  box-shadow: var(--card-shadow);
+  padding: 1.5rem;
+  height: 100%;
+  overflow: hidden;
 }
 
 /**
@@ -71,13 +70,13 @@
  */
 
 .expense-summary {
-    position: sticky;
-    top: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    max-height: calc(100vh - 2rem);
-    overflow-y: auto;
+  position: sticky;
+  top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
 }
 
 /**
@@ -85,34 +84,36 @@
  */
 
 .card {
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--card-border-radius);
-    box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 5%);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--card-border-radius);
+  box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 5%);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 10%);
+  transform: translateY(-2px);
+  box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 10%);
 }
 
 .card-header {
-    padding: 1rem 1.25rem;
-    font-weight: 600;
-    color: var(--heading-color);
-    background-color: var(--card-header-bg, #fff);
-    border-bottom: 1px solid var(--border-color);
+  padding: 1rem 1.25rem;
+  font-weight: 600;
+  color: var(--heading-color);
+  background-color: var(--card-header-bg, #fff);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .card-body {
-    padding: 1.25rem;
+  padding: 1.25rem;
 }
 
 .card-footer {
-    background-color: transparent;
-    border-top: 1px solid var(--border-color);
-    padding: 1rem 1.25rem;
+  background-color: transparent;
+  border-top: 1px solid var(--border-color);
+  padding: 1rem 1.25rem;
 }
 
 /**
@@ -120,36 +121,36 @@
  */
 
 .list-group {
-    border-radius: var(--border-radius);
-    overflow: hidden;
+  border-radius: var(--border-radius);
+  overflow: hidden;
 }
 
 .list-group-item {
-    padding: 0.75rem 1.25rem;
-    border: 1px solid var(--border-color);
-    border-width: 0 0 1px;
-    background-color: var(--card-bg);
-    transition: background-color 0.15s ease;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid var(--border-color);
+  border-width: 0 0 1px;
+  background-color: var(--card-bg);
+  transition: background-color 0.15s ease;
 }
 
 .list-group-item:first-child {
-    border-top-width: 0;
+  border-top-width: 0;
 }
 
 .list-group-item:last-child {
-    border-bottom-width: 0;
+  border-bottom-width: 0;
 }
 
 .list-group-item-action {
-    color: var(--text-color);
-    text-decoration: none;
+  color: var(--text-color);
+  text-decoration: none;
 }
 
 .list-group-item-action:hover,
 .list-group-item-action:focus {
-    background-color: var(--gray-50);
-    color: var(--primary);
-    z-index: 1;
+  background-color: var(--gray-50);
+  color: var(--primary);
+  z-index: 1;
 }
 
 /**
@@ -157,32 +158,32 @@
  */
 
 .summary-stats {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .stat-card {
-    background: var(--gray-50);
-    border-radius: var(--border-radius);
-    padding: 1rem;
-    text-align: center;
-    border-left: 4px solid var(--primary);
+  background: var(--gray-50);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  text-align: center;
+  border-left: 4px solid var(--primary);
 }
 
 .stat-card h5 {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
 }
 
 .stat-card .stat-value {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--heading-color);
-    line-height: 1.2;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--heading-color);
+  line-height: 1.2;
 }
 
 /**
@@ -190,34 +191,34 @@
  */
 
 .recent-transactions .transaction-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .recent-transactions .transaction-item:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .recent-transactions .transaction-amount {
-    font-weight: 600;
-    color: var(--heading-color);
+  font-weight: 600;
+  color: var(--heading-color);
 }
 
 .recent-transactions .transaction-date {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
 }
 
 .recent-transactions .transaction-notes {
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-    margin-top: 0.25rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /**
@@ -225,23 +226,23 @@
  */
 
 .map-container {
-    height: 300px;
-    background: var(--gray-100);
-    border-radius: var(--border-radius);
-    margin: 1.5rem 0;
-    overflow: hidden;
-    position: relative;
+  height: 300px;
+  background: var(--gray-100);
+  border-radius: var(--border-radius);
+  margin: 1.5rem 0;
+  overflow: hidden;
+  position: relative;
 }
 
 .map-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: var(--text-muted);
-    padding: 1.5rem;
-    text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  padding: 1.5rem;
+  text-align: center;
 }
 
 /**
@@ -249,10 +250,10 @@
  */
 
 .action-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
 }
 
 /**
@@ -260,20 +261,20 @@
  */
 
 .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2.5rem 1.5rem;
-    color: var(--text-muted);
-    text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 .loading-state .spinner {
-    width: 2.5rem;
-    height: 2.5rem;
-    margin-bottom: 1rem;
-    color: var(--primary);
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: 1rem;
+  color: var(--primary);
 }
 
 /**
@@ -281,8 +282,8 @@
  */
 
 .text-break {
-    word-break: break-word !important;
-    overflow-wrap: break-word !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
 }
 
 /**
@@ -290,101 +291,101 @@
  */
 
 .restaurant-info-cards .card {
-    border: 1px solid var(--bs-border-color);
-    box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 7.5%);
-    transition: box-shadow 0.15s ease-in-out;
+  border: 1px solid var(--bs-border-color);
+  box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 7.5%);
+  transition: box-shadow 0.15s ease-in-out;
 }
 
 .restaurant-info-cards .card:hover {
-    box-shadow: 0 0.25rem 0.5rem rgb(0 0 0 / 10%);
+  box-shadow: 0 0.25rem 0.5rem rgb(0 0 0 / 10%);
 }
 
 .restaurant-info-cards .list-group-item {
-    border: none;
-    padding: 1rem 0;
+  border: none;
+  padding: 1rem 0;
 }
 
 .restaurant-info-cards .list-group-item:not(:last-child) {
-    border-bottom: 1px solid var(--bs-border-color-translucent);
+  border-bottom: 1px solid var(--bs-border-color-translucent);
 }
 
 .restaurant-info-cards .list-group-item:first-child {
-    padding-top: 0.5rem;
+  padding-top: 0.5rem;
 }
 
 .restaurant-info-cards .list-group-item:last-child {
-    padding-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 .restaurant-info-cards .list-group-item > div {
-    align-items: flex-start;
+  align-items: flex-start;
 }
 
 .restaurant-info-cards .list-group-item > div > i {
-    margin-top: 0.25rem;
-    width: 1.25rem;
-    text-align: center;
+  margin-top: 0.25rem;
+  width: 1.25rem;
+  text-align: center;
 }
 
 .restaurant-info-cards .list-group-item > div > div:first-child {
-    font-weight: 500;
-    color: var(--bs-secondary);
-    font-size: 0.8125rem;
-    margin-bottom: 0.375rem;
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
+  font-weight: 500;
+  color: var(--bs-secondary);
+  font-size: 0.8125rem;
+  margin-bottom: 0.375rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
 .restaurant-info-cards .list-group-item > div > div:last-child {
-    font-weight: 600;
-    color: var(--bs-body-color);
-    font-size: 0.9375rem;
-    line-height: 1.4;
+  font-weight: 600;
+  color: var(--bs-body-color);
+  font-size: 0.9375rem;
+  line-height: 1.4;
 }
 
-/**
- * Service Level Badge Styling
- */
-
-/* Service level badge styles now handled by unified badge system */
+/* Ensure badges maintain their proper sizing in restaurant info cards */
+.restaurant-info-cards .list-group-item > div > div:last-child .badge-unified {
+  font-size: 0.75rem !important; /* Match default badge-md font size */
+  line-height: 1.3 !important; /* Match default badge-md line height */
+}
 
 /**
  * Contact Information Improvements
  */
 
 .contact-info-list .list-group-item {
-    padding: 0.75rem 0;
-    border: none;
-    border-bottom: 1px solid var(--bs-border-color-translucent);
+  padding: 0.75rem 0;
+  border: none;
+  border-bottom: 1px solid var(--bs-border-color-translucent);
 }
 
 .contact-info-list .list-group-item:first-child {
-    padding-top: 0.5rem;
+  padding-top: 0.5rem;
 }
 
 .contact-info-list .list-group-item:last-child {
-    border-bottom: none;
-    padding-bottom: 0.5rem;
+  border-bottom: none;
+  padding-bottom: 0.5rem;
 }
 
 .contact-info-list .list-group-item > div > i {
-    margin-top: 0.125rem;
-    width: 1.25rem;
-    text-align: center;
-    color: var(--bs-primary);
+  margin-top: 0.125rem;
+  width: 1.25rem;
+  text-align: center;
+  color: var(--bs-primary);
 }
 
 .contact-info-list a {
-    color: var(--bs-primary);
-    font-weight: 500;
-    text-decoration: none;
-    transition: color 0.15s ease-in-out;
+  color: var(--bs-primary);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.15s ease-in-out;
 }
 
 .contact-info-list a:hover {
-    color: var(--bs-primary);
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
+  color: var(--bs-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
 }
 
 /**
@@ -392,26 +393,26 @@
  */
 
 .location-section h6 {
-    font-weight: 600;
-    color: var(--bs-dark);
-    margin-bottom: 1rem;
+  font-weight: 600;
+  color: var(--bs-dark);
+  margin-bottom: 1rem;
 }
 
 .location-section address {
-    font-weight: 500;
-    color: var(--bs-body-color);
+  font-weight: 500;
+  color: var(--bs-body-color);
 }
 
 .location-section .btn-primary {
-    background: linear-gradient(135deg, var(--bs-primary) 0%, #0056b3 100%);
-    border: none;
-    font-weight: 500;
-    transition: all 0.2s ease-in-out;
+  background: linear-gradient(135deg, var(--bs-primary) 0%, #0056b3 100%);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
 }
 
 .location-section .btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 0.25rem 0.5rem rgb(0 123 255 / 25%);
+  transform: translateY(-1px);
+  box-shadow: 0 0.25rem 0.5rem rgb(0 123 255 / 25%);
 }
 
 /**
@@ -419,17 +420,17 @@
  */
 
 address {
-    font-style: normal;
-    line-height: 1.5;
-    margin-bottom: 0;
+  font-style: normal;
+  line-height: 1.5;
+  margin-bottom: 0;
 }
 
 address div {
-    margin-bottom: 0.25rem;
+  margin-bottom: 0.25rem;
 }
 
 address div:last-child {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 /**
@@ -437,66 +438,64 @@ address div:last-child {
  */
 
 @media (width <= 991.98px) {
+  .restaurant-detail-main {
+    grid-template-columns: 1fr;
+  }
 
-    .restaurant-detail-main {
-        grid-template-columns: 1fr;
-    }
+  .expense-summary {
+    position: static;
+    max-height: none;
+  }
 
-    .expense-summary {
-        position: static;
-        max-height: none;
-    }
-
-    .summary-stats {
-        grid-template-columns: repeat(4, 1fr);
-    }
+  .summary-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 @media (width <= 767.98px) {
+  .summary-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
-    .summary-stats {
-        grid-template-columns: repeat(2, 1fr);
-    }
+  .action-buttons {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 
-    .action-buttons {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
+  .action-buttons .btn {
+    width: 100%;
+  }
 
-    .action-buttons .btn {
-        width: 100%;
-    }
+  /* Stack restaurant info cards on mobile */
 
-    /* Stack restaurant info cards on mobile */
+  .restaurant-info-cards .col-md-6 {
+    margin-bottom: 1rem;
+  }
 
-    .restaurant-info-cards .col-md-6 {
-        margin-bottom: 1rem;
-    }
+  .restaurant-info-cards .col-md-6:last-child {
+    margin-bottom: 0;
+  }
 
-    .restaurant-info-cards .col-md-6:last-child {
-        margin-bottom: 0;
-    }
+  /* Improved mobile button layout */
 
-    /* Improved mobile button layout */
+  .location-section .d-flex {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 
-    .location-section .d-flex {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
+  .location-section .btn {
+    width: 100%;
+  }
 
-    .location-section .btn {
-        width: 100%;
-    }
+  /* Better mobile typography */
 
-    /* Better mobile typography */
+  .restaurant-info-cards .list-group-item > div > div:first-child {
+    font-size: 0.75rem;
+  }
 
-    .restaurant-info-cards .list-group-item > div > div:first-child {
-        font-size: 0.75rem;
-    }
-
-    .restaurant-info-cards .list-group-item > div > div:last-child {
-        font-size: 0.875rem;
-    }
+  .restaurant-info-cards .list-group-item > div > div:last-child {
+    font-size: 0.875rem;
+  }
 }
 
 /**
@@ -504,18 +503,17 @@ address div:last-child {
  */
 
 @keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
 
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
-    animation: fadeIn 0.3s ease-out forwards;
+  animation: fadeIn 0.3s ease-out forwards;
 }

@@ -325,6 +325,48 @@ python init_db.py --reset --migrate
 The script respects the application's environment configuration, ensuring proper database connection settings for each
 environment.
 
+## 🧪 Browser Automation & Testing
+
+The project includes comprehensive browser automation and testing capabilities using the Model Context Protocol (MCP):
+
+### MCP Browser Automation
+
+- **Console Debugging**: Automated browser console error detection and analysis
+- **End-to-End Testing**: Comprehensive browser automation for testing user flows
+- **Performance Monitoring**: Real-time performance analysis during browser interactions
+- **Cross-Browser Testing**: Support for multiple browser engines via Playwright
+
+### Quick Start with MCP
+
+1. **Install MCP Server**:
+   ```bash
+   ./scripts/setup-mcp.sh
+   ```
+
+2. **Run Health Check**:
+   ```bash
+   # In Cursor with MCP enabled
+   node scripts/mcp-health-check.js
+   ```
+
+3. **Debug Console Issues**:
+   ```bash
+   # In Cursor with MCP enabled
+   node scripts/mcp-console-debug.js
+   ```
+
+4. **Run Browser Tests**:
+   ```bash
+   # In Cursor with MCP enabled
+   node scripts/test-mcp.js
+   ```
+
+### MCP Documentation
+
+- [MCP Browser Quick Reference](docs/MCP_BROWSER_QUICK_REFERENCE.md) - Quick commands and setup
+- [MCP Console Debugging Guide](docs/BROWSER_MCP_CONSOLE_DEBUGGING.md) - Detailed debugging workflow
+- [MCP Troubleshooting Guide](docs/MCP_TROUBLESHOOTING.md) - Common issues and solutions
+
 ## 📚 Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) - High-level system design

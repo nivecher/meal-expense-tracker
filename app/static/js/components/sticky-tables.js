@@ -44,7 +44,6 @@ class StickyTable {
 
     // Calculate and set proper header heights
     this.headers.forEach((header) => {
-      const computedStyle = window.getComputedStyle(header);
       const height = header.offsetHeight;
       header.style.minHeight = `${height}px`;
     });
@@ -155,7 +154,7 @@ class StickyTable {
     );
 
     stickyContainers.forEach((container) => {
-      new StickyTable(container);
+      new StickyTable(container); // eslint-disable-line no-new
     });
   }
 

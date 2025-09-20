@@ -87,6 +87,14 @@ class Restaurant(BaseModel):
         comment="Whether it's a chain restaurant",
     )
     rating: Mapped[Optional[float]] = db.Column(db.Float, comment="User's personal rating (1.0-5.0)")
+    price_level: Mapped[Optional[int]] = db.Column(
+        db.Integer, comment="Price level from Google Places (0=Free, 1=$1-10, 2=$11-30, 3=$31-60, 4=$61+)"
+    )
+    primary_type: Mapped[Optional[str]] = db.Column(
+        db.String(100), comment="Primary business type from Google Places API (e.g., restaurant, cafe, bar)"
+    )
+    latitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Restaurant latitude coordinate")
+    longitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Restaurant longitude coordinate")
     notes: Mapped[Optional[str]] = db.Column(db.Text, comment="Additional notes")
 
     # Foreign Keys
@@ -363,20 +371,155 @@ class Restaurant(BaseModel):
         Args:
             place_data: Raw Google Places API response data
         """
-        # Business status
-        if "business_status" in place_data:
-            self.business_status = place_data["business_status"]
-
+        # Note: business_status is time-sensitive and not stored permanently
         # Note: rating is now user's personal rating, not from Google Places
-        # Google's rating/price_level would be looked up dynamically via lookup service
 
-        # Website (as fallback if not set in _update_contact_info)
+        self._update_price_level(place_data)
+        self._update_primary_type(place_data)
+        self._update_coordinates(place_data)
+        self._update_website_fallback(place_data)
+        self._update_service_level_and_cuisine(place_data)
+        self._store_raw_place_data(place_data)
+
+    def _update_price_level(self, place_data: dict) -> None:
+        """Update price level from Google Places data.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
+        if "price_level" in place_data:
+            self.price_level = place_data["price_level"]
+        elif "priceLevel" in place_data:
+            self.price_level = self._convert_price_level(place_data["priceLevel"])
+
+    def _convert_price_level(self, price_level: Any) -> int:
+        """Convert price level to integer format.
+
+        Args:
+            price_level: Price level value from Google Places API
+
+        Returns:
+            int: Converted price level (0-4)
+        """
+        if isinstance(price_level, str):
+            price_level_map = {
+                "PRICE_LEVEL_FREE": 0,
+                "PRICE_LEVEL_INEXPENSIVE": 1,
+                "PRICE_LEVEL_MODERATE": 2,
+                "PRICE_LEVEL_EXPENSIVE": 3,
+                "PRICE_LEVEL_VERY_EXPENSIVE": 4,
+            }
+            return price_level_map.get(price_level, 0)
+        return price_level
+
+    def _update_primary_type(self, place_data: dict) -> None:
+        """Update primary type from Google Places data.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
+        if "primary_type" in place_data:
+            self.primary_type = place_data["primary_type"]
+        elif "primaryType" in place_data:
+            self.primary_type = place_data["primaryType"]
+
+    def _update_coordinates(self, place_data: dict) -> None:
+        """Update coordinates from Google Places data.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
+        # Try legacy API geometry format first
+        if "geometry" in place_data and place_data["geometry"]:
+            self._update_coordinates_from_geometry(place_data["geometry"])
+        # Try new API location format
+        elif "location" in place_data and place_data["location"]:
+            self._update_coordinates_from_location(place_data["location"])
+
+    def _update_coordinates_from_geometry(self, geometry: dict) -> None:
+        """Update coordinates from legacy API geometry format.
+
+        Args:
+            geometry: Geometry data from Google Places API
+        """
+        if "location" in geometry:
+            location = geometry["location"]
+            if "lat" in location:
+                self.latitude = location["lat"]
+            if "lng" in location:
+                self.longitude = location["lng"]
+
+    def _update_coordinates_from_location(self, location: dict) -> None:
+        """Update coordinates from new API location format.
+
+        Args:
+            location: Location data from Google Places API
+        """
+        if "latitude" in location:
+            self.latitude = location["latitude"]
+        if "longitude" in location:
+            self.longitude = location["longitude"]
+
+    def _update_website_fallback(self, place_data: dict) -> None:
+        """Update website as fallback if not already set.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
         if not self.website and "website" in place_data:
             self.website = place_data["website"]
 
-        # Store raw place data for reference
+    def _store_raw_place_data(self, place_data: dict) -> None:
+        """Store raw place data for reference.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
         if hasattr(self, "place_data"):
             self.place_data = place_data
+
+    def _update_service_level_and_cuisine(self, place_data: dict) -> None:
+        """Update service level and cuisine from Google Places data.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
+        try:
+            from flask import current_app
+
+            from app.restaurants.routes import (
+                analyze_restaurant_types,
+                detect_cuisine_from_name,
+            )
+
+            # Get types from place data
+            types = place_data.get("types", [])
+            if not types:
+                current_app.logger.info("No types found in place data, skipping classification")
+                return
+
+            # Analyze restaurant types to get cuisine and service level
+            cuisine, service_level = analyze_restaurant_types(types, place_data)
+
+            # If no cuisine detected from types, try name-based detection
+            if not cuisine:
+                restaurant_name = place_data.get("name", "")
+                if restaurant_name:
+                    cuisine = detect_cuisine_from_name(restaurant_name)
+                    current_app.logger.info(f"Detected cuisine from name: {cuisine}")
+
+            # Update the restaurant fields if we detected values
+            if cuisine:
+                self.cuisine = cuisine
+                current_app.logger.info(f"Updated cuisine to: {cuisine}")
+
+            if service_level:
+                self.service_level = service_level
+                current_app.logger.info(f"Updated service level to: {service_level}")
+
+        except Exception as e:
+            current_app.logger.error(f"Error updating service level and cuisine: {str(e)}")
+            # Don't raise - this is not critical enough to fail the entire update
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a dictionary representation of the restaurant.
@@ -398,8 +541,10 @@ class Restaurant(BaseModel):
             "website": self.website,
             "email": self.email,
             "cuisine": self.cuisine,
+            "service_level": self.service_level,
             "is_chain": self.is_chain,
             "rating": self.rating,
+            "price_level": self.price_level,
             "notes": self.notes,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),

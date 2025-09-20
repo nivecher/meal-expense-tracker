@@ -1624,7 +1624,7 @@ def update_tag(user_id: int, tag_id: int, name: str, color: str = "#6c757d", des
     tag.name = normalized_name
     tag.color = color
     tag.description = description
-    tag.updated_at = datetime.utcnow()
+    tag.updated_at = datetime.now(timezone.utc)
 
     db.session.commit()
 
@@ -1702,7 +1702,8 @@ def add_tags_to_expense(expense_id: int, user_id: int, tag_names: list[str]) -> 
     Returns:
         List of Tag objects that were added
     """
-    expense = Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag)).get(expense_id)
+    # Use SQLAlchemy 2.0 style to avoid LegacyAPIWarning for Query.get()
+    expense = db.session.get(Expense, expense_id)
     if not expense:
         raise ValueError("Expense not found")
 
@@ -1749,7 +1750,7 @@ def remove_tags_from_expense(expense_id: int, user_id: int, tag_names: list[str]
     Returns:
         List of Tag objects that were removed
     """
-    expense = Expense.query.get(expense_id)
+    expense = db.session.get(Expense, expense_id)
     if not expense:
         raise ValueError("Expense not found")
 
@@ -1794,7 +1795,7 @@ def get_expense_tags(expense_id: int, user_id: int) -> list[Tag]:
     Returns:
         List of Tag objects for the expense
     """
-    expense = Expense.query.get(expense_id)
+    expense = db.session.get(Expense, expense_id)
     if not expense:
         return []
 
@@ -1815,7 +1816,7 @@ def update_expense_tags(expense_id: int, user_id: int, tag_names: list[str]) -> 
     Returns:
         List of Tag objects that are now associated with the expense
     """
-    expense = Expense.query.get(expense_id)
+    expense = db.session.get(Expense, expense_id)
     if not expense:
         raise ValueError("Expense not found")
 
@@ -1854,7 +1855,7 @@ def delete_tag(user_id: int, tag_id: int) -> bool:
     Returns:
         True if tag was deleted, False if not found or unauthorized
     """
-    tag = Tag.query.get(tag_id)
+    tag = db.session.get(Tag, tag_id)
     if not tag or tag.user_id != user_id:
         return False
 

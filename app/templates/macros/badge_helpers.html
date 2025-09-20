@@ -98,6 +98,82 @@ if size == 'lg' else 'badge-md' -%} {%- set bg_class = 'bg-' + color -%} {%- if 
     <i class="fas fa-{{ icon }} me-1"></i>
     {%- endif -%} {{ text }}
 </span>
+{%- endif -%} {%- endmacro %} {# Price Level Badge Macro #} {% macro price_level_badge(price_level, size='md') -%} {%-
+set price_level_int = price_level|int if price_level is not none else none -%} {%- if price_level_int is not none and
+price_level_int >= 0 -%} {%- set size_class = 'badge-sm' if size == 'sm' else 'badge-lg' if size == 'lg' else 'badge-md'
+-%} {%- if price_level_int == 0 -%}
+<span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Free">
+    <i class="fas fa-gift me-1"></i>Free
+</span>
+{%- elif price_level_int == 1 -%}
+<span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Budget ($1-10 / person)">
+    <i class="fas fa-dollar-sign me-1"></i>$
+</span>
+{%- elif price_level_int == 2 -%}
+<span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Moderate ($11-30 / person)">
+    <i class="fas fa-dollar-sign me-1"></i>$$
+</span>
+{%- elif price_level_int == 3 -%}
+<span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Expensive ($31-60 / person)">
+    <i class="fas fa-dollar-sign me-1"></i>$$$
+</span>
+{%- elif price_level_int == 4 -%}
+<span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Very Expensive ($61+ / person)">
+    <i class="fas fa-dollar-sign me-1"></i>$$$$
+</span>
+{%- else -%}
+<span class="badge bg-secondary {{ size_class }}" data-bs-toggle="tooltip" title="Price level unknown">
+    <i class="fas fa-question me-1"></i>?
+</span>
+{%- endif -%} {%- else -%}
+<span class="text-muted">-</span>
+{%- endif -%} {%- endmacro %} {# Price Level Detail Macro for detailed display with price per person #} {% macro
+price_level_detail(price_level, size='md') -%} {%- set price_level_int = price_level|int if price_level is not none else
+none -%} {%- if price_level_int is not none and price_level_int >= 0 -%} {%- set size_class = 'badge-sm' if size == 'sm'
+else 'badge-lg' if size == 'lg' else 'badge-md' -%} {%- if price_level_int == 0 -%}
+<div class="d-flex flex-column">
+    <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Free">
+        <i class="fas fa-gift me-1"></i>Free
+    </span>
+    <small class="text-muted mt-1">No cost</small>
+</div>
+{%- elif price_level_int == 1 -%}
+<div class="d-flex flex-column">
+    <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="$1-10 per person">
+        <i class="fas fa-dollar-sign me-1"></i>Budget
+    </span>
+    <small class="text-muted mt-1">$1-10 per person</small>
+</div>
+{%- elif price_level_int == 2 -%}
+<div class="d-flex flex-column">
+    <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="$11-30 per person">
+        <i class="fas fa-dollar-sign me-1"></i>Moderate
+    </span>
+    <small class="text-muted mt-1">$11-30 per person</small>
+</div>
+{%- elif price_level_int == 3 -%}
+<div class="d-flex flex-column">
+    <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="$31-60 per person">
+        <i class="fas fa-dollar-sign me-1"></i>Expensive
+    </span>
+    <small class="text-muted mt-1">$31-60 per person</small>
+</div>
+{%- elif price_level_int == 4 -%}
+<div class="d-flex flex-column">
+    <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="$61+ per person">
+        <i class="fas fa-dollar-sign me-1"></i>Very Expensive
+    </span>
+    <small class="text-muted mt-1">$61+ per person</small>
+</div>
+{%- else -%}
+<div class="d-flex flex-column">
+    <span class="badge bg-secondary {{ size_class }}" data-bs-toggle="tooltip" title="Price level unknown">
+        <i class="fas fa-question me-1"></i>Unknown
+    </span>
+    <small class="text-muted mt-1">Price unknown</small>
+</div>
+{%- endif -%} {%- else -%}
+<span class="text-muted">-</span>
 {%- endif -%} {%- endmacro %} {# Badge Group Macro for displaying multiple badges together #} {% macro
 badge_group(badges, separator=' ') -%} {%- for badge in badges -%} {{ badge }} {%- if not loop.last -%}{{ separator
 }}{%- endif -%} {%- endfor -%} {%- endmacro %}

@@ -3,7 +3,7 @@
 /* Table sorting styles */
 
 .expense-table th[data-sort="true"]:hover {
-    background-color: #e9ecef;
+  background-color: #e9ecef;
 }
 
 /* Badge styles now handled by unified badge system */
@@ -11,183 +11,182 @@
 /* Restaurant/Cuisine combined layout */
 
 .restaurant-cuisine-combined {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .restaurant-cuisine-combined .fw-medium {
-    font-size: 0.9rem;
-    line-height: 1.2;
+  font-size: 0.9rem;
+  line-height: 1.2;
 }
 
 /* Stacked meal/order layout */
 
 .meal-order-stacked {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
 }
 
 .meal-order-stacked .badge {
-    font-size: 0.7rem;
-    padding: 0.25rem 0.5rem;
-    line-height: 1.2;
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  line-height: 1.2;
 }
 
 /* Tags/Notes combined layout */
 
 .tags-notes-combined {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
 }
 
 /* Ensure amounts are right-aligned and compact */
 
 .amount-right {
-    text-align: right !important;
-    font-family: 'Courier New', monospace;
-    font-weight: 600;
+  text-align: right !important;
+  font-family: "Courier New", monospace;
+  font-weight: 600;
 }
 
 /* Compact table indicators for tags and notes */
 
 .table-tags-compact {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 6px;
-    background-color: #f8f9fa;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    cursor: help;
-    transition: background-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  cursor: help;
+  transition: background-color 0.2s ease;
 }
 
 .table-tags-compact:hover {
-    background-color: #e9ecef;
+  background-color: #e9ecef;
 }
 
 .table-tags-compact .tag-count {
-    background-color: #007bff;
-    color: white;
-    border-radius: 50%;
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.65rem;
-    font-weight: 600;
-    line-height: 1;
+  background-color: #007bff;
+  color: #fff;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .table-notes-compact {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    background-color: #fff3cd;
-    border-radius: 50%;
-    cursor: help;
-    transition: background-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: #fff3cd;
+  border-radius: 50%;
+  cursor: help;
+  transition: background-color 0.2s ease;
 }
 
 .table-notes-compact:hover {
-    background-color: #ffeaa7;
+  background-color: #ffeaa7;
 }
-
 
 /* Table sorting styles now handled by unified-table.css */
 
-
 /* Favicon loading improvements */
 
-.restaurant-favicon, .restaurant-favicon-table {
-    transition: opacity 0.3s ease-in-out;
+.restaurant-favicon,
+.restaurant-favicon-table {
+  transition: opacity 0.3s ease-in-out;
 }
 
-.restaurant-fallback-icon, .restaurant-fallback-icon-table {
-    transition: all 0.2s ease-in-out;
+.restaurant-fallback-icon,
+.restaurant-fallback-icon-table {
+  transition: all 0.2s ease-in-out;
 }
 
 /* Expense Card Layout Improvements */
 
 .card-body {
-    padding: 1rem;
+  padding: 1rem;
 }
 
 /* Consistent badge spacing in cards */
 
 .card .d-flex.flex-column.gap-1 .badge {
-    margin-bottom: 0.25rem;
+  margin-bottom: 0.25rem;
 }
 
 .card .d-flex.flex-column.gap-1 .badge:last-child {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 /* Compact badges - width of text only */
 
 .card .badge {
-    width: fit-content;
-    max-width: none;
-    white-space: nowrap;
+  width: fit-content;
+  max-width: none;
+  white-space: nowrap;
 }
 
 /* Better alignment for left and right badge columns */
 
 .card .d-flex.flex-column.gap-1.align-items-start .badge,
 .card .d-flex.flex-column.gap-1.align-items-end .badge {
-    display: inline-block;
+  display: inline-block;
 }
 
 /* Horizontal badge layout for restaurant info */
 
 .card .d-flex.gap-2 .badge {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 /* Improved expense tags in cards */
 
 .expense-tags {
-    margin-top: 0.5rem;
-    margin-bottom: 0;
+  margin-top: 0.5rem;
+  margin-bottom: 0;
 }
 
 /* Better party size display in cards */
 
 .card .badge.bg-info {
-    font-size: 0.75rem;
-    padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  padding: 0.375rem 0.75rem;
 }
 
 /* Reduced card bottom padding */
 
 .card-body .row:last-child {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 /* Better alignment for action buttons */
 
 .card .d-flex.gap-2.justify-content-end {
-    align-items: center;
+  align-items: center;
 }
 
 /* Responsive adjustments for card layout */
 
 @media (width <= 576px) {
+  .card-body .row .col-8,
+  .card-body .row .col-4 {
+    margin-bottom: 0.5rem;
+  }
 
-    .card-body .row .col-8,
-    .card-body .row .col-4 {
-        margin-bottom: 0.5rem;
-    }
-
-    .card-body .row .col-4:last-child {
-        margin-bottom: 0;
-    }
+  .card-body .row .col-4:last-child {
+    margin-bottom: 0;
+  }
 }

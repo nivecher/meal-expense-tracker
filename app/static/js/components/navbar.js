@@ -112,8 +112,8 @@ class ResponsiveNavbarManager {
     const resizeObserver = new ResizeObserver((entries) => {
       const { width } = entries[0].contentRect;
       const wasMobile = this.isMobile;
-      const wasTablet = this.isTablet;
-      const wasSmallMobile = this.isSmallMobile;
+      // const wasTablet = this.isTablet; // Unused for now
+      // const wasSmallMobile = this.isSmallMobile; // Unused for now
 
       this.isMobile = width < this.breakpoints.mobile;
       this.isTablet = width < this.breakpoints.tablet;

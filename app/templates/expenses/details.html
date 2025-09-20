@@ -5,31 +5,8 @@ Expense Tracker{% endblock title %} {% block styles %} {{ super() }}
 <link href="{{ url_for('static', filename='css/tags.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/tagify-pretty.css') }}" rel="stylesheet" />
 {% endblock styles %} {% block scripts %} {{ super() }}
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        // Apply colors to all tag badges on the page
-        const tagBadges = document.querySelectorAll(".tag-badge[data-tag-color]");
-        tagBadges.forEach((badge) => {
-            const color = badge.getAttribute("data-tag-color");
-            if (color) {
-                // Use setProperty with !important to ensure styles are applied
-                badge.style.setProperty("background-color", color, "important");
-                badge.style.setProperty("color", "white", "important");
-                badge.style.setProperty("border-radius", "20px", "important");
-                badge.style.setProperty("padding", "4px 12px", "important");
-                badge.style.setProperty("font-size", "0.8rem", "important");
-                badge.style.setProperty("font-weight", "500", "important");
-                badge.style.setProperty("box-shadow", "0 2px 4px rgba(0, 0, 0, 0.1)", "important");
-                badge.style.setProperty("transition", "all 0.2s ease", "important");
-                badge.style.setProperty("border", "none", "important");
-                badge.style.setProperty("display", "inline-flex", "important");
-                badge.style.setProperty("align-items", "center", "important");
-                badge.style.setProperty("margin", "2px", "important");
-                badge.style.setProperty("line-height", "1.2", "important");
-            }
-        });
-    });
-</script>
+<!-- Tag badge styling -->
+<script src="{{ url_for('static', filename='js/components/tag-badge-styler.js') }}"></script>
 <!-- Expense detail functionality -->
 <script type="module" src="{{ url_for('static', filename='js/pages/expense-detail.js') }}"></script>
 {% endblock scripts %} {% block content %}
@@ -74,8 +51,8 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                             <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
                                 {% if expense.restaurant and expense.restaurant.cuisine %} {% from
                                 'macros/badge_helpers.html' import cuisine_badge %} {{
-                                cuisine_badge(expense.restaurant.cuisine, size='sm') }} {% endif %}
-                                {% if expense.restaurant and expense.restaurant.service_level %} {% from
+                                cuisine_badge(expense.restaurant.cuisine, size='sm') }} {% endif %} {% if
+                                expense.restaurant and expense.restaurant.service_level %} {% from
                                 'macros/badge_helpers.html' import service_level_badge %} {{
                                 service_level_badge(expense.restaurant.service_level, size='sm') }} {% endif %}
                             </div>
@@ -355,14 +332,11 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                             <h6 class="mb-1 fw-bold">{{ expense.restaurant.name }}</h6>
                             {% if expense.restaurant.cuisine or expense.restaurant.service_level %}
                             <div class="d-flex justify-content-end gap-2">
-                                {% if expense.restaurant.cuisine %}
-                                    {% from 'macros/badge_helpers.html' import cuisine_badge %} {{
-                                    cuisine_badge(expense.restaurant.cuisine) }}
-                                {% endif %}
-                                {% if expense.restaurant.service_level %}
-                                    {% from 'macros/badge_helpers.html' import service_level_badge %} {{
-                                    service_level_badge(expense.restaurant.service_level) }}
-                                {% endif %}
+                                {% if expense.restaurant.cuisine %} {% from 'macros/badge_helpers.html' import
+                                cuisine_badge %} {{ cuisine_badge(expense.restaurant.cuisine) }} {% endif %} {% if
+                                expense.restaurant.service_level %} {% from 'macros/badge_helpers.html' import
+                                service_level_badge %} {{ service_level_badge(expense.restaurant.service_level) }} {%
+                                endif %}
                             </div>
                             {% endif %}
                         </div>

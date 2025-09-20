@@ -3,161 +3,163 @@
 /* Tags Input Container */
 
 .tags-input-container {
-    position: relative;
-    border: 1px solid #ced4da;
-    border-radius: 0.375rem;
-    background-color: #fff;
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  position: relative;
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  background-color: #fff;
+  transition:
+    border-color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
 }
 
 .tags-input-container:focus-within {
-    border-color: #86b7fe;
-    box-shadow: 0 0 0 0.25rem rgb(13 110 253 / 25%);
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.25rem rgb(13 110 253 / 25%);
 }
 
 .tags-input-wrapper {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    padding: 0.375rem 0.75rem;
-    min-height: 38px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.375rem 0.75rem;
+  min-height: 38px;
 }
 
 /* Tags Display Area */
 
 .tags-display {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-right: 0.5rem;
-    flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-right: 0.5rem;
+  flex: 1;
 }
 
 /* Individual Tag Badge - Base styling only */
 
 .tag-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 0.25rem;
-    color: #fff;
-    border: none;
-    cursor: pointer;
-    transition: all 0.15s ease-in-out;
-    user-select: none;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 0.25rem;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  user-select: none;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Default background color only when no custom color class is present */
 
 .tag-badge:not([class*="tag-"]) {
-    background-color: #6c757d;
+  background-color: #6c757d;
 }
 
 .tag-badge:hover {
-    opacity: 0.8;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  opacity: 0.8;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .tag-badge .tag-remove {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background-color: rgb(255 255 255 / 20%);
-    color: inherit;
-    font-size: 10px;
-    cursor: pointer;
-    transition: background-color 0.15s ease-in-out;
-    margin-left: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: rgb(255 255 255 / 20%);
+  color: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+  margin-left: 0.25rem;
 }
 
 .tag-badge .tag-remove:hover {
-    background-color: rgb(255 255 255 / 30%);
+  background-color: rgb(255 255 255 / 30%);
 }
 
 /* Tags Input Field */
 
 .tags-input {
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
-    background: transparent !important;
-    flex: 1;
-    min-width: 120px;
-    padding: 0 !important;
-    margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  flex: 1;
+  min-width: 120px;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 .tags-input:focus {
-    border: none !important;
-    outline: none !important;
-    box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Tags Suggestions Dropdown */
 
 .tags-suggestions {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background-color: #fff;
-    border: 1px solid #ced4da;
-    border-top: none;
-    border-radius: 0 0 0.375rem 0.375rem;
-    box-shadow: 0 4px 6px rgb(0 0 0 / 10%);
-    z-index: 1000;
-    max-height: 200px;
-    overflow-y: auto;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  border: 1px solid #ced4da;
+  border-top: none;
+  border-radius: 0 0 0.375rem 0.375rem;
+  box-shadow: 0 4px 6px rgb(0 0 0 / 10%);
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .tags-suggestion-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 0.75rem;
-    cursor: pointer;
-    transition: background-color 0.15s ease-in-out;
-    border-bottom: 1px solid #f8f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+  border-bottom: 1px solid #f8f9fa;
 }
 
 .tags-suggestion-item:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .tags-suggestion-item:hover {
-    background-color: #f8f9fa;
+  background-color: #f8f9fa;
 }
 
 .tags-suggestion-item.selected {
-    background-color: #e9ecef;
+  background-color: #e9ecef;
 }
 
 .tags-suggestion-item .suggestion-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.125rem 0.375rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 0.25rem;
-    color: #fff;
-    background-color: #6c757d;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 0.25rem;
+  color: #fff;
+  background-color: #6c757d;
 }
 
 .tags-suggestion-item .suggestion-text {
-    font-size: 0.875rem;
-    color: #6c757d;
+  font-size: 0.875rem;
+  color: #6c757d;
 }
 
 /* Tag Colors - These old classes are deprecated in favor of user-specific tag-{id} classes */
@@ -167,191 +169,190 @@
 /* Tags in Expense Lists */
 
 .expense-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-top: 0.25rem;
-    padding-left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  padding-left: 0;
 }
 
 /* Ensure wrapped tags maintain proper indentation */
+
 .expense-tags .tag-badge {
-    margin-left: 0;
+  margin-left: 0;
 }
 
 .expense-tags .tag-badge {
-    font-size: 0.625rem;
-    padding: 0.125rem 0.375rem;
-    max-width: 150px;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.375rem;
+  max-width: 150px;
 }
 
 /* Tags in Table View */
 
 .table-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.125rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem;
 }
 
 .table-tags .tag-badge {
-    font-size: 0.625rem;
-    padding: 0.125rem 0.25rem;
-    max-width: 100px;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.25rem;
+  max-width: 100px;
 }
 
 /* Tags Filter */
 
 .tags-filter {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    padding: 1rem;
-    background-color: #f8f9fa;
-    border-radius: 0.375rem;
-    border: 1px solid #e9ecef;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 0.375rem;
+  border: 1px solid #e9ecef;
 }
 
 .tags-filter .tag-badge {
-    cursor: pointer;
-    opacity: 0.6;
-    transition: opacity 0.15s ease-in-out;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease-in-out;
 }
 
 .tags-filter .tag-badge.active {
-    opacity: 1;
-    box-shadow: 0 0 0 2px rgb(13 110 253 / 25%);
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgb(13 110 253 / 25%);
 }
 
 .tags-filter .tag-badge:hover {
-    opacity: 0.8;
+  opacity: 0.8;
 }
 
 /* Responsive Design */
 
 @media (width <= 768px) {
+  .tags-input-wrapper {
+    padding: 0.25rem 0.5rem;
+    min-height: 36px;
+  }
 
-    .tags-input-wrapper {
-        padding: 0.25rem 0.5rem;
-        min-height: 36px;
-    }
+  .tag-badge {
+    font-size: 0.6875rem;
+    padding: 0.1875rem 0.4375rem;
+  }
 
-    .tag-badge {
-        font-size: 0.6875rem;
-        padding: 0.1875rem 0.4375rem;
-    }
+  .tags-suggestions {
+    max-height: 150px;
+  }
 
-    .tags-suggestions {
-        max-height: 150px;
-    }
-
-    .expense-tags .tag-badge {
-        font-size: 0.5625rem;
-        padding: 0.0625rem 0.3125rem;
-    }
+  .expense-tags .tag-badge {
+    font-size: 0.5625rem;
+    padding: 0.0625rem 0.3125rem;
+  }
 }
 
 /* Animation for tag addition/removal */
 
 .tag-badge {
-    animation: tagSlideIn 0.2s ease-out;
+  animation: tagSlideIn 0.2s ease-out;
 }
 
 @keyframes tagSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.9);
+  }
 
-    from {
-        opacity: 0;
-        transform: translateY(-10px) scale(0.9);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Loading state for tags */
 
 .tags-loading {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    color: #6c757d;
-    font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  color: #6c757d;
+  font-size: 0.875rem;
 }
 
 .tags-loading .spinner-border {
-    width: 1rem;
-    height: 1rem;
+  width: 1rem;
+  height: 1rem;
 }
 
 /* Empty state */
 
 .tags-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    color: #6c757d;
-    font-style: italic;
-    font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: #6c757d;
+  font-style: italic;
+  font-size: 0.875rem;
 }
 
 /* Tag management modal */
 
 .tag-management-modal .tag-list {
-    max-height: 300px;
-    overflow-y: auto;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .tag-management-modal .tag-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem;
-    border-bottom: 1px solid #e9ecef;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border-bottom: 1px solid #e9ecef;
 }
 
 .tag-management-modal .tag-item:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .tag-management-modal .tag-info {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
 }
 
 .tag-management-modal .tag-actions {
-    display: flex;
-    gap: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
 }
 
 /* Tag color picker */
 
 .tag-color-picker {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .tag-color-option {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    cursor: pointer;
-    transition: all 0.15s ease-in-out;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
 }
 
 .tag-color-option:hover {
-    transform: scale(1.1);
+  transform: scale(1.1);
 }
 
 .tag-color-option.selected {
-    border-color: #000;
-    transform: scale(1.1);
+  border-color: #000;
+  transform: scale(1.1);
 }

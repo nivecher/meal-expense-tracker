@@ -13,7 +13,7 @@
   // Store original console methods
   const originalWarn = console.warn;
   const originalError = console.error;
-  const originalLog = console.log;
+  // const originalLog = console.log; // Unused for now
 
   // Common CDN/library warning patterns to filter
   const FILTERED_PATTERNS = [
@@ -59,7 +59,7 @@
 
   // Filtered console.warn
   console.warn = function(...args) {
-    const message = args[0];
+    const [message] = args;
     if (shouldFilter(message)) {
       // Log to a separate filtered warnings object for debugging
       if (!window.filteredWarnings) {
@@ -78,7 +78,7 @@
 
   // Filtered console.error
   console.error = function(...args) {
-    const message = args[0];
+    const [message] = args;
     if (shouldFilter(message)) {
       if (!window.filteredWarnings) {
         window.filteredWarnings = [];

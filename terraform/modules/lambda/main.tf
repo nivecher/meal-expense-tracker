@@ -315,9 +315,9 @@ resource "aws_lambda_function" "main" {
         GOOGLE_MAPS_MAP_ID  = data.aws_ssm_parameter.google_maps_map_id.value
 
         # Email configuration (AWS SES)
-        MAIL_ENABLED         = var.mail_enabled ? "true" : "false"
-        MAIL_DEFAULT_SENDER  = var.mail_default_sender
-        AWS_SES_REGION       = var.aws_ses_region
+        MAIL_ENABLED        = var.mail_enabled ? "true" : "false"
+        MAIL_DEFAULT_SENDER = var.mail_default_sender
+        AWS_SES_REGION      = var.aws_ses_region
 
         # Database configuration will be set at runtime via the secret
 
@@ -337,17 +337,17 @@ resource "aws_lambda_function" "main" {
         ALLOWED_REFERRER_DOMAINS = "${var.server_name},${var.api_gateway_domain_name}"
 
         # DynamoDB session configuration (available but not used in Lambda)
-        SESSION_DYNAMODB_TABLE     = var.session_table_name
-        SESSION_DYNAMODB_REGION    = data.aws_region.current.name  # Optional: falls back to built-in AWS_REGION
-        SESSION_DYNAMODB_ENDPOINT  = "" # Use AWS default endpoint
-        SESSION_TIMEOUT            = "3600"  # 1 hour session timeout
+        SESSION_DYNAMODB_TABLE    = var.session_table_name
+        SESSION_DYNAMODB_REGION   = data.aws_region.current.name # Optional: falls back to built-in AWS_REGION
+        SESSION_DYNAMODB_ENDPOINT = ""                           # Use AWS default endpoint
+        SESSION_TIMEOUT           = "3600"                       # 1 hour session timeout
 
         # X-Ray tracing is enabled via IAM permissions and X-Ray daemon
         # _X_AMZN_TRACE_ID is automatically set by Lambda when X-Ray tracing is enabled
 
         # OpenTelemetry configuration
         OPENTELEMETRY_COLLECTOR_CONFIG_FILE = var.enable_otel_tracing ? "/var/task/opentelemetry-collector-config.yaml" : ""
-        AWS_LAMBDA_EXEC_WRAPPER            = var.enable_otel_tracing ? "/opt/otel-handler" : ""
+        AWS_LAMBDA_EXEC_WRAPPER             = var.enable_otel_tracing ? "/opt/otel-handler" : ""
 
         # Set Python path to include the layer
         PYTHONPATH = "/opt/python:/opt/python/lib/python3.13/site-packages"

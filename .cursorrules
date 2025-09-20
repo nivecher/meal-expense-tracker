@@ -1,0 +1,328 @@
+# JavaScript ESLint Standards Rule
+
+## Overview
+This rule ensures all JavaScript code follows the project's ESLint configuration and maintains consistent code quality standards.
+
+## Rule: Always Follow ESLint Standards
+
+### Code Generation Requirements
+
+When generating or modifying JavaScript code, you MUST follow these ESLint rules:
+
+#### Naming Conventions
+- **camelCase**: All variables, functions, and object properties must use camelCase
+  - ✅ `const userName = 'john'`
+  - ❌ `const user_name = 'john'`
+  - ✅ `function handleFormSubmit() {}`
+  - ❌ `function handle_form_submit() {}`
+
+#### Function Declaration Order
+- **No Use Before Define**: Functions must be declared before they are used
+  - ✅ Declare functions at the top of their scope
+  - ❌ Using functions before declaration (even with hoisting)
+
+#### Code Structure
+- **Trailing Commas**: Always use trailing commas in multiline objects and arrays
+  - ✅ `{ name: 'test', value: 123, }`
+  - ❌ `{ name: 'test', value: 123 }`
+
+#### Async/Await Best Practices
+- **No Return Await**: Don't use `await` on return statements
+  - ✅ `return fetchData()`
+  - ❌ `return await fetchData()`
+
+#### Error Handling
+- **Radix Parameter**: Always specify radix for parseInt
+  - ✅ `parseInt(value, 10)`
+  - ❌ `parseInt(value)`
+
+#### Promise Handling
+- **No Promise Executor Return**: Don't return values from promise executors
+  - ✅ `new Promise((resolve) => { resolve(data) })`
+  - ❌ `new Promise((resolve) => { return resolve(data) })`
+
+#### Variable Declarations
+- **Prefer Const**: Use `const` for variables that are never reassigned
+  - ✅ `const config = getConfig()`
+  - ❌ `let config = getConfig()` (if never reassigned)
+
+#### Function Parameters
+- **No Parameter Reassignment**: Don't reassign function parameters
+  - ✅ `function process(data) { const processed = data + 1; return processed; }`
+  - ❌ `function process(data) { data = data + 1; return data; }`
+
+#### Underscore Usage
+- **No Underscore Dangle**: Don't use leading/trailing underscores except for private class members
+  - ✅ `class MyClass { #privateField = 'value' }`
+  - ❌ `class MyClass { _privateField = 'value' }`
+
+#### Console Usage
+- **Limited Console**: Only use console.warn and console.error in production
+  - ✅ `console.warn('Warning message')`
+  - ❌ `console.log('Debug message')` (in production)
+
+#### Brace Style
+- **Consistent Braces**: Use consistent brace placement
+  - ✅ `if (condition) { return true; }`
+  - ❌ `if (condition) { return true; } else { return false; }`
+
+#### Multi-Assignment
+- **No Chained Assignment**: Avoid chained variable assignments
+  - ✅ `const a = 1; const b = 1;`
+  - ❌ `const a = b = 1;`
+
+### Code Organization
+
+#### Function Length Limits
+- **Max Statements**: Functions should not exceed 20 statements
+- **Max Lines**: Functions should not exceed 100 lines
+- **Max Classes**: Files should not exceed 2 classes
+
+#### File Structure
+```javascript
+// 1. Imports and dependencies
+import { utility } from './utils';
+
+// 2. Constants and configuration
+const CONFIG = {
+  timeout: 5000,
+  retries: 3,
+};
+
+// 3. Helper functions (declared before use)
+function helperFunction() {
+  // Implementation
+}
+
+// 4. Main functions
+function mainFunction() {
+  // Implementation using helper functions
+}
+
+// 5. Event handlers and initialization
+document.addEventListener('DOMContentLoaded', () => {
+  mainFunction();
+});
+```
+
+### Error Prevention Patterns
+
+#### Function Hoisting Prevention
+```javascript
+// ✅ Correct: Declare functions before use
+function processData(data) {
+  return validateData(data);
+}
+
+function validateData(data) {
+  return data && data.length > 0;
+}
+
+// ❌ Incorrect: Using function before declaration
+function processData(data) {
+  return validateData(data); // Error: used before defined
+}
+
+function validateData(data) {
+  return data && data.length > 0;
+}
+```
+
+#### Async Function Patterns
+```javascript
+// ✅ Correct: No redundant await on return
+async function fetchUserData(userId) {
+  const response = await api.get(`/users/${userId}`);
+  return response.data; // No await needed
+}
+
+// ❌ Incorrect: Redundant await on return
+async function fetchUserData(userId) {
+  const response = await api.get(`/users/${userId}`);
+  return await response.data; // Redundant await
+}
+```
+
+#### Promise Patterns
+```javascript
+// ✅ Correct: No return in promise executor
+function createPromise() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve('success');
+    }, 1000);
+  });
+}
+
+// ❌ Incorrect: Return in promise executor
+function createPromise() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      return resolve('success'); // Error: return in executor
+    }, 1000);
+  });
+}
+```
+
+#### Array Destructuring Patterns
+```javascript
+// ✅ Correct: Use array destructuring
+const [first, second] = array;
+const [first] = array;
+const [, second] = array;
+
+// ❌ Incorrect: Array indexing
+const first = array[0];
+const second = array[1];
+```
+
+#### Object Destructuring Patterns
+```javascript
+// ✅ Correct: Use object destructuring
+const { name, age } = user;
+const { name } = user;
+
+// ❌ Incorrect: Property access
+const name = user.name;
+const age = user.age;
+```
+
+#### Unused Variable Patterns
+```javascript
+// ✅ Correct: Prefix unused parameters with underscore
+function handleEvent(_event) {
+  // Event not used
+}
+
+// ✅ Correct: Comment out unused variables
+// const unusedVar = getValue();
+
+// ❌ Incorrect: Unused variables
+function handleEvent(event) {
+  // event not used - will cause linting error
+}
+```
+
+#### Bootstrap Component Initialization
+```javascript
+// ✅ Correct: Use eslint-disable-line for legitimate side effects
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+  new bootstrap.Tooltip(el); // eslint-disable-line no-new
+});
+
+// ✅ Correct: Store reference when needed
+const tooltip = new bootstrap.Tooltip(el);
+tooltip.show();
+
+// ❌ Incorrect: Unnecessary new without side effects
+const result = new SomeClass(); // Should store reference or disable rule
+```
+
+### Code Quality Checklist
+
+Before submitting JavaScript code, verify:
+
+- [ ] All variables use camelCase naming
+- [ ] Functions are declared before use
+- [ ] Trailing commas are present in multiline structures
+- [ ] No redundant `await` on return statements
+- [ ] `parseInt` includes radix parameter
+- [ ] No return statements in promise executors
+- [ ] `const` used for non-reassigned variables
+- [ ] No parameter reassignment
+- [ ] No leading/trailing underscores (except private class members)
+- [ ] Console usage limited to warn/error in production
+- [ ] Functions under 20 statements and 100 lines
+- [ ] Files contain maximum 2 classes
+- [ ] Consistent brace style
+- [ ] No chained assignments
+- [ ] Array destructuring used instead of indexing
+- [ ] Object destructuring used instead of property access
+- [ ] Unused parameters prefixed with underscore
+- [ ] Bootstrap components use eslint-disable-line no-new when appropriate
+
+### Integration with ESLint Config
+
+This rule aligns with the project's ESLint configuration in `eslint.config.js`:
+
+- **Base Rules**: Enforces core JavaScript best practices
+- **Environment Rules**: Adapts to development vs production
+- **File-Specific Rules**: Different rules for utils, services, components
+- **Test Rules**: Relaxed rules for test files
+
+### Enforcement
+
+This rule is MANDATORY for all JavaScript code generation and modification. Code that violates these standards will be rejected.
+
+The ESLint configuration automatically enforces these rules, and the build process will fail if violations are present.
+
+### Examples of Good JavaScript Code
+
+```javascript
+// ✅ Well-structured JavaScript following all rules
+import { apiUtils } from './utils/api-utils';
+import { showToast } from './utils/notifications';
+
+const FORM_CONFIG = {
+  timeout: 5000,
+  maxRetries: 3,
+};
+
+function validateFormData(formData) {
+  if (!formData || typeof formData !== 'object') {
+    return false;
+  }
+
+  return formData.name && formData.email;
+}
+
+function handleFormSubmission(event) {
+  event.preventDefault();
+
+  const formData = extractFormData();
+
+  if (!validateFormData(formData)) {
+    showToast('Please fill in all required fields', 'error');
+    return;
+  }
+
+  submitFormData(formData);
+}
+
+function extractFormData() {
+  const form = document.getElementById('user-form');
+  return {
+    name: form.name.value,
+    email: form.email.value,
+  };
+}
+
+async function submitFormData(formData) {
+  try {
+    const response = await apiUtils.post('/api/users', formData);
+    showToast('User created successfully', 'success');
+    return response.data;
+  } catch (error) {
+    showToast('Failed to create user', 'error');
+    throw error;
+  }
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('user-form');
+  if (form) {
+    form.addEventListener('submit', handleFormSubmission);
+  }
+});
+```
+
+This example demonstrates:
+- Proper camelCase naming
+- Functions declared before use
+- Trailing commas in objects
+- No redundant await on return
+- Proper error handling
+- Const for non-reassigned variables
+- Clean separation of concerns
+- Event-driven initialization

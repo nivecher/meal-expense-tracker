@@ -54,7 +54,9 @@ def test_edit_restaurant(client, auth, test_user, test_restaurant, session):
     assert b"Restaurant updated successfully" in response.data
 
     # Verify the changes in the database
-    updated_restaurant = Restaurant.query.get(test_restaurant.id)
+    from app.extensions import db
+
+    updated_restaurant = db.session.get(Restaurant, test_restaurant.id)
     assert updated_restaurant.name == "Updated Restaurant Name"
     assert updated_restaurant.cuisine == "Italian"
     assert updated_restaurant.address == "123 Updated St"

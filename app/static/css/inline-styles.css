@@ -6,64 +6,136 @@
 /* Restaurant image loading styles */
 
 .restaurant-image-loading {
-    opacity: 0;
-    transition: opacity 0.2s;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
 .restaurant-image-loaded {
-    opacity: 1;
+  opacity: 1;
 }
 
 /* Restaurant fallback icons */
 
 .restaurant-fallback-icon {
-    font-size: 28px;
+  font-size: 28px;
 }
 
 .restaurant-fallback-icon-table {
-    font-size: 16px;
+  font-size: 16px;
 }
 
 .restaurant-fallback-icon-large {
-    font-size: 32px;
+  font-size: 32px;
 }
 
 .restaurant-fallback-icon-dashboard {
-    font-size: 24px;
+  font-size: 24px;
 }
 
 /* Avatar styles */
 
 .avatar-initials {
-    display: none;
+  display: none;
 }
 
 /* Cuisine badge styles now handled by unified badge system */
 
 /* Table column min-widths for sticky tables */
-.sticky-table th:nth-child(1) { min-width: 150px; }
-.sticky-table th:nth-child(2) { min-width: 120px; }
-.sticky-table th:nth-child(3) { min-width: 100px; }
-.sticky-table th:nth-child(4) { min-width: 120px; }
-.sticky-table th:nth-child(5) { min-width: 100px; }
-.sticky-table th:nth-child(6) { min-width: 100px; }
-.sticky-table th:nth-child(7) { min-width: 120px; }
-.sticky-table th:nth-child(8) { min-width: 100px; }
-.sticky-table th:nth-child(9) { min-width: 150px; }
-.sticky-table th:nth-child(10) { min-width: 200px; }
-.sticky-table th:nth-child(11) { min-width: 120px; }
-.sticky-table th:nth-child(12) { min-width: 120px; }
+
+.sticky-table th:nth-child(1) {
+  min-width: 150px;
+}
+
+.sticky-table th:nth-child(2) {
+  min-width: 120px;
+}
+
+.sticky-table th:nth-child(3) {
+  min-width: 100px;
+}
+
+.sticky-table th:nth-child(4) {
+  min-width: 120px;
+}
+
+.sticky-table th:nth-child(5) {
+  min-width: 100px;
+}
+
+.sticky-table th:nth-child(6) {
+  min-width: 100px;
+}
+
+.sticky-table th:nth-child(7) {
+  min-width: 120px;
+}
+
+.sticky-table th:nth-child(8) {
+  min-width: 100px;
+}
+
+.sticky-table th:nth-child(9) {
+  min-width: 150px;
+}
+
+.sticky-table th:nth-child(10) {
+  min-width: 200px;
+}
+
+.sticky-table th:nth-child(11) {
+  min-width: 120px;
+}
+
+.sticky-table th:nth-child(12) {
+  min-width: 120px;
+}
 
 /* Expense table specific widths */
-.expense-table th:nth-child(1) { min-width: 150px; }
-.expense-table th:nth-child(2) { min-width: 200px; }
-.expense-table th:nth-child(3) { min-width: 150px; }
-.expense-table th:nth-child(4) { min-width: 120px; }
-.expense-table th:nth-child(5) { min-width: 100px; }
-.expense-table th:nth-child(6) { min-width: 100px; }
-.expense-table th:nth-child(7) { min-width: 100px; }
-.expense-table th:nth-child(8) { min-width: 120px; }
-.expense-table th:nth-child(9) { min-width: 150px; }
-.expense-table th:nth-child(10) { min-width: 200px; }
-.expense-table th:nth-child(11) { min-width: 100px; }
-.expense-table th:nth-child(12) { min-width: 120px; }
+
+.expense-table th:nth-child(1) {
+  min-width: 150px;
+}
+
+.expense-table th:nth-child(2) {
+  min-width: 200px;
+}
+
+.expense-table th:nth-child(3) {
+  min-width: 150px;
+}
+
+.expense-table th:nth-child(4) {
+  min-width: 120px;
+}
+
+.expense-table th:nth-child(5) {
+  min-width: 100px;
+}
+
+.expense-table th:nth-child(6) {
+  min-width: 100px;
+}
+
+.expense-table th:nth-child(7) {
+  min-width: 100px;
+}
+
+.expense-table th:nth-child(8) {
+  min-width: 120px;
+}
+
+.expense-table th:nth-child(9) {
+  min-width: 150px;
+}
+
+.expense-table th:nth-child(10) {
+  min-width: 200px;
+}
+
+.expense-table th:nth-child(11) {
+  min-width: 100px;
+}
+
+.expense-table th:nth-child(12) {
+  min-width: 120px;
+}
