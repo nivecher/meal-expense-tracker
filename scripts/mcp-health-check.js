@@ -1,6 +1,6 @@
 /**
  * MCP Health Check Script
- * 
+ *
  * This script performs a quick health check of the MCP setup
  * and provides recommendations for fixing any issues.
  */
@@ -11,7 +11,7 @@
 
 async function mcpHealthCheck() {
   console.log("🏥 MCP Health Check Starting...");
-  
+
   const health = {
     mcpServer: false,
     application: false,
@@ -42,11 +42,11 @@ async function mcpHealthCheck() {
     await mcp_playwright_browser_navigate({
       url: "http://localhost:5000"
     });
-    
+
     await mcp_playwright_browser_wait_for({
       selector: "body"
     });
-    
+
     health.application = true;
     console.log("✅ Application is accessible");
   } catch (error) {
@@ -61,7 +61,7 @@ async function mcpHealthCheck() {
     const title = await mcp_playwright_browser_evaluate({
       expression: "document.title"
     });
-    
+
     if (title && title.length > 0) {
       health.browser = true;
       console.log("✅ Browser functionality working");
@@ -91,33 +91,33 @@ async function mcpHealthCheck() {
   // Generate Health Report
   console.log("\n📊 MCP Health Check Results:");
   console.log("=============================");
-  
+
   const checks = [
     { name: "MCP Server", status: health.mcpServer },
     { name: "Application", status: health.application },
     { name: "Browser", status: health.browser },
     { name: "Configuration", status: health.configuration }
   ];
-  
+
   checks.forEach(check => {
     const status = check.status ? "✅" : "❌";
     console.log(`${status} ${check.name}`);
   });
-  
+
   const overallHealth = checks.every(check => check.status);
-  
+
   if (overallHealth) {
     console.log("\n🎉 MCP setup is healthy and ready to use!");
   } else {
     console.log("\n⚠️  MCP setup has issues that need attention:");
-    
+
     if (health.issues.length > 0) {
       console.log("\n❌ Issues found:");
       health.issues.forEach((issue, index) => {
         console.log(`${index + 1}. ${issue}`);
       });
     }
-    
+
     if (health.recommendations.length > 0) {
       console.log("\n💡 Recommendations:");
       health.recommendations.forEach((rec, index) => {
@@ -125,12 +125,12 @@ async function mcpHealthCheck() {
       });
     }
   }
-  
+
   // Additional Diagnostics
   if (!overallHealth) {
     console.log("\n🔧 Additional Diagnostics:");
     console.log("=========================");
-    
+
     try {
       // Check if we can get basic page info
       const pageInfo = await mcp_playwright_browser_evaluate({
@@ -143,18 +143,18 @@ async function mcpHealthCheck() {
           }
         `
       });
-      
+
       console.log("Page Information:");
       console.log(`  URL: ${pageInfo.url}`);
       console.log(`  Title: ${pageInfo.title}`);
       console.log(`  Ready State: ${pageInfo.readyState}`);
       console.log(`  User Agent: ${pageInfo.userAgent.substring(0, 50)}...`);
-      
+
     } catch (error) {
       console.log(`❌ Could not retrieve page information: ${error.message}`);
     }
   }
-  
+
   return health;
 }
 
@@ -163,7 +163,7 @@ console.log("🚀 Starting MCP Health Check...");
 mcpHealthCheck()
   .then(health => {
     const overallHealth = health.mcpServer && health.application && health.browser && health.configuration;
-    
+
     if (overallHealth) {
       console.log("\n✅ MCP is ready for use!");
       console.log("You can now run the debugging scripts:");
@@ -173,7 +173,7 @@ mcpHealthCheck()
       console.log("\n❌ MCP needs attention before use.");
       console.log("Please follow the recommendations above and run this script again.");
     }
-    
+
     return health;
   })
   .catch(error => {

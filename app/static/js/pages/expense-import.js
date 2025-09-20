@@ -1,6 +1,6 @@
 /**
  * Expense Import Page
- * 
+ *
  * Handles form validation for expense CSV import functionality.
  * This replaces the inline JavaScript in the expenses/import.html template.
  */

@@ -1,6 +1,6 @@
 /**
  * Places Search Page
- * 
+ *
  * Handles map-based restaurant search functionality and restaurant management.
  * This replaces the inline JavaScript in the places_search.html template.
  */
@@ -29,8 +29,8 @@ function showLocalToast(title, message, type = 'info', actions = null) {
                 ${actions
     .map(
       (action, _index) => `
-                    <button class="btn btn-sm ${action.class || 'btn-light'} me-2" 
-                            data-action="${action.action || 'default'}" 
+                    <button class="btn btn-sm ${action.class || 'btn-light'} me-2"
+                            data-action="${action.action || 'default'}"
                             data-action-data='${JSON.stringify(action.data || {})}'>
                         ${action.icon ? `<i class="${action.icon} me-1"></i>` : ''}${action.text}
                     </button>
@@ -58,14 +58,14 @@ function showLocalToast(title, message, type = 'info', actions = null) {
   toastContainer.insertAdjacentHTML('beforeend', toastHtml);
 
   const toastElement = document.getElementById(toastId);
-    
+
   // Handle action button clicks using event delegation
   toastElement.addEventListener('click', (e) => {
     const button = e.target.closest('button[data-action]');
     if (button) {
       const { action } = button.dataset;
       const actionData = JSON.parse(button.dataset.actionData || '{}');
-            
+
       if (action === 'navigate') {
         window.location.href = actionData.url;
       } else if (action === 'default') {
@@ -79,7 +79,7 @@ function showLocalToast(title, message, type = 'info', actions = null) {
       }
     }
   });
-    
+
   // Auto-dismiss toasts, including warnings and success with actions
   const autohide = type !== 'error';
   const delay = type === 'warning' ? 7000 : type === 'success' ? 4000 : 5000;

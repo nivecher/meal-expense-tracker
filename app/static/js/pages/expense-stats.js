@@ -1,6 +1,6 @@
 /**
  * Expense Stats Page
- * 
+ *
  * Handles Chart.js initialization for expense statistics visualization.
  * This replaces the inline JavaScript in the expenses/stats.html template.
  */
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ],
   };
 
-  new Chart(ctx, {
+  new Chart(ctx, { // eslint-disable-line no-new
     type: 'line',
     data: chartData,
     options: {

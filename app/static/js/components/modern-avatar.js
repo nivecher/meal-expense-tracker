@@ -253,7 +253,7 @@ class ModernAvatarManager {
 
     // Handle email addresses
     if (source.includes('@')) {
-      source = source.split('@')[0];
+      [source] = source.split('@');
     }
 
     // Split by common separators and take first letters
@@ -277,7 +277,7 @@ class ModernAvatarManager {
     // Create a simple hash from the identifier
     let hash = 0;
     for (let i = 0; i < identifier.length; i++) {
-      hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
+      hash = identifier.charCodeAt(i) + ((hash << 5) - hash); // eslint-disable-line no-bitwise
     }
 
     // Use hash to select color consistently

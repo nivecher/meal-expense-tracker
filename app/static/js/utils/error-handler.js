@@ -1,9 +1,9 @@
 /**
  * Enhanced Error Handler
- * 
+ *
  * Provides comprehensive error handling and console management
  * for the Meal Expense Tracker application.
- * 
+ *
  * @version 1.0.0
  * @author Meal Expense Tracker Team
  */
@@ -58,35 +58,35 @@ class ErrorHandler {
       /Bootstrap.*deprecated/i,
       /Bootstrap.*warning/i,
       /Bootstrap.*v5/i,
-      
+
       // jQuery warnings
       /jQuery.*deprecated/i,
       /jQuery.*warning/i,
-      
+
       // Font Awesome warnings
       /Font Awesome.*deprecated/i,
       /Font Awesome.*warning/i,
       /Font Awesome.*v6/i,
-      
+
       // Select2 warnings
       /Select2.*deprecated/i,
       /Select2.*warning/i,
-      
+
       // Chart.js warnings
       /Chart\.js.*deprecated/i,
       /Chart\.js.*warning/i,
-      
+
       // CDN warnings
       /cdn\.jsdelivr\.net/i,
       /cdnjs\.cloudflare\.com/i,
       /code\.jquery\.com/i,
-      
+
       // Browser compatibility warnings
       /webkit.*not supported/i,
       /text-size-adjust.*not supported/i,
       /color-adjust.*not supported/i,
       /CSS.*not supported/i,
-      
+
       // Extension warnings
       /chrome-extension/i,
       /moz-extension/i,
@@ -206,7 +206,7 @@ class ErrorHandler {
 
   handleError(errorInfo) {
     this.errorCount++;
-    
+
     if (this.errors.length < this.options.maxErrors) {
       this.errors.push({
         ...errorInfo,
@@ -245,7 +245,7 @@ class ErrorHandler {
     if (!window.filteredMessages) {
       window.filteredMessages = [];
     }
-    
+
     window.filteredMessages.push({
       type,
       message,

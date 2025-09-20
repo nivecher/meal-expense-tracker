@@ -1,8 +1,8 @@
 /**
  * Console Test Utility
- * 
+ *
  * Tests browser console functionality and error handling
- * 
+ *
  * @version 1.0.0
  * @author Meal Expense Tracker Team
  */
@@ -24,12 +24,12 @@ class ConsoleTest {
 
   runTests() {
     console.log('🧪 Running console tests...');
-    
+
     this.testConsoleMethods();
     this.testErrorHandling();
     this.testPerformance();
     this.testFiltering();
-    
+
     this.displayResults();
   }
 
@@ -39,7 +39,7 @@ class ConsoleTest {
       console.warn('⚠️ Console.warn working');
       console.error('❌ Console.error working');
       console.info('ℹ️ Console.info working');
-      
+
       this.testResults.push({
         test: 'Console Methods',
         status: 'PASS',
@@ -106,7 +106,7 @@ class ConsoleTest {
         }
         const end = performance.now();
         const duration = end - start;
-        
+
         this.testResults.push({
           test: 'Performance API',
           status: 'PASS',
@@ -156,25 +156,25 @@ class ConsoleTest {
 
   displayResults() {
     console.group('🧪 Console Test Results');
-    
+
     const passed = this.testResults.filter((r) => r.status === 'PASS').length;
     const failed = this.testResults.filter((r) => r.status === 'FAIL').length;
     const skipped = this.testResults.filter((r) => r.status === 'SKIP').length;
-    
+
     console.log(`✅ Passed: ${passed}`);
     console.log(`❌ Failed: ${failed}`);
     console.log(`⏭️ Skipped: ${skipped}`);
     console.log(`📊 Total: ${this.testResults.length}`);
-    
+
     console.log('\n📋 Detailed Results:');
     this.testResults.forEach((result, index) => {
-      const icon = result.status === 'PASS' ? '✅' : 
+      const icon = result.status === 'PASS' ? '✅' :
         result.status === 'SKIP' ? '⏭️' : '❌';
       console.log(`${index + 1}. ${icon} ${result.test}: ${result.message}`);
     });
-    
+
     console.groupEnd();
-    
+
     // Store results for external access
     window.consoleTestResults = {
       passed,
@@ -188,9 +188,9 @@ class ConsoleTest {
 }
 
 // Auto-run tests only in development mode and only when explicitly enabled
-if ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && 
+if ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
     window.location.search.includes('debug=console')) {
-  new ConsoleTest();
+  new ConsoleTest(); // eslint-disable-line no-new
 }
 
 // Export for manual testing

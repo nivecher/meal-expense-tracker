@@ -102,10 +102,10 @@ function extractDomain(url) {
 
   try {
     // Remove protocol and www
-    const domain = url
+    const [domain] = url
       .replace(/^https?:\/\//, '')
       .replace(/^www\./, '')
-      .split('/')[0]; // Remove path
+      .split('/'); // Remove path
 
     // Handle edge cases
     if (domain.includes('.')) {
@@ -526,7 +526,7 @@ function suppressFaviconCORSErrors() {
 
   // Override the browser's native error logging for network requests
   const originalError = window.onerror;
-  window.onerror = function(message, _source, _lineno, _colno, _error) {
+  window.onerror = function(message, _source, _lineno, _colno, _error, ...args) {
     if (message && (
       message.includes('t1.gstatic.com/faviconV2') ||
         message.includes('t2.gstatic.com/faviconV2') ||
@@ -537,14 +537,14 @@ function suppressFaviconCORSErrors() {
       return true; // Suppress the error
     }
     if (originalError) {
-      return originalError.apply(this, arguments);
+      return originalError.apply(this, [message, _source, _lineno, _colno, _error, ...args]);
     }
     return false;
   };
 
   // Override the browser's native error logging for network requests
   const originalUnhandledRejection = window.onunhandledrejection;
-  window.onunhandledrejection = function(event) {
+  window.onunhandledrejection = function(event, ...args) {
     if (event.reason && event.reason.message && (
       event.reason.message.includes('t1.gstatic.com/faviconV2') ||
         event.reason.message.includes('t2.gstatic.com/faviconV2') ||
@@ -555,7 +555,7 @@ function suppressFaviconCORSErrors() {
       return false;
     }
     if (originalUnhandledRejection) {
-      return originalUnhandledRejection.apply(this, arguments);
+      return originalUnhandledRejection.apply(this, [event, ...args]);
     }
     return false;
   };
@@ -619,7 +619,7 @@ function suppressFaviconCORSErrors() {
   const originalFetch = window.fetch;
   if (originalFetch) {
     window.fetch = function(...args) {
-      const url = args[0];
+      const [url] = args;
       if (typeof url === 'string' && (
         url.includes('google.com/s2/favicons') ||
           url.includes('t1.gstatic.com/faviconV2') ||

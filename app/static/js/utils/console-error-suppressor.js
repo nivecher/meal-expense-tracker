@@ -1,6 +1,6 @@
 /**
  * Console Error Suppressor
- * 
+ *
  * Suppresses known browser extension and framework errors that clutter the console
  * without affecting application functionality. This runs immediately to prevent
  * errors from appearing in the console.
@@ -15,7 +15,7 @@
 
   console.error = function(...args) {
     const msg = args.join(' ');
-    if (msg && typeof msg === 'string' && (msg.includes('bootstrap-autofill-overlay') || 
+    if (msg && typeof msg === 'string' && (msg.includes('bootstrap-autofill-overlay') ||
             msg.includes('tagName.toLowerCase') ||
             msg.includes('elementIsInstanceOf'))) {
       return; // SILENT SUPPRESSION
@@ -25,17 +25,17 @@
 
   console.warn = function(...args) {
     const msg = args.join(' ');
-    if (msg && typeof msg === 'string' && (msg.includes('bootstrap-autofill-overlay') || 
+    if (msg && typeof msg === 'string' && (msg.includes('bootstrap-autofill-overlay') ||
             msg.includes('tagName.toLowerCase') ||
             msg.includes('elementIsInstanceOf'))) {
       return; // SILENT SUPPRESSION
     }
     originalWarn.apply(console, args);
   };
-    
+
   console.log = function(...args) {
     const msg = args.join(' ');
-    if (msg && typeof msg === 'string' && (msg.includes('bootstrap-autofill-overlay') || 
+    if (msg && typeof msg === 'string' && (msg.includes('bootstrap-autofill-overlay') ||
             msg.includes('tagName.toLowerCase') ||
             msg.includes('elementIsInstanceOf'))) {
       return; // SILENT SUPPRESSION

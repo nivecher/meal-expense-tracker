@@ -1,6 +1,6 @@
 /**
  * Restaurant Import Page
- * 
+ *
  * Handles form validation for restaurant CSV import functionality.
  * This replaces the inline JavaScript in the restaurants/import.html template.
  */

@@ -1,12 +1,12 @@
 /**
  * jQuery Form Submission Fix
- * 
+ *
  * Fixes jQuery overriding HTMLFormElement.prototype.submit
  * This ensures native form submission works properly
  */
 (function() {
   'use strict';
-    
+
   // Store the original submit method
   const originalSubmit = HTMLFormElement.prototype.submit;
 

@@ -1,6 +1,6 @@
 /**
  * Restaurant Form Page
- * 
+ *
  * Handles restaurant form functionality including website opening, place ID management,
  * and restaurant validation. This replaces the inline JavaScript in the restaurants/form.html template.
  */
@@ -17,7 +17,7 @@ function getCSRFToken() {
 function updateWebsiteButton() {
   const websiteField = document.getElementById('website');
   const websiteBtn = document.getElementById('website-btn');
-  
+
   if (websiteField && websiteBtn) {
     const hasWebsite = websiteField.value.trim().length > 0;
     websiteBtn.style.display = hasWebsite ? 'inline-block' : 'none';
@@ -27,7 +27,7 @@ function updateWebsiteButton() {
 function updateValidateButton() {
   const placeIdField = document.getElementById('google_place_id');
   const validateBtn = document.getElementById('validate-restaurant-btn');
-  
+
   if (placeIdField && validateBtn) {
     const hasPlaceId = placeIdField.value.trim().length > 0;
     validateBtn.disabled = !hasPlaceId;
@@ -70,7 +70,7 @@ function updateFormFields(restaurantData) {
   // Update button states
   updateValidateButton();
   updateWebsiteButton();
-  
+
   // Mobile-specific updates
   if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
     // Ensure form fields are properly updated on mobile
@@ -89,7 +89,7 @@ async function refreshFormData() {
     console.log('Starting form data refresh...');
     const restaurantIdField = document.querySelector('[data-restaurant-id]');
     const restaurantId = restaurantIdField ? restaurantIdField.getAttribute('data-restaurant-id') : '';
-    
+
     if (!restaurantId) {
       console.warn('No restaurant ID found for refresh');
       return;
@@ -118,7 +118,7 @@ async function refreshFormData() {
       if (result.status === 'success' && result.data) {
         console.log('Updating form fields with fresh data');
         updateFormFields(result.data);
-        
+
         // Trigger a visual update for mobile devices
         if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
           // Force a reflow on mobile
@@ -145,9 +145,9 @@ function showSuccessMessage(message) {
     ${message}
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   `;
-  
+
   document.body.appendChild(alert);
-  
+
   // Auto-remove after 3 seconds
   setTimeout(() => {
     if (alert.parentNode) {
@@ -167,9 +167,9 @@ function showErrorMessage(message) {
     ${message}
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   `;
-  
+
   document.body.appendChild(alert);
-  
+
   // Auto-remove after 5 seconds
   setTimeout(() => {
     if (alert.parentNode) {
@@ -182,11 +182,11 @@ function showValidationLoading() {
   const modal = document.getElementById('validationModal');
   const loadingDiv = document.getElementById('validation-loading');
   const resultsDiv = document.getElementById('validation-results');
-  
+
   if (modal && loadingDiv && resultsDiv) {
     loadingDiv.classList.remove('d-none');
     resultsDiv.classList.add('d-none');
-    
+
     // Show the modal (accessibility is handled by global event listeners)
     const bsModal = new bootstrap.Modal(modal, {
       focus: true,
@@ -194,7 +194,7 @@ function showValidationLoading() {
       backdrop: true,
       static: false,
     });
-    
+
     bsModal.show();
   }
 }
@@ -205,22 +205,22 @@ function showValidationError(message) {
   const resultsDiv = document.getElementById('validation-results');
   const errorDiv = document.getElementById('validation-error');
   const successDiv = document.getElementById('validation-success');
-  
+
   if (modal && loadingDiv && resultsDiv && errorDiv && successDiv) {
     loadingDiv.classList.add('d-none');
     resultsDiv.classList.remove('d-none');
     successDiv.classList.add('d-none');
     errorDiv.classList.remove('d-none');
-    
+
     const errorMessageDiv = document.getElementById('validation-error-message');
     if (errorMessageDiv) {
       errorMessageDiv.textContent = message;
     }
-    
+
     // Properly manage accessibility attributes
     modal.removeAttribute('aria-hidden');
     modal.setAttribute('aria-modal', 'true');
-    
+
     // Show the modal with proper focus management
     const bsModal = new bootstrap.Modal(modal, {
       focus: true,
@@ -228,9 +228,9 @@ function showValidationError(message) {
       backdrop: true,
       static: false,
     });
-    
+
     bsModal.show();
-    
+
     // Set focus to the modal content after it's shown
     setTimeout(() => {
       const modalContent = modal.querySelector('.modal-content');
@@ -267,14 +267,14 @@ async function applyFixes(_fixes) {
     });
 
     const result = await response.json();
-    
+
     if (result.status === 'success') {
       if (result.data.restaurant_updated) {
         showSuccessMessage('Restaurant information updated successfully!');
       } else {
         showSuccessMessage('No changes were needed - restaurant information is already up to date.');
       }
-      
+
       // Close the modal (form refresh will be handled by global event listener)
       const modal = document.getElementById('validationModal');
       if (modal) {
@@ -298,7 +298,7 @@ function showValidationResults(results) {
   const resultsDiv = document.getElementById('validation-results');
   const successDiv = document.getElementById('validation-success');
   const errorDiv = document.getElementById('validation-error');
-  
+
   if (!modal || !loadingDiv || !resultsDiv || !successDiv || !errorDiv) return;
 
   loadingDiv.classList.add('d-none');
@@ -308,34 +308,34 @@ function showValidationResults(results) {
 
   if (results.status === 'success' && results.data) {
     const { data } = results;
-    
+
     // Show mismatches if any
     const mismatchesDiv = document.getElementById('validation-mismatches');
     const noMismatchesDiv = document.getElementById('validation-no-mismatches');
     const mismatchListDiv = document.getElementById('mismatch-list');
     const applyFixesBtn = document.getElementById('apply-fixes-btn');
-    
+
     if (data.mismatches && data.mismatches.length > 0) {
       // Show mismatches
       mismatchesDiv.classList.remove('d-none');
       noMismatchesDiv.classList.add('d-none');
-      
+
       // Populate mismatch list
       if (mismatchListDiv) {
-        mismatchListDiv.innerHTML = data.mismatches.map((mismatch) => 
+        mismatchListDiv.innerHTML = data.mismatches.map((mismatch) =>
           `<div class="alert alert-warning mb-2"><i class="fas fa-exclamation-triangle me-2"></i>${mismatch}</div>`,
         ).join('');
       }
-      
+
       // Show apply fixes button
       if (applyFixesBtn) {
         applyFixesBtn.classList.remove('d-none');
-        
+
         // Use both click and touch events for mobile compatibility
         const handleApplyFixes = () => applyFixes(data.fixes);
         applyFixesBtn.onclick = handleApplyFixes;
         applyFixesBtn.ontouchend = handleApplyFixes;
-        
+
         // Ensure button is touch-friendly on mobile
         if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
           applyFixesBtn.style.minHeight = '44px'; // iOS recommended touch target size
@@ -346,17 +346,17 @@ function showValidationResults(results) {
       // No mismatches
       mismatchesDiv.classList.add('d-none');
       noMismatchesDiv.classList.remove('d-none');
-      
+
       // Hide apply fixes button
       if (applyFixesBtn) {
         applyFixesBtn.classList.add('d-none');
       }
     }
-    
+
     // Properly manage accessibility attributes
     modal.removeAttribute('aria-hidden');
     modal.setAttribute('aria-modal', 'true');
-    
+
     // Show the modal with proper focus management
     const bsModal = new bootstrap.Modal(modal, {
       focus: true,
@@ -364,9 +364,9 @@ function showValidationResults(results) {
       backdrop: true,
       static: false,
     });
-    
+
     bsModal.show();
-    
+
     // Set focus to the modal content after it's shown
     setTimeout(() => {
       const modalContent = modal.querySelector('.modal-content');
@@ -509,7 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
     validationModal.addEventListener('show.bs.modal', () => {
       validationModal.removeAttribute('aria-hidden');
       validationModal.setAttribute('aria-modal', 'true');
-      
+
       // Set focus to the first focusable element
       setTimeout(() => {
         const firstFocusable = validationModal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');

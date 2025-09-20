@@ -1,6 +1,6 @@
 /**
  * Admin Base Page
- * 
+ *
  * Handles admin-specific functionality like confirmation dialogs for dangerous actions.
  * This replaces the inline JavaScript in the admin/base.html template.
  */

@@ -3,6 +3,7 @@
 ## Quick Start
 
 1. **Install MCP Server**: Run `./scripts/setup-mcp.sh` or manually install:
+
    ```bash
    npm install -g @modelcontextprotocol/server-playwright
    ```
@@ -20,6 +21,7 @@
 ## Essential Commands
 
 ### 1. Basic Navigation and Setup
+
 ```javascript
 // Navigate to app
 await mcp_playwright_browser_navigate({ url: "http://localhost:5000" });
@@ -29,54 +31,68 @@ await mcp_playwright_browser_wait_for({ selector: "body" });
 await mcp_playwright_browser_evaluate({
   expression: `
     // [Paste the console debugger script here]
-  `
+  `,
 });
 ```
 
 ### 2. Check Console Status
+
 ```javascript
 // Get console summary
 const summary = await mcp_playwright_browser_evaluate({
-  expression: "window.getConsoleSummary()"
+  expression: "window.getConsoleSummary()",
 });
 console.log("Console summary:", summary);
 ```
 
 ### 3. Test Key Pages
+
 ```javascript
 // Home page
 await mcp_playwright_browser_navigate({ url: "http://localhost:5000/" });
 const homeConsole = await mcp_playwright_browser_evaluate({
-  expression: "window.getConsoleSummary()"
+  expression: "window.getConsoleSummary()",
 });
 
 // Login page
-await mcp_playwright_browser_navigate({ url: "http://localhost:5000/auth/login" });
+await mcp_playwright_browser_navigate({
+  url: "http://localhost:5000/auth/login",
+});
 const loginConsole = await mcp_playwright_browser_evaluate({
-  expression: "window.getConsoleSummary()"
+  expression: "window.getConsoleSummary()",
 });
 
 // Login and go to expenses
-await mcp_playwright_browser_fill({ selector: "input[name='username']", value: "testuser_1" });
-await mcp_playwright_browser_fill({ selector: "input[name='password']", value: "testpass" });
+await mcp_playwright_browser_fill({
+  selector: "input[name='username']",
+  value: "testuser_1",
+});
+await mcp_playwright_browser_fill({
+  selector: "input[name='password']",
+  value: "testpass",
+});
 await mcp_playwright_browser_click({ selector: "button[type='submit']" });
 await mcp_playwright_browser_wait_for({ selector: "body" });
 
-await mcp_playwright_browser_navigate({ url: "http://localhost:5000/expenses" });
+await mcp_playwright_browser_navigate({
+  url: "http://localhost:5000/expenses",
+});
 const expensesConsole = await mcp_playwright_browser_evaluate({
-  expression: "window.getConsoleSummary()"
+  expression: "window.getConsoleSummary()",
 });
 ```
 
 ### 4. Check for Critical Errors
+
 ```javascript
 const criticalErrors = await mcp_playwright_browser_evaluate({
-  expression: "window.getCriticalErrors()"
+  expression: "window.getCriticalErrors()",
 });
 console.log("Critical errors:", criticalErrors);
 ```
 
 ### 5. Check Expenses Display
+
 ```javascript
 const expensesStatus = await mcp_playwright_browser_evaluate({
   expression: `
@@ -86,7 +102,7 @@ const expensesStatus = await mcp_playwright_browser_evaluate({
       noExpenses: !!document.querySelector('.text-center.py-5'),
       expensesCount: document.querySelector('#card-view-container')?.children.length || 0
     }
-  `
+  `,
 });
 console.log("Expenses display:", expensesStatus);
 ```
@@ -98,38 +114,47 @@ Use the complete script from `scripts/mcp-console-debug.js` for comprehensive te
 ## Common Issues and Solutions
 
 ### Issue: Expenses not displaying
-**Check**: 
+
+**Check**:
+
 ```javascript
 const expensesStatus = await mcp_playwright_browser_evaluate({
-  expression: "document.querySelector('#card-view-container')?.children.length || 0"
+  expression:
+    "document.querySelector('#card-view-container')?.children.length || 0",
 });
 ```
 
 **Possible causes**:
+
 - JavaScript errors preventing page load
 - Database connection issues
 - Authentication problems
 - Template rendering errors
 
 ### Issue: Console errors
+
 **Check**:
+
 ```javascript
 const errors = await mcp_playwright_browser_evaluate({
-  expression: "window.consoleDebugger.errors"
+  expression: "window.consoleDebugger.errors",
 });
 ```
 
 **Common fixes**:
+
 - Fix JavaScript syntax errors
 - Update module imports
 - Fix undefined variables
 - Resolve library conflicts
 
 ### Issue: Performance problems
+
 **Check**:
+
 ```javascript
 const performance = await mcp_playwright_browser_evaluate({
-  expression: "performance.getEntriesByType('navigation')[0]"
+  expression: "performance.getEntriesByType('navigation')[0]",
 });
 ```
 

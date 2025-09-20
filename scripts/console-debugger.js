@@ -1,15 +1,15 @@
 /**
  * Browser Console Debugger Script
- * 
+ *
  * This script can be injected into the browser using the MCP server
  * to identify and fix console issues in the Meal Expense Tracker.
- * 
+ *
  * Usage with MCP Browser Server:
  * 1. Navigate to the application
  * 2. Inject this script using evaluateJavaScript
  * 3. Run the debugging functions
  * 4. Analyze the results
- * 
+ *
  * @version 1.0.0
  * @author Meal Expense Tracker Team
  */
@@ -26,7 +26,7 @@
       this.logs = [];
       this.performanceIssues = [];
       this.moduleErrors = [];
-      
+
       this.originalConsole = {
         log: console.log,
         warn: console.warn,
@@ -34,7 +34,7 @@
         info: console.info,
         debug: console.debug,
       };
-      
+
       this.startMonitoring();
     }
 
@@ -135,7 +135,7 @@
         /webkit.*not supported/i,
       ];
 
-      return this.errors.filter(error => 
+      return this.errors.filter(error =>
         !filteredPatterns.some(pattern => pattern.test(error.message))
       );
     }
@@ -154,13 +154,13 @@
         /webkit.*not supported/i,
       ];
 
-      return this.messages.filter(msg => 
+      return this.messages.filter(msg =>
         !filteredPatterns.some(pattern => pattern.test(msg.message))
       );
     }
 
     getModuleErrors() {
-      return this.errors.filter(error => 
+      return this.errors.filter(error =>
         error.message.includes('Failed to load') ||
         error.message.includes('Module not found') ||
         error.message.includes('import') ||
@@ -170,7 +170,7 @@
     }
 
     getPerformanceIssues() {
-      return this.warnings.filter(warning => 
+      return this.warnings.filter(warning =>
         warning.message.includes('performance') ||
         warning.message.includes('slow') ||
         warning.message.includes('timeout') ||
@@ -199,7 +199,7 @@
     // Diagnostic methods
     checkJavaScriptModules() {
       const issues = [];
-      
+
       // Check if main modules are loaded
       const mainScript = document.querySelector('script[src*="main.js"]');
       if (!mainScript) {
@@ -222,9 +222,9 @@
 
     checkConsoleFiltering() {
       const issues = [];
-      
+
       // Check if console filter is active
-      if (typeof window.filteredWarnings === 'undefined' && 
+      if (typeof window.filteredWarnings === 'undefined' &&
           typeof window.showFilteredWarnings !== 'function') {
         issues.push('Console filtering not active');
       }
@@ -240,7 +240,7 @@
 
     checkPerformance() {
       const issues = [];
-      
+
       // Check page load performance
       const navigation = performance.getEntriesByType('navigation')[0];
       if (navigation) {

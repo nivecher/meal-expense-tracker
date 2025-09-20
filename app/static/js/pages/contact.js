@@ -1,6 +1,6 @@
 /**
  * Contact Page
- * 
+ *
  * Handles contact form validation functionality.
  * This replaces the inline JavaScript in the main/contact.html template.
  */

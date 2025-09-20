@@ -1,9 +1,73 @@
 /**
  * Auth Forms Handler
- * 
+ *
  * Handles authentication form submission, error logging, and validation display.
  * This replaces the inline JavaScript in the base_auth.html template.
  */
+
+// Helper function to display validation errors
+function displayValidationErrors(form, errors) {
+  // Clear existing errors
+  form.querySelectorAll('.text-danger').forEach((el) => el.remove());
+  form.querySelectorAll('.is-invalid').forEach((el) => el.classList.remove('is-invalid'));
+
+  // Display new errors
+  for (const [fieldName, errorMessages] of Object.entries(errors)) {
+    const field = form.querySelector(`[name="${fieldName}"]`);
+    if (field) {
+      field.classList.add('is-invalid');
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'text-danger mt-1';
+      errorDiv.textContent = Array.isArray(errorMessages) ? errorMessages[0] : errorMessages;
+      field.parentNode.appendChild(errorDiv);
+    }
+  }
+}
+
+// Helper function to show error message
+function showErrorMessage(message) {
+  // Remove existing alerts
+  document.querySelectorAll('.alert-danger').forEach((el) => el.remove());
+
+  // Create new alert
+  const alertDiv = document.createElement('div');
+  alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+  alertDiv.innerHTML = `
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  `;
+
+  // Insert at the top of the form
+  const form = document.querySelector('form');
+  if (form) {
+    form.insertBefore(alertDiv, form.firstChild);
+  }
+}
+
+async function handleErrorResponse(response, form) {
+  console.error('Response failed with status:', response.status);
+
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    try {
+      const errorData = await response.json();
+      console.error('Form validation errors:', errorData);
+
+      // Display validation errors
+      if (errorData.errors) {
+        displayValidationErrors(form, errorData.errors);
+      } else if (errorData.message) {
+        showErrorMessage(errorData.message);
+      }
+      return;
+    } catch (e) {
+      console.error('Failed to parse error response:', e);
+    }
+  }
+
+  console.error('Form submission failed:', response.status, response.statusText);
+  // Don't reload to preserve error info for debugging
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   // Add error logging that persists across redirects
@@ -26,43 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Previous error found:', lastError);
     // Clear it after logging
     localStorage.removeItem('lastError');
-  }
-
-  // Helper function to display validation errors
-  function displayValidationErrors(form, errors) {
-    // Clear existing errors
-    form.querySelectorAll('.text-danger').forEach((el) => el.remove());
-    form.querySelectorAll('.is-invalid').forEach((el) => el.classList.remove('is-invalid'));
-
-    // Display new errors
-    for (const [fieldName, errorMessages] of Object.entries(errors)) {
-      const field = form.querySelector(`[name="${fieldName}"]`);
-      if (field) {
-        field.classList.add('is-invalid');
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'text-danger mt-1';
-        errorDiv.textContent = Array.isArray(errorMessages) ? errorMessages[0] : errorMessages;
-        field.parentNode.appendChild(errorDiv);
-      }
-    }
-  }
-
-  // Helper function to show error message
-  function showErrorMessage(message) {
-    // Remove existing alerts
-    document.querySelectorAll('.alert-danger').forEach((el) => el.remove());
-
-    // Create and show error alert
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
-    alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-
-    // Find the form container and prepend the alert
-    const container = document.querySelector('.container') || document.body;
-    container.insertBefore(alertDiv, container.firstChild);
   }
 
   // Simple form submission handler for auth forms
@@ -131,29 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
           // For HTML responses, reload the page to show any messages
           window.location.reload();
         } else {
-          // Handle error responses
-          console.error('Response failed with status:', response.status);
-
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            try {
-              const errorData = await response.json();
-              console.error('Form validation errors:', errorData);
-
-              // Display validation errors
-              if (errorData.errors) {
-                displayValidationErrors(form, errorData.errors);
-              } else if (errorData.message) {
-                showErrorMessage(errorData.message);
-              }
-              return;
-            } catch (e) {
-              console.error('Failed to parse error response:', e);
-            }
-          }
-
-          console.error('Form submission failed:', response.status, response.statusText);
-          // Don't reload to preserve error info for debugging
+          await handleErrorResponse(response, form);
         }
       } catch {
         console.error('Form submission error:', error);

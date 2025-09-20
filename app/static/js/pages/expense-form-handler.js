@@ -66,7 +66,7 @@ function showFormErrors(form, errors) {
 
       // Set error message
       if (Array.isArray(errorMessages)) {
-        errorDiv.textContent = errorMessages[0];
+        [errorDiv.textContent] = errorMessages;
       } else if (typeof errorMessages === 'object' && errorMessages !== null) {
         errorDiv.textContent = Object.values(errorMessages)[0]?.[0] || 'Invalid value';
       } else {

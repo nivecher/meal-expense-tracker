@@ -1,6 +1,6 @@
 /**
  * Admin Create User Page
- * 
+ *
  * Handles form validation and confirmation for user creation functionality.
  * This replaces the inline JavaScript in the admin/create_user.html template.
  */

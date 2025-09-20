@@ -11,6 +11,7 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 **Error**: `mcp_playwright_browser_navigate is not defined`
 
 **Causes**:
+
 - MCP server not installed
 - MCP configuration incorrect
 - Cursor not restarted after configuration changes
@@ -18,21 +19,25 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 **Solutions**:
 
 1. **Install MCP Playwright Server**:
+
    ```bash
    npm install -g @modelcontextprotocol/server-playwright
    ```
 
 2. **Verify Installation**:
+
    ```bash
    npx @modelcontextprotocol/server-playwright --help
    ```
 
 3. **Check MCP Configuration**:
+
    ```bash
    cat ~/.cursor/mcp.json
    ```
-   
+
    Should contain:
+
    ```json
    {
      "mcpServers": {
@@ -55,6 +60,7 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 **Error**: `Navigation failed` or `Connection refused`
 
 **Causes**:
+
 - Application not started
 - Wrong port number
 - Firewall blocking connection
@@ -62,6 +68,7 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 **Solutions**:
 
 1. **Start the Application**:
+
    ```bash
    cd /home/mtd37/workspace/meal-expense-tracker
    source venv/bin/activate
@@ -69,6 +76,7 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
    ```
 
 2. **Check if Application is Running**:
+
    ```bash
    curl http://localhost:5000
    ```
@@ -82,6 +90,7 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 **Error**: `Browser launch failed` or `Page not found`
 
 **Causes**:
+
 - Playwright browser not installed
 - Insufficient permissions
 - Network issues
@@ -89,11 +98,13 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 **Solutions**:
 
 1. **Install Playwright Browsers**:
+
    ```bash
    npx playwright install
    ```
 
 2. **Check Permissions**:
+
    ```bash
    ls -la ~/.cache/ms-playwright/
    ```
@@ -108,6 +119,7 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 **Error**: `Console debugger not loaded` or `getConsoleSummary is not a function`
 
 **Causes**:
+
 - Script injection failed
 - JavaScript errors preventing execution
 - Page not fully loaded
@@ -115,29 +127,32 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 **Solutions**:
 
 1. **Check Script Injection**:
+
    ```javascript
    await mcp_playwright_browser_evaluate({
-     expression: "typeof window.consoleDebugger"
+     expression: "typeof window.consoleDebugger",
    });
    ```
 
 2. **Verify Page Load**:
+
    ```javascript
    await mcp_playwright_browser_wait_for({
-     selector: "body"
+     selector: "body",
    });
    ```
 
 3. **Check for JavaScript Errors**:
    ```javascript
    await mcp_playwright_browser_evaluate({
-     expression: "window.consoleDebugger.errors"
+     expression: "window.consoleDebugger.errors",
    });
    ```
 
 ### 5. Performance Issues
 
 **Symptoms**:
+
 - Slow page loads
 - Timeout errors
 - Memory issues
@@ -145,17 +160,19 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 **Solutions**:
 
 1. **Optimize Browser Settings**:
+
    ```javascript
    await mcp_playwright_browser_navigate({
      url: "http://localhost:5000",
      options: {
        waitUntil: "networkidle",
-       timeout: 30000
-     }
+       timeout: 30000,
+     },
    });
    ```
 
 2. **Check System Resources**:
+
    ```bash
    free -h
    top -p $(pgrep -f "playwright")
@@ -169,6 +186,7 @@ This guide helps you troubleshoot common issues with the Model Context Protocol 
 ## Diagnostic Commands
 
 ### Check MCP Server Status
+
 ```bash
 # Check if MCP server is running
 ps aux | grep playwright
@@ -181,6 +199,7 @@ npx @modelcontextprotocol/server-playwright --help
 ```
 
 ### Check Application Status
+
 ```bash
 # Check if application is running
 ps aux | grep python | grep app.py
@@ -193,6 +212,7 @@ tail -f /var/log/meal-expense-tracker.log
 ```
 
 ### Check Browser Status
+
 ```bash
 # Check Playwright installation
 npx playwright --version
@@ -207,11 +227,12 @@ npx playwright test --headed --browser=chromium
 ## Debugging Steps
 
 ### 1. Basic Connectivity Test
+
 ```javascript
 // Test basic MCP functionality
 try {
   await mcp_playwright_browser_navigate({
-    url: "http://localhost:5000"
+    url: "http://localhost:5000",
   });
   console.log("✅ Basic navigation works");
 } catch (error) {
@@ -220,11 +241,12 @@ try {
 ```
 
 ### 2. Page Load Test
+
 ```javascript
 // Test page loading
 try {
   await mcp_playwright_browser_wait_for({
-    selector: "body"
+    selector: "body",
   });
   console.log("✅ Page loaded successfully");
 } catch (error) {
@@ -233,11 +255,12 @@ try {
 ```
 
 ### 3. JavaScript Execution Test
+
 ```javascript
 // Test JavaScript execution
 try {
   const result = await mcp_playwright_browser_evaluate({
-    expression: "document.title"
+    expression: "document.title",
   });
   console.log("✅ JavaScript execution works:", result);
 } catch (error) {
@@ -246,6 +269,7 @@ try {
 ```
 
 ### 4. Console Debugging Test
+
 ```javascript
 // Test console debugging
 try {
@@ -255,7 +279,7 @@ try {
         throw new Error('Console debugger not loaded');
       }
       window.consoleDebugger.getSummary();
-    `
+    `,
   });
   console.log("✅ Console debugging works");
 } catch (error) {
@@ -266,6 +290,7 @@ try {
 ## Advanced Troubleshooting
 
 ### 1. Network Issues
+
 ```bash
 # Check network connectivity
 ping localhost
@@ -277,6 +302,7 @@ sudo iptables -L
 ```
 
 ### 2. Permission Issues
+
 ```bash
 # Check file permissions
 ls -la ~/.cursor/
@@ -288,6 +314,7 @@ chmod -R 755 ~/.cache/ms-playwright/
 ```
 
 ### 3. Resource Issues
+
 ```bash
 # Check memory usage
 free -h
@@ -299,6 +326,7 @@ du -sh ~/.cache/ms-playwright/
 ```
 
 ### 4. Configuration Issues
+
 ```bash
 # Validate JSON configuration
 python -m json.tool ~/.cursor/mcp.json
@@ -314,6 +342,7 @@ npx playwright --version
 ## Getting Help
 
 ### 1. Check Logs
+
 ```bash
 # Application logs
 tail -f /var/log/meal-expense-tracker.log
@@ -326,6 +355,7 @@ ls -la ~/.cache/ms-playwright/
 ```
 
 ### 2. Enable Debug Mode
+
 ```bash
 # Enable MCP debug mode
 export DEBUG=mcp:*
@@ -337,6 +367,7 @@ npx playwright test --headed
 ```
 
 ### 3. Create Support Package
+
 ```bash
 # Create diagnostic package
 mkdir -p /tmp/mcp-debug
@@ -350,18 +381,21 @@ tar -czf /tmp/mcp-debug.tar.gz /tmp/mcp-debug/
 ## Prevention
 
 ### 1. Regular Maintenance
+
 - Update MCP server regularly
 - Clean browser cache periodically
 - Monitor system resources
 - Keep application updated
 
 ### 2. Best Practices
+
 - Always restart Cursor after configuration changes
 - Test MCP functionality before running complex scripts
 - Use proper error handling in scripts
 - Keep debugging scripts up to date
 
 ### 3. Monitoring
+
 - Set up application monitoring
 - Monitor system resources
 - Track MCP server performance
@@ -370,6 +404,7 @@ tar -czf /tmp/mcp-debug.tar.gz /tmp/mcp-debug/
 ## Quick Fixes
 
 ### Reset MCP Configuration
+
 ```bash
 # Backup current configuration
 cp ~/.cursor/mcp.json ~/.cursor/mcp.json.backup
@@ -392,6 +427,7 @@ EOF
 ```
 
 ### Reinstall MCP Server
+
 ```bash
 # Uninstall
 npm uninstall -g @modelcontextprotocol/server-playwright
@@ -403,6 +439,7 @@ npm install -g @modelcontextprotocol/server-playwright
 ```
 
 ### Clear Browser Cache
+
 ```bash
 # Clear Playwright cache
 rm -rf ~/.cache/ms-playwright/
@@ -421,6 +458,7 @@ If you continue to experience issues:
 4. **Contact the development team** with detailed error information
 
 Include in your support request:
+
 - Error messages
 - System information
 - Steps to reproduce

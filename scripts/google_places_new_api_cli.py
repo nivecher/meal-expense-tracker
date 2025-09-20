@@ -15,7 +15,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import requests
 from dotenv import load_dotenv

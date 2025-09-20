@@ -1,6 +1,6 @@
 /**
  * Restaurant Search Page
- * 
+ *
  * Handles auto-submit form functionality and cookie management for restaurant search.
  * This replaces the inline JavaScript in the restaurants/search.html template.
  */

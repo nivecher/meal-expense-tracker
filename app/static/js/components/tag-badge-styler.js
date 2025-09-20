@@ -1,6 +1,6 @@
 /**
  * Tag Badge Styler
- * 
+ *
  * Applies custom styling to tag badges based on their data-tag-color attribute.
  * This ensures consistent styling across all pages that display tag badges.
  */

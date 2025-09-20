@@ -151,17 +151,17 @@ function initUI() {
   // Bootstrap tooltips - check if bootstrap is available
   if (typeof bootstrap !== 'undefined') {
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
-      new bootstrap.Tooltip(el);
+      new bootstrap.Tooltip(el); // eslint-disable-line no-new
     });
 
     // Bootstrap popovers
     document.querySelectorAll('[data-bs-toggle="popover"]').forEach((el) => {
-      new bootstrap.Popover(el, { html: true });
+      new bootstrap.Popover(el, { html: true }); // eslint-disable-line no-new
     });
 
     // Bootstrap dropdowns - Initialize manually for reliability
     document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach((el) => {
-      new bootstrap.Dropdown(el);
+      new bootstrap.Dropdown(el); // eslint-disable-line no-new
     });
   }
 
@@ -202,7 +202,7 @@ async function init() {
     initNotifications();
 
     // Initialize event handlers (replaces inline onclick handlers)
-    new EventHandlers();
+    new EventHandlers(); // eslint-disable-line no-new
 
     // Initialize tag color watcher for dynamically added content
     initTagColorWatcher();

@@ -26,7 +26,7 @@ class TagManager {
     // Initialize new tooltips
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     tooltipTriggerList.forEach((tooltipTriggerEl) => {
-      new bootstrap.Tooltip(tooltipTriggerEl);
+      new bootstrap.Tooltip(tooltipTriggerEl); // eslint-disable-line no-new
     });
   }
 

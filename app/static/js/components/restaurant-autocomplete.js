@@ -154,7 +154,7 @@ class RestaurantAutocomplete {
     }
   }
 
-  async getUserLocation() {
+  async getUserLocation() { // eslint-disable-line require-await
     return new Promise((resolve) => {
       if (!navigator.geolocation) {
         console.log('Geolocation not supported');
@@ -791,7 +791,7 @@ function initRestaurantAutocomplete() {
   inputs.forEach((input, index) => {
     console.log('Initializing restaurant autocomplete for input', index, input);
     try {
-      new RestaurantAutocomplete(input);
+      new RestaurantAutocomplete(input); // eslint-disable-line no-new
       console.log('Successfully initialized autocomplete for input', index);
     } catch {
       console.error('Failed to initialize autocomplete for input', index, error);

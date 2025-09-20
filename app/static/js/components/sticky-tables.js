@@ -154,7 +154,7 @@ class StickyTable {
     );
 
     stickyContainers.forEach((container) => {
-      new StickyTable(container);
+      new StickyTable(container); // eslint-disable-line no-new
     });
   }
 

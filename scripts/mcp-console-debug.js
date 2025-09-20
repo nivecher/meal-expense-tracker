@@ -1,9 +1,9 @@
 /**
  * MCP Browser Console Debugging Script
- * 
+ *
  * This script provides ready-to-use MCP browser commands
  * for debugging console issues in the Meal Expense Tracker.
- * 
+ *
  * Copy and paste these commands into your MCP browser session.
  */
 
@@ -38,7 +38,7 @@ await mcp_playwright_browser_evaluate({
   expression: `
     (function() {
       'use strict';
-      
+
       class ConsoleDebugger {
         constructor() {
           this.messages = [];
@@ -140,7 +140,7 @@ await mcp_playwright_browser_evaluate({
             /webkit.*not supported/i,
           ];
 
-          return this.errors.filter(error => 
+          return this.errors.filter(error =>
             !filteredPatterns.some(pattern => pattern.test(error.message))
           );
         }
@@ -160,7 +160,7 @@ await mcp_playwright_browser_evaluate({
       window.consoleDebugger = new ConsoleDebugger();
       window.getConsoleSummary = () => window.consoleDebugger.getSummary();
       window.getCriticalErrors = () => window.consoleDebugger.getCriticalErrors();
-      
+
       console.log('🔧 Console Debugger active');
     })();
   `
@@ -312,7 +312,7 @@ const expensesVisible = await mcp_playwright_browser_evaluate({
     const cardContainer = document.querySelector('#card-view-container');
     const tableContainer = document.querySelector('#table-view-container');
     const noExpenses = document.querySelector('.text-center.py-5');
-    
+
     return {
       cardContainer: !!cardContainer,
       tableContainer: !!tableContainer,
@@ -329,7 +329,7 @@ console.log("Expenses display status:", expensesVisible);
 // Check for JavaScript errors that might prevent expenses from loading
 const jsErrors = await mcp_playwright_browser_evaluate({
   expression: `
-    window.consoleDebugger.errors.filter(error => 
+    window.consoleDebugger.errors.filter(error =>
       error.message.includes('expense') ||
       error.message.includes('Expense') ||
       error.message.includes('module') ||

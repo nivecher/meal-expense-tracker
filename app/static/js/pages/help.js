@@ -1,6 +1,6 @@
 /**
  * Help Page
- * 
+ *
  * Handles auto-expand functionality and enhanced navigation for accordion sections.
  * This replaces the inline JavaScript in the main/help.html template.
  */
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (targetElement && targetElement.classList.contains('accordion-item')) {
       const collapseElement = targetElement.querySelector('.accordion-collapse');
       if (collapseElement) {
-        new bootstrap.Collapse(collapseElement, { show: true });
+        new bootstrap.Collapse(collapseElement, { show: true }); // eslint-disable-line no-new
       }
     }
   }
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
           } else {
             // Open the accordion section using Bootstrap's Collapse API
-            new bootstrap.Collapse(collapseElement, { show: true });
+            new bootstrap.Collapse(collapseElement, { show: true }); // eslint-disable-line no-new
 
             // Wait for the collapse animation to complete, then scroll
             collapseElement.addEventListener(

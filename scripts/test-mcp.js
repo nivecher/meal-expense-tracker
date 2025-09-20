@@ -1,9 +1,9 @@
 /**
  * MCP Browser Testing Script
- * 
+ *
  * This script tests the MCP browser automation functionality
  * for the Meal Expense Tracker application.
- * 
+ *
  * Usage: Run this script in a Cursor session with MCP enabled
  */
 
@@ -13,7 +13,7 @@
 
 async function testMCPBrowser() {
   console.log("🧪 Starting MCP Browser Testing Suite...");
-  
+
   const results = {
     tests: [],
     errors: [],
@@ -27,11 +27,11 @@ async function testMCPBrowser() {
   // Test 1: Check MCP tools availability
   try {
     console.log("🔍 Test 1: Checking MCP tools availability...");
-    
+
     if (typeof mcp_playwright_browser_navigate === 'undefined') {
       throw new Error("MCP Playwright browser tools not available");
     }
-    
+
     results.tests.push({
       name: "MCP Tools Availability",
       status: "PASSED",
@@ -52,15 +52,15 @@ async function testMCPBrowser() {
   // Test 2: Navigate to application
   try {
     console.log("🔍 Test 2: Navigating to application...");
-    
+
     await mcp_playwright_browser_navigate({
       url: "http://localhost:5000"
     });
-    
+
     await mcp_playwright_browser_wait_for({
       selector: "body"
     });
-    
+
     results.tests.push({
       name: "Application Navigation",
       status: "PASSED",
@@ -81,11 +81,11 @@ async function testMCPBrowser() {
   // Test 3: Check page title
   try {
     console.log("🔍 Test 3: Checking page title...");
-    
+
     const title = await mcp_playwright_browser_evaluate({
       expression: "document.title"
     });
-    
+
     if (title && title.includes("Meal Expense Tracker")) {
       results.tests.push({
         name: "Page Title",
@@ -110,7 +110,7 @@ async function testMCPBrowser() {
   // Test 4: Check for JavaScript errors
   try {
     console.log("🔍 Test 4: Checking for JavaScript errors...");
-    
+
     const jsErrors = await mcp_playwright_browser_evaluate({
       expression: `
         (function() {
@@ -120,24 +120,24 @@ async function testMCPBrowser() {
             errors.push(args.join(' '));
             originalError.apply(console, args);
           };
-          
+
           // Trigger any pending errors
           setTimeout(() => {
             window.jsErrors = errors;
           }, 1000);
-          
+
           return errors;
         })()
       `
     });
-    
+
     // Wait a bit for errors to accumulate
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
+
     const finalErrors = await mcp_playwright_browser_evaluate({
       expression: "window.jsErrors || []"
     });
-    
+
     if (finalErrors.length === 0) {
       results.tests.push({
         name: "JavaScript Errors",
@@ -167,21 +167,21 @@ async function testMCPBrowser() {
   // Test 5: Test form interaction
   try {
     console.log("🔍 Test 5: Testing form interaction...");
-    
+
     // Navigate to login page
     await mcp_playwright_browser_navigate({
       url: "http://localhost:5000/auth/login"
     });
-    
+
     await mcp_playwright_browser_wait_for({
       selector: "body"
     });
-    
+
     // Check if login form exists
     const formExists = await mcp_playwright_browser_evaluate({
       expression: "!!document.querySelector('form')"
     });
-    
+
     if (formExists) {
       results.tests.push({
         name: "Form Interaction",
@@ -206,7 +206,7 @@ async function testMCPBrowser() {
   // Test 6: Test responsive design
   try {
     console.log("🔍 Test 6: Testing responsive design...");
-    
+
     // Test mobile viewport
     await mcp_playwright_browser_evaluate({
       expression: `
@@ -223,12 +223,12 @@ async function testMCPBrowser() {
         window.dispatchEvent(new Event('resize'));
       `
     });
-    
+
     // Check if page is responsive
     const isResponsive = await mcp_playwright_browser_evaluate({
       expression: "window.innerWidth === 375 && window.innerHeight === 667"
     });
-    
+
     if (isResponsive) {
       results.tests.push({
         name: "Responsive Design",
@@ -253,25 +253,25 @@ async function testMCPBrowser() {
   // Generate final report
   console.log("\n📊 MCP Browser Testing Results:");
   console.log("=====================================");
-  
+
   results.tests.forEach((test, index) => {
     const status = test.status === "PASSED" ? "✅" : test.status === "WARNING" ? "⚠️" : "❌";
     console.log(`${index + 1}. ${status} ${test.name}: ${test.message}`);
   });
-  
+
   console.log("\n📈 Summary:");
   console.log(`Total Tests: ${results.summary.total}`);
   console.log(`Passed: ${results.summary.passed}`);
   console.log(`Failed: ${results.summary.failed}`);
   console.log(`Success Rate: ${((results.summary.passed / results.summary.total) * 100).toFixed(1)}%`);
-  
+
   if (results.errors.length > 0) {
     console.log("\n❌ Errors:");
     results.errors.forEach((error, index) => {
       console.log(`${index + 1}. ${error.message}`);
     });
   }
-  
+
   return results;
 }
 
