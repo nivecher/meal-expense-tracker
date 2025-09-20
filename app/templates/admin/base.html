@@ -77,20 +77,6 @@
     </div>
 </div>
 {% endblock content %} {% block extra_js %}
-<script>
-    // Admin-specific JavaScript
-    document.addEventListener("DOMContentLoaded", function () {
-        // Confirm dangerous actions
-        document.querySelectorAll("[data-confirm]").forEach(function (element) {
-            element.addEventListener("click", function (e) {
-                const message = this.getAttribute("data-confirm");
-                if (!confirm(message)) {
-                    e.preventDefault();
-                }
-            });
-        });
-
-        // Alert dismissal is handled by main.js
-    });
-</script>
+<!-- Admin-specific functionality -->
+<script src="{{ url_for('static', filename='js/pages/admin-base.js') }}"></script>
 {% endblock extra_js %}

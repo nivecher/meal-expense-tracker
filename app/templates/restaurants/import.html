@@ -363,52 +363,6 @@
     </div>
 </div>
 {% endblock content %} {% block scripts %} {{ super() }}
-<script>
-    // Form validation
-    document.addEventListener("DOMContentLoaded", function () {
-        const form = document.getElementById("import-form");
-        const fileInput = form.querySelector("#file");
-
-        // Reset any initial validation states
-        fileInput.classList.remove("is-invalid", "is-valid");
-
-        form.addEventListener("submit", function (event) {
-            // Clear any previous validation states
-            fileInput.classList.remove("is-invalid", "is-valid");
-
-            if (!fileInput.files.length) {
-                event.preventDefault();
-                event.stopPropagation();
-                fileInput.classList.add("is-invalid");
-                form.classList.add("was-validated");
-            } else {
-                // File is selected, allow form submission
-                fileInput.classList.add("is-valid");
-            }
-        });
-
-        fileInput.addEventListener("change", function () {
-            // Clear any validation classes when file selection changes
-            this.classList.remove("is-invalid", "is-valid");
-
-            if (this.files.length) {
-                // File selected, show positive feedback but don't persist it
-                this.classList.add("is-valid");
-
-                // Remove validation state after a short delay to prevent persistent green border
-                setTimeout(() => {
-                    if (!form.classList.contains("was-validated")) {
-                        this.classList.remove("is-valid");
-                    }
-                }, 1000);
-            }
-        });
-
-        // Clear validation states when form is reset or page loads
-        form.addEventListener("reset", function () {
-            fileInput.classList.remove("is-invalid", "is-valid");
-            form.classList.remove("was-validated");
-        });
-    });
-</script>
+<!-- Restaurant import form validation -->
+<script src="{{ url_for('static', filename='js/pages/restaurant-import.js') }}"></script>
 {% endblock scripts %}

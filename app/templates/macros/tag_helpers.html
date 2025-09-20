@@ -6,7 +6,10 @@
     {{ tag.name }}
 </span>
 {% endmacro %} {% macro tag_badge_with_remove(tag, compact=false) %} {% set size_class = 'compact' if compact else '' %}
-<span class="tag-badge tag-{{ tag.id }} {{ size_class }}" data-tag-name="{{ tag.name }}" data-tag-color="{{ tag.color }}">
+<span
+    class="tag-badge tag-{{ tag.id }} {{ size_class }}"
+    data-tag-name="{{ tag.name }}"
+    data-tag-color="{{ tag.color }}">
     {{ tag.name }}
     <span class="tag-remove" data-tag-name="{{ tag.name }}"> × </span>
 </span>

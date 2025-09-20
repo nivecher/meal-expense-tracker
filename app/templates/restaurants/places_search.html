@@ -27,238 +27,31 @@ url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Fin
                 <!-- Toasts will be inserted here by JavaScript -->
             </div>
         </div>
-        {% endblock content %} {% block scripts %} {{ super() }}
+        {% endblock content %}
+
+        <!-- Configuration data for JavaScript -->
+        <script type="application/json" id="places-search-config">
+            {
+                "csrfToken": "{{ csrf_token() }}",
+                "addRestaurantUrl": "{{ url_for('restaurants.add_restaurant') }}",
+                "googleMapsMapId": "{{ google_maps_map_id }}"
+            }
+        </script>
+
+        {% block scripts %} {{ super() }}
         <!-- Load map-based restaurant search component -->
         <script type="module" src="{{ url_for('static', filename='js/components/map-restaurant-search.js') }}"></script>
+        <!-- Load places search page functionality -->
+        <script src="{{ url_for('static', filename='js/pages/places-search.js') }}"></script>
 
         <script>
-            // Initialize the map-based restaurant search when DOM is ready
-            document.addEventListener("DOMContentLoaded", async function () {
-                const container = document.getElementById("map-restaurant-search-container");
-
-                if (container) {
-                    try {
-                        // Import the MapRestaurantSearch component
-                        const { MapRestaurantSearch } = await import(
-                            '{{ url_for("static", filename="js/components/map-restaurant-search.js") }}'
-                        );
-
-                        // Initialize the map-based search component
-                        const mapSearch = new MapRestaurantSearch(container, {
-                            googleMapsApiKey: window.GOOGLE_MAPS_API_KEY,
-                            googleMapsMapId: "{{ google_maps_map_id }}",
-                            onSelect: function (restaurant) {
-                                console.log("Restaurant selected:", restaurant);
-                                // Handle restaurant selection
-                            },
-                            onError: function (error) {
-                                console.error("Search error:", error);
-                                showLocalToast("Search Error", error.message, "error");
-                            },
-                            onResults: function (results) {
-                                console.log("Search results:", results);
-                                // Handle search results
-                            },
-                        });
-
-                        // Make the component globally accessible for debugging
-                        window.mapSearch = mapSearch;
-                    } catch (error) {
-                        console.error("Failed to initialize map-based search:", error);
-                        container.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Failed to load the map-based restaurant search. Please refresh the page and try again.
-                </div>
-            `;
-                    }
+            // Load configuration from JSON script tag
+            document.addEventListener("DOMContentLoaded", function () {
+                const configElement = document.getElementById("places-search-config");
+                if (configElement) {
+                    window.PLACES_SEARCH_CONFIG = JSON.parse(configElement.textContent);
                 }
             });
-
-            // Enhanced toast notification function with action buttons
-            function showLocalToast(title, message, type = "info", actions = null) {
-                const toastContainer = document.getElementById("toastContainer");
-                if (!toastContainer) return;
-
-                const toastId = "toast-" + Date.now();
-                const bgClass =
-                    type === "error"
-                        ? "bg-danger"
-                        : type === "success"
-                          ? "bg-success"
-                          : type === "warning"
-                            ? "bg-warning"
-                            : "bg-info";
-                const textClass = type === "warning" ? "text-dark" : "text-white";
-
-                // Build action buttons HTML
-                let actionsHtml = "";
-                if (actions && actions.length > 0) {
-                    actionsHtml = `
-            <div class="mt-2">
-                ${actions
-                    .map(
-                        (action) => `
-                    <button class="btn btn-sm ${action.class || "btn-light"} me-2" onclick="${action.onclick}">
-                        ${action.icon ? `<i class="${action.icon} me-1"></i>` : ""}${action.text}
-                    </button>
-                `
-                    )
-                    .join("")}
-            </div>
-        `;
-                }
-
-                const toastHtml = `
-        <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header ${bgClass} ${textClass}">
-                <i class="fas fa-${type === "error" ? "exclamation-triangle" : type === "success" ? "check-circle" : type === "warning" ? "exclamation-triangle" : "info-circle"} me-2"></i>
-                <strong class="me-auto">${title}</strong>
-                <button type="button" class="btn-close ${type === "warning" ? "btn-close-dark" : "btn-close-white"}" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-            <div class="toast-body">
-                ${message}
-                ${actionsHtml}
-            </div>
-        </div>
-    `;
-
-                toastContainer.insertAdjacentHTML("beforeend", toastHtml);
-
-                const toastElement = document.getElementById(toastId);
-                // Auto-dismiss toasts, including warnings and success with actions
-                const autohide = type !== "error";
-                const delay = type === "warning" ? 7000 : type === "success" ? 4000 : 5000;
-                const toast = new bootstrap.Toast(toastElement, {
-                    autohide: autohide,
-                    delay: autohide ? delay : 0,
-                });
-
-                toast.show();
-
-                // Remove toast element after it's hidden
-                toastElement.addEventListener("hidden.bs.toast", () => {
-                    toastElement.remove();
-                });
-
-                // Return a small handle so callers can dismiss this toast when needed
-                return {
-                    id: toastId,
-                    hide: () => {
-                        try {
-                            toast.hide();
-                        } catch (e) {
-                            /* no-op */
-                        }
-                    },
-                };
-            }
-
-            // Global function to add restaurant to user's list
-            window.addToMyRestaurants = async function (placeId) {
-                try {
-                    // Validate placeId
-                    if (!placeId || placeId === "null" || placeId === "undefined") {
-                        throw new Error("Invalid place ID: " + placeId);
-                    }
-
-                    // Show loading state and keep a handle to dismiss it later
-                    const addingToast = showLocalToast(
-                        "Adding Restaurant",
-                        "Adding restaurant to your list...",
-                        "info"
-                    );
-
-                    // Get restaurant details
-                    const response = await fetch(`/restaurants/api/places/details/${placeId}`, {
-                        method: "GET",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Failed to get restaurant details: ${response.status}`);
-                    }
-
-                    const restaurantData = await response.json();
-
-                    // Create form data for adding restaurant
-                    const formData = new FormData();
-                    formData.append("csrf_token", "{{ csrf_token() }}");
-                    formData.append("name", restaurantData.name || "");
-                    formData.append("type", "restaurant");
-                    formData.append("description", restaurantData.description || "");
-                    formData.append("address", restaurantData.address || "");
-                    formData.append("city", restaurantData.city || "");
-                    formData.append("state", restaurantData.state || "");
-                    formData.append("postal_code", restaurantData.postal_code || "");
-                    formData.append("country", restaurantData.country || "");
-                    formData.append("phone", restaurantData.phone || "");
-                    formData.append("website", restaurantData.website || "");
-                    formData.append("email", restaurantData.email || "");
-                    formData.append("google_place_id", restaurantData.google_place_id || "");
-                    formData.append("cuisine", restaurantData.cuisine || "");
-                    formData.append("service_level", restaurantData.service_level || "");
-                    formData.append("is_chain", restaurantData.is_chain ? "true" : "false");
-                    formData.append("rating", restaurantData.rating || "");
-                    formData.append("notes", restaurantData.notes || "");
-
-                    // Submit the form
-                    const addResponse = await fetch('{{ url_for("restaurants.add_restaurant") }}', {
-                        method: "POST",
-                        headers: {
-                            "X-Requested-With": "XMLHttpRequest",
-                        },
-                        body: formData,
-                    });
-
-                    const responseData = await addResponse.json();
-
-                    if (addResponse.status === 201) {
-                        // Hide the adding toast before showing the success toast
-                        if (addingToast && addingToast.hide) addingToast.hide();
-                        // Success - new restaurant created
-                        const restaurantId = responseData.restaurant_id;
-
-                        showLocalToast("Success", "Restaurant added to your list!", "success", [
-                            {
-                                text: "View Restaurant",
-                                icon: "fas fa-eye",
-                                class: "btn-light",
-                                onclick: `window.location.href='/restaurants/${restaurantId}'`,
-                            },
-                        ]);
-                    } else if (addResponse.status === 409) {
-                        // Hide the adding toast before showing the conflict toast
-                        if (addingToast && addingToast.hide) addingToast.hide();
-                        // Conflict - restaurant already exists
-                        const restaurantId = responseData.restaurant_id;
-
-                        showLocalToast("Restaurant Already Exists", responseData.message, "warning", [
-                            {
-                                text: "View Restaurant",
-                                icon: "fas fa-eye",
-                                class: "btn-outline-primary",
-                                onclick: `window.location.href='/restaurants/${restaurantId}'`,
-                            },
-                            {
-                                text: "Update Info",
-                                icon: "fas fa-edit",
-                                class: "btn-outline-warning",
-                                onclick: `window.location.href='/restaurants/${restaurantId}/edit'`,
-                            },
-                        ]);
-                    } else {
-                        if (addingToast && addingToast.hide) addingToast.hide();
-                        // Other error
-                        throw new Error(responseData.message || "Failed to add restaurant");
-                    }
-                } catch (error) {
-                    console.error("Error adding restaurant:", error);
-                    showLocalToast("Error", error.message, "error");
-                }
-            };
         </script>
         {% endblock scripts %}
     </div></div

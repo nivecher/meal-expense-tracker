@@ -8,6 +8,10 @@
         <meta name="keywords" content="meal expense tracker, food expenses, budget tracking, expense management" />
         <meta name="author" content="Meal Expense Tracker" />
         <meta name="csrf-token" content="{{ csrf_token() }}" />
+
+        <!-- Console Error Suppressor - MUST LOAD FIRST -->
+        <script src="{{ url_for('static', filename='js/utils/console-error-suppressor.js') }}"></script>
+
         <!-- Bootstrap Icons -->
         <title> {% block title %} Meal Expense Tracker {% endblock title %} </title>
         <!-- Favicon -->
@@ -110,18 +114,23 @@
                 }
             }'>
         </div>
+        <!-- Extension Error Suppressor - MUST LOAD FIRST -->
+        <script src="{{ url_for('static', filename='js/extension-error-suppressor.js') }}"></script>
+
         <!-- Core Application Scripts -->
         <script type="module" src="{{ url_for('static', filename='js/main.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/config.js') }}" defer></script>
         <!-- Load other utility modules -->
+        <script type="module" src="{{ url_for('static', filename='js/utils/error-handler.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/utils/logger.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/utils/module-loader.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/utils/select2-init.js') }}" defer></script>
         {% if config.DEBUG %}
         <script type="module" src="{{ url_for('static', filename='js/utils/debug.js') }}" defer></script>
+        <script type="module" src="{{ url_for('static', filename='js/utils/console-test.js') }}" defer></script>
         <!-- Console warning filter for development -->
         <script src="{{ url_for('static', filename='js/utils/console-filter.js') }}"></script>
-        {% endif %} itting
+        {% endif %}
         <!-- Page-specific scripts -->
         {% block scripts %} {% endblock scripts %} {% block extra_js %} {% endblock extra_js %}
 

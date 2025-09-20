@@ -75,23 +75,6 @@
     </div>
 </div>
 {% endblock content %} {% block scripts %} {{ super() }}
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        // Initialize form validation
-        const form = document.getElementById("contactForm");
-        if (form) {
-            form.addEventListener(
-                "submit",
-                function (event) {
-                    if (!form.checkValidity()) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                    }
-                    form.classList.add("was-validated");
-                },
-                false
-            );
-        }
-    });
-</script>
+<!-- Contact form validation -->
+<script src="{{ url_for('static', filename='js/pages/contact.js') }}"></script>
 {% endblock scripts %}

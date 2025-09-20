@@ -59,9 +59,13 @@
                                         {% from 'macros/badge_helpers.html' import service_level_badge %}
                                         {{ service_level_badge(restaurant.service_level) }}
                                     {% endif %}
+                                    {% if restaurant.price_level is not none %}
+                                        {% from 'macros/badge_helpers.html' import price_level_badge %}
+                                        {{ price_level_badge(restaurant.price_level) }}
+                                    {% endif %}
                                     {% if restaurant.rating %}
                                         <span class="badge bg-warning text-dark">
-                                            <i class="fas fa-star me-1"></i>{{ "%.1f"|format(restaurant.rating) }}/5.0
+                                            <i class="fas fa-star me-1"></i>{{ "%.1f"|format(restaurant.rating) }}
                                         </span>
                                     {% endif %}
                                 </div>
@@ -164,7 +168,7 @@
                                                                 <span class="text-muted small">Cuisine</span>
                                                                 <div>
                                                                     {% from 'macros/badge_helpers.html' import cuisine_badge %}
-                                                                    {{ cuisine_badge(restaurant.cuisine, size='sm') }}
+                                                                    {{ cuisine_badge(restaurant.cuisine) }}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -177,6 +181,20 @@
                                                             <div>
                                                                 <span class="text-muted small">Restaurant Type</span>
                                                                 <div>{{ 'Chain Restaurant' if restaurant.is_chain else 'Independent Restaurant' }}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                                {% if restaurant.price_level is not none %}
+                                                    <div class="list-group-item px-0 py-2 border-0">
+                                                        <div class="d-flex align-items-center">
+                                                            <i class="fas fa-dollar-sign text-muted me-3"></i>
+                                                            <div>
+                                                                <span class="text-muted small">Price Level</span>
+                                                                <div>
+                                                                    {% from 'macros/badge_helpers.html' import price_level_detail %}
+                                                                    {{ price_level_detail(restaurant.price_level) }}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
