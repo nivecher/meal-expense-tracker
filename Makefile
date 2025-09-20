@@ -239,13 +239,13 @@ lint-js-fix: check-npm
 .PHONY: format-html
 format-html: check-npm
 	@echo "\n\033[1m=== Formatting HTML code ===\033[0m"
-	@npm run format-html 2>/dev/null | grep -v "unchanged" || (echo "\033[1;31m❌ HTML formatting failed\033[0m"; exit 1)
+	@npm run format-html 2>/dev/null | grep -v "unchanged" || true
 
 ## Format CSS code
 .PHONY: format-css
 format-css: check-npm
 	@echo "\n\033[1m=== Formatting CSS code ===\033[0m"
-	@npx prettier --write "app/static/css/**/*.css" 2>/dev/null | grep -v "unchanged" || (echo "\033[1;31m❌ CSS formatting failed\033[0m"; exit 1)
+	@npx prettier --write "app/static/css/**/*.css" 2>/dev/null | grep -v "unchanged" || true
 
 ## Format JavaScript code
 .PHONY: format-js

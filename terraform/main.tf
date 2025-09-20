@@ -468,7 +468,7 @@ module "api_gateway" {
     "https://localhost:5000"
   ]
   api_cors_allow_credentials = true
-  api_cors_allow_headers = ["*"]
+  api_cors_allow_headers     = ["*"]
   api_cors_expose_headers = [
     "Content-Length",
     "Content-Type",
@@ -498,10 +498,10 @@ module "lambda" {
   source = "./modules/lambda"
 
   # Basic configuration
-  app_name        = var.app_name
-  environment     = var.environment
-  server_name     = local.api_domain_name
-  aws_region      = var.aws_region
+  app_name    = var.app_name
+  environment = var.environment
+  server_name = local.api_domain_name
+  aws_region  = var.aws_region
 
   # SSM Parameter for secret key
   app_secret_key_arn = aws_ssm_parameter.app_secret_key.arn
@@ -542,7 +542,7 @@ module "lambda" {
   dynamodb_table_arn = module.dynamodb.table_arn
 
   # API Gateway integration
-  api_gateway_domain_name   = module.api_gateway.api_endpoint  # Use actual API Gateway execution URL
+  api_gateway_domain_name   = module.api_gateway.api_endpoint # Use actual API Gateway execution URL
   api_gateway_execution_arn = module.api_gateway.api_execution_arn
 
   # Runtime configuration
@@ -567,8 +567,8 @@ module "lambda" {
   extra_environment_variables = {
     SESSION_TYPE            = "dynamodb"
     SESSION_DYNAMODB_TABLE  = module.dynamodb.table_name
-    SESSION_DYNAMODB_REGION = var.aws_region  # Optional: falls back to built-in AWS_REGION
-    SESSION_TIMEOUT         = "3600"  # 1 hour session timeout
+    SESSION_DYNAMODB_REGION = var.aws_region # Optional: falls back to built-in AWS_REGION
+    SESSION_TIMEOUT         = "3600"         # 1 hour session timeout
     # Explicitly ensure no localhost endpoint is set (use AWS service)
     SESSION_DYNAMODB_ENDPOINT = ""
   }

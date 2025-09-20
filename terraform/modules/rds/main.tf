@@ -6,14 +6,14 @@
 resource "aws_db_instance" "main" {
   # Basic configuration - optimized for free tier
   identifier            = "${var.app_name}-${var.environment}"
-  instance_class        = "db.t3.micro"  # Free tier eligible
-  allocated_storage     = 20             # Free tier eligible (20GB)
-  max_allocated_storage = 20             # Match allocated storage to prevent scaling
-  storage_type          = "gp2"          # Free tier eligible
+  instance_class        = "db.t3.micro" # Free tier eligible
+  allocated_storage     = 20            # Free tier eligible (20GB)
+  max_allocated_storage = 20            # Match allocated storage to prevent scaling
+  storage_type          = "gp2"         # Free tier eligible
   storage_encrypted     = true
   kms_key_id            = var.db_kms_key_arn
   engine                = "postgres"
-  engine_version        = "14.18"        # Latest free tier eligible version
+  engine_version        = "14.18" # Latest free tier eligible version
   parameter_group_name  = aws_db_parameter_group.main.name
 
   # Database credentials
@@ -27,7 +27,7 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids = [aws_security_group.rds.id]
   publicly_accessible    = var.db_publicly_accessible
   network_type           = "IPV4"
-  multi_az               = false  # Disable Multi-AZ for free tier
+  multi_az               = false # Disable Multi-AZ for free tier
 
   # Backup & maintenance
   backup_retention_period = 7                     # Keep backups for 7 days (free tier)
@@ -43,7 +43,7 @@ resource "aws_db_instance" "main" {
 
   # Monitoring - disable performance insights for free tier
   performance_insights_enabled = false
-  monitoring_interval = 0 # Disable enhanced monitoring for free tier
+  monitoring_interval          = 0 # Disable enhanced monitoring for free tier
 
   tags = merge({
     Name        = "${var.app_name}-${var.environment}-db"
