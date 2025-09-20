@@ -1,0 +1,78 @@
+# Code Quality and Complexity Rules
+
+## Complexity Management Rule
+
+### Rule: Prevent High Complexity Functions
+
+When writing Python code, you MUST:
+
+1. **Keep Functions Simple**: Functions should have a single responsibility and be easy to understand
+2. **Monitor Complexity**: If a function becomes complex (McCabe complexity > 10), break it down into smaller functions
+3. **Use Helper Functions**: Extract complex logic into private helper functions (prefixed with `_`)
+4. **Follow TIGER Principles**: Keep functions under 70 lines and focused on one task
+
+### Implementation Guidelines
+
+- **Complexity Threshold**: Keep McCabe complexity ≤ 10 (flake8 default)
+- **Function Length**: Keep functions under 70 lines
+- **Single Responsibility**: Each function should do one thing well
+- **Early Returns**: Use early returns to reduce nesting and complexity
+- **Helper Functions**: Break complex functions into smaller, focused helpers
+
+### Examples
+
+```python
+# ❌ BAD - Complex function with high complexity
+def process_restaurant_data(data):
+    # 50+ lines of complex logic
+    if condition1:
+        if condition2:
+            if condition3:
+                # nested logic...
+    # more complex logic...
+
+# ✅ GOOD - Broken into focused helper functions
+def process_restaurant_data(data):
+    basic_info = _extract_basic_info(data)
+    _print_basic_info(basic_info)
+    _print_payment_options(data)
+    _print_accessibility_options(data)
+
+def _extract_basic_info(data):
+    # Single responsibility: extract basic info
+    pass
+
+def _print_basic_info(info):
+    # Single responsibility: print basic info
+    pass
+```
+
+### Enforcement
+
+- All Python functions must pass flake8 complexity checks
+- Functions exceeding complexity 10 must be refactored
+- Code reviews should check for complexity violations
+- Use `flake8 --max-complexity=10` in CI/CD pipeline
+
+## Code Style Rules
+
+### Formatting
+- No trailing whitespace
+- No blank lines with whitespace
+- Consistent spacing around operators
+- Proper f-string usage (no placeholders = no f-string)
+
+### Function Design
+- Functions < 70 lines
+- Single responsibility principle
+- Clear, descriptive names
+- Type hints for parameters and returns
+- Docstrings for public functions
+
+### Error Handling
+- Specific exception handling
+- Clear error messages
+- Fail fast on invalid input
+- Log errors appropriately
+
+This rule ensures maintainable, readable, and testable code that follows TIGER principles.

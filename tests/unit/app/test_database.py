@@ -95,7 +95,7 @@ class TestDatabaseModule:
         """Test getting database URI for SQLite development database."""
         with patch.dict(os.environ, {}, clear=True):
             with patch("app.database.os.path.exists") as mock_exists:
-                with patch("app.database.os.makedirs") as mock_makedirs:
+                with patch("app.database.os.makedirs"):
                     mock_exists.return_value = True
 
                     uri = _get_database_uri()
@@ -108,7 +108,7 @@ class TestDatabaseModule:
         """Test getting database URI when instance directory doesn't exist."""
         with patch.dict(os.environ, {}, clear=True):
             with patch("app.database.os.path.exists") as mock_exists:
-                with patch("app.database.os.makedirs") as mock_makedirs:
+                with patch("app.database.os.makedirs"):
                     mock_exists.return_value = False
 
                     uri = _get_database_uri()
@@ -118,7 +118,7 @@ class TestDatabaseModule:
         """Test getting database URI with different FLASK_ENV values."""
         with patch.dict(os.environ, {"FLASK_ENV": "production"}, clear=True):
             with patch("app.database.os.path.exists") as mock_exists:
-                with patch("app.database.os.makedirs") as mock_makedirs:
+                with patch("app.database.os.makedirs"):
                     mock_exists.return_value = True
 
                     uri = _get_database_uri()
@@ -147,8 +147,8 @@ class TestDatabaseModule:
         """Test database initialization with connection pooling for non-SQLite databases."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://user:pass@host:5432/db"
 
-        with patch("app.database.db.init_app") as mock_init_app:
-            with patch("app.database.db.create_all") as mock_create_all:
+        with patch("app.database.db.init_app"):
+            with patch("app.database.db.create_all"):
                 init_database(app)
 
                 assert "SQLALCHEMY_ENGINE_OPTIONS" in app.config
@@ -162,8 +162,8 @@ class TestDatabaseModule:
         """Test database initialization without connection pooling for SQLite."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
 
-        with patch("app.database.db.init_app") as mock_init_app:
-            with patch("app.database.db.create_all") as mock_create_all:
+        with patch("app.database.db.init_app"):
+            with patch("app.database.db.create_all"):
                 init_database(app)
 
                 assert "SQLALCHEMY_ENGINE_OPTIONS" not in app.config
@@ -283,7 +283,7 @@ class TestDatabaseModule:
         """Test SQLite path construction for development database."""
         with patch.dict(os.environ, {}, clear=True):
             with patch("app.database.os.path.exists") as mock_exists:
-                with patch("app.database.os.makedirs") as mock_makedirs:
+                with patch("app.database.os.makedirs"):
                     with patch("app.database.os.path.dirname") as mock_dirname:
                         with patch("app.database.os.path.join") as mock_join:
                             mock_exists.return_value = True
@@ -297,8 +297,8 @@ class TestDatabaseModule:
 
     def test_init_database_configuration_values(self, app):
         """Test that init_database sets correct configuration values."""
-        with patch("app.database.db.init_app") as mock_init_app:
-            with patch("app.database.db.create_all") as mock_create_all:
+        with patch("app.database.db.init_app"):
+            with patch("app.database.db.create_all"):
                 init_database(app)
 
                 assert app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] is False
@@ -306,8 +306,8 @@ class TestDatabaseModule:
 
     def test_init_database_logging(self, app):
         """Test that init_database logs appropriate messages."""
-        with patch("app.database.db.init_app") as mock_init_app:
-            with patch("app.database.db.create_all") as mock_create_all:
+        with patch("app.database.db.init_app"):
+            with patch("app.database.db.create_all"):
                 with patch("app.database.logger") as mock_logger:
                     init_database(app)
 

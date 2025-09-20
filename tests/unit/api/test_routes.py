@@ -1,38 +1,34 @@
 """Tests for API routes module."""
 
-import json
-import os
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 from flask import Flask
 from marshmallow import ValidationError
 
 from app.api.routes import (
-    _get_current_user,
     _create_api_response,
-    _handle_validation_error,
+    _get_current_user,
     _handle_service_error,
-    health_check,
-    version_info,
-    get_cuisines,
-    get_expenses,
-    create_expense,
-    get_expense,
-    update_expense,
-    delete_expense,
-    get_restaurants,
-    create_restaurant,
-    get_restaurant,
-    update_restaurant,
-    delete_restaurant,
+    _handle_validation_error,
     check_restaurant_exists,
-    validate_restaurant,
-    get_categories,
     create_category,
-    get_category,
-    update_category,
+    create_expense,
+    create_restaurant,
     delete_category,
+    delete_expense,
+    get_categories,
+    get_category,
+    get_cuisines,
+    get_expense,
+    get_expenses,
+    get_restaurant,
+    get_restaurants,
+    health_check,
+    update_category,
+    update_expense,
+    validate_restaurant,
+    version_info,
 )
 
 
@@ -157,7 +153,7 @@ class TestAPIRoutes:
                             mock_join.return_value = "/tmp/static/data/cuisines.json"
                             mock_load.return_value = {"cuisines": ["American", "Chinese"]}
                             mock_open.return_value.__enter__.return_value = Mock()
-                            
+
                             response, status = get_cuisines()
                             assert status == 200
                             assert response.json["status"] == "success"
@@ -182,7 +178,7 @@ class TestAPIRoutes:
                     with patch("app.api.routes.expenses_schema") as mock_schema:
                         mock_services.get_expenses_for_user.return_value = [mock_expense]
                         mock_schema.dump.return_value = [{"id": 1, "amount": 25.50}]
-                        
+
                         response, status = get_expenses()
                         assert status == 200
                         assert response.json["status"] == "success"
@@ -194,7 +190,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.expense_services") as mock_services:
                     mock_services.get_expenses_for_user.side_effect = Exception("Database error")
-                    
+
                     response, status = get_expenses()
                     assert status == 500
                     assert response.json["status"] == "error"
@@ -213,7 +209,7 @@ class TestAPIRoutes:
                         mock_schema.load.return_value = {"amount": 25.50, "description": "Test expense"}
                         mock_services.create_expense_for_user.return_value = mock_expense
                         mock_schema.dump.return_value = {"id": 1, "amount": 25.50}
-                        
+
                         response, status = create_expense()
                         assert status == 201
                         assert response.json["status"] == "success"
@@ -230,7 +226,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.expense_schema") as mock_schema:
                     mock_schema.load.side_effect = ValidationError({"amount": ["Invalid amount"]})
-                    
+
                     response, status = create_expense()
                     assert status == 400
                     assert response.json["status"] == "error"
@@ -243,7 +239,7 @@ class TestAPIRoutes:
                     with patch("app.api.routes.expense_schema") as mock_schema:
                         mock_services.get_expense_by_id_for_user.return_value = mock_expense
                         mock_schema.dump.return_value = {"id": 1, "amount": 25.50}
-                        
+
                         response, status = get_expense(1)
                         assert status == 200
                         assert response.json["status"] == "success"
@@ -254,7 +250,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.expense_services") as mock_services:
                     mock_services.get_expense_by_id_for_user.return_value = None
-                    
+
                     response, status = get_expense(999)
                     assert status == 404
                     assert response.json["status"] == "error"
@@ -274,7 +270,7 @@ class TestAPIRoutes:
                         mock_schema.load.return_value = {"amount": 30.00, "description": "Updated expense"}
                         mock_services.update_expense_for_user.return_value = mock_expense
                         mock_schema.dump.return_value = {"id": 1, "amount": 30.00}
-                        
+
                         response, status = update_expense(1)
                         assert status == 200
                         assert response.json["status"] == "success"
@@ -290,7 +286,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.expense_services") as mock_services:
                     mock_services.get_expense_by_id_for_user.return_value = None
-                    
+
                     response, status = update_expense(999)
                     assert status == 404
                     assert response.json["status"] == "error"
@@ -305,7 +301,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.expense_services") as mock_services:
                     mock_services.get_expense_by_id_for_user.return_value = mock_expense
-                    
+
                     response, status = delete_expense(1)
                     assert status == 204
                     assert response.json["status"] == "success"
@@ -321,7 +317,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.expense_services") as mock_services:
                     mock_services.get_expense_by_id_for_user.return_value = None
-                    
+
                     response, status = delete_expense(999)
                     assert status == 404
                     assert response.json["status"] == "error"
@@ -334,7 +330,7 @@ class TestAPIRoutes:
                     with patch("app.api.routes.restaurants_schema") as mock_schema:
                         mock_services.get_restaurants_for_user.return_value = [mock_restaurant]
                         mock_schema.dump.return_value = [{"id": 1, "name": "Test Restaurant"}]
-                        
+
                         response, status = get_restaurants()
                         assert status == 200
                         assert response.json["status"] == "success"
@@ -354,7 +350,7 @@ class TestAPIRoutes:
                         mock_schema.load.return_value = {"name": "Test Restaurant", "city": "Test City"}
                         mock_services.create_restaurant_for_user.return_value = mock_restaurant
                         mock_schema.dump.return_value = {"id": 1, "name": "Test Restaurant"}
-                        
+
                         response, status = create_restaurant()
                         assert status == 201
                         assert response.json["status"] == "success"
@@ -368,7 +364,7 @@ class TestAPIRoutes:
                     with patch("app.api.routes.restaurant_schema") as mock_schema:
                         mock_services.get_restaurant_for_user.return_value = mock_restaurant
                         mock_schema.dump.return_value = {"id": 1, "name": "Test Restaurant"}
-                        
+
                         response, status = get_restaurant(1)
                         assert status == 200
                         assert response.json["status"] == "success"
@@ -379,7 +375,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.restaurant_services") as mock_services:
                     mock_services.get_restaurant_for_user.return_value = None
-                    
+
                     response, status = get_restaurant(999)
                     assert status == 404
                     assert response.json["status"] == "error"
@@ -392,7 +388,7 @@ class TestAPIRoutes:
                     mock_query = Mock()
                     mock_query.filter_by.return_value.first.return_value = mock_restaurant
                     mock_restaurant_model.query = mock_query
-                    
+
                     response, status = check_restaurant_exists()
                     assert status == 200
                     assert response.json["status"] == "success"
@@ -468,7 +464,7 @@ class TestAPIRoutes:
                     with patch("app.api.routes.categories_schema") as mock_schema:
                         mock_services.get_categories_for_user.return_value = [mock_category]
                         mock_schema.dump.return_value = [{"id": 1, "name": "Test Category"}]
-                        
+
                         response, status = get_categories()
                         assert status == 200
                         assert response.json["status"] == "success"
@@ -488,7 +484,7 @@ class TestAPIRoutes:
                         mock_schema.load.return_value = {"name": "Test Category", "color": "#FF5733"}
                         mock_services.create_category_for_user.return_value = mock_category
                         mock_schema.dump.return_value = {"id": 1, "name": "Test Category"}
-                        
+
                         response, status = create_category()
                         assert status == 201
                         assert response.json["status"] == "success"
@@ -502,7 +498,7 @@ class TestAPIRoutes:
                     with patch("app.api.routes.category_schema") as mock_schema:
                         mock_services.get_category_by_id_for_user.return_value = mock_category
                         mock_schema.dump.return_value = {"id": 1, "name": "Test Category"}
-                        
+
                         response, status = get_category(1)
                         assert status == 200
                         assert response.json["status"] == "success"
@@ -513,7 +509,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.category_services") as mock_services:
                     mock_services.get_category_by_id_for_user.return_value = None
-                    
+
                     response, status = get_category(999)
                     assert status == 404
                     assert response.json["status"] == "error"
@@ -533,7 +529,7 @@ class TestAPIRoutes:
                         mock_schema.load.return_value = {"name": "Updated Category", "color": "#00FF00"}
                         mock_services.update_category_for_user.return_value = mock_category
                         mock_schema.dump.return_value = {"id": 1, "name": "Updated Category"}
-                        
+
                         response, status = update_category(1)
                         assert status == 200
                         assert response.json["status"] == "success"
@@ -548,7 +544,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.category_services") as mock_services:
                     mock_services.get_category_by_id_for_user.return_value = mock_category
-                    
+
                     response, status = delete_category(1)
                     assert status == 204
                     assert response.json["status"] == "success"
@@ -564,7 +560,7 @@ class TestAPIRoutes:
             with patch("app.api.routes._get_current_user", return_value=mock_user):
                 with patch("app.api.routes.category_services") as mock_services:
                     mock_services.get_category_by_id_for_user.return_value = None
-                    
+
                     response, status = delete_category(999)
                     assert status == 404
                     assert response.json["status"] == "error"

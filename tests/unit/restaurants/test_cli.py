@@ -621,7 +621,7 @@ class TestRestaurantCLI:
         }
 
         with patch("app.restaurants.cli._check_restaurant_mismatches") as mock_check:
-            with patch("app.restaurants.cli._display_google_info") as mock_display:
+            with patch("app.restaurants.cli._display_google_info"):
                 mock_check.return_value = ([], {})
 
                 status, fixed = _process_restaurant_validation(mock_restaurant, False, False)

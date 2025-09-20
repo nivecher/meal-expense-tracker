@@ -205,7 +205,7 @@ class TestExtensionsModule:
         app.config["SESSION_DYNAMODB"].Table.return_value = mock_table
 
         with patch.object(app.logger, "info") as mock_info:
-            with patch.object(app.logger, "warning") as mock_warning:
+            with patch.object(app.logger, "warning"):
                 with patch("app.extensions._test_dynamodb_permissions") as mock_test_permissions:
                     _test_dynamodb_connection(app, "test-table")
 
@@ -303,7 +303,7 @@ class TestExtensionsModule:
                         mock_redirect.return_value = "redirected"
 
                         csrf_error = CSRFError("CSRF token missing")
-                        response = app.error_handler_spec[None][403][CSRFError](csrf_error)
+                        app.error_handler_spec[None][403][CSRFError](csrf_error)
 
                         mock_flash.assert_called_once()
                         mock_redirect.assert_called_once()
@@ -314,7 +314,7 @@ class TestExtensionsModule:
             with patch("app.extensions.jwt") as mock_jwt:
                 with patch("app.extensions.login_manager") as mock_login_manager:
                     with patch("app.extensions.migrate") as mock_migrate:
-                        with patch("app.extensions.flask_session") as mock_flask_session:
+                        with patch("app.extensions.flask_session"):
                             with patch("app.extensions.limiter") as mock_limiter:
                                 with patch("app.extensions.csrf") as mock_csrf:
                                     with patch("app.extensions._log_session_config") as mock_log_config:
@@ -336,7 +336,7 @@ class TestExtensionsModule:
 
         with patch("app.extensions._validate_dynamodb_session_config") as mock_validate:
             with patch("app.extensions.flask_session") as mock_flask_session:
-                with patch("app.extensions._log_session_config") as mock_log_config:
+                with patch("app.extensions._log_session_config"):
                     init_app(app)
 
                     mock_validate.assert_called_once_with(app)
@@ -347,7 +347,7 @@ class TestExtensionsModule:
         app.config["SESSION_TYPE"] = "filesystem"
 
         with patch("app.extensions.flask_session") as mock_flask_session:
-            with patch("app.extensions._log_session_config") as mock_log_config:
+            with patch("app.extensions._log_session_config"):
                 with patch.object(app.logger, "info") as mock_info:
                     init_app(app)
 
@@ -359,7 +359,7 @@ class TestExtensionsModule:
         app.config["SESSION_TYPE"] = "redis"
 
         with patch("app.extensions.flask_session") as mock_flask_session:
-            with patch("app.extensions._log_session_config") as mock_log_config:
+            with patch("app.extensions._log_session_config"):
                 init_app(app)
 
                 mock_flask_session.init_app.assert_called_once_with(app)
@@ -367,7 +367,7 @@ class TestExtensionsModule:
     def test_init_app_lambda_environment(self, app):
         """Test app initialization in Lambda environment."""
         with patch.dict(os.environ, {"AWS_LAMBDA_FUNCTION_NAME": "test-function"}):
-            with patch("app.extensions._log_session_config") as mock_log_config:
+            with patch("app.extensions._log_session_config"):
                 with patch.object(app.logger, "info") as mock_info:
                     init_app(app)
 
@@ -417,7 +417,7 @@ class TestExtensionsModule:
                     mock_request.url = "http://localhost/test"
                     mock_redirect.return_value = "redirected"
 
-                    response = unauthorized()
+                    unauthorized()
 
                     mock_redirect.assert_called_once()
 
@@ -450,7 +450,7 @@ class TestExtensionsModule:
         """Test user loading with invalid user ID."""
         with app.app_context():
             with patch("app.extensions.db") as mock_db:
-                with patch("app.extensions.User") as mock_user_class:
+                with patch("app.extensions.User"):
                     mock_db.session.get.side_effect = ValueError("Invalid user ID")
 
                     result = load_user("invalid")
@@ -464,7 +464,7 @@ class TestExtensionsModule:
 
         with app.test_request_context("/test"):
             with patch("app.extensions.request") as mock_request:
-                with patch("app.extensions.flash") as mock_flash:
+                with patch("app.extensions.flash"):
                     with patch("app.extensions.redirect") as mock_redirect:
                         with patch.object(app.logger, "warning") as mock_warning:
                             mock_request.path = "/test"
@@ -474,6 +474,6 @@ class TestExtensionsModule:
                             mock_redirect.return_value = "redirected"
 
                             csrf_error = CSRFError("CSRF token missing")
-                            response = app.error_handler_spec[None][403][CSRFError](csrf_error)
+                            app.error_handler_spec[None][403][CSRFError](csrf_error)
 
                             assert mock_warning.call_count >= 2  # Multiple warning calls

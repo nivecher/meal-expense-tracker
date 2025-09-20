@@ -1,48 +1,45 @@
 """Tests for restaurants routes module."""
 
-import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
-from flask import Flask, url_for
-from werkzeug.datastructures import FileStorage
+from flask import Flask
 
 from app.restaurants.routes import (
-    _get_page_size_from_cookie,
-    _extract_location_from_query,
-    _get_regional_bias_from_request,
-    _build_search_params,
     _build_photo_urls,
     _build_reviews_summary,
-    _get_place_details,
-    _process_place_data,
-    _validate_search_params,
-    _filter_place_by_criteria,
-    _process_search_result_place,
-    parse_address_components,
-    get_cuisine_choices,
-    _get_specific_cuisine_types,
+    _build_search_params,
+    _create_ajax_error_response,
+    _create_ajax_success_response,
+    _create_restaurant_from_form,
     _detect_cuisine_from_types,
     _detect_service_level_from_types,
-    analyze_restaurant_types,
+    _extract_location_from_query,
+    _filter_place_by_criteria,
+    _get_page_size_from_cookie,
+    _get_place_details,
+    _get_regional_bias_from_request,
+    _get_specific_cuisine_types,
+    _handle_import_error,
+    _handle_import_success,
+    _handle_restaurant_creation_error,
+    _handle_restaurant_creation_success,
     _matches_cuisine_pattern,
-    detect_cuisine_from_name,
+    _parse_import_file,
+    _prepare_restaurant_form,
+    _process_import_file,
+    _process_place_data,
+    _process_search_result_place,
+    _validate_google_places_request,
+    _validate_import_file,
+    _validate_search_params,
+    analyze_restaurant_types,
     detect_chain_restaurant,
+    detect_cuisine_from_name,
     generate_description,
     generate_notes,
-    _create_ajax_success_response,
-    _create_ajax_error_response,
-    _handle_restaurant_creation_success,
-    _handle_restaurant_creation_error,
-    _process_restaurant_form_submission,
-    _validate_import_file,
-    _parse_import_file,
-    _process_import_file,
-    _handle_import_success,
-    _handle_import_error,
-    _validate_google_places_request,
-    _prepare_restaurant_form,
-    _create_restaurant_from_form,
+    get_cuisine_choices,
+    parse_address_components,
 )
 
 
@@ -130,9 +127,7 @@ class TestRestaurantsRoutes:
     def test_build_search_params_with_location(self, app):
         """Test building search parameters with location."""
         with app.app_context():
-            url, params = _build_search_params(
-                "McDonald's Dallas", "American", "32.7767", "-96.7970", "5", "test-key"
-            )
+            url, params = _build_search_params("McDonald's Dallas", "American", "32.7767", "-96.7970", "5", "test-key")
             assert "nearbysearch" in url
             assert "location" in params
             assert "32.7767,-96.7970" in params["location"]

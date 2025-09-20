@@ -625,7 +625,7 @@ class TestAuthCLI:
     def test_create_user_inactive(self, runner, app):
         """Test creating inactive user."""
         with app.app_context():
-            with patch("app.auth.cli.db") as mock_db:
+            with patch("app.auth.cli.db"):
                 with patch("app.auth.cli.User") as mock_user_class:
                     mock_user_class.query.filter.return_value.first.return_value = None
                     mock_user = Mock()
