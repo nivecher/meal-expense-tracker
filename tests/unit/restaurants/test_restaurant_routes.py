@@ -97,9 +97,10 @@ def test_delete_restaurant(client, auth, test_restaurant, test_user, session):
     # We can verify this by checking that the restaurant is not in the database
 
     # Verify it's gone from the database
+    from app.extensions import db
     from app.restaurants.models import Restaurant
 
-    assert Restaurant.query.get(test_restaurant.id) is None
+    assert db.session.get(Restaurant, test_restaurant.id) is None
 
 
 def test_import_restaurants_csv(client, auth, test_user, session):

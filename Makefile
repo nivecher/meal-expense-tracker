@@ -28,6 +28,7 @@ PIP = ./venv/bin/pip3
 # Python settings
 PYTHONPATH = $(shell pwd)
 PYTEST_OPTS = -v --cov=app --cov-report=term-missing --cov-report=html
+PYTEST_PARALLEL = -n auto
 TEST_PATH = tests/
 
 # Docker settings
@@ -260,8 +261,14 @@ check-act:
 ## Run unit tests only
 .PHONY: test-unit
 test-unit:
-	@echo "\n\033[1m=== Running Unit Tests ===\033[0m"
-	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Unit tests failed\033[0m"; exit 1)
+	@echo "\n\033[1m=== Running Unit Tests (Parallel) ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/ $(PYTEST_OPTS) $(PYTEST_PARALLEL) || (echo "\033[1;31m❌ Unit tests failed\033[0m"; exit 1)
+
+## Run unit tests quickly (no coverage, parallel)
+.PHONY: test-fast
+test-fast:
+	@echo "\n\033[1m=== Running Fast Unit Tests (Parallel, No Coverage) ===\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/unit/ -q $(PYTEST_PARALLEL) || (echo "\033[1;31m❌ Unit tests failed\033[0m"; exit 1)
 
 ## Run integration tests only
 .PHONY: test-integration

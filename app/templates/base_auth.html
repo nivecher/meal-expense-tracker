@@ -126,11 +126,8 @@
 
                 authForms.forEach((form) => {
                     form.addEventListener("submit", async function (e) {
-                        // Temporarily disable JavaScript form handling to test normal form submission
-                        console.log("Form submission intercepted by JavaScript - allowing normal submission");
-                        return; // Allow normal form submission
-
-                        e.preventDefault();
+                        // Allow normal form submission for better reliability
+                        return;
 
                         const submitBtn = form.querySelector('input[type="submit"], button[type="submit"]');
                         const originalText = submitBtn.value || submitBtn.textContent;
@@ -144,33 +141,18 @@
                         }
 
                         try {
-                            console.log("=== FORM SUBMISSION STARTING ===");
-                            console.log("Form action:", form.action || window.location.pathname);
-                            console.log("Form method:", form.method);
-
                             const formData = new FormData(form);
-
-                            // Log form data for debugging
-                            console.log("Form data entries:");
-                            for (let [key, value] of formData.entries()) {
-                                console.log(`  ${key}: ${key === "password" ? "[REDACTED]" : value}`);
-                            }
 
                             // Include CSRF token only if available in form (local dev)
                             const csrfInput = form.querySelector('input[name="csrf_token"]');
                             if (csrfInput && csrfInput.value) {
                                 formData.set("csrf_token", csrfInput.value);
-                                console.log("CSRF token added from form input");
                             } else {
                                 // For Lambda deployment, add empty CSRF token to satisfy form validation
                                 formData.set("csrf_token", "");
-                                console.log("Added empty CSRF token for Lambda deployment");
                             }
-                            // Note: For Lambda deployment, CSRF is disabled entirely
 
-                            console.log("=== MAKING FETCH REQUEST ===");
                             const url = form.action || window.location.pathname;
-                            console.log("Request URL:", url);
 
                             const response = await fetch(url, {
                                 method: "POST",
@@ -180,15 +162,7 @@
                                 },
                             });
 
-                            console.log("=== RESPONSE RECEIVED ===");
-                            console.log("Response status:", response.status);
-                            console.log("Response ok:", response.ok);
-                            console.log("Response URL:", response.url);
-                            console.log("Response headers:", [...response.headers.entries()]);
-
-                            // Try to get response body for debugging
-                            const responseText = await response.clone().text();
-                            console.log("Response body preview:", responseText.substring(0, 500));
+                            // Check response status
 
                             if (response.ok) {
                                 // Check if it's a redirect (successful login/registration)
@@ -216,8 +190,6 @@
                             } else {
                                 // Handle error responses
                                 console.error("Response failed with status:", response.status);
-                                console.error("Response headers:", [...response.headers.entries()]);
-                                debugger; // Pause here to examine the response
 
                                 const contentType = response.headers.get("content-type");
                                 if (contentType && contentType.includes("application/json")) {
@@ -242,7 +214,6 @@
                             }
                         } catch (error) {
                             console.error("Form submission error:", error);
-                            debugger; // This will pause execution to see the error
                             alert("An error occurred. Please try again.");
                         } finally {
                             // Restore button state

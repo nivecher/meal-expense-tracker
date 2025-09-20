@@ -349,6 +349,7 @@
                                 </div>
                             </div>
                             <!-- Expense Summary Card (moved to sidebar) -->
+                            {% if expense_stats %}
                             <div class="card border-0 shadow-sm mb-4">
                                 <div class="card-header bg-white border-bottom-0">
                                     <h5 class="mb-0">
@@ -384,6 +385,7 @@
                                     </div>
                                 </div>
                             </div>
+                            {% endif %}
                             <!-- Recent Transactions -->
                             <div class="card border-0 shadow-sm">
                                 <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center">
