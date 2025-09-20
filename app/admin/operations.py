@@ -758,6 +758,14 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
         if not isinstance(dry_run, bool):
             errors.append("dry_run must be a boolean")
 
+        find_place_id = kwargs.get("find_place_id", False)
+        if not isinstance(find_place_id, bool):
+            errors.append("find_place_id must be a boolean")
+
+        closest = kwargs.get("closest", False)
+        if not isinstance(closest, bool):
+            errors.append("closest must be a boolean")
+
         return {"valid": len(errors) == 0, "errors": errors}
 
     def _get_target_users(self, **kwargs) -> tuple[Optional[Dict[str, Any]], List[User]]:
@@ -768,7 +776,9 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             all_users = kwargs.get("all_users", False)
 
             if user_id:
-                user = User.query.get(user_id)
+                from app.extensions import db
+
+                user = db.session.get(User, user_id)
                 if not user:
                     return {"success": False, "message": f"User with ID {user_id} not found"}, []
                 return None, [user]
@@ -798,7 +808,9 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             counts = {"total_restaurants": 0, "missing_google_id": 0, "with_google_id": 0}
 
             if restaurant_id:
-                restaurant = Restaurant.query.get(restaurant_id)
+                from app.extensions import db
+
+                restaurant = db.session.get(Restaurant, restaurant_id)
                 if not restaurant:
                     return {"success": False, "message": f"Restaurant with ID {restaurant_id} not found"}, [], counts
 
@@ -1069,9 +1081,10 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
 
     def _get_specific_restaurant_without_google_id(self, restaurant_id: int) -> List[Restaurant]:
         """Get specific restaurant without Google Place ID."""
+        from app.extensions import db
         from app.restaurants.models import Restaurant
 
-        restaurant = Restaurant.query.get(restaurant_id)
+        restaurant = db.session.get(Restaurant, restaurant_id)
         if restaurant and not restaurant.google_place_id:
             return [restaurant]
         return []
@@ -1083,7 +1096,9 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
         all_users = kwargs.get("all_users", False)
 
         if user_id:
-            user = User.query.get(user_id)
+            from app.extensions import db
+
+            user = db.session.get(User, user_id)
             return [user] if user else []
         elif username:
             user = User.query.filter_by(username=username).first()
@@ -1249,11 +1264,11 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             fix_mismatches = kwargs.get("fix_mismatches", False)
             update_service_levels = kwargs.get("update_service_levels", False)
             dry_run = kwargs.get("dry_run", False)
+            find_place_id = kwargs.get("find_place_id", False)
 
-            # Handle service level updates for restaurants without Google Place IDs
-            service_level_results = None
-            if update_service_levels:
-                service_level_results = self._update_service_levels_for_restaurants_without_google_id(**kwargs)
+            # Handle service level updates and place ID finding
+            service_level_results = self._handle_service_level_updates(update_service_levels, **kwargs)
+            place_id_results = self._handle_place_id_finding(find_place_id, **kwargs)
 
             # Get restaurants to validate
             error_response, restaurants_to_validate, restaurant_counts = self._get_restaurants_to_validate(**kwargs)
@@ -1261,67 +1276,308 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
                 return error_response
 
             if not restaurants_to_validate:
-                summary = {
-                    "total_restaurants": restaurant_counts["total_restaurants"],
-                    "missing_google_id": restaurant_counts["missing_google_id"],
-                    "with_google_id": restaurant_counts["with_google_id"],
-                    "valid_count": 0,
-                    "invalid_count": 0,
-                    "error_count": 0,
-                    "fixed_count": 0,
-                    "mismatch_count": 0,
-                    "dry_run": dry_run,
-                }
-
-                # Add service level metrics to summary
-                if service_level_results and service_level_results.get("success"):
-                    summary["service_level_metrics"] = {
-                        "total_without_google_id": service_level_results.get("total_count", 0),
-                        "updated_count": service_level_results.get("updated_count", 0),
-                        "dry_run": dry_run,
-                    }
-
-                return {
-                    "success": True,
-                    "message": "No restaurants with Google Place IDs found to validate",
-                    "data": {
-                        "restaurant_counts": restaurant_counts,
-                        "service_level_results": service_level_results,
-                        "summary": summary,
-                    },
-                }
+                return self._build_no_restaurants_response(
+                    restaurant_counts, service_level_results, place_id_results, dry_run
+                )
 
             # Process all restaurants
             validation_results, summary = self._process_all_restaurants(
                 restaurants_to_validate, fix_mismatches, dry_run
             )
 
-            # Merge restaurant counts into summary
-            summary.update(restaurant_counts)
-
-            action_text = self._get_action_text(fix_mismatches, dry_run)
-
-            # Add service level metrics to summary
-            if service_level_results and service_level_results.get("success"):
-                summary["service_level_metrics"] = {
-                    "total_without_google_id": service_level_results.get("total_count", 0),
-                    "updated_count": service_level_results.get("updated_count", 0),
-                    "dry_run": dry_run,
-                }
-
-            return {
-                "success": True,
-                "message": f"Successfully {action_text} {len(validation_results)} restaurants",
-                "data": {
-                    "validation_results": validation_results,
-                    "summary": summary,
-                    "service_level_results": service_level_results,
-                },
-            }
+            # Build final response
+            return self._build_validation_response(
+                validation_results,
+                summary,
+                restaurant_counts,
+                service_level_results,
+                place_id_results,
+                fix_mismatches,
+                dry_run,
+            )
 
         except Exception as e:
             logger.exception(f"Error in restaurant validation: {e}")
             return {"success": False, "message": f"Restaurant validation failed: {str(e)}"}
+
+    def _handle_service_level_updates(self, update_service_levels: bool, **kwargs) -> Dict[str, Any] | None:
+        """Handle service level updates for restaurants without Google Place IDs."""
+        if update_service_levels:
+            return self._update_service_levels_for_restaurants_without_google_id(**kwargs)
+        return None
+
+    def _handle_place_id_finding(self, find_place_id: bool, **kwargs) -> Dict[str, Any] | None:
+        """Handle place ID finding for restaurants without Google Place IDs."""
+        if find_place_id:
+            return self._find_place_ids_for_restaurants_without_google_id(**kwargs)
+        return None
+
+    def _build_no_restaurants_response(
+        self, restaurant_counts: dict, service_level_results: dict | None, place_id_results: dict | None, dry_run: bool
+    ) -> Dict[str, Any]:
+        """Build response when no restaurants are found to validate."""
+        summary = {
+            "total_restaurants": restaurant_counts["total_restaurants"],
+            "missing_google_id": restaurant_counts["missing_google_id"],
+            "with_google_id": restaurant_counts["with_google_id"],
+            "valid_count": 0,
+            "invalid_count": 0,
+            "error_count": 0,
+            "fixed_count": 0,
+            "mismatch_count": 0,
+            "dry_run": dry_run,
+        }
+
+        # Add service level metrics to summary
+        if service_level_results and service_level_results.get("success"):
+            summary["service_level_metrics"] = {
+                "total_without_google_id": service_level_results.get("total_count", 0),
+                "updated_count": service_level_results.get("updated_count", 0),
+                "dry_run": dry_run,
+            }
+
+        # Add place ID finding metrics to summary
+        if place_id_results and place_id_results.get("success"):
+            summary["place_id_metrics"] = {
+                "found_count": place_id_results.get("found_count", 0),
+                "warning_count": place_id_results.get("warning_count", 0),
+                "error_count": place_id_results.get("error_count", 0),
+                "dry_run": dry_run,
+            }
+
+        return {
+            "success": True,
+            "message": "No restaurants with Google Place IDs found to validate",
+            "data": {
+                "restaurant_counts": restaurant_counts,
+                "service_level_results": service_level_results,
+                "place_id_results": place_id_results,
+                "summary": summary,
+            },
+        }
+
+    def _build_validation_response(
+        self,
+        validation_results: list,
+        summary: dict,
+        restaurant_counts: dict,
+        service_level_results: dict | None,
+        place_id_results: dict | None,
+        fix_mismatches: bool,
+        dry_run: bool,
+    ) -> Dict[str, Any]:
+        """Build final validation response."""
+        # Merge restaurant counts into summary
+        summary.update(restaurant_counts)
+
+        action_text = self._get_action_text(fix_mismatches, dry_run)
+
+        # Add service level metrics to summary
+        if service_level_results and service_level_results.get("success"):
+            summary["service_level_metrics"] = {
+                "total_without_google_id": service_level_results.get("total_count", 0),
+                "updated_count": service_level_results.get("updated_count", 0),
+                "dry_run": dry_run,
+            }
+
+        # Add place ID finding metrics to summary
+        if place_id_results and place_id_results.get("success"):
+            summary["place_id_metrics"] = {
+                "found_count": place_id_results.get("found_count", 0),
+                "warning_count": place_id_results.get("warning_count", 0),
+                "error_count": place_id_results.get("error_count", 0),
+                "dry_run": dry_run,
+            }
+
+        return {
+            "success": True,
+            "message": f"Successfully {action_text} {len(validation_results)} restaurants",
+            "data": {
+                "validation_results": validation_results,
+                "summary": summary,
+                "service_level_results": service_level_results,
+                "place_id_results": place_id_results,
+            },
+        }
+
+    def _find_place_ids_for_restaurants_without_google_id(self, **kwargs) -> Dict[str, Any]:
+        """Find Google Place IDs for restaurants without them."""
+        try:
+            from app.restaurants.models import Restaurant
+
+            # Get restaurants without Google Place IDs
+            error_response, users = self._get_target_users(**kwargs)
+            if error_response:
+                return error_response
+
+            restaurants_without_google_id = []
+            for user in users:
+                user_restaurants = (
+                    Restaurant.query.filter_by(user_id=user.id).filter(Restaurant.google_place_id.is_(None)).all()
+                )
+                restaurants_without_google_id.extend(user_restaurants)
+
+            if not restaurants_without_google_id:
+                return {
+                    "success": True,
+                    "message": "All restaurants already have Google Place IDs",
+                    "found_count": 0,
+                    "warning_count": 0,
+                    "error_count": 0,
+                }
+
+            # Process restaurants to find place IDs
+            return self._process_place_id_finding(restaurants_without_google_id, **kwargs)
+
+        except Exception as e:
+            logger.exception(f"Error finding place IDs: {e}")
+            return {"success": False, "message": f"Place ID finding failed: {str(e)}"}
+
+    def _process_place_id_finding(self, restaurants: list, **kwargs) -> Dict[str, Any]:
+        """Process restaurants to find Google Place IDs."""
+        from app.extensions import db
+
+        dry_run = kwargs.get("dry_run", False)
+        closest = kwargs.get("closest", False)
+
+        found_count = 0
+        warning_count = 0
+        error_count = 0
+
+        for restaurant in restaurants:
+            place_id, matches = self._find_google_place_match(restaurant)
+
+            if place_id:
+                found_count += 1
+                if not dry_run:
+                    restaurant.google_place_id = place_id
+                    db.session.commit()
+            elif matches:
+                if closest and len(matches) > 1:
+                    closest_match = self._find_closest_match(restaurant, matches)
+                    if closest_match:
+                        closest_place_id = closest_match.get("id")
+                        if not dry_run:
+                            restaurant.google_place_id = closest_place_id
+                            db.session.commit()
+                        found_count += 1
+                    else:
+                        warning_count += 1
+                else:
+                    warning_count += 1
+            else:
+                error_count += 1
+
+        return {
+            "success": True,
+            "message": "Place ID finding completed",
+            "found_count": found_count,
+            "warning_count": warning_count,
+            "error_count": error_count,
+        }
+
+    def _find_google_place_match(self, restaurant) -> tuple[str | None, list[dict]]:
+        """Find Google Place ID match for a restaurant based on name and address."""
+        try:
+            name = restaurant.name
+            address = restaurant.full_address
+
+            places = self._search_google_places_by_name_and_address(name, address)
+
+            if not places:
+                return None, []
+
+            exact_matches = []
+            for place in places:
+                place_name = (
+                    place.get("displayName", {}).get("text", "")
+                    if isinstance(place.get("displayName"), dict)
+                    else place.get("displayName", "")
+                )
+
+                if place_name.lower() == name.lower():
+                    exact_matches.append(place)
+
+            if len(exact_matches) == 1:
+                return exact_matches[0].get("id"), exact_matches
+
+            if len(exact_matches) > 1:
+                return None, exact_matches
+
+            return None, places
+
+        except Exception as e:
+            logger.exception(f"Error finding Google Place match: {e}")
+            return None, []
+
+    def _search_google_places_by_name_and_address(self, name: str, address: str | None = None) -> list[dict]:
+        """Search Google Places API for restaurants by name and address."""
+        try:
+            import requests
+            from flask import current_app
+
+            api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
+            if not api_key:
+                return []
+
+            search_query = name
+            if address:
+                search_query += f" {address}"
+
+            url = "https://places.googleapis.com/v1/places:searchText"
+            headers = {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": api_key,
+                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.location",
+            }
+            payload = {
+                "textQuery": search_query,
+                "maxResultCount": 10,
+                "includedType": "restaurant",
+            }
+
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            return data.get("places", [])
+
+        except Exception as e:
+            logger.exception(f"Error searching Google Places: {e}")
+            return []
+
+    def _find_closest_match(self, restaurant, matches: list[dict]) -> dict | None:
+        """Find the closest match based on restaurant address and Google Places coordinates."""
+        if not matches:
+            return None
+
+        restaurant_city = restaurant.city
+        restaurant_state = restaurant.state
+
+        if not restaurant_city or not restaurant_state:
+            return matches[0]
+
+        best_match = None
+        best_score = -1
+
+        for match in matches:
+            match_address = match.get("formattedAddress", "").lower()
+            score = 0
+
+            if restaurant_city.lower() in match_address:
+                score += 2
+
+            if restaurant_state.lower() in match_address:
+                score += 1
+
+            city_state_combo = f"{restaurant_city.lower()}, {restaurant_state.lower()}"
+            if city_state_combo in match_address:
+                score += 3
+
+            if score > best_score:
+                best_score = score
+                best_match = match
+
+        return best_match if best_match else matches[0]
 
 
 class RunMigrationsOperation(BaseAdminOperation):

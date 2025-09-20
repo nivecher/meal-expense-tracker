@@ -12,9 +12,10 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
 from flask_migrate import Migrate
-from flask_session import Session
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFError, CSRFProtect
+
+from flask_session import Session
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
@@ -213,8 +214,12 @@ def init_app(app: Flask) -> None:
     elif session_type is None:
         # Using Flask's default signed cookie sessions - no Flask-Session needed
         app.logger.info("Using Flask's default signed cookie sessions (ideal for Lambda)")
+    elif session_type == "filesystem":
+        # Use CacheLib backend directly for filesystem sessions
+        app.logger.info("Using filesystem session with CacheLib backend")
+        flask_session.init_app(app)
     else:
-        # Other session types (filesystem, redis, etc.)
+        # Other session types (redis, etc.)
         flask_session.init_app(app)
 
     _log_session_config(app)

@@ -625,7 +625,10 @@ def delete_expense(expense_id: int) -> FlaskResponse | WerkzeugResponse:
         404: If expense is not found
         403: If user doesn't have permission to delete the expense
     """
-    expense = Expense.query.get_or_404(expense_id)
+    # Use SQLAlchemy 2.0 style to avoid LegacyAPIWarning for Query.get()
+    expense = db.session.get(Expense, expense_id)
+    if expense is None:
+        abort(404)
     if expense.user_id != current_user.id:
         abort(403)
     expense_services.delete_expense(expense)

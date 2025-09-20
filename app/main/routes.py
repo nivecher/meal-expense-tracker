@@ -5,7 +5,7 @@ This module contains the route handlers for the main blueprint.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import (
     Response,
@@ -81,7 +81,7 @@ def terms():
     Returns:
         Rendered terms of service template with current datetime
     """
-    return render_template("main/terms.html", now=datetime.utcnow())
+    return render_template("main/terms.html", now=datetime.now(timezone.utc))
 
 
 @bp.route("/privacy")
@@ -91,7 +91,7 @@ def privacy():
     Returns:
         Rendered privacy policy template with current datetime
     """
-    return render_template("main/privacy.html", now=datetime.utcnow())
+    return render_template("main/privacy.html", now=datetime.now(timezone.utc))
 
 
 @bp.route("/contact", methods=["GET", "POST"])
@@ -212,7 +212,7 @@ def user_tag_css():
     css_content = "\n".join(css_rules)
 
     # Add a comment with timestamp for cache busting
-    css_content = f"""/* User tag colors - Generated at {datetime.utcnow().isoformat()} */
+    css_content = f"""/* User tag colors - Generated at {datetime.now(timezone.utc).isoformat()} */
 {css_content}"""
 
     # Create ETag based on user ID, tag count, and last update time

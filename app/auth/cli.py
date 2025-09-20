@@ -252,7 +252,9 @@ def _find_user_by_identifier(identifier: str) -> User | None:
     from app.auth.models import User
 
     if identifier.isdigit():
-        return User.query.get(int(identifier))
+        from app.extensions import db
+
+        return db.session.get(User, int(identifier))
     return User.query.filter((User.username == identifier) | (User.email == identifier)).first()
 
 

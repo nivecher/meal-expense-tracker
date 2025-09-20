@@ -1624,7 +1624,7 @@ def update_tag(user_id: int, tag_id: int, name: str, color: str = "#6c757d", des
     tag.name = normalized_name
     tag.color = color
     tag.description = description
-    tag.updated_at = datetime.utcnow()
+    tag.updated_at = datetime.now(timezone.utc)
 
     db.session.commit()
 
@@ -1702,7 +1702,8 @@ def add_tags_to_expense(expense_id: int, user_id: int, tag_names: list[str]) -> 
     Returns:
         List of Tag objects that were added
     """
-    expense = Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag)).get(expense_id)
+    # Use SQLAlchemy 2.0 style to avoid LegacyAPIWarning for Query.get()
+    expense = db.session.get(Expense, expense_id)
     if not expense:
         raise ValueError("Expense not found")
 

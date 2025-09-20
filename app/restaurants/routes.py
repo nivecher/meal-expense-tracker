@@ -23,6 +23,28 @@ from sqlalchemy.orm import joinedload
 
 # Import Expense model here to avoid circular imports
 from app.extensions import db
+
+# Comprehensive list of food-related business types for Google Places API searches
+FOOD_BUSINESS_TYPES = [
+    "restaurant",
+    "cafe",
+    "bakery",
+    "bar",
+    "fast_food_restaurant",
+    "meal_delivery",
+    "meal_takeaway",
+    "food_court",
+    "coffee_shop",
+    "ice_cream_shop",
+    "sandwich_shop",
+    "deli",
+    "donut_shop",
+    "dessert_shop",
+    "juice_shop",
+    "wine_bar",
+    "pub",
+    "tea_house",
+]
 from app.restaurants import bp, services
 from app.restaurants.exceptions import (
     DuplicateGooglePlaceIdError,
@@ -30,7 +52,10 @@ from app.restaurants.exceptions import (
 )
 from app.restaurants.forms import RestaurantForm
 from app.restaurants.models import Restaurant
-from app.restaurants.services import calculate_expense_stats
+from app.restaurants.services import (
+    calculate_expense_stats,
+    search_restaurants_by_location,
+)
 from app.utils.decorators import admin_required
 
 # Constants
@@ -96,7 +121,7 @@ def _get_regional_bias_from_request():
 
 
 def _build_search_params(query, cuisine, lat, lng, radius_miles, api_key):
-    """Build search parameters for Google Places API with smart location handling."""
+    """Build search parameters for NEW Google Places API with smart location handling."""
     # Extract location from query if present
     business_query, extracted_location = _extract_location_from_query(query)
 
@@ -112,42 +137,61 @@ def _build_search_params(query, cuisine, lat, lng, radius_miles, api_key):
     if extracted_location:
         search_query += f" {extracted_location}"
 
-    if lat and lng:
-        # Explicit location provided - use nearby search
+    # Always prioritize text-based search when there's a meaningful query
+    if search_query and search_query.strip() and search_query.strip() != "restaurants":
+        # Use text search with location bias for better text-based results
+        url = "https://places.googleapis.com/v1/places:searchText"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel",
+        }
+        payload = {"textQuery": search_query, "maxResultCount": 20}
+
+        # Add location bias if coordinates are provided
+        if lat and lng:
+            payload["locationBias"] = {
+                "circle": {
+                    "center": {"latitude": float(lat), "longitude": float(lng)},
+                    "radius": min(float(radius_miles) * 1609.34, 50000),  # Convert miles to meters
+                }
+            }
+    elif lat and lng:
+        # No meaningful query - use location-based search
         radius_meters = float(radius_miles) * 1609.34
-        url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-        params = {
-            "location": f"{lat},{lng}",
-            "radius": min(radius_meters, 50000),
-            "key": api_key,
+        url = "https://places.googleapis.com/v1/places:searchNearby"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel",
         }
-        # Use keyword search instead of type restriction for broader results
-        # This includes restaurants, cafes, food trucks, drink shops, etc.
-        if search_query and search_query.strip() != "restaurants":
-            params["keyword"] = search_query
-        else:
-            # If no specific query, search for food-related businesses
-            params["keyword"] = "food restaurant cafe bar"
+        payload = {
+            "locationRestriction": {
+                "circle": {
+                    "center": {"latitude": float(lat), "longitude": float(lng)},
+                    "radius": min(radius_meters, 50000),
+                }
+            },
+            "includedTypes": FOOD_BUSINESS_TYPES,
+            "maxResultCount": 20,
+        }
     else:
-        # No explicit location - use text search with location bias
-        url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-        params = {
-            "query": search_query,
-            "key": api_key,
+        # Fallback: generic text search
+        url = "https://places.googleapis.com/v1/places:searchText"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel",
         }
+        payload = {"textQuery": "restaurants", "maxResultCount": 20}
 
-        # Add location bias if we extracted a location from the query
-        if extracted_location:
-            # Use text search with location in query for best results
-            params["query"] = search_query
-        else:
-            # For generic searches without location, try to add regional bias
-            # This helps prioritize nearby results without requiring exact location
-            region_bias = _get_regional_bias_from_request()
-            if region_bias:
-                params["region"] = region_bias
+        # For generic searches without location, try to add regional bias
+        # This helps prioritize nearby results without requiring exact location
+        region_bias = _get_regional_bias_from_request()
+        if region_bias:
+            payload["locationBias"] = {"region": region_bias}
 
-    return url, params
+    return url, headers, payload
 
 
 def _build_photo_urls(photos, api_key):
@@ -282,29 +326,38 @@ def _validate_search_params():
 
 
 def _filter_place_by_criteria(place, min_rating, max_price_level):
-    """Filter place based on rating and price level criteria."""
+    """Filter place based on rating and price level criteria (new API structure)."""
+    # Convert price level to integer using the same logic as storage
+    price_level = _convert_price_level_to_int(place.get("priceLevel", place.get("price_level", 0)))
+    if price_level is None:
+        price_level = 0  # Default to 0 if conversion fails
     if min_rating and place.get("rating", 0) < float(min_rating):
         return False
-    if max_price_level and place.get("price_level", 0) > int(max_price_level):
+    if max_price_level and price_level > int(max_price_level):
         return False
     return True
 
 
 def _process_search_result_place(place, api_key):
-    """Process a single place from search results."""
+    """Process a single place from search results (new API structure)."""
     # Debug: Log the raw place data from search results
-    current_app.logger.info(f"Raw place from search: place_id={place.get('place_id')}, name={place.get('name')}")
+    place_id = place.get("id")
+    display_name = (
+        place.get("displayName", {}).get("text")
+        if isinstance(place.get("displayName"), dict)
+        else place.get("displayName", "")
+    )
+    current_app.logger.info(f"Raw place from search: place_id={place_id}, name={display_name}")
 
     # Get detailed information including address_components
-    place_id = place.get("place_id")
     if not place_id:
-        current_app.logger.warning(f"Place has no place_id, skipping: {place.get('name')}")
+        current_app.logger.warning(f"Place has no place_id, skipping: {display_name}")
         return None
 
     detailed_place = _get_place_details(place_id, api_key)
     if detailed_place:
         # Preserve the original place_id from search results
-        detailed_place["place_id"] = place_id
+        detailed_place["id"] = place_id
         return _process_place_data(detailed_place, api_key)
     else:
         # Fallback to basic place data if details fetch fails
@@ -322,17 +375,17 @@ def search_places():
 
     try:
         # Build search parameters and make API request
-        url, search_params = _build_search_params(
+        url, headers, payload = _build_search_params(
             params["query"], params["cuisine"], params["lat"], params["lng"], params["radius_miles"], params["api_key"]
         )
-        response = requests.get(url, params=search_params, timeout=10)
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
         data = response.json()
 
-        # Process results
+        # Process results (new API structure)
         results = []
-        if data.get("status") == "OK":
-            for place in data.get("results", [])[: params["max_results"]]:
+        if "places" in data:
+            for place in data.get("places", [])[: params["max_results"]]:
                 if not _filter_place_by_criteria(place, params["min_rating"], params["max_price_level"]):
                     continue
 
@@ -367,77 +420,112 @@ def search_places():
 @login_required
 def get_place_details(place_id):
     """Get place details using Google Places API with comprehensive field mapping."""
+    current_app.logger.info(f"=== get_place_details called with place_id: {place_id} ===")
+
     api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
     if not api_key:
+        current_app.logger.error("Google Maps API key not configured")
         return jsonify({"error": "Google Maps API key not configured"}), 500
 
     try:
-        # Make request to Google Places API with comprehensive fields
-        url = "https://maps.googleapis.com/maps/api/place/details/json"
-        params = {
-            "place_id": place_id,
-            "fields": "name,formatted_address,formatted_phone_number,website,rating,types,address_components,opening_hours,price_level,reviews,photos,geometry,editorial_summary,current_opening_hours,utc_offset,vicinity,url,place_id,plus_code,adr_address,international_phone_number,reviews,user_ratings_total",
-            "key": api_key,
+        # Make request to NEW Google Places API with comprehensive fields
+        url = f"https://places.googleapis.com/v1/places/{place_id}"
+        headers = {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": api_key,
+            "X-Goog-FieldMask": "displayName,formattedAddress,nationalPhoneNumber,websiteUri,location,rating,userRatingCount,priceLevel,editorialSummary,paymentOptions,accessibilityOptions,parkingOptions,restroom,outdoorSeating,servesBreakfast,servesLunch,servesDinner,servesBeer,servesWine,servesBrunch,servesVegetarianFood,delivery,dineIn,takeout,reservable,primaryType,types,addressComponents,regularOpeningHours,currentOpeningHours,plusCode,photos,reviews,generativeSummary",
         }
 
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
 
-        data = response.json()
+        place = response.json()
 
-        if data.get("status") == "OK":
-            place = data.get("result", {})
+        # Parse address components (new API structure)
+        address_data = parse_address_components(place.get("addressComponents", []))
 
-            # Parse address components
-            address_data = parse_address_components(place.get("address_components", []))
+        # Get restaurant name from new API structure
+        restaurant_name = (
+            place.get("displayName", {}).get("text")
+            if isinstance(place.get("displayName"), dict)
+            else place.get("displayName", "")
+        )
 
-            # Determine cuisine and service level from types
-            cuisine, service_level = analyze_restaurant_types(place.get("types", []))
+        # Determine cuisine and service level from types and service options
+        current_app.logger.info(f"Analyzing restaurant types for place: {restaurant_name}")
+        current_app.logger.info(f"Types from Google Places: {place.get('types', [])}")
+        current_app.logger.info(f"Primary Type: {place.get('primaryType', 'Unknown')}")
+        cuisine, service_level = analyze_restaurant_types(place.get("types", []), place)
+        current_app.logger.info(f"Classification results - Cuisine: {cuisine}, Service Level: {service_level}")
 
-            # If no cuisine detected from types, try name-based detection
-            if not cuisine:
-                cuisine = detect_cuisine_from_name(place.get("name", ""))
-                current_app.logger.info(f"Detected cuisine from name: {cuisine}")
+        # If no cuisine detected from types, try name-based detection
+        if not cuisine:
+            cuisine = detect_cuisine_from_name(restaurant_name)
+            current_app.logger.info(f"Detected cuisine from name: {cuisine}")
 
-            # Map all fields comprehensively
-            mapped_data = {
-                # Basic Information
-                "name": place.get("name"),
-                "type": "restaurant",  # Default for Google Places restaurants
-                "description": generate_description(place),
-                # Location Information (parsed from address_components)
-                "address": address_data.get("street_address"),
-                "city": address_data.get("city"),
-                "state": address_data.get("state"),
-                "postal_code": address_data.get("postal_code"),
-                "country": address_data.get("country"),
-                # Contact Information
-                "phone": place.get("formatted_phone_number") or place.get("international_phone_number"),
-                "website": place.get("website"),
-                "email": None,  # Google Places doesn't provide email
-                "google_place_id": place_id,
-                # Business Details
-                "cuisine": cuisine,
-                "service_level": service_level,
-                "is_chain": detect_chain_restaurant(place.get("name", "")),
-                "rating": place.get("rating"),
-                "notes": generate_notes(place),
-                # Additional Google Data
-                "formatted_address": place.get("formatted_address"),
-                "types": place.get("types", []),
-                "address_components": place.get("address_components", []),
-                "price_level": place.get("price_level"),
-                "opening_hours": place.get("opening_hours", {}),
-                "geometry": place.get("geometry", {}),
-                "editorial_summary": place.get("editorial_summary", {}),
-                "user_ratings_total": place.get("user_ratings_total"),
-                "vicinity": place.get("vicinity"),
-                "url": place.get("url"),
-            }
+        # Map all fields comprehensively for new API
+        mapped_data = {
+            # Basic Information
+            "name": restaurant_name,
+            "type": "restaurant",  # Default for Google Places restaurants
+            "description": generate_description(place),
+            # Location Information (parsed from addressComponents)
+            "address": address_data.get("street_address"),
+            "city": address_data.get("city"),
+            "state": address_data.get("state"),
+            "postal_code": address_data.get("postal_code"),
+            "country": address_data.get("country"),
+            # Contact Information
+            "phone": place.get("nationalPhoneNumber"),
+            "website": place.get("websiteUri"),
+            "email": None,  # Google Places doesn't provide email
+            "google_place_id": place_id,
+            # Business Details
+            "cuisine": cuisine,
+            "service_level": service_level,
+            "is_chain": detect_chain_restaurant(restaurant_name, place),
+            "rating": place.get("rating"),
+            "notes": generate_notes(place),
+            # Additional Google Data (new API structure)
+            "formatted_address": place.get("formattedAddress"),
+            "types": place.get("types", []),
+            "primary_type": place.get("primaryType"),  # NEW: Primary business type
+            "address_components": place.get("addressComponents", []),
+            "price_level": _convert_price_level_to_int(place.get("priceLevel")),
+            "opening_hours": place.get("regularOpeningHours", {}),
+            "current_opening_hours": place.get("currentOpeningHours", {}),
+            "location": place.get("location", {}),
+            # Extract coordinates from location for easier access
+            "latitude": place.get("location", {}).get("latitude"),
+            "longitude": place.get("location", {}).get("longitude"),
+            "editorial_summary": place.get("editorialSummary", {}),
+            "generative_summary": place.get("generativeSummary", {}),  # NEW: AI-generated summary
+            "user_ratings_total": place.get("userRatingCount"),
+            "plus_code": place.get("plusCode", {}),
+            "photos": place.get("photos", []),
+            "reviews": place.get("reviews", []),
+            # NEW: Enhanced restaurant data
+            "payment_options": place.get("paymentOptions", {}),
+            "accessibility_options": place.get("accessibilityOptions", {}),
+            "parking_options": place.get("parkingOptions", {}),
+            "restroom": place.get("restroom"),
+            "outdoor_seating": place.get("outdoorSeating"),
+            "takeout": place.get("takeout"),
+            "delivery": place.get("delivery"),
+            "dine_in": place.get("dineIn"),
+            "reservable": place.get("reservable"),
+            # Service options
+            "serves_breakfast": place.get("servesBreakfast"),
+            "serves_lunch": place.get("servesLunch"),
+            "serves_dinner": place.get("servesDinner"),
+            "serves_beer": place.get("servesBeer"),
+            "serves_wine": place.get("servesWine"),
+            "serves_brunch": place.get("servesBrunch"),
+            "serves_vegetarian_food": place.get("servesVegetarianFood"),
+            # Note: business_status is time-sensitive and not stored permanently
+        }
 
-            return jsonify(mapped_data)
-        else:
-            return jsonify({"error": f"Google Places API error: {data.get('status')}"}), 400
+        return jsonify(mapped_data)
 
     except requests.RequestException as e:
         current_app.logger.error(f"Google Places API error: {e}")
@@ -504,6 +592,7 @@ def get_cuisine_choices():
 def _get_specific_cuisine_types():
     """Get mapping of specific Google Places cuisine types to formatted names."""
     return {
+        # Primary cuisine types from Google Places API
         "chinese_restaurant": "Chinese",
         "italian_restaurant": "Italian",
         "japanese_restaurant": "Japanese",
@@ -523,20 +612,116 @@ def _get_specific_cuisine_types():
         "moroccan_restaurant": "Moroccan",
         "brazilian_restaurant": "Brazilian",
         "peruvian_restaurant": "Peruvian",
+        # Food type restaurants
         "barbecue_restaurant": "Barbecue",
         "pizza_restaurant": "Pizza",
         "seafood_restaurant": "Seafood",
         "sushi_restaurant": "Sushi",
         "steak_house": "Steakhouse",
-        "fast_food_restaurant": "Fast Food",
+        # Fast food and casual
+        "fast_food_restaurant": "American",  # Fast food is typically American
+        "fast_casual_restaurant": "American",  # Fast casual is typically American
+        # Bars and drinks
         "bar": "Bar",
         "night_club": "Bar",
+        "cocktail_bar": "Bar",
+        "wine_bar": "Bar",
+        "brewery": "Bar",
+        "brewpub": "Bar",
+        # Other food establishments
+        "bakery": "Bakery",
+        "cafe": "Coffee",
+        "coffee_shop": "Coffee",
+        "ice_cream_shop": "Dessert",
+        "dessert_shop": "Dessert",
     }
 
 
-def _detect_cuisine_from_types(types_lower):
-    """Detect cuisine from Google Places types array."""
-    # Check for specific cuisine restaurant types first
+def _detect_cuisine_from_chain_name(restaurant_name):
+    """Detect cuisine from restaurant name using keyword patterns."""
+    restaurant_name_lower = restaurant_name.lower()
+
+    # Fast food chains (highest priority)
+    fast_food_chains = [
+        "mcdonald's",
+        "burger king",
+        "wendy's",
+        "subway",
+        "kfc",
+        "taco bell",
+        "domino's",
+        "pizza hut",
+        "chick-fil-a",
+        "popeyes",
+        "arby's",
+        "jack in the box",
+        "in-n-out",
+        "five guys",
+        "shake shack",
+        "chipotle",
+        "qdoba",
+        "panera bread",
+    ]
+
+    if any(chain in restaurant_name_lower for chain in fast_food_chains):
+        return "American"
+
+    # Cuisine keyword patterns (more maintainable than hardcoded lists)
+    cuisine_patterns = {
+        "Mexican": ["taco", "burrito", "mexican", "enchilada", "quesadilla"],
+        "Pizza": ["pizza", "pizzeria"],
+        "Chinese": ["chinese", "panda", "wok", "dim sum"],
+        "Coffee": ["coffee", "espresso", "latte", "cappuccino", "brew", "roast"],
+        "Italian": ["italian", "pasta", "spaghetti", "lasagna", "trattoria"],
+        "Japanese": ["japanese", "sushi", "ramen", "tempura", "bento"],
+        "Indian": ["indian", "curry", "tandoori", "masala", "naan"],
+        "Thai": ["thai", "pad thai", "tom yum"],
+        "American": ["burger", "fries", "grill", "diner", "bbq", "barbecue", "steak"],
+    }
+
+    # Check for cuisine patterns
+    for cuisine, keywords in cuisine_patterns.items():
+        if any(keyword in restaurant_name_lower for keyword in keywords):
+            return cuisine
+
+    return None
+
+
+def _detect_cuisine_from_description(description):
+    """Detect cuisine from Google Places editorial summary/description."""
+    if not description:
+        current_app.logger.info("No description provided for cuisine detection")
+        return None
+
+    current_app.logger.info(f"Analyzing description for cuisine: {description}")
+    description_lower = description.lower()
+
+    # Cuisine keywords in description
+    cuisine_keywords = {
+        "American": ["american", "burger", "fries", "grill", "diner", "bbq", "barbecue", "steak"],
+        "Mexican": ["mexican", "taco", "burrito", "enchilada", "quesadilla", "salsa"],
+        "Italian": ["italian", "pizza", "pasta", "spaghetti", "lasagna", "trattoria"],
+        "Chinese": ["chinese", "panda", "wok", "dim sum", "kung pao", "lo mein"],
+        "Japanese": ["japanese", "sushi", "ramen", "tempura", "bento", "sashimi"],
+        "Indian": ["indian", "curry", "tandoori", "masala", "naan", "biryani"],
+        "Thai": ["thai", "pad thai", "tom yum", "curry", "coconut"],
+        "Coffee": ["coffee", "espresso", "latte", "cappuccino", "brew", "roast"],
+    }
+
+    # Check for cuisine keywords
+    for cuisine, keywords in cuisine_keywords.items():
+        for keyword in keywords:
+            if keyword in description_lower:
+                current_app.logger.info(f"Found cuisine keyword '{keyword}' in description, detecting as {cuisine}")
+                return cuisine
+
+    current_app.logger.info("No cuisine keywords found in description")
+    return None
+
+
+def _detect_cuisine_from_google_types(types_lower):
+    """Detect cuisine from Google Places types."""
+    current_app.logger.info(f"Analyzing types for cuisine: {types_lower}")
     specific_cuisine_types = _get_specific_cuisine_types()
 
     for google_type in types_lower:
@@ -545,7 +730,148 @@ def _detect_cuisine_from_types(types_lower):
             current_app.logger.info(f"Detected specific cuisine type: {cuisine} from {google_type}")
             return cuisine
 
+    current_app.logger.info(f"No specific cuisine types found in: {types_lower}")
+    return None
+
+
+def _detect_cuisine_from_primary_type(primary_type):
+    """Detect cuisine from Google Places primary type (new API feature)."""
+    if not primary_type:
+        return None
+
+    primary_type_lower = primary_type.lower()
+    current_app.logger.info(f"Analyzing primary type: {primary_type}")
+
+    # Primary type to cuisine mapping
+    primary_type_mappings = {
+        # Coffee and beverages
+        "coffee_shop": "coffee",
+        "cafe": "coffee",
+        "tea_house": "tea",
+        # Fast food and casual
+        "fast_food_restaurant": "fast_food",
+        "hamburger_restaurant": "fast_food",
+        "pizza_restaurant": "pizza",
+        "sandwich_shop": "sandwiches",
+        "hot_dog_restaurant": "fast_food",
+        "chicken_restaurant": "fast_food",
+        "taco_restaurant": "mexican",
+        "burrito_restaurant": "mexican",
+        # Ethnic cuisines
+        "chinese_restaurant": "chinese",
+        "japanese_restaurant": "japanese",
+        "korean_restaurant": "korean",
+        "thai_restaurant": "thai",
+        "vietnamese_restaurant": "vietnamese",
+        "indian_restaurant": "indian",
+        "italian_restaurant": "italian",
+        "mexican_restaurant": "mexican",
+        "french_restaurant": "french",
+        "german_restaurant": "german",
+        "greek_restaurant": "greek",
+        "mediterranean_restaurant": "mediterranean",
+        "middle_eastern_restaurant": "middle_eastern",
+        "american_restaurant": "american",
+        "barbecue_restaurant": "bbq",
+        "seafood_restaurant": "seafood",
+        "steak_house": "steakhouse",
+        "sushi_restaurant": "sushi",
+        # Specialty
+        "breakfast_restaurant": "breakfast",
+        "brunch_restaurant": "brunch",
+        "diner": "american",
+        "bakery": "bakery",
+        "dessert_shop": "desserts",
+        "ice_cream_shop": "ice_cream",
+        # Bars and drinks
+        "bar": "bar",
+        "pub": "pub",
+        "wine_bar": "wine_bar",
+        "cocktail_lounge": "cocktail_bar",
+        "brewery": "brewery",
+        "distillery": "distillery",
+    }
+
+    cuisine = primary_type_mappings.get(primary_type_lower)
+    if cuisine:
+        current_app.logger.info(f"Cuisine detected from primary type '{primary_type}': {cuisine}")
+        return cuisine
+
+    current_app.logger.info(f"No cuisine mapping found for primary type: {primary_type}")
+    return None
+
+
+def _convert_price_level_to_int(price_level):
+    """Convert Google Places price level to integer (handles both old and new API formats)."""
+    if price_level is None:
+        return None
+
+    # If it's already an integer, return it
+    if isinstance(price_level, int):
+        return price_level
+
+    # If it's a string number, convert to int
+    if isinstance(price_level, str) and price_level.isdigit():
+        return int(price_level)
+
+    # Handle new API string format (PRICE_LEVEL_MODERATE -> 2)
+    if isinstance(price_level, str):
+        price_level_map = {
+            "PRICE_LEVEL_FREE": 0,
+            "PRICE_LEVEL_INEXPENSIVE": 1,
+            "PRICE_LEVEL_MODERATE": 2,
+            "PRICE_LEVEL_EXPENSIVE": 3,
+            "PRICE_LEVEL_VERY_EXPENSIVE": 4,
+        }
+        return price_level_map.get(price_level, None)
+
+    return None
+
+
+def _detect_cuisine_from_types(types_lower, restaurant_name="", place_data=None, primary_type=""):
+    """Detect cuisine from Google Places types array and primary type."""
+    # Check primary type first (new API feature - highest priority)
+    if primary_type:
+        cuisine = _detect_cuisine_from_primary_type(primary_type)
+        if cuisine:
+            return cuisine
+
+    # Check description for cuisine indicators (high priority for fast food)
+    if place_data and "editorialSummary" in place_data and place_data["editorialSummary"]:
+        editorial_text = (
+            place_data["editorialSummary"].get("overview", "")
+            if isinstance(place_data["editorialSummary"], dict)
+            else str(place_data["editorialSummary"])
+        )
+        if editorial_text:
+            cuisine = _detect_cuisine_from_description(editorial_text)
+            if cuisine:
+                current_app.logger.info(f"Cuisine detected from description: {cuisine}")
+                return cuisine
+
+    # Check restaurant name patterns (high priority for chains)
+    if restaurant_name:
+        cuisine = _detect_cuisine_from_chain_name(restaurant_name)
+        if cuisine:
+            current_app.logger.info(f"Cuisine detected from name patterns: {cuisine}")
+            return cuisine
+
+    # Check for specific cuisine restaurant types (lower priority)
+    cuisine = _detect_cuisine_from_google_types(types_lower)
+    if cuisine:
+        current_app.logger.info(f"Cuisine detected from Google types: {cuisine}")
+        return cuisine
+
+    # Default cuisine for restaurants
+    if "restaurant" in types_lower or "food" in types_lower:
+        return "American"
+
     # Check for broader patterns
+    return _detect_cuisine_from_broader_patterns(types_lower)
+
+
+def _detect_cuisine_from_broader_patterns(types_lower):
+    """Detect cuisine from broader patterns in types."""
     cuisine_keywords = {
         "italian": ["italian", "pizza", "pasta"],
         "chinese": ["chinese"],
@@ -574,50 +900,272 @@ def _detect_cuisine_from_types(types_lower):
     if any(bar_type in types_lower for bar_type in ["bar", "pub", "brewery"]):
         food_types = ["restaurant", "food", "meal_delivery", "meal_takeaway"]
         if any(food_type in types_lower for food_type in food_types):
-            # Has both bar and restaurant characteristics - classify as Pub
             current_app.logger.info("Detected as pub establishment (bar + restaurant)")
             return "Pub"
         else:
-            # Primarily a bar without food service
             current_app.logger.info("Detected as primarily a bar establishment")
             return "Bar"
 
     return None
 
 
-def _detect_service_level_from_types(types_lower):
-    """Detect service level from Google Places types array."""
-    # Fast food places should be classified as quick service
-    if "fast_food" in types_lower or "fast_food_restaurant" in types_lower:
+def _detect_service_level_from_chain_name(restaurant_name):
+    """Detect service level from restaurant name using patterns and service indicators."""
+    restaurant_name_lower = restaurant_name.lower()
+
+    # Service level indicators based on restaurant characteristics
+    quick_service_indicators = [
+        "drive",
+        "drive-in",
+        "drive thru",
+        "drive-thru",
+        "express",
+        "quick",
+        "fast",
+        "takeout",
+        "delivery",
+        "grab",
+        "go",
+        "counter",
+    ]
+
+    fast_casual_indicators = ["fresh", "healthy", "organic", "natural", "artisan", "craft"]
+
+    fine_dining_indicators = [
+        "fine dining",
+        "restaurant",
+        "bistro",
+        "brasserie",
+        "steakhouse",
+        "grill",
+        "chophouse",
+        "supper club",
+    ]
+
+    # Check for service level indicators
+    if any(indicator in restaurant_name_lower for indicator in quick_service_indicators):
         return "quick_service"
-    # Fast casual is counter service but higher quality
-    elif "fast_casual" in types_lower or "fast_casual_restaurant" in types_lower:
+
+    if any(indicator in restaurant_name_lower for indicator in fast_casual_indicators):
         return "fast_casual"
-    # Fine dining is upscale with full service
-    elif "fine_dining" in types_lower or "upscale" in types_lower or "fine_dining_restaurant" in types_lower:
+
+    if any(indicator in restaurant_name_lower for indicator in fine_dining_indicators):
         return "fine_dining"
-    # Regular restaurants are casual dining (full service, sit-down)
-    elif "restaurant" in types_lower:
+
+    return None
+
+
+def _detect_service_level_from_description(description):
+    """Detect service level from Google Places editorial summary/description."""
+    if not description:
+        current_app.logger.info("No description provided for service level detection")
+        return None
+
+    current_app.logger.info(f"Analyzing description for service level: {description}")
+    description_lower = description.lower()
+
+    # Fine Dining indicators in description (check first - higher priority)
+    fine_dining_keywords = [
+        "fine dining",
+        "upscale",
+        "elegant",
+        "sophisticated",
+        "gourmet",
+        "chef",
+        "haute cuisine",
+        "white tablecloth",
+        "formal dining",
+        "full service",
+        "table service",
+        "servers",
+        "waiter",
+        "waitress",
+    ]
+
+    for keyword in fine_dining_keywords:
+        if keyword in description_lower:
+            current_app.logger.info(f"Found fine dining keyword '{keyword}' in description")
+            return "fine_dining"
+
+    # Quick Service indicators in description (more specific)
+    quick_service_keywords = [
+        "fast food",
+        "fast-food",
+        "quick service",
+        "counter service",
+        "drive-thru",
+        "drive thru",
+        "grab and go",
+        "order at counter",
+        "fast casual",
+        "quick bite",
+        "fast service",
+        "no table service",
+    ]
+
+    for keyword in quick_service_keywords:
+        if keyword in description_lower:
+            current_app.logger.info(f"Found quick service keyword '{keyword}' in description")
+            return "quick_service"
+
+    # Fast Casual indicators in description
+    fast_casual_keywords = ["fast casual", "counter service", "order at counter", "casual dining"]
+
+    for keyword in fast_casual_keywords:
+        if keyword in description_lower:
+            current_app.logger.info(f"Found fast casual keyword '{keyword}' in description")
+            return "fast_casual"
+
+    current_app.logger.info("No service level keywords found in description")
+    return None
+
+
+def _detect_service_level_from_types_and_options(types_lower, place_data=None):
+    """Detect service level from Google Places types and service options."""
+    # Check Google Places types first (most reliable)
+    service_level = _detect_service_level_from_google_types(types_lower)
+    if service_level:
+        current_app.logger.info(f"Service level detected from Google types: {service_level}")
+        return service_level
+
+    # Check service options for restaurants (reliable indicator based on price/reservations)
+    if "restaurant" in types_lower and place_data:
+        service_level = _detect_service_level_from_service_options(place_data)
+        if service_level:
+            current_app.logger.info(f"Service level detected from service options: {service_level}")
+            return service_level
+
+    # Check description for service level indicators (only for obvious cases)
+    if place_data and "editorial_summary" in place_data and place_data["editorial_summary"]:
+        editorial_text = (
+            place_data["editorial_summary"].get("overview", "")
+            if isinstance(place_data["editorial_summary"], dict)
+            else str(place_data["editorial_summary"])
+        )
+        if editorial_text:
+            service_level = _detect_service_level_from_description(editorial_text)
+            # Only use description if it's very clear (fine dining or obvious fast food)
+            if service_level in ["fine_dining"] or (
+                service_level == "quick_service" and "fast food" in editorial_text.lower()
+            ):
+                current_app.logger.info(f"Service level detected from description: {service_level}")
+                return service_level
+
+    # Check name patterns as fallback (only for edge cases)
+    if place_data and "name" in place_data:
+        service_level = _detect_service_level_from_chain_name(place_data["name"])
+        if service_level:
+            current_app.logger.info(f"Service level detected from name patterns: {service_level}")
+            return service_level
+
+    # Default fallback
+    default_level = "casual_dining" if "restaurant" in types_lower else None
+    current_app.logger.info(f"Using default service level: {default_level}")
+    return default_level
+
+
+def _detect_service_level_from_google_types(types_lower):
+    """Detect service level from Google Places types."""
+    current_app.logger.info(f"Analyzing types for service level: {types_lower}")
+
+    # Quick Service (Fast Food) - Google's primary indicators
+    quick_service_types = ["fast_food_restaurant", "fast_food", "food_court", "convenience_store"]
+    if any(indicator in types_lower for indicator in quick_service_types):
+        current_app.logger.info(f"Found quick service type in: {types_lower}")
+        return "quick_service"
+
+    # Fast Casual - Counter service but higher quality
+    fast_casual_types = ["fast_casual_restaurant", "fast_casual"]
+    if any(indicator in types_lower for indicator in fast_casual_types):
+        current_app.logger.info(f"Found fast casual type in: {types_lower}")
+        return "fast_casual"
+
+    # Fine Dining - Upscale establishments
+    fine_dining_types = ["fine_dining_restaurant", "fine_dining", "upscale_restaurant"]
+    if any(indicator in types_lower for indicator in fine_dining_types):
+        current_app.logger.info(f"Found fine dining type in: {types_lower}")
+        return "fine_dining"
+
+    current_app.logger.info(f"No specific service level types found in: {types_lower}")
+    return None
+
+
+def _detect_service_level_from_service_options(place_data):
+    """Detect service level from Google Places service options."""
+    takeout = place_data.get("takeout", False)
+    dine_in = place_data.get("dine_in", False)
+    reservable = place_data.get("reservable", False)
+    price_level = place_data.get("price_level")
+    delivery = place_data.get("delivery", False)
+
+    current_app.logger.info(
+        f"Service options - takeout: {takeout}, dine_in: {dine_in}, reservable: {reservable}, price_level: {price_level}, delivery: {delivery}"
+    )
+
+    # SIMPLIFIED LOGIC - Price level is the primary indicator
+
+    # Fine dining: Price level 4+ ($$$$)
+    if price_level is not None and price_level >= 4:
+        current_app.logger.info("Detected fine dining from price level 4+")
+        return "fine_dining"
+
+    # Casual dining: Price level 3+ ($$$) OR reservations OR price level 2 with dine-in
+    if (price_level is not None and price_level >= 3) or reservable or (price_level == 2 and dine_in):
+        current_app.logger.info("Detected casual dining from price level 3+/reservations/price level 2 with dine-in")
         return "casual_dining"
-    else:
-        return "casual_dining"  # Default to casual dining
+
+    # Fast casual: Price level 2 ($$) without dine-in (counter service only)
+    if price_level == 2 and not dine_in:
+        current_app.logger.info("Detected fast casual from price level 2 without dine-in")
+        return "fast_casual"
+
+    # Quick service: Price level 1 ($)
+    if price_level == 1:
+        current_app.logger.info("Detected quick service from price level 1")
+        return "quick_service"
+
+    # Default fallback
+    current_app.logger.info("Defaulting to casual dining from service options")
+    return "casual_dining"
 
 
-def analyze_restaurant_types(types):
-    """Analyze Google Places types to determine cuisine and service level."""
+def _detect_service_level_from_types(types_lower):
+    """Legacy function - use _detect_service_level_from_types_and_options instead."""
+    return _detect_service_level_from_types_and_options(types_lower)
+
+
+def analyze_restaurant_types(types, place_data=None):
+    """Analyze Google Places types and service options to determine cuisine and service level."""
     current_app.logger.info(f"Analyzing restaurant types: {types}")
+    current_app.logger.info(f"Place data keys: {list(place_data.keys()) if place_data else 'None'}")
+    if place_data and "editorialSummary" in place_data:
+        current_app.logger.info(f"Editorial summary: {place_data['editorialSummary']}")
 
     types_lower = [t.lower() for t in types]
     current_app.logger.info(f"Types lower: {types_lower}")
 
-    # Detect cuisine from types
-    cuisine = _detect_cuisine_from_types(types_lower)
+    # Get restaurant name from place data (handle new API structure)
+    restaurant_name = ""
+    if place_data:
+        if "displayName" in place_data and isinstance(place_data["displayName"], dict):
+            restaurant_name = place_data["displayName"].get("text", "")
+        elif "name" in place_data:
+            restaurant_name = place_data["name"]
+
+    # Use primaryType if available (new API feature)
+    primary_type = ""
+    if place_data and "primaryType" in place_data:
+        primary_type = place_data["primaryType"]
+        current_app.logger.info(f"Primary type: {primary_type}")
+
+    # Detect cuisine from types, primary type, description, and name
+    cuisine = _detect_cuisine_from_types(types_lower, restaurant_name, place_data, primary_type)
 
     if not cuisine:
         current_app.logger.info("No cuisine detected from types, will try name-based detection")
 
-    # Detect service level
-    service_level = _detect_service_level_from_types(types_lower)
+    # Detect service level from types and service options
+    service_level = _detect_service_level_from_types_and_options(types_lower, place_data)
     current_app.logger.info(f"Detected service level: {service_level}")
 
     return cuisine, service_level
@@ -699,47 +1247,165 @@ def detect_cuisine_from_name(name):
 
 
 # TODO find a better way
-def detect_chain_restaurant(name):
-    """Detect if restaurant is likely a chain based on name patterns."""
-    chain_indicators = [
-        "mcdonald",
-        "burger king",
-        "wendy",
-        "subway",
-        "kfc",
-        "taco bell",
-        "domino",
-        "pizza hut",
-        "chipotle",
-        "panera",
-        "olive garden",
-        "applebee",
-        "chili",
-        "outback",
-        "red lobster",
-        "buffalo wild wings",
-        "starbucks",
-        "dunkin",
-        "tim hortons",
-        "peet",
-        "caribou",
+def detect_chain_restaurant(name, place_data=None):
+    """Detect if restaurant is likely a chain using multiple detection methods."""
+    current_app.logger.info(f"Detecting chain status for: {name}")
+
+    # Method 1: Description-based detection (highest priority)
+    if place_data and "editorial_summary" in place_data and place_data["editorial_summary"]:
+        editorial_text = (
+            place_data["editorial_summary"].get("overview", "")
+            if isinstance(place_data["editorial_summary"], dict)
+            else str(place_data["editorial_summary"])
+        )
+        if editorial_text:
+            is_chain = _detect_chain_from_description(editorial_text)
+            if is_chain is not None:
+                current_app.logger.info(f"Chain detected from description: {is_chain}")
+                return is_chain
+
+    # Method 2: Name pattern analysis (secondary)
+    is_chain = _detect_chain_from_name_patterns(name)
+    if is_chain is not None:
+        current_app.logger.info(f"Chain detected from name patterns: {is_chain}")
+        return is_chain
+
+    # Method 3: Corporate indicators (tertiary)
+    is_chain = _detect_chain_from_corporate_indicators(name, place_data)
+    if is_chain is not None:
+        current_app.logger.info(f"Chain detected from corporate indicators: {is_chain}")
+        return is_chain
+
+    # Default: assume not a chain (conservative approach)
+    current_app.logger.info("No clear chain indicators found, defaulting to False")
+    return False
+
+
+def _detect_chain_from_description(description):
+    """Detect chain status from Google Places editorial summary."""
+    description_lower = description.lower()
+
+    # Strong chain indicators
+    chain_keywords = [
+        "chain",
+        "chains",
+        "franchise",
+        "franchises",
+        "locations",
+        "nationwide",
+        "regional",
+        "corporate",
+        "brand",
+        "brands",
+        "restaurant group",
+        "restaurant chain",
     ]
 
+    # Anti-chain indicators (local, family-owned, etc.)
+    anti_chain_keywords = [
+        "family-owned",
+        "family owned",
+        "local",
+        "locally owned",
+        "independent",
+        "mom and pop",
+        "mom & pop",
+        "small business",
+    ]
+
+    # Check for anti-chain indicators first
+    for keyword in anti_chain_keywords:
+        if keyword in description_lower:
+            current_app.logger.info(f"Found anti-chain keyword: {keyword}")
+            return False
+
+    # Check for chain indicators
+    for keyword in chain_keywords:
+        if keyword in description_lower:
+            current_app.logger.info(f"Found chain keyword: {keyword}")
+            return True
+
+    return None
+
+
+def _detect_chain_from_name_patterns(name):
+    """Detect chain status from restaurant name patterns."""
     name_lower = name.lower()
-    return any(indicator in name_lower for indicator in chain_indicators)
+
+    # Corporate naming patterns
+    corporate_patterns = [
+        r"\b\w+\s+(kitchen|grill|house|restaurant|bistro|cafe)\b",  # "Joe's Kitchen", "Bob's Grill"
+        r"\w+\s+&+\s+\w+",  # "Tom & Jerry's", "Mike & Son's"
+        r"\b\w+\'s\s+\w+",  # "Joe's Place", "Mary's Diner"
+    ]
+
+    # Trademark indicators
+    trademark_indicators = ["™", "®", "©"]
+
+    # Check for trademarks (strong chain indicator)
+    for indicator in trademark_indicators:
+        if indicator in name:
+            current_app.logger.info(f"Found trademark indicator: {indicator}")
+            return True
+
+    # Check for corporate patterns (moderate chain indicator)
+    import re
+
+    for pattern in corporate_patterns:
+        if re.search(pattern, name_lower):
+            current_app.logger.info(f"Found corporate pattern: {pattern}")
+            return True
+
+    return None
+
+
+def _detect_chain_from_corporate_indicators(name, place_data=None):
+    """Detect chain status from corporate/Google Places indicators."""
+    # Check for corporate website patterns
+    if place_data and "website" in place_data and place_data["website"]:
+        website = place_data["website"].lower()
+        corporate_domains = [
+            ".com/",  # Corporate websites often have subpages
+            "locations",  # Corporate sites often have locations pages
+            "franchise",  # Franchise information
+            "about",  # Corporate about pages
+        ]
+
+        for indicator in corporate_domains:
+            if indicator in website:
+                current_app.logger.info(f"Found corporate website indicator: {indicator}")
+                return True
+
+    # Check for multiple location indicators in name
+    location_indicators = ["location", "branch", "store", "unit"]
+    name_lower = name.lower()
+    for indicator in location_indicators:
+        if indicator in name_lower:
+            current_app.logger.info(f"Found location indicator: {indicator}")
+            return True
+
+    return None
 
 
 def generate_description(place):
     """Generate a description from Google Places data."""
     parts = []
 
-    # Use editorial summary if available
-    if place.get("editorial_summary", {}).get("overview"):
+    # Use editorial summary if available (new API structure)
+    editorial_summary = place.get("editorialSummary", {})
+    if isinstance(editorial_summary, dict) and editorial_summary.get("overview"):
+        parts.append(editorial_summary.get("overview"))
+    elif place.get("editorial_summary", {}).get("overview"):  # Legacy fallback
         parts.append(place.get("editorial_summary", {}).get("overview"))
+
+    # Use generative summary if available (new API feature)
+    generative_summary = place.get("generativeSummary", {})
+    if isinstance(generative_summary, dict) and generative_summary.get("overview"):
+        parts.append(generative_summary.get("overview").get("text", ""))
 
     if place.get("rating"):
         rating = place.get("rating")
-        user_ratings_total = place.get("user_ratings_total")
+        user_ratings_total = place.get("userRatingCount") or place.get("user_ratings_total")
         if user_ratings_total:
             parts.append(f"Google Rating: {rating}/5 ({user_ratings_total} reviews)")
         else:
@@ -1582,6 +2248,66 @@ def add_from_google_places():
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Unexpected error in add_from_google_places: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
+
+
+@bp.route("/api/search/location", methods=["GET"])
+@login_required
+def search_restaurants_by_location_api():
+    """Search for restaurants within a specified radius of a location.
+
+    Query Parameters:
+        latitude: Center latitude for search (required)
+        longitude: Center longitude for search (required)
+        radius_km: Search radius in kilometers (default: 10.0)
+        limit: Maximum number of results (default: 50)
+
+    Returns:
+        JSON response with restaurants and distances
+    """
+    try:
+        # Get and validate parameters
+        latitude = request.args.get("latitude", type=float)
+        longitude = request.args.get("longitude", type=float)
+        radius_km = request.args.get("radius_km", 10.0, type=float)
+        limit = request.args.get("limit", 50, type=int)
+
+        # Validate required parameters
+        if latitude is None or longitude is None:
+            return jsonify({"success": False, "message": "latitude and longitude are required parameters"}), 400
+
+        # Validate parameter ranges
+        if not (-90 <= latitude <= 90):
+            return jsonify({"success": False, "message": "latitude must be between -90 and 90"}), 400
+
+        if not (-180 <= longitude <= 180):
+            return jsonify({"success": False, "message": "longitude must be between -180 and 180"}), 400
+
+        if radius_km <= 0:
+            return jsonify({"success": False, "message": "radius_km must be positive"}), 400
+
+        if limit <= 0:
+            return jsonify({"success": False, "message": "limit must be positive"}), 400
+
+        # Perform the search
+        results = search_restaurants_by_location(
+            user_id=current_user.id, latitude=latitude, longitude=longitude, radius_km=radius_km, limit=limit
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "results": results,
+                "count": len(results),
+                "search_params": {"latitude": latitude, "longitude": longitude, "radius_km": radius_km, "limit": limit},
+            }
+        )
+
+    except ValueError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+
+    except Exception as e:
+        current_app.logger.error(f"Error in location search: {str(e)}")
         return jsonify({"success": False, "message": "An unexpected error occurred"}), 500
 
 
