@@ -226,9 +226,12 @@ class Config:
         """Setup filesystem session configuration."""
         import tempfile
 
+        from cachelib.file import FileSystemCache
+
         self.SESSION_TYPE = "filesystem"
-        self.SESSION_FILE_DIR = tempfile.mkdtemp(prefix="flask_session_")
-        self.SESSION_FILE_THRESHOLD = 100
+        # Use FileSystemCache instance instead of deprecated SESSION_FILE_DIR and SESSION_FILE_THRESHOLD
+        session_dir = tempfile.mkdtemp(prefix="flask_session_")
+        self.SESSION_CACHELIB = FileSystemCache(session_dir, threshold=100, mode=0o600)
 
 
 class DevelopmentConfig(Config):
@@ -240,7 +243,7 @@ class DevelopmentConfig(Config):
     # SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE are always enabled for security
 
 
-class TestingConfig(Config):  # noqa: D101
+class UnitTestConfig(Config):  # noqa: D101
     """Testing configuration."""
 
     TESTING: bool = True
@@ -263,7 +266,7 @@ def get_config() -> Config:
 
     configs = {
         "development": DevelopmentConfig,
-        "testing": TestingConfig,
+        "testing": UnitTestConfig,
         "production": ProductionConfig,
     }
 

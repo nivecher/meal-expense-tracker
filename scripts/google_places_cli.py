@@ -264,52 +264,324 @@ def _format_opening_hours(place: Dict[str, Any]) -> str:
 
 
 def _format_dining_services(place: Dict[str, Any]) -> List[str]:
-    """Format dining services information."""
-    service_fields = [
-        "serves_breakfast",
-        "serves_lunch",
-        "serves_dinner",
-        "serves_brunch",
-        "serves_dessert",
-        "serves_vegetarian_food",
-        "serves_beer",
-        "serves_wine",
-    ]
+    """Format dining services information with icons and better categorization."""
+    service_mapping = {
+        "serves_breakfast": "🌅 Breakfast",
+        "serves_lunch": "🍽️ Lunch",
+        "serves_dinner": "🌙 Dinner",
+        "serves_brunch": "🥞 Brunch",
+        "serves_dessert": "🍰 Dessert",
+        "serves_vegetarian_food": "🥗 Vegetarian",
+        "serves_beer": "🍺 Beer",
+        "serves_wine": "🍷 Wine",
+    }
 
     dining_services = []
-    for field in service_fields:
+    for field, display_name in service_mapping.items():
         if place.get(field):
-            service_name = field.replace("serves_", "").replace("_", " ").title()
-            dining_services.append(service_name)
+            dining_services.append(display_name)
+
     return dining_services
 
 
 def _format_service_options(place: Dict[str, Any]) -> List[str]:
-    """Format service options information."""
-    option_fields = ["delivery", "takeout", "dine_in", "curbside_pickup", "reservable"]
+    """Format service options information with icons and better categorization."""
+    option_mapping = {
+        "delivery": "🚚 Delivery",
+        "takeout": "🥡 Takeout",
+        "dine_in": "🍽️ Dine-in",
+        "curbside_pickup": "🚗 Curbside",
+        "reservable": "📅 Reservations",
+    }
 
     service_options = []
-    for field in option_fields:
+    for field, display_name in option_mapping.items():
         if place.get(field):
-            option_name = field.replace("_", " ").title()
-            service_options.append(option_name)
+            service_options.append(display_name)
+
     return service_options
 
 
 def _format_accessibility_info(place: Dict[str, Any]) -> List[str]:
-    """Format accessibility information."""
+    """Format accessibility information with icons and better display."""
     accessibility_info = []
 
     if place.get("wheelchair_accessible_entrance"):
-        accessibility_info.append("Wheelchair Accessible")
+        accessibility_info.append("♿ Wheelchair Accessible")
+
     if place.get("parking_options"):
-        accessibility_info.append("Parking Available")
+        parking_options = place.get("parking_options", [])
+        if isinstance(parking_options, list) and parking_options:
+            parking_types = [opt.get("name", "Parking") for opt in parking_options if isinstance(opt, dict)]
+            accessibility_info.append(f"🅿️ {', '.join(parking_types[:2])}")  # Limit to 2 parking types
+        else:
+            accessibility_info.append("🅿️ Parking Available")
+
     if place.get("payment_options"):
         payment_methods = place.get("payment_options", [])
-        if payment_methods:
-            accessibility_info.append(f"Payment: {', '.join(payment_methods)}")
+        if isinstance(payment_methods, list) and payment_methods:
+            # Format payment methods nicely
+            payment_display = []
+            for method in payment_methods[:3]:  # Limit to 3 payment methods
+                if isinstance(method, dict):
+                    payment_display.append(method.get("name", "Payment"))
+                else:
+                    payment_display.append(str(method))
+            accessibility_info.append(f"💳 {', '.join(payment_display)}")
 
     return accessibility_info
+
+
+def _categorize_place_types(types: List[str]) -> Dict[str, List[str]]:
+    """Categorize place types into different groups.
+
+    Args:
+        types: List of type strings
+
+    Returns:
+        Dictionary with categorized types
+    """
+    primary_keywords = ["restaurant", "food", "meal_takeaway", "meal_delivery"]
+    establishment_keywords = ["establishment", "point_of_interest", "store"]
+    food_keywords = [
+        "cafe",
+        "bakery",
+        "bar",
+        "pizza",
+        "sandwich",
+        "burger",
+        "chinese",
+        "italian",
+        "mexican",
+        "indian",
+        "thai",
+        "japanese",
+        "korean",
+        "vietnamese",
+        "mediterranean",
+        "american",
+        "french",
+        "greek",
+        "turkish",
+        "lebanese",
+        "vegetarian",
+        "vegan",
+        "seafood",
+        "steakhouse",
+        "diner",
+        "fast_food",
+        "fine_dining",
+        "casual_dining",
+    ]
+    service_keywords = ["delivery", "takeout", "dine_in", "reservation", "booking"]
+
+    categorized = {"primary": [], "establishment": [], "food": [], "service": [], "other": []}
+
+    for type_name in types:
+        formatted_name = type_name.replace("_", " ").title()
+
+        if type_name in primary_keywords:
+            categorized["primary"].append(formatted_name)
+        elif type_name in establishment_keywords:
+            categorized["establishment"].append(formatted_name)
+        elif any(food in type_name for food in food_keywords):
+            categorized["food"].append(formatted_name)
+        elif any(service in type_name for service in service_keywords):
+            categorized["service"].append(formatted_name)
+        else:
+            categorized["other"].append(formatted_name)
+
+    return categorized
+
+
+def _format_types_detailed(place: Dict[str, Any]) -> str:
+    """Format types information with better categorization and display.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        Formatted types string with categories
+    """
+    types = place.get("types", [])
+    if not types:
+        return "No types specified"
+
+    categorized = _categorize_place_types(types)
+
+    # Build formatted result with limits
+    result_parts = []
+
+    if categorized["primary"]:
+        result_parts.append(f"Primary: {', '.join(categorized['primary'][:3])}")
+
+    if categorized["food"]:
+        result_parts.append(f"Food: {', '.join(categorized['food'][:4])}")
+
+    if categorized["service"]:
+        result_parts.append(f"Services: {', '.join(categorized['service'][:3])}")
+
+    if categorized["establishment"]:
+        result_parts.append(f"Establishment: {', '.join(categorized['establishment'][:2])}")
+
+    if categorized["other"]:
+        result_parts.append(f"Other: {', '.join(categorized['other'][:3])}")
+
+    return " | ".join(result_parts)
+
+
+def _build_basic_info(place: Dict[str, Any]) -> List[str]:
+    """Build basic information section."""
+    name = place.get("name", "Unknown")
+    address = place.get("formatted_address", "No address")
+    phone = place.get("formatted_phone_number", "No phone")
+    website = place.get("website", "No website")
+    rating = place.get("rating", "N/A")
+    total_ratings = place.get("user_ratings_total", 0)
+    price_level = place.get("price_level")
+    price_str = "?" * price_level if price_level else "Not specified"
+    business_status = place.get("business_status", "Unknown")
+
+    return [
+        f"\n{'=' * 80}",
+        f"Name: {name}",
+        f"Address: {address}",
+        f"Phone: {phone}",
+        f"Website: {website}",
+        f"Rating: {rating}/5 ({total_ratings} reviews)",
+        f"Price Level: {price_str}",
+        f"Business Status: {business_status}",
+    ]
+
+
+def _extract_cuisine_types(place: Dict[str, Any]) -> List[str]:
+    """Extract cuisine types from place data.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        List of cuisine types
+    """
+    types = place.get("types", [])
+    cuisine_keywords = [
+        "chinese",
+        "italian",
+        "mexican",
+        "indian",
+        "thai",
+        "japanese",
+        "korean",
+        "vietnamese",
+        "mediterranean",
+        "american",
+        "french",
+        "greek",
+        "turkish",
+        "lebanese",
+        "vegetarian",
+        "vegan",
+        "seafood",
+        "steakhouse",
+        "pizza",
+        "sandwich",
+        "burger",
+        "cafe",
+        "bakery",
+        "bar",
+        "diner",
+        "fast_food",
+        "fine_dining",
+        "casual_dining",
+        "bbq",
+        "sushi",
+        "ramen",
+        "tapas",
+        "spanish",
+        "german",
+        "russian",
+        "brazilian",
+        "peruvian",
+        "ethiopian",
+    ]
+
+    cuisines = []
+    for type_name in types:
+        if any(cuisine in type_name.lower() for cuisine in cuisine_keywords):
+            formatted_cuisine = type_name.replace("_", " ").title()
+            cuisines.append(formatted_cuisine)
+
+    return cuisines
+
+
+def _format_description(place: Dict[str, Any]) -> str:
+    """Format description from editorial_summary.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        Formatted description string
+    """
+    editorial_summary = place.get("editorial_summary")
+    if not editorial_summary:
+        return "No description available"
+
+    if isinstance(editorial_summary, dict):
+        return editorial_summary.get("overview", "No description available")
+
+    return str(editorial_summary)
+
+
+def _build_additional_info(place: Dict[str, Any]) -> List[str]:
+    """Build additional information section."""
+    result = []
+
+    # Add description prominently if available
+    description = _format_description(place)
+    if description != "No description available":
+        result.append(f"\nDescription: {description}")
+
+    # Add cuisine information prominently
+    cuisines = _extract_cuisine_types(place)
+    if cuisines:
+        # Remove duplicates and limit to 5 most relevant
+        unique_cuisines = list(dict.fromkeys(cuisines))[:5]
+        result.append(f"\nCuisine: {', '.join(unique_cuisines)}")
+
+    # Add detailed types information
+    types_info = _format_types_detailed(place)
+    if types_info:
+        result.append(f"\nTypes: {types_info}")
+
+    # Add service information
+    dining_services = _format_dining_services(place)
+    if dining_services:
+        result.append(f"\nDining Services: {', '.join(dining_services)}")
+
+    service_options = _format_service_options(place)
+    if service_options:
+        result.append(f"Service Options: {', '.join(service_options)}")
+
+    accessibility_info = _format_accessibility_info(place)
+    if accessibility_info:
+        result.append(f"Accessibility: {', '.join(accessibility_info)}")
+
+    return result
+
+
+def _build_media_info(place: Dict[str, Any]) -> List[str]:
+    """Build media and reviews information section."""
+    result = []
+
+    # Format photos and reviews info
+    if "photos" in place and place["photos"]:
+        result.append(f"\nPhotos available: {len(place['photos'])}")
+
+    if "reviews" in place and place["reviews"]:
+        result.append(f"\nRecent reviews: {len(place['reviews'])}")
+
+    return result
 
 
 def format_place_summary(place: Dict[str, Any]) -> str:
@@ -321,66 +593,16 @@ def format_place_summary(place: Dict[str, Any]) -> str:
     Returns:
         Formatted string summary
     """
-    name = place.get("name", "Unknown")
-    address = place.get("formatted_address", "No address")
-    phone = place.get("formatted_phone_number", "No phone")
-    website = place.get("website", "No website")
-    rating = place.get("rating", "N/A")
-    total_ratings = place.get("user_ratings_total", 0)
-    price_level = place.get("price_level")
-    price_str = "?" * price_level if price_level else "Not specified"
-    types = ", ".join(place.get("types", []))
-    business_status = place.get("business_status", "Unknown")
+    result = _build_basic_info(place)
+    result.extend(_build_additional_info(place))
 
-    # Get formatted information
+    # Add hours information
     hours_info = _format_opening_hours(place)
-    dining_services = _format_dining_services(place)
-    service_options = _format_service_options(place)
-    accessibility_info = _format_accessibility_info(place)
-
-    # Format photos and reviews info
-    photos_info = ""
-    if "photos" in place and place["photos"]:
-        photos_info = f"Photos available: {len(place['photos'])}"
-
-    reviews_info = ""
-    if "reviews" in place and place["reviews"]:
-        reviews_info = f"Recent reviews: {len(place['reviews'])}"
-
-    # Build result
-    result = [
-        f"\n{'=' * 80}",
-        f"Name: {name}",
-        f"Address: {address}",
-        f"Phone: {phone}",
-        f"Website: {website}",
-        f"Rating: {rating}/5 ({total_ratings} reviews)",
-        f"Price Level: {price_str}",
-        f"Types: {types}",
-        f"Business Status: {business_status}",
-    ]
-
-    # Add optional information
-    if place.get("editorial_summary"):
-        result.append(f"Description: {place['editorial_summary']}")
-
-    if dining_services:
-        result.append(f"Dining Services: {', '.join(dining_services)}")
-
-    if service_options:
-        result.append(f"Service Options: {', '.join(service_options)}")
-
-    if accessibility_info:
-        result.append(f"Accessibility: {', '.join(accessibility_info)}")
-
     if hours_info:
         result.extend(["\nOpening Hours:", hours_info])
 
-    if photos_info:
-        result.append(f"\n{photos_info}")
-
-    if reviews_info:
-        result.append(f"\n{reviews_info}")
+    # Add media information
+    result.extend(_build_media_info(place))
 
     result.append("=" * 80)
     return "\n".join(result)
@@ -398,27 +620,44 @@ def format_place_table(places: List[Dict[str, Any]]) -> str:
     if not places:
         return "No places found."
 
-    # Define table columns
-    headers = ["Name", "Address", "Rating", "Price", "Types", "Status"]
+    # Define table columns with more relevant fields
+    headers = ["Name", "Description", "Cuisine", "Rating", "Price", "Services", "Status"]
     rows = []
 
     for place in places:
+        # Name (truncated)
         name = (
-            place.get("name", "Unknown")[:30] + "..."
-            if len(place.get("name", "")) > 30
+            place.get("name", "Unknown")[:25] + "..."
+            if len(place.get("name", "")) > 25
             else place.get("name", "Unknown")
         )
-        address = (
-            place.get("formatted_address", "No address")[:40] + "..."
-            if len(place.get("formatted_address", "")) > 40
-            else place.get("formatted_address", "No address")
-        )
+
+        # Description (editorial_summary or first part of address)
+        description = _format_description(place)
+        description = description[:35] + "..." if len(description) > 35 else description
+
+        # Cuisine (extracted from types)
+        cuisines = _extract_cuisine_types(place)
+        cuisine = ", ".join(cuisines[:3]) if cuisines else "N/A"
+        cuisine = cuisine[:20] + "..." if len(cuisine) > 20 else cuisine
+
+        # Rating
         rating = f"{place.get('rating', 'N/A')}/5 ({place.get('user_ratings_total', 0)})"
+
+        # Price level
         price = "?" * place.get("price_level", 0) if place.get("price_level") else "N/A"
-        types = ", ".join(place.get("types", [])[:2])  # Show first 2 types
+
+        # Service options (key services only)
+        service_options = _format_service_options(place)
+        dining_services = _format_dining_services(place)
+        all_services = service_options + dining_services
+        services = ", ".join(all_services[:3]) if all_services else "N/A"
+        services = services[:25] + "..." if len(services) > 25 else services
+
+        # Status
         status = place.get("business_status", "Unknown")
 
-        rows.append([name, address, rating, price, types, status])
+        rows.append([name, description, cuisine, rating, price, services, status])
 
     # Calculate column widths
     col_widths = [len(header) for header in headers]

@@ -73,10 +73,12 @@ help:  ## Show this help message
 	@echo "\033[1mDevelopment:\033[0m"
 	@echo "  \033[1mmake setup\033[0m           Install development dependencies"
 	@echo "  \033[1mmake run\033[0m             Run the application locally"
-	@echo "  \033[1mmake format\033[0m          Format code with black and autoflake"
-	@echo "  \033[1mmake lint\033[0m            Run linters (flake8, black, mypy)"
+	@echo "  \033[1mmake format\033[0m          Format code (Python, HTML, CSS, JS)"
+	@echo "  \033[1mmake lint\033[0m            Run linters (Python, HTML, CSS, JS)"
+	@echo "  \033[1mmake lint-fix\033[0m        Run linters with auto-fix (Python, HTML, CSS, JS)"
 	@echo "  \033[1mmake test\033[0m            Run all tests with coverage"
 	@echo "  \033[1mmake check\033[0m           Run all checks (format + lint + test)"
+	@echo "  \033[1mmake check-fix\033[0m       Run all checks with auto-fix (format + lint-fix + test)"
 	@echo "  \033[1mmake pre-commit\033[0m      Run pre-commit checks"
 	@echo "  \033[1mmake validate-env\033[0m    Validate development environment"
 
@@ -163,7 +165,11 @@ run: check-env
 
 ## Run all linters
 .PHONY: lint
-lint: lint-python
+lint: lint-python lint-html lint-css lint-js
+
+## Run all linters with auto-fix
+.PHONY: lint-fix
+lint-fix: lint-python-fix lint-html-fix lint-css-fix lint-js-fix
 
 ## Python linter
 .PHONY: lint-python
@@ -172,9 +178,9 @@ lint-python: check-env
 	@$(PYTHON) -m flake8 app tests || (echo "\033[1;31m❌ Flake8 failed\033[0m"; exit 1)
 	@$(PYTHON) -m black --check app tests || (echo "\033[1;31m❌ Black check failed\033[0m"; exit 1)
 
-## Format all code (Python)
+## Format all code (Python, HTML, CSS, JS)
 .PHONY: format
-format: format-python
+format: format-python format-html format-css format-js
 
 ## Format Python code
 .PHONY: format-python
@@ -183,6 +189,69 @@ format-python: check-env
 	@$(PYTHON) -m isort app/ tests/ migrations/ *.py || (echo "\033[1;31m❌ isort failed\033[0m"; exit 1)
 	@$(PYTHON) -m black app/ tests/ migrations/ */*.py *.py || (echo "\033[1;31m❌ black failed\033[0m"; exit 1)
 	@$(PYTHON) -m autoflake --in-place --remove-all-unused-imports --recursive app/ tests/ || (echo "\033[1;31m❌ autoflake failed\033[0m"; exit 1)
+
+## HTML linter
+.PHONY: lint-html
+lint-html: check-npm
+	@echo "\n\033[1m=== Running HTML Linter ===\033[0m"
+	@npm run lint-html 2>/dev/null | grep -v "unchanged" || (echo "\033[1;31m❌ HTML linting failed\033[0m"; exit 1)
+
+## CSS linter
+.PHONY: lint-css
+lint-css: check-npm
+	@echo "\n\033[1m=== Running CSS Linter ===\033[0m"
+	@npx stylelint "app/static/css/**/*.css" 2>/dev/null || (echo "\033[1;31m❌ CSS linting failed\033[0m"; exit 1)
+
+## JavaScript linter
+.PHONY: lint-js
+lint-js: check-npm
+	@echo "\n\033[1m=== Running JavaScript Linter ===\033[0m"
+	@npm run lint:js 2>/dev/null || (echo "\033[1;31m❌ JavaScript linting failed\033[0m"; exit 1)
+
+## Python linter with auto-fix
+.PHONY: lint-python-fix
+lint-python-fix: check-env
+	@echo "\n\033[1m=== Running Python Linter with Auto-fix ===\033[0m"
+	@$(PYTHON) -m black app tests || (echo "\033[1;31m❌ Black auto-fix failed\033[0m"; exit 1)
+	@$(PYTHON) -m autoflake --in-place --remove-all-unused-imports --recursive app/ tests/ || (echo "\033[1;31m❌ autoflake auto-fix failed\033[0m"; exit 1)
+	@$(PYTHON) -m isort app/ tests/ migrations/ *.py || (echo "\033[1;31m❌ isort auto-fix failed\033[0m"; exit 1)
+	@$(PYTHON) -m flake8 app tests || (echo "\033[1;31m❌ Flake8 check failed\033[0m"; exit 1)
+
+## HTML linter with auto-fix
+.PHONY: lint-html-fix
+lint-html-fix: check-npm
+	@echo "\n\033[1m=== Running HTML Linter with Auto-fix ===\033[0m"
+	@npm run format-html 2>/dev/null | grep -v "unchanged" || (echo "\033[1;31m❌ HTML auto-fix failed\033[0m"; exit 1)
+
+## CSS linter with auto-fix
+.PHONY: lint-css-fix
+lint-css-fix: check-npm
+	@echo "\n\033[1m=== Running CSS Linter with Auto-fix ===\033[0m"
+	@npx stylelint "app/static/css/**/*.css" --fix 2>/dev/null || (echo "\033[1;31m❌ CSS auto-fix failed\033[0m"; exit 1)
+
+## JavaScript linter with auto-fix
+.PHONY: lint-js-fix
+lint-js-fix: check-npm
+	@echo "\n\033[1m=== Running JavaScript Linter with Auto-fix ===\033[0m"
+	@npm run format:js 2>/dev/null || (echo "\033[1;31m❌ JavaScript auto-fix failed\033[0m"; exit 1)
+
+## Format HTML code
+.PHONY: format-html
+format-html: check-npm
+	@echo "\n\033[1m=== Formatting HTML code ===\033[0m"
+	@npm run format-html 2>/dev/null | grep -v "unchanged" || (echo "\033[1;31m❌ HTML formatting failed\033[0m"; exit 1)
+
+## Format CSS code
+.PHONY: format-css
+format-css: check-npm
+	@echo "\n\033[1m=== Formatting CSS code ===\033[0m"
+	@npx prettier --write "app/static/css/**/*.css" 2>/dev/null | grep -v "unchanged" || (echo "\033[1;31m❌ CSS formatting failed\033[0m"; exit 1)
+
+## Format JavaScript code
+.PHONY: format-js
+format-js: check-npm
+	@echo "\n\033[1m=== Formatting JavaScript code ===\033[0m"
+	@npm run format:js 2>/dev/null || (echo "\033[1;31m❌ JavaScript formatting failed\033[0m"; exit 1)
 
 ## Run all tests
 .PHONY: test
@@ -198,6 +267,10 @@ pre-commit: format lint test
 .PHONY: check
 check: format lint test
 
+## Run all checks with auto-fix (format + lint-fix + test)
+.PHONY: check-fix
+check-fix: format lint-fix test
+
 # =============================================================================
 # Local CI/CD Workflows
 # =============================================================================
@@ -210,10 +283,13 @@ ci-local: check-env
 
 ## Run quick CI checks (lint + unit tests)
 .PHONY: ci-quick
-ci-quick: check-env
+ci-quick: check-env check-npm
 	@echo "\n\033[1m=== Running Quick CI Checks ===\033[0m"
 	@$(PYTHON) -m flake8 app tests || (echo "\033[1;31m❌ Flake8 failed\033[0m"; exit 1)
 	@$(PYTHON) -m black --check app tests || (echo "\033[1;31m❌ Black check failed\033[0m"; exit 1)
+	@npm run lint-html || (echo "\033[1;31m❌ HTML linting failed\033[0m"; exit 1)
+	@npx stylelint "app/static/css/**/*.css" || (echo "\033[1;31m❌ CSS linting failed\033[0m"; exit 1)
+	@npm run lint:js || (echo "\033[1;31m❌ JavaScript linting failed\033[0m"; exit 1)
 	@PYTHONPATH=. $(PYTHON) -m pytest tests/unit/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Unit tests failed\033[0m"; exit 1)
 	@echo "\033[1;32m✅ Quick CI checks completed\033[0m"
 
@@ -589,6 +665,15 @@ check-env:
 	@if [ ! -d "venv" ]; then \
 		echo "\033[1;31m❌ Virtual environment not found. Run 'make venv' first.\033[0m"; \
 		exit 1; \
+	fi
+
+## Check npm dependencies
+.PHONY: check-npm
+check-npm:
+	@echo "\033[1m🔍 Checking npm dependencies...\033[0m"
+	@if [ ! -d "node_modules" ]; then \
+		echo "\033[1;33m⚠️  npm dependencies not found. Installing...\033[0m"; \
+		npm install; \
 	fi
 
 ## Validate all required tools and environment

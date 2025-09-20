@@ -53,6 +53,7 @@ env/
 .env.*.local
 !.env.example
 .flaskenv
+flask_session/
 
 # Docker
 docker-compose.override.yml
