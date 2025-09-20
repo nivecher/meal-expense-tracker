@@ -11,6 +11,26 @@ class TagManager {
   }
 
   /**
+   * Initialize tooltips for tag elements
+   */
+  initializeTooltips() {
+    // Dispose existing tooltips to avoid duplicates
+    const existingTooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    existingTooltips.forEach((element) => {
+      const tooltip = bootstrap.Tooltip.getInstance(element);
+      if (tooltip) {
+        tooltip.dispose();
+      }
+    });
+
+    // Initialize new tooltips
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipTriggerList.forEach((tooltipTriggerEl) => {
+      new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  }
+
+  /**
      * Initialize the tag manager
      */
   init() {
@@ -73,14 +93,55 @@ class TagManager {
       resetBtn.addEventListener('click', () => this.resetForm());
     }
 
-    // Reset modal when hidden
+    // Prevent form submission
+    if (this.form) {
+      this.form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.saveTag();
+      });
+    }
+
+    // Reset modal when hidden and restore focus
     this.modal.addEventListener('hidden.bs.modal', () => {
+      // Reset form to clear any unsaved changes
       this.resetForm();
+
+      // Reload all tags to show updated descriptions
+      this.loadAllTags();
+
+      // Refresh Tagify instance to show updated tags
+      this.refreshTagifyInstance();
+
+      // Restore focus to the tags input field after a delay
+      // This prevents the aria-hidden focus issue
+      setTimeout(() => {
+        const tagsInput = document.getElementById('tagsInput');
+        if (tagsInput) {
+          tagsInput.focus();
+        }
+      }, 200);
+    });
+
+    // Handle modal before it's hidden to manage focus properly
+    this.modal.addEventListener('hide.bs.modal', () => {
+      // Remove focus from any focused element inside the modal
+      const focusedElement = document.activeElement;
+      if (focusedElement && this.modal.contains(focusedElement)) {
+        focusedElement.blur();
+      }
     });
 
     // Load all tags when modal is shown
     this.modal.addEventListener('shown.bs.modal', () => {
       this.loadAllTags();
+      // Ensure modal is properly accessible when shown
+      this.modal.setAttribute('aria-hidden', 'false');
+    });
+
+    // Handle modal when it's about to be shown
+    this.modal.addEventListener('show.bs.modal', () => {
+      // Ensure modal is accessible when being shown
+      this.modal.setAttribute('aria-hidden', 'false');
     });
   }
 
@@ -106,11 +167,19 @@ class TagManager {
   }
 
   /**
-     * Load all user tags
-     */
+   * Load all user tags
+   */
   async loadAllTags() {
     const container = document.getElementById('allTagsContainer');
     if (!container) return;
+
+    // Store current form state if editing a tag
+    const currentTagId = document.getElementById('tagId')?.value;
+    const currentFormData = currentTagId ? {
+      name: document.getElementById('tagName')?.value || '',
+      color: document.getElementById('tagColor')?.value || '',
+      description: document.getElementById('tagDescription')?.value || '',
+    } : null;
 
     try {
       container.innerHTML = '<div class="text-muted small">Loading tags...</div>';
@@ -141,6 +210,13 @@ class TagManager {
           tagElement.style.cursor = 'pointer';
           tagElement.textContent = tag.name;
 
+          // Add tooltip if description exists
+          if (tag.description && tag.description.trim()) {
+            tagElement.setAttribute('data-bs-toggle', 'tooltip');
+            tagElement.setAttribute('data-bs-placement', 'top');
+            tagElement.setAttribute('title', tag.description);
+          }
+
           // Add click handler to edit tag
           tagElement.addEventListener('click', () => {
             this.editTag(tag.id, tag.name, tag.color, tag.description || '');
@@ -148,8 +224,27 @@ class TagManager {
 
           container.appendChild(tagElement);
         });
+
+        // Initialize tooltips for the new elements
+        this.initializeTooltips();
+
+        // Restore form state if we were editing a tag
+        if (currentFormData && currentTagId) {
+          const updatedTag = tags.find((tag) => tag.id === currentTagId);
+          if (updatedTag) {
+            // Use the updated tag data from the server
+            this.editTag(updatedTag.id, updatedTag.name, updatedTag.color, updatedTag.description || '');
+          } else {
+            // Restore the form with the current form data
+            document.getElementById('tagId').value = currentTagId;
+            document.getElementById('tagName').value = currentFormData.name;
+            document.getElementById('tagColor').value = currentFormData.color;
+            document.getElementById('tagDescription').value = currentFormData.description;
+            this.updateTagPreview();
+          }
+        }
       }
-    } catch (error) {
+    } catch {
       console.error('Error loading all tags:', error);
       container.innerHTML = '<div class="text-danger small">Error loading tags.</div>';
     }
@@ -183,6 +278,12 @@ class TagManager {
     const tagColor = document.getElementById('tagColor')?.value;
     const tagDescription = document.getElementById('tagDescription')?.value?.trim();
 
+    // Debug: Check if description field exists and has value
+    const descriptionField = document.getElementById('tagDescription');
+    console.log('Description field element:', descriptionField);
+    console.log('Description field value:', tagDescription);
+    console.log('Description field value length:', tagDescription?.length);
+
     if (!tagName) {
       alert('Tag name is required');
       return;
@@ -196,6 +297,7 @@ class TagManager {
 
     try {
       console.log('Saving tag:', { tagId, formData });
+      console.log('Form data JSON:', JSON.stringify(formData));
 
       let response;
       if (tagId) {
@@ -230,17 +332,23 @@ class TagManager {
         // Reload all tags
         await this.loadAllTags();
 
-        // Reset form
-        this.resetForm();
+        // Don't reset form immediately - let user see the updated values
+        // The form will be reset when the modal is closed
 
         // Trigger custom event for other components to listen to
         document.dispatchEvent(new CustomEvent('tagsUpdated', {
           detail: { tagId, tag: result.tag },
         }));
+
+        // Update Tagify instance if it exists
+        if (window.tagifyInstance) {
+          // Refresh the entire Tagify instance
+          this.refreshTagifyInstance();
+        }
       } else {
         alert(`Error: ${result.message}`);
       }
-    } catch (error) {
+    } catch {
       console.error('Error saving tag:', error);
       alert('Error saving tag. Please try again.');
     }
@@ -282,10 +390,16 @@ class TagManager {
         document.dispatchEvent(new CustomEvent('tagDeleted', {
           detail: { tagId },
         }));
+
+        // Update Tagify instance if it exists
+        if (window.tagifyInstance) {
+          // Refresh the entire Tagify instance
+          this.refreshTagifyInstance();
+        }
       } else {
         alert(`Error: ${result.message}`);
       }
-    } catch (error) {
+    } catch {
       console.error('Error deleting tag:', error);
       alert('Error deleting tag. Please try again.');
     }
@@ -306,8 +420,58 @@ class TagManager {
   }
 
   /**
-     * Convert hex color to RGB
-     */
+   * Update Tagify whitelist with current tags
+   */
+  async updateTagifyWhitelist() {
+    if (!window.tagifyInstance) return;
+
+    try {
+      const response = await fetch('/expenses/tags');
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (data.success && data.tags) {
+        window.tagifyInstance.settings.whitelist = data.tags.map((tag) => ({
+          value: tag.name,
+          id: tag.id,
+          title: tag.description || tag.name,
+          description: tag.description || '',
+          color: tag.color,
+        }));
+      }
+    } catch {
+      console.error('Error updating Tagify whitelist:', error);
+    }
+  }
+
+  /**
+   * Refresh the Tagify instance to show updated tags
+   */
+  async refreshTagifyInstance() {
+    if (!window.tagifyInstance) return;
+
+    try {
+      // Update the whitelist with latest tags
+      await this.updateTagifyWhitelist();
+
+      // Re-apply colors to existing tags
+      setTimeout(() => {
+        const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
+        tagElements.forEach((tagEl) => {
+          const tagColor = tagEl.getAttribute('data-tag-color');
+          if (tagColor) {
+            tagEl.style.setProperty('background-color', tagColor, 'important');
+          }
+        });
+      }, 100);
+    } catch {
+      console.error('Error refreshing Tagify instance:', error);
+    }
+  }
+
+  /**
+   * Convert hex color to RGB
+   */
   hexToRgb(hex) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {

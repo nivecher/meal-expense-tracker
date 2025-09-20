@@ -3,25 +3,105 @@
  * Clean separation of concerns - no embedded JavaScript in HTML
  */
 
-// Initialize immediately if DOM is already loaded, otherwise wait for DOMContentLoaded
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    initExpenseTableSorting();
-  });
-} else {
-  // DOM is already loaded
-  initExpenseTableSorting();
+// Define all functions first
+function getExpenseCellValue(row, columnIndex) {
+  const cell = row.cells[columnIndex];
+  if (!cell) return '';
+
+  const { sortValue } = cell.dataset;
+  if (sortValue !== null) {
+    if (columnIndex === 0) { // Date column
+      return new Date(sortValue);
+    } else if (columnIndex === 6 || columnIndex === 7) { // Currency columns
+      return parseFloat(sortValue) || 0;
+    } else if (columnIndex === 5) { // Party size column
+      return parseInt(sortValue, 10) || 0;
+    }
+    return sortValue;
+  }
+
+  return cell.textContent.trim();
 }
 
-function initExpenseTableSorting() {
-  // Initialize table sorting for both expense and restaurant tables
-  initTableSorting('expenseTable');
-  initTableSorting('restaurantTable');
+function getRestaurantCellValue(row, columnIndex) {
+  const cell = row.cells[columnIndex];
+  if (!cell) return '';
 
-  // Initialize other expense-specific functionality
-  if (typeof initExpenseList === 'function') {
-    initExpenseList();
+  const { sortValue } = cell.dataset;
+  if (sortValue !== null) {
+    if (columnIndex === 1) { // Rating column
+      return parseFloat(sortValue) || 0;
+    } else if (columnIndex === 2) { // Price level column
+      return parseInt(sortValue, 10) || 0;
+    }
+    return sortValue;
   }
+
+  return cell.textContent.trim();
+}
+
+function compareValues(a, b) {
+  if (a === b) return 0;
+  if (a < b) return -1;
+  return 1;
+}
+
+function sortExpenseTable(columnIndex, ascending) {
+  const table = document.getElementById('expenseTable');
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+
+  rows.sort((a, b) => {
+    const aValue = getExpenseCellValue(a, columnIndex);
+    const bValue = getExpenseCellValue(b, columnIndex);
+
+    // Multi-level sort for restaurant column
+    if (columnIndex === 1) { // Restaurant column
+      const aRestaurant = aValue.toLowerCase();
+      const bRestaurant = bValue.toLowerCase();
+      if (aRestaurant !== bRestaurant) {
+        return ascending ? compareValues(aRestaurant, bRestaurant) : compareValues(bRestaurant, aRestaurant);
+      }
+      // If restaurants are the same, sort by date (column 0)
+      const aDate = getExpenseCellValue(a, 0);
+      const bDate = getExpenseCellValue(b, 0);
+      return ascending ? compareValues(aDate, bDate) : compareValues(bDate, aDate);
+    }
+
+    return ascending ? compareValues(aValue, bValue) : compareValues(bValue, aValue);
+  });
+
+  // Re-append sorted rows
+  rows.forEach((row) => tbody.appendChild(row));
+}
+
+function sortRestaurantTable(columnIndex, ascending) {
+  const table = document.getElementById('restaurantTable');
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+
+  rows.sort((a, b) => {
+    const aValue = getRestaurantCellValue(a, columnIndex);
+    const bValue = getRestaurantCellValue(b, columnIndex);
+
+    // Multi-level sort for name column
+    if (columnIndex === 0) { // Name column
+      const aName = aValue.toLowerCase();
+      const bName = bValue.toLowerCase();
+      if (aName !== bName) {
+        return ascending ? compareValues(aName, bName) : compareValues(bName, aName);
+      }
+      // If names are the same, sort by rating (column 1)
+      const aRating = getRestaurantCellValue(a, 1);
+      const bRating = getRestaurantCellValue(b, 1);
+      return ascending ? compareValues(aRating, bRating) : compareValues(bRating, aRating);
+    }
+
+    return ascending ? compareValues(aValue, bValue) : compareValues(bValue, aValue);
+  });
+
+  // Re-append sorted rows
+  rows.forEach((row) => tbody.appendChild(row));
 }
 
 function initTableSorting(tableId) {
@@ -59,108 +139,23 @@ function initTableSorting(tableId) {
   });
 }
 
-function sortExpenseTable(columnIndex, ascending) {
-  const table = document.getElementById('expenseTable');
-  const tbody = table.querySelector('tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
+function initExpenseTableSorting() {
+  // Initialize table sorting for both expense and restaurant tables
+  initTableSorting('expenseTable');
+  initTableSorting('restaurantTable');
 
-  rows.sort((a, b) => {
-    const aValue = getExpenseCellValue(a, columnIndex);
-    const bValue = getExpenseCellValue(b, columnIndex);
+  // Initialize other expense-specific functionality
+  if (typeof initExpenseList === 'function') {
+    initExpenseList();
+  }
+}
 
-    // Multi-level sort for restaurant column
-    if (columnIndex === 1) {
-      const aRestaurant = aValue.toLowerCase();
-      const bRestaurant = bValue.toLowerCase();
-      if (aRestaurant === bRestaurant) {
-        // Secondary sort by date
-        const aDate = getExpenseCellValue(a, 0);
-        const bDate = getExpenseCellValue(b, 0);
-        return ascending ? aDate - bDate : bDate - aDate;
-      }
-      return ascending ? aRestaurant.localeCompare(bRestaurant) : bRestaurant.localeCompare(aRestaurant);
-    }
-
-    return compareValues(aValue, bValue, ascending);
+// Initialize immediately if DOM is already loaded, otherwise wait for DOMContentLoaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    initExpenseTableSorting();
   });
-
-  // Re-append sorted rows
-  rows.forEach((row) => tbody.appendChild(row));
-}
-
-function getExpenseCellValue(row, columnIndex) {
-  const cell = row.children[columnIndex];
-  const sortValue = cell.getAttribute('data-sort-value');
-
-  if (sortValue !== null) {
-    if (columnIndex === 0) { // Date column
-      return new Date(sortValue);
-    } else if (columnIndex === 6 || columnIndex === 7) { // Currency columns
-      return parseFloat(sortValue) || 0;
-    } else if (columnIndex === 5) { // Party size column
-      return parseInt(sortValue) || 0;
-    }
-    return sortValue;
-  }
-
-  return cell.textContent.trim();
-}
-
-function sortRestaurantTable(columnIndex, ascending) {
-  const table = document.getElementById('restaurantTable');
-  const tbody = table.querySelector('tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-
-  rows.sort((a, b) => {
-    const aValue = getRestaurantCellValue(a, columnIndex);
-    const bValue = getRestaurantCellValue(b, columnIndex);
-
-    // Multi-level sort for restaurant name column
-    if (columnIndex === 1) {
-      const aRestaurant = aValue.toLowerCase();
-      const bRestaurant = bValue.toLowerCase();
-      if (aRestaurant === bRestaurant) {
-        // Secondary sort by cuisine
-        const aCuisine = getRestaurantCellValue(a, 2);
-        const bCuisine = getRestaurantCellValue(b, 2);
-        return ascending ? aCuisine.localeCompare(bCuisine) : bCuisine.localeCompare(aCuisine);
-      }
-      return ascending ? aRestaurant.localeCompare(bRestaurant) : bRestaurant.localeCompare(aRestaurant);
-    }
-
-    return compareValues(aValue, bValue, ascending);
-  });
-
-  // Re-append sorted rows
-  rows.forEach((row) => tbody.appendChild(row));
-}
-
-function getRestaurantCellValue(row, columnIndex) {
-  const cell = row.children[columnIndex];
-  const sortValue = cell.getAttribute('data-sort-value');
-
-  if (sortValue !== null) {
-    if (columnIndex === 3) { // Rating column
-      return parseFloat(sortValue) || 0;
-    } else if (columnIndex === 4) { // Visit count column
-      return parseInt(sortValue, 10) || 0;
-    }
-    return sortValue;
-  }
-
-  return cell.textContent.trim();
-}
-
-function compareValues(a, b, ascending) {
-  if (a instanceof Date && b instanceof Date) {
-    return ascending ? a - b : b - a;
-  }
-
-  if (typeof a === 'number' && typeof b === 'number') {
-    return ascending ? a - b : b - a;
-  }
-
-  const aStr = String(a).toLowerCase();
-  const bStr = String(b).toLowerCase();
-  return ascending ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+} else {
+  // DOM is already loaded
+  initExpenseTableSorting();
 }

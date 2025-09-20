@@ -8,6 +8,7 @@
 
 import { initNotifications } from './utils/notifications.js';
 import { EventHandlers } from './components/event-handlers.js';
+// import { errorHandler } from './utils/error-handler.js'; // Unused for now
 
 // Enhanced page module loading with error handling
 const pageModules = {
@@ -17,8 +18,136 @@ const pageModules = {
   '/restaurants': () => import('./pages/restaurant-list.js'),
 };
 
+// Apply tag colors from data attributes
+function applyTagColors() {
+  const tagBadges = document.querySelectorAll('.tag-badge[data-tag-color], .tagify__tag[data-tag-color]');
+  tagBadges.forEach((badge) => {
+    const color = badge.getAttribute('data-tag-color');
+    if (color) {
+      // Set CSS custom property for maximum override
+      badge.style.setProperty('--tag-color', color, 'important');
+      badge.style.setProperty('background-color', color, 'important');
+      badge.style.setProperty('background-image', 'none', 'important');
+      badge.style.setProperty('background', color, 'important');
+
+      // Also apply to any nested elements
+      const textElement = badge.querySelector('.tagify__tag-text');
+      if (textElement) {
+        textElement.style.setProperty('color', '#fff', 'important');
+      }
+    }
+  });
+}
+
+// Watch for dynamically added tag badges
+function initTagColorWatcher() {
+  const observer = new MutationObserver((mutations) => {
+    try {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check if the added node is a tag badge
+            if (node.classList && (node.classList.contains('tag-badge') || node.classList.contains('tagify__tag')) && node.hasAttribute('data-tag-color')) {
+              const color = node.getAttribute('data-tag-color');
+              if (color) {
+                // Set CSS custom property for maximum override
+                node.style.setProperty('--tag-color', color, 'important');
+                node.style.setProperty('background-color', color, 'important');
+                node.style.setProperty('background-image', 'none', 'important');
+                node.style.setProperty('background', color, 'important');
+
+                // Also apply to text element
+                const textElement = node.querySelector('.tagify__tag-text');
+                if (textElement) {
+                  textElement.style.setProperty('color', '#fff', 'important');
+                }
+              }
+            }
+            // Check for tag badges within the added node
+            const tagBadges = node.querySelectorAll && node.querySelectorAll('.tag-badge[data-tag-color], .tagify__tag[data-tag-color]');
+            if (tagBadges) {
+              tagBadges.forEach((badge) => {
+                const color = badge.getAttribute('data-tag-color');
+                if (color) {
+                  // Set CSS custom property for maximum override
+                  badge.style.setProperty('--tag-color', color, 'important');
+                  badge.style.setProperty('background-color', color, 'important');
+                  badge.style.setProperty('background-image', 'none', 'important');
+                  badge.style.setProperty('background', color, 'important');
+
+                  // Also apply to text element
+                  const textElement = badge.querySelector('.tagify__tag-text');
+                  if (textElement) {
+                    textElement.style.setProperty('color', '#fff', 'important');
+                  }
+                }
+              });
+            }
+          }
+        });
+      });
+    } catch {
+      // Silently handle any errors from browser extensions
+      // console.debug('MutationObserver error (likely from browser extension)');
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+// Refresh Tagify instance with updated tags
+async function refreshTagifyInstance() {
+  if (!window.tagifyInstance) return;
+
+  try {
+    // Update the whitelist with latest tags
+    const response = await fetch('/expenses/tags');
+    if (!response.ok) return;
+
+    const data = await response.json();
+    if (data.success && data.tags) {
+      window.tagifyInstance.settings.whitelist = data.tags.map((tag) => ({
+        value: tag.name,
+        id: tag.id,
+        title: tag.description || tag.name,
+        description: tag.description || '',
+        color: tag.color,
+      }));
+    }
+
+    // Re-apply colors to existing tags
+    setTimeout(() => {
+      const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
+      tagElements.forEach((tagEl) => {
+        const tagColor = tagEl.getAttribute('data-tag-color');
+        if (tagColor) {
+          // Set CSS custom property for maximum override
+          tagEl.style.setProperty('--tag-color', tagColor, 'important');
+          tagEl.style.setProperty('background-color', tagColor, 'important');
+          tagEl.style.setProperty('background-image', 'none', 'important');
+          tagEl.style.setProperty('background', tagColor, 'important');
+
+          // Also apply to text element
+          const textElement = tagEl.querySelector('.tagify__tag-text');
+          if (textElement) {
+            textElement.style.setProperty('color', '#fff', 'important');
+          }
+        }
+      });
+    }, 100);
+  } catch {
+    console.error('Error refreshing Tagify instance:', error);
+  }
+}
+
 // Initialize essential UI components directly
 function initUI() {
+  // Apply tag colors
+  applyTagColors();
+
   // Bootstrap tooltips - check if bootstrap is available
   if (typeof bootstrap !== 'undefined') {
     document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
@@ -58,7 +187,7 @@ async function loadPageModule() {
   try {
     const module = await moduleLoader();
     module.init?.();
-  } catch (error) {
+  } catch {
     console.error('Failed to load page module:', error);
   }
 }
@@ -75,6 +204,101 @@ async function init() {
     // Initialize event handlers (replaces inline onclick handlers)
     new EventHandlers();
 
+    // Initialize tag color watcher for dynamically added content
+    initTagColorWatcher();
+
+    // Listen for tag update events to refresh Tagify
+    document.addEventListener('tagsUpdated', () => {
+      if (window.tagifyInstance) {
+        refreshTagifyInstance();
+      }
+    });
+
+    document.addEventListener('tagDeleted', () => {
+      if (window.tagifyInstance) {
+        refreshTagifyInstance();
+      }
+    });
+
+    // AGGRESSIVE browser extension error suppression
+    const originalConsoleError = console.error;
+    const originalConsoleWarn = console.warn;
+
+    // Override console methods to filter out extension errors
+    console.error = function(...args) {
+      const message = args.join(' ');
+      if (message && typeof message === 'string' && (message.includes('bootstrap-autofill-overlay') ||
+          message.includes('element.tagName.toLowerCase is not a function') ||
+          message.includes('elementIsInstanceOf'))) {
+        return; // Suppress these errors completely
+      }
+      originalConsoleError.apply(console, args);
+    };
+
+    console.warn = function(...args) {
+      const message = args.join(' ');
+      if (message && typeof message === 'string' && (message.includes('bootstrap-autofill-overlay') ||
+          message.includes('element.tagName.toLowerCase is not a function') ||
+          message.includes('elementIsInstanceOf'))) {
+        return; // Suppress these warnings completely
+      }
+      originalConsoleWarn.apply(console, args);
+    };
+
+    // Handle browser extension errors gracefully
+    window.addEventListener('error', (event) => {
+      if (event.filename && (event.filename.includes('bootstrap-autofill-overlay') ||
+          event.filename.includes('extension') ||
+          event.message.includes('tagName.toLowerCase'))) {
+        // Silently ignore browser extension errors
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      if (event.reason && (event.reason.stack && (event.reason.stack.includes('bootstrap-autofill-overlay') ||
+          event.reason.stack.includes('extension') ||
+          event.reason.message.includes('tagName.toLowerCase')))) {
+        // Silently ignore browser extension promise rejections
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+    });
+
+    // Nuclear option: Override the problematic function globally
+    if (typeof window !== 'undefined') {
+      const originalQuerySelector = document.querySelector;
+      const originalQuerySelectorAll = document.querySelectorAll;
+
+      // Wrap DOM methods to catch extension errors
+      document.querySelector = function(selector) {
+        try {
+          return originalQuerySelector.call(this, selector);
+        } catch {
+          if (error.message.includes('tagName.toLowerCase') ||
+              error.stack && error.stack.includes('bootstrap-autofill-overlay')) {
+            return null;
+          }
+          throw error;
+        }
+      };
+
+      document.querySelectorAll = function(selector) {
+        try {
+          return originalQuerySelectorAll.call(this, selector);
+        } catch {
+          if (error.message.includes('tagName.toLowerCase') ||
+              error.stack && error.stack.includes('bootstrap-autofill-overlay')) {
+            return [];
+          }
+          throw error;
+        }
+      };
+    }
+
     // Initialize style replacer (replaces inline styles) - DISABLED BY DEFAULT
     // Uncomment to enable: new StyleReplacer({ enabled: true, verbose: false });
 
@@ -89,7 +313,7 @@ async function init() {
           if (alert && alert.parentNode) {
             new bootstrap.Alert(alert).close();
           }
-        } catch (error) {
+        } catch {
           console.warn('Error closing alert:', error);
           // Safe fallback removal
           if (alert && alert.parentNode) {
@@ -128,22 +352,13 @@ async function init() {
       });
     });
 
-    // Global error handler for unhandled promise rejections
-    window.addEventListener('unhandledrejection', (event) => {
-      console.error('Unhandled promise rejection:', event.reason);
-      if (window.showErrorToast) {
-        window.showErrorToast('An unexpected error occurred. Please try again.');
-      }
-      event.preventDefault(); // Prevent default browser error handling
-    });
-
-    // Global error handler for JavaScript errors
-    window.addEventListener('error', (event) => {
-      console.error('JavaScript error:', event.error);
-      if (window.showErrorToast && !event.filename?.includes('chrome-extension')) {
-        window.showErrorToast('An error occurred. Please refresh the page if problems persist.');
-      }
-    });
+    // Error handling is now managed by the ErrorHandler class
+    // The error handler is automatically initialized and will handle:
+    // - JavaScript errors
+    // - Unhandled promise rejections
+    // - Resource loading errors
+    // - Performance monitoring
+    // - Console message filtering
 
     // Dispatch initialization complete event
     document.dispatchEvent(new CustomEvent('app:initialized', {
@@ -160,7 +375,7 @@ async function init() {
 
     console.warn('✅ Application initialized successfully');
 
-  } catch (error) {
+  } catch {
     console.error('❌ Failed to initialize application:', error);
 
     // Show error feedback

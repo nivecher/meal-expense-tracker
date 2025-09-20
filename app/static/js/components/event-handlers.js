@@ -179,7 +179,7 @@ export class EventHandlers {
    * @param {HTMLFormElement} form - The form to auto-save
    * @param {HTMLElement} input - The input that changed
    */
-  handleAutoSave(form, input) {
+  handleAutoSave(form, _input) {
     // Debounce auto-save to avoid excessive requests
     clearTimeout(this.autoSaveTimeout);
     this.autoSaveTimeout = setTimeout(() => {
@@ -208,7 +208,7 @@ export class EventHandlers {
       } else {
         throw new Error('Auto-save failed');
       }
-    } catch (error) {
+    } catch {
       console.warn('Auto-save failed:', error);
       this.showAutoSaveIndicator('Save failed', 'danger');
     }
@@ -243,7 +243,7 @@ export class EventHandlers {
    */
   handleConfirmationButton(button) {
     const message = button.dataset.confirm || 'Are you sure?';
-    const action = button.dataset.confirmAction || 'proceed';
+    // const action = button.dataset.confirmAction || 'proceed'; // Unused for now
 
     if (confirm(message)) {
       // Execute the original action
@@ -271,7 +271,7 @@ export class EventHandlers {
     try {
       await navigator.clipboard.writeText(textToCopy);
       this.showCopySuccess(button);
-    } catch (error) {
+    } catch {
       console.error('Copy failed:', error);
       this.showCopyError(button);
     }
@@ -318,7 +318,7 @@ export class EventHandlers {
       } else {
         throw new Error('Form submission failed');
       }
-    } catch (error) {
+    } catch {
       console.error('Modal form submission failed:', error);
       if (window.showErrorToast) {
         window.showErrorToast('Operation failed. Please try again.');

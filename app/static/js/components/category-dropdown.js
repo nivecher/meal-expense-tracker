@@ -3,7 +3,7 @@
  * Handles dynamic styling based on selected category color
  */
 
-function init_category_dropdown() {
+function initCategoryDropdown() {
   const categorySelect = document.querySelector('[data-category-select]');
   if (!categorySelect) return;
 
@@ -25,7 +25,7 @@ function init_category_dropdown() {
 }
 
 // Auto-initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', init_category_dropdown);
+document.addEventListener('DOMContentLoaded', initCategoryDropdown);
 
 // Export for manual initialization if needed
-export { init_category_dropdown };
+export { initCategoryDropdown };

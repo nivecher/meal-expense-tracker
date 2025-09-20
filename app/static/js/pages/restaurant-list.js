@@ -194,13 +194,13 @@ function initTooltips() {
   if (typeof bootstrap !== 'undefined') {
     // Handle standard tooltip triggers
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    const tooltipList = tooltipTriggerList.map((tooltipTriggerEl) => {
+    tooltipTriggerList.map((tooltipTriggerEl) => {
       return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
     // Handle custom tooltip triggers (for elements that also have other data-bs-toggle attributes)
     const customTooltipTriggerList = [].slice.call(document.querySelectorAll('[data-tooltip="true"]'));
-    const customTooltipList = customTooltipTriggerList.map((tooltipTriggerEl) => {
+    customTooltipTriggerList.map((tooltipTriggerEl) => {
       return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 

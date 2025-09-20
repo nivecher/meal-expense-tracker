@@ -13,7 +13,7 @@
   // Store original console methods
   const originalWarn = console.warn;
   const originalError = console.error;
-  const originalLog = console.log;
+  // const originalLog = console.log; // Unused for now
 
   // Common CDN/library warning patterns to filter
   const FILTERED_PATTERNS = [

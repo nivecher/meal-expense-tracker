@@ -1,160 +1,164 @@
 /* Enhanced Error Modal Styles */
 
 .duplicate-restaurant-modal .modal-content {
-    border: none;
-    border-radius: 0.75rem;
-    box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.15);
+  border: none;
+  border-radius: 0.75rem;
+  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 15%);
 }
 
 .duplicate-restaurant-modal .modal-header {
-    border-bottom: 1px solid var(--border-color, #dee2e6);
-    padding: 1.5rem;
-    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-    border-radius: 0.75rem 0.75rem 0 0;
+  border-bottom: 1px solid var(--border-color, #dee2e6);
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border-radius: 0.75rem 0.75rem 0 0;
 }
 
 .duplicate-restaurant-modal .modal-title {
-    font-weight: 600;
-    color: #856404;
-    display: flex;
-    align-items: center;
+  font-weight: 600;
+  color: #856404;
+  display: flex;
+  align-items: center;
 }
 
 .duplicate-restaurant-modal .modal-title i {
-    font-size: 1.2em;
-    margin-right: 0.5rem;
+  font-size: 1.2em;
+  margin-right: 0.5rem;
 }
 
 .duplicate-restaurant-modal .modal-body {
-    padding: 1.5rem;
+  padding: 1.5rem;
 }
 
 .duplicate-restaurant-modal .alert {
-    border: none;
-    border-radius: 0.5rem;
-    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-    border-left: 4px solid #ffc107;
-    margin-bottom: 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border-left: 4px solid #ffc107;
+  margin-bottom: 1.5rem;
 }
 
 .duplicate-restaurant-modal .card {
-    border: 1px solid #e9ecef;
-    border-radius: 0.5rem;
-    transition: all 0.2s ease;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
 }
 
 .duplicate-restaurant-modal .card:hover {
-    box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.1);
-    border-color: #007bff;
+  box-shadow: 0 0.125rem 0.5rem rgb(0 0 0 / 10%);
+  border-color: #007bff;
 }
 
 .duplicate-restaurant-modal .card-title {
-    color: #495057;
-    margin-bottom: 0.75rem;
+  color: #495057;
+  margin-bottom: 0.75rem;
 }
 
 .duplicate-restaurant-modal .card-title i {
-    color: #6c757d;
+  color: #6c757d;
 }
 
 .duplicate-restaurant-modal .btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
-    border-radius: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
 }
 
 .duplicate-restaurant-modal .modal-footer {
-    border-top: 1px solid var(--border-color, #dee2e6);
-    padding: 1rem 1.5rem;
-    background-color: #f8f9fa;
-    border-radius: 0 0 0.75rem 0.75rem;
+  border-top: 1px solid var(--border-color, #dee2e6);
+  padding: 1rem 1.5rem;
+  background-color: #f8f9fa;
+  border-radius: 0 0 0.75rem 0.75rem;
 }
 
 .duplicate-restaurant-modal .modal-footer .btn {
-    margin-left: 0.5rem;
-    min-width: 80px;
+  margin-left: 0.5rem;
+  min-width: 80px;
 }
 
 .duplicate-restaurant-modal .modal-footer .btn:first-child {
-    margin-left: 0;
+  margin-left: 0;
 }
 
 /* Animation for modal entrance */
+
 .duplicate-restaurant-modal.fade .modal-dialog {
-    transform: translate(0, -50px);
-    transition: transform 0.3s ease-out;
+  transform: translate(0, -50px);
+  transition: transform 0.3s ease-out;
 }
 
 .duplicate-restaurant-modal.show .modal-dialog {
-    transform: none;
+  transform: none;
 }
 
 /* Enhanced alert styling */
+
 .duplicate-restaurant-modal .alert strong {
-    color: #856404;
+  color: #856404;
 }
 
 .duplicate-restaurant-modal .alert .text-muted {
-    color: #6c757d !important;
-    font-size: 0.9em;
+  color: #6c757d !important;
+  font-size: 0.9em;
 }
 
 /* Responsive adjustments */
-@media (max-width: 576px) {
-    .duplicate-restaurant-modal .modal-dialog {
-        margin: 1rem;
-    }
+@media (width <= 576px) {
+  .duplicate-restaurant-modal .modal-dialog {
+    margin: 1rem;
+  }
 
-    .duplicate-restaurant-modal .modal-header,
-    .duplicate-restaurant-modal .modal-body,
-    .duplicate-restaurant-modal .modal-footer {
-        padding: 1rem;
-    }
+  .duplicate-restaurant-modal .modal-header,
+  .duplicate-restaurant-modal .modal-body,
+  .duplicate-restaurant-modal .modal-footer {
+    padding: 1rem;
+  }
 
-    .duplicate-restaurant-modal .modal-footer .btn {
-        margin-bottom: 0.5rem;
-        width: 100%;
-        margin-left: 0;
-    }
+  .duplicate-restaurant-modal .modal-footer .btn {
+    margin-bottom: 0.5rem;
+    width: 100%;
+    margin-left: 0;
+  }
 
-    .duplicate-restaurant-modal .card .d-flex {
-        flex-direction: column;
-        gap: 0.5rem;
-    }
+  .duplicate-restaurant-modal .card .d-flex {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 
-    .duplicate-restaurant-modal .card .btn-sm {
-        width: 100%;
-    }
+  .duplicate-restaurant-modal .card .btn-sm {
+    width: 100%;
+  }
 }
 
 /* Focus management */
+
 .duplicate-restaurant-modal .btn:focus {
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  box-shadow: 0 0 0 0.2rem rgb(0 123 255 / 25%);
 }
 
 /* Loading state */
+
 .duplicate-restaurant-modal .btn.loading {
-    position: relative;
-    color: transparent;
+  position: relative;
+  color: transparent;
 }
 
 .duplicate-restaurant-modal .btn.loading::after {
-    content: "";
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    top: 50%;
-    left: 50%;
-    margin-left: -8px;
-    margin-top: -8px;
-    border: 2px solid #ffffff;
-    border-radius: 50%;
-    border-top-color: transparent;
-    animation: spin 1s linear infinite;
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  margin-left: -8px;
+  margin-top: -8px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+  to {
+    transform: rotate(360deg);
+  }
 }

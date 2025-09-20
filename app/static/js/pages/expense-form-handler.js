@@ -280,7 +280,7 @@ async function processFormSubmission(formElements, formData) {
       handleSubmissionError(form, response, result);
     }
 
-  } catch (error) {
+  } catch {
     handleSubmissionException(form, error);
   } finally {
     restoreButtonState(submitButton, originalButtonText);

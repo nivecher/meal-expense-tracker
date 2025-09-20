@@ -7,43 +7,32 @@
  */
 
 /**
- * Initialize the notification system
- * Sets up global toast functions and ensures toast container exists
+ * Get icon class for toast type
+ * @param {string} type - Toast type (success, error, warning, info)
+ * @returns {string} Font Awesome icon class
  */
-export function initNotifications() {
-  // Ensure toast container exists
-  createToastContainer();
-
-  // Set up global toast functions
-  window.showSuccessToast = (message, title = 'Success', duration = 4000) => {
-    showToast(title, message, 'success', duration);
+function getIconForType(type) {
+  const icons = {
+    success: 'fa-check-circle',
+    danger: 'fa-exclamation-circle',
+    error: 'fa-exclamation-circle',
+    warning: 'fa-exclamation-triangle',
+    info: 'fa-info-circle',
   };
-
-  window.showErrorToast = (message, title = 'Error', duration = 0) => {
-    showToast(title, message, 'danger', duration);
-  };
-
-  window.showWarningToast = (message, title = 'Warning', duration = 7000) => {
-    showToast(title, message, 'warning', duration);
-  };
-
-  window.showInfoToast = (message, title = 'Info', duration = 5000) => {
-    showToast(title, message, 'info', duration);
-  };
-
-  console.log('✅ Notification system initialized');
+  return icons[type] || icons.info;
 }
 
 /**
  * Create toast container if it doesn't exist
+ * @returns {HTMLElement} Toast container element
  */
 function createToastContainer() {
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
     container.id = 'toast-container';
-    container.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-    container.style.zIndex = '1090';
+    container.className = 'toast-container position-fixed top-0 end-0 p-3';
+    container.style.zIndex = '9999';
     document.body.appendChild(container);
   }
   return container;
@@ -53,10 +42,9 @@ function createToastContainer() {
  * Show a toast notification
  * @param {string} title - Toast title
  * @param {string} message - Toast message
- * @param {string} type - Toast type (success, danger, warning, info)
+ * @param {string} type - Toast type (success, error, warning, info)
  * @param {number} duration - Auto-hide duration in ms (0 = no auto-hide)
  * @param {Array} actions - Optional action buttons
- * @returns {Object} Toast handle with hide() method
  */
 export function showToast(title, message, type = 'info', duration = 5000, actions = null) {
   const toastContainer = createToastContainer();
@@ -97,68 +85,86 @@ export function showToast(title, message, type = 'info', duration = 5000, action
   toastContainer.insertAdjacentHTML('beforeend', toastHtml);
 
   const toastElement = document.getElementById(toastId);
-  const autohide = duration > 0;
-
   const toast = new bootstrap.Toast(toastElement, {
-    autohide,
-    delay: autohide ? duration : 0,
+    autohide: duration > 0,
+    delay: duration,
   });
 
   toast.show();
 
-  // Remove toast element after it's hidden
+  // Clean up after toast is hidden
   toastElement.addEventListener('hidden.bs.toast', () => {
     toastElement.remove();
   });
 
-  // Return toast handle for programmatic control
-  return {
-    id: toastId,
-    hide: () => {
-      try {
-        toast.hide();
-      } catch (e) {
-        console.warn('Error hiding toast:', e);
-      }
-    },
+  return toast;
+}
+
+/**
+ * Initialize the notification system
+ * Sets up global toast functions and ensures toast container exists
+ */
+export function initNotifications() {
+  // Ensure toast container exists
+  createToastContainer();
+
+  // Set up global toast functions
+  window.showSuccessToast = (message, title = 'Success', duration = 4000) => {
+    showToast(title, message, 'success', duration);
   };
-}
 
-/**
- * Get appropriate icon for toast type
- * @param {string} type - Toast type
- * @returns {string} FontAwesome icon class
- */
-function getIconForType(type) {
-  const iconMap = {
-    success: 'fa-check-circle',
-    danger: 'fa-exclamation-triangle',
-    warning: 'fa-exclamation-triangle',
-    info: 'fa-info-circle',
+  window.showErrorToast = (message, title = 'Error', duration = 0) => {
+    showToast(title, message, 'danger', duration);
   };
-  return iconMap[type] || 'fa-info-circle';
+
+  window.showWarningToast = (message, title = 'Warning', duration = 7000) => {
+    showToast(title, message, 'warning', duration);
+  };
+
+  window.showInfoToast = (message, title = 'Info', duration = 5000) => {
+    showToast(title, message, 'info', duration);
+  };
+
+  // Legacy compatibility
+  window.showToast = showToast;
 }
 
 /**
- * Show a confirmation toast with action buttons
- * @param {string} title - Toast title
- * @param {string} message - Toast message
- * @param {Array} actions - Action buttons array
- * @returns {Object} Toast handle
+ * Show success notification
+ * @param {string} message - Success message
+ * @param {string} title - Optional title (default: 'Success')
+ * @param {number} duration - Auto-hide duration (default: 4000ms)
  */
-export function showConfirmationToast(title, message, actions) {
-  return showToast(title, message, 'warning', 0, actions);
+export function showSuccess(message, title = 'Success', duration = 4000) {
+  return showToast(title, message, 'success', duration);
 }
 
 /**
- * Clear all toasts
+ * Show error notification
+ * @param {string} message - Error message
+ * @param {string} title - Optional title (default: 'Error')
+ * @param {number} duration - Auto-hide duration (default: 0 = no auto-hide)
  */
-export function clearAllToasts() {
-  const container = document.getElementById('toast-container');
-  if (container) {
-    container.innerHTML = '';
-  }
+export function showError(message, title = 'Error', duration = 0) {
+  return showToast(title, message, 'danger', duration);
 }
 
-// Export for testing
-export { createToastContainer, getIconForType };
+/**
+ * Show warning notification
+ * @param {string} message - Warning message
+ * @param {string} title - Optional title (default: 'Warning')
+ * @param {number} duration - Auto-hide duration (default: 7000ms)
+ */
+export function showWarning(message, title = 'Warning', duration = 7000) {
+  return showToast(title, message, 'warning', duration);
+}
+
+/**
+ * Show info notification
+ * @param {string} message - Info message
+ * @param {string} title - Optional title (default: 'Info')
+ * @param {number} duration - Auto-hide duration (default: 5000ms)
+ */
+export function showInfo(message, title = 'Info', duration = 5000) {
+  return showToast(title, message, 'info', duration);
+}

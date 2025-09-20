@@ -3,81 +3,81 @@
 /* Following TIGER principles: Safety, Performance, Developer Experience */
 
 .admin-sidebar {
-    background-color: #f8f9fa;
-    border-right: 1px solid #dee2e6;
-    min-height: calc(100vh - 56px);
+  background-color: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+  min-height: calc(100vh - 56px);
 }
 
 .admin-content {
-    padding: 2rem;
+  padding: 2rem;
 }
 
 .admin-stats-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-radius: 10px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .admin-stats-card h3 {
-    color: white;
-    margin-bottom: 0.5rem;
+  color: #fff;
+  margin-bottom: 0.5rem;
 }
 
 .admin-stats-card .stat-number {
-    font-size: 2rem;
-    font-weight: bold;
-    margin-bottom: 0.25rem;
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 0.25rem;
 }
 
 .admin-stats-card .stat-label {
-    opacity: 0.9;
-    font-size: 0.9rem;
+  opacity: 0.9;
+  font-size: 0.9rem;
 }
 
 .user-status-badge {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
 }
 
 .action-buttons .btn {
-    margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
-    transition: all 0.2s ease-in-out;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  transition: all 0.2s ease-in-out;
 }
 
 .action-buttons .btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .table-actions {
-    white-space: nowrap;
+  white-space: nowrap;
 }
 
 .table-actions .btn {
-    margin-right: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.8rem;
+  margin-right: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
 }
 
 .table-actions form {
-    display: inline-block;
+  display: inline-block;
 }
 
 .admin-stats-card:hover {
-    transform: translateY(-2px);
-    transition: transform 0.2s ease-in-out;
-    box-shadow: 0 4px 8px rgb(0 0 0 / 10%);
+  transform: translateY(-2px);
+  transition: transform 0.2s ease-in-out;
+  box-shadow: 0 4px 8px rgb(0 0 0 / 10%);
 }
 
 .card {
-    border: none;
-    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
-    transition: box-shadow 0.2s ease-in-out;
+  border: none;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  transition: box-shadow 0.2s ease-in-out;
 }
 
 .card:hover {
-    box-shadow: 0 4px 8px rgb(0 0 0 / 15%);
+  box-shadow: 0 4px 8px rgb(0 0 0 / 15%);
 }

@@ -1,192 +1,202 @@
 /* Table Styles */
 
 /* Sticky/Frozen Table Headers */
+
 .table-sticky-header {
-    position: relative;
-    max-height: 70vh; /* Limit table height to enable scrolling */
-    overflow-y: auto;
-    border: 1px solid var(--border-color, #dee2e6);
-    border-radius: 0.375rem;
+  position: relative;
+  max-height: 70vh; /* Limit table height to enable scrolling */
+  overflow-y: auto;
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 0.375rem;
 }
 
 .table-sticky-header .table {
-    margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .table-sticky-header thead th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background-color: var(--gray-100, #f8f9fa);
-    border-bottom: 2px solid var(--border-color, #dee2e6);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--gray-100, #f8f9fa);
+  border-bottom: 2px solid var(--border-color, #dee2e6);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 /* Frozen columns (first column stays fixed during horizontal scroll) */
+
 .table-frozen-columns {
-    position: relative;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table-frozen-columns .table {
-    min-width: 100%;
-    white-space: nowrap;
+  min-width: 100%;
+  white-space: nowrap;
 }
 
 .table-frozen-columns .table th:first-child,
 .table-frozen-columns .table td:first-child {
-    position: sticky;
-    left: 0;
-    z-index: 5;
-    background-color: inherit;
-    border-right: 2px solid var(--border-color, #dee2e6);
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background-color: inherit;
+  border-right: 2px solid var(--border-color, #dee2e6);
 }
 
 .table-frozen-columns .table thead th:first-child {
-    z-index: 15; /* Higher than both sticky header and frozen column */
+  z-index: 15; /* Higher than both sticky header and frozen column */
 }
 
 /* Enhanced sticky table with both vertical and horizontal freezing */
+
 .table-sticky-frozen {
-    position: relative;
-    max-height: 70vh;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    border: 1px solid var(--border-color, #dee2e6);
-    border-radius: 0.375rem;
+  position: relative;
+  max-height: 70vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border-color, #dee2e6);
+  border-radius: 0.375rem;
 }
 
 .table-sticky-frozen .table {
-    margin-bottom: 0;
-    min-width: 100%;
+  margin-bottom: 0;
+  min-width: 100%;
 }
 
 .table-sticky-frozen thead th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background-color: var(--gray-100, #f8f9fa);
-    border-bottom: 2px solid var(--border-color, #dee2e6);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--gray-100, #f8f9fa);
+  border-bottom: 2px solid var(--border-color, #dee2e6);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
 }
 
 .table-sticky-frozen .table th:first-child,
 .table-sticky-frozen .table td:first-child {
-    position: sticky;
-    left: 0;
-    z-index: 5;
-    background-color: inherit;
-    border-right: 2px solid var(--border-color, #dee2e6);
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background-color: inherit;
+  border-right: 2px solid var(--border-color, #dee2e6);
 }
 
 .table-sticky-frozen .table thead th:first-child {
-    z-index: 15;
-    background-color: var(--gray-100, #f8f9fa);
+  z-index: 15;
+  background-color: var(--gray-100, #f8f9fa);
 }
 
 /* Hover effects for frozen tables */
+
 .table-sticky-frozen tbody tr:hover td:first-child,
 .table-frozen-columns tbody tr:hover td:first-child {
-    background-color: var(--gray-50, #f8f9fa);
+  background-color: var(--gray-50, #f8f9fa);
 }
 
 /* Custom scrollbar styling for better UX */
+
 .table-sticky-header::-webkit-scrollbar,
 .table-frozen-columns::-webkit-scrollbar,
 .table-sticky-frozen::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  width: 8px;
+  height: 8px;
 }
 
 .table-sticky-header::-webkit-scrollbar-track,
 .table-frozen-columns::-webkit-scrollbar-track,
 .table-sticky-frozen::-webkit-scrollbar-track {
-    background: var(--gray-100, #f1f3f4);
-    border-radius: 4px;
+  background: var(--gray-100, #f1f3f4);
+  border-radius: 4px;
 }
 
 .table-sticky-header::-webkit-scrollbar-thumb,
 .table-frozen-columns::-webkit-scrollbar-thumb,
 .table-sticky-frozen::-webkit-scrollbar-thumb {
-    background: var(--gray-400, #9ca3af);
-    border-radius: 4px;
+  background: var(--gray-400, #9ca3af);
+  border-radius: 4px;
 }
 
 .table-sticky-header::-webkit-scrollbar-thumb:hover,
 .table-frozen-columns::-webkit-scrollbar-thumb:hover,
 .table-sticky-frozen::-webkit-scrollbar-thumb:hover {
-    background: var(--gray-500, #6b7280);
+  background: var(--gray-500, #6b7280);
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
-    .table-sticky-header,
-    .table-sticky-frozen {
-        max-height: 60vh;
-    }
+@media (width <= 768px) {
+  .table-sticky-header,
+  .table-sticky-frozen {
+    max-height: 60vh;
+  }
 
-    .table-frozen-columns .table th:first-child,
-    .table-frozen-columns .table td:first-child,
-    .table-sticky-frozen .table th:first-child,
-    .table-sticky-frozen .table td:first-child {
-        min-width: 120px; /* Ensure frozen column has minimum width on mobile */
-    }
+  .table-frozen-columns .table th:first-child,
+  .table-frozen-columns .table td:first-child,
+  .table-sticky-frozen .table th:first-child,
+  .table-sticky-frozen .table td:first-child {
+    min-width: 120px; /* Ensure frozen column has minimum width on mobile */
+  }
 }
 
 /* Sortable table headers */
+
 th[data-sort="true"] {
-    position: relative;
-    -webkit-user-select: none;
-    user-select: none;
-    transition: background-color 0.2s ease;
+  position: relative;
+  user-select: none;
+  transition: background-color 0.2s ease;
 }
 
 th[data-sort="true"]:hover,
 th[data-sort="true"]:focus {
-    background-color: #f1f3f5;
-    outline: none;
+  background-color: #f1f3f5;
+  outline: none;
 }
 
 th[data-sort="true"] .sort-indicator {
-    display: inline-block;
-    width: 1em;
-    text-align: center;
-    color: #6c757d;
-    transition: transform 0.2s ease;
+  display: inline-block;
+  width: 1em;
+  text-align: center;
+  color: #6c757d;
+  transition: transform 0.2s ease;
 }
 
 th[data-sort="true"]:focus .sort-indicator,
 th[data-sort="true"]:hover .sort-indicator {
-    color: #0d6efd;
+  color: #0d6efd;
 }
 
 /* Responsive table */
+
 .table-responsive {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Hover effect for table rows */
+
 .table-hover tbody tr {
-    transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
 /* Ensure table cells have proper spacing */
-.table td, .table th {
-    vertical-align: middle;
-    padding: 0.75rem;
+
+.table td,
+.table th {
+  vertical-align: middle;
+  padding: 0.75rem;
 }
 
 /* Style for the active sort column */
+
 th[aria-sort] {
-    background-color: #e9ecef;
+  background-color: #e9ecef;
 }
 
 th[aria-sort="ascending"] .sort-indicator::before {
-    content: "↑";
+  content: "↑";
 }
 
 th[aria-sort="descending"] .sort-indicator::before {
-    content: "↓";
+  content: "↓";
 }

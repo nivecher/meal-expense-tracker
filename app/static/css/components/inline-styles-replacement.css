@@ -7,135 +7,158 @@
  */
 
 /* Layout and Sizing Utilities */
+
 .amount-min-width {
-    min-width: 80px;
+  min-width: 80px;
 }
 
 .align-self-start {
-    align-self: flex-start;
+  align-self: flex-start;
 }
 
 .per-page-select {
-    width: auto;
-    min-width: 80px;
+  width: auto;
+  min-width: 80px;
 }
 
 .word-break-all {
-    word-break: break-all;
+  word-break: break-all;
 }
 
 /* Restaurant Icon Styles */
+
 .restaurant-fallback-icon {
-    display: none;
-    font-size: 24px;
+  display: none;
+  font-size: 24px;
 }
 
 .restaurant-fallback-icon-table {
-    display: none;
-    font-size: 14px;
-    margin-top: 2px;
+  display: none;
+  font-size: 14px;
+  margin-top: 2px;
 }
 
 .restaurant-fallback-icon-large {
-    font-size: 28px;
+  font-size: 28px;
 }
 
 /* Restaurant Icon Opacity Transitions */
+
 .restaurant-icon-opacity {
-    opacity: 0;
-    transition: opacity 0.2s;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
 .restaurant-icon-opacity-with-margin {
-    opacity: 0;
-    transition: opacity 0.2s;
-    margin-top: 2px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  margin-top: 2px;
 }
 
 .restaurant-icon-opacity-with-margin {
-    opacity: 0;
-    transition: opacity 0.2s;
-    margin-top: 2px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  margin-top: 2px;
 }
 
 /* Scrollable Containers */
+
 .scrollable-container-sm {
-    max-height: 200px;
-    overflow-y: auto;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .scrollable-container-md {
-    max-height: 300px;
-    overflow-y: auto;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .scrollable-container-lg {
-    max-height: 400px;
-    overflow-y: auto;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 /* Table Column Widths */
-.table-col-100 { min-width: 100px; }
-.table-col-120 { min-width: 120px; }
-.table-col-150 { min-width: 150px; }
-.table-col-200 { min-width: 200px; }
+
+.table-col-100 {
+  min-width: 100px;
+}
+
+.table-col-120 {
+  min-width: 120px;
+}
+
+.table-col-150 {
+  min-width: 150px;
+}
+
+.table-col-200 {
+  min-width: 200px;
+}
 
 /* Avatar Styles */
+
 .avatar-initials {
-    display: none;
+  display: none;
 }
 
 .avatar-initials-sm {
-    width: 32px;
-    height: 32px;
+  width: 32px;
+  height: 32px;
 }
 
 .avatar-initials-md {
-    width: 36px;
-    height: 36px;
+  width: 36px;
+  height: 36px;
 }
 
 /* Tag Styles */
+
 .tag-badge-custom {
-    background-color: var(--tag-color, #6c757d);
-    color: white;
+  background-color: var(--tag-color, #6c757d);
+  color: #fff;
 }
 
 /* Button States */
+
 .btn-hidden {
-    display: none;
+  display: none;
 }
 
 /* Icon Sizes */
+
 .icon-size-2rem {
-    font-size: 2rem;
+  font-size: 2rem;
 }
 
 /* Dynamic Color Systems */
+
 /* Cuisine badge styles now handled by unified badge system */
 
 .category-badge {
-    --category-color: var(--default-category-color, #6c757d);
-    --category-color-rgb: var(--default-category-color-rgb, 108, 117, 125);
+  --category-color: var(--default-category-color, #6c757d);
+  --category-color-rgb: var(--default-category-color-rgb, 108, 117, 125);
 }
 
 /* Progress Bar Dynamic Width */
+
 .progress-bar-dynamic {
-    width: var(--progress-width, 0%);
+  width: var(--progress-width, 0%);
 }
 
 /* Timezone Detection */
+
 .timezone-detection-result {
-    display: none;
+  display: none;
 }
 
 /* Responsive Utilities */
-@media (max-width: 768px) {
-    .per-page-select {
-        min-width: 60px;
-    }
+@media (width <= 768px) {
+  .per-page-select {
+    min-width: 60px;
+  }
 
-    .amount-min-width {
-        min-width: 60px;
-    }
+  .amount-min-width {
+    min-width: 60px;
+  }
 }

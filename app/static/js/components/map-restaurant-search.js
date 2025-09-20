@@ -401,7 +401,7 @@ export class MapRestaurantSearch {
         statusDiv.classList.add('d-none');
       }, 3000);
 
-    } catch (error) {
+    } catch {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
       statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
@@ -444,7 +444,7 @@ export class MapRestaurantSearch {
         statusDiv.classList.add('d-none');
       }, 3000);
 
-    } catch (error) {
+    } catch {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
       statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
@@ -503,7 +503,7 @@ export class MapRestaurantSearch {
         query: searchQuery,
         lat: searchLocation.lat,
         lng: searchLocation.lng,
-        radius_miles: radius,
+        radiusMiles: radius,
         cuisine: filters.cuisine || '',
         minRating: filters.minRating || '',
         maxPriceLevel: filters.maxPriceLevel || '',
@@ -526,7 +526,7 @@ export class MapRestaurantSearch {
       // Call callback
       this.options.onResults(results);
 
-    } catch (error) {
+    } catch {
       console.error('Search error:', error);
       this.options.onError(error);
       this.showError(error.message);
@@ -1159,7 +1159,7 @@ export class MapRestaurantSearch {
         }, 3000);
       }
 
-    } catch (error) {
+    } catch {
       console.warn('Could not get current location:', error);
 
       // Show error message
@@ -1236,7 +1236,7 @@ export class MapRestaurantSearch {
     if (window.addToMyRestaurants && typeof window.addToMyRestaurants === 'function') {
       try {
         window.addToMyRestaurants(placeId);
-      } catch (error) {
+      } catch {
         console.error('Error calling global addToMyRestaurants:', error);
       }
     } else {

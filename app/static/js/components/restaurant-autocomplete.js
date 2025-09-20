@@ -6,10 +6,7 @@
  * Flow: Type restaurant name → Get suggestions → Select restaurant → Populate form
  */
 
-import { cuisineService } from '../services/cuisine-service.js';
-
-// Debug: Check if cuisine service is loaded
-console.log('Cuisine service loaded:', cuisineService);
+// Cuisine service removed - not needed for basic autocomplete functionality
 
 class RestaurantAutocomplete {
   constructor(inputElement) {
@@ -18,6 +15,8 @@ class RestaurantAutocomplete {
     this.suggestionsContainer = null;
     this.selectedIndex = -1;
     this.suggestions = [];
+    this.userLocation = null;
+    this.locationError = null;
     this.init();
   }
 
@@ -25,34 +24,8 @@ class RestaurantAutocomplete {
     console.log('RestaurantAutocomplete init() called');
     this.createSuggestionsContainer();
     this.setupEventListeners();
-    this.populateCuisineFilter();
+    this.getUserLocation();
     console.log('RestaurantAutocomplete initialization complete');
-  }
-
-  async populateCuisineFilter() {
-    const cuisineFilter = document.getElementById('cuisine-filter');
-    if (!cuisineFilter) {
-      // No cuisine filter element found - this is normal for restaurant forms
-      return;
-    }
-
-    try {
-      const cuisineData = await cuisineService.loadCuisineData();
-      const cuisineNames = cuisineService.getCuisineNames();
-
-      // Clear existing options except "All Cuisines"
-      cuisineFilter.innerHTML = '<option value="">All Cuisines</option>';
-
-      // Add cuisine options
-      cuisineNames.forEach((name) => {
-        const option = document.createElement('option');
-        option.value = name.toLowerCase();
-        option.textContent = name;
-        cuisineFilter.appendChild(option);
-      });
-    } catch (error) {
-      console.error('Failed to populate cuisine filter:', error);
-    }
   }
 
   createSuggestionsContainer() {
@@ -140,22 +113,260 @@ class RestaurantAutocomplete {
 
     try {
       console.log('Showing loading and getting suggestions for:', query);
-      this.showLoading();
+      this.showLoading(query);
+
+      // If we don't have location yet, try to get it
+      if (!this.userLocation && !this.locationError) {
+        console.log('Attempting to get location for better search results...');
+        await this.getUserLocation();
+      }
+
       const suggestions = await this.getSuggestions(query);
       console.log('Got suggestions:', suggestions);
       this.showSuggestions(suggestions);
-    } catch (error) {
+    } catch {
       console.error('Error getting suggestions:', error);
-      this.showError('Failed to get suggestions');
+
+      // Provide more specific error messages based on the error type
+      let errorMessage = 'Failed to get suggestions';
+
+      if (error.message.includes('Failed to fetch')) {
+        // This could be a network error or authentication redirect
+        // Let the server handle authentication redirects naturally
+        errorMessage = 'Unable to connect to server. Please check your connection and try again.';
+      } else if (error.message.includes('HTTP 401')) {
+        // Don't show error for 401 - redirect to login
+        console.log('Authentication required - redirecting to login');
+        const currentUrl = window.location.href;
+        window.location.href = `/login?next=${encodeURIComponent(currentUrl)}`;
+        return;
+      } else if (error.message.includes('HTTP 403')) {
+        errorMessage = 'Access denied: You do not have permission to search for restaurants.';
+      } else if (error.message.includes('HTTP 500')) {
+        errorMessage = 'Server error: Google Maps API is not configured. Please contact support.';
+      } else if (error.message.includes('Google Maps API key not configured')) {
+        errorMessage = 'Google Maps integration is not available. Please contact support.';
+      } else if (error.message) {
+        errorMessage = `Search error: ${error.message}`;
+      }
+
+      this.showError(errorMessage);
     }
+  }
+
+  async getUserLocation() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        console.log('Geolocation not supported');
+        this.locationError = 'Geolocation not supported';
+        resolve(null);
+        return;
+      }
+
+      console.log('Requesting user location...');
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          this.userLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          console.log('User location obtained:', this.userLocation);
+          resolve(this.userLocation);
+        },
+        (error) => {
+          console.log('Geolocation error:', error.message);
+          this.locationError = error.message;
+          resolve(null);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000, // 5 minutes
+        },
+      );
+    });
   }
 
   async getSuggestions(query) {
     try {
-      // Build query parameters
+      // Build query parameters with location if available
       const params = new URLSearchParams({
         query,
       });
+
+      // Add location parameters if we have user location
+      if (this.userLocation) {
+        params.append('lat', this.userLocation.lat);
+        params.append('lng', this.userLocation.lng);
+
+        // Use dynamic radius based on search context
+        const radius = this.getDynamicRadius(query);
+        params.append('radiusMiles', radius.toString());
+        console.log(`Searching with location: ${this.userLocation.lat}, ${this.userLocation.lng}, radius: ${radius} miles`);
+      } else {
+        console.log('Searching without location (fallback to text-only search)');
+      }
+
+      const url = `/restaurants/api/places/search?${params.toString()}`;
+      console.log('Making request to:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin', // Include cookies for authentication
+        redirect: 'manual', // Don't follow redirects automatically
+      });
+
+      console.log('Response status:', response.status, response.statusText);
+
+      // Handle redirects manually
+      if (response.status === 302 || response.status === 301) {
+        const redirectUrl = response.headers.get('Location');
+        console.log('Redirect detected to:', redirectUrl);
+        if (redirectUrl && redirectUrl.includes('/login')) {
+          // Redirect to login page
+          window.location.href = redirectUrl;
+          return;
+        }
+      }
+
+      // Handle authentication errors
+      if (response.status === 401) {
+        console.log('Authentication required - redirecting to login');
+        // Redirect to login page with current URL as next parameter
+        const currentUrl = window.location.href;
+        window.location.href = `/login?next=${encodeURIComponent(currentUrl)}`;
+        return;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (data.error) {
+        // Handle specific API errors
+        if (data.error.includes('Google Maps API key not configured')) {
+          throw new Error('Google Maps integration is not available. Please contact support.');
+        }
+        throw new Error(data.error);
+      }
+
+      // Backend returns { data: { results: [...] } } for places search.
+      // Normalize to a lightweight suggestions list expected by the UI.
+      const results = (data && data.data && Array.isArray(data.data.results)) ? data.data.results : [];
+      const suggestions = results.map((place) => {
+        // Calculate distance if we have user location and place coordinates
+        let distance = null;
+        if (this.userLocation && place.geometry && place.geometry.location) {
+          distance = this.calculateDistance(
+            this.userLocation.lat,
+            this.userLocation.lng,
+            place.geometry.location.lat,
+            place.geometry.location.lng,
+          );
+        }
+
+        return {
+          placeId: place.place_id || place.placeId || '',
+          title: place.name || place.title || '',
+          description: place.formatted_address || place.vicinity || place.address || '',
+          distance,
+          distanceMiles: distance ? this.formatDistance(distance) : null,
+        };
+      }).filter((s) => s.placeId && s.title);
+
+      // Sort by distance if we have location data (nearest first)
+      if (this.userLocation) {
+        suggestions.sort((a, b) => {
+          if (a.distance === null && b.distance === null) return 0;
+          if (a.distance === null) return 1; // Put items without distance at the end
+          if (b.distance === null) return -1;
+          return a.distance - b.distance; // Sort by distance, nearest first
+        });
+      }
+
+      // If we have location but no results, try a broader search
+      if (this.userLocation && suggestions.length === 0) {
+        console.log('No nearby results found, trying broader search...');
+        return await this.getSuggestionsWithFallback(query);
+      }
+
+      return suggestions;
+    } catch {
+      throw new Error(`Search error: ${error.message}`);
+    }
+  }
+
+  getDynamicRadius(query) {
+    const lowerQuery = query.toLowerCase();
+
+    // Chain restaurants - search wider since they're more common
+    const chainRestaurants = ['mcdonald', 'burger king', 'kfc', 'subway', 'taco bell', 'pizza hut', 'domino', 'starbucks', 'dunkin'];
+    const isChain = chainRestaurants.some((chain) => lowerQuery.includes(chain));
+
+    // Fine dining or specific restaurants - search wider
+    const fineDining = ['michelin', 'fine dining', 'upscale', 'gourmet', 'chef', 'restaurant'];
+    const isFineDining = fineDining.some((term) => lowerQuery.includes(term));
+
+    // Generic terms - search wider
+    const genericTerms = ['restaurant', 'food', 'dining', 'eat', 'lunch', 'dinner'];
+    const isGeneric = genericTerms.some((term) => lowerQuery.includes(term));
+
+    if (isChain) {
+      return 25; // 25 miles for chains
+    } else if (isFineDining) {
+      return 50; // 50 miles for fine dining
+    } else if (isGeneric) {
+      return 15; // 15 miles for generic searches
+    }
+    return 20; // 20 miles for specific restaurant names
+
+  }
+
+  calculateDistance(lat1, lng1, lat2, lng2) {
+    // Haversine formula to calculate distance between two points
+    const R = 3959; // Earth's radius in miles
+    const dLat = this.toRadians(lat2 - lat1);
+    const dLng = this.toRadians(lng2 - lng1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  toRadians(degrees) {
+    return degrees * (Math.PI / 180);
+  }
+
+  formatDistance(distanceMiles) {
+    if (distanceMiles < 0.1) {
+      return '< 0.1 mi';
+    } else if (distanceMiles < 1) {
+      return `${distanceMiles.toFixed(1)} mi`;
+    }
+    return `${Math.round(distanceMiles)} mi`;
+
+  }
+
+  async getSuggestionsWithFallback(query) {
+    try {
+      // Try with a much larger radius (100 miles)
+      const params = new URLSearchParams({
+        query,
+        lat: this.userLocation.lat,
+        lng: this.userLocation.lng,
+        radiusMiles: '100', // 100 mile radius for fallback
+      });
+
+      console.log('Fallback search with 100-mile radius...');
 
       const response = await fetch(`/restaurants/api/places/search?${params.toString()}`, {
         method: 'GET',
@@ -174,18 +385,88 @@ class RestaurantAutocomplete {
         throw new Error(data.error);
       }
 
-      // Backend returns { data: { results: [...] } } for places search.
-      // Normalize to a lightweight suggestions list expected by the UI.
+      const results = (data && data.data && Array.isArray(data.data.results)) ? data.data.results : [];
+      const suggestions = results.map((place) => {
+        // Calculate distance if we have user location and place coordinates
+        let distance = null;
+        if (this.userLocation && place.geometry && place.geometry.location) {
+          distance = this.calculateDistance(
+            this.userLocation.lat,
+            this.userLocation.lng,
+            place.geometry.location.lat,
+            place.geometry.location.lng,
+          );
+        }
+
+        return {
+          placeId: place.place_id || place.placeId || '',
+          title: place.name || place.title || '',
+          description: place.formatted_address || place.vicinity || place.address || '',
+          distance,
+          distanceMiles: distance ? this.formatDistance(distance) : null,
+        };
+      }).filter((s) => s.placeId && s.title);
+
+      // Sort by distance if we have location data (nearest first)
+      if (this.userLocation) {
+        suggestions.sort((a, b) => {
+          if (a.distance === null && b.distance === null) return 0;
+          if (a.distance === null) return 1; // Put items without distance at the end
+          if (b.distance === null) return -1;
+          return a.distance - b.distance; // Sort by distance, nearest first
+        });
+      }
+
+      // If still no results, try without location
+      if (suggestions.length === 0) {
+        console.log('No results with location, trying text-only search...');
+        return await this.getSuggestionsTextOnly(query);
+      }
+
+      return suggestions;
+    } catch {
+      console.error('Fallback search failed:', error);
+      // Try text-only search as last resort
+      return this.getSuggestionsTextOnly(query);
+    }
+  }
+
+  async getSuggestionsTextOnly(query) {
+    try {
+      const params = new URLSearchParams({
+        query,
+      });
+
+      console.log('Text-only search (no location)...');
+
+      const response = await fetch(`/restaurants/api/places/search?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
       const results = (data && data.data && Array.isArray(data.data.results)) ? data.data.results : [];
       const suggestions = results.map((place) => ({
         placeId: place.place_id || place.placeId || '',
         title: place.name || place.title || '',
         description: place.formatted_address || place.vicinity || place.address || '',
+        distance: null, // No distance for text-only search
       })).filter((s) => s.placeId && s.title);
 
       return suggestions;
-    } catch (error) {
-      throw new Error(`Search error: ${error.message}`);
+    } catch {
+      throw new Error(`Text-only search error: ${error.message}`);
     }
   }
 
@@ -203,10 +484,11 @@ class RestaurantAutocomplete {
       <div class="suggestion-item" data-place-id="${suggestion.placeId}" data-index="${index}">
         <div class="d-flex align-items-center p-2">
           <i class="fas fa-utensils text-primary me-2"></i>
-          <div>
+          <div class="flex-grow-1">
             <div class="fw-medium">${suggestion.title}</div>
             <small class="text-muted">${suggestion.description}</small>
           </div>
+          ${suggestion.distanceMiles ? `<small class="text-primary ms-2 fw-medium">${suggestion.distanceMiles}</small>` : ''}
         </div>
       </div>
     `).join('');
@@ -276,7 +558,7 @@ class RestaurantAutocomplete {
 
       this.hideSuggestions();
 
-    } catch (error) {
+    } catch {
       console.error('Error getting restaurant details:', error);
       this.showError('Failed to load restaurant details');
     }
@@ -329,7 +611,7 @@ class RestaurantAutocomplete {
         address_components: place.address_components || [],
         place_id: placeId,
       };
-    } catch (error) {
+    } catch {
       throw new Error(`Details error: ${error.message}`);
     }
   }
@@ -354,6 +636,7 @@ class RestaurantAutocomplete {
       'restaurant-google-place-id': restaurantData.google_place_id,
       'restaurant-cuisine': restaurantData.cuisine,
       'restaurant-service-level': restaurantData.service_level,
+      'restaurant-price-level': restaurantData.price_level,
       'restaurant-is-chain': restaurantData.is_chain,
       'restaurant-rating': restaurantData.rating,
       'restaurant-notes': restaurantData.notes,
@@ -373,6 +656,7 @@ class RestaurantAutocomplete {
       google_place_id: restaurantData.google_place_id,
       cuisine: restaurantData.cuisine,
       service_level: restaurantData.service_level,
+      price_level: restaurantData.price_level,
       is_chain: restaurantData.is_chain,
       rating: restaurantData.rating,
       notes: restaurantData.notes,
@@ -393,16 +677,27 @@ class RestaurantAutocomplete {
           console.log('Field type:', field.type);
         }
 
+        // Special debugging for price_level field
+        if (fieldId === 'restaurant-price-level' || fieldId === 'price_level') {
+          console.log('Price level field found:', field);
+          console.log('Price level value:', value);
+          console.log('Field type:', field.type);
+          console.log('Field options:', Array.from(field.options).map((opt) => ({ value: opt.value, text: opt.text })));
+        }
+
         // Handle different field types
         if (field.type === 'checkbox') {
           field.checked = Boolean(value);
         } else if (field.type === 'select-one') {
           // For select fields, try to find matching option
           const option = Array.from(field.options).find((opt) =>
-            opt.value === value || opt.text.toLowerCase() === String(value).toLowerCase(),
+            opt.value === String(value) || opt.value === value || opt.text.toLowerCase() === String(value).toLowerCase(),
           );
           if (option) {
             field.value = option.value;
+            console.log(`Set select field ${fieldId} to option:`, { value: option.value, text: option.text });
+          } else {
+            console.log(`No matching option found for ${fieldId} with value:`, value);
           }
         } else {
           field.value = value;
@@ -421,13 +716,24 @@ class RestaurantAutocomplete {
     this.showSuccess(message);
   }
 
-  showLoading() {
+  showLoading(query = '') {
+    let locationStatus;
+    if (this.userLocation) {
+      const radius = this.getDynamicRadius(query);
+      locationStatus = `<small class="text-success d-block mt-1"><i class="fas fa-map-marker-alt me-1"></i>Searching within ${radius} miles</small>`;
+    } else if (this.locationError) {
+      locationStatus = '<small class="text-muted d-block mt-1"><i class="fas fa-info-circle me-1"></i>Searching all restaurants</small>';
+    } else {
+      locationStatus = '<small class="text-info d-block mt-1"><i class="fas fa-spinner fa-spin me-1"></i>Getting your location...</small>';
+    }
+
     this.suggestionsContainer.innerHTML = `
       <div class="p-3 text-center">
         <div class="spinner-border spinner-border-sm text-primary" role="status">
           <span class="visually-hidden">Loading...</span>
         </div>
         <span class="ms-2">Loading...</span>
+        ${locationStatus}
       </div>
     `;
     this.suggestionsContainer.style.display = 'block';
@@ -487,7 +793,7 @@ function initRestaurantAutocomplete() {
     try {
       new RestaurantAutocomplete(input);
       console.log('Successfully initialized autocomplete for input', index);
-    } catch (error) {
+    } catch {
       console.error('Failed to initialize autocomplete for input', index, error);
     }
   });

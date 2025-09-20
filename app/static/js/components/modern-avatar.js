@@ -112,8 +112,8 @@ class ModernAvatarManager {
   }
 
   extractAvatarData(element) {
-    const rect = element.getBoundingClientRect();
-    const computedStyle = window.getComputedStyle(element);
+    // const rect = element.getBoundingClientRect(); // Unused for now
+    // const computedStyle = window.getComputedStyle(element); // Unused for now
 
     // Get the image source and clean it up
     let src = element.src || element.dataset.src || '';

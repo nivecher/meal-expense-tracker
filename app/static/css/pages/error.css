@@ -1,88 +1,87 @@
 /* Error page styling */
 
 .error-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 70vh;
-    padding: 2rem;
-    text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 70vh;
+  padding: 2rem;
+  text-align: center;
 }
 
 .error-content {
-    max-width: 600px;
-    padding: 2.5rem;
-    background-color: var(--bs-body-bg);
-    border-radius: var(--bs-border-radius-lg);
-    box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 10%);
+  max-width: 600px;
+  padding: 2.5rem;
+  background-color: var(--bs-body-bg);
+  border-radius: var(--bs-border-radius-lg);
+  box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 10%);
 }
 
 .error-code {
-    font-size: 6rem;
-    font-weight: 700;
-    color: var(--bs-primary);
-    margin: 0 0 1rem;
-    line-height: 1;
+  font-size: 6rem;
+  font-weight: 700;
+  color: var(--bs-primary);
+  margin: 0 0 1rem;
+  line-height: 1;
 }
 
 .error-title {
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--bs-heading-color);
-    margin-bottom: 1.5rem;
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--bs-heading-color);
+  margin-bottom: 1.5rem;
 }
 
 .error-message {
-    font-size: 1.1rem;
-    color: var(--bs-secondary-color);
-    margin-bottom: 2rem;
-    line-height: 1.6;
+  font-size: 1.1rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 2rem;
+  line-height: 1.6;
 }
 
 .error-actions {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    flex-wrap: wrap;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .error-actions .btn {
-    min-width: 150px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
+  min-width: 150px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 /* Dark mode support */
 
 [data-bs-theme="dark"] .error-content {
-    background-color: var(--bs-gray-900);
-    border: 1px solid var(--bs-gray-800);
+  background-color: var(--bs-gray-900);
+  border: 1px solid var(--bs-gray-800);
 }
 
 /* Responsive adjustments */
 
 @media (width <= 576px) {
+  .error-code {
+    font-size: 4.5rem;
+  }
 
-    .error-code {
-        font-size: 4.5rem;
-    }
+  .error-title {
+    font-size: 1.75rem;
+  }
 
-    .error-title {
-        font-size: 1.75rem;
-    }
+  .error-message {
+    font-size: 1rem;
+  }
 
-    .error-message {
-        font-size: 1rem;
-    }
+  .error-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
 
-    .error-actions {
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-
-    .error-actions .btn {
-        width: 100%;
-    }
+  .error-actions .btn {
+    width: 100%;
+  }
 }

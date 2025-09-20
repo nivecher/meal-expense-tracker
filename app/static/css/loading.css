@@ -5,51 +5,53 @@
 /* Loading Overlay */
 
 .loading-overlay {
-    position: fixed;
-    inset: 0;
-    background-color: rgb(255 255 255 / 85%);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    -webkit-backdrop-filter: blur(2px);
-    backdrop-filter: blur(2px);
-    transition: opacity 0.3s ease, visibility 0.3s ease;
+  position: fixed;
+  inset: 0;
+  background-color: rgb(255 255 255 / 85%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s ease;
 }
 
 /* Dark mode adjustments for loading overlay */
 
 @media (prefers-color-scheme: dark) {
+  .loading-overlay {
+    background-color: rgb(0 0 0 / 80%);
+  }
 
-    .loading-overlay {
-        background-color: rgb(0 0 0 / 80%);
-    }
-
-    .loading-overlay span {
-        color: #fff;
-    }
+  .loading-overlay span {
+    color: #fff;
+  }
 }
 
 /* Loading Spinner */
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-overlay .spinner-border {
-    width: 2rem;
-    height: 2rem;
-    border-width: 0.25rem;
-    animation: spin 0.75s linear infinite;
+  width: 2rem;
+  height: 2rem;
+  border-width: 0.25rem;
+  animation: spin 0.75s linear infinite;
 }
 
 /* Loading Text */
 
 .loading-overlay span {
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: var(--bs-body-color);
-    margin-left: 1rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--bs-body-color);
+  margin-left: 1rem;
 }
 
 /* Loading Skeletons */
@@ -57,269 +59,267 @@
 /* Base Skeleton Styles */
 
 .skeleton {
-    position: relative;
-    background-color: var(--gray-200);
-    overflow: hidden;
-    border-radius: 0.375rem;
+  position: relative;
+  background-color: var(--gray-200);
+  overflow: hidden;
+  border-radius: 0.375rem;
 }
 
 /* Skeleton Animation */
 
 @keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
 
-    0% {
-        transform: translateX(-100%);
-    }
-
-    100% {
-        transform: translateX(100%);
-    }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .skeleton::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-        90deg,
-        rgb(255 255 255 / 0%) 0%,
-        rgb(255 255 255 / 40%) 50%,
-        rgb(255 255 255 / 0%) 100%
-    );
-    animation: shimmer 1.5s infinite;
-    z-index: 1;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(255 255 255 / 0%) 0%, rgb(255 255 255 / 40%) 50%, rgb(255 255 255 / 0%) 100%);
+  animation: shimmer 1.5s infinite;
+  z-index: 1;
 }
 
 /* Dark mode adjustments */
 
 @media (prefers-color-scheme: dark) {
+  .skeleton {
+    background-color: var(--gray-700);
+  }
 
-    .skeleton {
-        background-color: var(--gray-700);
-    }
-
-    .skeleton::after {
-        background: linear-gradient(
-            90deg,
-            rgb(255 255 255 / 0%) 0%,
-            rgb(255 255 255 / 10%) 50%,
-            rgb(255 255 255 / 0%) 100%
-        );
-    }
+  .skeleton::after {
+    background: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0%) 0%,
+      rgb(255 255 255 / 10%) 50%,
+      rgb(255 255 255 / 0%) 100%
+    );
+  }
 }
 
 /* Skeleton Text */
 
 .skeleton-text {
-    width: 100%;
-    height: 1rem;
-    margin-bottom: 0.5rem;
-    border-radius: 0.25rem;
+  width: 100%;
+  height: 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.25rem;
 }
 
 .skeleton-text:last-child {
-    margin-bottom: 0;
-    width: 80%;
+  margin-bottom: 0;
+  width: 80%;
 }
 
 /* Skeleton Title */
 
 .skeleton-title {
-    width: 50%;
-    height: 1.5rem;
-    margin-bottom: 1rem;
-    border-radius: 0.25rem;
+  width: 50%;
+  height: 1.5rem;
+  margin-bottom: 1rem;
+  border-radius: 0.25rem;
 }
 
 /* Skeleton Avatar */
 
 .skeleton-avatar {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 50%;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
 }
 
 /* Skeleton Image */
 
 .skeleton-img {
-    width: 100%;
-    height: 0;
-    padding-bottom: 56.25%; /* 16:9 aspect ratio */
-    margin-bottom: 1rem;
-    border-radius: 0.5rem;
+  width: 100%;
+  height: 0;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
 }
 
 /* Skeleton Button */
 
 .skeleton-btn {
-    width: 100%;
-    height: 2.5rem;
-    border-radius: 0.375rem;
+  width: 100%;
+  height: 2.5rem;
+  border-radius: 0.375rem;
 }
 
 /* Skeleton Card */
 
 .skeleton-card {
-    padding: 1.5rem;
-    border-radius: 0.5rem;
-    background-color: var(--card-bg);
-    border: 1px solid var(--border-color);
-    margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  margin-bottom: 1.5rem;
 }
 
 /* Skeleton List */
 
 .skeleton-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .skeleton-list-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .skeleton-list-item:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 /* Skeleton Table */
 
 .skeleton-table {
-    width: 100%;
-    border-collapse: collapse;
+  width: 100%;
+  border-collapse: collapse;
 }
 
 .skeleton-table thead th {
-    padding: 0.75rem 1rem;
-    text-align: left;
-    border-bottom: 2px solid var(--border-color);
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 2px solid var(--border-color);
 }
 
 .skeleton-table tbody td {
-    padding: 1rem;
-    border-bottom: 1px solid var(--border-color);
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .skeleton-table .skeleton-text {
-    margin: 0;
+  margin: 0;
 }
 
 /* Skeleton Grid */
 
 .skeleton-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
 }
 
 /* Loading States */
 
 .loading {
-    position: relative;
-    pointer-events: none;
-    -webkit-user-select: none;
-    user-select: none;
+  position: relative;
+  pointer-events: none;
+  user-select: none;
 }
 
 .loading::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgb(255 255 255 / 70%);
-    z-index: 10;
-    border-radius: inherit;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(255 255 255 / 70%);
+  z-index: 10;
+  border-radius: inherit;
 }
 
 .loading::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 2rem;
-    height: 2rem;
-    margin: -1rem 0 0 -1rem;
-    border: 3px solid var(--accent-color);
-    border-radius: 50%;
-    border-top-color: transparent;
-    animation: spin 0.8s linear infinite;
-    z-index: 11;
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin: -1rem 0 0 -1rem;
+  border: 3px solid var(--accent-color);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+  z-index: 11;
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Dark mode adjustments for loading states */
 
 @media (prefers-color-scheme: dark) {
-
-    .loading::after {
-        background: rgb(15 23 42 / 70%);
-    }
+  .loading::after {
+    background: rgb(15 23 42 / 70%);
+  }
 }
 
 /* Pulse Animation */
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .animate-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 /* Skeleton Wrapper */
 
 .skeleton-wrapper {
-    position: relative;
-    overflow: hidden;
+  position: relative;
+  overflow: hidden;
 }
 
 /* Skeleton Content */
 
 .skeleton-content {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    padding: 1.5rem;
-    background: var(--card-bg);
-    border-radius: 0.5rem;
-    border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
 }
 
 /* Skeleton with Image */
 
 .skeleton-with-image {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .skeleton-with-image .skeleton-img {
-    margin-bottom: 0;
-    border-radius: 0.5rem 0.5rem 0 0;
+  margin-bottom: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
 }
 
 /* Responsive Adjustments */
 
 @media (width <= 767.98px) {
+  .skeleton-grid {
+    grid-template-columns: 1fr;
+  }
 
-    .skeleton-grid {
-        grid-template-columns: 1fr;
-    }
+  .skeleton-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 
-    .skeleton-list-item {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .skeleton-avatar {
-        margin-bottom: 0.5rem;
-    }
+  .skeleton-avatar {
+    margin-bottom: 0.5rem;
+  }
 }

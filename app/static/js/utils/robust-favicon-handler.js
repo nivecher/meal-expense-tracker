@@ -45,8 +45,50 @@ const problematicDomains = new Set([
   'square.site', // Square sites often have favicon issues
   'wix.com',
   'squarespace.com',
-  'weebly.com'
+  'weebly.com',
 ]);
+
+/**
+ * Handle favicon loading errors with fallback strategies
+ * @param {HTMLImageElement} imgElement - The image element that failed to load
+ * @param {Object} options - Configuration options
+ */
+export function handleFaviconError(imgElement, options = {}) {
+  const {
+    fallbackSelector = '.restaurant-fallback-icon',
+    hideImage = true,
+    showFallback = true,
+  } = options;
+
+  // Input validation - safety first
+  if (!imgElement || !(imgElement instanceof HTMLImageElement)) {
+    console.warn('Invalid image element provided to handleFaviconError');
+    return;
+  }
+
+  try {
+    // Hide the failed image
+    if (hideImage) {
+      imgElement.style.display = 'none';
+    }
+
+    // Find and show the fallback icon
+    if (showFallback) {
+      const container = imgElement.parentElement;
+      if (container) {
+        const fallbackIcon = container.querySelector(fallbackSelector);
+        if (fallbackIcon) {
+          fallbackIcon.style.display = 'inline-block';
+          fallbackIcon.classList.remove('d-none');
+        } else {
+          console.warn('Fallback icon not found for favicon error');
+        }
+      }
+    }
+  } catch {
+    console.warn('Error in handleFaviconError:', error);
+  }
+}
 
 /**
  * Extract clean domain from URL
@@ -70,7 +112,7 @@ function extractDomain(url) {
       return domain;
     }
     return '';
-  } catch (error) {
+  } catch {
     console.warn('Error extracting domain from URL:', url, error);
     return '';
   }
@@ -105,25 +147,25 @@ function extractRootDomain(domain) {
 function shouldSkipFaviconRequest(domain) {
   // Check if domain is in problematic domains list
   if (problematicDomains.has(domain)) {
-    console.log(`Domain "${domain}" found in problematic domains list`);
+    console.debug(`Domain "${domain}" found in problematic domains list`);
     return true;
   }
 
   // Check if root domain is in problematic domains list
   const rootDomain = extractRootDomain(domain);
   if (problematicDomains.has(rootDomain)) {
-    console.log(`Root domain "${rootDomain}" found in problematic domains list for "${domain}"`);
+    console.debug(`Root domain "${rootDomain}" found in problematic domains list for "${domain}"`);
     return true;
   }
 
   // Check if domain has consistently failed favicon requests
   const failedCount = failedDomainsCache.get(domain) || 0;
   if (failedCount >= 3) {
-    console.log(`Domain "${domain}" has failed ${failedCount} times, skipping`);
+    console.debug(`Domain "${domain}" has failed ${failedCount} times, skipping`);
     return true;
   }
 
-  console.log(`Domain "${domain}" (root: "${rootDomain}") is not problematic, proceeding with favicon request`);
+  console.debug(`Domain "${domain}" (root: "${rootDomain}") is not problematic, proceeding with favicon request`);
   return false;
 }
 
@@ -214,9 +256,9 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
   }
 
   // Smart skip: Check if domain should skip favicon requests
-  console.log(`Extracted domain: "${domain}" from URL: "${website}"`);
+  console.debug(`Extracted domain: "${domain}" from URL: "${website}"`);
   if (shouldSkipFaviconRequest(domain)) {
-    console.log(`Skipping favicon request for problematic domain: ${domain}`);
+    console.debug(`Skipping favicon request for problematic domain: ${domain}`);
     handleFaviconError(imgElement, { fallbackSelector, hideImage, showFallback });
     return;
   }
@@ -251,7 +293,7 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
           success = true;
           break;
         }
-      } catch (error) {
+      } catch {
         console.warn(`Favicon source ${source.name} failed for ${domain}:`, error);
       }
     }
@@ -268,67 +310,9 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
       handleFaviconError(imgElement, { fallbackSelector, hideImage, showFallback });
     }
 
-  } catch (error) {
+  } catch {
     console.error('Error loading favicon with fallback:', error);
     handleFaviconError(imgElement, { fallbackSelector, hideImage, showFallback });
-  }
-}
-
-/**
- * Handle favicon loading errors by showing fallback icon
- * @param {HTMLImageElement} imgElement - The failed image element
- * @param {Object} options - Configuration options
- */
-export function handleFaviconError(imgElement, options = {}) {
-  const {
-    fallbackSelector = '.restaurant-fallback-icon',
-    hideImage = true,
-    showFallback = true,
-  } = options;
-
-  // Input validation - safety first
-  if (!imgElement || !(imgElement instanceof HTMLImageElement)) {
-    console.warn('Invalid image element provided to handleFaviconError');
-    return;
-  }
-
-  try {
-    // Hide the failed image
-    if (hideImage) {
-      imgElement.style.display = 'none';
-    }
-
-    // Find and show the fallback icon
-    if (showFallback) {
-      const container = imgElement.parentElement;
-      if (container) {
-        const fallbackIcon = container.querySelector(fallbackSelector);
-        if (fallbackIcon) {
-          fallbackIcon.style.display = 'inline-block';
-          fallbackIcon.classList.remove('d-none');
-        } else {
-          // Try alternative selectors for different layouts
-          const alternativeSelectors = [
-            '.restaurant-fallback-icon-table',
-            '.restaurant-fallback-icon',
-            '.restaurant-fallback-icon-large',
-            'i.fa-utensils',
-          ];
-
-          for (const selector of alternativeSelectors) {
-            const altIcon = container.querySelector(selector);
-            if (altIcon) {
-              altIcon.style.display = 'inline-block';
-              altIcon.classList.remove('d-none');
-              break;
-            }
-          }
-        }
-      }
-    }
-
-  } catch (error) {
-    console.error('Error handling favicon fallback:', error);
   }
 }
 
@@ -345,7 +329,7 @@ export function handleFaviconLoad(imgElement) {
   try {
     // Show the image with smooth transition
     imgElement.style.opacity = '1';
-  } catch (error) {
+  } catch {
     console.error('Error handling favicon load:', error);
   }
 }
@@ -390,12 +374,12 @@ export function initializeRobustFaviconHandling(selector = '.restaurant-favicon'
         if (!favicon.onload) {
           favicon.onload = () => handleFaviconLoad(favicon);
         }
-      } catch (error) {
+      } catch {
         console.error(`Error initializing favicon ${index}:`, error);
       }
     });
 
-  } catch (error) {
+  } catch {
     console.error('Error initializing robust favicon handling:', error);
   }
 }
@@ -421,7 +405,7 @@ export function clearFailedDomainsCache() {
 export function getFailedDomainsCacheStats() {
   return {
     size: failedDomainsCache.size,
-    domains: Array.from(failedDomainsCache.entries())
+    domains: Array.from(failedDomainsCache.entries()),
   };
 }
 
@@ -439,7 +423,7 @@ export async function debugFaviconSources(domain) {
     domain,
     sources: [],
     workingSources: [],
-    failedSources: []
+    failedSources: [],
   };
 
   for (const source of FAVICON_SOURCES) {
@@ -455,7 +439,7 @@ export async function debugFaviconSources(domain) {
         url,
         success,
         duration,
-        timeout: source.timeout
+        timeout: source.timeout,
       };
 
       results.sources.push(result);
@@ -465,13 +449,13 @@ export async function debugFaviconSources(domain) {
       } else {
         results.failedSources.push(result);
       }
-    } catch (error) {
+    } catch {
       results.sources.push({
         name: source.name,
         url,
         success: false,
         error: error.message,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       });
       results.failedSources.push(source.name);
     }
@@ -489,7 +473,7 @@ export function getFaviconCacheStats() {
     totalEntries: faviconCache.size,
     successfulEntries: 0,
     failedEntries: 0,
-    entries: []
+    entries: [],
   };
 
   for (const [key, value] of faviconCache.entries()) {
@@ -502,7 +486,7 @@ export function getFaviconCacheStats() {
     stats.entries.push({
       key,
       success: value.success,
-      src: value.src
+      src: value.src,
     });
   }
 
@@ -515,7 +499,7 @@ export function getFaviconCacheStats() {
  */
 function suppressFaviconCORSErrors() {
   // Override the global error handler to catch CORS errors
-  window.addEventListener('error', function(event) {
+  window.addEventListener('error', (event) => {
     if (event.message && event.message.includes('CORS') &&
         (event.filename && event.filename.includes('favicon.ico'))) {
       event.preventDefault(); // Prevent the error from being logged
@@ -524,16 +508,16 @@ function suppressFaviconCORSErrors() {
   }, true);
 
   // Add a more aggressive error listener for network errors
-  window.addEventListener('error', function(event) {
+  window.addEventListener('error', (event) => {
     if (event.target && event.target.tagName === 'IMG' &&
         event.target.src && (
-          event.target.src.includes('t1.gstatic.com/faviconV2') ||
+      event.target.src.includes('t1.gstatic.com/faviconV2') ||
           event.target.src.includes('t2.gstatic.com/faviconV2') ||
           event.target.src.includes('favicon.ico') ||
           event.target.src.includes('google.com/s2/favicons') ||
           event.target.src.includes('favicons.githubusercontent.com') ||
           event.target.src.includes('logo.clearbit.com')
-        )) {
+    )) {
       event.preventDefault();
       event.stopPropagation();
       return false;
@@ -542,9 +526,9 @@ function suppressFaviconCORSErrors() {
 
   // Override the browser's native error logging for network requests
   const originalError = window.onerror;
-  window.onerror = function(message, source, lineno, colno, error) {
+  window.onerror = function(message, _source, _lineno, _colno, _error) {
     if (message && (
-        message.includes('t1.gstatic.com/faviconV2') ||
+      message.includes('t1.gstatic.com/faviconV2') ||
         message.includes('t2.gstatic.com/faviconV2') ||
         message.includes('favicon.ico') ||
         message.includes('CORS') ||
@@ -562,7 +546,7 @@ function suppressFaviconCORSErrors() {
   const originalUnhandledRejection = window.onunhandledrejection;
   window.onunhandledrejection = function(event) {
     if (event.reason && event.reason.message && (
-        event.reason.message.includes('t1.gstatic.com/faviconV2') ||
+      event.reason.message.includes('t1.gstatic.com/faviconV2') ||
         event.reason.message.includes('t2.gstatic.com/faviconV2') ||
         event.reason.message.includes('favicon.ico') ||
         event.reason.message.includes('404')
@@ -637,7 +621,7 @@ function suppressFaviconCORSErrors() {
     window.fetch = function(...args) {
       const url = args[0];
       if (typeof url === 'string' && (
-          url.includes('google.com/s2/favicons') ||
+        url.includes('google.com/s2/favicons') ||
           url.includes('t1.gstatic.com/faviconV2') ||
           url.includes('t2.gstatic.com/faviconV2') ||
           url.includes('favicons.githubusercontent.com') ||
@@ -645,7 +629,7 @@ function suppressFaviconCORSErrors() {
           url.includes('favicon.ico')
       )) {
         // Suppress network errors for favicon requests
-        return originalFetch.apply(this, args).catch(error => {
+        return originalFetch.apply(this, args).catch((error) => {
           // Don't log favicon fetch errors
           return Promise.reject(error);
         });
@@ -658,7 +642,7 @@ function suppressFaviconCORSErrors() {
   const originalXHROpen = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function(method, url, ...args) {
     if (typeof url === 'string' && (
-        url.includes('t1.gstatic.com/faviconV2') ||
+      url.includes('t1.gstatic.com/faviconV2') ||
         url.includes('t2.gstatic.com/faviconV2') ||
         url.includes('google.com/s2/favicons') ||
         url.includes('favicons.githubusercontent.com') ||
@@ -666,7 +650,7 @@ function suppressFaviconCORSErrors() {
         url.includes('favicon.ico')
     )) {
       // Suppress errors for favicon requests
-      this.addEventListener('error', function(event) {
+      this.addEventListener('error', (event) => {
         event.preventDefault();
         event.stopPropagation();
       });
@@ -684,7 +668,7 @@ document.addEventListener('DOMContentLoaded', () => {
   clearFaviconCache();
 
   // Log version for debugging
-  console.log('Robust Favicon Handler v3.1.0 loaded - Fixed Root Domain Detection for Subdomains');
+  console.debug('Robust Favicon Handler v3.1.0 loaded - Fixed Root Domain Detection for Subdomains');
 
   // Initialize favicon handling
   initializeRobustFaviconHandling('.restaurant-favicon');
@@ -698,7 +682,7 @@ window.RobustFaviconHandler = {
   handleLoad: handleFaviconLoad,
   initialize: initializeRobustFaviconHandling,
   clearCache: clearFaviconCache,
-  clearFailedDomainsCache: clearFailedDomainsCache,
+  clearFailedDomainsCache,
   getCacheStats: getFaviconCacheStats,
-  getFailedDomainsCacheStats: getFailedDomainsCacheStats,
+  getFailedDomainsCacheStats,
 };

@@ -1,19 +1,20 @@
 /* Unified Table System for Expenses and Restaurants */
 
 /* Base table sorting styles - works for both expense-table and restaurant-table */
+
 .table th[data-sort="true"] {
-    position: relative;
-    cursor: pointer;
-    -webkit-user-select: none;
-    user-select: none;
-    vertical-align: bottom;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  vertical-align: bottom;
 }
 
 .table th[data-sort="true"]:hover {
-    background-color: #e9ecef;
+  background-color: #e9ecef;
 }
 
 /* Simple sort arrows - disabled, using JavaScript arrows instead */
+
 /* .table th.sort-asc::after {
     content: " ↑";
     color: #007bff;
@@ -26,52 +27,115 @@
     color: #007bff;
     font-weight: bold;
     margin-left: 5px;
-} */ */
+} */
 
 /* Standard column widths - responsive */
-.table th:nth-child(1), .table td:nth-child(1) { min-width: 120px; width: 120px; }
-.table th:nth-child(2), .table td:nth-child(2) { min-width: 180px; width: 180px; }
-.table th:nth-child(3), .table td:nth-child(3) { min-width: 100px; width: 100px; }
-.table th:nth-child(4), .table td:nth-child(4) { min-width: 100px; width: 100px; }
-.table th:nth-child(5), .table td:nth-child(5) { min-width: 80px; width: 80px; }
-.table th:nth-child(6), .table td:nth-child(6) { min-width: 100px; width: 100px; }
-.table th:nth-child(7), .table td:nth-child(7) { min-width: 100px; width: 100px; }
-.table th:nth-child(8), .table td:nth-child(8) { min-width: 120px; width: 120px; }
+.table th:nth-child(1),
+.table td:nth-child(1) {
+  min-width: 120px;
+  width: 120px;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2) {
+  min-width: 180px;
+  width: 180px;
+}
+
+.table th:nth-child(3),
+.table td:nth-child(3) {
+  min-width: 100px;
+  width: 100px;
+}
+
+.table th:nth-child(4),
+.table td:nth-child(4) {
+  min-width: 100px;
+  width: 100px;
+}
+
+.table th:nth-child(5),
+.table td:nth-child(5) {
+  min-width: 80px;
+  width: 80px;
+}
+
+.table th:nth-child(6),
+.table td:nth-child(6) {
+  min-width: 100px;
+  width: 100px;
+}
+
+.table th:nth-child(7),
+.table td:nth-child(7) {
+  min-width: 100px;
+  width: 100px;
+}
+
+.table th:nth-child(8),
+.table td:nth-child(8) {
+  min-width: 120px;
+  width: 120px;
+}
 
 /* Right-aligned columns */
-.table th.text-end, .table td.text-end {
-    text-align: right;
+
+.table th.text-end,
+.table td.text-end {
+  text-align: right;
 }
 
 /* Center-aligned columns */
-.table th.text-center, .table td.text-center {
-    text-align: center;
+
+.table th.text-center,
+.table td.text-center {
+  text-align: center;
 }
 
 /* Compact table styling */
-.table td, .table th {
-    padding: 0.5rem 0.75rem;
-    vertical-align: bottom;
+
+.table td,
+.table th {
+  padding: 0.5rem 0.75rem;
+  vertical-align: bottom;
 }
 
 /* Action buttons */
+
 .table .btn-group .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    line-height: 1.2;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
 }
 
 /* Amount formatting */
+
 .amount-right {
-    text-align: right !important;
-    font-family: 'Courier New', monospace;
-    font-weight: 600;
+  text-align: right !important;
+  font-family: "Courier New", monospace;
+  font-weight: 600;
 }
 
 /* Responsive adjustments */
 @media (width <= 768px) {
-    .table th:nth-child(1), .table td:nth-child(1) { min-width: 80px; width: 80px; }
-    .table th:nth-child(2), .table td:nth-child(2) { min-width: 140px; width: 140px; }
-    .table .btn-group .btn span { display: none; }
-    .table .btn-group .btn { padding: 0.25rem; min-width: 32px; }
+  .table th:nth-child(1),
+  .table td:nth-child(1) {
+    min-width: 80px;
+    width: 80px;
+  }
+
+  .table th:nth-child(2),
+  .table td:nth-child(2) {
+    min-width: 140px;
+    width: 140px;
+  }
+
+  .table .btn-group .btn span {
+    display: none;
+  }
+
+  .table .btn-group .btn {
+    padding: 0.25rem;
+    min-width: 32px;
+  }
 }

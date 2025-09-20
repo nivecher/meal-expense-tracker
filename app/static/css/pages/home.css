@@ -1,68 +1,69 @@
 /* Home page specific styles */
+
 .hero {
-    padding: 4rem 0;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 0 0 1rem 1rem;
-    margin-bottom: 2rem;
+  padding: 4rem 0;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 0 0 1rem 1rem;
+  margin-bottom: 2rem;
 }
 
 .hero h1 {
-    font-weight: 700;
-    margin-bottom: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
 }
 
 .hero p.lead {
-    font-size: 1.25rem;
-    color: #495057;
-    max-width: 700px;
-    margin: 0 auto 2rem;
+  font-size: 1.25rem;
+  color: #495057;
+  max-width: 700px;
+  margin: 0 auto 2rem;
 }
 
 .features {
-    padding: 3rem 0;
+  padding: 3rem 0;
 }
 
 .feature-card {
-    padding: 2rem;
-    border-radius: 8px;
-    height: 100%;
-    transition: transform 0.3s ease;
-    background-color: white;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 2rem;
+  border-radius: 8px;
+  height: 100%;
+  transition: transform 0.3s ease;
+  background-color: #fff;
+  border: 1px solid rgb(0 0 0 / 5%);
 }
 
 .feature-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgb(0 0 0 / 10%);
 }
 
 .feature-icon {
-    font-size: 2.5rem;
-    color: var(--primary-color);
-    margin-bottom: 1.5rem;
+  font-size: 2.5rem;
+  color: var(--primary-color);
+  margin-bottom: 1.5rem;
 }
 
 .feature-card h3 {
-    margin-bottom: 1rem;
-    font-weight: 600;
+  margin-bottom: 1rem;
+  font-weight: 600;
 }
 
 /* Responsive adjustments */
-@media (max-width: 768px) {
-    .hero {
-        padding: 3rem 0;
-        text-align: center;
-    }
+@media (width <= 768px) {
+  .hero {
+    padding: 3rem 0;
+    text-align: center;
+  }
 
-    .hero h1 {
-        font-size: 2rem;
-    }
+  .hero h1 {
+    font-size: 2rem;
+  }
 
-    .hero p.lead {
-        font-size: 1.1rem;
-    }
+  .hero p.lead {
+    font-size: 1.1rem;
+  }
 
-    .feature-card {
-        margin-bottom: 1.5rem;
-    }
+  .feature-card {
+    margin-bottom: 1.5rem;
+  }
 }
