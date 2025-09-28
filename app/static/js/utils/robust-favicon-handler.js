@@ -9,19 +9,20 @@
 
 /**
  * Configuration for favicon sources with fallback priority
+ * Uses reliable services without the problematic Google faviconV2
  */
 const FAVICON_SOURCES = [
   {
-    name: 'google_v2',
-    url: (domain) => `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=32`,
-    timeout: 3000,
-    quality: 'high', // Latest Google favicon API, most stable and reliable
+    name: 'direct-favicon',
+    url: (domain) => `https://${domain}/favicon.ico`,
+    timeout: 2000,
+    quality: 'high', // Direct from website, most accurate
   },
   {
     name: 'google_legacy',
     url: (domain) => `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
     timeout: 3000,
-    quality: 'high', // Fallback to legacy Google service
+    quality: 'high', // Reliable legacy Google service
   },
   {
     name: 'duckduckgo',
@@ -30,10 +31,10 @@ const FAVICON_SOURCES = [
     quality: 'high', // Very stable, excellent coverage
   },
   {
-    name: 'favicon.io',
-    url: (domain) => `https://favicons.githubusercontent.com/${domain}`,
+    name: 'getfavicon',
+    url: (domain) => `https://www.getfavicon.org/?url=https://${domain}`,
     timeout: 3000,
-    quality: 'medium', // Stable GitHub-hosted service
+    quality: 'medium', // Alternative service
   },
 ];
 
@@ -42,6 +43,41 @@ const FAVICON_SOURCES = [
  * Uses Map instead of localStorage to avoid tracking prevention issues
  */
 const faviconCache = new Map();
+
+/**
+ * Try to load favicon from our backend service (highest priority)
+ * @param {string} website - The restaurant website URL
+ * @returns {Promise<string|null>} - Base64 favicon data URL or null
+ */
+async function tryBackendFaviconService(website) {
+  try {
+    const response = await fetch(`/api/v1/restaurants/favicon?url=${encodeURIComponent(website)}`, {
+      method: 'GET',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'same-origin', // Include cookies for authentication
+      signal: AbortSignal.timeout(5000), // 5 second timeout
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (data.status === 'success' && data.data && data.data.favicon_url) {
+      return data.data.favicon_url;
+    }
+
+    return null;
+
+  } catch (error) {
+    console.warn('Backend favicon service failed:', error.message);
+    return null;
+  }
+}
 
 // Cache for domains that consistently fail favicon requests
 const failedDomainsCache = new Map();
@@ -493,6 +529,16 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
   }
 
   try {
+    // First try our backend favicon service (highest priority)
+    const backendFavicon = await tryBackendFaviconService(website);
+    if (backendFavicon) {
+      imgElement.src = backendFavicon;
+      imgElement.style.opacity = '1';
+      // Cache successful result
+      faviconCache.set(cacheKey, { success: true, src: backendFavicon });
+      return;
+    }
+
     // Get specialized sources for this domain type
     const sources = getSpecializedFaviconSources(domain);
 

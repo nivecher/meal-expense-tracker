@@ -164,19 +164,35 @@ class FaviconService:
 
             soup = BeautifulSoup(response.content, "html.parser")
 
-            # Look for various favicon link tags
+            # Look for various favicon link tags in standards-compliant order
             favicon_selectors = [
+                # HTML5 standard (highest priority)
                 'link[rel="icon"]',
+                # Legacy support
                 'link[rel="shortcut icon"]',
+                # Apple-specific (for mobile devices)
                 'link[rel="apple-touch-icon"]',
                 'link[rel="apple-touch-icon-precomposed"]',
+                # PWA manifest icons
+                'link[rel="manifest"]',
             ]
 
             for selector in favicon_selectors:
                 favicon_links = soup.select(selector)
-                for link in favicon_links:
+
+                # Sort links by preference (size, format, etc.)
+                preferred_links = self._sort_favicon_links_by_preference(favicon_links)
+
+                for link in preferred_links:
                     href = link.get("href")
                     if href:
+                        # Handle manifest files differently
+                        if link.get("rel") == "manifest":
+                            manifest_favicon = self._get_favicon_from_manifest(urljoin(website_url, href))
+                            if manifest_favicon:
+                                return manifest_favicon
+                            continue
+
                         # Convert relative URL to absolute
                         favicon_url = urljoin(website_url, href)
                         favicon_data = self._download_favicon(favicon_url)
@@ -185,6 +201,59 @@ class FaviconService:
 
         except Exception as error:
             logger.warning(f"Error parsing HTML for favicon: {error}")
+
+        return None
+
+    def _sort_favicon_links_by_preference(self, links):
+        """Sort favicon links by preference according to web standards"""
+
+        def get_priority(link):
+            """Calculate priority score for favicon link"""
+            score = 0
+
+            # Prefer modern formats
+            icon_type = link.get("type", "")
+            if "svg" in icon_type:
+                score += 30  # SVG is scalable and modern
+            elif "png" in icon_type:
+                score += 20  # PNG has good quality
+            elif "ico" in icon_type or not icon_type:
+                score += 10  # ICO is standard but older
+
+            # Prefer appropriate sizes (32x32 is good for general use)
+            sizes = link.get("sizes", "")
+            if "32x32" in sizes:
+                score += 15
+            elif "16x16" in sizes:
+                score += 10
+            elif "48x48" in sizes or "64x64" in sizes:
+                score += 12
+            elif sizes == "any":  # SVG with any size
+                score += 25
+
+            return score
+
+        return sorted(links, key=get_priority, reverse=True)
+
+    def _get_favicon_from_manifest(self, manifest_url: str) -> Optional[str]:
+        """Extract favicon from PWA manifest file"""
+        try:
+            response = requests.get(manifest_url, timeout=self.timeout)
+            response.raise_for_status()
+
+            manifest = response.json()
+            icons = manifest.get("icons", [])
+
+            # Find best icon from manifest
+            for icon in icons:
+                if "src" in icon:
+                    icon_url = urljoin(manifest_url, icon["src"])
+                    favicon_data = self._download_favicon(icon_url)
+                    if favicon_data:
+                        return favicon_data
+
+        except Exception as error:
+            logger.warning(f"Error parsing manifest for favicon: {error}")
 
         return None
 
