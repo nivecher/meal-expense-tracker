@@ -100,9 +100,13 @@ help:  ## Show this help message
 	@echo "  \033[1mmake ci-local\033[0m        Run local CI workflow (equivalent to ci.yml)"
 	@echo "  \033[1mmake ci-quick\033[0m        Run quick CI checks (lint + unit tests)"
 	@echo "  \033[1mmake pipeline-local\033[0m  Run local pipeline workflow (equivalent to deploy.yml)"
-	@echo "  \033[1mmake act-ci\033[0m          Run CI workflow using act"
-	@echo "  \033[1mmake act-deploy\033[0m      Run deploy workflow using act"
-	@echo "  \033[1mmake act-release\033[0m     Run release workflow using act"
+	@echo "  \033[1mmake act-setup\033[0m       Setup act configuration files"
+	@echo "  \033[1mmake act-ci\033[0m          Run complete CI workflow"
+	@echo "  \033[1mmake act-pipeline\033[0m    Run complete pipeline workflow"
+	@echo "  \033[1mmake act-lint\033[0m        Run linting job only"
+	@echo "  \033[1mmake act-test\033[0m        Run test jobs only"
+	@echo "  \033[1mmake act-security\033[0m    Run security scan only"
+	@echo "  \033[1mmake act-help\033[0m        Show all act commands and examples"
 
 	@echo "\n\033[1mDatabase:\033[0m"
 	@echo "  \033[1mmake db-init\033[0m         Initialize database"
@@ -517,40 +521,198 @@ pipeline-local: check-env
 	@echo "\n\033[1m=== Running Local Deploy Workflow ===\033[0m"
 	@./scripts/local-pipeline.sh $(ENV) $(SKIP_TESTS)
 
-## Run CI workflow using act
-.PHONY: act-ci
-act-ci: check-act
-	@echo "\n\033[1m=== Running CI Workflow with act ===\033[0m"
-	@act -W .github/workflows/ci.yml --secret-file .env.local
-
-## Run deploy workflow using act
-.PHONY: act-deploy
-act-deploy: check-act
-	@echo "\n\033[1m=== Running Deploy Workflow with act ===\033[0m"
-	@act -W .github/workflows/deploy.yml --secret-file .env.local --input environment=$(ENV) --input skip_tests=$(SKIP_TESTS)
-
-## Run release workflow using act
-.PHONY: act-release
-act-release: check-act
-	@echo "\n\033[1m=== Running Release Workflow with act ===\033[0m"
-	@act -W .github/workflows/release.yml --secret-file .env.local --input environment=$(ENV) --input tag=$(TAG)
+# Act Configuration
+ACT_PLATFORM ?= ubuntu-latest=catthehacker/ubuntu:act-latest
+ACT_SECRET_FILE ?= .secrets
+ACT_ENV_FILE ?= .env.act
+ACT_ARTIFACT_SERVER_PATH ?= /tmp/artifacts
 
 ## Check if act is installed
 .PHONY: check-act
 check-act:
-	@if command -v act >/dev/null 2>&1; then \
-		echo "\033[1;32m✅ act is available\033[0m"; \
-	elif [ -f "$$HOME/.local/bin/act" ]; then \
-		echo "\033[1;33m⚠️  act found in ~/.local/bin but not in PATH\033[0m"; \
-		echo "\033[1;33m   Run: export PATH=\"$$HOME/.local/bin:$$PATH\"\033[0m"; \
-		echo "\033[1;33m   Or restart your shell\033[0m"; \
-		exit 1; \
-	else \
-		echo "\033[1;31m❌ act not found. Install with:\033[0m"; \
-		echo "\033[1;31m   curl https://raw.githubusercontent.com/nektos/act/master/install.sh | bash -s -- -b ~/.local/bin\033[0m"; \
-		echo "\033[1;31m   export PATH=\"$$HOME/.local/bin:$$PATH\"\033[0m"; \
+	@if ! command -v act >/dev/null 2>&1; then \
+		echo "\033[1;31m❌ act is not installed\033[0m"; \
+		echo "\033[1;36mℹ️  Install act for local GitHub Actions testing:\033[0m"; \
+		echo "  • macOS: brew install act"; \
+		echo "  • Linux: curl -s https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash"; \
+		echo "  • Windows: choco install act-cli"; \
+		echo "  • Or download from: https://github.com/nektos/act/releases"; \
 		exit 1; \
 	fi
+	@echo "\033[1;32m✅ act is installed: $(shell act --version)\033[0m"
+
+## Setup act configuration files
+.PHONY: act-setup
+act-setup: check-act
+	@echo "\033[1m🔧 Setting up act configuration...\033[0m"
+	@if [ ! -f ".actrc" ]; then \
+		echo "Creating .actrc configuration..."; \
+		echo "-P $(ACT_PLATFORM)" > .actrc; \
+		echo "--artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)" >> .actrc; \
+		if [ -f "$(ACT_SECRET_FILE)" ]; then \
+			echo "--secret-file $(ACT_SECRET_FILE)" >> .actrc; \
+		fi; \
+		if [ -f "$(ACT_ENV_FILE)" ]; then \
+			echo "--env-file $(ACT_ENV_FILE)" >> .actrc; \
+		fi; \
+		echo "\033[1;32m✅ Created .actrc configuration\033[0m"; \
+	else \
+		echo "\033[1;33m⚠️  .actrc already exists\033[0m"; \
+	fi
+	@if [ ! -f "$(ACT_ENV_FILE)" ]; then \
+		echo "Creating sample .env.act file..."; \
+		echo "# Environment variables for act" > $(ACT_ENV_FILE); \
+		echo "PYTHON_VERSION=3.13" >> $(ACT_ENV_FILE); \
+		echo "NODE_VERSION=20" >> $(ACT_ENV_FILE); \
+		echo "PYTHONPATH=/github/workspace" >> $(ACT_ENV_FILE); \
+		echo "FLASK_ENV=test" >> $(ACT_ENV_FILE); \
+		echo "TESTING=true" >> $(ACT_ENV_FILE); \
+		echo "\033[1;32m✅ Created $(ACT_ENV_FILE) sample file\033[0m"; \
+	fi
+	@echo "\033[1;36mℹ️  Edit $(ACT_ENV_FILE) and $(ACT_SECRET_FILE) as needed\033[0m"
+
+## Run CI workflow locally
+.PHONY: act-ci
+act-ci: check-act
+	@echo "\033[1m🚀 Running CI workflow locally with act...\033[0m"
+	act -W .github/workflows/ci.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+
+## Run pipeline workflow locally
+.PHONY: act-pipeline
+act-pipeline: check-act
+	@echo "\033[1m🚀 Running pipeline workflow locally with act...\033[0m"
+	act -W .github/workflows/pipeline.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+
+## Run lint job locally
+.PHONY: act-lint
+act-lint: check-act
+	@echo "\033[1m🔍 Running lint job locally with act...\033[0m"
+	act -W .github/workflows/ci.yml -j lint --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+
+## Run test jobs locally
+.PHONY: act-test
+act-test: check-act
+	@echo "\033[1m🧪 Running test jobs locally with act...\033[0m"
+	act -W .github/workflows/ci.yml -j test --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+
+## Run security scan locally
+.PHONY: act-security
+act-security: check-act
+	@echo "\033[1m🔒 Running security scan locally with act...\033[0m"
+	act -W .github/workflows/ci.yml -j security --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+
+## Run quality gate locally
+.PHONY: act-quality-gate
+act-quality-gate: check-act
+	@echo "\033[1m✅ Running quality gate locally with act...\033[0m"
+	act -W .github/workflows/pipeline.yml -j quality-gate --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+
+## Run terraform validation locally
+.PHONY: act-terraform
+act-terraform: check-act
+	@echo "\033[1m🏗️  Running terraform validation locally with act...\033[0m"
+	act -W .github/workflows/ci.yml -j terraform --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+
+## List available workflows and jobs
+.PHONY: act-list
+act-list: check-act
+	@echo "\033[1m📋 Available workflows and jobs:\033[0m"
+	@echo "\n\033[1mCI Workflow (.github/workflows/ci.yml):\033[0m"
+	act -W .github/workflows/ci.yml --list
+	@echo "\n\033[1mPipeline Workflow (.github/workflows/pipeline.yml):\033[0m"
+	act -W .github/workflows/pipeline.yml --list
+
+## Run specific workflow with custom event
+.PHONY: act-run
+act-run: check-act
+	@if [ -z "$(WORKFLOW)" ]; then \
+		echo "\033[1;31m❌ WORKFLOW is required\033[0m"; \
+		echo "Usage: make act-run WORKFLOW=ci [JOB=lint] [EVENT=push]"; \
+		echo "Examples:"; \
+		echo "  make act-run WORKFLOW=ci"; \
+		echo "  make act-run WORKFLOW=ci JOB=lint"; \
+		echo "  make act-run WORKFLOW=pipeline EVENT=workflow_dispatch"; \
+		exit 1; \
+	fi
+	@echo "\033[1m🚀 Running workflow $(WORKFLOW) locally...\033[0m"
+	@if [ -n "$(JOB)" ]; then \
+		act $(or $(EVENT),push) -W .github/workflows/$(WORKFLOW).yml -j $(JOB) --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH); \
+	else \
+		act $(or $(EVENT),push) -W .github/workflows/$(WORKFLOW).yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH); \
+	fi
+
+## Run act with pull request event
+.PHONY: act-pr
+act-pr: check-act
+	@echo "\033[1m🔄 Running workflows for pull_request event...\033[0m"
+	act pull_request -W .github/workflows/ci.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+
+## Run act with workflow_dispatch event
+.PHONY: act-dispatch
+act-dispatch: check-act
+	@echo "\033[1m⚡ Running workflows for workflow_dispatch event...\033[0m"
+	act workflow_dispatch -W .github/workflows/pipeline.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+
+## Dry run workflows (plan only)
+.PHONY: act-plan
+act-plan: check-act
+	@echo "\033[1m📋 Planning workflow execution (dry run)...\033[0m"
+	@if [ -n "$(WORKFLOW)" ]; then \
+		act -W .github/workflows/$(WORKFLOW).yml --dryrun; \
+	else \
+		echo "Planning CI workflow:"; \
+		act -W .github/workflows/ci.yml --dryrun; \
+		echo "\nPlanning Pipeline workflow:"; \
+		act -W .github/workflows/pipeline.yml --dryrun; \
+	fi
+
+## Clean act artifacts and containers
+.PHONY: act-clean
+act-clean:
+	@echo "\033[1m🧹 Cleaning act artifacts and containers...\033[0m"
+	@rm -rf $(ACT_ARTIFACT_SERVER_PATH) 2>/dev/null || true
+	@docker container prune -f --filter label=act 2>/dev/null || true
+	@docker image prune -f --filter label=act 2>/dev/null || true
+	@echo "\033[1;32m✅ Act cleanup completed\033[0m"
+
+## Show act help and examples
+.PHONY: act-help
+act-help: check-act
+	@echo "\033[1m🎯 Act Local Testing - Available Commands\033[0m"
+	@echo ""
+	@echo "\033[1mSetup:\033[0m"
+	@echo "  \033[1mmake act-setup\033[0m          Setup act configuration files"
+	@echo "  \033[1mmake check-act\033[0m          Verify act installation"
+	@echo ""
+	@echo "\033[1mWorkflow Testing:\033[0m"
+	@echo "  \033[1mmake act-ci\033[0m             Run complete CI workflow"
+	@echo "  \033[1mmake act-pipeline\033[0m       Run complete pipeline workflow"
+	@echo "  \033[1mmake act-lint\033[0m           Run linting job only"
+	@echo "  \033[1mmake act-test\033[0m           Run test jobs only"
+	@echo "  \033[1mmake act-security\033[0m       Run security scan only"
+	@echo "  \033[1mmake act-quality-gate\033[0m   Run quality gate only"
+	@echo "  \033[1mmake act-terraform\033[0m      Run terraform validation only"
+	@echo ""
+	@echo "\033[1mAdvanced Usage:\033[0m"
+	@echo "  \033[1mmake act-run WORKFLOW=ci JOB=lint\033[0m          Run specific job"
+	@echo "  \033[1mmake act-pr\033[0m                                Run for PR event"
+	@echo "  \033[1mmake act-dispatch\033[0m                          Run workflow_dispatch"
+	@echo "  \033[1mmake act-plan\033[0m                              Dry run (plan only)"
+	@echo "  \033[1mmake act-list\033[0m                              List all workflows/jobs"
+	@echo ""
+	@echo "\033[1mUtilities:\033[0m"
+	@echo "  \033[1mmake act-clean\033[0m          Clean artifacts and containers"
+	@echo "  \033[1mmake act-help\033[0m           Show this help"
+	@echo ""
+	@echo "\033[1mExamples:\033[0m"
+	@echo "  \033[1mmake act-setup && make act-lint\033[0m                    # Setup and run linting"
+	@echo "  \033[1mmake act-run WORKFLOW=ci JOB=test EVENT=pull_request\033[0m # Run tests for PR"
+	@echo "  \033[1mmake act-plan WORKFLOW=pipeline\033[0m                     # Plan pipeline execution"
+	@echo ""
+	@echo "\033[1mConfiguration Files:\033[0m"
+	@echo "  \033[1m.actrc\033[0m                  Act configuration file"
+	@echo "  \033[1m.env.act\033[0m               Environment variables for act"
+	@echo "  \033[1m.secrets\033[0m               Secrets file (create manually if needed)"
 
 ## Run unit tests only
 .PHONY: test-unit
