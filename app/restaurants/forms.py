@@ -38,11 +38,12 @@ class RestaurantForm(FlaskForm):
         ],
         validators=[DataRequired()],
     )
+    located_within = StringField("Location Within", validators=[Optional(), Length(max=100)])
     description = TextAreaField("Description", validators=[Optional(), Length(max=500)])
 
     # Contact Information
-    address = StringField("Address Line 1", validators=[Optional(), Length(max=255)])
-    address2 = StringField("Address Line 2", validators=[Optional(), Length(max=255)])
+    address_line_1 = StringField("Address Line 1", validators=[Optional(), Length(max=255)])
+    address_line_2 = StringField("Address Line 2", validators=[Optional(), Length(max=255)])
     city = StringField("City", validators=[Optional(), Length(max=100)])
     state = StringField("State/Province", validators=[Optional(), Length(max=100)])
     postal_code = StringField("Postal Code", validators=[Optional(), Length(max=20)])

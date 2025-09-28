@@ -34,6 +34,23 @@
                        required>
                 {% if form.date.errors %}<div class="invalid-feedback">{{ form.date.errors[0] }}</div>{% endif %}
             </div>
+            <div class="col-md-6">
+                {{ form.time.label(class="form-label") }}
+                {% set default_time = form.time.data.strftime('%H:%M') if form.time.data else '' %}
+                <input type="time"
+                       id="{{ form.time.id }}"
+                       name="{{ form.time.name }}"
+                       class="form-control{{ ' is-invalid' if form.time.errors else '' }}"
+                       value="{{ default_time }}"
+                       placeholder="Optional time (e.g., 14:30)">
+                {% if form.time.errors %}<div class="invalid-feedback">{{ form.time.errors[0] }}</div>{% endif %}
+                <div class="form-text">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Optional time in 24-hour format. If not specified, defaults to noon in your timezone.
+                    </small>
+                </div>
+            </div>
         </div>
         <div class="row mb-3">
             <div class="col-md-6">
@@ -142,8 +159,7 @@
     </form>
 {% endmacro %}
 {% macro expense_scripts() %}
-    <!-- Extension Error Suppressor - MUST LOAD FIRST -->
-    <script src="{{ url_for('static', filename='js/extension-error-suppressor.js') }}"></script>
+    <!-- Unified Error Handler already loaded in base template -->
 
     <!-- Tagify CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.17.9/dist/tagify.css">

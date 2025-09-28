@@ -3,7 +3,7 @@
  * Handles favicon loading with multiple fallback strategies
  * Following TIGER principles: Safety, Performance, Developer Experience
  *
- * Version: 3.1.0 - Fixed Root Domain Detection for Subdomains
+ * Version: 3.6.0 - Modern Google Favicon V2 API & Enhanced Stability
  * Last Updated: 2024-01-XX
  */
 
@@ -12,22 +12,28 @@
  */
 const FAVICON_SOURCES = [
   {
+    name: 'google_v2',
+    url: (domain) => `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=32`,
+    timeout: 3000,
+    quality: 'high', // Latest Google favicon API, most stable and reliable
+  },
+  {
     name: 'google_legacy',
     url: (domain) => `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
     timeout: 3000,
-    quality: 'high', // Most reliable and widely supported
+    quality: 'high', // Fallback to legacy Google service
+  },
+  {
+    name: 'duckduckgo',
+    url: (domain) => `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+    timeout: 3000,
+    quality: 'high', // Very stable, excellent coverage
   },
   {
     name: 'favicon.io',
     url: (domain) => `https://favicons.githubusercontent.com/${domain}`,
     timeout: 3000,
-    quality: 'medium', // GitHub-hosted favicons, good coverage
-  },
-  {
-    name: 'clearbit',
-    url: (domain) => `https://logo.clearbit.com/${domain}`,
-    timeout: 3000,
-    quality: 'medium', // Good quality but less reliable coverage
+    quality: 'medium', // Stable GitHub-hosted service
   },
 ];
 
@@ -42,11 +48,177 @@ const failedDomainsCache = new Map();
 
 // Known problematic domains that should skip favicon requests
 const problematicDomains = new Set([
-  'square.site', // Square sites often have favicon issues
+  // Removed 'square.site' - now allowing Square sites to load favicons
   'wix.com',
   'squarespace.com',
   'weebly.com',
 ]);
+
+/**
+ * Create a fallback icon element when none exists
+ * @param {HTMLElement} container - The container to add the fallback icon to
+ * @returns {HTMLElement|null} - The created fallback icon element
+ */
+function createFallbackIcon(container) {
+  if (!container) return null;
+
+  try {
+    // Create fallback icon element
+    const fallbackIcon = document.createElement('i');
+    fallbackIcon.className = 'fas fa-utensils text-primary restaurant-fallback-icon';
+    fallbackIcon.style.display = 'inline-block';
+    fallbackIcon.style.opacity = '1';
+
+    // Determine appropriate size based on container context
+    const containerClasses = container.className;
+    if (containerClasses.includes('table') || containerClasses.includes('small')) {
+      fallbackIcon.style.fontSize = '16px';
+      fallbackIcon.classList.add('restaurant-fallback-icon-table');
+    } else if (containerClasses.includes('large') || containerClasses.includes('detail')) {
+      fallbackIcon.style.fontSize = '32px';
+      fallbackIcon.classList.add('restaurant-fallback-icon-large');
+    } else if (containerClasses.includes('dashboard')) {
+      fallbackIcon.style.fontSize = '24px';
+      fallbackIcon.classList.add('restaurant-fallback-icon-dashboard');
+    } else {
+      fallbackIcon.style.fontSize = '20px';
+    }
+
+    // Add the fallback icon to the container
+    container.appendChild(fallbackIcon);
+
+    // Debug logging only in debug mode
+    if (window.location.search.includes('debug=favicon')) {
+      console.debug('Created fallback icon:', fallbackIcon);
+    }
+
+    return fallbackIcon;
+  } catch (error) {
+    console.warn('Error creating fallback icon:', error);
+    return null;
+  }
+}
+
+/**
+ * Find or create a fallback icon using multiple strategies
+ * @param {HTMLImageElement} imgElement - The image element
+ * @param {string} fallbackSelector - The fallback selector
+ * @returns {HTMLElement|null} - The found or created fallback icon
+ */
+function findOrCreateFallbackIcon(imgElement, fallbackSelector) {
+  let fallbackIcon = null;
+
+  // Strategy 1: Look for sibling fallback icon (most common case)
+  fallbackIcon = imgElement.parentElement?.querySelector(fallbackSelector);
+  if (fallbackIcon) return fallbackIcon;
+
+  // Strategy 2: Look for fallback icon as next sibling
+  fallbackIcon = imgElement.nextElementSibling;
+  if (fallbackIcon && fallbackIcon.classList.contains('restaurant-fallback-icon')) {
+    return fallbackIcon;
+  }
+
+  // Strategy 3: Look for fallback icon as previous sibling
+  fallbackIcon = imgElement.previousElementSibling;
+  if (fallbackIcon && fallbackIcon.classList.contains('restaurant-fallback-icon')) {
+    return fallbackIcon;
+  }
+
+  // Strategy 4: Look in parent container with more specific selectors
+  if (imgElement.parentElement) {
+    const container = imgElement.parentElement;
+    const selectors = [
+      '.restaurant-fallback-icon',
+      '.restaurant-fallback-icon-table',
+      '.restaurant-fallback-icon-large',
+      '.restaurant-fallback-icon-dashboard',
+    ];
+
+    for (const selector of selectors) {
+      fallbackIcon = container.querySelector(selector);
+      if (fallbackIcon) return fallbackIcon;
+    }
+  }
+
+  // Strategy 5: Create fallback icon if none exists
+  if (imgElement.parentElement) {
+    return createFallbackIcon(imgElement.parentElement);
+  }
+
+  return null;
+}
+
+/**
+ * Show a fallback icon with proper styling
+ * @param {HTMLElement} fallbackIcon - The fallback icon element
+ */
+function showFallbackIcon(fallbackIcon) {
+  fallbackIcon.style.display = 'inline-block';
+  fallbackIcon.classList.remove('d-none');
+  fallbackIcon.style.opacity = '1';
+
+  // Debug logging only in debug mode
+  if (window.location.search.includes('debug=favicon')) {
+    console.debug('Fallback icon shown for favicon error:', fallbackIcon);
+  }
+}
+
+/**
+ * Find the fallback icon associated with an image element
+ * @param {HTMLImageElement} imgElement - The image element
+ * @returns {HTMLElement|null} - The fallback icon element or null
+ */
+function findFallbackIcon(imgElement) {
+  // Strategy 1: Look for sibling fallback icon
+  let fallbackIcon = imgElement.parentElement.querySelector('.restaurant-fallback-icon');
+
+  if (fallbackIcon) {
+    return fallbackIcon;
+  }
+
+  // Strategy 2: Look for next sibling fallback icon
+  fallbackIcon = imgElement.nextElementSibling;
+  if (fallbackIcon && fallbackIcon.classList.contains('restaurant-fallback-icon')) {
+    return fallbackIcon;
+  }
+
+  // Strategy 3: Look for previous sibling fallback icon
+  fallbackIcon = imgElement.previousElementSibling;
+  if (fallbackIcon && fallbackIcon.classList.contains('restaurant-fallback-icon')) {
+    return fallbackIcon;
+  }
+
+  // Strategy 4: Look in parent container
+  const container = imgElement.closest('.restaurant-favicon, .restaurant-favicon-table');
+  if (container) {
+    fallbackIcon = container.querySelector('.restaurant-fallback-icon');
+    if (fallbackIcon) {
+      return fallbackIcon;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Hide a fallback icon
+ * @param {HTMLImageElement} imgElement - The image element to find associated fallback for
+ */
+function hideFallbackIcon(imgElement) {
+  // Find the associated fallback icon
+  const fallbackIcon = findFallbackIcon(imgElement);
+
+  if (fallbackIcon) {
+    fallbackIcon.style.display = 'none';
+    fallbackIcon.classList.add('d-none');
+    fallbackIcon.style.opacity = '0';
+
+    // Debug logging only in debug mode
+    if (window.location.search.includes('debug=favicon')) {
+      console.debug('Fallback icon hidden - real favicon loaded:', imgElement.src);
+    }
+  }
+}
 
 /**
  * Handle favicon loading errors with fallback strategies
@@ -73,19 +245,16 @@ export function handleFaviconError(imgElement, options = {}) {
     }
 
     // Find and show the fallback icon
-    if (showFallback) {
-      const container = imgElement.parentElement;
-      if (container) {
-        const fallbackIcon = container.querySelector(fallbackSelector);
-        if (fallbackIcon) {
-          fallbackIcon.style.display = 'inline-block';
-          fallbackIcon.classList.remove('d-none');
-        } else {
-          console.warn('Fallback icon not found for favicon error');
-        }
-      }
+    if (!showFallback) return;
+
+    const fallbackIcon = findOrCreateFallbackIcon(imgElement, fallbackSelector);
+
+    if (fallbackIcon) {
+      showFallbackIcon(fallbackIcon);
+    } else {
+      console.warn('Fallback icon not found for favicon error - no fallback available');
     }
-  } catch {
+  } catch (error) {
     console.warn('Error in handleFaviconError:', error);
   }
 }
@@ -147,25 +316,33 @@ function extractRootDomain(domain) {
 function shouldSkipFaviconRequest(domain) {
   // Check if domain is in problematic domains list
   if (problematicDomains.has(domain)) {
-    console.debug(`Domain "${domain}" found in problematic domains list`);
+    if (window.location.search.includes('debug=favicon')) {
+      console.debug(`Domain "${domain}" found in problematic domains list`);
+    }
     return true;
   }
 
   // Check if root domain is in problematic domains list
   const rootDomain = extractRootDomain(domain);
   if (problematicDomains.has(rootDomain)) {
-    console.debug(`Root domain "${rootDomain}" found in problematic domains list for "${domain}"`);
+    if (window.location.search.includes('debug=favicon')) {
+      console.debug(`Root domain "${rootDomain}" found in problematic domains list for "${domain}"`);
+    }
     return true;
   }
 
   // Check if domain has consistently failed favicon requests
   const failedCount = failedDomainsCache.get(domain) || 0;
   if (failedCount >= 3) {
-    console.debug(`Domain "${domain}" has failed ${failedCount} times, skipping`);
+    if (window.location.search.includes('debug=favicon')) {
+      console.debug(`Domain "${domain}" has failed ${failedCount} times, skipping`);
+    }
     return true;
   }
 
-  console.debug(`Domain "${domain}" (root: "${rootDomain}") is not problematic, proceeding with favicon request`);
+  if (window.location.search.includes('debug=favicon')) {
+    console.debug(`Domain "${domain}" (root: "${rootDomain}") is not problematic, proceeding with favicon request`);
+  }
   return false;
 }
 
@@ -224,6 +401,41 @@ function tryFaviconSource(imgElement, src, timeout = 3000) {
 }
 
 /**
+ * Log favicon success in debug mode
+ * @param {string} sourceName - Name of the favicon source
+ * @param {string} domain - The domain
+ * @param {string} src - The favicon URL
+ */
+function logFaviconSuccess(sourceName, domain, src) {
+  if (window.location.search.includes('debug=favicon')) {
+    console.debug(`✅ Favicon loaded from ${sourceName} for ${domain}:`, src);
+  }
+}
+
+/**
+ * Log favicon error in debug mode
+ * @param {string} sourceName - Name of the favicon source
+ * @param {string} domain - The domain
+ * @param {Error} error - The error object
+ */
+function logFaviconError(sourceName, domain, error) {
+  if (window.location.search.includes('debug=favicon')) {
+    console.debug(`❌ Favicon source ${sourceName} failed for ${domain}:`, error);
+  }
+}
+
+/**
+ * Get specialized favicon sources for specific domain types
+ * @param {string} domain - The domain to get sources for
+ * @returns {Array} - Array of specialized favicon sources
+ */
+function getSpecializedFaviconSources(_domain) {
+  // Return the standard stable sources for all domains
+  // No special handling needed - let the stable sources handle all cases
+  return [...FAVICON_SOURCES];
+}
+
+/**
  * Load favicon with fallback strategy
  * @param {HTMLImageElement} imgElement - The image element to update
  * @param {string} website - The restaurant website URL
@@ -256,9 +468,11 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
   }
 
   // Smart skip: Check if domain should skip favicon requests
-  console.debug(`Extracted domain: "${domain}" from URL: "${website}"`);
   if (shouldSkipFaviconRequest(domain)) {
-    console.debug(`Skipping favicon request for problematic domain: ${domain}`);
+    // Only log in debug mode to reduce console noise
+    if (window.location.search.includes('debug=favicon')) {
+      console.debug(`Skipping favicon request for problematic domain: ${domain}`);
+    }
     handleFaviconError(imgElement, { fallbackSelector, hideImage, showFallback });
     return;
   }
@@ -279,22 +493,30 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
   }
 
   try {
+    // Get specialized sources for this domain type
+    const sources = getSpecializedFaviconSources(domain);
+
     // Try each favicon source in order
     let success = false;
     let workingSrc = '';
 
-    for (const source of FAVICON_SOURCES) {
+    for (const source of sources) {
       try {
         const src = source.url(domain);
+        // eslint-disable-next-line no-await-in-loop
         const loaded = await tryFaviconSource(imgElement, src, source.timeout);
 
         if (loaded) {
           workingSrc = src;
           success = true;
+
+          // Debug logging for successful loads
+          logFaviconSuccess(source.name, domain, src);
           break;
         }
-      } catch {
-        console.warn(`Favicon source ${source.name} failed for ${domain}:`, error);
+      } catch (error) {
+        // Only log in debug mode to reduce console noise
+        logFaviconError(source.name, domain, error);
       }
     }
 
@@ -302,15 +524,18 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
     faviconCache.set(cacheKey, { success, src: workingSrc });
 
     if (success && workingSrc) {
-      imgElement.src = workingSrc;
-      imgElement.style.opacity = '1';
+      // Use requestAnimationFrame to ensure atomic updates
+      requestAnimationFrame(() => {
+        imgElement.src = workingSrc;
+        imgElement.style.opacity = '1';
+      });
     } else {
       // Mark domain as failed for future requests
       markDomainAsFailed(domain);
       handleFaviconError(imgElement, { fallbackSelector, hideImage, showFallback });
     }
 
-  } catch {
+  } catch (error) {
     console.error('Error loading favicon with fallback:', error);
     handleFaviconError(imgElement, { fallbackSelector, hideImage, showFallback });
   }
@@ -329,7 +554,16 @@ export function handleFaviconLoad(imgElement) {
   try {
     // Show the image with smooth transition
     imgElement.style.opacity = '1';
-  } catch {
+    imgElement.style.display = 'inline-block';
+
+    // Hide the fallback icon since real favicon loaded successfully
+    hideFallbackIcon(imgElement);
+
+    // Log success for debugging
+    if (window.location.search.includes('debug=favicon')) {
+      console.debug('✅ Favicon loaded successfully:', imgElement.src);
+    }
+  } catch (error) {
     console.error('Error handling favicon load:', error);
   }
 }
@@ -374,12 +608,57 @@ export function initializeRobustFaviconHandling(selector = '.restaurant-favicon'
         if (!favicon.onload) {
           favicon.onload = () => handleFaviconLoad(favicon);
         }
-      } catch {
+
+        // Also handle the case where onload was deferred due to lazy loading
+        // Use a small delay to check if the image loaded after initialization
+        setTimeout(() => {
+          if (favicon.complete && favicon.naturalWidth > 0) {
+            handleFaviconLoad(favicon);
+          }
+        }, 100);
+
+        // Handle already loaded images (but be careful with lazy loading)
+        if (favicon.complete && favicon.naturalWidth > 0 && !favicon.loading) {
+          handleFaviconLoad(favicon);
+        }
+
+        // Handle lazy loading - check if image is in viewport and loaded
+        if (favicon.loading === 'lazy') {
+          // Use Intersection Observer to detect when lazy image loads
+          if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+              entries.forEach((entry) => {
+                if (entry.isIntersecting && entry.target.complete && entry.target.naturalWidth > 0) {
+                  handleFaviconLoad(entry.target);
+                  observer.unobserve(entry.target);
+                }
+              });
+            });
+            observer.observe(favicon);
+          }
+        }
+
+        // Additional check for lazy loading intervention
+        // Some browsers defer load events for lazy images
+        const checkLazyLoaded = () => {
+          if (favicon.complete && favicon.naturalWidth > 0) {
+            handleFaviconLoad(favicon);
+            return true;
+          }
+          return false;
+        };
+
+        // Check immediately and after a short delay
+        if (!checkLazyLoaded()) {
+          setTimeout(checkLazyLoaded, 200);
+          setTimeout(checkLazyLoaded, 500);
+        }
+      } catch (error) {
         console.error(`Error initializing favicon ${index}:`, error);
       }
     });
 
-  } catch {
+  } catch (error) {
     console.error('Error initializing robust favicon handling:', error);
   }
 }
@@ -389,6 +668,82 @@ export function initializeRobustFaviconHandling(selector = '.restaurant-favicon'
  */
 export function clearFaviconCache() {
   faviconCache.clear();
+  failedDomainsCache.clear();
+}
+
+/**
+ * Enable debug mode for favicon handling
+ * Adds ?debug=favicon to URL to enable detailed logging
+ */
+export function enableFaviconDebugMode() {
+  const url = new URL(window.location);
+  if (!url.searchParams.has('debug') || url.searchParams.get('debug') !== 'favicon') {
+    url.searchParams.set('debug', 'favicon');
+    window.location.href = url.toString();
+  }
+}
+
+/**
+ * Get favicon handling statistics for debugging
+ * @returns {Object} - Statistics about favicon handling
+ */
+export function getFaviconStats() {
+  return {
+    cacheSize: faviconCache.size,
+    failedDomainsCount: failedDomainsCache.size,
+    problematicDomainsCount: problematicDomains.size,
+    cacheEntries: Array.from(faviconCache.entries()),
+    failedDomains: Array.from(failedDomainsCache.keys()),
+  };
+}
+
+/**
+ * Test favicon handling for a specific domain
+ * @param {string} domain - The domain to test
+ * @returns {Promise<Object>} - Test results
+ */
+export async function testFaviconForDomain(domain) {
+  const results = {
+    domain,
+    sources: [],
+    success: false,
+    workingSource: null,
+  };
+
+  // Test all sources in parallel to avoid await in loop
+  const sourcePromises = FAVICON_SOURCES.map(async(source) => {
+    try {
+      const src = source.url(domain);
+      const loaded = await tryFaviconSource(null, src, source.timeout);
+
+      return {
+        name: source.name,
+        url: src,
+        success: loaded,
+      };
+    } catch (error) {
+      return {
+        name: source.name,
+        url: source.url(domain),
+        success: false,
+        error: error.message,
+      };
+    }
+  });
+
+  const sourceResults = await Promise.all(sourcePromises);
+  results.sources = sourceResults;
+
+  // Find the first successful source
+  for (const source of sourceResults) {
+    if (source.success && !results.success) {
+      results.success = true;
+      results.workingSource = source.name;
+      break;
+    }
+  }
+
+  return results;
 }
 
 /**
@@ -431,6 +786,7 @@ export async function debugFaviconSources(domain) {
     const startTime = Date.now();
 
     try {
+      // eslint-disable-next-line no-await-in-loop
       const success = await tryFaviconSource(null, url, source.timeout);
       const duration = Date.now() - startTime;
 
@@ -659,21 +1015,23 @@ function suppressFaviconCORSErrors() {
   };
 }
 
-// Auto-initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+// Standard initialization function
+function initializeFaviconSystem() {
   // Suppress CORS errors for favicon requests
   suppressFaviconCORSErrors();
 
-  // Clear any existing favicon cache to prevent stale data
-  clearFaviconCache();
-
-  // Log version for debugging
-  console.debug('Robust Favicon Handler v3.1.0 loaded - Fixed Root Domain Detection for Subdomains');
-
-  // Initialize favicon handling
+  // Initialize favicon handling for all favicon elements
   initializeRobustFaviconHandling('.restaurant-favicon');
   initializeRobustFaviconHandling('.restaurant-favicon-table');
-});
+
+  // Debug logging (only in debug mode)
+  if (window.location.search.includes('debug=favicon')) {
+    console.debug('🔧 Favicon Handler v3.6.0 initialized - Modern Google Favicon V2 API');
+  }
+}
+
+// Note: Favicon system is now initialized by main.js
+// Auto-initialization removed to prevent conflicts
 
 // Export for global access
 window.RobustFaviconHandler = {
@@ -681,6 +1039,7 @@ window.RobustFaviconHandler = {
   handleError: handleFaviconError,
   handleLoad: handleFaviconLoad,
   initialize: initializeRobustFaviconHandling,
+  initializeSystem: initializeFaviconSystem,
   clearCache: clearFaviconCache,
   clearFailedDomainsCache,
   getCacheStats: getFaviconCacheStats,

@@ -478,7 +478,7 @@ def detect_service_level_from_google_places(place_data: dict) -> ServiceLevel:
 
 def _calculate_price_score(price_level: Optional[int], score_type: str) -> float:
     """Calculate score based on price level."""
-    if not price_level:
+    if price_level is None:
         return 0.0
 
     # Define price level mappings for each service type

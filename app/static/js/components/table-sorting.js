@@ -9,7 +9,7 @@ function getExpenseCellValue(row, columnIndex) {
   if (!cell) return '';
 
   const { sortValue } = cell.dataset;
-  if (sortValue !== null) {
+  if (sortValue !== null && sortValue !== undefined) {
     if (columnIndex === 0) { // Date column
       return new Date(sortValue);
     } else if (columnIndex === 6 || columnIndex === 7) { // Currency columns
@@ -28,7 +28,7 @@ function getRestaurantCellValue(row, columnIndex) {
   if (!cell) return '';
 
   const { sortValue } = cell.dataset;
-  if (sortValue !== null) {
+  if (sortValue !== null && sortValue !== undefined) {
     if (columnIndex === 1) { // Rating column
       return parseFloat(sortValue) || 0;
     } else if (columnIndex === 2) { // Price level column
@@ -57,8 +57,8 @@ function sortExpenseTable(columnIndex, ascending) {
 
     // Multi-level sort for restaurant column
     if (columnIndex === 1) { // Restaurant column
-      const aRestaurant = aValue.toLowerCase();
-      const bRestaurant = bValue.toLowerCase();
+      const aRestaurant = (aValue || '').toString().toLowerCase();
+      const bRestaurant = (bValue || '').toString().toLowerCase();
       if (aRestaurant !== bRestaurant) {
         return ascending ? compareValues(aRestaurant, bRestaurant) : compareValues(bRestaurant, aRestaurant);
       }
@@ -86,8 +86,8 @@ function sortRestaurantTable(columnIndex, ascending) {
 
     // Multi-level sort for name column
     if (columnIndex === 0) { // Name column
-      const aName = aValue.toLowerCase();
-      const bName = bValue.toLowerCase();
+      const aName = (aValue || '').toString().toLowerCase();
+      const bName = (bValue || '').toString().toLowerCase();
       if (aName !== bName) {
         return ascending ? compareValues(aName, bName) : compareValues(bName, aName);
       }

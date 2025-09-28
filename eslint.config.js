@@ -259,19 +259,6 @@ export default [
       }],
     },
   },
-  // Special configuration for extension error suppressor
-  {
-    files: ['app/static/js/extension-error-suppressor.js'],
-    rules: {
-      'no-console': 'off', // Allow console statements for error suppression
-      'no-unused-vars': ['warn', {
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_',
-        caughtErrorsIgnorePattern: '^_',
-        ignoreRestSiblings: true,
-      }],
-    },
-  },
   // Ignore patterns
   {
     ignores: [

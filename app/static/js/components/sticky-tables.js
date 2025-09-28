@@ -42,10 +42,12 @@ class StickyTable {
   setupHeaders() {
     if (!this.isSticky) return;
 
-    // Calculate and set proper header heights
-    this.headers.forEach((header) => {
-      const height = header.offsetHeight;
-      header.style.minHeight = `${height}px`;
+    // Use requestAnimationFrame to batch DOM reads
+    requestAnimationFrame(() => {
+      this.headers.forEach((header) => {
+        const height = header.offsetHeight;
+        header.style.minHeight = `${height}px`;
+      });
     });
   }
 
@@ -64,17 +66,21 @@ class StickyTable {
   }
 
   handleScroll() {
+    // Cache scroll values to avoid multiple property reads
     const { scrollTop } = this.container;
     const { scrollLeft } = this.container;
 
-    // Add shadow effect when scrolling
-    if (this.isSticky) {
-      this.updateStickyHeaderShadow(scrollTop);
-    }
+    // Use requestAnimationFrame to batch DOM writes
+    requestAnimationFrame(() => {
+      // Add shadow effect when scrolling
+      if (this.isSticky) {
+        this.updateStickyHeaderShadow(scrollTop);
+      }
 
-    if (this.isFrozen) {
-      this.updateFrozenColumnShadow(scrollLeft);
-    }
+      if (this.isFrozen) {
+        this.updateFrozenColumnShadow(scrollLeft);
+      }
+    });
   }
 
   updateStickyHeaderShadow(scrollTop) {

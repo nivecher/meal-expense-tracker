@@ -3,6 +3,7 @@
 This module initializes and configures all Flask extensions used in the application.
 """
 
+import logging
 from typing import Any, Optional, Union, cast
 
 from flask import Flask, request, url_for
@@ -16,6 +17,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
 from flask_session import Session
+
+logger = logging.getLogger(__name__)
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
@@ -202,7 +205,22 @@ def init_app(app: Flask) -> None:
     db.init_app(app)
     jwt.init_app(app)
     login_manager.init_app(app)
-    migrate.init_app(app, db)
+
+    # Configure Flask-Migrate with Lambda-aware directory handling
+    import os
+
+    # In Lambda, we need to handle the read-only filesystem
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        # Lambda environment - use environment variable if set, otherwise /var/task/migrations
+        migration_dir = os.environ.get("MIGRATIONS_DIR")
+        if not migration_dir:
+            migration_dir = "/var/task/migrations"
+        logger.info(f"Lambda environment detected, using migration directory: {migration_dir}")
+    else:
+        # Local environment - use standard location
+        migration_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "migrations")
+
+    migrate.init_app(app, db, directory=migration_dir)
 
     # Initialize Flask-Session based on session type
     session_type = app.config.get("SESSION_TYPE")
@@ -283,4 +301,8 @@ def load_user(user_id: str) -> Optional[Any]:
     # Lazy import to avoid circular imports
     from app.auth.models import User
 
-    return db.session.get(User, int(user_id))
+    try:
+        user_id_int = int(user_id)
+        return db.session.get(User, user_id_int)
+    except (ValueError, TypeError):
+        return None

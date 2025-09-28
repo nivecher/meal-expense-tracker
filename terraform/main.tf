@@ -517,7 +517,7 @@ module "lambda" {
   # Lambda package
   s3_bucket      = aws_s3_bucket.lambda_deployment.bucket
   s3_key         = "${var.environment}/app/${var.lambda_architecture}/app-${var.lambda_architecture}.zip"
-  app_local_path = "${path.module}/../dist/${var.lambda_architecture}/app-${var.lambda_architecture}.zip"
+  app_local_path = "${path.module}/../dist/${var.lambda_architecture}/app/app-${var.lambda_architecture}.zip"
 
   # Layer configuration
   layer_s3_bucket     = aws_s3_bucket.lambda_deployment.bucket

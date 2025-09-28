@@ -142,7 +142,7 @@ make release-prod TAG=v1.0.0
 - `TF_ENV`: Terraform environment
 - `AWS_REGION`: AWS region (default: us-east-1)
 - `PYTHON_VERSION`: Python version (default: 3.13)
-- `NODE_VERSION`: Node.js version (default: 20)
+- `NODE_VERSION`: Node.js version (default: 22)
 
 ## Workflow Triggers
 

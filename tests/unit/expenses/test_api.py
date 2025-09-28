@@ -83,7 +83,7 @@ def test_restaurant(db, test_user):
         name="Test Restaurant",
         type="restaurant",  # Add required field
         user_id=test_user.id,
-        address="123 Test St",
+        address_line_1="123 Test St",
         city="Test City",
         state="TS",
         postal_code="12345",

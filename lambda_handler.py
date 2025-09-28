@@ -70,7 +70,19 @@ def get_or_create_app() -> Flask:
             # Initialize migration manager
             from app.utils.migration_manager import init_migration_manager
 
-            init_migration_manager(_APP_INSTANCE)
+            migration_manager = init_migration_manager(_APP_INSTANCE)
+
+            # Run auto-migration if enabled (force refresh)
+            try:
+                auto_migration_result = migration_manager.auto_migrate()
+                if auto_migration_result.get("success"):
+                    logger.info(f"Auto-migration completed: {auto_migration_result.get('message', 'Success')}")
+                else:
+                    logger.warning(f"Auto-migration failed: {auto_migration_result.get('message', 'Unknown error')}")
+            except Exception as e:
+                logger.error(f"Auto-migration error: {e}")
+                # Don't fail the entire Lambda initialization for migration issues
+                logger.info("Continuing Lambda initialization despite migration error")
 
         except Exception as e:
             logger.exception("Failed to create Flask application")
@@ -524,11 +536,15 @@ def _process_awsgi_response(response: Dict[str, Any], event: Dict[str, Any] = No
 
 def _run_auto_migration() -> None:
     """Run auto-migration on first request if enabled."""
+    logger.info("_run_auto_migration called")
+
     if not hasattr(lambda_handler, "_migration_checked"):
+        logger.info("Migration not yet checked, running initialization...")
         try:
             from lambda_init import initialize_lambda
 
             # Initialize Lambda with migrations
+            logger.info("Calling initialize_lambda...")
             init_result = initialize_lambda()
             if init_result.get("success"):
                 logger.info(f"Lambda initialization: {init_result['message']}")
@@ -536,10 +552,14 @@ def _run_auto_migration() -> None:
                 logger.warning(f"Lambda initialization failed: {init_result.get('message', 'Unknown error')}")
 
         except Exception as e:
-            logger.warning(f"Lambda initialization error (non-critical): {e}")
+            logger.error(f"Lambda initialization error: {e}")
+            logger.exception("Full traceback:")
 
         # Mark as checked to avoid running on every request
         lambda_handler._migration_checked = True
+        logger.info("Migration check completed")
+    else:
+        logger.info("Migration already checked, skipping")
 
 
 def _extract_cookies_from_headers(headers: Dict[str, str]) -> list[str]:
@@ -646,6 +666,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     # Handle health check requests
     if event.get("path") == "/health" or event.get("rawPath") == "/health":
+        logger.info("Health check request detected")
+        # Run auto-migration on health check (first request)
+        logger.info("About to call _run_auto_migration")
+        _run_auto_migration()
+        logger.info("Finished calling _run_auto_migration")
         return _handle_health_check()
 
     # Auto-migrate on first request (if enabled)

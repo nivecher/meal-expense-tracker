@@ -13,7 +13,7 @@ SKIP_TESTS=${2:-false}
 # Environment setup
 export APP_NAME=meal-expense-tracker
 export PYTHON_VERSION=3.13
-export NODE_VERSION=20
+export NODE_VERSION=22
 export PYTHONPATH=$(pwd)
 export FLASK_APP=wsgi:app
 export FLASK_ENV=test

@@ -251,12 +251,12 @@ def delete_restaurant(restaurant_id: int) -> Tuple[Response, int]:
     """Delete a restaurant."""
     try:
         user = _get_current_user()
-        restaurant = restaurant_services.get_restaurant_for_user(restaurant_id, user.id)
-        if not restaurant:
-            return jsonify({"status": "error", "message": "Restaurant not found"}), 404
+        success, message = restaurant_services.delete_restaurant_by_id(restaurant_id, user.id)
 
-        restaurant_services.delete_restaurant_for_user(restaurant)
-        return _create_api_response(message="Restaurant deleted successfully", code=204)
+        if not success:
+            return jsonify({"status": "error", "message": message}), 404
+
+        return _create_api_response(message=message, code=204)
     except Exception as e:
         return _handle_service_error(e, "delete restaurant")
 
@@ -334,12 +334,43 @@ def validate_restaurant() -> Tuple[Response, int]:
         if fix_mismatches and fixes_to_apply:
             _apply_restaurant_fixes_api(restaurant, fixes_to_apply)
 
+        # Prepare current restaurant data for comparison
+        current_data = {
+            "name": restaurant.name,
+            "address_line_1": restaurant.address_line_1,
+            "address_line_2": restaurant.address_line_2,
+            "service_level": restaurant.service_level,
+            "rating": restaurant.rating,
+            "price_level": restaurant.price_level,
+            "phone": restaurant.phone,
+            "website": restaurant.website,
+            "description": restaurant.description,
+        }
+
+        # Prepare Google data in the same format for comparison
+        google_data = {
+            "name": validation_result.get("google_name"),
+            "address_line_1": validation_result.get("google_address_line_1"),
+            "address_line_2": validation_result.get("google_address_line_2"),
+            "service_level": (
+                validation_result.get("google_service_level", [None, 0.0])[0]
+                if validation_result.get("google_service_level")
+                else None
+            ),
+            "rating": validation_result.get("google_rating"),
+            "price_level": validation_result.get("google_price_level"),
+            "phone": validation_result.get("google_phone"),
+            "website": validation_result.get("google_website"),
+            "description": None,  # Google Places doesn't provide descriptions
+        }
+
         return _create_api_response(
             data={
                 "valid": True,
                 "mismatches": mismatches,
                 "fixes": fixes_to_apply,
-                "google_data": validation_result,
+                "current_data": current_data,
+                "google_data": google_data,
                 "restaurant_updated": fix_mismatches and bool(fixes_to_apply),
             },
             message="Restaurant validated successfully",
@@ -351,7 +382,7 @@ def validate_restaurant() -> Tuple[Response, int]:
 
 
 def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
-    """Validate restaurant information using NEW Google Places API directly.
+    """Validate restaurant information using centralized Google Places service.
 
     Args:
         google_place_id: Google Place ID to validate
@@ -360,102 +391,39 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
         Dictionary with validation results
     """
     try:
-        import requests
+        from app.services.google_places_service import get_google_places_service
 
-        api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
-        if not api_key:
-            return {"valid": False, "errors": ["Google Maps API not configured"]}
+        places_service = get_google_places_service()
+        place = places_service.get_place_details(google_place_id, "comprehensive")
 
-        # Call the new Google Places API
-        url = f"https://places.googleapis.com/v1/places/{google_place_id}"
-        headers = {
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": api_key,
-            "X-Goog-FieldMask": "displayName,formattedAddress,nationalPhoneNumber,websiteUri,location,rating,userRatingCount,priceLevel,editorialSummary,primaryType,types,addressComponents",
+        if not place:
+            return {"valid": False, "errors": ["Failed to retrieve place data from Google Places API"]}
+
+        # Extract restaurant data using the service
+        google_data = places_service.extract_restaurant_data(place)
+
+        return {
+            "valid": True,
+            "google_name": google_data.get("name"),
+            "google_address": google_data.get("formatted_address"),
+            "google_address_line_1": google_data.get("address_line_1"),
+            "google_address_line_2": google_data.get("address_line_2"),
+            "google_city": google_data.get("city"),
+            "google_state": google_data.get("state"),
+            "google_postal_code": google_data.get("postal_code"),
+            "google_country": google_data.get("country"),
+            "google_rating": google_data.get("rating"),
+            "google_status": google_data.get("business_status", "OPERATIONAL"),
+            "types": google_data.get("types", []),
+            "primary_type": google_data.get("primary_type"),
+            "google_phone": google_data.get("phone_number"),
+            "google_website": google_data.get("website"),
+            "google_price_level": google_data.get("price_level"),
+            "google_street_address": google_data.get("street_address"),  # Legacy field
+            "google_service_level": places_service.detect_service_level_from_data(place),
+            "errors": [],
         }
 
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-
-        place = response.json()
-
-        if place:
-            # Get restaurant name from new API structure
-            restaurant_name = (
-                place.get("displayName", {}).get("text")
-                if isinstance(place.get("displayName"), dict)
-                else place.get("displayName", "")
-            )
-
-            return {
-                "valid": True,
-                "google_name": restaurant_name,
-                "google_address": place.get("formattedAddress"),
-                "google_rating": place.get("rating"),
-                "google_status": "OPERATIONAL",  # New API doesn't provide business_status
-                "types": place.get("types", []),
-                "primary_type": place.get("primaryType"),
-                "google_phone": place.get("nationalPhoneNumber"),
-                "google_website": place.get("websiteUri"),
-                "google_price_level": place.get("priceLevel"),
-                "google_address_components": place.get("addressComponents", []),
-                "google_street_number": next(
-                    (
-                        comp.get("longName")
-                        for comp in place.get("addressComponents", [])
-                        if "street_number" in comp.get("types", [])
-                    ),
-                    None,
-                ),
-                "google_route": next(
-                    (
-                        comp.get("longName")
-                        for comp in place.get("addressComponents", [])
-                        if "route" in comp.get("types", [])
-                    ),
-                    None,
-                ),
-                "google_street_address": _build_street_address_from_components_api(place.get("addressComponents", [])),
-                "google_service_level": _detect_service_level_from_google_data_api(place),
-                "google_city": next(
-                    (
-                        comp.get("longName")
-                        for comp in place.get("addressComponents", [])
-                        if "locality" in comp.get("types", [])
-                    ),
-                    None,
-                ),
-                "google_state": next(
-                    (
-                        comp.get("shortName")
-                        for comp in place.get("addressComponents", [])
-                        if "administrative_area_level_1" in comp.get("types", [])
-                    ),
-                    None,
-                ),
-                "google_postal_code": next(
-                    (
-                        comp.get("longName")
-                        for comp in place.get("addressComponents", [])
-                        if "postal_code" in comp.get("types", [])
-                    ),
-                    None,
-                ),
-                "google_country": next(
-                    (
-                        comp.get("longName")
-                        for comp in place.get("addressComponents", [])
-                        if "country" in comp.get("types", [])
-                    ),
-                    None,
-                ),
-                "errors": [],
-            }
-        else:
-            return {"valid": False, "errors": ["No response from Google Places API"]}
-
-    except requests.RequestException as e:
-        return {"valid": False, "errors": [f"Google Places API request failed: {str(e)}"]}
     except ImportError:
         return {"valid": False, "errors": ["Google Places API service not available"]}
     except Exception as e:
@@ -463,58 +431,54 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
         return {"valid": False, "errors": [f"Unexpected error: {str(e)}"]}
 
 
-def _build_street_address_from_components_api(address_components: list) -> str:
-    """Build street address from Google Places address components."""
-    street_number = next(
-        (comp.get("longName") for comp in address_components if "street_number" in comp.get("types", [])), None
-    )
-    route = next((comp.get("longName") for comp in address_components if "route" in comp.get("types", [])), None)
-
-    if street_number and route:
-        return f"{street_number} {route}"
-    elif route:
-        return route
-    else:
-        return ""
-
-
-def _detect_service_level_from_google_data_api(place_data: dict) -> tuple[str, float]:
-    """Detect service level from Google Places data."""
-    try:
-        from app.utils.service_level_detector import detect_service_level_from_name
-
-        restaurant_name = (
-            place_data.get("displayName", {}).get("text")
-            if isinstance(place_data.get("displayName"), dict)
-            else place_data.get("displayName", "")
-        )
-
-        if restaurant_name:
-            detected_level = detect_service_level_from_name(restaurant_name)
-            return detected_level.value, 0.5  # Default confidence
-        return "unknown", 0.0
-    except Exception:
-        return "unknown", 0.0
-
-
 def _check_restaurant_mismatches_api(restaurant, validation_result: dict) -> tuple[list[str], dict[str, str]]:
     """Check for mismatches between restaurant data and Google data."""
-    google_name = validation_result.get("google_name")
-    google_street_address = validation_result.get("google_street_address")
-    google_service_level_data = validation_result.get("google_service_level")
-
     mismatches = []
     fixes_to_apply = {}
 
+    # Check name mismatch
+    _check_name_mismatch_api(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    # Check address mismatches
+    _check_address_mismatches_api(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    # Check service level mismatch
+    _check_service_level_mismatch_api(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    return mismatches, fixes_to_apply
+
+
+def _check_name_mismatch_api(restaurant, validation_result, mismatches, fixes_to_apply):
+    """Check for name mismatch."""
+    google_name = validation_result.get("google_name")
     if google_name and google_name.lower() != restaurant.name.lower():
         mismatches.append(f"Name: '{restaurant.name}' vs Google: '{google_name}'")
         fixes_to_apply["name"] = google_name
 
-    if google_street_address and restaurant.address and google_street_address.lower() != restaurant.address.lower():
-        mismatches.append(f"Address: '{restaurant.address}' vs Google: '{google_street_address}'")
-        fixes_to_apply["address"] = google_street_address
 
-    # Check service level
+def _check_address_mismatches_api(restaurant, validation_result, mismatches, fixes_to_apply):
+    """Check for address field mismatches."""
+    address_fields = [
+        ("google_address_line_1", "address_line_1", "Address Line 1"),
+        ("google_address_line_2", "address_line_2", "Address Line 2"),
+        ("google_city", "city", "City"),
+        ("google_state", "state", "State"),
+        ("google_postal_code", "postal_code", "Postal Code"),
+        ("google_country", "country", "Country"),
+    ]
+
+    for google_field, restaurant_field, display_name in address_fields:
+        google_value = validation_result.get(google_field)
+        restaurant_value = getattr(restaurant, restaurant_field)
+
+        if google_value and restaurant_value and google_value.lower() != restaurant_value.lower():
+            mismatches.append(f"{display_name}: '{restaurant_value}' vs Google: '{google_value}'")
+            fixes_to_apply[restaurant_field] = google_value
+
+
+def _check_service_level_mismatch_api(restaurant, validation_result, mismatches, fixes_to_apply):
+    """Check for service level mismatch."""
+    google_service_level_data = validation_result.get("google_service_level")
     if google_service_level_data:
         google_service_level, confidence = google_service_level_data
         from app.restaurants.services import validate_restaurant_service_level
@@ -528,21 +492,14 @@ def _check_restaurant_mismatches_api(restaurant, validation_result: dict) -> tup
             if suggested_fix:
                 fixes_to_apply["service_level"] = suggested_fix
 
-    return mismatches, fixes_to_apply
-
 
 def _apply_restaurant_fixes_api(restaurant, fixes_to_apply: dict[str, str]) -> bool:
     """Apply fixes to restaurant data and return success status."""
     try:
         from app.extensions import db
 
-        # Apply fixes
-        if "name" in fixes_to_apply:
-            restaurant.name = fixes_to_apply["name"]
-        if "address" in fixes_to_apply:
-            restaurant.address = fixes_to_apply["address"]
-        if "service_level" in fixes_to_apply:
-            restaurant.service_level = fixes_to_apply["service_level"]
+        # Apply all fixes
+        _apply_restaurant_field_fixes_api(restaurant, fixes_to_apply)
 
         db.session.commit()
         return True
@@ -550,6 +507,24 @@ def _apply_restaurant_fixes_api(restaurant, fixes_to_apply: dict[str, str]) -> b
         db.session.rollback()
         current_app.logger.error(f"Error applying fixes to restaurant {restaurant.id}: {e}")
         return False
+
+
+def _apply_restaurant_field_fixes_api(restaurant, fixes_to_apply: dict[str, str]) -> None:
+    """Apply individual field fixes to restaurant."""
+    field_mapping = {
+        "name": "name",
+        "address_line_1": "address_line_1",
+        "address_line_2": "address_line_2",
+        "city": "city",
+        "state": "state",
+        "postal_code": "postal_code",
+        "country": "country",
+        "service_level": "service_level",
+    }
+
+    for fix_key, restaurant_field in field_mapping.items():
+        if fix_key in fixes_to_apply:
+            setattr(restaurant, restaurant_field, fixes_to_apply[fix_key])
 
 
 # Generic CRUD operations for categories

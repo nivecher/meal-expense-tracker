@@ -30,6 +30,7 @@
 } */
 
 /* Standard column widths - responsive */
+
 .table th:nth-child(1),
 .table td:nth-child(1) {
   min-width: 120px;

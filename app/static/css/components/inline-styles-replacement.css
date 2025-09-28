@@ -46,19 +46,18 @@
 
 .restaurant-icon-opacity {
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s ease-in-out;
 }
 
 .restaurant-icon-opacity-with-margin {
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s ease-in-out;
   margin-top: 2px;
 }
 
-.restaurant-icon-opacity-with-margin {
+.restaurant-icon-opacity-ease {
   opacity: 0;
-  transition: opacity 0.2s;
-  margin-top: 2px;
+  transition: opacity 0.2s ease-in-out;
 }
 
 /* Scrollable Containers */
@@ -129,6 +128,22 @@
 
 .icon-size-2rem {
   font-size: 2rem;
+}
+
+.icon-size-16px {
+  font-size: 16px;
+}
+
+.icon-size-24px {
+  font-size: 24px;
+}
+
+.icon-size-28px {
+  font-size: 28px;
+}
+
+.icon-size-32px {
+  font-size: 32px;
 }
 
 /* Dynamic Color Systems */

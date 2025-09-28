@@ -124,7 +124,7 @@ class RestaurantAutocomplete {
       const suggestions = await this.getSuggestions(query);
       console.log('Got suggestions:', suggestions);
       this.showSuggestions(suggestions);
-    } catch {
+    } catch (error) {
       console.error('Error getting suggestions:', error);
 
       // Provide more specific error messages based on the error type
@@ -276,7 +276,7 @@ class RestaurantAutocomplete {
         return {
           placeId: place.place_id || place.placeId || '',
           title: place.name || place.title || '',
-          description: place.formatted_address || place.vicinity || place.address || '',
+          description: place.formatted_address || place.vicinity || place.address_line_1 || '',
           distance,
           distanceMiles: distance ? this.formatDistance(distance) : null,
         };
@@ -299,7 +299,7 @@ class RestaurantAutocomplete {
       }
 
       return suggestions;
-    } catch {
+    } catch (error) {
       throw new Error(`Search error: ${error.message}`);
     }
   }
@@ -373,6 +373,7 @@ class RestaurantAutocomplete {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'same-origin', // Include cookies for authentication
       });
 
       if (!response.ok) {
@@ -401,7 +402,7 @@ class RestaurantAutocomplete {
         return {
           placeId: place.place_id || place.placeId || '',
           title: place.name || place.title || '',
-          description: place.formatted_address || place.vicinity || place.address || '',
+          description: place.formatted_address || place.vicinity || place.address_line_1 || '',
           distance,
           distanceMiles: distance ? this.formatDistance(distance) : null,
         };
@@ -424,7 +425,7 @@ class RestaurantAutocomplete {
       }
 
       return suggestions;
-    } catch {
+    } catch (error) {
       console.error('Fallback search failed:', error);
       // Try text-only search as last resort
       return this.getSuggestionsTextOnly(query);
@@ -444,6 +445,7 @@ class RestaurantAutocomplete {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'same-origin', // Include cookies for authentication
       });
 
       if (!response.ok) {
@@ -460,12 +462,12 @@ class RestaurantAutocomplete {
       const suggestions = results.map((place) => ({
         placeId: place.place_id || place.placeId || '',
         title: place.name || place.title || '',
-        description: place.formatted_address || place.vicinity || place.address || '',
+        description: place.formatted_address || place.vicinity || place.address_line_1 || '',
         distance: null, // No distance for text-only search
       })).filter((s) => s.placeId && s.title);
 
       return suggestions;
-    } catch {
+    } catch (error) {
       throw new Error(`Text-only search error: ${error.message}`);
     }
   }
@@ -558,7 +560,7 @@ class RestaurantAutocomplete {
 
       this.hideSuggestions();
 
-    } catch {
+    } catch (error) {
       console.error('Error getting restaurant details:', error);
       this.showError('Failed to load restaurant details');
     }
@@ -572,10 +574,21 @@ class RestaurantAutocomplete {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'same-origin', // Include cookies for authentication
       });
 
       if (!response.ok) {
+        // Handle authentication errors
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Authentication required. Please log in to use this feature.');
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Check if response is HTML (redirect to login page)
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('text/html')) {
+        throw new Error('Authentication required. Please log in to use this feature.');
       }
 
       const place = await response.json();
@@ -586,11 +599,12 @@ class RestaurantAutocomplete {
       }
 
       // Return the comprehensive data structure from backend
-      return {
+      const result = {
         name: place.name || '',
         type: place.type || 'restaurant',
         description: place.description || '',
-        address: place.address || '',
+        address_line_1: place.address_line_1 || '',
+        address_line_2: place.address_line_2 || '',
         city: place.city || '',
         state: place.state || '',
         postal_code: place.postal_code || '',
@@ -601,17 +615,21 @@ class RestaurantAutocomplete {
         google_place_id: place.google_place_id || placeId,
         cuisine: place.cuisine || '',
         service_level: place.service_level || '',
+        price_level: place.price_level || null,
         is_chain: place.is_chain || false,
         rating: place.rating || null,
         notes: place.notes || '',
         // Keep the original fields for backward compatibility
-        formatted_address: place.formatted_address || place.address || '',
+        address: place.address_line_1 || '', // Map to legacy field
+        formatted_address: place.formatted_address || place.address_line_1 || '',
         formatted_phone_number: place.phone || '',
         types: place.types || [],
         address_components: place.address_components || [],
         place_id: placeId,
       };
-    } catch {
+
+      return result;
+    } catch (error) {
       throw new Error(`Details error: ${error.message}`);
     }
   }
@@ -619,13 +637,20 @@ class RestaurantAutocomplete {
   populateForm(restaurantData) {
     console.log('Populating form with restaurant data:', restaurantData);
 
+    // Set a flag to prevent form refresh from overriding our data
+    window.restaurantAutocompleteActive = true;
+    setTimeout(() => {
+      window.restaurantAutocompleteActive = false;
+    }, 2000); // Clear flag after 2 seconds
+
     // Define field mappings for both places_search.html and form.html
     const fieldMappings = {
       // Places search page field IDs (with restaurant- prefix)
       'restaurant-name': restaurantData.name,
       'restaurant-type': restaurantData.type,
       'restaurant-description': restaurantData.description,
-      'restaurant-address': restaurantData.address,
+      'restaurant-address_line_1': restaurantData.address_line_1,
+      'restaurant-address_line_2': restaurantData.address_line_2,
       'restaurant-city': restaurantData.city,
       'restaurant-state': restaurantData.state,
       'restaurant-postal-code': restaurantData.postal_code,
@@ -645,7 +670,8 @@ class RestaurantAutocomplete {
       name: restaurantData.name,
       type: restaurantData.type,
       description: restaurantData.description,
-      address: restaurantData.address,
+      address_line_1: restaurantData.address_line_1,
+      address_line_2: restaurantData.address_line_2,
       city: restaurantData.city,
       state: restaurantData.state,
       postal_code: restaurantData.postal_code,
@@ -793,7 +819,7 @@ function initRestaurantAutocomplete() {
     try {
       new RestaurantAutocomplete(input); // eslint-disable-line no-new
       console.log('Successfully initialized autocomplete for input', index);
-    } catch {
+    } catch (error) {
       console.error('Failed to initialize autocomplete for input', index, error);
     }
   });

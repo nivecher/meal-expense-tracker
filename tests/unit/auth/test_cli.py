@@ -42,9 +42,33 @@ class TestAuthCLI:
         return app
 
     @pytest.fixture
-    def runner(self):
-        """Create CLI runner."""
-        return CliRunner()
+    def runner(self, app):
+        """Create CLI runner with app context."""
+        from app import create_app
+        from app.extensions import db
+
+        # Create a proper app instance
+        test_app = create_app()
+        test_app.config["TESTING"] = True
+        test_app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+
+        # Initialize database
+        with test_app.app_context():
+            db.create_all()
+
+        runner = CliRunner()
+
+        # Create a wrapper that runs commands in app context
+        class AppContextRunner:
+            def __init__(self, app, runner):
+                self.app = app
+                self.runner = runner
+
+            def invoke(self, cli, args=None, **kwargs):
+                with self.app.app_context():
+                    return self.runner.invoke(cli, args, **kwargs)
+
+        return AppContextRunner(test_app, runner)
 
     @pytest.fixture
     def mock_user(self):
@@ -207,8 +231,11 @@ class TestAuthCLI:
     def test_create_user_existing_user(self, runner, app):
         """Test user creation when user already exists."""
         with app.app_context():
-            with patch("app.auth.cli.User") as mock_user_class:
-                mock_user_class.query.filter.return_value.first.return_value = Mock()
+            with patch("app.auth.models.User") as mock_user_class:
+                # Mock the query chain properly
+                mock_query = Mock()
+                mock_query.filter.return_value.first.return_value = Mock()  # User exists
+                mock_user_class.query = mock_query
 
                 result = runner.invoke(
                     create_user,
@@ -238,7 +265,7 @@ class TestAuthCLI:
     def test_find_user_by_identifier_id(self, app, mock_user):
         """Test finding user by ID."""
         with app.app_context():
-            with patch("app.auth.cli.db") as mock_db:
+            with patch("app.extensions.db") as mock_db:
                 mock_db.session.get.return_value = mock_user
 
                 result = _find_user_by_identifier("123")
@@ -248,7 +275,7 @@ class TestAuthCLI:
     def test_find_user_by_identifier_username(self, app, mock_user):
         """Test finding user by username."""
         with app.app_context():
-            with patch("app.auth.cli.User") as mock_user_class:
+            with patch("app.auth.models.User") as mock_user_class:
                 mock_query = Mock()
                 mock_query.filter.return_value.first.return_value = mock_user
                 mock_user_class.query = mock_query
@@ -259,7 +286,7 @@ class TestAuthCLI:
     def test_find_user_by_identifier_email(self, app, mock_user):
         """Test finding user by email."""
         with app.app_context():
-            with patch("app.auth.cli.User") as mock_user_class:
+            with patch("app.auth.models.User") as mock_user_class:
                 mock_query = Mock()
                 mock_query.filter.return_value.first.return_value = mock_user
                 mock_user_class.query = mock_query
@@ -270,7 +297,7 @@ class TestAuthCLI:
     def test_find_user_by_identifier_not_found(self, app):
         """Test finding user when not found."""
         with app.app_context():
-            with patch("app.auth.cli.User") as mock_user_class:
+            with patch("app.auth.models.User") as mock_user_class:
                 mock_query = Mock()
                 mock_query.filter.return_value.first.return_value = None
                 mock_user_class.query = mock_query
@@ -278,14 +305,20 @@ class TestAuthCLI:
                 result = _find_user_by_identifier("nonexistent")
                 assert result is None
 
-    def test_update_user_username_success(self, mock_user):
+    def test_update_user_username_success(self, app, mock_user):
         """Test successful username update."""
-        changes = []
-        result = _update_user_username(mock_user, "newusername", changes)
+        with app.app_context():
+            with patch("app.auth.models.User") as mock_user_class:
+                mock_query = Mock()
+                mock_query.filter.return_value.first.return_value = None  # Username available
+                mock_user_class.query = mock_query
 
-        assert result is True
-        assert mock_user.username == "newusername"
-        assert "username to 'newusername'" in changes
+                changes = []
+                result = _update_user_username(mock_user, "newusername", changes)
+
+                assert result is True
+                assert mock_user.username == "newusername"
+                assert "username to 'newusername'" in changes
 
     def test_update_user_username_same(self, mock_user):
         """Test username update with same username."""
@@ -295,27 +328,34 @@ class TestAuthCLI:
         assert result is True
         assert changes == []
 
-    def test_update_user_username_taken(self, mock_user):
+    def test_update_user_username_taken(self, app, mock_user):
         """Test username update with taken username."""
-        with patch("app.auth.cli.User") as mock_user_class:
-            mock_query = Mock()
-            mock_query.filter.return_value.first.return_value = Mock()
-            mock_user_class.query = mock_query
+        with app.app_context():
+            with patch("app.auth.models.User") as mock_user_class:
+                mock_query = Mock()
+                mock_query.filter.return_value.first.return_value = Mock()  # Username taken
+                mock_user_class.query = mock_query
 
-            changes = []
-            result = _update_user_username(mock_user, "takenusername", changes)
+                changes = []
+                result = _update_user_username(mock_user, "takenusername", changes)
 
-            assert result is False
-            assert changes == []
+                assert result is False
+                assert changes == []
 
-    def test_update_user_email_success(self, mock_user):
+    def test_update_user_email_success(self, app, mock_user):
         """Test successful email update."""
-        changes = []
-        result = _update_user_email(mock_user, "newemail@example.com", changes)
+        with app.app_context():
+            with patch("app.auth.models.User") as mock_user_class:
+                mock_query = Mock()
+                mock_query.filter.return_value.first.return_value = None  # Email available
+                mock_user_class.query = mock_query
 
-        assert result is True
-        assert mock_user.email == "newemail@example.com"
-        assert "email to 'newemail@example.com'" in changes
+                changes = []
+                result = _update_user_email(mock_user, "newemail@example.com", changes)
+
+                assert result is True
+                assert mock_user.email == "newemail@example.com"
+                assert "email to 'newemail@example.com'" in changes
 
     def test_update_user_email_same(self, mock_user):
         """Test email update with same email."""
@@ -333,18 +373,19 @@ class TestAuthCLI:
         assert result is False
         assert changes == []
 
-    def test_update_user_email_taken(self, mock_user):
+    def test_update_user_email_taken(self, app, mock_user):
         """Test email update with taken email."""
-        with patch("app.auth.cli.User") as mock_user_class:
-            mock_query = Mock()
-            mock_query.filter.return_value.first.return_value = Mock()
-            mock_user_class.query = mock_query
+        with app.app_context():
+            with patch("app.auth.models.User") as mock_user_class:
+                mock_query = Mock()
+                mock_query.filter.return_value.first.return_value = Mock()  # Email taken
+                mock_user_class.query = mock_query
 
-            changes = []
-            result = _update_user_email(mock_user, "taken@example.com", changes)
+                changes = []
+                result = _update_user_email(mock_user, "taken@example.com", changes)
 
-            assert result is False
-            assert changes == []
+                assert result is False
+                assert changes == []
 
     def test_update_user_password_success(self, mock_user):
         """Test successful password update."""

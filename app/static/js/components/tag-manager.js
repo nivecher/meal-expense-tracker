@@ -182,7 +182,10 @@ class TagManager {
     } : null;
 
     try {
-      container.innerHTML = '<div class="text-muted small">Loading tags...</div>';
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'text-muted small';
+      loadingDiv.textContent = 'Loading tags...';
+      container.replaceChildren(loadingDiv);
 
       const response = await fetch('/expenses/tags');
       if (!response.ok) {
@@ -194,11 +197,14 @@ class TagManager {
         const { tags } = data;
 
         if (tags.length === 0) {
-          container.innerHTML = '<div class="text-muted small">No tags created yet. Create your first tag above!</div>';
+          const noTagsDiv = document.createElement('div');
+          noTagsDiv.className = 'text-muted small';
+          noTagsDiv.textContent = 'No tags created yet. Create your first tag above!';
+          container.replaceChildren(noTagsDiv);
           return;
         }
 
-        container.innerHTML = '';
+        container.replaceChildren();
         tags.forEach((tag) => {
           const tagElement = document.createElement('span');
           tagElement.className = 'tag-badge tag-editable tag-badge-pretty';
@@ -246,7 +252,10 @@ class TagManager {
       }
     } catch {
       console.error('Error loading all tags:', error);
-      container.innerHTML = '<div class="text-danger small">Error loading tags.</div>';
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'text-danger small';
+      errorDiv.textContent = 'Error loading tags.';
+      container.replaceChildren(errorDiv);
     }
   }
 
@@ -431,13 +440,16 @@ class TagManager {
 
       const data = await response.json();
       if (data.success && data.tags) {
-        window.tagifyInstance.settings.whitelist = data.tags.map((tag) => ({
-          value: tag.name,
-          id: tag.id,
-          title: tag.description || tag.name,
-          description: tag.description || '',
-          color: tag.color,
-        }));
+        const { tagifyInstance } = window;
+        if (tagifyInstance) {
+          tagifyInstance.settings.whitelist = data.tags.map((tag) => ({
+            value: tag.name,
+            id: tag.id,
+            title: tag.description || tag.name,
+            description: tag.description || '',
+            color: tag.color,
+          }));
+        }
       }
     } catch {
       console.error('Error updating Tagify whitelist:', error);

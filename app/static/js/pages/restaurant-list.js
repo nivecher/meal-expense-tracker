@@ -3,7 +3,7 @@
  * Handles view toggling, pagination, table sorting, and delete functionality
  */
 
-import { initializeRobustFaviconHandling, handleFaviconError } from '../utils/robust-favicon-handler.js';
+import { handleFaviconError } from '../utils/robust-favicon-handler.js';
 window.handleFaviconError = handleFaviconError;
 
 // Utility functions - defined first
@@ -95,16 +95,32 @@ function initDeleteRestaurant() {
     button.addEventListener('click', function() {
       const restaurantId = this.getAttribute('data-restaurant-id');
       const restaurantName = this.getAttribute('data-restaurant-name');
-      const modalTitle = document.getElementById('deleteModalLabel');
+      const modalTitle = document.getElementById('deleteRestaurantModalLabel');
+      const restaurantNameElement = document.getElementById('restaurantName');
+      const deleteForm = document.getElementById('deleteRestaurantForm');
 
       if (modalTitle) {
         modalTitle.textContent = `Delete Restaurant: ${restaurantName}`;
       }
 
-      // Set up the delete button in the modal
-      const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-      if (confirmDeleteBtn) {
-        confirmDeleteBtn.onclick = () => {
+      if (restaurantNameElement) {
+        restaurantNameElement.textContent = restaurantName;
+      }
+
+      if (deleteForm) {
+        const deleteUrl = deleteForm.getAttribute('data-delete-url');
+        deleteForm.action = `${deleteUrl}/${restaurantId}`;
+      }
+
+      // Show the modal
+      const modal = new bootstrap.Modal(document.getElementById('deleteRestaurantModal'));
+      modal.show();
+
+      // Handle form submission
+      if (deleteForm) {
+        deleteForm.onsubmit = (e) => {
+          e.preventDefault();
+
           fetch(`/restaurants/delete/${restaurantId}`, {
             method: 'POST',
             headers: {
@@ -124,10 +140,7 @@ function initDeleteRestaurant() {
                   row.remove();
                 }
                 // Close the modal
-                const modal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
-                if (modal) {
-                  modal.hide();
-                }
+                modal.hide();
               } else {
                 return response.json().then((data) => {
                   if (data.error) {
@@ -184,9 +197,12 @@ function initPagination() {
 
 // Favicon loading functionality
 function initFaviconLoading() {
-  // Initialize robust favicon handling for any new elements
-  initializeRobustFaviconHandling('.restaurant-favicon');
-  initializeRobustFaviconHandling('.restaurant-favicon-table');
+  // Favicon system auto-initializes on DOM ready
+  // Only reinitialize if needed for dynamically added content
+  if (window.RobustFaviconHandler) {
+    window.RobustFaviconHandler.initialize('.restaurant-favicon');
+    window.RobustFaviconHandler.initialize('.restaurant-favicon-table');
+  }
 }
 
 // Tooltip initialization

@@ -12,7 +12,7 @@ def test_create_restaurant(session, test_user):
         user_id=test_user.id,
         name="Test Restaurant",
         city="Test City",
-        address="123 Test St",
+        address_line_1="123 Test St",  # Use address_line_1 instead of address
         phone="123-456-7890",
         website="http://test.com",
         cuisine="American",

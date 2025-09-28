@@ -175,6 +175,7 @@ html {
   html {
     /* Fallback for browsers that don't support text-size-adjust */
     font-size: 16px; /* Explicit base font size */
+    text-size-adjust: 100%;
   }
 }
 
@@ -354,6 +355,7 @@ p {
 }
 
 .form-check-input {
+  user-select: none;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }

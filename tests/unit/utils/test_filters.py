@@ -163,7 +163,8 @@ class TestExtractRestaurantData:
         mock_obj = Mock()
         mock_obj.name = "Test Restaurant"
         mock_obj.google_place_id = "place123"
-        mock_obj.address = "123 Main St"
+        mock_obj.address_line_1 = "123 Main St"
+        mock_obj.address = "123 Main St"  # The address property that combines address lines
         mock_obj.city = "Test City"
         mock_obj.state = "TS"
         mock_obj.postal_code = "12345"
@@ -185,7 +186,8 @@ class TestExtractRestaurantData:
         mock_obj.name = "Test Restaurant"
         # Set other attributes to None to simulate missing attributes
         mock_obj.google_place_id = None
-        mock_obj.address = ""
+        mock_obj.address_line_1 = ""
+        mock_obj.address = ""  # The address property should be empty when address_line_1 is empty
         mock_obj.city = ""
         mock_obj.state = ""
         mock_obj.postal_code = ""

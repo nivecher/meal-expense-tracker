@@ -399,8 +399,10 @@ def validate_expense(mapper, connection, target):
             if target.date.tzinfo is None:
                 target.date = target.date.replace(tzinfo=timezone.utc)
         else:
-            # For date objects, convert to timezone-aware datetime
-            target.date = datetime.combine(target.date, datetime.min.time(), tzinfo=timezone.utc)
+            # For date objects, interpret as the user's intended date
+            # Convert to UTC at noon to avoid date shifting issues
+            # This preserves the user's intended date regardless of timezone
+            target.date = datetime.combine(target.date, datetime.min.time().replace(hour=12), tzinfo=timezone.utc)
 
 
 @event.listens_for(Tag, "before_insert")

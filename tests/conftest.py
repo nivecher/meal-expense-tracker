@@ -407,7 +407,7 @@ def test_restaurant(session: Session, test_user: User) -> Restaurant:
     # Create the restaurant with all required fields
     restaurant = Restaurant(
         name=f"Test Restaurant {uuid.uuid4().hex[:8]}",
-        address="123 Test St",
+        address_line_1="123 Test St",
         city="Test City",
         state="TS",
         postal_code="12345",

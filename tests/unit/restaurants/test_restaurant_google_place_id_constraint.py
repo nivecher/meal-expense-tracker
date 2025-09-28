@@ -150,7 +150,7 @@ class TestGooglePlaceIdConstraint:
                 obj.google_place_id = google_place_id
                 obj.type = "restaurant"
                 obj.description = "Test description"
-                obj.address = "789 Test St"
+                obj.address_line_1 = "789 Test St"
                 obj.state = "TS"
                 obj.postal_code = "12345"
                 obj.country = "Test Country"
@@ -215,7 +215,7 @@ class TestGooglePlaceIdConstraint:
                 obj.google_place_id = google_place_id
                 obj.type = "restaurant"
                 obj.description = "Test description"
-                obj.address = "123 Test St"
+                obj.address_line_1 = "123 Test St"
                 obj.state = "TS"
                 obj.postal_code = "12345"
                 obj.country = "Test Country"
@@ -242,7 +242,7 @@ class TestGooglePlaceIdConstraint:
                 obj.google_place_id = google_place_id
                 obj.type = "restaurant"
                 obj.description = "Test description"
-                obj.address = "456 Test St"
+                obj.address_line_1 = "456 Test St"
                 obj.state = "TS"
                 obj.postal_code = "12345"
                 obj.country = "Test Country"

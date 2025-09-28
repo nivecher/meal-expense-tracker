@@ -44,12 +44,11 @@
         <div class="d-flex align-items-start">
             <i class="fas fa-map-marker-alt me-2 mt-1 flex-shrink-0 text-muted"></i>
             <div class="flex-grow-1">
-                {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %} {% if
-                restaurant.address %}<div class="small text-muted">{{ restaurant.address }}</div>{% endif %} {% if
-                restaurant.city or restaurant.state or restaurant.postal_code %}
-                <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
-                {% endif %} {% else %}
-                <span class="text-muted">-</span>
+                {% if restaurant.get('address') or restaurant.get('city') or restaurant.get('state') or
+                restaurant.get('postal_code') %}
+                <div>{{ restaurant|restaurant_address_only|replace('\n', '<br />')|safe }}</div>
+                {% else %}
+                <span class="text-muted">No address</span>
                 {% endif %}
             </div>
             {% set maps_url = restaurant|google_maps_url %} {% if maps_url %}

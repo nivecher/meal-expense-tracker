@@ -709,24 +709,6 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
     description = "Validate restaurant information against Google Places API and optionally fix mismatches"
     requires_confirmation = False
 
-    def _build_street_address_from_components(self, address_components: list[dict]) -> str:
-        """Build street address from Google Places address components."""
-        street_number = next(
-            (comp.get("long_name") for comp in address_components if "street_number" in comp.get("types", [])),
-            None,
-        )
-        route = next(
-            (comp.get("long_name") for comp in address_components if "route" in comp.get("types", [])),
-            None,
-        )
-        return " ".join(filter(None, [street_number, route]))
-
-    def _detect_service_level_from_google_data(self, google_data: dict) -> tuple[str, float]:
-        """Detect service level from Google Places data."""
-        from app.restaurants.services import detect_service_level_from_google_data
-
-        return detect_service_level_from_google_data(google_data)
-
     def validate_params(self, **kwargs) -> Dict[str, Any]:
         """Validate restaurant validation parameters."""
         errors = []
@@ -850,61 +832,46 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             return {"success": False, "message": f"Failed to get restaurants: {str(e)}"}, [], counts
 
     def _validate_restaurant_with_google(self, restaurant) -> Dict[str, Any]:
-        """Validate restaurant using Google Places API."""
+        """Validate restaurant using new Google Places API."""
         try:
-            from app.api.routes import get_gmaps_client
+            from app.services.google_places_service import get_google_places_service
 
             if not restaurant.google_place_id:
                 return {"valid": None, "errors": ["No Google Place ID available for validation"]}
 
-            gmaps = get_gmaps_client()
-            if not gmaps:
-                return {"valid": False, "errors": ["Google Maps API not configured"]}
+            places_service = get_google_places_service()
+            place_data = places_service.get_place_details(restaurant.google_place_id, "comprehensive")
 
-            place = gmaps.place(
-                place_id=restaurant.google_place_id,
-                language="en",
-                fields=[
-                    "name",
-                    "formatted_address",
-                    "geometry/location",
-                    "rating",
-                    "business_status",
-                    "type",
-                    "user_ratings_total",
-                    "opening_hours",
-                    "website",
-                    "international_phone_number",
-                    "price_level",
-                    "editorial_summary",
-                    "address_component",
-                ],
-            )
+            if not place_data:
+                return {"valid": False, "errors": ["Failed to retrieve place data from Google Places API"]}
 
-            if place and "result" in place:
-                google_data = place["result"]
-                return {
-                    "valid": True,
-                    "google_name": google_data.get("name"),
-                    "google_address": google_data.get("formatted_address"),
-                    "google_rating": google_data.get("rating"),
-                    "google_status": google_data.get("business_status"),
-                    "types": google_data.get("type", []),
-                    "google_phone": google_data.get("international_phone_number"),
-                    "google_website": google_data.get("website"),
-                    "google_price_level": google_data.get("price_level"),
-                    "google_street_address": self._build_street_address_from_components(
-                        google_data.get("address_component", [])
-                    ),
-                    "google_service_level": self._detect_service_level_from_google_data(google_data),
-                    "errors": [],
-                }
-            elif place and "status" in place:
-                status = place["status"]
-                error_msg = place.get("error_message", f"Google API error: {status}")
-                return {"valid": False, "errors": [error_msg]}
-            else:
-                return {"valid": False, "errors": ["No response from Google Places API"]}
+            # Extract restaurant data using the service
+            google_data = places_service.extract_restaurant_data(place_data)
+
+            return {
+                "valid": True,
+                "google_name": google_data.get("name"),
+                "google_address": google_data.get("formatted_address"),
+                "google_rating": google_data.get("rating"),
+                "google_status": google_data.get("business_status"),
+                "types": google_data.get("types", []),
+                "primary_type": google_data.get("primary_type"),
+                "google_phone": google_data.get("phone_number"),
+                "google_website": google_data.get("website"),
+                "google_price_level": google_data.get("price_level"),
+                "google_address_line_1": google_data.get("address_line_1"),
+                "google_address_line_2": google_data.get("address_line_2"),
+                "google_city": google_data.get("city"),
+                "google_state": google_data.get("state"),
+                "google_state_long": google_data.get("state_long"),
+                "google_state_short": google_data.get("state_short"),
+                "google_postal_code": google_data.get("postal_code"),
+                "google_country": google_data.get("country"),
+                # Legacy field for backward compatibility
+                "google_street_address": google_data.get("street_address"),
+                "google_service_level": places_service.detect_service_level_from_data(place_data),
+                "errors": [],
+            }
 
         except ImportError:
             return {"valid": False, "errors": ["Google Places API service not available"]}
@@ -916,21 +883,118 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
         self, restaurant, validation_result: Dict[str, Any]
     ) -> tuple[List[str], Dict[str, str]]:
         """Check for mismatches between restaurant data and Google data."""
-        google_name = validation_result.get("google_name")
-        google_street_address = validation_result.get("google_street_address")
-
         mismatches = []
         fixes_to_apply = {}
 
+        # Check name mismatch
+        self._check_name_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+        # Check address mismatches
+        self._check_address_mismatches(restaurant, validation_result, mismatches, fixes_to_apply)
+
+        # Check service level mismatch
+        self._check_service_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+        return mismatches, fixes_to_apply
+
+    def _check_name_mismatch(self, restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict) -> None:
+        """Check for name mismatches."""
+        google_name = validation_result.get("google_name")
         if google_name and google_name.lower() != restaurant.name.lower():
             mismatches.append(f"Name: '{restaurant.name}' vs Google: '{google_name}'")
             fixes_to_apply["name"] = google_name
 
-        if google_street_address and restaurant.address and google_street_address.lower() != restaurant.address.lower():
-            mismatches.append(f"Address: '{restaurant.address}' vs Google: '{google_street_address}'")
-            fixes_to_apply["address"] = google_street_address
+    def _check_address_mismatches(
+        self, restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+    ) -> None:
+        """Check for address component mismatches."""
+        # Check regular address fields
+        self._check_regular_address_fields(restaurant, validation_result, mismatches, fixes_to_apply)
 
-        # Check service level
+        # Check state field with special handling
+        self._check_state_field(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    def _check_regular_address_fields(
+        self, restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+    ) -> None:
+        """Check regular address fields for mismatches."""
+        address_checks = [
+            ("google_address_line_1", "address_line_1", "Address Line 1"),
+            ("google_address_line_2", "address_line_2", "Address Line 2"),
+            ("google_city", "city", "City"),
+            ("google_postal_code", "postal_code", "Postal Code"),
+            ("google_country", "country", "Country"),
+        ]
+
+        for google_field, restaurant_field, display_name in address_checks:
+            google_value = validation_result.get(google_field)
+            restaurant_value = getattr(restaurant, restaurant_field)
+
+            if google_value and restaurant_value and google_value.lower() != restaurant_value.lower():
+                mismatches.append(f"{display_name}: '{restaurant_value}' vs Google: '{google_value}'")
+                fixes_to_apply[restaurant_field] = google_value
+
+    def _check_state_field(self, restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict) -> None:
+        """Check state field for mismatches with Google's longText/shortText comparison."""
+
+        google_state = validation_result.get("google_state")
+        google_state_long = validation_result.get("google_state_long")
+        google_state_short = validation_result.get("google_state_short")
+        restaurant_state = restaurant.state
+
+        if not ((google_state or google_state_long or google_state_short) and restaurant_state):
+            return
+
+        # Check direct string matches first
+        if self._states_match_directly(restaurant_state, google_state, google_state_long, google_state_short):
+            return
+
+        # Try US library matching as fallback
+        if self._states_match_with_us_library(restaurant_state, google_state, google_state_long, google_state_short):
+            return
+
+        # No matches found - report mismatch
+        mismatches.append(f"State: '{restaurant_state}' vs Google: '{google_state}'")
+        fixes_to_apply["state"] = google_state
+
+    def _states_match_directly(
+        self, restaurant_state: str, google_state: str, google_state_long: str, google_state_short: str
+    ) -> bool:
+        """Check if restaurant state matches any Google state format directly."""
+        restaurant_state_lower = restaurant_state.lower()
+
+        if google_state and google_state.lower() == restaurant_state_lower:
+            return True
+        if google_state_long and google_state_long.lower() == restaurant_state_lower:
+            return True
+        if google_state_short and google_state_short.lower() == restaurant_state_lower:
+            return True
+
+        return False
+
+    def _states_match_with_us_library(
+        self, restaurant_state: str, google_state: str, google_state_long: str, google_state_short: str
+    ) -> bool:
+        """Check if states match using US library normalization."""
+        import us
+
+        restaurant_state_obj = us.states.lookup(restaurant_state)
+        if not restaurant_state_obj:
+            return False
+
+        # Check each Google state format
+        for google_state_value in [google_state, google_state_long, google_state_short]:
+            if google_state_value:
+                google_state_obj = us.states.lookup(google_state_value)
+                if google_state_obj and restaurant_state_obj.abbr == google_state_obj.abbr:
+                    return True
+
+        return False
+
+    def _check_service_level_mismatch(
+        self, restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+    ) -> None:
+        """Check for service level mismatches."""
         google_service_level_data = validation_result.get("google_service_level")
         if google_service_level_data:
             google_service_level, confidence = google_service_level_data
@@ -945,8 +1009,6 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
                 if suggested_fix:
                     fixes_to_apply["service_level"] = suggested_fix
 
-        return mismatches, fixes_to_apply
-
     def _apply_restaurant_fixes(self, restaurant, fixes_to_apply: Dict[str, str], dry_run: bool) -> tuple[bool, str]:
         """Apply fixes to restaurant data."""
         if dry_run:
@@ -954,15 +1016,23 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
 
         try:
             changes_made = []
-            if "name" in fixes_to_apply:
-                restaurant.name = fixes_to_apply["name"]
-                changes_made.append("name")
-            if "address" in fixes_to_apply:
-                restaurant.address = fixes_to_apply["address"]
-                changes_made.append("address")
-            if "service_level" in fixes_to_apply:
-                restaurant.service_level = fixes_to_apply["service_level"]
-                changes_made.append("service_level")
+
+            # Field mappings for fixes
+            field_mappings = {
+                "name": "name",
+                "address_line_1": "address_line_1",
+                "address_line_2": "address_line_2",
+                "city": "city",
+                "state": "state",
+                "postal_code": "postal_code",
+                "country": "country",
+                "service_level": "service_level",
+            }
+
+            for fix_key, field_name in field_mappings.items():
+                if fix_key in fixes_to_apply:
+                    setattr(restaurant, field_name, fixes_to_apply[fix_key])
+                    changes_made.append(field_name)
 
             if changes_made:
                 db.session.commit()
@@ -981,7 +1051,9 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             "id": restaurant.id,
             "name": restaurant.name,
             "user_id": restaurant.user_id,
+            "username": restaurant.user.username,
             "google_place_id": restaurant.google_place_id,
+            "full_address": restaurant.full_address,
             "status": "error",
             "mismatches": [],
             "has_mismatches": False,
@@ -989,17 +1061,24 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             "would_fix": False,
             "dry_run": dry_run,
             "errors": [],
+            "google_data": {},
+            "address_comparison": {},
         }
 
         validation_result = self._validate_restaurant_with_google(restaurant)
 
         if validation_result["valid"] is True:
             result["status"] = "valid"
+            result["google_data"] = validation_result
 
             # Check for mismatches
             mismatches, fixes_to_apply = self._check_restaurant_mismatches(restaurant, validation_result)
             result["mismatches"] = mismatches
             result["has_mismatches"] = len(mismatches) > 0
+
+            # Add address comparison if there are address mismatches
+            if self._has_address_mismatches(restaurant, validation_result):
+                result["address_comparison"] = self._build_address_comparison(restaurant, validation_result)
 
             if mismatches and fix_mismatches and fixes_to_apply:
                 fixed, fix_message = self._apply_restaurant_fixes(restaurant, fixes_to_apply, dry_run)
@@ -1017,6 +1096,40 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
             result["errors"] = validation_result["errors"]
 
         return result
+
+    def _has_address_mismatches(self, restaurant, validation_result: dict) -> bool:
+        """Check if there are any address-related mismatches."""
+        address_fields = ["address_line_1", "address_line_2", "city", "state", "postal_code", "country"]
+
+        for field in address_fields:
+            google_field = f"google_{field}"
+            if google_field in validation_result and validation_result[google_field]:
+                stored_value = getattr(restaurant, field)
+                google_value = validation_result[google_field]
+                if stored_value and google_value and stored_value.lower() != google_value.lower():
+                    return True
+        return False
+
+    def _build_address_comparison(self, restaurant, validation_result: dict) -> dict:
+        """Build detailed address comparison data."""
+        return {
+            "stored_address": {
+                "street": restaurant.address_line_1 or "N/A",
+                "unit": restaurant.address_line_2 or None,
+                "city": restaurant.city or "N/A",
+                "state": restaurant.state or "N/A",
+                "zip": restaurant.postal_code or "N/A",
+                "country": restaurant.country or "N/A",
+            },
+            "google_address": {
+                "street": validation_result.get("google_address_line_1", "N/A"),
+                "unit": validation_result.get("google_address_line_2"),
+                "city": validation_result.get("google_city", "N/A"),
+                "state": validation_result.get("google_state", "N/A"),
+                "zip": validation_result.get("google_postal_code", "N/A"),
+                "country": validation_result.get("google_country", "N/A"),
+            },
+        }
 
     def _process_all_restaurants(
         self, restaurants_to_validate: List, fix_mismatches: bool, dry_run: bool
@@ -1513,33 +1626,19 @@ class ValidateRestaurantsOperation(BaseAdminOperation):
     def _search_google_places_by_name_and_address(self, name: str, address: str | None = None) -> list[dict]:
         """Search Google Places API for restaurants by name and address."""
         try:
-            import requests
-            from flask import current_app
+            from app.services.google_places_service import get_google_places_service
 
-            api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
-            if not api_key:
-                return []
+            places_service = get_google_places_service()
 
+            # Build search query
             search_query = name
             if address:
                 search_query += f" {address}"
 
-            url = "https://places.googleapis.com/v1/places:searchText"
-            headers = {
-                "Content-Type": "application/json",
-                "X-Goog-Api-Key": api_key,
-                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.location",
-            }
-            payload = {
-                "textQuery": search_query,
-                "maxResultCount": 10,
-                "includedType": "restaurant",
-            }
+            # Search for places
+            places = places_service.search_places_by_text(search_query, max_results=10, included_type="restaurant")
 
-            response = requests.post(url, headers=headers, json=payload, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            return data.get("places", [])
+            return places
 
         except Exception as e:
             logger.exception(f"Error searching Google Places: {e}")
@@ -1650,6 +1749,59 @@ class RunMigrationsOperation(BaseAdminOperation):
             }
 
 
+class StampMigrationOperation(BaseAdminOperation):
+    """Stamp the database to a specific Alembic revision (no DDL).
+
+    Safe operation that only updates alembic_version. Requires confirmation.
+    """
+
+    name = "stamp"
+    description = "Stamp the database to a specific Alembic revision (metadata only)"
+    requires_confirmation = True
+
+    def validate_params(self, **kwargs) -> Dict[str, Any]:
+        errors: list[str] = []
+        revision = kwargs.get("revision")
+        if not revision or not isinstance(revision, str):
+            errors.append("revision is required and must be a string")
+        return {"valid": len(errors) == 0, "errors": errors}
+
+    def execute(self, **kwargs) -> Dict[str, Any]:
+        try:
+            from app.utils.migration_manager import migration_manager
+
+            revision: str = kwargs.get("revision")
+
+            # Validate revision exists in scripts
+            latest, _ = migration_manager._get_latest_revision()
+            mig_dir = (
+                migration_manager._detect_migrations_dir() or migration_manager._copy_migrations_to_writable_location()
+            )
+            if not mig_dir:
+                return {"success": False, "message": "No migrations directory available"}
+
+            from alembic.script import ScriptDirectory
+
+            script = ScriptDirectory(mig_dir)
+            if not script.get_revision(revision):
+                return {"success": False, "message": f"Unknown revision: {revision}"}
+
+            # Set alembic_version directly
+            migration_manager._set_migration_revision(revision)
+            db.session.commit()
+
+            return {
+                "success": True,
+                "message": f"Stamped database to revision {revision}",
+                "data": {"revision": revision, "latest": latest},
+            }
+
+        except Exception as e:
+            db.session.rollback()
+            logger.exception(f"Stamp operation failed: {e}")
+            return {"success": False, "message": f"Stamp failed: {str(e)}"}
+
+
 class AdminOperationRegistry:
     """Registry for all available admin operations."""
 
@@ -1663,6 +1815,7 @@ class AdminOperationRegistry:
         "db_maintenance": DatabaseMaintenanceOperation,
         "validate_restaurants": ValidateRestaurantsOperation,
         "run_migrations": RunMigrationsOperation,
+        "stamp": StampMigrationOperation,
     }
 
     @classmethod

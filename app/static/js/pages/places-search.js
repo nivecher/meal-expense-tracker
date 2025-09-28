@@ -152,7 +152,8 @@ window.addToMyRestaurants = async function(placeId) {
     formData.append('name', restaurantData.name || '');
     formData.append('type', 'restaurant');
     formData.append('description', restaurantData.description || '');
-    formData.append('address', restaurantData.address || '');
+    formData.append('address_line_1', restaurantData.address_line_1 || '');
+    formData.append('address_line_2', restaurantData.address_line_2 || '');
     formData.append('city', restaurantData.city || '');
     formData.append('state', restaurantData.state || '');
     formData.append('postal_code', restaurantData.postal_code || '');

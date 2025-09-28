@@ -27,8 +27,12 @@ body {
   text-size-adjust: 100%;
 }
 
-/* Firefox doesn't support text-size-adjust property
-   Browser will use default text scaling behavior */
+/* Browser compatibility for text-size-adjust */
+@supports not (text-size-adjust: 100%) {
+  html {
+    text-size-adjust: 100%;
+  }
+}
 
 .container {
   max-width: 1200px;
@@ -49,6 +53,20 @@ th {
 }
 
 /* Favicon loading improvements */
+
+.restaurant-favicon {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.restaurant-favicon-table {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.restaurant-fallback-icon {
+  font-size: 20px;
+}
 
 .restaurant-favicon,
 .restaurant-favicon-table {

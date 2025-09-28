@@ -113,7 +113,7 @@ class ModernAvatarManager {
 
   extractAvatarData(element) {
     // const rect = element.getBoundingClientRect(); // Unused for now
-    // const computedStyle = window.getComputedStyle(element); // Unused for now
+    const computedStyle = window.getComputedStyle(element);
 
     // Get the image source and clean it up
     let src = element.src || element.dataset.src || '';
@@ -307,19 +307,22 @@ class ModernAvatarManager {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       cursor: pointer;
+    }
+
+    .avatar-hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      border-color: rgba(255, 255, 255, 1);
+    }
     `;
 
-    // Add hover effect
+    // Add hover effect using CSS classes for better performance
     element.addEventListener('mouseenter', () => {
-      element.style.transform = 'translateY(-1px)';
-      element.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
-      element.style.borderColor = 'rgba(255, 255, 255, 1)';
+      element.classList.add('avatar-hover');
     });
 
     element.addEventListener('mouseleave', () => {
-      element.style.transform = '';
-      element.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)';
-      element.style.borderColor = 'rgba(255, 255, 255, 0.9)';
+      element.classList.remove('avatar-hover');
     });
 
     return element;

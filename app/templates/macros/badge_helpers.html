@@ -26,7 +26,7 @@ set rgb_values = hex_to_rgb(cuisine_color) -%} {%- set size_class = 'badge-sm' i
     href="{{ link_url }}"
     class="badge-unified cuisine {{ cuisine_css_class }} {{ size_class }}"
     data-cuisine="{{ cuisine_name }}"
-    style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }};">
+    style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }}; min-width: 80px;">
     {%- if show_icon and cuisine_icon -%}
     <i class="fas fa-{{ cuisine_icon }}"></i>
     {%- endif -%} {{ cuisine_name }}
@@ -35,7 +35,7 @@ set rgb_values = hex_to_rgb(cuisine_color) -%} {%- set size_class = 'badge-sm' i
 <span
     class="badge-unified cuisine {{ cuisine_css_class }} {{ size_class }}"
     data-cuisine="{{ cuisine_name }}"
-    style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }};">
+    style="--cuisine-color: {{ cuisine_color }}; --cuisine-color-rgb: {{ rgb_values }}; min-width: 80px;">
     {%- if show_icon and cuisine_icon -%}
     <i class="fas fa-{{ cuisine_icon }}"></i>
     {%- endif -%} {{ cuisine_name }}
@@ -55,15 +55,20 @@ set display_name = order_type.replace('_', ' ').title() -%} {%- set size_class =
 </span>
 {%- else -%}
 <span class="text-muted">-</span>
-{%- endif -%} {%- endmacro %} {# Service Level Badge Macro #} {% macro service_level_badge(service_level, size='md') -%}
-{%- if service_level -%} {%- set service_level_normalized = service_level.lower().strip().replace(' ', '-') -%} {%- set
-display_name = service_level.replace('_', ' ').title() -%} {%- set size_class = 'badge-sm' if size == 'sm' else
-'badge-lg' if size == 'lg' else 'badge-md' -%}
+{%- endif -%} {%- endmacro %} {# Service Level Badge Macro #} {% macro service_level_badge(service_level, size='md',
+show_icon=true) -%} {%- if service_level -%} {%- set service_level_normalized = service_level.lower().strip().replace('
+', '-') -%} {%- set display_name = service_level.replace('_', ' ').title() -%} {%- set size_class = 'badge-sm' if size
+== 'sm' else 'badge-lg' if size == 'lg' else 'badge-md' -%} {%- set service_level_icon =
+service_level|service_level_icon if show_icon else '' -%} {%- set service_level_color =
+service_level|service_level_color -%} {%- set service_level_css_class = service_level|service_level_css_class -%}
 
 <span
-    class="badge-unified service-level {{ service_level_normalized }} {{ size_class }}"
-    data-service-level="{{ service_level }}">
-    {{ display_name }}
+    class="badge-unified service-level {{ service_level_css_class }} {{ size_class }}"
+    data-service-level="{{ service_level }}"
+    style="--service-level-color: {{ service_level_color }}; min-width: 80px;">
+    {%- if show_icon and service_level_icon -%}
+    <i class="fas fa-{{ service_level_icon }}"></i>
+    {%- endif -%} {{ display_name }}
 </span>
 {%- else -%}
 <span class="text-muted">-</span>
@@ -106,20 +111,36 @@ price_level_int >= 0 -%} {%- set size_class = 'badge-sm' if size == 'sm' else 'b
     <i class="fas fa-gift me-1"></i>Free
 </span>
 {%- elif price_level_int == 1 -%}
-<span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Budget ($1-10 / person)">
-    <i class="fas fa-dollar-sign me-1"></i>$
+<span
+    class="badge bg-success {{ size_class }}"
+    data-bs-toggle="tooltip"
+    title="Budget ($1-10 / person)"
+    style="min-width: 80px">
+    $ Budget
 </span>
 {%- elif price_level_int == 2 -%}
-<span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Moderate ($11-30 / person)">
-    <i class="fas fa-dollar-sign me-1"></i>$$
+<span
+    class="badge bg-success {{ size_class }}"
+    data-bs-toggle="tooltip"
+    title="Moderate ($11-30 / person)"
+    style="min-width: 80px">
+    $$ Moderate
 </span>
 {%- elif price_level_int == 3 -%}
-<span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Expensive ($31-60 / person)">
-    <i class="fas fa-dollar-sign me-1"></i>$$$
+<span
+    class="badge bg-success {{ size_class }}"
+    data-bs-toggle="tooltip"
+    title="Expensive ($31-60 / person)"
+    style="min-width: 80px">
+    $$$ Expensive
 </span>
 {%- elif price_level_int == 4 -%}
-<span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="Very Expensive ($61+ / person)">
-    <i class="fas fa-dollar-sign me-1"></i>$$$$
+<span
+    class="badge bg-success {{ size_class }}"
+    data-bs-toggle="tooltip"
+    title="Very Expensive ($61+ / person)"
+    style="min-width: 80px">
+    $$$$ Very Expensive
 </span>
 {%- else -%}
 <span class="badge bg-secondary {{ size_class }}" data-bs-toggle="tooltip" title="Price level unknown">
@@ -139,29 +160,27 @@ else 'badge-lg' if size == 'lg' else 'badge-md' -%} {%- if price_level_int == 0 
 </div>
 {%- elif price_level_int == 1 -%}
 <div class="d-flex flex-column">
-    <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="$1-10 per person">
-        <i class="fas fa-dollar-sign me-1"></i>Budget
-    </span>
+    <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="$1-10 per person"> $ Budget </span>
     <small class="text-muted mt-1">$1-10 per person</small>
 </div>
 {%- elif price_level_int == 2 -%}
 <div class="d-flex flex-column">
     <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="$11-30 per person">
-        <i class="fas fa-dollar-sign me-1"></i>Moderate
+        $$ Moderate
     </span>
     <small class="text-muted mt-1">$11-30 per person</small>
 </div>
 {%- elif price_level_int == 3 -%}
 <div class="d-flex flex-column">
     <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="$31-60 per person">
-        <i class="fas fa-dollar-sign me-1"></i>Expensive
+        $$$ Expensive
     </span>
     <small class="text-muted mt-1">$31-60 per person</small>
 </div>
 {%- elif price_level_int == 4 -%}
 <div class="d-flex flex-column">
     <span class="badge bg-success {{ size_class }}" data-bs-toggle="tooltip" title="$61+ per person">
-        <i class="fas fa-dollar-sign me-1"></i>Very Expensive
+        $$$$ Very Expensive
     </span>
     <small class="text-muted mt-1">$61+ per person</small>
 </div>

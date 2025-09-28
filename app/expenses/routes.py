@@ -142,10 +142,20 @@ def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
     except (ValueError, TypeError):
         normalized_restaurant_id = None
 
+    # Set default date to current date in user's timezone
+    from app.utils.timezone_utils import get_current_time_in_user_timezone
+
+    user_timezone = current_user.timezone if current_user.timezone else "UTC"
+    current_datetime_user_tz = get_current_time_in_user_timezone(user_timezone)
+    current_date_user_tz = current_datetime_user_tz.date()
+    current_time_user_tz = current_datetime_user_tz.time()
+
     form = ExpenseForm(
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant")] + restaurants,
         restaurant_id=normalized_restaurant_id,
+        date=current_date_user_tz,
+        time=current_time_user_tz,
     )
     return form, is_ajax
 
@@ -417,9 +427,18 @@ def _handle_expense_not_found() -> ResponseReturnValue:
 
 def _init_expense_form(categories: list[tuple[int, str, str, str]], restaurants: list[tuple[str, str]]) -> ExpenseForm:
     """Initialize an expense form with the given choices."""
+    # Set default date to current date in user's timezone
+    from app.utils.timezone_utils import get_current_time_in_user_timezone
+
+    user_timezone = current_user.timezone if current_user.timezone else "UTC"
+    current_datetime_user_tz = get_current_time_in_user_timezone(user_timezone)
+    current_date_user_tz = current_datetime_user_tz.date()
+    current_time_user_tz = current_datetime_user_tz.time()
     return ExpenseForm(
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant")] + restaurants,
+        date=current_date_user_tz,
+        time=current_time_user_tz,
     )
 
 
@@ -432,6 +451,14 @@ def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
         form.restaurant_id.data = expense.restaurant_id
     if expense.meal_type:
         form.meal_type.data = expense.meal_type
+    # Set the date and time from the expense
+    if expense.date:
+        from app.utils.timezone_utils import convert_to_user_timezone
+
+        user_timezone = current_user.timezone if current_user.timezone else "UTC"
+        expense_datetime_user_tz = convert_to_user_timezone(expense.date, user_timezone)
+        form.date.data = expense_datetime_user_tz.date()
+        form.time.data = expense_datetime_user_tz.time()
 
 
 def _handle_expense_update(

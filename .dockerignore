@@ -99,11 +99,43 @@ instance/
 *.sqlite
 *.sqlite3
 
-# Terraform
+# Session files (permission issues)
+flask_session/
+
+# Terraform (HUGE - 734MB)
 terraform/
 *.tfstate
 *.tfstate.*
 .terraform/
+
+# Build artifacts (HUGE - 221MB)
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Test artifacts (HUGE - 10MB+)
+test-results/
+playwright-report/
+htmlcov/
+.coverage
+coverage.xml
+.pytest_cache/
+.mypy_cache/
+
+# Documentation (300KB)
+docs/
+*.md
+README*
+CHANGELOG*
+LICENSE*
+CONTRIBUTING.md
+LAMBDA_MIGRATION_GUIDE.md
+MIGRATION_GUIDE.md
+
+# Test files (3MB)
+tests/
+test-data/
 
 # AWS
 .aws/

@@ -8,6 +8,13 @@
 
 import { initNotifications } from './utils/notifications.js';
 import { EventHandlers } from './components/event-handlers.js';
+import {
+  getFaviconStats,
+  clearFaviconCache,
+  testFaviconForDomain,
+  enableFaviconDebugMode,
+  initializeRobustFaviconHandling,
+} from './utils/robust-favicon-handler.js';
 // import { errorHandler } from './utils/error-handler.js'; // Unused for now
 
 // Enhanced page module loading with error handling
@@ -109,13 +116,16 @@ async function refreshTagifyInstance() {
 
     const data = await response.json();
     if (data.success && data.tags) {
-      window.tagifyInstance.settings.whitelist = data.tags.map((tag) => ({
-        value: tag.name,
-        id: tag.id,
-        title: tag.description || tag.name,
-        description: tag.description || '',
-        color: tag.color,
-      }));
+      const { tagifyInstance } = window;
+      if (tagifyInstance) {
+        tagifyInstance.settings.whitelist = data.tags.map((tag) => ({
+          value: tag.name,
+          id: tag.id,
+          title: tag.description || tag.name,
+          description: tag.description || '',
+          color: tag.color,
+        }));
+      }
     }
 
     // Re-apply colors to existing tags
@@ -204,6 +214,10 @@ async function init() {
     // Initialize event handlers (replaces inline onclick handlers)
     new EventHandlers(); // eslint-disable-line no-new
 
+    // Initialize favicon system
+    initializeRobustFaviconHandling('.restaurant-favicon');
+    initializeRobustFaviconHandling('.restaurant-favicon-table');
+
     // Initialize tag color watcher for dynamically added content
     initTagColorWatcher();
 
@@ -220,84 +234,9 @@ async function init() {
       }
     });
 
-    // AGGRESSIVE browser extension error suppression
-    const originalConsoleError = console.error;
-    const originalConsoleWarn = console.warn;
+    // Error handling is now managed by unified-error-handler.js
 
-    // Override console methods to filter out extension errors
-    console.error = function(...args) {
-      const message = args.join(' ');
-      if (message && typeof message === 'string' && (message.includes('bootstrap-autofill-overlay') ||
-          message.includes('element.tagName.toLowerCase is not a function') ||
-          message.includes('elementIsInstanceOf'))) {
-        return; // Suppress these errors completely
-      }
-      originalConsoleError.apply(console, args);
-    };
-
-    console.warn = function(...args) {
-      const message = args.join(' ');
-      if (message && typeof message === 'string' && (message.includes('bootstrap-autofill-overlay') ||
-          message.includes('element.tagName.toLowerCase is not a function') ||
-          message.includes('elementIsInstanceOf'))) {
-        return; // Suppress these warnings completely
-      }
-      originalConsoleWarn.apply(console, args);
-    };
-
-    // Handle browser extension errors gracefully
-    window.addEventListener('error', (event) => {
-      if (event.filename && (event.filename.includes('bootstrap-autofill-overlay') ||
-          event.filename.includes('extension') ||
-          event.message.includes('tagName.toLowerCase'))) {
-        // Silently ignore browser extension errors
-        event.preventDefault();
-        event.stopPropagation();
-        return false;
-      }
-    });
-
-    window.addEventListener('unhandledrejection', (event) => {
-      if (event.reason && (event.reason.stack && (event.reason.stack.includes('bootstrap-autofill-overlay') ||
-          event.reason.stack.includes('extension') ||
-          event.reason.message.includes('tagName.toLowerCase')))) {
-        // Silently ignore browser extension promise rejections
-        event.preventDefault();
-        event.stopPropagation();
-        return false;
-      }
-    });
-
-    // Nuclear option: Override the problematic function globally
-    if (typeof window !== 'undefined') {
-      const originalQuerySelector = document.querySelector;
-      const originalQuerySelectorAll = document.querySelectorAll;
-
-      // Wrap DOM methods to catch extension errors
-      document.querySelector = function(selector) {
-        try {
-          return originalQuerySelector.call(this, selector);
-        } catch {
-          if (error.message.includes('tagName.toLowerCase') ||
-              error.stack && error.stack.includes('bootstrap-autofill-overlay')) {
-            return null;
-          }
-          throw error;
-        }
-      };
-
-      document.querySelectorAll = function(selector) {
-        try {
-          return originalQuerySelectorAll.call(this, selector);
-        } catch {
-          if (error.message.includes('tagName.toLowerCase') ||
-              error.stack && error.stack.includes('bootstrap-autofill-overlay')) {
-            return [];
-          }
-          throw error;
-        }
-      };
-    }
+    // DOM method protection is now handled by unified-error-handler.js
 
     // Initialize style replacer (replaces inline styles) - DISABLED BY DEFAULT
     // Uncomment to enable: new StyleReplacer({ enabled: true, verbose: false });
@@ -373,7 +312,10 @@ async function init() {
       }, 500);
     }
 
-    console.warn('✅ Application initialized successfully');
+    // Only show debug messages if debug mode is enabled
+    if (window.location.search.includes('debug=true') || localStorage.getItem('debugMode') === 'true') {
+      console.warn('✅ Application initialized successfully');
+    }
 
   } catch {
     console.error('❌ Failed to initialize application:', error);
@@ -384,6 +326,22 @@ async function init() {
     } else {
       alert('Failed to initialize application. Please refresh the page.');
     }
+  }
+}
+
+// Add favicon debug commands to global scope for development
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  window.faviconDebug = {
+    stats: getFaviconStats,
+    clearCache: clearFaviconCache,
+    testDomain: testFaviconForDomain,
+    enableDebug: enableFaviconDebugMode,
+  };
+
+  // Only show debug messages if debug mode is enabled
+  if (window.location.search.includes('debug=true') || localStorage.getItem('debugMode') === 'true') {
+    console.warn('🔧 Favicon debug commands available: window.faviconDebug');
+    console.warn('📊 Usage: window.faviconDebug.stats(), window.faviconDebug.testDomain("example.com")');
   }
 }
 

@@ -27,7 +27,10 @@ export class EventHandlers {
     this.setupModalHandlers();
     this.setupDropdownHandlers();
 
-    console.log('✅ Event handlers initialized');
+    // Only show debug messages if debug mode is enabled
+    if (window.location.search.includes('debug=true') || localStorage.getItem('debugMode') === 'true') {
+      console.warn('✅ Event handlers initialized');
+    }
   }
 
   /**

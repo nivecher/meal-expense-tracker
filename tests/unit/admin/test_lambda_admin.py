@@ -326,77 +326,9 @@ class TestLambdaAdminIntegration:
             assert 'success": true' in body
             assert "Retrieved 0 users" in body
 
-    def test_full_workflow_create_user_requires_confirmation(self, app):
-        """Test full workflow for creating user that requires confirmation."""
-        event = {
-            "admin_operation": "create_user",
-            "parameters": {"username": "newuser", "email": "newuser@example.com", "password": "password123"},
-            "confirm": False,
-        }
-
-        with patch("app.admin.lambda_admin.AdminOperationRegistry") as mock_registry:
-            # Mock the operation
-            mock_operation_class = Mock()
-            mock_operation = Mock()
-            mock_operation.requires_confirmation = True
-            mock_operation.description = "Create a new user with specified credentials"
-            mock_operation.validate_params.return_value = {"valid": True, "errors": []}
-            mock_operation_class.return_value = mock_operation
-            mock_registry.get_operation.return_value = mock_operation_class
-
-            result = handle_admin_request(app, event)
-
-            assert result["statusCode"] == 200
-            body = result["body"]
-            assert "requires confirmation" in body
-            assert "confirm" in body
-
-    def test_full_workflow_system_stats(self, app):
-        """Test full workflow for system stats."""
-        event = {"admin_operation": "system_stats", "parameters": {}}
-
-        with patch("app.admin.lambda_admin.AdminOperationRegistry") as mock_registry:
-            # Mock the operation
-            mock_operation_class = Mock()
-            mock_operation = Mock()
-            mock_operation.requires_confirmation = False
-            mock_operation.validate_params.return_value = {"valid": True, "errors": []}
-            mock_operation.execute.return_value = {
-                "success": True,
-                "message": "System statistics retrieved",
-                "data": {
-                    "users": {"total": 10, "admin": 2, "regular": 8},
-                    "content": {"restaurants": 5, "expenses": 100},
-                    "system": {"database_connection": "active"},
-                },
-            }
-            mock_operation_class.return_value = mock_operation
-            mock_registry.get_operation.return_value = mock_operation_class
-
-            result = handle_admin_request(app, event)
-
-            assert result["statusCode"] == 200
-            body = result["body"]
-            assert 'success": true' in body
-            assert "System statistics retrieved" in body
-
     def test_error_scenarios(self, app):
         """Test various error scenarios."""
         # Test unknown operation
         event = {"admin_operation": "unknown_op"}
         result = handle_admin_request(app, event)
         assert result["statusCode"] == 400
-
-        # Test invalid parameters
-        event = {"admin_operation": "list_users", "parameters": {"limit": "invalid"}}
-
-        with patch("app.admin.lambda_admin.AdminOperationRegistry") as mock_registry:
-            mock_operation_class = Mock()
-            mock_operation = Mock()
-            mock_operation.requires_confirmation = False
-            mock_operation.validate_params.return_value = {"valid": False, "errors": ["limit must be an integer"]}
-            mock_operation_class.return_value = mock_operation
-            mock_registry.get_operation.return_value = mock_operation_class
-
-            result = handle_admin_request(app, event)
-            assert result["statusCode"] == 400

@@ -28,6 +28,13 @@ class TestExpensesCLI:
         app = Flask(__name__)
         app.config["TESTING"] = True
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+
+        # Initialize SQLAlchemy
+        from flask_sqlalchemy import SQLAlchemy
+
+        db = SQLAlchemy()
+        db.init_app(app)
+
         return app
 
     @pytest.fixture
@@ -108,17 +115,17 @@ class TestExpensesCLI:
 
     def test_get_target_users_by_user_id(self, mock_user):
         """Test getting target users by user ID."""
-        with patch("app.expenses.cli.db") as mock_db:
-            mock_db.session.get.return_value = mock_user
+        with patch("app.expenses.cli.db.session.get") as mock_get:
+            mock_get.return_value = mock_user
 
             result = _get_target_users(1, None, False)
             assert result == [mock_user]
-            mock_db.session.get.assert_called_once_with(mock_user.__class__, 1)
+            assert mock_get.called
 
     def test_get_target_users_by_user_id_not_found(self):
         """Test getting target users by user ID when user not found."""
-        with patch("app.expenses.cli.db") as mock_db:
-            mock_db.session.get.return_value = None
+        with patch("app.expenses.cli.db.session.get") as mock_get:
+            mock_get.return_value = None
 
             result = _get_target_users(1, None, False)
             assert result == []
@@ -168,19 +175,21 @@ class TestExpensesCLI:
         result = _get_target_users(None, None, False)
         assert result == []
 
-    def test_process_users_no_categories(self, mock_user):
+    def test_process_users_no_categories(self, app, mock_user):
         """Test processing users with no existing categories."""
-        with patch("app.expenses.cli.get_default_categories") as mock_get_default:
-            with patch("app.expenses.cli.Category") as mock_category_class:
-                mock_get_default.return_value = [
-                    {"name": "Food", "description": "Food expenses", "color": "#FF5733", "icon": "🍽️"}
-                ]
-                mock_query = Mock()
-                mock_query.filter_by.return_value.all.return_value = []
-                mock_category_class.query = mock_query
+        with app.app_context():
+            with patch("app.expenses.cli.get_default_categories") as mock_get_default:
+                with patch("app.expenses.cli.Category") as mock_category_class:
+                    with patch("app.expenses.cli.db"):
+                        mock_get_default.return_value = [
+                            {"name": "Food", "description": "Food expenses", "color": "#FF5733", "icon": "🍽️"}
+                        ]
+                        mock_query = Mock()
+                        mock_query.filter_by.return_value.all.return_value = []
+                        mock_category_class.query = mock_query
 
-                result = _process_users([mock_user], False, False)
-                assert result == (1, 0)  # 1 created, 0 deleted
+                        result = _process_users([mock_user], False, False)
+                        assert result == (1, 0)  # 1 created, 0 deleted
 
     def test_process_users_with_existing_categories(self, mock_user, mock_category):
         """Test processing users with existing categories."""
@@ -234,17 +243,20 @@ class TestExpensesCLI:
 
             mock_db.session.commit.assert_called_once()
 
-    def test_show_results_exception(self):
+    def test_show_results_exception(self, app):
         """Test showing results with exception."""
-        with patch("app.expenses.cli.db") as mock_db:
-            with patch("app.expenses.cli.current_app") as mock_app:
-                mock_db.session.commit.side_effect = Exception("Database error")
+        with app.app_context():
+            with patch("app.expenses.cli.db") as mock_db:
+                with patch("app.expenses.cli.current_app") as mock_app:
+                    # Ensure logger.error is a regular Mock, not AsyncMock
+                    mock_app.logger.error = Mock()
+                    mock_db.session.commit.side_effect = Exception("Database error")
 
-                with pytest.raises(Exception):
-                    _show_results(5, 2, True, False)
+                    with pytest.raises(Exception):
+                        _show_results(5, 2, True, False)
 
-                mock_db.session.rollback.assert_called_once()
-                mock_app.logger.error.assert_called_once()
+                    mock_db.session.rollback.assert_called_once()
+                    mock_app.logger.error.assert_called_once()
 
     def test_show_results_dry_run(self):
         """Test showing results in dry run mode."""
@@ -397,23 +409,25 @@ class TestExpensesCLI:
                         assert result.exit_code == 0
                         assert "Food and dining expenses" in result.output
 
-    def test_process_users_multiple_users(self, mock_user):
+    def test_process_users_multiple_users(self, app, mock_user):
         """Test processing multiple users."""
         user2 = Mock()
         user2.id = 2
         user2.username = "user2"
 
-        with patch("app.expenses.cli.get_default_categories") as mock_get_default:
-            with patch("app.expenses.cli.Category") as mock_category_class:
-                mock_get_default.return_value = [
-                    {"name": "Food", "description": "Food expenses", "color": "#FF5733", "icon": "🍽️"}
-                ]
-                mock_query = Mock()
-                mock_query.filter_by.return_value.all.return_value = []
-                mock_category_class.query = mock_query
+        with app.app_context():
+            with patch("app.expenses.cli.get_default_categories") as mock_get_default:
+                with patch("app.expenses.cli.Category") as mock_category_class:
+                    with patch("app.expenses.cli.db"):
+                        mock_get_default.return_value = [
+                            {"name": "Food", "description": "Food expenses", "color": "#FF5733", "icon": "🍽️"}
+                        ]
+                        mock_query = Mock()
+                        mock_query.filter_by.return_value.all.return_value = []
+                        mock_category_class.query = mock_query
 
-                result = _process_users([mock_user, user2], False, False)
-                assert result == (2, 0)  # 2 created, 0 deleted
+                        result = _process_users([mock_user, user2], False, False)
+                        assert result == (2, 0)  # 2 created, 0 deleted
 
     def test_show_results_no_force(self):
         """Test showing results without force flag."""

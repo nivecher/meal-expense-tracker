@@ -344,6 +344,7 @@
 }
 
 /* Ensure badges maintain their proper sizing in restaurant info cards */
+
 .restaurant-info-cards .list-group-item > div > div:last-child .badge-unified {
   font-size: 0.75rem !important; /* Match default badge-md font size */
   line-height: 1.3 !important; /* Match default badge-md line height */

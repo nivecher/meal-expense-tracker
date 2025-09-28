@@ -85,11 +85,10 @@ class TestDatabaseModule:
     def test_get_database_uri_from_app_config_runtime_error(self, app):
         """Test getting database URI when app context is not available."""
         with patch.dict(os.environ, {}, clear=True):
-            with patch("app.database.current_app._get_current_object", side_effect=RuntimeError):
-                # Should fall back to SQLite development database
-                uri = _get_database_uri()
-                assert uri.startswith("sqlite:///")
-                assert "app-development.db" in uri
+            # Test without app context - should fall back to SQLite
+            uri = _get_database_uri()  # No app parameter passed
+            assert uri.startswith("sqlite:///")
+            assert "app-development.db" in uri
 
     def test_get_database_uri_sqlite_development(self):
         """Test getting database URI for SQLite development database."""
@@ -145,18 +144,17 @@ class TestDatabaseModule:
 
     def test_init_database_with_connection_pooling(self, app):
         """Test database initialization with connection pooling for non-SQLite databases."""
-        app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://user:pass@host:5432/db"
+        with patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@host:5432/db"}):
+            with patch("app.database.db.init_app"):
+                with patch("app.database.db.create_all"):
+                    init_database(app)
 
-        with patch("app.database.db.init_app"):
-            with patch("app.database.db.create_all"):
-                init_database(app)
-
-                assert "SQLALCHEMY_ENGINE_OPTIONS" in app.config
-                engine_options = app.config["SQLALCHEMY_ENGINE_OPTIONS"]
-                assert engine_options["pool_pre_ping"] is True
-                assert engine_options["pool_recycle"] == 300
-                assert engine_options["pool_size"] == 5
-                assert engine_options["max_overflow"] == 10
+                    assert "SQLALCHEMY_ENGINE_OPTIONS" in app.config
+                    engine_options = app.config["SQLALCHEMY_ENGINE_OPTIONS"]
+                    assert engine_options["pool_pre_ping"] is True
+                    assert engine_options["pool_recycle"] == 300
+                    assert engine_options["pool_size"] == 5
+                    assert engine_options["max_overflow"] == 10
 
     def test_init_database_sqlite_no_pooling(self, app):
         """Test database initialization without connection pooling for SQLite."""

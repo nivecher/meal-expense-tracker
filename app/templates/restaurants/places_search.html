@@ -33,7 +33,7 @@ url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Fin
         <script type="application/json" id="places-search-config">
             {
                 "csrfToken": "{{ csrf_token() }}",
-                "addRestaurantUrl": "{{ url_for('restaurants.add_restaurant') }}",
+                "addRestaurantUrl": "{{ url_for('restaurants.add_from_google_places') }}",
                 "googleMapsMapId": "{{ google_maps_map_id }}"
             }
         </script>

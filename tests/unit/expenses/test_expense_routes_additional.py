@@ -91,7 +91,7 @@ class TestExpenseRoutesAdditional:
                 city="Import City",
                 state="CA",
                 postal_code="12345",
-                address="123 Import St",
+                address_line_1="123 Import St",
                 user_id=test_user.id,
             )
             db.session.add(restaurant)

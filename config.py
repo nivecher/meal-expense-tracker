@@ -15,7 +15,8 @@ class Config:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-key-change-in-production")
 
     # Flask settings
-    DEBUG: bool = False
+    DEBUG: bool = os.getenv("FLASK_DEBUG", "0").lower() == "1"
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     TESTING: bool = False
 
     # Database settings
@@ -237,7 +238,7 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration."""
 
-    DEBUG: bool = True
+    # DEBUG: bool = True
     # Cookie security is now automatically configured based on HTTPS availability
     # SESSION_COOKIE_SECURE will be False for HTTP development, True for HTTPS
     # SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE are always enabled for security

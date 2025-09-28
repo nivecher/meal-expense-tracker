@@ -8,7 +8,7 @@ echo "🚀 Running Local CI Workflow..."
 
 # Environment setup
 export PYTHON_VERSION=3.13
-export NODE_VERSION=20
+export NODE_VERSION=22
 export PYTHONPATH=$(pwd)
 export FLASK_ENV=test
 export TESTING=true

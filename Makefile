@@ -71,8 +71,22 @@ export PYTHONPATH
 help:  ## Show this help message
 	@echo "\n\033[1mMeal Expense Tracker - Available Commands\033[0m\n"
 	@echo "\033[1mDevelopment:\033[0m"
-	@echo "  \033[1mmake setup\033[0m           Install development dependencies"
+	@echo "  \033[1mmake setup\033[0m           Complete development environment setup"
+	@echo "  \033[1mmake setup-quick\033[0m     Quick development setup (minimal)"
+	@echo "  \033[1mmake setup-optional\033[0m  Install optional development tools"
+	@echo "  \033[1mmake upgrade-tools\033[0m   Upgrade all development tools"
+	@echo "  \033[1mmake reset-dev\033[0m       Reset development environment"
+	@echo "  \033[1mmake dev-status\033[0m      Check development environment status"
 	@echo "  \033[1mmake run\033[0m             Run the application locally"
+	@echo ""
+	@echo "\033[1mTool Upgrades:\033[0m"
+	@echo "  \033[1mmake upgrade-node\033[0m      Upgrade Node.js to latest version"
+	@echo "  \033[1mmake upgrade-python\033[0m    Upgrade Python to latest version"
+	@echo "  \033[1mmake upgrade-docker\033[0m    Upgrade Docker to latest version"
+	@echo "  \033[1mmake upgrade-terraform\033[0m Upgrade Terraform to latest version"
+	@echo "  \033[1mmake upgrade-aws\033[0m       Upgrade AWS CLI to latest version"
+	@echo "  \033[1mmake upgrade-act\033[0m       Upgrade act to latest version"
+	@echo "  \033[1mmake upgrade-playwright\033[0m Upgrade Playwright to latest version"
 	@echo "  \033[1mmake format\033[0m          Format code (Python, HTML, CSS, JS)"
 	@echo "  \033[1mmake lint\033[0m            Run linters (Python, HTML, CSS, JS)"
 	@echo "  \033[1mmake lint-fix\033[0m        Run linters with auto-fix (Python, HTML, CSS, JS)"
@@ -102,12 +116,22 @@ help:  ## Show this help message
 	@echo "  \033[1mmake docker-logs\033[0m     View container logs (follow mode)"
 	@echo "  \033[1mmake docker-shell\033[0m    Open shell in the application container"
 	@echo "  \033[1mmake docker-rebuild\033[0m  Rebuild and restart containers"
+	@echo "  \033[1mmake docker-build-fast\033[0m ⚡ Fast Docker build (production deps only)"
+	@echo "  \033[1mmake docker-build-standard\033[0m 🚀 Standard Docker build (optimized by default)"
 
 	@echo "\n\033[1mTesting:\033[0m"
 	@echo "  \033[1mmake test\033[0m            Run all tests with coverage"
 	@echo "  \033[1mmake test-unit\033[0m        Run only unit tests"
 	@echo "  \033[1mmake test-integration\033[0m Run only integration tests"
 	@echo "  \033[1mmake test-smoke\033[0m       Run smoke tests"
+	@echo "  \033[1mmake test-frontend\033[0m    Run Playwright frontend tests"
+	@echo "  \033[1mmake test-security\033[0m    Run security headers tests"
+	@echo "  \033[1mmake test-console\033[0m     Run console error tests"
+	@echo "  \033[1mmake test-e2e\033[0m         Run all end-to-end tests"
+	@echo "  \033[1mmake test-frontend-headed\033[0m Run frontend tests with browser visible"
+	@echo "  \033[1mmake test-frontend-debug\033[0m Run frontend tests in debug mode"
+	@echo "  \033[1mmake test-report\033[0m      Generate HTML test report"
+	@echo "  \033[1mmake install-playwright\033[0m Install Playwright dependencies"
 
 	@echo "\n\033[1mTerraform (TF_ENV=env, default: dev):\033[0m"
 	@echo "  \033[1mmake tf-init\033[0m        Initialize Terraform with backend config"
@@ -117,11 +141,22 @@ help:  ## Show this help message
 	@echo "  \033[1mmake tf-validate\033[0m    Validate Terraform configuration"
 
 	@echo "\n\033[1mDeployment Pipeline:\033[0m"
+	@echo "  \033[1mmake package\033[0m         ⚡ Lambda package (app only)"
+	@echo "  \033[1mmake package-layer\033[0m   ⚡ Lambda layer (architecture-aware)"
+	@echo "  \033[1mmake package-complete\033[0m ⚡ Complete package (app + layer)"
 	@echo "  \033[1mmake deploy-dev\033[0m      Deploy to development environment"
 	@echo "  \033[1mmake deploy-staging\033[0m  Deploy to staging environment"
 	@echo "  \033[1mmake deploy-prod\033[0m     Deploy to production environment"
 	@echo "  \033[1mmake release-staging\033[0m Release to staging (tag-based)"
 	@echo "  \033[1mmake release-prod\033[0m    Release to production (tag-based)"
+
+	@echo "\n\033[1mRequirements & Security:\033[0m"
+	@echo "  \033[1mmake requirements\033[0m     Generate requirements files from .in files"
+	@echo "  \033[1mmake security-scan\033[0m     Run security analysis (vulnerabilities + bandit)"
+	@echo "  \033[1mmake security-vulns\033[0m    Check for known vulnerabilities"
+	@echo "  \033[1mmake security-bandit\033[0m   Run Bandit security linter"
+	@echo "  \033[1mmake deps-check\033[0m        Check for outdated dependencies"
+	@echo "  \033[1mmake deps-update\033[0m       Update dependencies to latest versions"
 
 	@echo "\n\033[1mUtilities:\033[0m"
 	@echo "  \033[1mmake clean\033[0m           Remove build artifacts and temporary files"
@@ -152,11 +187,16 @@ venv:
 # Development
 # =============================================================================
 
-## Install development dependencies
+## Complete development environment setup
 .PHONY: setup
 setup:
-	@echo "\n\033[1m=== Setting up development environment ===\033[0m"
-	@./scripts/setup-local-dev.sh
+	@echo "\n\033[1m=== Running Development Setup ===\033[0m"
+	@./scripts/setup-dev.sh --mode full
+	@echo "\n\033[1mNext steps:\033[0m"
+	@echo "  \033[1msource venv/bin/activate\033[0m  # Activate virtual environment"
+	@echo "  \033[1mmake run\033[0m                 # Start the application"
+	@echo "  \033[1mmake test\033[0m                # Run tests"
+	@echo "  \033[1mmake security-scan\033[0m       # Check security"
 
 ## Run the application locally
 .PHONY: run
@@ -200,7 +240,7 @@ lint-html: check-npm
 .PHONY: lint-css
 lint-css: check-npm
 	@echo "\n\033[1m=== Running CSS Linter ===\033[0m"
-	@npx stylelint "app/static/css/**/*.css" 2>/dev/null || (echo "\033[1;31m❌ CSS linting failed\033[0m"; exit 1)
+	@npm run lint:css 2>/dev/null || (echo "\033[1;31m❌ CSS linting failed\033[0m"; exit 1)
 
 ## JavaScript linter
 .PHONY: lint-js
@@ -227,7 +267,7 @@ lint-html-fix: check-npm
 .PHONY: lint-css-fix
 lint-css-fix: check-npm
 	@echo "\n\033[1m=== Running CSS Linter with Auto-fix ===\033[0m"
-	@npx stylelint "app/static/css/**/*.css" --fix 2>/dev/null || (echo "\033[1;31m❌ CSS auto-fix failed\033[0m"; exit 1)
+	@npm run format:css 2>/dev/null || (echo "\033[1;31m❌ CSS auto-fix failed\033[0m"; exit 1)
 
 ## JavaScript linter with auto-fix
 .PHONY: lint-js-fix
@@ -245,7 +285,7 @@ format-html: check-npm
 .PHONY: format-css
 format-css: check-npm
 	@echo "\n\033[1m=== Formatting CSS code ===\033[0m"
-	@npx prettier --write "app/static/css/**/*.css" 2>/dev/null | grep -v "unchanged" || true
+	@npm run format:css 2>/dev/null | grep -v "unchanged" || true
 
 ## Format JavaScript code
 .PHONY: format-js
@@ -272,6 +312,184 @@ check: format lint test
 check-fix: format lint-fix test
 
 # =============================================================================
+# Requirements Management & SCA
+# =============================================================================
+
+## Generate requirements files from .in files
+.PHONY: requirements
+requirements: requirements-prod requirements-dev
+	@echo "\033[1;32m✅ Requirements files generated\033[0m"
+
+## Generate production requirements
+.PHONY: requirements-prod
+requirements-prod: check-pip-tools
+	@echo "\n\033[1m=== Generating Production Requirements ===\033[0m"
+	@pip-compile --upgrade --constraint=constraints.txt requirements/base.in -o requirements.txt
+	@echo "\033[1;32m✅ Production requirements generated\033[0m"
+
+## Generate development requirements (includes security tools)
+.PHONY: requirements-dev
+requirements-dev: check-pip-tools
+	@echo "\n\033[1m=== Generating Development Requirements ===\033[0m"
+	@pip-compile --upgrade --constraint=constraints.txt requirements/dev.in -o requirements-dev.txt
+	@echo "\033[1;32m✅ Development requirements generated\033[0m"
+
+## Check if pip-tools is installed
+.PHONY: check-pip-tools
+check-pip-tools:
+	@if ! $(PIP) show pip-tools >/dev/null 2>&1; then \
+		echo "\033[1;33m⚠️  Installing pip-tools...\033[0m"; \
+		$(PIP) install pip-tools; \
+	fi
+
+## Run comprehensive security analysis
+.PHONY: security-scan
+security-scan: security-vulns security-bandit
+	@echo "\n\033[1;32m✅ Security scan completed\033[0m"
+
+## Check for known vulnerabilities
+.PHONY: security-vulns
+security-vulns: check-env
+	@echo "\n\033[1m=== Checking for Known Vulnerabilities ===\033[0m"
+	@if ! $(PYTHON) -m safety --version >/dev/null 2>&1; then \
+		echo "\033[1;33m⚠️  Installing safety...\033[0m"; \
+		$(PIP) install safety; \
+	fi
+	@echo "\n\033[1m🔍 Scanning production dependencies...\033[0m"
+	@$(PYTHON) -m safety check -r requirements.txt || true
+	@echo "\n\033[1m🔍 Scanning development dependencies...\033[0m"
+	@$(PYTHON) -m safety check -r requirements-dev.txt || true
+	@echo "\033[1;32m✅ Vulnerability scan completed\033[0m"
+
+## Run Bandit security linter
+.PHONY: security-bandit
+security-bandit: check-env
+	@echo "\n\033[1m=== Running Bandit Security Linter ===\033[0m"
+	@if ! $(PYTHON) -m bandit --version >/dev/null 2>&1; then \
+		echo "\033[1;33m⚠️  Installing bandit...\033[0m"; \
+		$(PIP) install bandit; \
+	fi
+	@$(PYTHON) -m bandit -r app/ || true
+	@echo "\033[1;32m✅ Bandit security scan completed\033[0m"
+
+## Check for outdated dependencies
+.PHONY: deps-check
+deps-check: check-env
+	@echo "\n\033[1m=== Checking for Outdated Dependencies ===\033[0m"
+	@$(PIP) list --outdated || echo "✅ All dependencies are up to date"
+
+## Update dependencies
+.PHONY: deps-update
+deps-update: check-env
+	@echo "\n\033[1m=== Updating Dependencies ===\033[0m"
+	@$(MAKE) requirements
+	@$(PIP) install --upgrade -r requirements.txt
+	@$(PIP) install --upgrade -r requirements-dev.txt
+	@echo "\033[1;32m✅ Dependencies updated\033[0m"
+
+## Install production dependencies
+.PHONY: install-deps
+install-deps: check-env
+	@echo "\n\033[1m=== Installing Production Dependencies ===\033[0m"
+	@$(PIP) install -r requirements.txt
+	@echo "\033[1;32m✅ Production dependencies installed\033[0m"
+
+## Install development dependencies (includes security tools)
+.PHONY: install-dev-deps
+install-dev-deps: check-env
+	@echo "\n\033[1m=== Installing Development Dependencies ===\033[0m"
+	@$(PIP) install -r requirements-dev.txt
+	@echo "\033[1;32m✅ Development dependencies installed\033[0m"
+
+## Setup database for development
+.PHONY: setup-db
+setup-db: check-env
+	@echo "\n\033[1m=== Setting up Development Database ===\033[0m"
+	@$(PYTHON) -m flask db upgrade || echo "\033[1;33m⚠️  Database migration skipped (no database configured)\033[0m"
+	@echo "\033[1;32m✅ Database setup complete\033[0m"
+
+## Quick development setup (minimal)
+.PHONY: setup-quick
+setup-quick:
+	@echo "\n\033[1m=== Running Quick Development Setup ===\033[0m"
+	@./scripts/setup-dev.sh --mode minimal
+	@echo "\n\033[1mNote:\033[0m Run \033[1mmake setup\033[0m for full setup including database"
+
+## Install optional development tools
+.PHONY: setup-optional
+setup-optional:
+	@echo "\n\033[1m=== Installing Optional Development Tools ===\033[0m"
+	@./scripts/setup-dev.sh --mode optional
+	@echo "\n\033[1;32m✅ Optional tools installation complete\033[0m"
+
+## Upgrade all development tools
+.PHONY: upgrade-tools
+upgrade-tools:
+	@echo "\n\033[1m=== Upgrading Development Tools ===\033[0m"
+	@./scripts/setup-dev.sh --mode upgrade
+	@echo "\n\033[1;32m✅ Tool upgrades complete\033[0m"
+
+## Upgrade Node.js to latest version
+.PHONY: upgrade-node
+upgrade-node:
+	@echo "\n\033[1m=== Upgrading Node.js ===\033[0m"
+	@./scripts/setup-dev.sh --mode upgrade --tool node
+	@echo "\n\033[1;32m✅ Node.js upgrade complete\033[0m"
+
+## Upgrade Python to latest version
+.PHONY: upgrade-python
+upgrade-python:
+	@echo "\n\033[1m=== Upgrading Python ===\033[0m"
+	@./scripts/setup-dev.sh --mode upgrade --tool python
+	@echo "\n\033[1;32m✅ Python upgrade complete\033[0m"
+
+## Upgrade Docker to latest version
+.PHONY: upgrade-docker
+upgrade-docker:
+	@echo "\n\033[1m=== Upgrading Docker ===\033[0m"
+	@./scripts/setup-dev.sh --mode upgrade --tool docker
+	@echo "\n\033[1;32m✅ Docker upgrade complete\033[0m"
+
+## Upgrade Terraform to latest version
+.PHONY: upgrade-terraform
+upgrade-terraform:
+	@echo "\n\033[1m=== Upgrading Terraform ===\033[0m"
+	@./scripts/setup-dev.sh --mode upgrade --tool terraform
+	@echo "\n\033[1;32m✅ Terraform upgrade complete\033[0m"
+
+## Upgrade AWS CLI to latest version
+.PHONY: upgrade-aws
+upgrade-aws:
+	@echo "\n\033[1m=== Upgrading AWS CLI ===\033[0m"
+	@./scripts/setup-dev.sh --mode upgrade --tool aws
+	@echo "\n\033[1;32m✅ AWS CLI upgrade complete\033[0m"
+
+## Upgrade act to latest version
+.PHONY: upgrade-act
+upgrade-act:
+	@echo "\n\033[1m=== Upgrading act ===\033[0m"
+	@./scripts/setup-dev.sh --mode upgrade --tool act
+	@echo "\n\033[1;32m✅ act upgrade complete\033[0m"
+
+## Upgrade Playwright to latest version
+.PHONY: upgrade-playwright
+upgrade-playwright:
+	@echo "\n\033[1m=== Upgrading Playwright ===\033[0m"
+	@./scripts/setup-dev.sh --mode upgrade --tool playwright
+	@echo "\n\033[1;32m✅ Playwright upgrade complete\033[0m"
+
+## Reset development environment
+.PHONY: reset-dev
+reset-dev: clean-venv setup
+	@echo "\n\033[1;32m✅ Development environment reset complete\033[0m"
+
+## Check development environment status
+.PHONY: dev-status
+dev-status:
+	@echo "\n\033[1m=== Development Environment Status ===\033[0m"
+	@./scripts/setup-dev.sh --mode debug
+
+# =============================================================================
 # Local CI/CD Workflows
 # =============================================================================
 
@@ -288,7 +506,7 @@ ci-quick: check-env check-npm
 	@$(PYTHON) -m flake8 app tests || (echo "\033[1;31m❌ Flake8 failed\033[0m"; exit 1)
 	@$(PYTHON) -m black --check app tests || (echo "\033[1;31m❌ Black check failed\033[0m"; exit 1)
 	@npm run lint-html || (echo "\033[1;31m❌ HTML linting failed\033[0m"; exit 1)
-	@npx stylelint "app/static/css/**/*.css" || (echo "\033[1;31m❌ CSS linting failed\033[0m"; exit 1)
+	@npm run lint:css || (echo "\033[1;31m❌ CSS linting failed\033[0m"; exit 1)
 	@npm run lint:js || (echo "\033[1;31m❌ JavaScript linting failed\033[0m"; exit 1)
 	@PYTHONPATH=. $(PYTHON) -m pytest tests/unit/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Unit tests failed\033[0m"; exit 1)
 	@echo "\033[1;32m✅ Quick CI checks completed\033[0m"
@@ -358,6 +576,122 @@ test-smoke:
 	@echo "\n\033[1m=== Running Smoke Tests ===\033[0m"
 	PYTHONPATH=. $(PYTHON) -m pytest tests/smoke/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Smoke tests failed\033[0m"; exit 1)
 
+## Run Playwright frontend tests
+.PHONY: test-frontend
+test-frontend: check-npm check-playwright
+	@echo "\n\033[1m=== Running Playwright Frontend Tests ===\033[0m"
+	@if ! pgrep -f "flask run" > /dev/null; then \
+		echo "\033[1;33m⚠️  Flask app not running. Starting in background...\033[0m"; \
+		$(PYTHON) -m flask run --host=127.0.0.1 --port=5000 > /dev/null 2>&1 & \
+		FLASK_PID=$$!; \
+		sleep 3; \
+		npx playwright test tests/playwright/ || (echo "\033[1;31m❌ Frontend tests failed\033[0m"; kill $$FLASK_PID 2>/dev/null; exit 1); \
+		kill $$FLASK_PID 2>/dev/null; \
+	else \
+		echo "\033[1;32m✅ Flask app is running\033[0m"; \
+		npx playwright test tests/playwright/ || (echo "\033[1;31m❌ Frontend tests failed\033[0m"; exit 1); \
+	fi
+	@echo "\033[1;32m✅ Frontend tests completed\033[0m"
+
+## Run security headers tests (both Playwright and Python)
+.PHONY: test-security
+test-security: check-npm check-playwright
+	@echo "\n\033[1m=== Running Security Headers Tests ===\033[0m"
+	@echo "\033[1m🔒 Testing Python integration tests...\033[0m"
+	PYTHONPATH=. $(PYTHON) -m pytest tests/integration/test_security_headers.py $(PYTEST_OPTS) || (echo "\033[1;31m❌ Security integration tests failed\033[0m"; exit 1)
+	@echo "\033[1m🎭 Testing Playwright security headers...\033[0m"
+	@if ! pgrep -f "flask run" > /dev/null; then \
+		echo "\033[1;33m⚠️  Flask app not running. Starting in background...\033[0m"; \
+		$(PYTHON) -m flask run --host=127.0.0.1 --port=5000 > /dev/null 2>&1 & \
+		FLASK_PID=$$!; \
+		sleep 3; \
+		npx playwright test tests/playwright/security-headers.spec.js || (echo "\033[1;31m❌ Security Playwright tests failed\033[0m"; kill $$FLASK_PID 2>/dev/null; exit 1); \
+		kill $$FLASK_PID 2>/dev/null; \
+	else \
+		echo "\033[1;32m✅ Flask app is running\033[0m"; \
+		npx playwright test tests/playwright/security-headers.spec.js || (echo "\033[1;31m❌ Security Playwright tests failed\033[0m"; exit 1); \
+	fi
+	@echo "\033[1;32m✅ Security headers tests completed\033[0m"
+
+## Run console error tests
+.PHONY: test-console
+test-console: check-npm check-playwright
+	@echo "\n\033[1m=== Running Console Error Tests ===\033[0m"
+	@if ! pgrep -f "flask run" > /dev/null; then \
+		echo "\033[1;33m⚠️  Flask app not running. Starting in background...\033[0m"; \
+		$(PYTHON) -m flask run --host=127.0.0.1 --port=5000 > /dev/null 2>&1 & \
+		FLASK_PID=$$!; \
+		sleep 3; \
+		npx playwright test tests/playwright/console-tests.spec.js || (echo "\033[1;31m❌ Console tests failed\033[0m"; kill $$FLASK_PID 2>/dev/null; exit 1); \
+		kill $$FLASK_PID 2>/dev/null; \
+	else \
+		echo "\033[1;32m✅ Flask app is running\033[0m"; \
+		npx playwright test tests/playwright/console-tests.spec.js || (echo "\033[1;31m❌ Console tests failed\033[0m"; exit 1); \
+	fi
+	@echo "\033[1;32m✅ Console error tests completed\033[0m"
+
+## Run all frontend tests (Playwright)
+.PHONY: test-e2e
+test-e2e: test-frontend test-security test-console
+	@echo "\n\033[1;32m✅ All end-to-end tests completed\033[0m"
+
+## Install Playwright dependencies
+.PHONY: install-playwright
+install-playwright: check-npm
+	@echo "\n\033[1m=== Installing Playwright ===\033[0m"
+	@npm install @playwright/test
+	@npx playwright install
+	@echo "\033[1;32m✅ Playwright installed successfully\033[0m"
+
+## Run Playwright tests in headed mode (see browser)
+.PHONY: test-frontend-headed
+test-frontend-headed: check-npm check-playwright
+	@echo "\n\033[1m=== Running Playwright Tests (Headed Mode) ===\033[0m"
+	@if ! pgrep -f "flask run" > /dev/null; then \
+		echo "\033[1;33m⚠️  Flask app not running. Starting in background...\033[0m"; \
+		$(PYTHON) -m flask run --host=127.0.0.1 --port=5000 > /dev/null 2>&1 & \
+		FLASK_PID=$$!; \
+		sleep 3; \
+		npx playwright test tests/playwright/ --headed || (echo "\033[1;31m❌ Frontend tests failed\033[0m"; kill $$FLASK_PID 2>/dev/null; exit 1); \
+		kill $$FLASK_PID 2>/dev/null; \
+	else \
+		echo "\033[1;32m✅ Flask app is running\033[0m"; \
+		npx playwright test tests/playwright/ --headed || (echo "\033[1;31m❌ Frontend tests failed\033[0m"; exit 1); \
+	fi
+
+## Run Playwright tests in debug mode
+.PHONY: test-frontend-debug
+test-frontend-debug: check-npm check-playwright
+	@echo "\n\033[1m=== Running Playwright Tests (Debug Mode) ===\033[0m"
+	@if ! pgrep -f "flask run" > /dev/null; then \
+		echo "\033[1;33m⚠️  Flask app not running. Starting in background...\033[0m"; \
+		$(PYTHON) -m flask run --host=127.0.0.1 --port=5000 > /dev/null 2>&1 & \
+		FLASK_PID=$$!; \
+		sleep 3; \
+		npx playwright test tests/playwright/ --debug || (echo "\033[1;31m❌ Frontend tests failed\033[0m"; kill $$FLASK_PID 2>/dev/null; exit 1); \
+		kill $$FLASK_PID 2>/dev/null; \
+	else \
+		echo "\033[1;32m✅ Flask app is running\033[0m"; \
+		npx playwright test tests/playwright/ --debug || (echo "\033[1;31m❌ Frontend tests failed\033[0m"; exit 1); \
+	fi
+
+## Generate Playwright test report
+.PHONY: test-report
+test-report: check-npm check-playwright
+	@echo "\n\033[1m=== Generating Playwright Test Report ===\033[0m"
+	@if ! pgrep -f "flask run" > /dev/null; then \
+		echo "\033[1;33m⚠️  Flask app not running. Starting in background...\033[0m"; \
+		$(PYTHON) -m flask run --host=127.0.0.1 --port=5000 > /dev/null 2>&1 & \
+		FLASK_PID=$$!; \
+		sleep 3; \
+		npx playwright test tests/playwright/ --reporter=html || (echo "\033[1;31m❌ Frontend tests failed\033[0m"; kill $$FLASK_PID 2>/dev/null; exit 1); \
+		kill $$FLASK_PID 2>/dev/null; \
+	else \
+		echo "\033[1;32m✅ Flask app is running\033[0m"; \
+		npx playwright test tests/playwright/ --reporter=html || (echo "\033[1;31m❌ Frontend tests failed\033[0m"; exit 1); \
+	fi
+	@echo "\033[1;32m✅ Test report generated at playwright-report/index.html\033[0m"
+
 # =============================================================================
 # Database
 # =============================================================================
@@ -398,6 +732,29 @@ docker-build: validate-env
 		-t $(IMAGE_NAME):$$TAG_VAL \
 		--load \
 		. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1)
+
+## Fast development build (production deps only)
+.PHONY: docker-build-fast
+docker-build-fast: validate-env
+	@echo "\033[1m⚡ Fast building Docker image for development...\033[0m"
+	@docker build \
+		-f Dockerfile.dev-fast \
+		-t $(IMAGE_NAME):dev-fast \
+		--load \
+		. || (echo "\033[1;31m❌ Fast Docker build failed\033[0m"; exit 1)
+
+## Standard build (now optimized by default)
+.PHONY: docker-build-standard
+docker-build-standard: validate-env
+	@echo "\033[1m🚀 Building standard Docker image (optimized)...\033[0m"
+	@TARGET_VAL=$(if $(TARGET),$(TARGET),development); \
+	TAG_VAL=$(if $(TAG),$(TAG),standard); \
+	docker buildx build \
+		--platform $(TARGET_PLATFORM) \
+		--target $$TARGET_VAL \
+		-t $(IMAGE_NAME):$$TAG_VAL \
+		--load \
+		. || (echo "\033[1;31m❌ Standard Docker build failed\033[0m"; exit 1)
 	@echo "\033[1;32m✅ Docker image built successfully\033[0m"
 
 ## Quick development build
@@ -609,14 +966,15 @@ release-prod: validate-env
 ## Check Lambda package exists
 .PHONY: check-lambda-package
 check-lambda-package:
-	@if [ ! -f "dist/app.zip" ]; then \
-		echo "\033[1;33m⚠️  Lambda package (dist/app.zip) not found.\033[0m"; \
-		echo -n "Run 'make package-lambda' to create it now? [y/N] "; \
+	@ARCHITECTURE="$${LAMBDA_ARCHITECTURE:-arm64}"; \
+	if [ ! -f "dist/$$ARCHITECTURE/app/app-$$ARCHITECTURE.zip" ]; then \
+		echo "\033[1;33m⚠️  Lambda package (dist/$$ARCHITECTURE/app/app-$$ARCHITECTURE.zip) not found.\033[0m"; \
+		echo -n "Run 'make package' to create it now? [y/N] "; \
 		read -r -n 1; \
 		if [[ "$$REPLY" =~ ^[Yy]$$ ]]; then \
 			echo ""; \
-			$(MAKE) package-lambda; \
-			if [ ! -f "dist/app.zip" ]; then \
+			$(MAKE) package; \
+			if [ ! -f "dist/$$ARCHITECTURE/app/app-$$ARCHITECTURE.zip" ]; then \
 				echo "\033[1;31m❌ Package creation failed. Please fix the issues and try again.\033[0m"; \
 				exit 1; \
 			fi; \
@@ -626,10 +984,10 @@ check-lambda-package:
 		fi; \
 	fi
 
-## Package Lambda deployment
-.PHONY: package-lambda
-package-lambda:
-	@echo "\033[1m📦 Creating Lambda deployment package...\033[0m"
+## Package Lambda deployment (architecture-aware)
+.PHONY: package
+package:
+	@echo "\033[1m⚡ Creating Lambda deployment package...\033[0m"
 	@if [ ! -x "$(shell which zip)" ]; then \
 		echo "Error: 'zip' command is required but not installed."; \
 		exit 1; \
@@ -639,7 +997,71 @@ package-lambda:
 		echo "\033[1;31m❌ Failed to create Lambda package\033[0m"; \
 		exit 1; \
 	fi
-	@echo "\033[1;32m✅ Lambda package created at dist/app.zip\033[0m"
+	@echo "\033[1;32m✅ Lambda package created\033[0m"
+
+## Package Lambda deployment (alias for package)
+.PHONY: package-lambda
+package-lambda: package
+
+## Lambda layer package (architecture-aware with Docker fallback)
+.PHONY: package-layer
+package-layer:
+	@echo "\033[1m⚡ Creating Lambda layer package...\033[0m"
+	@if [ ! -x "$(shell which zip)" ]; then \
+		echo "Error: 'zip' command is required but not installed."; \
+		exit 1; \
+	fi
+	@chmod +x scripts/package.sh
+	@if ! ./scripts/package.sh -l; then \
+		echo "\033[1;31m❌ Failed to create Lambda layer package\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ Lambda layer package created\033[0m"
+
+## Complete Lambda package (app + layer, architecture-aware)
+.PHONY: package-complete
+package-complete:
+	@echo "\033[1m⚡ Creating complete Lambda package (app + layer)...\033[0m"
+	@if [ ! -x "$(shell which zip)" ]; then \
+		echo "Error: 'zip' command is required but not installed."; \
+		exit 1; \
+	fi
+	@chmod +x scripts/package.sh
+	@if ! ./scripts/package.sh -b; then \
+		echo "\033[1;31m❌ Failed to create complete Lambda package\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ Complete Lambda package created\033[0m"
+
+## Layer package for x86_64 (current platform)
+.PHONY: package-layer-x86
+package-layer-x86:
+	@echo "\033[1m⚡ Creating x86_64 Lambda layer package...\033[0m"
+	@if [ ! -x "$(shell which zip)" ]; then \
+		echo "Error: 'zip' command is required but not installed."; \
+		exit 1; \
+	fi
+	@chmod +x scripts/package.sh
+	@if ! ./scripts/package.sh -l --x86_64; then \
+		echo "\033[1;31m❌ Failed to create x86_64 layer package\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ x86_64 layer package created\033[0m"
+
+## Layer package for ARM64 (with Docker fallback for cross-architecture)
+.PHONY: package-layer-arm
+package-layer-arm:
+	@echo "\033[1m⚡ Creating ARM64 Lambda layer package...\033[0m"
+	@if [ ! -x "$(shell which zip)" ]; then \
+		echo "Error: 'zip' command is required but not installed."; \
+		exit 1; \
+	fi
+	@chmod +x scripts/package.sh
+	@if ! ./scripts/package.sh -l --arm64; then \
+		echo "\033[1;31m❌ Failed to create ARM64 layer package\033[0m"; \
+		exit 1; \
+	fi
+	@echo "\033[1;32m✅ ARM64 layer package created\033[0m"
 
 # =============================================================================
 # Utilities
@@ -675,6 +1097,21 @@ check-npm:
 		echo "\033[1;33m⚠️  npm dependencies not found. Installing...\033[0m"; \
 		npm install; \
 	fi
+
+## Check Playwright installation
+.PHONY: check-playwright
+check-playwright: check-npm
+	@echo "\033[1m🔍 Checking Playwright installation...\033[0m"
+	@if ! command -v npx >/dev/null 2>&1; then \
+		echo "\033[1;31m❌ npx not found. Please install Node.js and npm.\033[0m"; \
+		exit 1; \
+	fi
+	@if ! npx playwright --version >/dev/null 2>&1; then \
+		echo "\033[1;33m⚠️  Playwright not found. Installing...\033[0m"; \
+		npm install @playwright/test; \
+		npx playwright install; \
+	fi
+	@echo "\033[1;32m✅ Playwright is available\033[0m"
 
 ## Validate all required tools and environment
 .PHONY: validate-env

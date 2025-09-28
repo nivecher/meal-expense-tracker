@@ -8,8 +8,8 @@ class FlashMessages:
     LOGIN_SUCCESS = "Login successful!"
     LOGIN_ERROR = "Invalid username or password"
     REGISTRATION_SUCCESS = "Congratulations, you are now a registered user!"
-    PASSWORD_UPDATED = "Your password has been updated."
-    PASSWORD_ERROR = "Invalid password."
+    PASSWORD_UPDATED = "Your password has been updated."  # nosec B105
+    PASSWORD_ERROR = "Invalid password."  # nosec B105
     PROFILE_UPDATED = "Profile updated successfully!"
     PROFILE_UPDATE_ERROR = "Failed to update profile. Please try again."
     TIMEZONE_INVALID = "Invalid timezone, defaulted to UTC"

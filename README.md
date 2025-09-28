@@ -180,62 +180,78 @@ You can check the current version in several ways:
 
 ## 🚀 Quick Start
 
-### Initial Prerequisites
+### Prerequisites
 
-- Python 3.13+
-- Docker & Docker Compose
-- Terraform (for infrastructure)
-- AWS CLI (for deployment)
+- **Python 3.13+** (required)
+- **Docker & Docker Compose** (optional, for containerized development)
+- **Terraform** (optional, for infrastructure deployment)
+- **AWS CLI** (optional, for cloud deployment)
 
-### Local Development Setup
+### 🎯 Getting Started (3 Steps)
 
-1. Clone the repository:
-
+1. **Clone and setup**:
    ```bash
    git clone https://github.com/yourusername/meal-expense-tracker.git
    cd meal-expense-tracker
-   ```
-
-2. **Set up the development environment**
-
-   ```bash
    make setup
    ```
 
-3. Initialize the database:
-
+2. **Activate environment and run**:
    ```bash
-   make db-upgrade
+   source venv/bin/activate  # Activate virtual environment
+   make run                  # Start the application
    ```
 
-4. Run the development server:
+3. **Open your browser**:
+   - Visit: http://localhost:5000
+   - Default admin: `admin@example.com` / `admin123`
 
-   ```bash
-   make run
-   ```
-
-### Running Tests
+### 🔧 Development Commands
 
 ```bash
-## Run all tests
-make test
+# Environment management
+make setup          # Complete development setup
+make setup-quick    # Quick setup (minimal)
+make dev-status     # Check environment status
+make reset-dev      # Reset development environment
 
-## Run tests with coverage report
-make test-cov
+# Development workflow
+make run            # Start development server
+make test           # Run all tests
+make check          # Run all quality checks (format + lint + test)
+make security-scan  # Check for security vulnerabilities
 
+# Database management
+make db-upgrade     # Run database migrations
+make db-reset       # Reset database (development only)
 ```
 
-### Linting and Formatting
-
-#### Python
+### 🧪 Testing & Quality
 
 ```bash
-## Run all linters
-make lint
+# Testing
+make test              # Run all tests with coverage
+make test-unit         # Run only unit tests
+make test-integration  # Run only integration tests
+make test-frontend     # Run frontend tests (Playwright)
 
-## Format code
-make format
+# Code quality
+make format            # Format code (Python, HTML, CSS, JS)
+make lint              # Run all linters
+make lint-fix          # Run linters with auto-fix
+make check             # Run all quality checks
+make security-scan     # Security vulnerability scan
+```
 
+### 📦 Requirements & Dependencies
+
+```bash
+# Requirements management
+make requirements      # Generate requirements from .in files
+make deps-check        # Check for outdated dependencies
+make deps-update       # Update dependencies to latest versions
+make install-deps      # Install production dependencies
+make install-dev-deps  # Install development dependencies
 ```
 
 #### JavaScript
@@ -336,7 +352,9 @@ The project includes comprehensive browser automation and testing capabilities u
 - **Performance Monitoring**: Real-time performance analysis during browser interactions
 - **Cross-Browser Testing**: Support for multiple browser engines via Playwright
 
-### Quick Start with MCP
+### 🚀 Advanced Setup Options
+
+#### MCP (Model Context Protocol) Integration
 
 1. **Install MCP Server**:
    ```bash
@@ -355,7 +373,33 @@ The project includes comprehensive browser automation and testing capabilities u
    node scripts/mcp-console-debug.js
    ```
 
-4. **Run Browser Tests**:
+#### Containerized Development
+
+```bash
+# Start all services with Docker Compose
+make docker-up
+
+# View logs
+make docker-logs
+
+# Stop services
+make docker-down
+```
+
+#### Infrastructure Deployment
+
+```bash
+# Initialize Terraform
+make tf-init
+
+# Plan infrastructure changes
+make tf-plan
+
+# Deploy to development
+make deploy-dev
+```
+
+1. **Run Browser Tests**:
    ```bash
    # In Cursor with MCP enabled
    node scripts/test-mcp.js

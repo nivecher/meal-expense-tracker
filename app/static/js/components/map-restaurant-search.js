@@ -987,15 +987,18 @@ export class MapRestaurantSearch {
     // Highlight selected restaurant card
     const card = this.container.querySelector(`[data-index="${index}"]`);
     if (card) {
-      card.classList.add('border-primary', 'shadow-lg');
-      card.style.transform = 'scale(1.02)';
-      card.style.transition = 'all 0.2s ease';
+      // Use requestAnimationFrame to batch DOM writes
+      requestAnimationFrame(() => {
+        card.classList.add('border-primary', 'shadow-lg');
+        card.style.transform = 'scale(1.02)';
+        card.style.transition = 'all 0.2s ease';
 
-      // Scroll to selected card
-      card.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-        inline: 'nearest',
+        // Scroll to selected card
+        card.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'nearest',
+        });
       });
     }
 

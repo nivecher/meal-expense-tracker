@@ -17,10 +17,66 @@ from app.restaurants.exceptions import (
 from app.restaurants.models import Restaurant
 from app.utils.cuisine_formatter import format_cuisine_type
 from app.utils.geo_utils import calculate_distance_km, validate_coordinates
-from app.utils.service_level_detector import (
-    ServiceLevelDetector,
-    detect_restaurant_service_level,
-)
+from app.utils.service_level_detector import ServiceLevel, ServiceLevelDetector
+
+
+def normalize_service_level_value(value: str) -> Optional[str]:
+    """
+    Normalize service level value to enum format.
+
+    Converts display names like 'Casual Dining' to enum values like 'casual_dining'.
+    Also handles already-normalized values and validates them.
+
+    Args:
+        value: Service level value (display name or enum value)
+
+    Returns:
+        Normalized enum value or None if invalid
+    """
+    if not value or not isinstance(value, str):
+        return None
+
+    value = value.strip()
+    if not value:
+        return None
+
+    # Mapping from display names to enum values
+    display_to_enum = {
+        "Fine Dining": ServiceLevel.FINE_DINING.value,
+        "Casual Dining": ServiceLevel.CASUAL_DINING.value,
+        "Fast Casual": ServiceLevel.FAST_CASUAL.value,
+        "Quick Service": ServiceLevel.QUICK_SERVICE.value,
+        "Unknown": ServiceLevel.UNKNOWN.value,
+        # Also handle some variations
+        "Fine": ServiceLevel.FINE_DINING.value,
+        "Casual": ServiceLevel.CASUAL_DINING.value,
+        "Fast": ServiceLevel.FAST_CASUAL.value,
+        "Quick": ServiceLevel.QUICK_SERVICE.value,
+    }
+
+    # Check if it's already an enum value (validate it)
+    valid_enum_values = {level.value for level in ServiceLevel}
+    if value in valid_enum_values:
+        return value
+
+    # Try exact match with display names (case-insensitive)
+    for display_name, enum_value in display_to_enum.items():
+        if value.lower() == display_name.lower():
+            return enum_value
+
+    # Try partial matches for flexibility
+    value_lower = value.lower()
+    if "fine" in value_lower or "upscale" in value_lower:
+        return ServiceLevel.FINE_DINING.value
+    elif "casual" in value_lower and "fast" not in value_lower:
+        return ServiceLevel.CASUAL_DINING.value
+    elif "fast" in value_lower or "counter" in value_lower:
+        return ServiceLevel.FAST_CASUAL.value
+    elif "quick" in value_lower or "takeout" in value_lower or "drive" in value_lower:
+        return ServiceLevel.QUICK_SERVICE.value
+
+    # Return None for invalid values (will be handled by validation)
+    return None
 
 
 def recalculate_restaurant_statistics(user_id: int) -> None:
@@ -146,9 +202,14 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
     # Convert results to list of dictionaries with all required attributes
     restaurants = []
     for row in results:
-        restaurant = row[0].__dict__.copy()
+        restaurant_obj = row[0]
+        restaurant = restaurant_obj.__dict__.copy()
         # Remove SQLAlchemy instance state
         restaurant.pop("_sa_instance_state", None)
+        # Add the computed address property and individual address lines
+        restaurant["address"] = restaurant_obj.address
+        restaurant["address_line_1"] = restaurant_obj.address_line_1
+        restaurant["address_line_2"] = restaurant_obj.address_line_2
         # Add the aggregated fields
         restaurant.update(
             {
@@ -186,7 +247,8 @@ def _apply_search_filter(stmt, search_term: str):
     return stmt.where(
         or_(
             Restaurant.name.ilike(search_pattern),
-            Restaurant.address.ilike(search_pattern),
+            Restaurant.address_line_1.ilike(search_pattern),
+            Restaurant.address_line_2.ilike(search_pattern),
             Restaurant.city.ilike(search_pattern),
             Restaurant.state.ilike(search_pattern),
             Restaurant.notes.ilike(search_pattern),
@@ -564,8 +626,7 @@ def _validate_restaurant_row(row: dict) -> Tuple[bool, str]:
     """
     if not row.get("name", "").strip():
         return False, "Name is required"
-    if not row.get("city", "").strip():
-        return False, "City is required"
+    # City is optional - restaurants can exist without city information
     return True, ""
 
 
@@ -665,12 +726,15 @@ def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Optiona
             # Skip duplicate - return success but no restaurant to add
             return True, f"Skipped duplicate restaurant: {name}", None
 
-        # Create new restaurant
+        # Create new restaurant with normalized service level
+        service_level_raw = row.get("service_level", "").strip() or None
+        service_level_normalized = normalize_service_level_value(service_level_raw) if service_level_raw else None
+
         restaurant = Restaurant(
             user_id=user_id,
             name=name,
             city=city,
-            address=address,
+            address_line_1=address,
             state=row.get("state", "").strip() or None,
             postal_code=row.get("postal_code", "").strip() or None,
             country=row.get("country", "").strip() or None,
@@ -678,7 +742,7 @@ def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Optiona
             email=row.get("email", "").strip() or None,
             website=row.get("website", "").strip() or None,
             cuisine=row.get("cuisine", "").strip() or None,
-            service_level=row.get("service_level", "").strip() or None,
+            service_level=service_level_normalized,
             rating=safe_import_float(row.get("rating")),
             price_level=safe_import_int(row.get("price_level")),
             primary_type=row.get("primary_type", "").strip() or None,
@@ -908,8 +972,9 @@ def create_restaurant_for_user(user_id: int, data: Dict[str, Any]) -> Restaurant
         name=data.get("name"),
         type=data.get("type"),
         description=data.get("description"),
-        address=data.get("address"),
-        address2=data.get("address2"),
+        located_within=data.get("located_within"),
+        address_line_1=data.get("address_line_1"),
+        address_line_2=data.get("address_line_2"),
         city=data.get("city"),
         state=data.get("state"),
         postal_code=data.get("postal_code"),
@@ -951,8 +1016,9 @@ def update_restaurant_for_user(restaurant: Restaurant, data: Dict[str, Any]) -> 
         "name",
         "type",
         "description",
-        "address",
-        "address2",
+        "located_within",
+        "address_line_1",
+        "address_line_2",
         "city",
         "state",
         "postal_code",
@@ -1068,7 +1134,7 @@ def calculate_expense_stats(restaurant_id: int, user_id: int) -> Dict[str, Any]:
 
 def detect_service_level_from_google_data(google_data: Dict[str, Any]) -> Tuple[str, float]:
     """
-    Centralized function to detect service level from Google Places data.
+    Centralized function to detect service level from Google Places data using GooglePlacesService.
 
     Args:
         google_data: Dictionary containing Google Places API response data
@@ -1077,15 +1143,10 @@ def detect_service_level_from_google_data(google_data: Dict[str, Any]) -> Tuple[
         Tuple of (service_level, confidence_score)
     """
     try:
-        google_places_data = {
-            "price_level": google_data.get("price_level"),
-            "types": google_data.get("types", []),
-            "rating": google_data.get("rating"),
-            "user_ratings_total": google_data.get("user_ratings_total"),
-        }
+        from app.services.google_places_service import get_google_places_service
 
-        detected_level, confidence = detect_restaurant_service_level(google_places_data)
-        return detected_level.value, confidence
+        places_service = get_google_places_service()
+        return places_service.detect_service_level_from_data(google_data)
     except Exception:
         return "unknown", 0.0
 

@@ -145,7 +145,7 @@ make act-pipeline ENV=prod TF_APPLY=false
 **Steps:**
 
 1. ✅ Setup Python 3.13
-2. ✅ Setup Node.js 20
+2. ✅ Setup Node.js 22
 3. ✅ Install dependencies
 4. ✅ Run linting (Python, JS, CSS, HTML)
 5. ✅ Run tests (unit, integration)

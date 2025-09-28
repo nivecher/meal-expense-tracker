@@ -11,6 +11,8 @@ import os
 import time
 from typing import Any, Dict, Optional
 
+from sqlalchemy import text
+
 from app import create_app
 from app.utils.migration_manager import migration_manager
 
@@ -78,7 +80,7 @@ def _test_database_connection(app) -> Dict[str, Any]:
             from app.extensions import db
 
             # Test basic connection
-            db.session.execute("SELECT 1")
+            db.session.execute(text("SELECT 1"))
             db.session.commit()
 
             # Test if we can access the database

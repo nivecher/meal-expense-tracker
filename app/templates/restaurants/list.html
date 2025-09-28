@@ -285,10 +285,9 @@ include 'includes/breadcrumb.html' %}
                                         class="restaurant-favicon"
                                         width="32"
                                         height="32"
-                                        style="opacity: 0; transition: opacity 0.2s ease-in-out;"
                                     />
                                 {% endif %}
-                                <i class="fas fa-utensils text-primary restaurant-fallback-icon{% if restaurant.website %} d-none{% endif %}" style="font-size: 20px;"></i>
+                                <i class="fas fa-utensils text-primary restaurant-fallback-icon{% if restaurant.website %} d-none{% endif %}"></i>
                             </div>
 
                             <!-- Title and Cuisine -->
@@ -303,25 +302,24 @@ include 'includes/breadcrumb.html' %}
                                     >
                                 </h5>
 
-                                <div class="mt-1">
+                                <div class="mt-1 d-flex align-items-center gap-2">
                                     {% from 'macros/badge_helpers.html' import cuisine_badge %}
                                     {{ cuisine_badge(restaurant.cuisine, size='sm') }}
+                                    {% if restaurant.price_level is not none %}
+                                        {% from 'macros/badge_helpers.html' import price_level_badge %}
+                                        {{ price_level_badge(restaurant.price_level, size='sm') }}
+                                    {% endif %}
                                 </div>
 
                             </div>
                         </div>
 
-                        <!-- Right side: Rating, Price Level, and Service Level -->
+                        <!-- Right side: Rating and Service Level -->
                         <div class="d-flex flex-column align-items-end">
                             {% if restaurant.rating %}
                             <span class="badge bg-warning text-dark mb-1">
                                 <i class="fas fa-star"></i> {{ "%.1f"|format(restaurant.rating) }}
                             </span>
-                            {% endif %}
-
-                            {% if restaurant.price_level is not none %}
-                                {% from 'macros/badge_helpers.html' import price_level_badge %}
-                                {{ price_level_badge(restaurant.price_level, size='sm') }}
                             {% endif %}
 
                             {% if restaurant.service_level %}
@@ -332,17 +330,36 @@ include 'includes/breadcrumb.html' %}
                         </div>
                     </div>
 
-                    <p class="card-text text-muted small mb-2">
-                        <i class="fas fa-map-marker-alt me-2"></i>
-                        {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %}
-                            {% if restaurant.address %}<div>{{ restaurant.address }}</div>{% endif %}
-                            {% if restaurant.city or restaurant.state or restaurant.postal_code %}
-                                <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
+                    <div class="card-text text-muted small mb-2 d-flex align-items-start">
+                        <div class="d-flex align-items-center me-2 mt-1 flex-shrink-0">
+                            <i class="fas fa-map-marker-alt me-1"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            {% if restaurant.get('address_line_1') or restaurant.get('address_line_2') or restaurant.get('city') or restaurant.get('state') or restaurant.get('postal_code') %}
+                                {% set address_lines = restaurant|restaurant_address_only|split('\n') %}
+                                {% for line in address_lines %}
+                                    {% if loop.last and restaurant.get('google_place_id') %}
+                                        <div class="d-flex align-items-center">
+                                            <span>{{ line }}</span>
+                                            {% set maps_url = restaurant|google_maps_url %}
+                                            {% if maps_url %}
+                                            <a href="{{ maps_url }}" target="_blank" rel="noopener noreferrer" class="text-primary ms-3" data-bs-toggle="tooltip" title="View in Google Maps">
+                                                <i class="fas fa-map-marked-alt fa-sm"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <div>{{ line }}</div>
+                                    {% endif %}
+                                {% endfor %}
+                                {% if restaurant.get('located_within') %}
+                                    <br><span class="text-muted small">Located within: {{ restaurant.get('located_within') }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">No address</span>
                             {% endif %}
-                        {% else %}
-                            <span class="text-muted">No location</span>
-                        {% endif %}
-                    </p>
+                        </div>
+                    </div>
                     {% if restaurant.phone %}
                     <p class="card-text text-muted small mb-2">
                         <i class="fas fa-phone me-2"></i> {{ restaurant.phone }}
@@ -401,6 +418,7 @@ include 'includes/breadcrumb.html' %}
                                     <button
                                         type="button"
                                         class="btn btn-sm btn-outline-danger"
+                                        data-action="delete-restaurant"
                                         data-bs-toggle="modal"
                                         data-bs-target="#deleteRestaurantModal"
                                         data-restaurant-id="{{ restaurant.id }}"
@@ -472,11 +490,11 @@ include 'includes/breadcrumb.html' %}
                             <tr>
                                 <th data-sort="true" data-sort-type="text">Name</th>
                                 <th data-sort="true" data-sort-type="text">Location</th>
-                                <th data-sort="true" data-sort-type="text">Service Level</th>
+                                <th data-sort="true" data-sort-type="text">Price Level</th>
                                 <th data-sort="true" data-sort-type="number">Rating</th>
                                 <th data-sort="true" data-sort-type="number">Visits</th>
                                 <th data-sort="true" data-sort-type="date">Last Visit</th>
-                                <th data-sort="true" data-sort-type="currency" class="text-end">Avg $ / Person</th>
+                                <th data-sort="true" data-sort-type="currency" class="text-end" style="width: 100px;">Avg Price / Visit</th>
                                 <th data-sort="true" data-sort-type="currency" class="text-end">Total Spent</th>
                                 <th class="text-center">Actions</th>
                             </tr>
@@ -484,7 +502,7 @@ include 'includes/breadcrumb.html' %}
                         <tbody>
                             {% for restaurant in restaurants %}
                             <tr>
-                                <td>
+                                <td data-sort-value="{{ restaurant.name }}">
                                     <div class="d-flex align-items-start">
                                         <!-- Restaurant Icon (small for table view) -->
                                         <div class="restaurant-icon-table me-2 flex-shrink-0 d-flex align-items-center">
@@ -497,70 +515,68 @@ include 'includes/breadcrumb.html' %}
                                                     class="restaurant-favicon-table"
                                                     width="20"
                                                     height="20"
-                                                    style="opacity: 0; transition: opacity 0.2s ease-in-out;" />
-                                            <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 16px; display: none;"></i>
+ />
                                             {% else %}
-                                                <i class="fas fa-utensils text-primary restaurant-fallback-icon-table" style="font-size: 16px;"></i>
+                                                <i class="fas fa-utensils text-primary" style="font-size: 16px;"></i>
                                             {% endif %}
                                         </div>
 
                                         <!-- Restaurant Name and Cuisine -->
                                         <div>
-                                            <div class="d-flex align-items-center gap-2">
+                                            <div>
                                                 <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
                                                     >{{ restaurant.name }}</a
                                                 >
-                                                {% if restaurant.price_level is not none %}
-                                                    <span class="text-muted">•</span>
-                                                    {% from 'macros/badge_helpers.html' import price_level_badge %}
-                                                    {{ price_level_badge(restaurant.price_level, size='sm') }}
-                                                {% endif %}
                                             </div>
 
-                                            <div class="mt-1">
+                                            <div class="mt-1 d-flex align-items-center gap-2">
                                                 {% from 'macros/badge_helpers.html' import cuisine_badge %}
                                                 {{ cuisine_badge(restaurant.cuisine, size='sm') }}
+                                                {% if restaurant.service_level %}
+                                                    {% from 'macros/badge_helpers.html' import service_level_badge %}
+                                                    {{ service_level_badge(restaurant.service_level, size='sm') }}
+                                                {% endif %}
                                             </div>
 
                                         </div>
                                     </div>
                                 </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div>
-                                                {% if restaurant.city or restaurant.state or restaurant.postal_code %}
-                                                    {{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}
-                                                {% else %}
-                                                    <span class="text-muted">No location</span>
-                                                {% endif %}
-                                        </div>
-                                        {% if restaurant.place_id %}
-                                        <a
-                                            href="https://www.google.com/maps/search/?api=1&query={{ restaurant.name|urlencode }}&query_place_id={{ restaurant.place_id }}"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            class="btn btn-sm btn-outline-secondary ms-2"
-                                            data-bs-toggle="tooltip"
-                                            title="View on Google Maps">
-                                            <i class="fas fa-map-marked-alt me-1"></i><span class="d-none d-lg-inline">Maps</span>
-                                        </a>
-                                        {% endif %}
+                                <td data-sort-value="{% if restaurant.get('city') or restaurant.get('state') %}{{ restaurant.get('city', '') }}, {{ restaurant.get('state', '') }}{% else %}No location{% endif %}">
+                                    {% if restaurant.get('city') or restaurant.get('state') %}
+                                        {% set city = restaurant.get('city', '') %}
+                                        {% set state = restaurant.get('state', '') %}
+                                        {% set state_abbr = state|state_abbreviation if state else '' %}
+                                        {% set city_state = [city, state_abbr]|select('string')|join(', ') %}
 
-                                    </div>
-                                </td>
-                                <td>
-                                    {% if restaurant.service_level %}
-                                    {% from 'macros/badge_helpers.html' import service_level_badge %}
-                                    {{ service_level_badge(restaurant.service_level, size='sm') }}
+                                        <div>
+                                            <div class="d-flex align-items-center">
+                                                <span>{{ city_state }}</span>
+                                                {% if restaurant.get('place_id') %}
+                                                    <a href="https://www.google.com/maps/search/?api=1&query={{ restaurant.name|urlencode }}&query_place_id={{ restaurant.place_id }}" target="_blank" rel="noopener noreferrer" class="text-primary ms-2" data-bs-toggle="tooltip" title="View in Google Maps">
+                                                        <i class="fas fa-map-marked-alt fa-sm"></i>
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                            {% if restaurant.get('located_within') %}
+                                                <div class="text-muted small">({{ restaurant.get('located_within') }})</div>
+                                            {% endif %}
+                                        </div>
                                     {% else %}
-                                    <span class="text-muted">-</span>
+                                        <span class="text-muted">No location</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td data-sort-value="{{ restaurant.price_level if restaurant.price_level is not none else 0 }}">
+                                    {% if restaurant.price_level is not none %}
+                                        {% from 'macros/badge_helpers.html' import price_level_badge %}
+                                        {{ price_level_badge(restaurant.price_level, size='sm') }}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td data-sort-value="{{ restaurant.rating if restaurant.rating else 0 }}">
                                     {% if restaurant.rating %}
-                                    <span
-                                        class="badge {% if restaurant.rating >= 4.5 %}bg-success{% elif restaurant.rating >= 3.5 %}bg-warning{% else %}bg-danger{% endif %}">
-                                        {{ "%.1f"|format(restaurant.rating) }}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-star me-1"></i>{{ "%.1f"|format(restaurant.rating) }}
                                     </span>
                                     {% else %}
                                     <span class="text-muted">-</span>
@@ -584,42 +600,58 @@ include 'includes/breadcrumb.html' %}
                                     <span class="text-muted">No visits</span>
                                     {% endif %}
                                 </td>
-                                <td class="fw-bold text-info amount-right">
+                                <td class="fw-bold text-info amount-right" style="width: 100px;" data-sort-value="{{ restaurant.total_spent / restaurant.visit_count if restaurant.visit_count > 0 and restaurant.total_spent > 0 else 0 }}">
                                     {% if restaurant.visit_count > 0 and restaurant.total_spent > 0 %}
                                         ${{ "%.2f"|format(restaurant.total_spent / restaurant.visit_count) }}
                                     {% else %}
                                         <span class="text-muted">-</span>
                                     {% endif %}
                                 </td>
-                                <td class="fw-bold text-success amount-right"
+                                <td class="fw-bold text-success amount-right" data-sort-value="{{ restaurant.total_spent }}"
                                     >${{ "%.2f"|format(restaurant.total_spent) }}</td
                                 >
                                 <td class="actions text-center">
-                                    <a
-                                        href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                                        class="btn btn-sm btn-outline-primary"
-                                        data-bs-toggle="tooltip"
-                                        title="View Details">
-                                        <i class="fas fa-eye me-1"></i><span class="d-none d-lg-inline">View</span>
-                                    </a>
-                                    <a
-                                        href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-bs-toggle="tooltip"
-                                        title="Edit">
-                                        <i class="fas fa-edit me-1"></i><span class="d-none d-lg-inline">Edit</span>
-                                    </a>
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-danger"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#deleteRestaurantModal"
-                                        data-restaurant-id="{{ restaurant.id }}"
-                                        data-restaurant-name="{{ restaurant.name }}"
-                                        data-tooltip="true"
-                                        title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <div class="d-flex flex-column gap-1">
+                                        <!-- First row: Add and View -->
+                                        <div class="d-flex gap-1">
+                                            <a
+                                                href="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}"
+                                                class="btn btn-sm btn-success"
+                                                data-bs-toggle="tooltip"
+                                                title="Add Expense">
+                                                <i class="fas fa-plus me-1"></i><span class="d-none d-lg-inline">Add</span>
+                                            </a>
+                                            <a
+                                                href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                                                class="btn btn-sm btn-outline-primary"
+                                                data-bs-toggle="tooltip"
+                                                title="View Details">
+                                                <i class="fas fa-eye me-1"></i><span class="d-none d-lg-inline">View</span>
+                                            </a>
+                                        </div>
+                                        <!-- Second row: Edit and Delete -->
+                                        <div class="d-flex gap-1">
+                                            <a
+                                                href="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                data-bs-toggle="tooltip"
+                                                title="Edit">
+                                                <i class="fas fa-edit me-1"></i><span class="d-none d-lg-inline">Edit</span>
+                                            </a>
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-danger"
+                                                data-action="delete-restaurant"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#deleteRestaurantModal"
+                                                data-restaurant-id="{{ restaurant.id }}"
+                                                data-restaurant-name="{{ restaurant.name }}"
+                                                data-tooltip="true"
+                                                title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}

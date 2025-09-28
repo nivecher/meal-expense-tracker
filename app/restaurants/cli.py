@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 
 import click
-import requests
 from flask import current_app
 from flask.cli import with_appcontext
 
@@ -29,56 +28,24 @@ def register_commands(app):
     restaurant_cli.add_command(validate_restaurants)
 
 
-def _build_street_address_from_components(address_components: list[dict]) -> str:
-    """Build street address from Google Places address components."""
-    street_number = next(
-        (comp.get("long_name") for comp in address_components if "street_number" in comp.get("types", [])),
-        None,
-    )
-    route = next(
-        (comp.get("long_name") for comp in address_components if "route" in comp.get("types", [])),
-        None,
-    )
-    return " ".join(filter(None, [street_number, route]))
-
-
-def _detect_service_level_from_google_data(google_data: dict) -> tuple[str, float]:
-    """Detect service level from Google Places data."""
-    from app.restaurants.services import detect_service_level_from_google_data
-
-    return detect_service_level_from_google_data(google_data)
-
-
 def _search_google_places_by_name_and_address(name: str, address: str | None = None) -> list[dict]:
     """Search Google Places API for restaurants by name and address."""
-    api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
-    if not api_key:
-        click.echo("❌ Error: Google Maps API key not configured")
-        return []
-
-    # Build search query
-    search_query = name
-    if address:
-        search_query += f" {address}"
-
-    url = "https://places.googleapis.com/v1/places:searchText"
-    headers = {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount",
-    }
-    payload = {
-        "textQuery": search_query,
-        "maxResultCount": 10,
-        "includedType": "restaurant",
-    }
-
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        return data.get("places", [])
-    except requests.RequestException as e:
+        from app.services.google_places_service import get_google_places_service
+
+        places_service = get_google_places_service()
+
+        # Build search query
+        search_query = name
+        if address:
+            search_query += f" {address}"
+
+        # Search for places
+        places = places_service.search_places_by_text(search_query, max_results=10, included_type="restaurant")
+
+        return places
+
+    except Exception as e:
         click.echo(f"❌ Error searching Google Places: {e}")
         return []
 
@@ -287,7 +254,7 @@ def _get_target_users(user_id: int | None, username: str | None, all_users: bool
 
 
 def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
-    """Validate restaurant information using NEW Google Places API directly.
+    """Validate restaurant information using new Google Places API service.
 
     Args:
         restaurant: Restaurant instance to validate
@@ -296,108 +263,46 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
         Dictionary with validation results
     """
     try:
-        import requests
-        from flask import current_app
+        from app.services.google_places_service import get_google_places_service
 
         if restaurant.google_place_id:
-            # Use the new Google Places API
-            api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
-            if not api_key:
-                return {"valid": False, "errors": ["Google Maps API not configured"]}
+            places_service = get_google_places_service()
+            place_data = places_service.get_place_details(restaurant.google_place_id, "comprehensive")
 
-            # Call the new Google Places API
-            url = f"https://places.googleapis.com/v1/places/{restaurant.google_place_id}"
-            headers = {
-                "Content-Type": "application/json",
-                "X-Goog-Api-Key": api_key,
-                "X-Goog-FieldMask": "displayName,formattedAddress,nationalPhoneNumber,websiteUri,location,rating,userRatingCount,priceLevel,editorialSummary,primaryType,types",
+            if not place_data:
+                return {"valid": False, "errors": ["Failed to retrieve place data from Google Places API"]}
+
+            # Extract restaurant data using the service
+            google_data = places_service.extract_restaurant_data(place_data)
+
+            return {
+                "valid": True,
+                "google_name": google_data.get("name"),
+                "google_address": google_data.get("formatted_address"),
+                "google_rating": google_data.get("rating"),
+                "google_status": google_data.get("business_status", "OPERATIONAL"),
+                "types": google_data.get("types", []),
+                "primary_type": google_data.get("primary_type"),
+                "google_phone": google_data.get("phone_number"),
+                "google_website": google_data.get("website"),
+                "google_price_level": google_data.get("price_level"),
+                "google_address_line_1": google_data.get("address_line_1"),
+                "google_address_line_2": google_data.get("address_line_2"),
+                "google_city": google_data.get("city"),
+                "google_state": google_data.get("state"),
+                "google_state_long": google_data.get("state_long"),
+                "google_state_short": google_data.get("state_short"),
+                "google_postal_code": google_data.get("postal_code"),
+                "google_country": google_data.get("country"),
+                # Legacy field for backward compatibility
+                "google_street_address": google_data.get("street_address"),
+                "google_service_level": places_service.detect_service_level_from_data(place_data),
+                "errors": [],
             }
-
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-
-            place = response.json()
-
-            if place:
-                # Get restaurant name from new API structure
-                restaurant_name = (
-                    place.get("displayName", {}).get("text")
-                    if isinstance(place.get("displayName"), dict)
-                    else place.get("displayName", "")
-                )
-
-                return {
-                    "valid": True,
-                    "google_name": restaurant_name,
-                    "google_address": place.get("formattedAddress"),
-                    "google_rating": place.get("rating"),
-                    "google_status": "OPERATIONAL",  # New API doesn't provide business_status
-                    "types": place.get("types", []),
-                    "primary_type": place.get("primaryType"),
-                    "google_phone": place.get("nationalPhoneNumber"),
-                    "google_website": place.get("websiteUri"),
-                    "google_price_level": place.get("priceLevel"),
-                    "google_address_components": place.get("addressComponents", []),
-                    "google_street_number": next(
-                        (
-                            comp.get("longName")
-                            for comp in place.get("addressComponents", [])
-                            if "street_number" in comp.get("types", [])
-                        ),
-                        None,
-                    ),
-                    "google_route": next(
-                        (
-                            comp.get("longName")
-                            for comp in place.get("addressComponents", [])
-                            if "route" in comp.get("types", [])
-                        ),
-                        None,
-                    ),
-                    "google_street_address": _build_street_address_from_components(place.get("addressComponents", [])),
-                    "google_service_level": _detect_service_level_from_google_data(place),
-                    "google_city": next(
-                        (
-                            comp.get("longName")
-                            for comp in place.get("addressComponents", [])
-                            if "locality" in comp.get("types", [])
-                        ),
-                        None,
-                    ),
-                    "google_state": next(
-                        (
-                            comp.get("shortName")
-                            for comp in place.get("addressComponents", [])
-                            if "administrative_area_level_1" in comp.get("types", [])
-                        ),
-                        None,
-                    ),
-                    "google_postal_code": next(
-                        (
-                            comp.get("longName")
-                            for comp in place.get("addressComponents", [])
-                            if "postal_code" in comp.get("types", [])
-                        ),
-                        None,
-                    ),
-                    "google_country": next(
-                        (
-                            comp.get("longName")
-                            for comp in place.get("addressComponents", [])
-                            if "country" in comp.get("types", [])
-                        ),
-                        None,
-                    ),
-                    "errors": [],
-                }
-            else:
-                return {"valid": False, "errors": ["No response from Google Places API"]}
         else:
             # No Google Place ID to validate
             return {"valid": None, "errors": ["No Google Place ID available for validation"]}
 
-    except requests.RequestException as e:
-        return {"valid": False, "errors": [f"Google Places API request failed: {str(e)}"]}
     except ImportError:
         return {"valid": False, "errors": ["Google Places API service not available"]}
     except Exception as e:
@@ -421,27 +326,51 @@ def _format_restaurant_detailed(restaurant: Restaurant) -> None:
     click.echo(f"   📍 {restaurant.name}{google_indicator}")
     click.echo(f"      ID: {restaurant.id}")
 
+    _display_restaurant_basic_info(restaurant)
+    _display_restaurant_address_info(restaurant)
+    _display_restaurant_contact_info(restaurant)
+
+    click.echo(f"      Expenses: {expense_count}")
+    if restaurant.rating:
+        click.echo(f"      Rating: {restaurant.rating}/5.0")
+    click.echo()
+
+
+def _display_restaurant_basic_info(restaurant: Restaurant) -> None:
+    """Display basic restaurant information."""
     if restaurant.cuisine:
         click.echo(f"      Cuisine: {restaurant.cuisine}")
-    if restaurant.address:
-        click.echo(f"      Address: {restaurant.address}")
+
+
+def _display_restaurant_address_info(restaurant: Restaurant) -> None:
+    """Display restaurant address information."""
+    # Display address information
+    address_parts = []
+    if restaurant.address_line_1:
+        address_parts.append(restaurant.address_line_1)
+    if restaurant.address_line_2:
+        address_parts.append(restaurant.address_line_2)
+    if address_parts:
+        click.echo(f"      Address: {', '.join(address_parts)}")
+
+    # Display location information
     if restaurant.city:
         location_parts = [restaurant.city]
         if restaurant.state:
             location_parts.append(restaurant.state)
         if restaurant.postal_code:
             location_parts.append(restaurant.postal_code)
+        if restaurant.country:
+            location_parts.append(restaurant.country)
         click.echo(f"      Location: {', '.join(location_parts)}")
+
+
+def _display_restaurant_contact_info(restaurant: Restaurant) -> None:
+    """Display restaurant contact information."""
     if restaurant.phone:
         click.echo(f"      Phone: {restaurant.phone}")
     if restaurant.google_place_id:
         click.echo(f"      Google Place ID: {restaurant.google_place_id}")
-
-    click.echo(f"      Expenses: {expense_count}")
-
-    if restaurant.rating:
-        click.echo(f"      Rating: {restaurant.rating}/5.0")
-    click.echo()
 
 
 def _format_restaurant_simple(restaurant: Restaurant) -> None:
@@ -579,22 +508,124 @@ def _get_restaurants_to_validate(
 
 def _check_restaurant_mismatches(restaurant: Restaurant, validation_result: dict) -> tuple[list[str], dict[str, str]]:
     """Check for mismatches between restaurant data and Google data."""
-    google_name = validation_result.get("google_name")
-    google_street_address = validation_result.get("google_street_address")
-    google_service_level_data = validation_result.get("google_service_level")
-
     mismatches = []
     fixes_to_apply = {}
 
+    # Check name mismatch
+    _check_name_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    # Check address mismatches
+    _check_address_mismatches(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    # Check service level mismatch
+    _check_service_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    return mismatches, fixes_to_apply
+
+
+def _check_name_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for name mismatches."""
+    google_name = validation_result.get("google_name")
     if google_name and google_name.lower() != restaurant.name.lower():
         mismatches.append(f"Name: '{restaurant.name}' vs Google: '{google_name}'")
         fixes_to_apply["name"] = google_name
 
-    if google_street_address and restaurant.address and google_street_address.lower() != restaurant.address.lower():
-        mismatches.append(f"Address: '{restaurant.address}' vs Google: '{google_street_address}'")
-        fixes_to_apply["address"] = google_street_address
 
-    # Check service level
+def _check_address_mismatches(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for address component mismatches."""
+    address_checks = [
+        ("google_address_line_1", "address_line_1", "Address Line 1"),
+        ("google_address_line_2", "address_line_2", "Address Line 2"),
+        ("google_city", "city", "City"),
+        ("google_postal_code", "postal_code", "Postal Code"),
+        ("google_country", "country", "Country"),
+    ]
+
+    # Handle regular address fields with simple string comparison
+    for google_field, restaurant_field, display_name in address_checks:
+        google_value = validation_result.get(google_field)
+        restaurant_value = getattr(restaurant, restaurant_field)
+
+        if google_value and restaurant_value and google_value.lower() != restaurant_value.lower():
+            mismatches.append(f"{display_name}: '{restaurant_value}' vs Google: '{google_value}'")
+            fixes_to_apply[restaurant_field] = google_value
+
+    # Handle state field with specialized matching
+    _check_state_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+
+def _check_state_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for state field mismatches using multiple comparison methods."""
+
+    google_state = validation_result.get("google_state")
+    google_state_long = validation_result.get("google_state_long")
+    google_state_short = validation_result.get("google_state_short")
+    restaurant_state = restaurant.state
+
+    if not ((google_state or google_state_long or google_state_short) and restaurant_state):
+        return
+
+    # Check direct string matches first
+    if _states_match_directly(restaurant_state, google_state, google_state_long, google_state_short):
+        return
+
+    # Try US library matching as fallback
+    if _states_match_with_us_library(restaurant_state, google_state, google_state_long, google_state_short):
+        return
+
+    # No matches found - report mismatch
+    mismatches.append(f"State: '{restaurant_state}' vs Google: '{google_state}'")
+    fixes_to_apply["state"] = google_state
+
+
+def _states_match_directly(
+    restaurant_state: str, google_state: str, google_state_long: str, google_state_short: str
+) -> bool:
+    """Check if restaurant state matches any Google state format directly."""
+    restaurant_state_lower = restaurant_state.lower()
+
+    if google_state and google_state.lower() == restaurant_state_lower:
+        return True
+    if google_state_long and google_state_long.lower() == restaurant_state_lower:
+        return True
+    if google_state_short and google_state_short.lower() == restaurant_state_lower:
+        return True
+
+    return False
+
+
+def _states_match_with_us_library(
+    restaurant_state: str, google_state: str, google_state_long: str, google_state_short: str
+) -> bool:
+    """Check if states match using US library normalization."""
+    import us
+
+    restaurant_state_obj = us.states.lookup(restaurant_state)
+    if not restaurant_state_obj:
+        return False
+
+    # Check each Google state format
+    for google_state_value in [google_state, google_state_long, google_state_short]:
+        if google_state_value:
+            google_state_obj = us.states.lookup(google_state_value)
+            if google_state_obj and restaurant_state_obj.abbr == google_state_obj.abbr:
+                return True
+
+    return False
+
+
+def _check_service_level_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for service level mismatches."""
+    google_service_level_data = validation_result.get("google_service_level")
+
     if google_service_level_data:
         google_service_level, confidence = google_service_level_data
         from app.restaurants.services import validate_restaurant_service_level
@@ -608,8 +639,6 @@ def _check_restaurant_mismatches(restaurant: Restaurant, validation_result: dict
             if suggested_fix:
                 fixes_to_apply["service_level"] = suggested_fix
 
-    return mismatches, fixes_to_apply
-
 
 def _apply_restaurant_fixes(restaurant: Restaurant, fixes_to_apply: dict[str, str], dry_run: bool) -> bool:
     """Apply fixes to restaurant data and return success status."""
@@ -618,14 +647,7 @@ def _apply_restaurant_fixes(restaurant: Restaurant, fixes_to_apply: dict[str, st
         return True
     else:
         try:
-            # Apply fixes
-            if "name" in fixes_to_apply:
-                restaurant.name = fixes_to_apply["name"]
-            if "address" in fixes_to_apply:
-                restaurant.address = fixes_to_apply["address"]
-            if "service_level" in fixes_to_apply:
-                restaurant.service_level = fixes_to_apply["service_level"]
-
+            _apply_restaurant_field_fixes(restaurant, fixes_to_apply)
             db.session.commit()
             click.echo(f"   ✅ Fixed: {', '.join(fixes_to_apply.keys())}")
             return True
@@ -635,8 +657,72 @@ def _apply_restaurant_fixes(restaurant: Restaurant, fixes_to_apply: dict[str, st
             return False
 
 
+def _apply_restaurant_field_fixes(restaurant: Restaurant, fixes_to_apply: dict[str, str]) -> None:
+    """Apply field fixes to restaurant object."""
+    field_mappings = {
+        "name": "name",
+        "address_line_1": "address_line_1",
+        "address_line_2": "address_line_2",
+        "city": "city",
+        "state": "state",
+        "postal_code": "postal_code",
+        "country": "country",
+        "service_level": "service_level",
+    }
+
+    for fix_key, field_name in field_mappings.items():
+        if fix_key in fixes_to_apply:
+            setattr(restaurant, field_name, fixes_to_apply[fix_key])
+
+
+def _display_address_comparison(restaurant: Restaurant, validation_result: dict) -> None:
+    """Display detailed address comparison between stored and Google data."""
+    # Check if there are any address-related mismatches
+    address_fields = ["address_line_1", "address_line_2", "city", "state", "postal_code", "country"]
+
+    has_address_mismatch = False
+    for field in address_fields:
+        google_field = f"google_{field}"
+        if google_field in validation_result and validation_result[google_field]:
+            stored_value = getattr(restaurant, field)
+            google_value = validation_result[google_field]
+            if stored_value and google_value and stored_value.lower() != google_value.lower():
+                has_address_mismatch = True
+                break
+
+    if has_address_mismatch:
+        click.echo("   📍 Address Comparison:")
+        click.echo("      Stored Address:")
+        click.echo(f"         Street: {restaurant.address_line_1 or 'N/A'}")
+        if restaurant.address_line_2:
+            click.echo(f"         Unit: {restaurant.address_line_2}")
+        click.echo(f"         City: {restaurant.city or 'N/A'}")
+        click.echo(f"         State: {restaurant.state or 'N/A'}")
+        click.echo(f"         ZIP: {restaurant.postal_code or 'N/A'}")
+        click.echo(f"         Country: {restaurant.country or 'N/A'}")
+
+        click.echo("      Google Address:")
+        click.echo(f"         Street: {validation_result.get('google_address_line_1', 'N/A')}")
+        if validation_result.get("google_address_line_2"):
+            click.echo(f"         Unit: {validation_result['google_address_line_2']}")
+        click.echo(f"         City: {validation_result.get('google_city', 'N/A')}")
+        click.echo(f"         State: {validation_result.get('google_state', 'N/A')}")
+        click.echo(f"         ZIP: {validation_result.get('google_postal_code', 'N/A')}")
+        click.echo(f"         Country: {validation_result.get('google_country', 'N/A')}")
+
+
 def _display_google_info(validation_result: dict) -> None:
     """Display additional Google Places information."""
+    # Display Google's address information
+    if validation_result.get("google_address"):
+        click.echo(f"   🗺️  Google Address: {validation_result['google_address']}")
+
+    _display_google_basic_info(validation_result)
+    _display_google_service_info(validation_result)
+
+
+def _display_google_basic_info(validation_result: dict) -> None:
+    """Display basic Google Places information."""
     if validation_result.get("google_status"):
         click.echo(f"   📊 Status: {validation_result['google_status']}")
     if validation_result.get("google_rating"):
@@ -657,6 +743,10 @@ def _display_google_info(validation_result: dict) -> None:
         else:
             types_str = str(types_data)
         click.echo(f"   🏷️  Types: {types_str}")
+
+
+def _display_google_service_info(validation_result: dict) -> None:
+    """Display Google service level information."""
     if validation_result.get("google_service_level"):
         service_level, confidence = validation_result["google_service_level"]
         if service_level != "unknown":
@@ -685,6 +775,9 @@ def _process_restaurant_validation(restaurant: Restaurant, fix_mismatches: bool,
             click.echo("   ⚠️  Mismatches found:")
             for mismatch in mismatches:
                 click.echo(f"      - {mismatch}")
+
+            # Show detailed address comparison for address mismatches
+            _display_address_comparison(restaurant, validation_result)
 
             fixed = False
             if fix_mismatches and fixes_to_apply:

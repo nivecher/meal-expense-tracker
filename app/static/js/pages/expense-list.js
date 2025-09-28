@@ -3,7 +3,7 @@
  * Handles view toggling, pagination, table sorting, delete functionality, and favicon loading
  */
 
-import { initializeRobustFaviconHandling, handleFaviconError } from '../utils/robust-favicon-handler.js';
+import { handleFaviconError } from '../utils/robust-favicon-handler.js';
 
 // Make handleFaviconError globally available for inline onerror handlers
 window.handleFaviconError = handleFaviconError;
@@ -217,9 +217,12 @@ function initPagination() {
 
 // Favicon loading functionality
 function initFaviconLoading() {
-  // Initialize robust favicon handling for any new elements
-  initializeRobustFaviconHandling('.restaurant-favicon');
-  initializeRobustFaviconHandling('.restaurant-favicon-table');
+  // Favicon system auto-initializes on DOM ready
+  // Only reinitialize if needed for dynamically added content
+  if (window.RobustFaviconHandler) {
+    window.RobustFaviconHandler.initialize('.restaurant-favicon');
+    window.RobustFaviconHandler.initialize('.restaurant-favicon-table');
+  }
 }
 
 // Main initialization function

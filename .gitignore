@@ -75,6 +75,8 @@ docker-compose.override.yml
 htmlcov/
 .pytest_cache/
 .tox/
+test-results/
+playwright-report/
 
 # Logs
 *.log

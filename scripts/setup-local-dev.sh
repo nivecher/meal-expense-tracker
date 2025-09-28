@@ -19,7 +19,7 @@ readonly MAX_PACKAGES_PER_BATCH=20
 # Tool versions (centralized configuration)
 readonly TERRAFORM_VERSION="1.6.6"
 readonly PYTHON_VERSION="3.13"
-readonly NODE_VERSION="20"
+readonly NODE_VERSION="22"
 
 # Colors for output
 readonly GREEN='\033[0;32m'

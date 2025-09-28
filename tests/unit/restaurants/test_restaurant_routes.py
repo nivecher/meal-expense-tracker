@@ -70,7 +70,7 @@ def test_edit_restaurant(client, auth, test_restaurant, test_user):
             "name": "Updated Name",
             "type": "restaurant",  # Add required field
             "city": test_restaurant.city,
-            "address": test_restaurant.address or "",
+            "address_line_1": test_restaurant.address_line_1 or "",
             "phone": test_restaurant.phone or "",
             "website": test_restaurant.website or "",
             "cuisine": test_restaurant.cuisine or "",

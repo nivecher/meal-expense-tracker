@@ -94,18 +94,21 @@ class ResponsiveNavbarManager {
   }
 
   positionDropdown(dropdown, toggle) {
-    const rect = toggle.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
+    // Use requestAnimationFrame to batch DOM reads and writes
+    requestAnimationFrame(() => {
+      const rect = toggle.getBoundingClientRect();
+      const dropdownRect = dropdown.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
 
-    // Check if dropdown would overflow on the right
-    if (rect.left + dropdownRect.width > viewportWidth - 20) {
-      dropdown.style.left = 'auto';
-      dropdown.style.right = '0';
-    } else {
-      dropdown.style.left = '0';
-      dropdown.style.right = 'auto';
-    }
+      // Check if dropdown would overflow on the right
+      if (rect.left + dropdownRect.width > viewportWidth - 20) {
+        dropdown.style.left = 'auto';
+        dropdown.style.right = '0';
+      } else {
+        dropdown.style.left = '0';
+        dropdown.style.right = 'auto';
+      }
+    });
   }
 
   setupResizeObserver() {

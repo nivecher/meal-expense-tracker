@@ -21,47 +21,34 @@ class CuisineData(TypedDict):
 
 # Cuisine color mapping using Bootstrap colors for consistency
 CUISINE_COLORS = {
-    # Asian cuisines - reds and oranges
+    "American": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
+    "Argentinian": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
+    "Barbecue": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
+    "Brazilian": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "British": BOOTSTRAP_COLORS["indigo"]["hex"],  # #6610f2
     "Chinese": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
-    "Japanese": BOOTSTRAP_COLORS["purple"]["hex"],  # #6f42c1
-    "Korean": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
-    "Thai": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
-    "Vietnamese": BOOTSTRAP_COLORS["teal"]["hex"],  # #20c997
-    "Indian": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
-    "Sushi": BOOTSTRAP_COLORS["purple"]["hex"],  # #6f42c1
-    # European cuisines - blues and purples
-    "Italian": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "Deli": BOOTSTRAP_COLORS["teal"]["hex"],  # #20c997
+    "Fast Food": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
     "French": BOOTSTRAP_COLORS["indigo"]["hex"],  # #6610f2
     "German": BOOTSTRAP_COLORS["gray"]["hex"],  # #6c757d
-    "Spanish": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
     "Greek": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
-    "British": BOOTSTRAP_COLORS["indigo"]["hex"],  # #6610f2
-    "Turkish": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
-    # American cuisines - blues and teals
-    "American": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
-    "Mexican": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
-    "Barbecue": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
-    "Pizza": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
-    "Fast Food": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
-    # Specialty cuisines
-    "Seafood": BOOTSTRAP_COLORS["cyan"]["hex"],  # #0dcaf0
-    "Steakhouse": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
-    "Mediterranean": BOOTSTRAP_COLORS["cyan"]["hex"],  # #0dcaf0
+    "Indian": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
+    "Italian": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "Japanese": BOOTSTRAP_COLORS["purple"]["hex"],  # #6f42c1
+    "Korean": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
     "Lebanese": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
-    "Ethiopian": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
+    "Mediterranean": BOOTSTRAP_COLORS["cyan"]["hex"],  # #0dcaf0
+    "Mexican": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
     "Moroccan": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
-    "Brazilian": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
     "Peruvian": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
-    "Argentinian": BOOTSTRAP_COLORS["blue"]["hex"],  # #0d6efd
-    "Breakfast & Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107 TODO handle alternatives better
-    "Brunch": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
-    "Coffee House": "#92400e",  # Custom brown
-    "Coffee Bar": "#92400e",  # Custom brown
-    "Cafe": "#92400e",  # Custom brown
-    "Deli": BOOTSTRAP_COLORS["teal"]["hex"],  # #20c997
-    "Bakery": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
-    "Ice Cream": "#e83e8c",  # Custom pink
-    "Pub": "#d97706",  # Amber/orange for pub establishments (beer-focused)
+    "Pizza": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "Seafood": BOOTSTRAP_COLORS["cyan"]["hex"],  # #0dcaf0
+    "Spanish": BOOTSTRAP_COLORS["yellow"]["hex"],  # #ffc107
+    "Steakhouse": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
+    "Sushi": BOOTSTRAP_COLORS["purple"]["hex"],  # #6f42c1
+    "Thai": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
+    "Turkish": BOOTSTRAP_COLORS["red"]["hex"],  # #dc3545
+    "Vietnamese": BOOTSTRAP_COLORS["teal"]["hex"],  # #20c997
 }
 
 # Cuisine constants with colors and icons

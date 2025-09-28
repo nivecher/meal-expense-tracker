@@ -27,7 +27,7 @@ on:
 env:
   APP_NAME: meal-expense-tracker
   PYTHON_VERSION: '3.13'
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   PYTHONPATH: ${{ github.workspace }}
   FLASK_ENV: test
   TESTING: 'true'

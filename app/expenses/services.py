@@ -3,7 +3,7 @@
 import csv
 import io
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
@@ -112,7 +112,8 @@ def apply_filters(stmt, filters: Dict[str, Any]):
             or_(
                 # Restaurant fields
                 Restaurant.name.ilike(search_term),
-                Restaurant.address.ilike(search_term),
+                Restaurant.address_line_1.ilike(search_term),
+                Restaurant.address_line_2.ilike(search_term),
                 # Expense fields
                 Expense.notes.ilike(search_term),
                 Expense.meal_type.ilike(search_term),
@@ -322,6 +323,25 @@ def _process_date(date_value: Any) -> Tuple[Optional[date], Optional[str]]:
         return None, "Invalid date format. Please use YYYY-MM-DD format."
 
 
+def _process_time(time_value: Any) -> Tuple[Optional[time], Optional[str]]:
+    """Process and validate time from form data."""
+    if not time_value:
+        return None, None  # Time is optional
+
+    try:
+        if isinstance(time_value, str):
+            return datetime.strptime(time_value, "%H:%M").time(), None
+        # Accept native time objects
+        if hasattr(time_value, "time"):
+            return time_value.time(), None
+        if hasattr(time_value, "hour") and hasattr(time_value, "minute"):
+            return time_value, None
+        return None, "Invalid time format"
+    except (ValueError, TypeError, AttributeError) as e:
+        current_app.logger.error("Invalid time: %s. Error: %s", time_value, e)
+        return None, "Invalid time format. Please use HH:MM format."
+
+
 def _process_amount(amount_value: Any) -> Tuple[Optional[Decimal], Optional[str]]:
     """Process and validate amount from form data with smart amount support."""
     try:
@@ -463,18 +483,33 @@ def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], 
         - Error message on failure, None on success
     """
     try:
+        # Get user timezone for proper time handling
+        from app.auth.models import User
+        from app.extensions import db
+
+        user = db.session.get(User, user_id)
+        user_timezone = user.timezone if user and user.timezone else "UTC"
         # Process form data
-        expense_data = _process_expense_form_data(form)
+        expense_data = _process_expense_form_data(form, user_timezone)
         if isinstance(expense_data, str):  # Error message
             return None, expense_data
 
-        category_id, restaurant_id, date_value, amount, tags = expense_data
+        category_id, restaurant_id, datetime_value, amount, tags = expense_data
 
         # Create and save the expense
+        # Use current datetime in user's timezone if no datetime provided
+        if not datetime_value:
+            from app.auth.models import User
+            from app.utils.timezone_utils import get_current_time_in_user_timezone
+
+            user = User.query.get(user_id)
+            user_timezone = user.timezone if user and user.timezone else "UTC"
+            datetime_value = get_current_time_in_user_timezone(user_timezone)
+
         expense = Expense(
             user_id=user_id,
             amount=amount,
-            date=date_value or datetime.now(timezone.utc).date(),
+            date=datetime_value,
             notes=form.notes.data.strip() if form.notes.data else None,
             category_id=category_id,
             restaurant_id=restaurant_id,
@@ -503,7 +538,9 @@ def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], 
         return None, f"An error occurred while creating the expense: {str(e)}"
 
 
-def _process_expense_form_data(form: ExpenseForm) -> Union[Tuple[int, Optional[int], date, Decimal, list[str]], str]:
+def _process_expense_form_data(
+    form: ExpenseForm, user_timezone: str = "UTC"
+) -> Union[Tuple[int, Optional[int], datetime, Decimal, list[str]], str]:
     """Process all form data for expense creation/update.
 
     Args:
@@ -524,6 +561,10 @@ def _process_expense_form_data(form: ExpenseForm) -> Union[Tuple[int, Optional[i
     if error:
         return error
 
+    time_value, error = _process_time(form.time.data)
+    if error:
+        return error
+
     amount, error = _process_amount(form.amount.data)
     if error:
         return error
@@ -532,7 +573,23 @@ def _process_expense_form_data(form: ExpenseForm) -> Union[Tuple[int, Optional[i
     if error:
         return error
 
-    return category_id, restaurant_id, date_value, amount, tags
+    # Combine date and time into a datetime object
+    if time_value:
+        # Use the provided time - interpret as user's local time
+        import pytz
+
+        from app.utils.timezone_utils import get_user_timezone
+
+        user_tz = get_user_timezone(user_timezone)
+        user_datetime = datetime.combine(date_value, time_value)
+        # Localize to user's timezone, then convert to UTC for storage
+        user_datetime_tz = user_tz.localize(user_datetime)
+        datetime_value = user_datetime_tz.astimezone(pytz.UTC).replace(tzinfo=None)  # Remove tzinfo for storage
+    else:
+        # Use noon to avoid timezone issues (as we did before)
+        datetime_value = datetime.combine(date_value, time(12, 0))
+
+    return category_id, restaurant_id, datetime_value, amount, tags
 
 
 def update_expense(expense: Expense, form: ExpenseForm) -> Tuple[Optional[Expense], Optional[str]]:

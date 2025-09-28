@@ -9,8 +9,8 @@
         <meta name="author" content="Meal Expense Tracker" />
         <meta name="csrf-token" content="{{ csrf_token() }}" />
 
-        <!-- Console Error Suppressor - MUST LOAD FIRST -->
-        <script src="{{ url_for('static', filename='js/utils/console-error-suppressor.js') }}"></script>
+        <!-- Unified Error Handler - MUST LOAD FIRST -->
+        <script src="{{ url_for('static', filename='js/utils/unified-error-handler.js') }}"></script>
 
         <!-- Bootstrap Icons -->
         <title> {% block title %} Meal Expense Tracker {% endblock title %} </title>
@@ -114,8 +114,7 @@
                 }
             }'>
         </div>
-        <!-- Extension Error Suppressor - MUST LOAD FIRST -->
-        <script src="{{ url_for('static', filename='js/extension-error-suppressor.js') }}"></script>
+        <!-- Unified Error Handler already loaded above -->
 
         <!-- Core Application Scripts -->
         <script type="module" src="{{ url_for('static', filename='js/main.js') }}" defer></script>

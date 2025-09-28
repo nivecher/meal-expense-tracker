@@ -8,6 +8,8 @@
     "format-html": "prettier --write \"app/templates/**/*.html\"",
     "format-html-check": "prettier --check \"app/templates/**/*.html\"",
     "lint-html": "prettier --check \"app/templates/**/*.html\"",
+    "format:css": "stylelint --config .stylelintrc.json \"app/static/css/**/*.css\" --fix",
+    "lint:css": "stylelint --config .stylelintrc.json \"app/static/css/**/*.css\"",
     "lint:js": "eslint --config eslint.config.js \"app/static/js/**/*.js\"",
     "format:js": "eslint --config eslint.config.js \"app/static/js/**/*.js\" --fix",
     "install-deps": "npm install"
