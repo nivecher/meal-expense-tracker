@@ -9,12 +9,9 @@
 import { initNotifications } from './utils/notifications.js';
 import { EventHandlers } from './components/event-handlers.js';
 import {
-  getFaviconStats,
   clearFaviconCache,
-  testFaviconForDomain,
-  enableFaviconDebugMode,
-  initializeRobustFaviconHandling,
-} from './utils/robust-favicon-handler.js';
+  initializeFaviconHandling,
+} from './utils/simple-favicon-handler.js';
 // import { errorHandler } from './utils/error-handler.js'; // Unused for now
 
 // Enhanced page module loading with error handling
@@ -215,8 +212,8 @@ async function init() {
     new EventHandlers(); // eslint-disable-line no-new
 
     // Initialize favicon system
-    initializeRobustFaviconHandling('.restaurant-favicon');
-    initializeRobustFaviconHandling('.restaurant-favicon-table');
+    initializeFaviconHandling('.restaurant-favicon');
+    initializeFaviconHandling('.restaurant-favicon-table');
 
     // Initialize tag color watcher for dynamically added content
     initTagColorWatcher();
@@ -332,16 +329,12 @@ async function init() {
 // Add favicon debug commands to global scope for development
 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
   window.faviconDebug = {
-    stats: getFaviconStats,
     clearCache: clearFaviconCache,
-    testDomain: testFaviconForDomain,
-    enableDebug: enableFaviconDebugMode,
   };
 
   // Only show debug messages if debug mode is enabled
   if (window.location.search.includes('debug=true') || localStorage.getItem('debugMode') === 'true') {
-    console.warn('🔧 Favicon debug commands available: window.faviconDebug');
-    console.warn('📊 Usage: window.faviconDebug.stats(), window.faviconDebug.testDomain("example.com")');
+    console.warn('🔧 Favicon debug commands available: window.faviconDebug.clearCache()');
   }
 }
 

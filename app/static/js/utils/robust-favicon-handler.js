@@ -45,38 +45,130 @@ const FAVICON_SOURCES = [
 const faviconCache = new Map();
 
 /**
- * Try to load favicon from our backend service (highest priority)
+ * Request queue to prevent API flooding and rate limiting
+ */
+const faviconRequestQueue = {
+  queue: [],
+  processing: false,
+  requestsInFlight: new Map(), // Track pending requests by domain
+  maxConcurrent: 3, // Limit concurrent requests
+  delay: 100, // Delay between requests in ms
+};
+
+/**
+ * Try to load favicon from our backend service with queue management
  * @param {string} website - The restaurant website URL
  * @returns {Promise<string|null>} - Base64 favicon data URL or null
  */
 async function tryBackendFaviconService(website) {
-  try {
-    const response = await fetch(`/api/v1/restaurants/favicon?url=${encodeURIComponent(website)}`, {
-      method: 'GET',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'Content-Type': 'application/json',
-      },
-      credentials: 'same-origin', // Include cookies for authentication
-      signal: AbortSignal.timeout(5000), // 5 second timeout
+  const domain = extractDomain(website);
+
+  // Check if we already have a request in flight for this domain
+  if (faviconRequestQueue.requestsInFlight.has(domain)) {
+    // Wait for the existing request to complete
+    return faviconRequestQueue.requestsInFlight.get(domain);
+  }
+
+  // Create the request promise
+  const requestPromise = (async () => {
+    try {
+      const response = await fetch(`/api/v1/restaurants/favicon?url=${encodeURIComponent(website)}`, {
+        method: 'GET',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin', // Include cookies for authentication
+        signal: AbortSignal.timeout(5000), // 5 second timeout
+      });
+
+      // Handle rate limiting gracefully
+      if (response.status === 429) {
+        console.warn(`Rate limited for ${domain}, falling back to external services`);
+        return null;
+      }
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'success' && data.data && data.data.favicon_url) {
+        return data.data.favicon_url;
+      }
+
+      return null;
+
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.warn('Backend favicon service failed:', error.message);
+      }
+      return null;
+    } finally {
+      // Remove from in-flight requests
+      faviconRequestQueue.requestsInFlight.delete(domain);
+    }
+  })();
+
+  // Track the request
+  faviconRequestQueue.requestsInFlight.set(domain, requestPromise);
+
+  return requestPromise;
+}
+
+/**
+ * Add favicon request to queue to prevent API flooding
+ * @param {Function} requestFn - The favicon request function
+ * @returns {Promise} - Promise that resolves when request completes
+ */
+async function addToFaviconQueue(requestFn) {
+  return new Promise((resolve) => {
+    faviconRequestQueue.queue.push({ requestFn, resolve });
+    processFaviconQueue();
+  });
+}
+
+/**
+ * Process favicon requests in batches to prevent rate limiting
+ */
+async function processFaviconQueue() {
+  if (faviconRequestQueue.processing || faviconRequestQueue.queue.length === 0) {
+    return;
+  }
+
+  faviconRequestQueue.processing = true;
+
+  while (faviconRequestQueue.queue.length > 0) {
+    // Process up to maxConcurrent requests at once
+    const batch = faviconRequestQueue.queue.splice(0, faviconRequestQueue.maxConcurrent);
+
+    // Process batch with slight delays between requests
+    const batchPromises = batch.map(async ({ requestFn, resolve }, index) => {
+      try {
+        // Add progressive delay to stagger requests
+        if (index > 0) {
+          await new Promise(delayResolve => setTimeout(delayResolve, index * faviconRequestQueue.delay));
+        }
+
+        const result = await requestFn();
+        resolve(result);
+      } catch (error) {
+        console.warn('Queued favicon request failed:', error);
+        resolve(null);
+      }
     });
 
-    if (!response.ok) {
-      return null;
+    // Wait for current batch to complete before next batch
+    await Promise.all(batchPromises);
+
+    // Brief pause between batches
+    if (faviconRequestQueue.queue.length > 0) {
+      await new Promise(resolve => setTimeout(resolve, faviconRequestQueue.delay * 2));
     }
-
-    const data = await response.json();
-
-    if (data.status === 'success' && data.data && data.data.favicon_url) {
-      return data.data.favicon_url;
-    }
-
-    return null;
-
-  } catch (error) {
-    console.warn('Backend favicon service failed:', error.message);
-    return null;
   }
+
+  faviconRequestQueue.processing = false;
 }
 
 // Cache for domains that consistently fail favicon requests
