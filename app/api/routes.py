@@ -10,6 +10,7 @@ from app.auth.models import User
 from app.categories import services as category_services
 from app.expenses import services as expense_services
 from app.restaurants import services as restaurant_services
+from app.services.favicon_service import favicon_service
 
 from . import bp, validate_api_csrf
 from .schemas import CategorySchema, ExpenseSchema, RestaurantSchema
@@ -611,3 +612,27 @@ def delete_category(category_id: int) -> Tuple[Response, int]:
         return _create_api_response(message="Category deleted successfully", code=204)
     except Exception as e:
         return _handle_service_error(e, "delete category")
+
+
+@bp.route("/restaurants/favicon", methods=["GET"])
+@login_required
+def get_restaurant_favicon() -> Tuple[Response, int]:
+    """Get favicon for a restaurant website."""
+    try:
+        website_url = request.args.get("url")
+        if not website_url:
+            return jsonify({"status": "error", "message": "Website URL parameter is required"}), 400
+
+        # Input validation - ensure URL is reasonable length
+        if len(website_url) > 2048:
+            return jsonify({"status": "error", "message": "URL too long"}), 400
+
+        favicon_data = favicon_service.get_favicon_url(website_url)
+
+        if favicon_data:
+            return _create_api_response(data={"favicon_url": favicon_data}, message="Favicon retrieved successfully")
+        else:
+            return jsonify({"status": "error", "message": "Favicon not found"}), 404
+
+    except Exception as e:
+        return _handle_service_error(e, "retrieve favicon")

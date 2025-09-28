@@ -759,12 +759,14 @@ docker-build-standard: validate-env
 
 ## Quick development build
 .PHONY: docker-dev
-docker-dev: TARGET=development TAG=dev
+docker-dev: TARGET := development
+docker-dev: TAG := dev
 docker-dev: docker-build
 
 ## Quick production build
 .PHONY: docker-prod
-docker-prod: TARGET=production TAG=prod
+docker-prod: TARGET := production
+docker-prod: TAG := prod
 docker-prod: docker-build
 
 ## Start development environment
