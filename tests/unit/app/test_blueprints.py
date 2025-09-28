@@ -48,7 +48,7 @@ def test_blueprint_initialization(app):
         auth_extensions = [ext for ext in app.extensions.keys() if "login" in ext.lower() or "jwt" in ext.lower()]
         assert len(auth_extensions) > 0, f"No authentication extensions found. Available: {list(app.extensions.keys())}"
 
-        # Check for session management (Flask-Session extends Flask's built-in session)
+        # Check for session management (using Flask's default signed cookies)
         # The session functionality is available through Flask's built-in session
         assert hasattr(app, "permanent_session_lifetime"), "Flask session not available"
 
