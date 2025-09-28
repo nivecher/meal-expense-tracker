@@ -1,3 +1,5 @@
+-r base.in
+
 # Core Python type stubs
 types-python-dateutil>=2.8.0           # Type stubs for python-dateutil (date/time parsing and arithmetic)
 types-pytz>=2024.1.0                   # Type stubs for pytz (timezone support)
