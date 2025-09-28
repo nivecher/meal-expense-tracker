@@ -577,11 +577,16 @@ act-ci: check-act
 	@echo "\033[1m🚀 Running CI workflow locally with act...\033[0m"
 	act -W .github/workflows/ci.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
 
-## Run pipeline workflow locally
+## Run pipeline workflow locally (if available)
 .PHONY: act-pipeline
 act-pipeline: check-act
-	@echo "\033[1m🚀 Running pipeline workflow locally with act...\033[0m"
-	act -W .github/workflows/pipeline.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+	@if [ -f ".github/workflows/pipeline.yml" ]; then \
+		echo "\033[1m🚀 Running pipeline workflow locally with act...\033[0m"; \
+		act -W .github/workflows/pipeline.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH); \
+	else \
+		echo "\033[1;33m⚠️  Pipeline workflow not found, running CI workflow instead...\033[0m"; \
+		act -W .github/workflows/ci.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH); \
+	fi
 
 ## Run lint job locally
 .PHONY: act-lint
@@ -601,11 +606,11 @@ act-security: check-act
 	@echo "\033[1m🔒 Running security scan locally with act...\033[0m"
 	act -W .github/workflows/ci.yml -j security --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
 
-## Run quality gate locally
+## Run quality gate locally (CI workflow)
 .PHONY: act-quality-gate
 act-quality-gate: check-act
 	@echo "\033[1m✅ Running quality gate locally with act...\033[0m"
-	act -W .github/workflows/pipeline.yml -j quality-gate --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+	act -W .github/workflows/ci.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
 
 ## Run terraform validation locally
 .PHONY: act-terraform
@@ -619,8 +624,12 @@ act-list: check-act
 	@echo "\033[1m📋 Available workflows and jobs:\033[0m"
 	@echo "\n\033[1mCI Workflow (.github/workflows/ci.yml):\033[0m"
 	act -W .github/workflows/ci.yml --list
-	@echo "\n\033[1mPipeline Workflow (.github/workflows/pipeline.yml):\033[0m"
-	act -W .github/workflows/pipeline.yml --list
+	@if [ -f ".github/workflows/pipeline.yml" ]; then \
+		echo "\n\033[1mPipeline Workflow (.github/workflows/pipeline.yml):\033[0m"; \
+		act -W .github/workflows/pipeline.yml --list; \
+	else \
+		echo "\n\033[1;33m⚠️  Pipeline workflow not found (using CI only)\033[0m"; \
+	fi
 
 ## Run specific workflow with custom event
 .PHONY: act-run
@@ -651,7 +660,12 @@ act-pr: check-act
 .PHONY: act-dispatch
 act-dispatch: check-act
 	@echo "\033[1m⚡ Running workflows for workflow_dispatch event...\033[0m"
-	act workflow_dispatch -W .github/workflows/pipeline.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+	@if [ -f ".github/workflows/pipeline.yml" ]; then \
+		act workflow_dispatch -W .github/workflows/pipeline.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH); \
+	else \
+		echo "\033[1;33m⚠️  Pipeline workflow not found, using CI workflow...\033[0m"; \
+		act workflow_dispatch -W .github/workflows/ci.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH); \
+	fi
 
 ## Dry run workflows (plan only)
 .PHONY: act-plan
@@ -662,8 +676,10 @@ act-plan: check-act
 	else \
 		echo "Planning CI workflow:"; \
 		act -W .github/workflows/ci.yml --dryrun; \
-		echo "\nPlanning Pipeline workflow:"; \
-		act -W .github/workflows/pipeline.yml --dryrun; \
+		if [ -f ".github/workflows/pipeline.yml" ]; then \
+			echo "\nPlanning Pipeline workflow:"; \
+			act -W .github/workflows/pipeline.yml --dryrun; \
+		fi; \
 	fi
 
 ## Clean act artifacts and containers
