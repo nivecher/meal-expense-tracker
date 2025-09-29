@@ -200,6 +200,71 @@ def _process_search_result_place(place, api_key):
     return places_service.process_search_result_place(place)
 
 
+def _enhance_place_with_details(processed_place, places_service):
+    """Enhance a processed place with detailed address components."""
+    place_id = processed_place.get("place_id")
+    if not place_id:
+        return processed_place
+
+    try:
+        detailed_place = places_service.get_place_details(place_id, "address")
+        if detailed_place and detailed_place.get("addressComponents"):
+            # Debug: Log the raw address components
+            current_app.logger.info(f"Raw address components for {place_id}: {detailed_place['addressComponents']}")
+
+            # Parse address components into structured format
+            address_data = places_service.parse_address_components(detailed_place["addressComponents"])
+
+            # Debug: Log the parsed address data
+            current_app.logger.info(f"Parsed address data for {place_id}: {address_data}")
+
+            # Add structured address data to the result
+            processed_place.update(
+                {
+                    "address_line_1": address_data.get("address_line_1", ""),
+                    "address_line_2": address_data.get("address_line_2", ""),
+                    "city": address_data.get("city", ""),
+                    "state": address_data.get("state", ""),
+                    "postal_code": address_data.get("postal_code", ""),
+                    "country": address_data.get("country", ""),
+                    "address": address_data.get("address_line_1", ""),  # Legacy field
+                }
+            )
+
+            # Debug: Log the final processed place address fields
+            current_app.logger.info(
+                f"Final processed place address fields for {place_id}: address_line_1='{processed_place.get('address_line_1')}', city='{processed_place.get('city')}', state='{processed_place.get('state')}', postal_code='{processed_place.get('postal_code')}'"
+            )
+    except Exception as e:
+        current_app.logger.warning(f"Failed to get detailed address for {place_id}: {e}")
+        # Continue with basic data if details fail
+
+    return processed_place
+
+
+def _process_search_results(places, params, places_service):
+    """Process search results and return enhanced place data."""
+    results = []
+
+    for place in places[: params["max_results"]]:
+        # Filter by criteria using centralized service
+        if not places_service.filter_places_by_criteria([place], params["min_rating"], params["max_price_level"]):
+            continue
+
+        # Process place using centralized service
+        processed_place = places_service.process_search_result_place(place)
+        if processed_place:
+            # Enhance with detailed address components
+            processed_place = _enhance_place_with_details(processed_place, places_service)
+
+            # Add additional processing for photos and reviews if needed
+            processed_place["photos"] = places_service.build_photo_urls(place.get("photos", []))
+            processed_place["reviews"] = places_service.build_reviews_summary(place.get("reviews", []))
+            results.append(processed_place)
+
+    return results
+
+
 @bp.route("/api/places/search", methods=["GET"])
 @login_required
 def search_places():
@@ -219,20 +284,7 @@ def search_places():
 
         # Process results using centralized service
         places_service = get_google_places_service()
-        results = []
-
-        for place in places[: params["max_results"]]:
-            # Filter by criteria using centralized service
-            if not places_service.filter_places_by_criteria([place], params["min_rating"], params["max_price_level"]):
-                continue
-
-            # Process place using centralized service
-            processed_place = places_service.process_search_result_place(place)
-            if processed_place:
-                # Add additional processing for photos and reviews if needed
-                processed_place["photos"] = places_service.build_photo_urls(place.get("photos", []))
-                processed_place["reviews"] = places_service.build_reviews_summary(place.get("reviews", []))
-                results.append(processed_place)
+        results = _process_search_results(places, params, places_service)
 
         return jsonify(
             {
@@ -1005,9 +1057,27 @@ def find_places():
     # Check if Google Maps API key is configured
     google_maps_api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
     google_maps_map_id = current_app.config.get("GOOGLE_MAPS_MAP_ID")
+
+    # Debug logging
+    current_app.logger.info(f"Google Maps API Key configured: {bool(google_maps_api_key)}")
+    current_app.logger.info(f"Google Maps Map ID configured: {bool(google_maps_map_id)}")
+    current_app.logger.info(f"Google Maps Map ID value: {google_maps_map_id}")
+    current_app.logger.info(f"Google Maps Map ID type: {type(google_maps_map_id)}")
+
     if not google_maps_api_key:
         current_app.logger.warning("Google Maps API key is not configured")
         flash("Google Maps integration is not properly configured. Please contact support.", "warning")
+
+    if not google_maps_map_id:
+        current_app.logger.warning("Google Maps Map ID is not configured - Advanced Markers will not be available")
+        flash("Google Maps Map ID is not configured. Advanced Markers functionality will be limited.", "warning")
+
+    # Ensure Map ID is a string (handle None case)
+    google_maps_map_id = str(google_maps_map_id) if google_maps_map_id is not None else ""
+
+    # Handle case where Map ID might be the string "None"
+    if google_maps_map_id == "None":
+        google_maps_map_id = ""
 
     # Render the Google Places search template
     return render_template(

@@ -14,9 +14,6 @@ from app.restaurants import services as restaurant_services
 from . import bp, validate_api_csrf
 from .schemas import CategorySchema, ExpenseSchema, RestaurantSchema
 
-# Removed favicon_service import - using pure frontend approach
-
-
 # Schema instances
 expense_schema = ExpenseSchema()
 expenses_schema = ExpenseSchema(many=True)
@@ -614,6 +611,3 @@ def delete_category(category_id: int) -> Tuple[Response, int]:
         return _create_api_response(message="Category deleted successfully", code=204)
     except Exception as e:
         return _handle_service_error(e, "delete category")
-
-
-# Removed favicon API endpoint - using pure frontend approach for better performance

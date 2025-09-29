@@ -255,6 +255,13 @@ export class MapRestaurantSearch {
   initMap() {
     const mapElement = this.container.querySelector('#restaurant-map');
 
+    // Debug: Log map configuration
+    console.log('Map initialization options:', this.options);
+    console.log('Google Maps Map ID:', this.options.googleMapsMapId);
+    console.log('Google Maps Map ID type:', typeof this.options.googleMapsMapId);
+    console.log('Google Maps Map ID length:', this.options.googleMapsMapId ? this.options.googleMapsMapId.length : 'N/A');
+    console.log('Google Maps Map ID truthy:', !!this.options.googleMapsMapId);
+
     // Default to San Francisco if no location available
     const defaultLocation = { lat: 37.7749, lng: -122.4194 };
 
@@ -269,8 +276,27 @@ export class MapRestaurantSearch {
     };
 
     if (this.options.googleMapsMapId) {
-      mapOptions.mapId = this.options.googleMapsMapId;
+      // Validate Map ID format
+      const mapId = this.options.googleMapsMapId.trim();
+      console.log('Map ID validation:', {
+        original: this.options.googleMapsMapId,
+        trimmed: mapId,
+        length: mapId.length,
+        type: typeof mapId,
+      });
+
+      if (mapId.length < 10) {
+        console.warn('Map ID appears to be too short, may not be valid:', mapId);
+      }
+      mapOptions.mapId = mapId;
+      console.log('Using Map ID:', mapId);
     } else {
+      console.warn('No Map ID provided, using default styles');
+      console.log('Map ID options:', {
+        googleMapsMapId: this.options.googleMapsMapId,
+        type: typeof this.options.googleMapsMapId,
+        truthy: !!this.options.googleMapsMapId,
+      });
       // Only apply inline styles when not using a cloud-based Map ID style
       mapOptions.styles = [
         {
@@ -281,6 +307,7 @@ export class MapRestaurantSearch {
       ];
     }
 
+    console.log('Final map options:', mapOptions);
     this.map = new google.maps.Map(mapElement, mapOptions);
 
     // Add click listener to map
@@ -619,14 +646,27 @@ export class MapRestaurantSearch {
   }
 
   createMarker(restaurant, index) {
-    if (!restaurant.geometry || !restaurant.geometry.location) {
-      return;
+    // Handle both old and new Google Places API formats
+    let position = null;
+
+    if (restaurant.geometry && restaurant.geometry.location) {
+      // Old format: restaurant.geometry.location.lat/lng
+      position = {
+        lat: restaurant.geometry.location.lat,
+        lng: restaurant.geometry.location.lng,
+      };
+    } else if (restaurant.latitude && restaurant.longitude) {
+      // New format: restaurant.latitude/longitude
+      position = {
+        lat: restaurant.latitude,
+        lng: restaurant.longitude,
+      };
     }
 
-    const position = {
-      lat: restaurant.geometry.location.lat,
-      lng: restaurant.geometry.location.lng,
-    };
+    if (!position) {
+      console.warn('No location data found for restaurant:', restaurant.name);
+      return;
+    }
 
     // Use AdvancedMarkerElement with numbered content
     const marker = new google.maps.marker.AdvancedMarkerElement({
@@ -702,9 +742,26 @@ export class MapRestaurantSearch {
   }
 
   createResultCard(restaurant, index) {
-    const photoUrl = restaurant.photos && restaurant.photos.length > 0
-      ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=300&photoreference=${restaurant.photos[0].photo_reference}&key=${this.options.googleMapsApiKey}`
-      : null;
+    // Handle photos - use the URL if available, otherwise build it from photo_reference
+    let photoUrl = null;
+    console.log(`Restaurant ${restaurant.name} photos:`, restaurant.photos);
+
+    if (restaurant.photos && restaurant.photos.length > 0) {
+      const firstPhoto = restaurant.photos[0];
+      console.log(`First photo for ${restaurant.name}:`, firstPhoto);
+
+      if (firstPhoto.url) {
+        // New format: photo already has URL
+        photoUrl = firstPhoto.url;
+        console.log(`Using existing URL for ${restaurant.name}:`, photoUrl);
+      } else if (firstPhoto.photo_reference) {
+        // Old format: build URL from photo_reference
+        photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=300&photoreference=${firstPhoto.photo_reference}&key=${this.options.googleMapsApiKey}`;
+        console.log(`Built URL for ${restaurant.name}:`, photoUrl);
+      }
+    } else {
+      console.log(`No photos found for ${restaurant.name}`);
+    }
 
     const rating = restaurant.rating || 0;
     const reviewCount = restaurant.user_ratings_total || 0;
@@ -821,23 +878,50 @@ export class MapRestaurantSearch {
   }
 
   parseAddress(restaurant) {
+    console.log('Parsing address for:', restaurant.name);
+    console.log('Restaurant address data:', {
+      address: restaurant.address,
+      address_line_1: restaurant.address_line_1,
+      address_line_2: restaurant.address_line_2,
+      city: restaurant.city,
+      state: restaurant.state,
+      postal_code: restaurant.postal_code,
+      formatted_address: restaurant.formatted_address,
+      vicinity: restaurant.vicinity,
+    });
+
     // First, try to use structured address data if available (from details API)
-    if (restaurant.address && restaurant.city && restaurant.state) {
-      const street = restaurant.address;
+    if ((restaurant.address_line_1 || restaurant.address) && restaurant.city && restaurant.state) {
+      const street = restaurant.address_line_1 || restaurant.address;
       const cityState = restaurant.postal_code
         ? `${restaurant.city}, ${restaurant.state} ${restaurant.postal_code}`
         : `${restaurant.city}, ${restaurant.state}`;
 
+      console.log('Using structured address:', { street, cityStateZip: cityState });
       return {
         street,
         cityStateZip: cityState,
       };
     }
 
+    // Debug: Check if we have partial structured data
+    if (restaurant.city || restaurant.state || restaurant.postal_code) {
+      console.log('Partial structured data available:', {
+        address_line_1: restaurant.address_line_1,
+        address: restaurant.address,
+        city: restaurant.city,
+        state: restaurant.state,
+        postal_code: restaurant.postal_code,
+      });
+    }
+
     // Fallback to parsing formatted_address or vicinity from search results
     const formatted = restaurant.formatted_address || restaurant.vicinity || '';
 
+    console.log('Using formatted address fallback:', formatted);
+
     if (!formatted) {
+      console.log('No formatted address available');
       return { street: 'Address not available', cityStateZip: '' };
     }
 
@@ -931,10 +1015,13 @@ export class MapRestaurantSearch {
       };
     }
 
-    return {
+    const result = {
       street: formatted,
       cityStateZip: '',
     };
+
+    console.log('Final parsed address result:', result);
+    return result;
 
   }
 

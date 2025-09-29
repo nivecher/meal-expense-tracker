@@ -8,33 +8,21 @@
  */
 
 /**
- * Configuration for favicon sources with fallback priority
- * Uses reliable services without the problematic Google faviconV2
+ * Configuration for favicon sources with seamless fallback
+ * Google-style approach: try best quality first, fall back silently
  */
 const FAVICON_SOURCES = [
   {
-    name: 'direct-favicon',
-    url: (domain) => `https://${domain}/favicon.ico`,
-    timeout: 2000,
-    quality: 'high', // Direct from website, most accurate
-  },
-  {
-    name: 'google_legacy',
-    url: (domain) => `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
-    timeout: 3000,
-    quality: 'high', // Reliable legacy Google service
+    name: 'google-favicon-v2',
+    url: (domain) => `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=64`,
+    timeout: 2500,
+    quality: 'high', // Best quality when available
   },
   {
     name: 'duckduckgo',
     url: (domain) => `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-    timeout: 3000,
-    quality: 'high', // Very stable, excellent coverage
-  },
-  {
-    name: 'getfavicon',
-    url: (domain) => `https://www.getfavicon.org/?url=https://${domain}`,
-    timeout: 3000,
-    quality: 'medium', // Alternative service
+    timeout: 2500,
+    quality: 'high', // Reliable fallback
   },
 ];
 
@@ -44,142 +32,20 @@ const FAVICON_SOURCES = [
  */
 const faviconCache = new Map();
 
-/**
- * Request queue to prevent API flooding and rate limiting
- */
-const faviconRequestQueue = {
-  queue: [],
-  processing: false,
-  requestsInFlight: new Map(), // Track pending requests by domain
-  maxConcurrent: 3, // Limit concurrent requests
-  delay: 100, // Delay between requests in ms
-};
-
-/**
- * Try to load favicon from our backend service with queue management
- * @param {string} website - The restaurant website URL
- * @returns {Promise<string|null>} - Base64 favicon data URL or null
- */
-async function tryBackendFaviconService(website) {
-  const domain = extractDomain(website);
-
-  // Check if we already have a request in flight for this domain
-  if (faviconRequestQueue.requestsInFlight.has(domain)) {
-    // Wait for the existing request to complete
-    return faviconRequestQueue.requestsInFlight.get(domain);
-  }
-
-  // Create the request promise
-  const requestPromise = (async () => {
-    try {
-      const response = await fetch(`/api/v1/restaurants/favicon?url=${encodeURIComponent(website)}`, {
-        method: 'GET',
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-          'Content-Type': 'application/json',
-        },
-        credentials: 'same-origin', // Include cookies for authentication
-        signal: AbortSignal.timeout(5000), // 5 second timeout
-      });
-
-      // Handle rate limiting gracefully
-      if (response.status === 429) {
-        console.warn(`Rate limited for ${domain}, falling back to external services`);
-        return null;
-      }
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-
-      if (data.status === 'success' && data.data && data.data.favicon_url) {
-        return data.data.favicon_url;
-      }
-
-      return null;
-
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.warn('Backend favicon service failed:', error.message);
-      }
-      return null;
-    } finally {
-      // Remove from in-flight requests
-      faviconRequestQueue.requestsInFlight.delete(domain);
-    }
-  })();
-
-  // Track the request
-  faviconRequestQueue.requestsInFlight.set(domain, requestPromise);
-
-  return requestPromise;
-}
-
-/**
- * Add favicon request to queue to prevent API flooding
- * @param {Function} requestFn - The favicon request function
- * @returns {Promise} - Promise that resolves when request completes
- */
-async function addToFaviconQueue(requestFn) {
-  return new Promise((resolve) => {
-    faviconRequestQueue.queue.push({ requestFn, resolve });
-    processFaviconQueue();
-  });
-}
-
-/**
- * Process favicon requests in batches to prevent rate limiting
- */
-async function processFaviconQueue() {
-  if (faviconRequestQueue.processing || faviconRequestQueue.queue.length === 0) {
-    return;
-  }
-
-  faviconRequestQueue.processing = true;
-
-  while (faviconRequestQueue.queue.length > 0) {
-    // Process up to maxConcurrent requests at once
-    const batch = faviconRequestQueue.queue.splice(0, faviconRequestQueue.maxConcurrent);
-
-    // Process batch with slight delays between requests
-    const batchPromises = batch.map(async ({ requestFn, resolve }, index) => {
-      try {
-        // Add progressive delay to stagger requests
-        if (index > 0) {
-          await new Promise(delayResolve => setTimeout(delayResolve, index * faviconRequestQueue.delay));
-        }
-
-        const result = await requestFn();
-        resolve(result);
-      } catch (error) {
-        console.warn('Queued favicon request failed:', error);
-        resolve(null);
-      }
-    });
-
-    // Wait for current batch to complete before next batch
-    await Promise.all(batchPromises);
-
-    // Brief pause between batches
-    if (faviconRequestQueue.queue.length > 0) {
-      await new Promise(resolve => setTimeout(resolve, faviconRequestQueue.delay * 2));
-    }
-  }
-
-  faviconRequestQueue.processing = false;
-}
-
 // Cache for domains that consistently fail favicon requests
 const failedDomainsCache = new Map();
 
-// Known problematic domains that should skip favicon requests
+// Known problematic domains that should skip favicon requests entirely
 const problematicDomains = new Set([
-  // Removed 'square.site' - now allowing Square sites to load favicons
   'wix.com',
   'squarespace.com',
   'weebly.com',
+]);
+
+// Domains that should skip Google Favicon V2 API (but can use other sources)
+const skipGoogleFaviconDomains = new Set([
+  'creeksidefinegrillwylietx.com',
+  'jerseyjoesdeli.com',
 ]);
 
 /**
@@ -484,83 +350,41 @@ function markDomainAsFailed(domain) {
 }
 
 /**
- * Try to load favicon from a specific source
- * @param {HTMLImageElement} imgElement - The image element
+ * Try to load favicon from a specific source (Google-style seamless approach)
  * @param {string} src - The favicon URL
  * @param {number} timeout - Timeout in milliseconds
- * @returns {Promise<boolean>} - Whether the favicon loaded successfully
+ * @returns {Promise<string|null>} - Returns the URL if successful, null if failed
  */
-function tryFaviconSource(imgElement, src, timeout = 3000) {
+function tryFaviconSource(src, timeout = 2500) {
   return new Promise((resolve) => {
-    // Input validation - safety first
     if (!src || typeof src !== 'string') {
-      resolve(false);
+      resolve(null);
       return;
     }
 
-    const timeoutId = setTimeout(() => {
-      resolve(false);
-    }, timeout);
+    const timeoutId = setTimeout(() => resolve(null), timeout);
 
-    // Create a hidden image element to test the favicon
-    const testImg = document.createElement('img');
-    testImg.style.display = 'none';
-    testImg.style.position = 'absolute';
-    testImg.style.left = '-9999px';
-    testImg.style.top = '-9999px';
-    document.body.appendChild(testImg);
+    // Create a test image to check if the favicon loads
+    const testImg = new Image();
+
+    // Suppress error logging for expected favicon 404s
+    testImg.addEventListener('error', (event) => {
+      // Prevent the 404 error from appearing in console
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      clearTimeout(timeoutId);
+      resolve(null); // Failed, try next source
+    });
 
     testImg.onload = () => {
       clearTimeout(timeoutId);
-      document.body.removeChild(testImg);
-      resolve(true);
+      resolve(src); // Return the successful URL
     };
 
-    testImg.onerror = () => {
-      clearTimeout(timeoutId);
-      document.body.removeChild(testImg);
-      // All favicon service errors are expected, don't log them
-      resolve(false);
-    };
-
-    // Set the source to trigger the load
+    // Start loading
     testImg.src = src;
   });
-}
-
-/**
- * Log favicon success in debug mode
- * @param {string} sourceName - Name of the favicon source
- * @param {string} domain - The domain
- * @param {string} src - The favicon URL
- */
-function logFaviconSuccess(sourceName, domain, src) {
-  if (window.location.search.includes('debug=favicon')) {
-    console.debug(`✅ Favicon loaded from ${sourceName} for ${domain}:`, src);
-  }
-}
-
-/**
- * Log favicon error in debug mode
- * @param {string} sourceName - Name of the favicon source
- * @param {string} domain - The domain
- * @param {Error} error - The error object
- */
-function logFaviconError(sourceName, domain, error) {
-  if (window.location.search.includes('debug=favicon')) {
-    console.debug(`❌ Favicon source ${sourceName} failed for ${domain}:`, error);
-  }
-}
-
-/**
- * Get specialized favicon sources for specific domain types
- * @param {string} domain - The domain to get sources for
- * @returns {Array} - Array of specialized favicon sources
- */
-function getSpecializedFaviconSources(_domain) {
-  // Return the standard stable sources for all domains
-  // No special handling needed - let the stable sources handle all cases
-  return [...FAVICON_SOURCES];
 }
 
 /**
@@ -621,57 +445,32 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
   }
 
   try {
-    // First try our backend favicon service (highest priority)
-    const backendFavicon = await tryBackendFaviconService(website);
-    if (backendFavicon) {
-      imgElement.src = backendFavicon;
-      imgElement.style.opacity = '1';
-      // Cache successful result
-      faviconCache.set(cacheKey, { success: true, src: backendFavicon });
-      return;
-    }
+    // Check if this domain should skip Google Favicon V2 API
+    const shouldSkipGoogle = skipGoogleFaviconDomains.has(domain);
 
-    // Get specialized sources for this domain type
-    const sources = getSpecializedFaviconSources(domain);
+    // Try each favicon source in sequence until one works
+    for (const source of FAVICON_SOURCES) {
+      // Skip Google Favicon V2 API for problematic domains
+      if (shouldSkipGoogle && source.name === 'google-favicon-v2') {
+        continue;
+      }
 
-    // Try each favicon source in order
-    let success = false;
-    let workingSrc = '';
+      const src = source.url(domain);
+      const result = await tryFaviconSource(src, source.timeout);
 
-    for (const source of sources) {
-      try {
-        const src = source.url(domain);
-        // eslint-disable-next-line no-await-in-loop
-        const loaded = await tryFaviconSource(imgElement, src, source.timeout);
-
-        if (loaded) {
-          workingSrc = src;
-          success = true;
-
-          // Debug logging for successful loads
-          logFaviconSuccess(source.name, domain, src);
-          break;
-        }
-      } catch (error) {
-        // Only log in debug mode to reduce console noise
-        logFaviconError(source.name, domain, error);
+      if (result) {
+        // Success! Cache and apply the favicon
+        faviconCache.set(cacheKey, { success: true, src: result });
+        imgElement.src = result;
+        imgElement.style.opacity = '1';
+        return; // Exit early on success
       }
     }
 
-    // Cache the result
-    faviconCache.set(cacheKey, { success, src: workingSrc });
-
-    if (success && workingSrc) {
-      // Use requestAnimationFrame to ensure atomic updates
-      requestAnimationFrame(() => {
-        imgElement.src = workingSrc;
-        imgElement.style.opacity = '1';
-      });
-    } else {
-      // Mark domain as failed for future requests
-      markDomainAsFailed(domain);
-      handleFaviconError(imgElement, { fallbackSelector, hideImage, showFallback });
-    }
+    // If we get here, all sources failed
+    faviconCache.set(cacheKey, { success: false, src: '' });
+    markDomainAsFailed(domain);
+    handleFaviconError(imgElement, { fallbackSelector, hideImage, showFallback });
 
   } catch (error) {
     console.error('Error loading favicon with fallback:', error);
@@ -747,15 +546,7 @@ export function initializeRobustFaviconHandling(selector = '.restaurant-favicon'
           favicon.onload = () => handleFaviconLoad(favicon);
         }
 
-        // Also handle the case where onload was deferred due to lazy loading
-        // Use a small delay to check if the image loaded after initialization
-        setTimeout(() => {
-          if (favicon.complete && favicon.naturalWidth > 0) {
-            handleFaviconLoad(favicon);
-          }
-        }, 100);
-
-        // Handle already loaded images (but be careful with lazy loading)
+        // Handle already loaded images immediately
         if (favicon.complete && favicon.naturalWidth > 0 && !favicon.loading) {
           handleFaviconLoad(favicon);
         }
@@ -776,8 +567,7 @@ export function initializeRobustFaviconHandling(selector = '.restaurant-favicon'
           }
         }
 
-        // Additional check for lazy loading intervention
-        // Some browsers defer load events for lazy images
+        // Use requestAnimationFrame instead of setTimeout for better performance
         const checkLazyLoaded = () => {
           if (favicon.complete && favicon.naturalWidth > 0) {
             handleFaviconLoad(favicon);
@@ -786,10 +576,13 @@ export function initializeRobustFaviconHandling(selector = '.restaurant-favicon'
           return false;
         };
 
-        // Check immediately and after a short delay
+        // Check immediately and with requestAnimationFrame for deferred checks
         if (!checkLazyLoaded()) {
-          setTimeout(checkLazyLoaded, 200);
-          setTimeout(checkLazyLoaded, 500);
+          requestAnimationFrame(() => {
+            if (!checkLazyLoaded()) {
+              requestAnimationFrame(checkLazyLoaded);
+            }
+          });
         }
       } catch (error) {
         console.error(`Error initializing favicon ${index}:`, error);
@@ -1158,13 +951,33 @@ function initializeFaviconSystem() {
   // Suppress CORS errors for favicon requests
   suppressFaviconCORSErrors();
 
+  // Add global error suppression for favicon 404s - capture phase
+  window.addEventListener('error', (event) => {
+    if (event.target && event.target.tagName === 'IMG' &&
+        event.target.src && (event.target.src.includes('faviconV2') || event.target.src.includes('favicon'))) {
+      // Suppress all favicon-related 404 errors
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      return false;
+    }
+  }, true);
+
+  // Also suppress unhandled promise rejections for favicon errors
+  window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason && event.reason.message &&
+        event.reason.message.includes('favicon')) {
+      event.preventDefault();
+    }
+  });
+
   // Initialize favicon handling for all favicon elements
   initializeRobustFaviconHandling('.restaurant-favicon');
   initializeRobustFaviconHandling('.restaurant-favicon-table');
 
   // Debug logging (only in debug mode)
   if (window.location.search.includes('debug=favicon')) {
-    console.debug('🔧 Favicon Handler v3.6.0 initialized - Modern Google Favicon V2 API');
+    console.debug('🔧 Favicon Handler v3.6.0 initialized - Modern Google Favicon V2 API Enabled');
   }
 }
 

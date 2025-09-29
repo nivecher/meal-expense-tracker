@@ -539,6 +539,10 @@ def create_restaurant(user_id: int, form: Any) -> Tuple[Restaurant, bool]:
         return restaurant, True
     except IntegrityError as e:
         db.session.rollback()
+        # Reset session state to avoid PendingRollbackError
+        # This is necessary because after rollback, the session is in an invalid state
+        db.session.expunge_all()  # Remove all objects from session
+
         # Handle database constraint violations
         if "uix_restaurant_google_place_id_user" in str(e.orig):
             # Re-query to get the existing restaurant for the exception

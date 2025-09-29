@@ -10,13 +10,11 @@ import { initNotifications } from './utils/notifications.js';
 import { EventHandlers } from './components/event-handlers.js';
 import {
   clearFaviconCache,
-  initializeFaviconHandling,
-} from './utils/simple-favicon-handler.js';
-// import { errorHandler } from './utils/error-handler.js'; // Unused for now
+  initializeRobustFaviconHandling,
+} from './utils/robust-favicon-handler.js';
 
 // Enhanced page module loading with error handling
 const pageModules = {
-  // '/restaurants/add': () => import('./pages/restaurant-form.js'), // Removed - using simplified autocomplete
   '/restaurants/search': () => import('./pages/restaurant-search.js'),
   '/expenses': () => import('./pages/expense-list.js'),
   '/restaurants': () => import('./pages/restaurant-list.js'),
@@ -211,9 +209,9 @@ async function init() {
     // Initialize event handlers (replaces inline onclick handlers)
     new EventHandlers(); // eslint-disable-line no-new
 
-    // Initialize favicon system
-    initializeFaviconHandling('.restaurant-favicon');
-    initializeFaviconHandling('.restaurant-favicon-table');
+    // Initialize robust favicon system
+    initializeRobustFaviconHandling('.restaurant-favicon');
+    initializeRobustFaviconHandling('.restaurant-favicon-table');
 
     // Initialize tag color watcher for dynamically added content
     initTagColorWatcher();

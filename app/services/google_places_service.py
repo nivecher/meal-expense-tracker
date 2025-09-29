@@ -26,11 +26,12 @@ CLASSIC_PHOTOS_API_BASE = "https://maps.googleapis.com/maps/api/place/photo"
 # Field masks for different data categories
 FIELD_MASKS = {
     "basic": "displayName,formattedAddress,location,rating,userRatingCount,priceLevel",
+    "address": "displayName,formattedAddress,addressComponents",
     "contact": "displayName,formattedAddress,nationalPhoneNumber,websiteUri,editorialSummary",
     "services": "displayName,paymentOptions,accessibilityOptions,parkingOptions,restroom,outdoorSeating",
     "food": "displayName,servesBreakfast,servesLunch,servesDinner,servesBeer,servesWine,servesBrunch,servesVegetarianFood",
     "comprehensive": "displayName,formattedAddress,nationalPhoneNumber,websiteUri,location,rating,userRatingCount,priceLevel,editorialSummary,paymentOptions,accessibilityOptions,parkingOptions,restroom,outdoorSeating,servesBreakfast,servesLunch,servesDinner,servesBeer,servesWine,servesBrunch,servesVegetarianFood,delivery,dineIn,takeout,reservable,businessStatus,primaryType,types,addressComponents,regularOpeningHours,currentOpeningHours,plusCode,photos,reviews,generativeSummary,liveMusic,menuForChildren,servesCocktails,servesDessert,servesCoffee,goodForChildren,allowsDogs,goodForGroups,goodForWatchingSports",
-    "search": "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.primaryType,places.types",
+    "search": "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.primaryType,places.types,places.photos",
     "all": "*",  # Get all available fields
 }
 
@@ -128,7 +129,7 @@ class GooglePlacesService:
         headers = {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": self.api_key,
-            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.primaryType,places.types",
+            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.primaryType,places.types,places.photos",
         }
 
         payload = {
@@ -459,18 +460,32 @@ class GooglePlacesService:
             List of photo dictionaries with URLs
         """
         photo_list = []
+        logger.debug(f"Processing {len(photos) if photos else 0} photos")
+
         if photos:
             for photo in photos[:3]:  # Limit to first 3 photos
                 photo_reference = photo.get("name")  # New API uses 'name' instead of 'photo_reference'
+                logger.debug(f"Photo data: {photo}")
+
                 if photo_reference:
                     # Extract photo reference from the name (format: places/{place_id}/photos/{photo_id})
                     photo_id = photo_reference.split("/")[-1] if "/" in photo_reference else photo_reference
+                    photo_url = (
+                        f"{CLASSIC_PHOTOS_API_BASE}?maxwidth={max_width}&photoreference={photo_id}&key={self.api_key}"
+                    )
+
                     photo_list.append(
                         {
                             "photo_reference": photo_id,
-                            "url": f"{CLASSIC_PHOTOS_API_BASE}?maxwidth={max_width}&photoreference={photo_id}&key={self.api_key}",
+                            "url": photo_url,
                         }
                     )
+
+                    logger.debug(f"Built photo URL: {photo_url}")
+                else:
+                    logger.warning(f"No photo reference found in photo data: {photo}")
+
+        logger.debug(f"Built {len(photo_list)} photo URLs")
         return photo_list
 
     def build_reviews_summary(self, reviews: List[Dict[str, Any]], max_reviews: int = 3) -> List[Dict[str, Any]]:
@@ -750,9 +765,25 @@ class GooglePlacesService:
         elif route:
             address_data["address_line_1"] = route
 
-        # Set address_line_2 (subpremise with # prefix)
+        # Set address_line_2 (subpremise with proper formatting)
         if subpremise:
-            address_data["address_line_2"] = f"#{subpremise}"
+            logger.debug(f"Processing subpremise: '{subpremise}'")
+            stripped_subpremise = subpremise.strip()
+            logger.debug(f"Stripped subpremise: '{stripped_subpremise}'")
+
+            # Remove # prefix if it exists (Google Places sometimes includes it)
+            if stripped_subpremise.startswith("#"):
+                stripped_subpremise = stripped_subpremise[1:].strip()
+                logger.debug(f"Removed # prefix: '{stripped_subpremise}'")
+            # Check if subpremise is purely numeric (e.g., "100") vs text (e.g., "Suite 120")
+            if stripped_subpremise.isdigit():
+                # Only add # prefix for purely numeric values
+                address_data["address_line_2"] = f"#{stripped_subpremise}"
+                logger.debug(f"Set numeric address_line_2: '{address_data['address_line_2']}'")
+            else:
+                # Keep text values as-is (e.g., "Suite 120", "Apt B", etc.)
+                address_data["address_line_2"] = stripped_subpremise
+                logger.debug(f"Set text address_line_2: '{address_data['address_line_2']}'")
 
     def analyze_restaurant_types(
         self, types: List[str], place_data: Optional[Dict[str, Any]] = None

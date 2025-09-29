@@ -3,7 +3,7 @@
  * Handles view toggling, pagination, table sorting, delete functionality, and favicon loading
  */
 
-// Simple favicon handling - auto-initialized
+import { initializeRobustFaviconHandling } from '../utils/robust-favicon-handler.js';
 
 // Utility functions - defined first
 function createToastContainer() {
@@ -214,8 +214,9 @@ function initPagination() {
 
 // Favicon loading functionality
 function initFaviconLoading() {
-  // Simple favicon handling - auto-initialized with staggered loading
-  // No manual re-initialization needed for performance
+  // Initialize robust favicon handling for any new elements
+  initializeRobustFaviconHandling('.restaurant-favicon');
+  initializeRobustFaviconHandling('.restaurant-favicon-table');
 }
 
 // Main initialization function

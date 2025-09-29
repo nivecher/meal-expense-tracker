@@ -3,7 +3,7 @@
  * Handles view toggling, pagination, table sorting, and delete functionality
  */
 
-// Simple favicon handling - no need for complex imports
+import { initializeRobustFaviconHandling } from '../utils/robust-favicon-handler.js';
 
 // Utility functions - defined first
 function createToastContainer() {
@@ -87,76 +87,79 @@ function initViewToggle() {
   });
 }
 
-// Delete restaurant functionality
+// Delete restaurant functionality - optimized with event delegation
 function initDeleteRestaurant() {
-  const deleteButtons = document.querySelectorAll('[data-action="delete-restaurant"]');
-  deleteButtons.forEach((button) => {
-    button.addEventListener('click', function() {
-      const restaurantId = this.getAttribute('data-restaurant-id');
-      const restaurantName = this.getAttribute('data-restaurant-name');
-      const modalTitle = document.getElementById('deleteRestaurantModalLabel');
-      const restaurantNameElement = document.getElementById('restaurantName');
-      const deleteForm = document.getElementById('deleteRestaurantForm');
+  // Use event delegation for better performance
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-action="delete-restaurant"]');
+    if (!button) return;
 
-      if (modalTitle) {
-        modalTitle.textContent = `Delete Restaurant: ${restaurantName}`;
-      }
+    event.preventDefault();
 
-      if (restaurantNameElement) {
-        restaurantNameElement.textContent = restaurantName;
-      }
+    const restaurantId = button.getAttribute('data-restaurant-id');
+    const restaurantName = button.getAttribute('data-restaurant-name');
+    const modalTitle = document.getElementById('deleteRestaurantModalLabel');
+    const restaurantNameElement = document.getElementById('restaurantName');
+    const deleteForm = document.getElementById('deleteRestaurantForm');
 
-      if (deleteForm) {
-        const deleteUrl = deleteForm.getAttribute('data-delete-url');
-        deleteForm.action = `${deleteUrl}/${restaurantId}`;
-      }
+    if (modalTitle) {
+      modalTitle.textContent = `Delete Restaurant: ${restaurantName}`;
+    }
 
-      // Show the modal
-      const modal = new bootstrap.Modal(document.getElementById('deleteRestaurantModal'));
-      modal.show();
+    if (restaurantNameElement) {
+      restaurantNameElement.textContent = restaurantName;
+    }
 
-      // Handle form submission
-      if (deleteForm) {
-        deleteForm.onsubmit = (e) => {
-          e.preventDefault();
+    if (deleteForm) {
+      const deleteUrl = deleteForm.getAttribute('data-delete-url');
+      deleteForm.action = `${deleteUrl}/${restaurantId}`;
+    }
 
-          fetch(`/restaurants/delete/${restaurantId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest',
-            },
-            body: JSON.stringify({
-              csrf_token: document.querySelector('input[name="csrf_token"]').value,
-            }),
-          })
-            .then((response) => {
-              if (response.ok) {
-                showToast('Success', 'Restaurant deleted successfully.', 'success');
-                // Remove the row from the table
-                const row = document.querySelector(`[data-restaurant-id="${restaurantId}"]`);
-                if (row) {
-                  row.remove();
-                }
-                // Close the modal
-                modal.hide();
-              } else {
-                return response.json().then((data) => {
-                  if (data.error) {
-                    showToast('Error', data.error, 'danger');
-                  } else {
-                    window.location.reload();
-                  }
-                });
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('deleteRestaurantModal'));
+    modal.show();
+
+    // Handle form submission
+    if (deleteForm) {
+      deleteForm.onsubmit = (e) => {
+        e.preventDefault();
+
+        fetch(`/restaurants/delete/${restaurantId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({
+            csrf_token: document.querySelector('input[name="csrf_token"]').value,
+          }),
+        })
+          .then((response) => {
+            if (response.ok) {
+              showToast('Success', 'Restaurant deleted successfully.', 'success');
+              // Remove the row from the table
+              const row = document.querySelector(`[data-restaurant-id="${restaurantId}"]`);
+              if (row) {
+                row.remove();
               }
-            })
-            .catch((error) => {
-              console.error('Error:', error);
-              showToast('Error', 'An error occurred while deleting the restaurant.', 'danger');
-            });
-        };
-      }
-    });
+              // Close the modal
+              modal.hide();
+            } else {
+              return response.json().then((data) => {
+                if (data.error) {
+                  showToast('Error', data.error, 'danger');
+                } else {
+                  window.location.reload();
+                }
+              });
+            }
+          })
+          .catch((error) => {
+            console.error('Error:', error);
+            showToast('Error', 'An error occurred while deleting the restaurant.', 'danger');
+          });
+      };
+    }
   });
 }
 
@@ -194,48 +197,70 @@ function initPagination() {
   }
 }
 
-// Favicon loading functionality
+// Favicon loading functionality - optimized for performance
 function initFaviconLoading() {
-  // Simple favicon handling - auto-initialized with staggered loading
-  // No manual re-initialization needed for performance
-}
+  // Defer favicon loading to avoid blocking the main thread
+  const loadFaviconsWhenIdle = () => {
+    initializeRobustFaviconHandling('.restaurant-favicon');
+    initializeRobustFaviconHandling('.restaurant-favicon-table');
+  };
 
-// Tooltip initialization
-function initTooltips() {
-  if (typeof bootstrap !== 'undefined') {
-    // Handle standard tooltip triggers
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map((tooltipTriggerEl) => {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-
-    // Handle custom tooltip triggers (for elements that also have other data-bs-toggle attributes)
-    const customTooltipTriggerList = [].slice.call(document.querySelectorAll('[data-tooltip="true"]'));
-    customTooltipTriggerList.map((tooltipTriggerEl) => {
-      return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-
-    // Fix tooltip stuck issue on dropdown buttons
-    const dropdownButtons = document.querySelectorAll('[data-bs-toggle="dropdown"]');
-    dropdownButtons.forEach((button) => {
-      button.addEventListener('show.bs.dropdown', () => {
-        // Hide any visible tooltips when dropdown opens
-        const tooltips = document.querySelectorAll('.tooltip');
-        tooltips.forEach((tooltip) => {
-          if (tooltip.parentNode) {
-            tooltip.parentNode.removeChild(tooltip);
-          }
-        });
-      });
-    });
+  // Use requestIdleCallback if available, otherwise setTimeout
+  if (window.requestIdleCallback) {
+    requestIdleCallback(loadFaviconsWhenIdle, { timeout: 200 });
+  } else {
+    setTimeout(loadFaviconsWhenIdle, 50);
   }
 }
 
-// Main initialization function
+// Tooltip initialization - optimized for performance
+function initTooltips() {
+  if (typeof bootstrap === 'undefined') {
+    return;
+  }
+
+  // Use requestIdleCallback for non-critical tooltip initialization
+  const initTooltipsWhenIdle = () => {
+    // Handle standard tooltip triggers
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltipTriggerList.forEach((tooltipTriggerEl) => {
+      new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Handle custom tooltip triggers (for elements that also have other data-bs-toggle attributes)
+    const customTooltipTriggerList = document.querySelectorAll('[data-tooltip="true"]');
+    customTooltipTriggerList.forEach((tooltipTriggerEl) => {
+      new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+  };
+
+  // Use requestIdleCallback if available, otherwise setTimeout
+  if (window.requestIdleCallback) {
+    requestIdleCallback(initTooltipsWhenIdle, { timeout: 100 });
+  } else {
+    setTimeout(initTooltipsWhenIdle, 0);
+  }
+
+  // Fix tooltip stuck issue on dropdown buttons - use event delegation
+  document.addEventListener('show.bs.dropdown', (event) => {
+    // Hide any visible tooltips when dropdown opens
+    const tooltips = document.querySelectorAll('.tooltip');
+    tooltips.forEach((tooltip) => {
+      if (tooltip.parentNode) {
+        tooltip.parentNode.removeChild(tooltip);
+      }
+    });
+  });
+}
+
+// Main initialization function - optimized for performance
 function init() {
+  // Critical functionality that must run immediately
   initViewToggle();
   initDeleteRestaurant();
   initPagination();
+
+  // Non-critical functionality that can be deferred
   initFaviconLoading();
   initTooltips();
 }

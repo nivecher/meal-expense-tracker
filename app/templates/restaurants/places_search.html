@@ -22,23 +22,29 @@ url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Fin
                 <!-- The map-based search component will be rendered here -->
             </div>
 
+            <!-- Debug: Show Map ID value -->
+            <div class="alert alert-info" style="display: none" id="debug-info">
+                <strong>Debug Info:</strong><br />
+                Map ID: "{{ google_maps_map_id }}"<br />
+                Map ID Length: {{ google_maps_map_id|length }}<br />
+                Map ID Type: {{ google_maps_map_id.__class__.__name__ }}
+            </div>
+
             <!-- Toast container for notifications -->
             <div id="toastContainer" class="position-fixed bottom-0 end-0 p-3 toast-container">
                 <!-- Toasts will be inserted here by JavaScript -->
             </div>
         </div>
-        {% endblock content %}
 
         <!-- Configuration data for JavaScript -->
         <script type="application/json" id="places-search-config">
             {
                 "csrfToken": "{{ csrf_token() }}",
                 "addRestaurantUrl": "{{ url_for('restaurants.add_from_google_places') }}",
-                "googleMapsMapId": "{{ google_maps_map_id }}"
+                "googleMapsMapId": {{ google_maps_map_id|tojson }}
             }
         </script>
-
-        {% block scripts %} {{ super() }}
+        {% endblock content %} {% block scripts %} {{ super() }}
         <!-- Load map-based restaurant search component -->
         <script type="module" src="{{ url_for('static', filename='js/components/map-restaurant-search.js') }}"></script>
         <!-- Load places search page functionality -->
@@ -49,9 +55,30 @@ url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Fin
             document.addEventListener("DOMContentLoaded", function () {
                 const configElement = document.getElementById("places-search-config");
                 if (configElement) {
+                    console.log("Raw config JSON:", configElement.textContent);
                     window.PLACES_SEARCH_CONFIG = JSON.parse(configElement.textContent);
+                    console.log("Parsed config:", window.PLACES_SEARCH_CONFIG);
+                    console.log("Map ID from config:", window.PLACES_SEARCH_CONFIG.googleMapsMapId);
+
+                    // Show debug info if Map ID is empty or missing
+                    if (!window.PLACES_SEARCH_CONFIG.googleMapsMapId) {
+                        const debugInfo = document.getElementById("debug-info");
+                        if (debugInfo) {
+                            debugInfo.style.display = "block";
+                        }
+                    }
+                } else {
+                    console.error("places-search-config element not found");
                 }
             });
+
+            // Add global function to show debug info
+            window.showDebugInfo = function () {
+                const debugInfo = document.getElementById("debug-info");
+                if (debugInfo) {
+                    debugInfo.style.display = debugInfo.style.display === "none" ? "block" : "none";
+                }
+            };
         </script>
         {% endblock scripts %}
     </div></div

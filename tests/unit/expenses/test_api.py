@@ -5,8 +5,6 @@ from decimal import Decimal
 from typing import Any, Dict
 
 import pytest
-
-# from flask import Flask
 from flask.testing import FlaskClient
 from flask_sqlalchemy import SQLAlchemy
 

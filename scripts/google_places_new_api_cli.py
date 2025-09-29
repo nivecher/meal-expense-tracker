@@ -2,13 +2,15 @@
 """
 Google Places New API CLI Tool
 
-Test script to explore the new Google Places API (2024+) and compare
-with the classic API to see what additional data is available.
+Enhanced script to explore the new Google Places API (2024+) with clean,
+formatted output and comparison capabilities.
 
 Usage:
     python scripts/google_places_new_api_cli.py search "Starbucks Dallas TX"
     python scripts/google_places_new_api_cli.py details <place_id>
+    python scripts/google_places_new_api_cli.py info <place_id>    # Clean formatted output
     python scripts/google_places_new_api_cli.py compare <place_id>
+    python scripts/google_places_new_api_cli.py raw <place_id>     # Raw JSON output
 """
 
 import argparse
@@ -291,6 +293,313 @@ def _print_nearby_landmarks(place_data: Dict[str, Any]) -> None:
         print(f"   • {landmark_name} ({distance:.0f}m away)")
 
 
+def _format_opening_hours(place_data: Dict[str, Any]) -> str:
+    """Format opening hours information."""
+    regular_hours = place_data.get("regularOpeningHours", {})
+    if not regular_hours:
+        return "Hours not available"
+
+    weekday_descriptions = regular_hours.get("weekdayDescriptions", [])
+    if weekday_descriptions:
+        return "\n".join([f"   • {desc}" for desc in weekday_descriptions])
+
+    return "Hours not available"
+
+
+def _format_price_level(price_level: str) -> str:
+    """Format price level to readable text."""
+    if not price_level:
+        return "Not specified"
+
+    price_mapping = {
+        "PRICE_LEVEL_FREE": "Free",
+        "PRICE_LEVEL_INEXPENSIVE": "Inexpensive ($)",
+        "PRICE_LEVEL_MODERATE": "Moderate ($$)",
+        "PRICE_LEVEL_EXPENSIVE": "Expensive ($$$)",
+        "PRICE_LEVEL_VERY_EXPENSIVE": "Very Expensive ($$$$)",
+    }
+
+    return price_mapping.get(price_level, price_level)
+
+
+def _format_business_types(types: List[str]) -> str:
+    """Format business types to readable text."""
+    if not types:
+        return "Not specified"
+
+    # Filter out generic types and format the meaningful ones
+    meaningful_types = []
+    for type_name in types:
+        if type_name not in ["establishment", "point_of_interest", "food"]:
+            formatted = type_name.replace("_", " ").title()
+            meaningful_types.append(formatted)
+
+    return ", ".join(meaningful_types[:3]) if meaningful_types else "Restaurant"
+
+
+def _format_services(place_data: Dict[str, Any]) -> Dict[str, bool]:
+    """Extract and format service availability."""
+    services = {}
+
+    # Dining options
+    services["Takeout"] = place_data.get("takeout", False)
+    services["Dine In"] = place_data.get("dineIn", False)
+    services["Delivery"] = place_data.get("delivery", False)
+    services["Curbside Pickup"] = place_data.get("curbsidePickup", False)
+    services["Reservations"] = place_data.get("reservable", False)
+
+    # Meal services
+    services["Serves Breakfast"] = place_data.get("servesBreakfast", False)
+    services["Serves Lunch"] = place_data.get("servesLunch", False)
+    services["Serves Dinner"] = place_data.get("servesDinner", False)
+    services["Serves Brunch"] = place_data.get("servesBrunch", False)
+
+    # Beverage services
+    services["Serves Beer"] = place_data.get("servesBeer", False)
+    services["Serves Wine"] = place_data.get("servesWine", False)
+    services["Serves Cocktails"] = place_data.get("servesCocktails", False)
+    services["Serves Coffee"] = place_data.get("servesCoffee", False)
+
+    # Special features
+    services["Good for Children"] = place_data.get("goodForChildren", False)
+    services["Good for Groups"] = place_data.get("goodForGroups", False)
+    services["Outdoor Seating"] = place_data.get("outdoorSeating", False)
+    services["Live Music"] = place_data.get("liveMusic", False)
+    services["Restrooms"] = place_data.get("restroom", False)
+
+    return services
+
+
+def _format_accessibility(place_data: Dict[str, Any]) -> Dict[str, bool]:
+    """Extract accessibility features."""
+    accessibility = place_data.get("accessibilityOptions", {})
+
+    features = {}
+    features["Wheelchair Accessible Parking"] = accessibility.get("wheelchairAccessibleParking", False)
+    features["Wheelchair Accessible Entrance"] = accessibility.get("wheelchairAccessibleEntrance", False)
+    features["Wheelchair Accessible Restroom"] = accessibility.get("wheelchairAccessibleRestroom", False)
+    features["Wheelchair Accessible Seating"] = accessibility.get("wheelchairAccessibleSeating", False)
+
+    return features
+
+
+def _format_payment_options(place_data: Dict[str, Any]) -> Dict[str, bool]:
+    """Extract payment options."""
+    payment = place_data.get("paymentOptions", {})
+
+    options = {}
+    options["Accepts Credit Cards"] = payment.get("acceptsCreditCards", False)
+    options["Accepts Debit Cards"] = payment.get("acceptsDebitCards", False)
+    options["Accepts NFC"] = payment.get("acceptsNfc", False)
+    options["Cash Only"] = payment.get("acceptsCashOnly", False)
+
+    return options
+
+
+def _format_parking_options(place_data: Dict[str, Any]) -> Dict[str, bool]:
+    """Extract parking options."""
+    parking = place_data.get("parkingOptions", {})
+
+    options = {}
+    options["Free Parking Lot"] = parking.get("freeParkingLot", False)
+    options["Free Street Parking"] = parking.get("freeStreetParking", False)
+    options["Paid Street Parking"] = parking.get("paidStreetParking", False)
+
+    return options
+
+
+def _print_basic_restaurant_info(place_data: Dict[str, Any]) -> None:
+    """Print basic restaurant information."""
+    display_name = place_data.get("displayName", {})
+    name = (
+        display_name.get("text")
+        if isinstance(display_name, dict)
+        else str(display_name) if display_name else "Unknown Restaurant"
+    )
+
+    formatted_address = place_data.get("formattedAddress", "Address not available")
+    phone = place_data.get("nationalPhoneNumber", "Phone not available")
+    website = place_data.get("websiteUri", "Website not available")
+    rating = place_data.get("rating", "N/A")
+    review_count = place_data.get("userRatingCount", "N/A")
+    price_level = _format_price_level(place_data.get("priceLevel", ""))
+    business_status = place_data.get("businessStatus", "Status unknown")
+
+    print("**Restaurant Details:**")
+    print(f"- **Name**: {name}")
+    print(f"- **Address**: {formatted_address}")
+    print(f"- **Phone**: {phone}")
+    print(f"- **Website**: {website}")
+    print(f"- **Rating**: {rating}/5 ({review_count} reviews)")
+    print(f"- **Price Level**: {price_level}")
+    print(f"- **Business Status**: {business_status}")
+    print()
+
+
+def _print_business_info(place_data: Dict[str, Any]) -> None:
+    """Print business information."""
+    location = place_data.get("location", {})
+    latitude = location.get("latitude", "N/A")
+    longitude = location.get("longitude", "N/A")
+
+    types = place_data.get("types", [])
+    primary_type = place_data.get("primaryType", "")
+    business_types = _format_business_types(types)
+    business_status = place_data.get("businessStatus", "Status unknown")
+
+    print("**Business Information:**")
+    print(f"- **Types**: {business_types}")
+    print(f"- **Primary Type**: {primary_type.replace('_', ' ').title() if primary_type else 'Not specified'}")
+    print(f"- **Business Status**: {business_status}")
+    print(f"- **Coordinates**: {latitude}, {longitude}")
+    print()
+
+
+def _print_services_and_hours(place_data: Dict[str, Any]) -> None:
+    """Print services and operating hours."""
+    print("**Services Available:**")
+    services = _format_services(place_data)
+    for service, available in services.items():
+        status = "✅" if available else "❌"
+        print(f"{status} {service}")
+    print()
+
+    print("**Operating Hours:**")
+    hours_text = _format_opening_hours(place_data)
+    print(hours_text)
+    print()
+
+    # Happy Hour (if available)
+    secondary_hours = place_data.get("regularSecondaryOpeningHours", [])
+    if secondary_hours:
+        print("**Happy Hour:**")
+        for hours_info in secondary_hours:
+            if hours_info.get("secondaryHoursType") == "HAPPY_HOUR":
+                descriptions = hours_info.get("weekdayDescriptions", [])
+                for desc in descriptions:
+                    print(f"   • {desc}")
+        print()
+
+
+def _print_accessibility_features(place_data: Dict[str, Any]) -> None:
+    """Print accessibility features."""
+    accessibility = _format_accessibility(place_data)
+    if any(accessibility.values()):
+        print("♿ **Accessibility:**")
+        for feature, available in accessibility.items():
+            if available:
+                print(f"   • {feature}")
+        print()
+
+
+def _print_payment_features(place_data: Dict[str, Any]) -> None:
+    """Print payment options."""
+    payment = _format_payment_options(place_data)
+    if any(payment.values()):
+        print("💳 **Payment Options:**")
+        for option, available in payment.items():
+            if available:
+                print(f"   • {option}")
+        print()
+
+
+def _print_parking_features(place_data: Dict[str, Any]) -> None:
+    """Print parking options."""
+    parking = _format_parking_options(place_data)
+    if any(parking.values()):
+        print("🅿️ **Parking:**")
+        for option, available in parking.items():
+            if available:
+                print(f"   • {option}")
+        print()
+
+
+def _print_price_and_summary(place_data: Dict[str, Any]) -> None:
+    """Print price range and AI summary."""
+    # Price Range (if available)
+    price_range = place_data.get("priceRange", {})
+    if price_range:
+        start_price = price_range.get("startPrice", {}).get("units", "")
+        end_price = price_range.get("endPrice", {}).get("units", "")
+        if start_price and end_price:
+            print(f"💰 **Price Range**: ${start_price}-${end_price}")
+            print()
+
+    # AI Summary (if available)
+    gen_summary = place_data.get("generativeSummary", {}).get("overview", {})
+    if gen_summary and gen_summary.get("text"):
+        print(f"🤖 **AI Summary**: {gen_summary['text']}")
+        print()
+
+
+def _print_additional_features(place_data: Dict[str, Any]) -> None:
+    """Print additional features like accessibility, payment, parking."""
+    print("**Additional Features:**")
+
+    _print_accessibility_features(place_data)
+    _print_payment_features(place_data)
+    _print_parking_features(place_data)
+    _print_price_and_summary(place_data)
+
+
+def _print_reviews_and_links(place_data: Dict[str, Any]) -> None:
+    """Print reviews and Google Maps links."""
+    # Nearby Landmarks
+    landmarks = place_data.get("addressDescriptor", {}).get("landmarks", [])
+    if landmarks:
+        print("🏢 **Nearby Landmarks:**")
+        for landmark in landmarks[:3]:  # Show first 3
+            landmark_name = landmark.get("displayName", {}).get("text", "Unknown")
+            distance = landmark.get("straightLineDistanceMeters", 0)
+            print(f"   • {landmark_name} ({distance:.0f}m away)")
+        print()
+
+    # Recent Reviews (if available)
+    reviews = place_data.get("reviews", [])
+    if reviews:
+        print("📝 **Recent Reviews:**")
+        for i, review in enumerate(reviews[:3], 1):  # Show first 3
+            author = review.get("authorAttribution", {}).get("displayName", "Anonymous")
+            rating = review.get("rating", "N/A")
+            text = review.get("text", {}).get("text", "")
+            time_desc = review.get("relativePublishTimeDescription", "")
+
+            print(f"   {i}. **{author}** ({rating}/5) - {time_desc}")
+            if text:
+                # Truncate long reviews
+                display_text = text[:150] + "..." if len(text) > 150 else text
+                print(f'      "{display_text}"')
+        print()
+
+    # Google Maps Links
+    google_links = place_data.get("googleMapsLinks", {})
+    if google_links:
+        print("🗺️ **Google Maps Links:**")
+        if google_links.get("placeUri"):
+            print(f"   • [View on Google Maps]({google_links['placeUri']})")
+        if google_links.get("directionsUri"):
+            print(f"   • [Get Directions]({google_links['directionsUri']})")
+        if google_links.get("writeAReviewUri"):
+            print(f"   • [Write a Review]({google_links['writeAReviewUri']})")
+        print()
+
+
+def print_formatted_place_info(place_data: Dict[str, Any]) -> None:
+    """Print place information in a clean, formatted way like the example above."""
+    print("=" * 80)
+    print("📍 GOOGLE PLACES API - DETAILED RESTAURANT INFORMATION")
+    print("=" * 80)
+    print()
+
+    _print_basic_restaurant_info(place_data)
+    _print_business_info(place_data)
+    _print_services_and_hours(place_data)
+    _print_additional_features(place_data)
+    _print_reviews_and_links(place_data)
+
+    print("=" * 80)
+
+
 def print_place_summary(place_data: Dict[str, Any], api_type: str) -> None:
     """Print a summary of place data."""
     print(f"\n{'=' * 60}")
@@ -393,8 +702,8 @@ def compare_apis(place_id: str):
         print(f"❌ Error comparing APIs: {e}")
 
 
-def main():
-    """Main CLI function."""
+def _setup_argument_parser() -> argparse.ArgumentParser:
+    """Set up command line argument parser."""
     parser = argparse.ArgumentParser(description="Google Places New API CLI Tool")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -404,16 +713,84 @@ def main():
     search_parser.add_argument("--location-bias", help="Location bias (lat,lng)")
 
     # Details command
-    details_parser = subparsers.add_parser("details", help="Get place details")
+    details_parser = subparsers.add_parser("details", help="Get place details (basic summary)")
     details_parser.add_argument("place_id", help="Google Place ID")
     details_parser.add_argument(
         "--field-mask", choices=list(FIELD_MASKS.keys()) + ["all"], default="comprehensive", help="Field mask to use"
+    )
+
+    # Info command (new formatted output)
+    info_parser = subparsers.add_parser("info", help="Get formatted place information (clean output)")
+    info_parser.add_argument("place_id", help="Google Place ID")
+    info_parser.add_argument(
+        "--field-mask", choices=list(FIELD_MASKS.keys()) + ["all"], default="all", help="Field mask to use"
+    )
+
+    # Raw command (new raw JSON output)
+    raw_parser = subparsers.add_parser("raw", help="Get raw JSON response")
+    raw_parser.add_argument("place_id", help="Google Place ID")
+    raw_parser.add_argument(
+        "--field-mask", choices=list(FIELD_MASKS.keys()) + ["all"], default="all", help="Field mask to use"
     )
 
     # Compare command
     compare_parser = subparsers.add_parser("compare", help="Compare new vs classic API")
     compare_parser.add_argument("place_id", help="Google Place ID")
 
+    return parser
+
+
+def _handle_search_command(query: str, location_bias: Optional[str]) -> None:
+    """Handle search command."""
+    results = search_places_new_api(query, location_bias)
+    print("\n🔍 SEARCH RESULTS:")
+    print("=" * 60)
+
+    places = results.get("places", [])
+    print(f"Found {len(places)} places:")
+
+    for i, place in enumerate(places, 1):
+        name = place.get("displayName", "Unknown")
+        place_id = place.get("id", "No ID")
+        rating = place.get("rating", "N/A")
+        print(f"{i}. {name} (ID: {place_id}) - Rating: {rating}")
+
+        if i == 1:  # Show details for first result
+            print("\n📋 First result details:")
+            print(json.dumps(place, indent=2))
+
+
+def _handle_details_command(place_id: str, field_mask: str) -> None:
+    """Handle details command."""
+    details = get_place_details_new_api(place_id, field_mask)
+    print_place_summary(details, "NEW")
+
+    print("\n📋 FULL RESPONSE:")
+    print(json.dumps(details, indent=2))
+
+
+def _handle_info_command(place_id: str, field_mask: str) -> None:
+    """Handle info command."""
+    details = get_place_details_new_api(place_id, field_mask)
+    print_formatted_place_info(details)
+
+
+def _handle_raw_command(place_id: str, field_mask: str) -> None:
+    """Handle raw command."""
+    details = get_place_details_new_api(place_id, field_mask)
+    print("FULL JSON RESPONSE FROM GOOGLE PLACES API:")
+    print("=" * 80)
+    print(json.dumps(details, indent=2, ensure_ascii=False))
+
+
+def _handle_compare_command(place_id: str) -> None:
+    """Handle compare command."""
+    compare_apis(place_id)
+
+
+def main():
+    """Main CLI function."""
+    parser = _setup_argument_parser()
     args = parser.parse_args()
 
     if not args.command:
@@ -427,32 +804,15 @@ def main():
 
     try:
         if args.command == "search":
-            results = search_places_new_api(args.query, args.location_bias)
-            print("\n🔍 SEARCH RESULTS:")
-            print("=" * 60)
-
-            places = results.get("places", [])
-            print(f"Found {len(places)} places:")
-
-            for i, place in enumerate(places, 1):
-                name = place.get("displayName", "Unknown")
-                place_id = place.get("id", "No ID")
-                rating = place.get("rating", "N/A")
-                print(f"{i}. {name} (ID: {place_id}) - Rating: {rating}")
-
-                if i == 1:  # Show details for first result
-                    print("\n📋 First result details:")
-                    print(json.dumps(place, indent=2))
-
+            _handle_search_command(args.query, args.location_bias)
         elif args.command == "details":
-            details = get_place_details_new_api(args.place_id, args.field_mask)
-            print_place_summary(details, "NEW")
-
-            print("\n📋 FULL RESPONSE:")
-            print(json.dumps(details, indent=2))
-
+            _handle_details_command(args.place_id, args.field_mask)
+        elif args.command == "info":
+            _handle_info_command(args.place_id, args.field_mask)
+        elif args.command == "raw":
+            _handle_raw_command(args.place_id, args.field_mask)
         elif args.command == "compare":
-            compare_apis(args.place_id)
+            _handle_compare_command(args.place_id)
 
     except Exception as e:
         print(f"❌ Error: {e}")

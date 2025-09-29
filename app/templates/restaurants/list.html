@@ -24,12 +24,8 @@ include 'includes/breadcrumb.html' %}
         <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-primary" data-bs-toggle="tooltip" title="Add a new restaurant">
             <i class="fas fa-plus me-2"></i>Add Restaurant
         </a>
-        <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary d-none d-md-inline-flex" data-bs-toggle="tooltip" title="Search for restaurants using Google Places">
-            <i class="fas fa-search-location me-2"></i> Find Places
-        </a>
-        <!-- Mobile find button -->
-        <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary d-md-none" data-bs-toggle="tooltip" title="Find places">
-            <i class="fas fa-search-location me-1"></i>Find
+        <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-outline-primary" data-bs-toggle="tooltip" title="Search for restaurants using Google Places">
+            <i class="fas fa-search-location me-2"></i>Find Places
         </a>
         <!-- Data Management Dropdown -->
         <div class="dropdown">

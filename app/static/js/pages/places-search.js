@@ -146,40 +146,42 @@ window.addToMyRestaurants = async function(placeId) {
 
     const restaurantData = await response.json();
 
-    // Create form data for adding restaurant
-    const formData = new FormData();
-    formData.append('csrf_token', csrfToken);
-    formData.append('name', restaurantData.name || '');
-    formData.append('type', 'restaurant');
-    formData.append('description', restaurantData.description || '');
-    formData.append('address_line_1', restaurantData.address_line_1 || '');
-    formData.append('address_line_2', restaurantData.address_line_2 || '');
-    formData.append('city', restaurantData.city || '');
-    formData.append('state', restaurantData.state || '');
-    formData.append('postal_code', restaurantData.postal_code || '');
-    formData.append('country', restaurantData.country || '');
-    formData.append('phone', restaurantData.phone || '');
-    formData.append('website', restaurantData.website || '');
-    formData.append('email', restaurantData.email || '');
-    formData.append('google_place_id', restaurantData.google_place_id || '');
-    formData.append('cuisine', restaurantData.cuisine || '');
-    formData.append('service_level', restaurantData.service_level || '');
-    formData.append('is_chain', restaurantData.is_chain ? 'true' : 'false');
-    formData.append('rating', restaurantData.rating || '');
-    formData.append('notes', restaurantData.notes || '');
+    // Create JSON data for adding restaurant
+    const requestData = {
+      name: restaurantData.name || '',
+      type: 'restaurant',
+      description: restaurantData.description || '',
+      address_line_1: restaurantData.address_line_1 || '',
+      address_line_2: restaurantData.address_line_2 || '',
+      city: restaurantData.city || '',
+      state: restaurantData.state || '',
+      postal_code: restaurantData.postal_code || '',
+      country: restaurantData.country || '',
+      phone: restaurantData.phone || '',
+      website: restaurantData.website || '',
+      email: restaurantData.email || '',
+      google_place_id: restaurantData.google_place_id || '',
+      cuisine: restaurantData.cuisine || '',
+      service_level: restaurantData.service_level || '',
+      is_chain: restaurantData.is_chain ? true : false,
+      rating: restaurantData.rating || '',
+      notes: restaurantData.notes || '',
+    };
 
     // Submit the form
     const addResponse = await fetch(addRestaurantUrl, {
       method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
         'X-Requested-With': 'XMLHttpRequest',
       },
-      body: formData,
+      body: JSON.stringify(requestData),
     });
 
     const responseData = await addResponse.json();
 
-    if (addResponse.status === 201) {
+    if (addResponse.status === 200 || addResponse.status === 201) {
       // Hide the adding toast before showing the success toast
       if (addingToast && addingToast.hide) addingToast.hide();
       // Success - new restaurant created
@@ -198,7 +200,21 @@ window.addToMyRestaurants = async function(placeId) {
       // Hide the adding toast before showing the conflict toast
       if (addingToast && addingToast.hide) addingToast.hide();
       // Conflict - restaurant already exists
-      const restaurantId = responseData.restaurant_id;
+      console.log('409 Response data:', responseData);
+
+      // Extract restaurant ID from the error data
+      const restaurantId = responseData.error?.existing_restaurant?.id ||
+                          responseData.redirect_url?.split('/').pop() ||
+                          responseData.restaurant_id;
+
+      console.log('Restaurant ID:', restaurantId);
+
+      // Build the correct URLs
+      const viewUrl = `/restaurants/${restaurantId}`;
+      const editUrl = `/restaurants/${restaurantId}/edit`;
+
+      console.log('View URL:', viewUrl);
+      console.log('Edit URL:', editUrl);
 
       showLocalToast('Restaurant Already Exists', responseData.message, 'warning', [
         {
@@ -206,14 +222,14 @@ window.addToMyRestaurants = async function(placeId) {
           icon: 'fas fa-eye',
           class: 'btn-outline-primary',
           action: 'navigate',
-          data: { url: `/restaurants/${restaurantId}` },
+          data: { url: viewUrl },
         },
         {
           text: 'Update Info',
           icon: 'fas fa-edit',
           class: 'btn-outline-warning',
           action: 'navigate',
-          data: { url: `/restaurants/${restaurantId}/edit` },
+          data: { url: editUrl },
         },
       ]);
     } else {
@@ -221,7 +237,7 @@ window.addToMyRestaurants = async function(placeId) {
       // Other error
       throw new Error(responseData.message || 'Failed to add restaurant');
     }
-  } catch {
+  } catch (error) {
     console.error('Error adding restaurant:', error);
     showLocalToast('Error', error.message, 'error');
   }
@@ -240,6 +256,11 @@ document.addEventListener('DOMContentLoaded', async() => {
 
       // Get configuration from data attributes
       const config = window.PLACES_SEARCH_CONFIG || {};
+
+      // Debug: Log configuration values
+      console.log('Places search config:', config);
+      console.log('Google Maps API Key:', window.GOOGLE_MAPS_API_KEY);
+      console.log('Google Maps Map ID:', config.googleMapsMapId);
 
       // Initialize the map-based search component
       const mapSearch = new MapRestaurantSearch(container, {
