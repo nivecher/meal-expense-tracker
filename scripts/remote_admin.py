@@ -38,6 +38,8 @@ Examples:
     python scripts/remote_admin.py validate-restaurants --username admin --dry-run
     python scripts/remote_admin.py validate-restaurants --all-users --fix-mismatches
     python scripts/remote_admin.py validate-restaurants --restaurant-id 123
+    python scripts/remote_admin.py validate-restaurants --find-place-id --dry-run
+    python scripts/remote_admin.py validate-restaurants --find-place-id --closest --dry-run
 
     # Run migrations
     python scripts/remote_admin.py run-migrations --dry-run
@@ -223,17 +225,35 @@ class RemoteAdminClient:
         """Format individual validation results."""
         for result in validation_results[:5]:  # Show first 5
             restaurant_name = result.get("name", "Unknown")
+            restaurant_id = result.get("id", "N/A")
+            username = result.get("username", "N/A")
+            google_place_id = result.get("google_place_id", "N/A")
+            full_address = result.get("full_address", "N/A")
             status = result.get("status", "unknown")
 
             status_icon = self._get_status_icon(status)
-            output.append(f"  {status_icon} {restaurant_name}")
+            output.append(f"\n🍽️  {restaurant_name} (ID: {restaurant_id})")
+            output.append(f"   User: {username}")
+            output.append(f"   Google Place ID: {google_place_id}")
+            output.append(f"   Full Address: {full_address}")
+            output.append(f"   {status_icon} {status.title()}")
 
             # Show mismatches if any
             mismatches = result.get("mismatches", [])
             if mismatches:
-                output.append(f"      Mismatches: {', '.join(mismatches[:2])}")
-                if len(mismatches) > 2:
-                    output.append(f"      ... and {len(mismatches) - 2} more")
+                output.append("   ⚠️  Mismatches found:")
+                for mismatch in mismatches:
+                    output.append(f"      - {mismatch}")
+
+            # Show address comparison if available
+            address_comparison = result.get("address_comparison", {})
+            if address_comparison:
+                self._format_address_comparison(address_comparison, output)
+
+            # Show Google data if available
+            google_data = result.get("google_data", {})
+            if google_data:
+                self._format_google_data(google_data, output)
 
             # Show if fixed
             if result.get("fixed"):
@@ -243,6 +263,67 @@ class RemoteAdminClient:
 
         if len(validation_results) > 5:
             output.append(f"  ... and {len(validation_results) - 5} more restaurants")
+
+    def _format_address_comparison(self, address_comparison: Dict[str, Any], output: List[str]) -> None:
+        """Format address comparison output."""
+        stored = address_comparison.get("stored_address", {})
+        google = address_comparison.get("google_address", {})
+
+        output.append("   📍 Address Comparison:")
+        output.append("      Stored Address:")
+        output.append(f"         Street: {stored.get('street', 'N/A')}")
+        if stored.get("unit"):
+            output.append(f"         Unit: {stored['unit']}")
+        output.append(f"         City: {stored.get('city', 'N/A')}")
+        output.append(f"         State: {stored.get('state', 'N/A')}")
+        output.append(f"         ZIP: {stored.get('zip', 'N/A')}")
+        output.append(f"         Country: {stored.get('country', 'N/A')}")
+
+        output.append("      Google Address:")
+        output.append(f"         Street: {google.get('street', 'N/A')}")
+        if google.get("unit"):
+            output.append(f"         Unit: {google['unit']}")
+        output.append(f"         City: {google.get('city', 'N/A')}")
+        output.append(f"         State: {google.get('state', 'N/A')}")
+        output.append(f"         ZIP: {google.get('zip', 'N/A')}")
+        output.append(f"         Country: {google.get('country', 'N/A')}")
+
+    def _format_google_data(self, google_data: Dict[str, Any], output: List[str]) -> None:
+        """Format Google Places data output."""
+        self._format_google_basic_info(google_data, output)
+        self._format_google_service_info(google_data, output)
+
+    def _format_google_basic_info(self, google_data: Dict[str, Any], output: List[str]) -> None:
+        """Format basic Google Places information."""
+        if google_data.get("google_address"):
+            output.append(f"   🗺️  Google Address: {google_data['google_address']}")
+
+        if google_data.get("google_status"):
+            output.append(f"   📊 Status: {google_data['google_status']}")
+        if google_data.get("google_rating"):
+            output.append(f"   ⭐ Google Rating: {google_data['google_rating']}/5.0")
+        if google_data.get("google_phone"):
+            output.append(f"   📞 Phone: {google_data['google_phone']}")
+        if google_data.get("google_website"):
+            output.append(f"   🌐 Website: {google_data['google_website']}")
+        if google_data.get("google_price_level"):
+            price_level = google_data["google_price_level"]
+            price_symbols = "💰" * price_level if isinstance(price_level, int) else price_level
+            output.append(f"   💲 Price Level: {price_symbols}")
+        if google_data.get("types"):
+            types_data = google_data["types"]
+            if isinstance(types_data, list):
+                types_str = ", ".join(types_data[:3])  # Show first 3 types
+            else:
+                types_str = str(types_data)
+            output.append(f"   🏷️  Types: {types_str}")
+
+    def _format_google_service_info(self, google_data: Dict[str, Any], output: List[str]) -> None:
+        """Format Google service level information."""
+        if google_data.get("google_service_level"):
+            service_level, confidence = google_data["google_service_level"]
+            if service_level != "unknown":
+                output.append(f"   🍽️  Service Level: {service_level.title()} (confidence: {confidence:.2f})")
 
     def _get_status_icon(self, status: str) -> str:
         """Get status icon for validation result."""
@@ -381,6 +462,12 @@ def create_parser() -> argparse.ArgumentParser:
     validate_restaurants_parser.add_argument(
         "--dry-run", action="store_true", help="Show what would be fixed without making changes"
     )
+    validate_restaurants_parser.add_argument(
+        "--find-place-id", action="store_true", help="Find Google Place ID matches for restaurants without one"
+    )
+    validate_restaurants_parser.add_argument(
+        "--closest", action="store_true", help="Automatically select closest match when multiple options are found"
+    )
 
     # Run migrations
     migrate_parser = subparsers.add_parser("run-migrations", help="Run database migrations safely")
@@ -392,6 +479,15 @@ def create_parser() -> argparse.ArgumentParser:
         "--fix-history",
         action="store_true",
         help="Fix migration history for existing tables (use when you get 'already exists' errors)",
+    )
+
+    # Stamp alembic version
+    stamp_parser = subparsers.add_parser("stamp", help="Stamp the database to a specific Alembic revision")
+    stamp_parser.add_argument(
+        "--revision",
+        type=str,
+        required=True,
+        help="Target revision to stamp to (e.g., 42985d8e0812)",
     )
 
     return parser
@@ -514,6 +610,10 @@ def _handle_validate_restaurants(client: RemoteAdminClient, args: argparse.Names
         params["update_service_levels"] = args.update_service_levels
     if args.dry_run:
         params["dry_run"] = args.dry_run
+    if args.find_place_id:
+        params["find_place_id"] = args.find_place_id
+    if args.closest:
+        params["closest"] = args.closest
 
     return client.invoke_operation("validate_restaurants", params, args.confirm)
 
@@ -529,6 +629,12 @@ def _handle_run_migrations(client: RemoteAdminClient, args: argparse.Namespace) 
     return client.invoke_operation("run_migrations", params, args.confirm)
 
 
+def _handle_stamp(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+    """Handle stamp command."""
+    params = {"revision": args.revision}
+    return client.invoke_operation("stamp", params, args.confirm)
+
+
 def _execute_command(client: RemoteAdminClient, args: argparse.Namespace) -> Optional[Dict[str, Any]]:
     """Execute the specified command and return the result."""
     command_handlers = {
@@ -542,6 +648,7 @@ def _execute_command(client: RemoteAdminClient, args: argparse.Namespace) -> Opt
         "db-maintenance": lambda: _handle_db_maintenance(client, args),
         "validate-restaurants": lambda: _handle_validate_restaurants(client, args),
         "run-migrations": lambda: _handle_run_migrations(client, args),
+        "stamp": lambda: _handle_stamp(client, args),
     }
 
     handler = command_handlers.get(args.command)

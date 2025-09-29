@@ -5,8 +5,6 @@ from decimal import Decimal
 from typing import Any, Dict
 
 import pytest
-
-# from flask import Flask
 from flask.testing import FlaskClient
 from flask_sqlalchemy import SQLAlchemy
 
@@ -17,7 +15,6 @@ from app.extensions import db as _db
 from app.restaurants.models import Restaurant
 
 # Type aliases
-TestClient = FlaskClient
 TestData = Dict[str, Any]
 
 
@@ -84,7 +81,7 @@ def test_restaurant(db, test_user):
         name="Test Restaurant",
         type="restaurant",  # Add required field
         user_id=test_user.id,
-        address="123 Test St",
+        address_line_1="123 Test St",
         city="Test City",
         state="TS",
         postal_code="12345",
@@ -109,7 +106,7 @@ class TestExpenseAPI:
     """Test cases for the Expense API endpoints."""
 
     def test_create_expense(
-        self, client: TestClient, test_restaurant: Restaurant, test_category: Category, auth_headers: Dict[str, str]
+        self, client: FlaskClient, test_restaurant: Restaurant, test_category: Category, auth_headers: Dict[str, str]
     ) -> None:
         """Test creating a new expense."""
         expense_data = {
@@ -136,7 +133,7 @@ class TestExpenseAPI:
         assert data["restaurant_id"] == test_restaurant.id
         assert data["category_id"] == test_category.id
 
-    def test_create_expense_invalid_data(self, client: TestClient, auth_headers: Dict[str, str]) -> None:
+    def test_create_expense_invalid_data(self, client: FlaskClient, auth_headers: Dict[str, str]) -> None:
         """Test creating an expense with invalid data."""
         response = client.post(
             "/api/v1/expenses",
@@ -148,7 +145,7 @@ class TestExpenseAPI:
 
     def test_get_expenses(
         self,
-        client: TestClient,
+        client: FlaskClient,
         db: SQLAlchemy,
         test_user: User,
         test_restaurant: Restaurant,
@@ -179,7 +176,7 @@ class TestExpenseAPI:
 
     def test_get_expense(
         self,
-        client: TestClient,
+        client: FlaskClient,
         db: SQLAlchemy,
         test_user: User,
         test_restaurant: Restaurant,
@@ -210,7 +207,7 @@ class TestExpenseAPI:
 
     def test_update_expense(
         self,
-        client: TestClient,
+        client: FlaskClient,
         db: SQLAlchemy,
         test_user: User,
         test_restaurant: Restaurant,
@@ -255,7 +252,7 @@ class TestExpenseAPI:
 
     def test_delete_expense(
         self,
-        client: TestClient,
+        client: FlaskClient,
         db: SQLAlchemy,
         test_user: User,
         test_restaurant: Restaurant,
@@ -290,7 +287,7 @@ class TestExpenseAPI:
         )
         assert response.status_code == 404
 
-    def test_unauthorized_access(self, client: TestClient) -> None:
+    def test_unauthorized_access(self, client: FlaskClient) -> None:
         """Test that unauthorized access is rejected."""
         endpoints = [
             ("/api/v1/expenses", "GET"),
@@ -318,7 +315,7 @@ class TestExpenseAPI:
 
     def test_access_other_user_expense(
         self,
-        client: TestClient,
+        client: FlaskClient,
         db: SQLAlchemy,
         test_user: User,
         test_restaurant: Restaurant,

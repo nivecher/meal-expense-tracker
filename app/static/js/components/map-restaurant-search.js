@@ -55,7 +55,7 @@ export class MapRestaurantSearch {
     this.getCurrentLocation();
   }
 
-  async loadGoogleMaps() {
+  async loadGoogleMaps() { // eslint-disable-line require-await
     if (window.google && window.google.maps) {
       return; // Already loaded
     }
@@ -70,7 +70,7 @@ export class MapRestaurantSearch {
     });
   }
 
-  async waitForGoogleMaps() {
+  async waitForGoogleMaps() { // eslint-disable-line require-await
     // Wait for Google Maps API to be fully loaded including marker library
     return new Promise((resolve) => {
       const checkGoogleMaps = () => {
@@ -255,6 +255,13 @@ export class MapRestaurantSearch {
   initMap() {
     const mapElement = this.container.querySelector('#restaurant-map');
 
+    // Debug: Log map configuration
+    console.log('Map initialization options:', this.options);
+    console.log('Google Maps Map ID:', this.options.googleMapsMapId);
+    console.log('Google Maps Map ID type:', typeof this.options.googleMapsMapId);
+    console.log('Google Maps Map ID length:', this.options.googleMapsMapId ? this.options.googleMapsMapId.length : 'N/A');
+    console.log('Google Maps Map ID truthy:', !!this.options.googleMapsMapId);
+
     // Default to San Francisco if no location available
     const defaultLocation = { lat: 37.7749, lng: -122.4194 };
 
@@ -269,8 +276,27 @@ export class MapRestaurantSearch {
     };
 
     if (this.options.googleMapsMapId) {
-      mapOptions.mapId = this.options.googleMapsMapId;
+      // Validate Map ID format
+      const mapId = this.options.googleMapsMapId.trim();
+      console.log('Map ID validation:', {
+        original: this.options.googleMapsMapId,
+        trimmed: mapId,
+        length: mapId.length,
+        type: typeof mapId,
+      });
+
+      if (mapId.length < 10) {
+        console.warn('Map ID appears to be too short, may not be valid:', mapId);
+      }
+      mapOptions.mapId = mapId;
+      console.log('Using Map ID:', mapId);
     } else {
+      console.warn('No Map ID provided, using default styles');
+      console.log('Map ID options:', {
+        googleMapsMapId: this.options.googleMapsMapId,
+        type: typeof this.options.googleMapsMapId,
+        truthy: !!this.options.googleMapsMapId,
+      });
       // Only apply inline styles when not using a cloud-based Map ID style
       mapOptions.styles = [
         {
@@ -281,6 +307,7 @@ export class MapRestaurantSearch {
       ];
     }
 
+    console.log('Final map options:', mapOptions);
     this.map = new google.maps.Map(mapElement, mapOptions);
 
     // Add click listener to map
@@ -401,7 +428,7 @@ export class MapRestaurantSearch {
         statusDiv.classList.add('d-none');
       }, 3000);
 
-    } catch (error) {
+    } catch {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
       statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
@@ -444,7 +471,7 @@ export class MapRestaurantSearch {
         statusDiv.classList.add('d-none');
       }, 3000);
 
-    } catch (error) {
+    } catch {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
       statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
@@ -503,7 +530,7 @@ export class MapRestaurantSearch {
         query: searchQuery,
         lat: searchLocation.lat,
         lng: searchLocation.lng,
-        radius_miles: radius,
+        radiusMiles: radius,
         cuisine: filters.cuisine || '',
         minRating: filters.minRating || '',
         maxPriceLevel: filters.maxPriceLevel || '',
@@ -526,7 +553,7 @@ export class MapRestaurantSearch {
       // Call callback
       this.options.onResults(results);
 
-    } catch (error) {
+    } catch {
       console.error('Search error:', error);
       this.options.onError(error);
       this.showError(error.message);
@@ -619,14 +646,27 @@ export class MapRestaurantSearch {
   }
 
   createMarker(restaurant, index) {
-    if (!restaurant.geometry || !restaurant.geometry.location) {
-      return;
+    // Handle both old and new Google Places API formats
+    let position = null;
+
+    if (restaurant.geometry && restaurant.geometry.location) {
+      // Old format: restaurant.geometry.location.lat/lng
+      position = {
+        lat: restaurant.geometry.location.lat,
+        lng: restaurant.geometry.location.lng,
+      };
+    } else if (restaurant.latitude && restaurant.longitude) {
+      // New format: restaurant.latitude/longitude
+      position = {
+        lat: restaurant.latitude,
+        lng: restaurant.longitude,
+      };
     }
 
-    const position = {
-      lat: restaurant.geometry.location.lat,
-      lng: restaurant.geometry.location.lng,
-    };
+    if (!position) {
+      console.warn('No location data found for restaurant:', restaurant.name);
+      return;
+    }
 
     // Use AdvancedMarkerElement with numbered content
     const marker = new google.maps.marker.AdvancedMarkerElement({
@@ -702,9 +742,26 @@ export class MapRestaurantSearch {
   }
 
   createResultCard(restaurant, index) {
-    const photoUrl = restaurant.photos && restaurant.photos.length > 0
-      ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=300&photoreference=${restaurant.photos[0].photo_reference}&key=${this.options.googleMapsApiKey}`
-      : null;
+    // Handle photos - use the URL if available, otherwise build it from photo_reference
+    let photoUrl = null;
+    console.log(`Restaurant ${restaurant.name} photos:`, restaurant.photos);
+
+    if (restaurant.photos && restaurant.photos.length > 0) {
+      const firstPhoto = restaurant.photos[0];
+      console.log(`First photo for ${restaurant.name}:`, firstPhoto);
+
+      if (firstPhoto.url) {
+        // New format: photo already has URL
+        photoUrl = firstPhoto.url;
+        console.log(`Using existing URL for ${restaurant.name}:`, photoUrl);
+      } else if (firstPhoto.photo_reference) {
+        // Old format: build URL from photo_reference
+        photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=300&photoreference=${firstPhoto.photo_reference}&key=${this.options.googleMapsApiKey}`;
+        console.log(`Built URL for ${restaurant.name}:`, photoUrl);
+      }
+    } else {
+      console.log(`No photos found for ${restaurant.name}`);
+    }
 
     const rating = restaurant.rating || 0;
     const reviewCount = restaurant.user_ratings_total || 0;
@@ -821,23 +878,50 @@ export class MapRestaurantSearch {
   }
 
   parseAddress(restaurant) {
+    console.log('Parsing address for:', restaurant.name);
+    console.log('Restaurant address data:', {
+      address: restaurant.address,
+      address_line_1: restaurant.address_line_1,
+      address_line_2: restaurant.address_line_2,
+      city: restaurant.city,
+      state: restaurant.state,
+      postal_code: restaurant.postal_code,
+      formatted_address: restaurant.formatted_address,
+      vicinity: restaurant.vicinity,
+    });
+
     // First, try to use structured address data if available (from details API)
-    if (restaurant.address && restaurant.city && restaurant.state) {
-      const street = restaurant.address;
+    if ((restaurant.address_line_1 || restaurant.address) && restaurant.city && restaurant.state) {
+      const street = restaurant.address_line_1 || restaurant.address;
       const cityState = restaurant.postal_code
         ? `${restaurant.city}, ${restaurant.state} ${restaurant.postal_code}`
         : `${restaurant.city}, ${restaurant.state}`;
 
+      console.log('Using structured address:', { street, cityStateZip: cityState });
       return {
         street,
         cityStateZip: cityState,
       };
     }
 
+    // Debug: Check if we have partial structured data
+    if (restaurant.city || restaurant.state || restaurant.postal_code) {
+      console.log('Partial structured data available:', {
+        address_line_1: restaurant.address_line_1,
+        address: restaurant.address,
+        city: restaurant.city,
+        state: restaurant.state,
+        postal_code: restaurant.postal_code,
+      });
+    }
+
     // Fallback to parsing formatted_address or vicinity from search results
     const formatted = restaurant.formatted_address || restaurant.vicinity || '';
 
+    console.log('Using formatted address fallback:', formatted);
+
     if (!formatted) {
+      console.log('No formatted address available');
       return { street: 'Address not available', cityStateZip: '' };
     }
 
@@ -848,7 +932,7 @@ export class MapRestaurantSearch {
 
     if (states && states.length > 0) {
       // Found state abbreviation, try to parse around it
-      const state = states[0];
+      const [state] = states;
       const stateIndex = formatted.indexOf(state);
 
       // Extract everything after the state (should include city)
@@ -858,7 +942,7 @@ export class MapRestaurantSearch {
       // Try to find city before state
       const parts = beforeState.split(',').map((p) => p.trim());
       if (parts.length > 0) {
-        const street = parts[0];
+        const [street] = parts;
         const city = parts.length > 1 ? parts[parts.length - 1] : '';
 
         return {
@@ -873,9 +957,7 @@ export class MapRestaurantSearch {
 
     if (parts.length >= 4) {
       // Format: "Street, City, State ZIP, Country"
-      const street = parts[0];
-      const city = parts[1];
-      const stateZip = parts[2];
+      const [street, city, stateZip] = parts;
 
       return {
         street,
@@ -883,9 +965,7 @@ export class MapRestaurantSearch {
       };
     } else if (parts.length === 3) {
       // Format: "Street, City, State ZIP" or "Street, City, Country"
-      const street = parts[0];
-      const city = parts[1];
-      const lastPart = parts[2];
+      const [street, city, lastPart] = parts;
 
       // Check if last part contains state abbreviation or full state name
       const stateRegex = /\b[A-Z]{2}\b|\b(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming)\b/i;
@@ -905,14 +985,14 @@ export class MapRestaurantSearch {
 
     } else if (parts.length === 2) {
       // Format: "Street, City State" or "Street, City"
-      const street = parts[0];
-      const cityState = parts[1];
+      const [street] = parts;
+      const [, cityState] = parts;
 
       // Try to extract state from cityState if it's in format "City State ZIP"
       const stateMatch = cityState.match(/\b([A-Z]{2})\s+\d{5}(-\d{4})?$/);
       if (stateMatch) {
         const cityOnly = cityState.replace(/\s+[A-Z]{2}\s+\d{5}(-\d{4})?$/, '');
-        const stateZip = cityState.match(/\s+([A-Z]{2}\s+\d{5}(-\d{4})?)$/)[1];
+        const [, stateZip] = cityState.match(/\s+([A-Z]{2}\s+\d{5}(-\d{4})?)$/);
         return {
           street,
           cityStateZip: `${cityOnly}, ${stateZip}`,
@@ -935,10 +1015,13 @@ export class MapRestaurantSearch {
       };
     }
 
-    return {
+    const result = {
       street: formatted,
       cityStateZip: '',
     };
+
+    console.log('Final parsed address result:', result);
+    return result;
 
   }
 
@@ -972,7 +1055,7 @@ export class MapRestaurantSearch {
         // Extract just the hours part (after the day name and colon)
         const hoursMatch = todaysHours.match(/:\s*(.+)$/);
         if (hoursMatch) {
-          status.hoursText = hoursMatch[1];
+          [, status.hoursText] = hoursMatch;
         }
       }
     }
@@ -991,15 +1074,18 @@ export class MapRestaurantSearch {
     // Highlight selected restaurant card
     const card = this.container.querySelector(`[data-index="${index}"]`);
     if (card) {
-      card.classList.add('border-primary', 'shadow-lg');
-      card.style.transform = 'scale(1.02)';
-      card.style.transition = 'all 0.2s ease';
+      // Use requestAnimationFrame to batch DOM writes
+      requestAnimationFrame(() => {
+        card.classList.add('border-primary', 'shadow-lg');
+        card.style.transform = 'scale(1.02)';
+        card.style.transition = 'all 0.2s ease';
 
-      // Scroll to selected card
-      card.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-        inline: 'nearest',
+        // Scroll to selected card
+        card.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'nearest',
+        });
       });
     }
 
@@ -1159,7 +1245,7 @@ export class MapRestaurantSearch {
         }, 3000);
       }
 
-    } catch (error) {
+    } catch {
       console.warn('Could not get current location:', error);
 
       // Show error message
@@ -1189,7 +1275,7 @@ export class MapRestaurantSearch {
         position = marker.getPosition();
       } else if (marker.position) {
         // AdvancedMarkerElement
-        position = marker.position;
+        position = marker.position; // eslint-disable-line prefer-destructuring
       }
 
       if (position) {
@@ -1236,7 +1322,7 @@ export class MapRestaurantSearch {
     if (window.addToMyRestaurants && typeof window.addToMyRestaurants === 'function') {
       try {
         window.addToMyRestaurants(placeId);
-      } catch (error) {
+      } catch {
         console.error('Error calling global addToMyRestaurants:', error);
       }
     } else {

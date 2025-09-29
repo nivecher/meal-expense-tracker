@@ -34,37 +34,7 @@
     crossorigin="anonymous"></script>
 
 {# Fix jQuery form submission override issue #}
-<script>
-    // Fix jQuery overriding HTMLFormElement.prototype.submit
-    // This ensures native form submission works properly
-    (function () {
-        // Store the original submit method
-        const originalSubmit = HTMLFormElement.prototype.submit;
-
-        // Override the prototype to restore native functionality
-        HTMLFormElement.prototype.submit = function () {
-            // Create a temporary form and submit it using native method
-            const tempForm = document.createElement("form");
-            tempForm.method = this.method || "GET";
-            tempForm.action = this.action;
-            tempForm.style.display = "none";
-
-            // Copy all form data
-            const inputs = this.querySelectorAll("input, select, textarea");
-            inputs.forEach((input) => {
-                const newInput = input.cloneNode(true);
-                tempForm.appendChild(newInput);
-            });
-
-            document.body.appendChild(tempForm);
-
-            // Use the original native submit method
-            originalSubmit.call(tempForm);
-
-            document.body.removeChild(tempForm);
-        };
-    })();
-</script>
+<script src="{{ url_for('static', filename='js/utils/jquery-form-fix.js') }}"></script>
 
 {# Select2 JS - Latest stable version (requires jQuery) #}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>

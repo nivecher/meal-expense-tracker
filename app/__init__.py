@@ -67,40 +67,79 @@ def _configure_request_handlers(app: Flask) -> None:
 
 def _fix_content_type_headers(response) -> str:
     """Fix content-type headers for different file types."""
-    content_type = response.headers.get("Content-Type")
+    content_type = response.headers.get("Content-Type", "")
+
+    # Skip service worker - it has its own content type handling
+    if request.path == "/service-worker.js":
+        return content_type
+
+    # Fix CSS and JavaScript file content-type headers
+    if request.path and any(request.path.endswith(ext) for ext in [".css", ".js"]):
+        return _fix_css_js_headers(response)
 
     # Fix font file content-type headers (no charset for fonts)
-    if request.path and any(request.path.endswith(ext) for ext in [".woff2", ".woff", ".ttf", ".eot", ".otf"]):
-        font_type_map = {
-            ".woff2": "font/woff2",
-            ".woff": "font/woff",
-            ".ttf": "font/ttf",
-            ".eot": "font/eot",
-            ".otf": "font/otf",
-        }
-        for ext, mime_type in font_type_map.items():
-            if request.path.endswith(ext):
-                response.headers["Content-Type"] = mime_type
-                return mime_type
+    elif request.path and any(request.path.endswith(ext) for ext in [".woff2", ".woff", ".ttf", ".eot", ".otf"]):
+        return _fix_font_headers(response)
 
     # Fix charset for HTML/text responses - ensure UTF-8 is properly set
-    elif "text/" in content_type or "html" in content_type:
-        base_content_type = content_type.split(";")[0].strip()
-        if "html" in base_content_type or "text/" in base_content_type:
-            response.headers["Content-Type"] = f"{base_content_type}; charset=utf-8"
-            return response.headers["Content-Type"]
+    elif content_type and ("text/" in content_type or "html" in content_type):
+        return _fix_html_text_headers(response, content_type)
 
+    return content_type
+
+
+def _fix_css_js_headers(response) -> str:
+    """Fix content-type headers for CSS and JavaScript files."""
+    mime_type_map = {
+        ".css": "text/css; charset=utf-8",
+        ".js": "text/javascript; charset=utf-8",
+    }
+    for ext, mime_type in mime_type_map.items():
+        if request.path.endswith(ext):
+            response.headers["Content-Type"] = mime_type
+            return mime_type
+    return response.headers.get("Content-Type", "")
+
+
+def _fix_font_headers(response) -> str:
+    """Fix content-type headers for font files."""
+    font_type_map = {
+        ".woff2": "font/woff2",
+        ".woff": "font/woff",
+        ".ttf": "font/ttf",
+        ".eot": "font/eot",
+        ".otf": "font/otf",
+    }
+    for ext, mime_type in font_type_map.items():
+        if request.path.endswith(ext):
+            response.headers["Content-Type"] = mime_type
+            return mime_type
+    return response.headers.get("Content-Type", "")
+
+
+def _fix_html_text_headers(response, content_type: str) -> str:
+    """Fix charset for HTML/text responses - ensure UTF-8 is properly set."""
+    base_content_type = content_type.split(";")[0].strip()
+    if "html" in base_content_type or "text/" in base_content_type:
+        # Remove existing charset if present and add utf-8
+        if "charset=" in base_content_type:
+            base_content_type = base_content_type.split("charset=")[0].rstrip("; ")
+        response.headers["Content-Type"] = f"{base_content_type}; charset=utf-8"
+        return response.headers["Content-Type"]
     return content_type
 
 
 def _set_cache_control_headers(response, content_type: str) -> None:
     """Set appropriate cache control headers based on content type."""
+    # Static assets that rarely change - cache for 1 year
     if any(ext in content_type for ext in ["css", "javascript", "image", "font/"]):
-        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"  # 1 year, immutable
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    # HTML pages - short cache to ensure updates are seen
     elif "html" in content_type:
-        response.headers["Cache-Control"] = "no-cache, max-age=0"  # Prevent caching of HTML
+        response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
+    # Other content - moderate caching
     else:
-        response.headers["Cache-Control"] = "public, max-age=3600"  # 1 hour
+        response.headers["Cache-Control"] = "public, max-age=3600"
 
 
 def _set_security_headers(response, content_type: str) -> None:
@@ -108,18 +147,7 @@ def _set_security_headers(response, content_type: str) -> None:
     # Essential security headers - always set for all responses
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-
-    # Content Security Policy (replaces X-Frame-Options with better support)
-    csp = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://code.jquery.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://maps.googleapis.com; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
-        "font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
-        "img-src 'self' data: https:; "
-        "connect-src 'self' https://maps.googleapis.com https://cdn.jsdelivr.net; "
-        "frame-ancestors 'none';"
-    )
-    response.headers["Content-Security-Policy"] = csp
+    response.headers["X-Frame-Options"] = "DENY"  # Legacy support
 
     # Additional security headers
     response.headers["Permissions-Policy"] = "geolocation=(self), microphone=(), camera=()"
@@ -128,11 +156,20 @@ def _set_security_headers(response, content_type: str) -> None:
     response.headers.pop("Pragma", None)
     response.headers.pop("Expires", None)  # Remove deprecated Expires header
 
-    # Only add CSP for HTML responses to avoid unnecessary headers on static resources
+    # Content Security Policy - only for HTML responses to avoid unnecessary headers on static resources
     if content_type and "html" in content_type:
-        response.headers["Content-Security-Policy"] = (
-            "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.jquery.com https://maps.googleapis.com https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https: blob:; connect-src 'self' https://places.googleapis.com https://maps.googleapis.com https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';"
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://code.jquery.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://maps.googleapis.com https://maps.gstatic.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+            "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+            "img-src 'self' data: https: blob:; "
+            "connect-src 'self' https://places.googleapis.com https://maps.googleapis.com https://cdn.jsdelivr.net; "
+            "frame-ancestors 'none'; "
+            "object-src 'none'; "
+            "base-uri 'self';"
         )
+        response.headers["Content-Security-Policy"] = csp
 
 
 def _configure_app_settings(app: Flask) -> None:
@@ -240,6 +277,15 @@ def _register_blueprints(app: Flask) -> None:
     """Register all application blueprints."""
     logger.debug("Registering blueprints...")
 
+    # Register core blueprints
+    _register_core_blueprints(app)
+
+    # Register feature blueprints
+    _register_feature_blueprints(app)
+
+
+def _register_core_blueprints(app: Flask) -> None:
+    """Register core application blueprints."""
     # Main blueprint
     from .main import bp as main_bp
 
@@ -253,38 +299,30 @@ def _register_blueprints(app: Flask) -> None:
     init_auth(app)
     logger.debug(f"Registered blueprint: {auth_bp.name} at /auth")
 
-    # Feature blueprints - use explicit imports for reliability
+
+def _register_feature_blueprints(app: Flask) -> None:
+    """Register feature blueprints with error handling."""
+    blueprint_configs = [
+        ("restaurants", "/restaurants"),
+        ("expenses", "/expenses"),
+        ("api", "/api/v1"),
+        ("reports", "/reports"),
+        ("health", "/health"),
+    ]
+
+    for module_name, url_prefix in blueprint_configs:
+        _register_single_blueprint(app, module_name, url_prefix)
+
+
+def _register_single_blueprint(app: Flask, module_name: str, url_prefix: str) -> None:
+    """Register a single blueprint with error handling."""
     try:
-        from .restaurants import bp as restaurants_bp
-
-        app.register_blueprint(restaurants_bp, url_prefix="/restaurants")
-        logger.debug(f"Registered blueprint: {restaurants_bp.name} at /restaurants")
+        module = __import__(f"app.{module_name}", fromlist=["bp"])
+        bp = module.bp
+        app.register_blueprint(bp, url_prefix=url_prefix)
+        logger.debug(f"Registered blueprint: {bp.name} at {url_prefix}")
     except ImportError as e:
-        logger.warning(f"Could not import restaurants blueprint: {e}")
-
-    try:
-        from .expenses import bp as expenses_bp
-
-        app.register_blueprint(expenses_bp, url_prefix="/expenses")
-        logger.debug(f"Registered blueprint: {expenses_bp.name} at /expenses")
-    except ImportError as e:
-        logger.warning(f"Could not import expenses blueprint: {e}")
-
-    try:
-        from .api import bp as api_bp
-
-        app.register_blueprint(api_bp, url_prefix="/api/v1")
-        logger.debug(f"Registered blueprint: {api_bp.name} at /api/v1")
-    except ImportError as e:
-        logger.warning(f"Could not import api blueprint: {e}")
-
-    try:
-        from .reports import bp as reports_bp
-
-        app.register_blueprint(reports_bp, url_prefix="/reports")
-        logger.debug(f"Registered blueprint: {reports_bp.name} at /reports")
-    except ImportError as e:
-        logger.warning(f"Could not import reports blueprint: {e}")
+        logger.warning(f"Could not import {module_name} blueprint: {e}")
 
 
 def _configure_cors(app: Flask) -> None:

@@ -22,9 +22,15 @@
 
             <!-- Restaurant Name and Cuisine -->
             <div>
-                <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                    >{{ restaurant.name }}</a
-                >
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                        >{{ restaurant.name }}</a
+                    >
+                    {% if restaurant.price_level is not none %}
+                    <span class="text-muted">•</span>
+                    {% from 'macros/badge_helpers.html' import price_level_badge %} {{
+                    price_level_badge(restaurant.price_level, size='sm') }} {% endif %}
+                </div>
                 {% if restaurant.cuisine %}
                 <div class="mt-1">
                     {% from 'macros/badge_helpers.html' import cuisine_badge %} {{ cuisine_badge(restaurant.cuisine,
@@ -38,12 +44,11 @@
         <div class="d-flex align-items-start">
             <i class="fas fa-map-marker-alt me-2 mt-1 flex-shrink-0 text-muted"></i>
             <div class="flex-grow-1">
-                {% if restaurant.address or restaurant.city or restaurant.state or restaurant.postal_code %} {% if
-                restaurant.address %}<div class="small text-muted">{{ restaurant.address }}</div>{% endif %} {% if
-                restaurant.city or restaurant.state or restaurant.postal_code %}
-                <div>{{ [restaurant.city, restaurant.state, restaurant.postal_code]|select|join(", ") }}</div>
-                {% endif %} {% else %}
-                <span class="text-muted">-</span>
+                {% if restaurant.get('address') or restaurant.get('city') or restaurant.get('state') or
+                restaurant.get('postal_code') %}
+                <div>{{ restaurant|restaurant_address_only|replace('\n', '<br />')|safe }}</div>
+                {% else %}
+                <span class="text-muted">No address</span>
                 {% endif %}
             </div>
             {% set maps_url = restaurant|google_maps_url %} {% if maps_url %}
@@ -76,17 +81,13 @@
         {% endif %}
     </td>
     <td data-sort-value="{{ restaurant.visit_count }}">
-        {% if restaurant.visit_count > 0 %}
-            {{ restaurant.visit_count }}
-        {% else %}
-            <span class="text-muted">-</span>
+        {% if restaurant.visit_count > 0 %} {{ restaurant.visit_count }} {% else %}
+        <span class="text-muted">-</span>
         {% endif %}
     </td>
     <td data-sort-value="{% if last_visit %}{{ last_visit.isoformat() }}{% else %}1970-01-01T00:00:00{% endif %}">
         {% if last_visit %}
-        <span
-            data-bs-toggle="tooltip"
-            title="{{ last_visit|format_datetime_user_tz('%B %d, %Y at %I:%M %p') }}">
+        <span data-bs-toggle="tooltip" title="{{ last_visit|format_datetime_user_tz('%B %d, %Y at %I:%M %p') }}">
             {{ last_visit|time_ago }}
         </span>
         {% else %}

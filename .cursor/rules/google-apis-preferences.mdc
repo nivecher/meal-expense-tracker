@@ -1,0 +1,50 @@
+---
+description: "Google APIs preferences and modernization guidelines"
+globs: "*.py,*.js,*.html"
+---
+
+# Google APIs Preferences
+
+## Rule: Always Use Newer Google APIs
+
+When working with Google APIs, you MUST:
+
+1. **Use New APIs**: Prefer the latest Google APIs over legacy versions
+2. **Consistent Implementation**: Use the same API version across frontend and backend
+3. **Future-Proof**: Choose APIs that are actively maintained and recommended by Google
+
+### Current API Usage Status
+
+**✅ Frontend**: Using newest Google Maps JavaScript API with:
+- `google.maps.marker.AdvancedMarkerElement` (new marker system)
+- Modern loading: `loading=async`
+- New libraries: `marker` library
+
+**❌ Backend**: Currently using classic Places API (needs migration):
+- Old endpoint: `https://maps.googleapis.com/maps/api/place/details/json`
+- String-based field parameters
+- Legacy authentication method
+
+**✅ Recommended**: New Places API (2024+):
+- New endpoint: `https://places.googleapis.com/v1/places/{place_id}`
+- FieldMask-based field selection
+- Header-based authentication with `X-Goog-Api-Key`
+
+### Migration Benefits
+
+The new Google Places API provides:
+- **Better Restaurant Data**: Payment options, accessibility, parking details
+- **Enhanced Structure**: Organized data with proper typing
+- **AI Features**: Generative summaries and better categorization
+- **Future-Proof**: Google's recommended approach
+
+### Implementation Files
+
+Key files that need API updates:
+- [app/restaurants/routes.py](mdc:app/restaurants/routes.py) - Places API calls
+- [scripts/google_places_cli.py](mdc:scripts/google_places_cli.py) - CLI tools
+- [scripts/search_restaurants.py](mdc:scripts/search_restaurants.py) - Search scripts
+
+### Reference
+
+See [scripts/google_places_new_api_cli.py](mdc:scripts/google_places_new_api_cli.py) for examples of the new API implementation.

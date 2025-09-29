@@ -1,6 +1,5 @@
 """Forms for the expenses blueprint."""
 
-from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 from flask import current_app
@@ -14,6 +13,7 @@ from wtforms import (
     StringField,
     SubmitField,
     TextAreaField,
+    TimeField,
     ValidationError,
 )
 from wtforms.validators import DataRequired, NumberRange, Optional
@@ -97,8 +97,12 @@ class ExpenseForm(FlaskForm):
             current_app.logger.error(f"Error converting amount to Decimal: {e}")
             raise ValidationError("Please enter a valid amount")
 
-    date = DateField(
-        "Date", validators=[DataRequired(message="Date is required")], format="%Y-%m-%d", default=datetime.now().date()
+    date = DateField("Date", validators=[DataRequired(message="Date is required")], format="%Y-%m-%d")
+    time = TimeField(
+        "Time",
+        validators=[Optional()],
+        format="%H:%M",
+        render_kw={"class": "form-control", "placeholder": "Optional time (e.g., 14:30)"},
     )
     # Category and Restaurant
     category_id = SelectField(

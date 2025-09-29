@@ -15,7 +15,8 @@ class Config:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-key-change-in-production")
 
     # Flask settings
-    DEBUG: bool = False
+    DEBUG: bool = os.getenv("FLASK_DEBUG", "0").lower() == "1"
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     TESTING: bool = False
 
     # Database settings
@@ -226,21 +227,24 @@ class Config:
         """Setup filesystem session configuration."""
         import tempfile
 
+        from cachelib.file import FileSystemCache
+
         self.SESSION_TYPE = "filesystem"
-        self.SESSION_FILE_DIR = tempfile.mkdtemp(prefix="flask_session_")
-        self.SESSION_FILE_THRESHOLD = 100
+        # Use FileSystemCache instance instead of deprecated SESSION_FILE_DIR and SESSION_FILE_THRESHOLD
+        session_dir = tempfile.mkdtemp(prefix="flask_session_")
+        self.SESSION_CACHELIB = FileSystemCache(session_dir, threshold=100, mode=0o600)
 
 
 class DevelopmentConfig(Config):
     """Development configuration."""
 
-    DEBUG: bool = True
+    # DEBUG: bool = True
     # Cookie security is now automatically configured based on HTTPS availability
     # SESSION_COOKIE_SECURE will be False for HTTP development, True for HTTPS
     # SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE are always enabled for security
 
 
-class TestingConfig(Config):
+class UnitTestConfig(Config):  # noqa: D101
     """Testing configuration."""
 
     TESTING: bool = True
@@ -263,7 +267,7 @@ def get_config() -> Config:
 
     configs = {
         "development": DevelopmentConfig,
-        "testing": TestingConfig,
+        "testing": UnitTestConfig,
         "production": ProductionConfig,
     }
 

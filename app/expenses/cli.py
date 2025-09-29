@@ -48,7 +48,9 @@ def _sort_categories_by_default_order(categories: list[Category]) -> list[Catego
 def _get_target_users(user_id: int | None, username: str | None, all_users: bool) -> list[User]:
     """Get target users based on options."""
     if user_id:
-        user = User.query.get(user_id)
+        from app.extensions import db
+
+        user = db.session.get(User, user_id)
         if not user:
             click.echo(f"❌ Error: User with ID {user_id} not found")
             return []

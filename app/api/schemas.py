@@ -17,6 +17,9 @@ class RestaurantSchema(Schema):
     type = fields.Str()
     description = fields.Str()
     address = fields.Str()
+    address_line_1 = fields.Str()
+    address_line_2 = fields.Str()
+    located_within = fields.Str()
     city = fields.Str()
     state = fields.Str()
     postal_code = fields.Str()
@@ -25,11 +28,26 @@ class RestaurantSchema(Schema):
     website = fields.Str()
     email = fields.Email()
     cuisine = fields.Str()
+    service_level = fields.Str()
     is_chain = fields.Bool()
     rating = fields.Float()  # User's personal rating (1.0-5.0)
+    price_level = fields.Int()
+    primary_type = fields.Str()
+    latitude = fields.Float()
+    longitude = fields.Float()
     notes = fields.Str()
     user_id = fields.Int(dump_only=True)
     google_place_id = fields.Str()
+
+    # Computed/derived fields
+    full_name = fields.Str(dump_only=True)
+    full_address = fields.Str(dump_only=True)
+    google_maps_url = fields.Method("get_google_maps_url", dump_only=True)
+    google_search = fields.Str(dump_only=True)
+
+    def get_google_maps_url(self, obj):
+        """Get the Google Maps URL for the restaurant."""
+        return obj.get_google_maps_url()
 
 
 class ExpenseSchema(Schema):

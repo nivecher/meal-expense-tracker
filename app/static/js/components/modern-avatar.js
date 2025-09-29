@@ -112,7 +112,7 @@ class ModernAvatarManager {
   }
 
   extractAvatarData(element) {
-    const rect = element.getBoundingClientRect();
+    // const rect = element.getBoundingClientRect(); // Unused for now
     const computedStyle = window.getComputedStyle(element);
 
     // Get the image source and clean it up
@@ -253,7 +253,7 @@ class ModernAvatarManager {
 
     // Handle email addresses
     if (source.includes('@')) {
-      source = source.split('@')[0];
+      [source] = source.split('@');
     }
 
     // Split by common separators and take first letters
@@ -277,7 +277,7 @@ class ModernAvatarManager {
     // Create a simple hash from the identifier
     let hash = 0;
     for (let i = 0; i < identifier.length; i++) {
-      hash = identifier.charCodeAt(i) + ((hash << 5) - hash);
+      hash = identifier.charCodeAt(i) + ((hash << 5) - hash); // eslint-disable-line no-bitwise
     }
 
     // Use hash to select color consistently
@@ -307,19 +307,22 @@ class ModernAvatarManager {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       cursor: pointer;
+    }
+
+    .avatar-hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      border-color: rgba(255, 255, 255, 1);
+    }
     `;
 
-    // Add hover effect
+    // Add hover effect using CSS classes for better performance
     element.addEventListener('mouseenter', () => {
-      element.style.transform = 'translateY(-1px)';
-      element.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
-      element.style.borderColor = 'rgba(255, 255, 255, 1)';
+      element.classList.add('avatar-hover');
     });
 
     element.addEventListener('mouseleave', () => {
-      element.style.transform = '';
-      element.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)';
-      element.style.borderColor = 'rgba(255, 255, 255, 0.9)';
+      element.classList.remove('avatar-hover');
     });
 
     return element;

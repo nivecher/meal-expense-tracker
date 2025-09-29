@@ -142,10 +142,20 @@ def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
     except (ValueError, TypeError):
         normalized_restaurant_id = None
 
+    # Set default date to current date in user's timezone
+    from app.utils.timezone_utils import get_current_time_in_user_timezone
+
+    user_timezone = current_user.timezone if current_user.timezone else "UTC"
+    current_datetime_user_tz = get_current_time_in_user_timezone(user_timezone)
+    current_date_user_tz = current_datetime_user_tz.date()
+    current_time_user_tz = current_datetime_user_tz.time()
+
     form = ExpenseForm(
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant")] + restaurants,
         restaurant_id=normalized_restaurant_id,
+        date=current_date_user_tz,
+        time=current_time_user_tz,
     )
     return form, is_ajax
 
@@ -417,9 +427,18 @@ def _handle_expense_not_found() -> ResponseReturnValue:
 
 def _init_expense_form(categories: list[tuple[int, str, str, str]], restaurants: list[tuple[str, str]]) -> ExpenseForm:
     """Initialize an expense form with the given choices."""
+    # Set default date to current date in user's timezone
+    from app.utils.timezone_utils import get_current_time_in_user_timezone
+
+    user_timezone = current_user.timezone if current_user.timezone else "UTC"
+    current_datetime_user_tz = get_current_time_in_user_timezone(user_timezone)
+    current_date_user_tz = current_datetime_user_tz.date()
+    current_time_user_tz = current_datetime_user_tz.time()
     return ExpenseForm(
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant")] + restaurants,
+        date=current_date_user_tz,
+        time=current_time_user_tz,
     )
 
 
@@ -432,6 +451,14 @@ def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
         form.restaurant_id.data = expense.restaurant_id
     if expense.meal_type:
         form.meal_type.data = expense.meal_type
+    # Set the date and time from the expense
+    if expense.date:
+        from app.utils.timezone_utils import convert_to_user_timezone
+
+        user_timezone = current_user.timezone if current_user.timezone else "UTC"
+        expense_datetime_user_tz = convert_to_user_timezone(expense.date, user_timezone)
+        form.date.data = expense_datetime_user_tz.date()
+        form.time.data = expense_datetime_user_tz.time()
 
 
 def _handle_expense_update(
@@ -450,7 +477,7 @@ def _handle_expense_update(
             return _handle_update_error(error, is_ajax)
         return _handle_update_success(expense.id, is_ajax)
 
-    return _handle_validation_errors(form, is_ajax)
+    return _handle_validation_errors(form, expense, is_ajax)
 
 
 def _reinitialize_form_with_data(
@@ -487,11 +514,11 @@ def _handle_update_success(expense_id: int, is_ajax: bool) -> ResponseReturnValu
     return redirect(url_for("expenses.expense_details", expense_id=expense_id))
 
 
-def _handle_validation_errors(form: ExpenseForm, is_ajax: bool) -> ResponseReturnValue:
+def _handle_validation_errors(form: ExpenseForm, expense: Expense, is_ajax: bool) -> ResponseReturnValue:
     """Handle form validation errors."""
     if is_ajax and form.errors:
         return {"success": False, "errors": form.errors}, 400
-    return render_template("expenses/form.html", form=form, is_edit=True), 400
+    return render_template("expenses/form.html", form=form, expense=expense, is_edit=True), 400
 
 
 def _render_expense_form(
@@ -540,6 +567,7 @@ def list_expenses() -> str:
     # Get filtered expenses using the service layer
     try:
         expenses, total_amount, avg_price_per_person = expense_services.get_user_expenses(current_user.id, filters)
+        current_app.logger.info(f"Found {len(expenses)} expenses for user {current_user.id}")
     except Exception as e:
         current_app.logger.error(f"Error filtering expenses: {str(e)}")
         expenses, total_amount, avg_price_per_person = [], 0.0, None
@@ -624,7 +652,10 @@ def delete_expense(expense_id: int) -> FlaskResponse | WerkzeugResponse:
         404: If expense is not found
         403: If user doesn't have permission to delete the expense
     """
-    expense = Expense.query.get_or_404(expense_id)
+    # Use SQLAlchemy 2.0 style to avoid LegacyAPIWarning for Query.get()
+    expense = db.session.get(Expense, expense_id)
+    if expense is None:
+        abort(404)
     if expense.user_id != current_user.id:
         abort(403)
     expense_services.delete_expense(expense)
@@ -765,9 +796,17 @@ def create_tag():
     if not data:
         return jsonify({"success": False, "message": "No data provided"}), 400
 
+    # Debug: Log the received data
+    current_app.logger.info(f"Creating tag with data: {data}")
+    print(f"DEBUG: Creating tag with data: {data}")
+
     name = data.get("name", "").strip()
     color = data.get("color", "#6c757d")
     description = data.get("description", "").strip()
+
+    # Debug: Log extracted values
+    current_app.logger.info(f"Extracted values - name: '{name}', color: '{color}', description: '{description}'")
+    print(f"DEBUG: Extracted values - name: '{name}', color: '{color}', description: '{description}'")
 
     if not name:
         return jsonify({"success": False, "message": "Tag name is required"}), 400
@@ -790,9 +829,17 @@ def update_tag(tag_id):
     if not data:
         return jsonify({"success": False, "message": "No data provided"}), 400
 
+    # Debug: Log the received data
+    current_app.logger.info(f"Updating tag {tag_id} with data: {data}")
+    print(f"DEBUG: Updating tag {tag_id} with data: {data}")
+
     name = data.get("name", "").strip()
     color = data.get("color", "#6c757d")
     description = data.get("description", "").strip()
+
+    # Debug: Log extracted values
+    current_app.logger.info(f"Extracted values - name: '{name}', color: '{color}', description: '{description}'")
+    print(f"DEBUG: Extracted values - name: '{name}', color: '{color}', description: '{description}'")
 
     if not name:
         return jsonify({"success": False, "message": "Tag name is required"}), 400

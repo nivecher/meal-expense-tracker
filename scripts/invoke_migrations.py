@@ -5,6 +5,7 @@ This script simplifies the process of invoking a Lambda function to run database
 using the AWS CLI. It handles the invocation and provides clear success/error messages.
 """
 
+import base64
 import json
 import logging
 import os
@@ -165,7 +166,7 @@ def build_aws_cli_command(function_name: str, region: Optional[str] = None, prof
         "--log-type",
         "Tail",
         "--payload",
-        '{"action": "migrate"}',
+        base64.b64encode(json.dumps({"admin_operation": "run_migrations"}).encode()).decode(),
     ]
 
     # Add optional parameters

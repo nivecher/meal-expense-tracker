@@ -28,7 +28,9 @@ application = app  # This maintains WSGI compatibility
 print("\nApplication configuration:")
 print(f"- FLASK_ENV: {os.environ.get('FLASK_ENV')}")
 print(f"- DATABASE_URL: {'Set' if os.environ.get('DATABASE_URL') else 'Not set'}")
-print(f"- SQLALCHEMY_DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI', 'Not set')}\n")
+print(f"- SQLALCHEMY_DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI', 'Not set')}")
+print(f"- GOOGLE_MAPS_API_KEY: {'Set' if app.config.get('GOOGLE_MAPS_API_KEY') else 'Not set'}")
+print(f"- GOOGLE_MAPS_MAP_ID: {'Set' if app.config.get('GOOGLE_MAPS_MAP_ID') else 'Not set'}\n")
 
 
 def run_migrations() -> None:

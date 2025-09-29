@@ -174,21 +174,21 @@ build_docker_image() {
 package_lambda() {
   log_info "Packaging Lambda deployment..."
 
-  # Create dist directory
-  mkdir -p "dist/x86_64"
+  # Create dist directory with architecture-first structure
+  mkdir -p "dist/x86_64/app"
 
   # Create deployment package
   docker run --rm \
-    -v "$(pwd)/dist/x86_64:/output" \
+    -v "$(pwd)/dist/x86_64/app:/output" \
     "meal-expense-tracker:$ENVIRONMENT" \
     sh -c "cp -r /var/task/* /output/ && chmod -R 755 /output"
 
   # Create ZIP file
-  cd "dist/x86_64"
-  zip -r "../app-x86_64.zip" . -x "*.pyc" "__pycache__/*" "*.git*" "*.DS_Store"
+  cd "dist/x86_64/app"
+  zip -r "app-x86_64.zip" . -x "*.pyc" "__pycache__/*" "*.git*" "*.DS_Store"
   cd "$PROJECT_ROOT"
 
-  log_success "Lambda package created: dist/app-x86_64.zip"
+  log_success "Lambda package created: dist/x86_64/app/app-x86_64.zip"
 }
 
 # Deploy with Terraform

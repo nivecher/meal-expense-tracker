@@ -1,21 +1,21 @@
 /* Pagination Component Styles */
 
 .pagination .page-link .arrow {
-    display: inline-block;
-    width: 0.5em;
-    text-align: center;
+  display: inline-block;
+  width: 0.5em;
+  text-align: center;
 }
 
 .pagination .page-link .arrow.prev::before {
-    content: "\2039";
+  content: "\2039";
 }
 
 .pagination .page-link .arrow.next::before {
-    content: "\203A";
+  content: "\203A";
 }
 
 .pagination .page-link .ellipsis {
-    display: inline-block;
-    width: 1em;
-    text-align: center;
+  display: inline-block;
+  width: 1em;
+  text-align: center;
 }

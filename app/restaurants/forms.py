@@ -38,11 +38,12 @@ class RestaurantForm(FlaskForm):
         ],
         validators=[DataRequired()],
     )
+    located_within = StringField("Location Within", validators=[Optional(), Length(max=100)])
     description = TextAreaField("Description", validators=[Optional(), Length(max=500)])
 
     # Contact Information
-    address = StringField("Address Line 1", validators=[Optional(), Length(max=255)])
-    address2 = StringField("Address Line 2", validators=[Optional(), Length(max=255)])
+    address_line_1 = StringField("Address Line 1", validators=[Optional(), Length(max=255)])
+    address_line_2 = StringField("Address Line 2", validators=[Optional(), Length(max=255)])
     city = StringField("City", validators=[Optional(), Length(max=100)])
     state = StringField("State/Province", validators=[Optional(), Length(max=100)])
     postal_code = StringField("Postal Code", validators=[Optional(), Length(max=20)])
@@ -76,6 +77,23 @@ class RestaurantForm(FlaskForm):
         "Your Rating",
         validators=[Optional(), NumberRange(min=1.0, max=5.0)],
         render_kw={"step": "0.5", "min": "1.0", "max": "5.0", "placeholder": "Your personal rating (1.0 - 5.0)"},
+    )
+    price_level = SelectField(
+        "Price Level",
+        choices=[
+            ("", "Auto-detect (Google)"),
+            (0, "Free"),
+            (1, "$ Budget ($1-10)"),
+            (2, "$$ Moderate ($11-30)"),
+            (3, "$$$ Expensive ($31-60)"),
+            (4, "$$$$ Very Expensive ($61+)"),
+        ],
+        validators=[Optional()],
+        coerce=lambda x: int(x) if x and x != "" else None,
+        render_kw={
+            "data-bs-toggle": "tooltip",
+            "title": "Price level will be auto-detected from Google Places data if available",
+        },
     )
     is_chain = BooleanField("Part of a chain", false_values=(False, "false", 0, "0"), default=False)
     notes = TextAreaField("Notes", validators=[Optional()])

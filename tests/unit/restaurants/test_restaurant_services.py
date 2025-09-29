@@ -38,7 +38,7 @@ def test_create_restaurant_success(session, test_user):
             obj.name = "New Test Restaurant"
             obj.type = "restaurant"
             obj.description = "Test description"
-            obj.address = "123 Test St"
+            obj.address_line_1 = "123 Test St"
             obj.city = "Test City"
             obj.state = "TS"
             obj.postal_code = "12345"
@@ -59,7 +59,7 @@ def test_create_restaurant_success(session, test_user):
     assert restaurant.name == "New Test Restaurant"
     assert restaurant.type == "restaurant"
     assert restaurant.description == "Test description"
-    assert restaurant.address == "123 Test St"
+    assert restaurant.address_line_1 == "123 Test St"
     assert restaurant.city == "Test City"
     assert restaurant.state == "TS"
     assert restaurant.postal_code == "12345"
@@ -188,10 +188,11 @@ def test_import_restaurants_duplicate_restaurant(session, test_restaurant, test_
             ],
         )
 
-        # Mock the import to return 0 successes (duplicate)
+        # Mock the import to return 0 successes, 1 skipped (duplicate)
         mock_import.return_value = (
-            0,
-            [f"Restaurant '{test_restaurant.name}' already exists"],
+            0,  # success_count
+            1,  # skipped_count
+            [],  # errors (no actual errors, just skipped)
         )
 
         # Create a test CSV file
@@ -208,6 +209,7 @@ def test_import_restaurants_duplicate_restaurant(session, test_restaurant, test_
         success, result_data = import_restaurants_from_csv(file, test_user.id)
 
         # Check results - should indicate duplicate was skipped
+        # With no errors, this should be successful
         assert success is True
         assert result_data["success_count"] == 0
         assert result_data["skipped_count"] == 1

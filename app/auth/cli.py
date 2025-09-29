@@ -252,7 +252,9 @@ def _find_user_by_identifier(identifier: str) -> User | None:
     from app.auth.models import User
 
     if identifier.isdigit():
-        return User.query.get(int(identifier))
+        from app.extensions import db
+
+        return db.session.get(User, int(identifier))
     return User.query.filter((User.username == identifier) | (User.email == identifier)).first()
 
 
@@ -624,7 +626,7 @@ def delete_user(
     _display_user_info(user)
 
     # Check related data and handle cascade options
-    if not _check_related_data(user, no_cascade, force):
+    if not _check_related_data(user, not cascade, force):
         return
 
     # Confirm deletion

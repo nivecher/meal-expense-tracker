@@ -1,11 +1,8 @@
 /* Main CSS file for Meal Expense Tracker */
 
 @import url("../css/components/table.css");
-
 @import url("../css/components/avatar.css");
-
 @import url("../css/components/inline-styles-replacement.css");
-
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 /* Category Badge Classes */
@@ -43,7 +40,6 @@
 }
 
 :root {
-
   /* Modern Color Palette */
   --primary-color: #2563eb; /* Modern blue */
   --primary-light: #60a5fa;
@@ -176,11 +172,10 @@ html {
 /* Browser fallbacks for text-size-adjust */
 
 @supports not (text-size-adjust: 100%) {
-
   html {
-
     /* Fallback for browsers that don't support text-size-adjust */
     font-size: 16px; /* Explicit base font size */
+    text-size-adjust: 100%;
   }
 }
 
@@ -288,7 +283,7 @@ p {
 /* Primary Button */
 
 .btn-primary {
-  color: white;
+  color: #fff;
   background-color: var(--primary-color);
   border-color: var(--primary-color);
   transition:
@@ -298,7 +293,7 @@ p {
   &:hover {
     background-color: var(--primary-dark);
     border-color: var(--primary-dark);
-    color: white;
+    color: #fff;
     transform: translateY(-1px);
     box-shadow: var(--shadow);
   }
@@ -325,6 +320,7 @@ p {
 .btn-sm {
   --btn-padding-y: 0.25rem;
   --btn-padding-x: 0.75rem;
+
   font-size: 0.8125rem;
   border-radius: var(--border-radius-sm);
 }
@@ -332,6 +328,7 @@ p {
 .btn-lg {
   --btn-padding-y: 0.75rem;
   --btn-padding-x: 1.5rem;
+
   font-size: 1.0625rem;
   border-radius: var(--border-radius);
 }
@@ -358,6 +355,7 @@ p {
 }
 
 .form-check-input {
+  user-select: none;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -449,7 +447,7 @@ p {
 .dropdown-item.active,
 .dropdown-item:active {
   background-color: var(--accent-color);
-  color: white;
+  color: #fff;
 }
 
 .dropdown-item.active i,
@@ -564,7 +562,6 @@ p {
 /* Responsive Helpers */
 
 @media (width <= 768px) {
-
   .container {
     padding: 0 var(--spacing-sm);
   }
@@ -607,15 +604,8 @@ p {
   /* Spacing & Sizing */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 3rem;
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgb(0 0 0 / 10%);
-  --shadow: 0 4px 6px rgb(0 0 0 / 10%);
-  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 10%);
-  --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 10%);
 
   /* Border Radius */
   --border-radius-sm: 0.25rem;
@@ -666,20 +656,17 @@ body {
 /* Accessibility improvements for pagination */
 
 .btn[tabindex="-1"] {
-
   /* Ensure disabled-style buttons are not focusable */
   pointer-events: none;
 }
 
 .btn[aria-label*="not available"] {
-
   /* Visual styling for unavailable pagination buttons */
   opacity: 0.6;
   cursor: not-allowed;
 }
 
 .btn[aria-label*="current page"] {
-
   /* Ensure current page button is visually distinct */
   font-weight: 600;
 }
@@ -687,20 +674,17 @@ body {
 /* Accessibility improvements for navigation */
 
 .navbar-nav[role="menubar"] {
-
   /* Ensure menubar styling is consistent */
   display: flex;
   flex-direction: row;
 }
 
 .navbar-nav[role="menubar"] .nav-item[role="none"] {
-
   /* Ensure nav items don't interfere with menubar structure */
   position: relative;
 }
 
 .nav-link[role="menuitem"] {
-
   /* Ensure menuitem links are properly styled */
   display: flex;
   align-items: center;
@@ -708,13 +692,11 @@ body {
 }
 
 .nav-link[role="menuitem"][aria-haspopup="true"] {
-
   /* Visual indicator for dropdown menu items */
   position: relative;
 }
 
 .nav-link[role="menuitem"][aria-haspopup="true"]::after {
-
   /* Add dropdown indicator */
   content: "";
   width: 0;
@@ -764,7 +746,7 @@ footer {
   display: inline-block;
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
-  color: white;
+  color: #fff;
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: capitalize;
@@ -823,7 +805,7 @@ footer {
 .dropdown-item.active,
 .dropdown-item:active {
   background-color: var(--accent-color);
-  color: white;
+  color: #fff;
 }
 
 .dropdown-item.active i,
@@ -938,7 +920,6 @@ footer {
 /* Responsive Helpers */
 
 @media (width <= 991.98px) {
-
   .navbar-collapse {
     background-color: var(--primary-color);
     padding: 1rem;
@@ -993,7 +974,7 @@ footer {
 .navbar .form-control {
   background-color: rgb(255 255 255 / 10%);
   border-color: rgb(255 255 255 / 15%);
-  color: white;
+  color: #fff;
 }
 
 .navbar .form-control::placeholder {
@@ -1002,7 +983,7 @@ footer {
 
 .navbar .btn-outline-light {
   border-color: rgb(255 255 255 / 20%);
-  color: white;
+  color: #fff;
 }
 
 .navbar .btn-outline-light:hover {

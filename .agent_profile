@@ -1,0 +1,128 @@
+# Agent Shell Profile
+# Source this file to configure the shell environment for AI agents
+
+# Set proper terminal type
+export TERM=xterm-256color
+
+# Clean PATH (remove duplicates and Windows paths)
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin:/sbin:/home/mtd37/.local/bin:/home/mtd37/bin"
+
+# Set project root
+export PROJECT_ROOT="/home/mtd37/workspace/meal-expense-tracker"
+
+# Activate virtual environment if it exists
+if [[ -d "$PROJECT_ROOT/venv" ]]; then
+    source "$PROJECT_ROOT/venv/bin/activate"
+fi
+
+# Set Python path
+export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
+
+# Set Flask environment
+export FLASK_APP=wsgi:app
+export FLASK_ENV=development
+
+# Change to project directory
+cd "$PROJECT_ROOT"
+
+# Enable bash completion if available (skip in WSL environments)
+if [[ -f /usr/share/bash-completion/bash_completion ]] && [[ -z "${WSL_DISTRO_NAME:-}" ]]; then
+    source /usr/share/bash-completion/bash_completion
+fi
+
+# Set useful aliases
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias ..='cd ..'
+alias ...='cd ../..'
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
+
+# Function to quickly run the setup script
+agent_setup() {
+    "$PROJECT_ROOT/scripts/setup-agent-shell.sh"
+}
+
+# AWS Profile Management
+# Set default AWS profile (can be overridden)
+export AWS_PROFILE="${AWS_PROFILE:-meal-tracker}"
+
+# Function to list available AWS profiles
+aws_profiles() {
+    if command -v aws >/dev/null 2>&1; then
+        echo "📋 Available AWS Profiles:"
+        if [[ -f ~/.aws/config ]]; then
+            grep -E '^\[profile|^\[default' ~/.aws/config | sed 's/\[profile //g; s/\[default\]/default/g; s/\]//g' | sort
+        else
+            echo "  No AWS profiles configured"
+            echo "  Run: aws configure --profile meal-tracker"
+        fi
+    else
+        echo "❌ AWS CLI not installed"
+    fi
+}
+
+# Function to switch AWS profile
+aws_use_profile() {
+    local profile_name="$1"
+    if [[ -z "$profile_name" ]]; then
+        echo "Usage: aws_use_profile <profile_name>"
+        echo "Available profiles:"
+        aws_profiles
+        return 1
+    fi
+
+    export AWS_PROFILE="$profile_name"
+    echo "✅ Switched to AWS profile: $profile_name"
+    aws_status
+}
+
+# Function to check AWS status
+aws_status() {
+    if command -v aws >/dev/null 2>&1; then
+        local current_profile="${AWS_PROFILE:-default}"
+        echo "🔧 Current AWS Profile: $current_profile"
+
+        if aws sts get-caller-identity >/dev/null 2>&1; then
+            echo "✅ AWS credentials configured and working"
+            aws sts get-caller-identity --output table
+        else
+            echo "❌ AWS credentials not working for profile: $current_profile"
+            echo "Run: aws configure --profile $current_profile"
+        fi
+    else
+        echo "❌ AWS CLI not installed"
+    fi
+}
+
+# Function to setup AWS profile for this project
+aws_setup() {
+    local profile_name="${1:-meal-tracker}"
+    echo "🔧 Setting up AWS profile: $profile_name"
+    aws configure --profile "$profile_name"
+    export AWS_PROFILE="$profile_name"
+    aws_status
+}
+
+# Function to check project status
+project_status() {
+    echo "📁 Project: $(basename "$PROJECT_ROOT")"
+    echo "🐍 Python: $(which python)"
+    echo "📦 Virtual Env: $(if [[ -n "${VIRTUAL_ENV:-}" ]]; then echo "Active"; else echo "Not active"; fi)"
+    echo "🔧 AWS Profile: ${AWS_PROFILE:-default}"
+    echo "🔧 AWS Status: $(if aws sts get-caller-identity >/dev/null 2>&1; then echo "✅ Working"; else echo "❌ Not configured"; fi)"
+    echo "🐳 Docker: $(if command -v docker >/dev/null 2>&1; then echo "Available"; else echo "Not available"; fi)"
+    echo "📋 Node: $(if command -v node >/dev/null 2>&1; then echo "Available"; else echo "Not available"; fi)"
+}
+
+# Welcome message
+echo "🤖 Agent shell environment loaded"
+echo "📋 Available commands:"
+echo "  project_status    - Check system status"
+echo "  aws_status        - Check AWS profile status"
+echo "  aws_profiles      - List available AWS profiles"
+echo "  aws_use_profile   - Switch AWS profile"
+echo "  aws_setup         - Setup AWS profile"
+echo "  agent_setup       - Run full setup check"

@@ -156,6 +156,76 @@ def order_type_css_class_filter(order_type: str) -> str:
     return get_order_type_css_class(order_type)
 
 
+def service_level_icon(service_level: str) -> str:
+    """Get the icon for a service level.
+
+    Args:
+        service_level: The service level name
+
+    Returns:
+        Font Awesome icon name or default question if not found
+    """
+    if not service_level:
+        return "question"
+
+    service_level_lower = service_level.lower().strip().replace("_", "-")
+
+    # Service level icon mapping
+    icon_mapping = {
+        "fine-dining": "crown",  # Premium/upscale
+        "casual-dining": "utensils",  # Traditional restaurant
+        "fast-casual": "clock",  # Quick but quality
+        "quick-service": "bolt",  # Fast service
+        "unknown": "question",  # Unknown/undetermined
+    }
+
+    return icon_mapping.get(service_level_lower, "question")
+
+
+def service_level_color(service_level: str) -> str:
+    """Get the color for a service level.
+
+    Args:
+        service_level: The service level name
+
+    Returns:
+        Hex color code or default gray if not found
+    """
+    if not service_level:
+        return "#6c757d"
+
+    service_level_lower = service_level.lower().strip().replace("_", "-")
+
+    # Service level color mapping with enhanced colors
+    color_mapping = {
+        "fine-dining": "#8b0000",  # Dark red - premium/luxury
+        "casual-dining": "#ff6b35",  # Orange-red - warm/comfortable
+        "fast-casual": "#2d5016",  # Dark green - fresh/quality
+        "quick-service": "#ffa500",  # Orange - fast/energetic
+        "unknown": "#6c757d",  # Gray - neutral/unknown
+    }
+
+    return color_mapping.get(service_level_lower, "#6c757d")
+
+
+def service_level_css_class_filter(service_level: str) -> str:
+    """Get the CSS class for a service level.
+
+    Args:
+        service_level: The service level name
+
+    Returns:
+        CSS class name string
+    """
+    if not service_level:
+        return "service-level-default"
+
+    service_level_lower = service_level.lower().strip().replace("_", "-")
+
+    # Return the normalized service level as CSS class
+    return f"service-level-{service_level_lower}"
+
+
 def format_datetime_user_tz(value: datetime, format_str: str = "%B %d, %Y at %I:%M %p") -> str:
     """Format a datetime for display in user's timezone.
 
@@ -275,6 +345,11 @@ def init_app(app: Flask) -> None:
     app.add_template_filter(cuisine_icon, name="cuisine_icon")
     app.add_template_filter(cuisine_color, name="cuisine_color")
     app.add_template_filter(cuisine_css_class_filter, name="cuisine_css_class")
+
+    # Service level filters
+    app.add_template_filter(service_level_icon, name="service_level_icon")
+    app.add_template_filter(service_level_color, name="service_level_color")
+    app.add_template_filter(service_level_css_class_filter, name="service_level_css_class")
 
     # Add template global functions
     app.add_template_global(get_app_version, name="get_app_version")

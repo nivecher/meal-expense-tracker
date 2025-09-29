@@ -28,7 +28,7 @@ user_avatar_dropdown %}
                     class="nav-link dropdown-toggle {% if request.endpoint and 'expenses' in request.endpoint %}active{% endif %}"
                     href="#"
                     id="expensesDropdownDesktop"
-                    role="menuitem"
+                    role="button"
                     aria-haspopup="true"
                     aria-expanded="false"
                     title="Expenses">
@@ -37,57 +37,52 @@ user_avatar_dropdown %}
                 </a>
                 <ul class="dropdown-menu" aria-labelledby="expensesDropdownDesktop" role="menu">
                     <!-- Primary Actions -->
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'expenses.add_expense' %}active{% endif %}"
-                            href="{{ url_for('expenses.add_expense') }}"
-                            role="menuitem">
-                            <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                            <span>Add Expense</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Primary Actions">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'expenses.add_expense' %}active{% endif %}"
+                                href="{{ url_for('expenses.add_expense') }}"
+                                role="menuitem">
+                                <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                                <span>Add Expense</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'expenses.list_expenses' %}active{% endif %}"
+                                href="{{ url_for('expenses.list_expenses') }}"
+                                role="menuitem">
+                                <i class="fas fa-list" aria-hidden="true"></i>
+                                <span>View All</span>
+                            </a>
+                        </div>
                     </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'expenses.list_expenses' %}active{% endif %}"
-                            href="{{ url_for('expenses.list_expenses') }}"
-                            role="menuitem">
-                            <i class="fas fa-list" aria-hidden="true"></i>
-                            <span>View All</span>
-                        </a>
-                    </li>
-                    <li>
+                    <li role="none">
                         <hr class="dropdown-divider" role="separator" />
                     </li>
                     <!-- Data Management Options -->
-                    <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('expenses.export_expenses', format='csv') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-csv" aria-hidden="true"></i>
-                            <span>Export as CSV</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('expenses.export_expenses', format='json') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-code" aria-hidden="true"></i>
-                            <span>Export as JSON</span>
-                        </a>
-                    </li>
-                    <li>
-                        <hr class="dropdown-divider" role="separator" />
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'expenses.import_expenses' %}active{% endif %}"
-                            href="{{ url_for('expenses.import_expenses') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-import" aria-hidden="true"></i>
-                            <span>Import Expenses</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Data Management">
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('expenses.export_expenses', format='csv') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-csv" aria-hidden="true"></i>
+                                <span>Export as CSV</span>
+                            </a>
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('expenses.export_expenses', format='json') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-code" aria-hidden="true"></i>
+                                <span>Export as JSON</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'expenses.import_expenses' %}active{% endif %}"
+                                href="{{ url_for('expenses.import_expenses') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-import" aria-hidden="true"></i>
+                                <span>Import Expenses</span>
+                            </a>
+                        </div>
                     </li>
                 </ul>
             </div>
@@ -98,7 +93,7 @@ user_avatar_dropdown %}
                     class="nav-link dropdown-toggle {% if request.endpoint and 'restaurants' in request.endpoint %}active{% endif %}"
                     href="#"
                     id="restaurantsDropdownDesktop"
-                    role="menuitem"
+                    role="button"
                     aria-haspopup="true"
                     aria-expanded="false"
                     title="Restaurants">
@@ -107,63 +102,56 @@ user_avatar_dropdown %}
                 </a>
                 <ul class="dropdown-menu" aria-labelledby="restaurantsDropdownDesktop" role="menu">
                     <!-- Primary Actions -->
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'restaurants.add_restaurant' %}active{% endif %}"
-                            href="{{ url_for('restaurants.add_restaurant') }}"
-                            role="menuitem">
-                            <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                            <span>Add Restaurant</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Primary Actions">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'restaurants.add_restaurant' %}active{% endif %}"
+                                href="{{ url_for('restaurants.add_restaurant') }}"
+                                role="menuitem">
+                                <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                                <span>Add Restaurant</span>
+                            </a>
+                            <a class="dropdown-item" href="{{ url_for('restaurants.find_places') }}" role="menuitem">
+                                <i class="fas fa-search-location" aria-hidden="true"></i>
+                                <span>Find Restaurants</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'restaurants.list_restaurants' %}active{% endif %}"
+                                href="{{ url_for('restaurants.list_restaurants') }}"
+                                role="menuitem">
+                                <i class="fas fa-list" aria-hidden="true"></i>
+                                <span>View All</span>
+                            </a>
+                        </div>
                     </li>
-                    <li role="group">
-                        <a class="dropdown-item" href="{{ url_for('restaurants.find_places') }}" role="menuitem">
-                            <i class="fas fa-search-location" aria-hidden="true"></i>
-                            <span>Find Restaurants</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'restaurants.list_restaurants' %}active{% endif %}"
-                            href="{{ url_for('restaurants.list_restaurants') }}"
-                            role="menuitem">
-                            <i class="fas fa-list" aria-hidden="true"></i>
-                            <span>View All</span>
-                        </a>
-                    </li>
-                    <li>
+                    <li role="none">
                         <hr class="dropdown-divider" role="separator" />
                     </li>
                     <!-- Data Management Options -->
-                    <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('restaurants.export_restaurants', format='csv') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-csv" aria-hidden="true"></i>
-                            <span>Export as CSV</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('restaurants.export_restaurants', format='json') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-code" aria-hidden="true"></i>
-                            <span>Export as JSON</span>
-                        </a>
-                    </li>
-                    <li>
-                        <hr class="dropdown-divider" role="separator" />
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'restaurants.import_restaurants' %}active{% endif %}"
-                            href="{{ url_for('restaurants.import_restaurants') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-import" aria-hidden="true"></i>
-                            <span>Import Restaurants</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Data Management">
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('restaurants.export_restaurants', format='csv') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-csv" aria-hidden="true"></i>
+                                <span>Export as CSV</span>
+                            </a>
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('restaurants.export_restaurants', format='json') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-code" aria-hidden="true"></i>
+                                <span>Export as JSON</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'restaurants.import_restaurants' %}active{% endif %}"
+                                href="{{ url_for('restaurants.import_restaurants') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-import" aria-hidden="true"></i>
+                                <span>Import Restaurants</span>
+                            </a>
+                        </div>
                     </li>
                 </ul>
             </div>
@@ -187,7 +175,7 @@ user_avatar_dropdown %}
                     class="nav-link dropdown-toggle {% if request.endpoint and 'admin' in request.endpoint %}active{% endif %}"
                     href="#"
                     id="adminDropdownDesktop"
-                    role="menuitem"
+                    role="button"
                     aria-haspopup="true"
                     aria-expanded="false"
                     title="Admin">
@@ -195,32 +183,30 @@ user_avatar_dropdown %}
                     <span>Admin</span>
                 </a>
                 <ul class="dropdown-menu" aria-labelledby="adminDropdownDesktop" role="menu">
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}"
-                            href="{{ url_for('admin.dashboard') }}"
-                            role="menuitem">
-                            <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
-                            <span>Dashboard</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'admin.list_users' %}active{% endif %}"
-                            href="{{ url_for('admin.list_users') }}"
-                            role="menuitem">
-                            <i class="fas fa-users" aria-hidden="true"></i>
-                            <span>User Management</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'admin.create_user' %}active{% endif %}"
-                            href="{{ url_for('admin.create_user') }}"
-                            role="menuitem">
-                            <i class="fas fa-user-plus" aria-hidden="true"></i>
-                            <span>Create User</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Admin Actions">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}"
+                                href="{{ url_for('admin.dashboard') }}"
+                                role="menuitem">
+                                <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
+                                <span>Dashboard</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'admin.list_users' %}active{% endif %}"
+                                href="{{ url_for('admin.list_users') }}"
+                                role="menuitem">
+                                <i class="fas fa-users" aria-hidden="true"></i>
+                                <span>User Management</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'admin.create_user' %}active{% endif %}"
+                                href="{{ url_for('admin.create_user') }}"
+                                role="menuitem">
+                                <i class="fas fa-user-plus" aria-hidden="true"></i>
+                                <span>Create User</span>
+                            </a>
+                        </div>
                     </li>
                 </ul>
             </div>
@@ -246,63 +232,58 @@ user_avatar_dropdown %}
                     class="nav-link dropdown-toggle {% if request.endpoint and 'expenses' in request.endpoint %}active{% endif %}"
                     href="#"
                     id="expensesDropdownMobile"
-                    role="menuitem"
+                    role="button"
                     aria-haspopup="true"
                     aria-expanded="false"
                     title="Expenses">
                     <i class="fas fa-receipt" aria-hidden="true"></i>
                 </a>
                 <ul class="dropdown-menu" aria-labelledby="expensesDropdownMobile" role="menu">
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'expenses.add_expense' %}active{% endif %}"
-                            href="{{ url_for('expenses.add_expense') }}"
-                            role="menuitem">
-                            <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                            <span>Add Expense</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Primary Actions">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'expenses.add_expense' %}active{% endif %}"
+                                href="{{ url_for('expenses.add_expense') }}"
+                                role="menuitem">
+                                <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                                <span>Add Expense</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'expenses.list_expenses' %}active{% endif %}"
+                                href="{{ url_for('expenses.list_expenses') }}"
+                                role="menuitem">
+                                <i class="fas fa-list" aria-hidden="true"></i>
+                                <span>View All</span>
+                            </a>
+                        </div>
                     </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'expenses.list_expenses' %}active{% endif %}"
-                            href="{{ url_for('expenses.list_expenses') }}"
-                            role="menuitem">
-                            <i class="fas fa-list" aria-hidden="true"></i>
-                            <span>View All</span>
-                        </a>
-                    </li>
-                    <li>
+                    <li role="none">
                         <hr class="dropdown-divider" role="separator" />
                     </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('expenses.export_expenses', format='csv') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-csv" aria-hidden="true"></i>
-                            <span>Export CSV</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('expenses.export_expenses', format='json') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-code" aria-hidden="true"></i>
-                            <span>Export JSON</span>
-                        </a>
-                    </li>
-                    <li>
-                        <hr class="dropdown-divider" role="separator" />
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'expenses.import_expenses' %}active{% endif %}"
-                            href="{{ url_for('expenses.import_expenses') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-import" aria-hidden="true"></i>
-                            <span>Import</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Data Management">
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('expenses.export_expenses', format='csv') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-csv" aria-hidden="true"></i>
+                                <span>Export CSV</span>
+                            </a>
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('expenses.export_expenses', format='json') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-code" aria-hidden="true"></i>
+                                <span>Export JSON</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'expenses.import_expenses' %}active{% endif %}"
+                                href="{{ url_for('expenses.import_expenses') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-import" aria-hidden="true"></i>
+                                <span>Import</span>
+                            </a>
+                        </div>
                     </li>
                 </ul>
             </div>
@@ -313,69 +294,62 @@ user_avatar_dropdown %}
                     class="nav-link dropdown-toggle {% if request.endpoint and 'restaurants' in request.endpoint %}active{% endif %}"
                     href="#"
                     id="restaurantsDropdownMobile"
-                    role="menuitem"
+                    role="button"
                     aria-haspopup="true"
                     aria-expanded="false"
                     title="Restaurants">
                     <i class="fas fa-utensils" aria-hidden="true"></i>
                 </a>
                 <ul class="dropdown-menu" aria-labelledby="restaurantsDropdownMobile" role="menu">
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'restaurants.add_restaurant' %}active{% endif %}"
-                            href="{{ url_for('restaurants.add_restaurant') }}"
-                            role="menuitem">
-                            <i class="fas fa-plus-circle" aria-hidden="true"></i>
-                            <span>Add Restaurant</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Primary Actions">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'restaurants.add_restaurant' %}active{% endif %}"
+                                href="{{ url_for('restaurants.add_restaurant') }}"
+                                role="menuitem">
+                                <i class="fas fa-plus-circle" aria-hidden="true"></i>
+                                <span>Add Restaurant</span>
+                            </a>
+                            <a class="dropdown-item" href="{{ url_for('restaurants.find_places') }}" role="menuitem">
+                                <i class="fas fa-search-location" aria-hidden="true"></i>
+                                <span>Find Places</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'restaurants.list_restaurants' %}active{% endif %}"
+                                href="{{ url_for('restaurants.list_restaurants') }}"
+                                role="menuitem">
+                                <i class="fas fa-list" aria-hidden="true"></i>
+                                <span>View All</span>
+                            </a>
+                        </div>
                     </li>
-                    <li role="group">
-                        <a class="dropdown-item" href="{{ url_for('restaurants.find_places') }}" role="menuitem">
-                            <i class="fas fa-search-location" aria-hidden="true"></i>
-                            <span>Find Places</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'restaurants.list_restaurants' %}active{% endif %}"
-                            href="{{ url_for('restaurants.list_restaurants') }}"
-                            role="menuitem">
-                            <i class="fas fa-list" aria-hidden="true"></i>
-                            <span>View All</span>
-                        </a>
-                    </li>
-                    <li>
+                    <li role="none">
                         <hr class="dropdown-divider" role="separator" />
                     </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('restaurants.export_restaurants', format='csv') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-csv" aria-hidden="true"></i>
-                            <span>Export CSV</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item"
-                            href="{{ url_for('restaurants.export_restaurants', format='json') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-code" aria-hidden="true"></i>
-                            <span>Export JSON</span>
-                        </a>
-                    </li>
-                    <li>
-                        <hr class="dropdown-divider" role="separator" />
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'restaurants.import_restaurants' %}active{% endif %}"
-                            href="{{ url_for('restaurants.import_restaurants') }}"
-                            role="menuitem">
-                            <i class="fas fa-file-import" aria-hidden="true"></i>
-                            <span>Import</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Data Management">
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('restaurants.export_restaurants', format='csv') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-csv" aria-hidden="true"></i>
+                                <span>Export CSV</span>
+                            </a>
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('restaurants.export_restaurants', format='json') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-code" aria-hidden="true"></i>
+                                <span>Export JSON</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'restaurants.import_restaurants' %}active{% endif %}"
+                                href="{{ url_for('restaurants.import_restaurants') }}"
+                                role="menuitem">
+                                <i class="fas fa-file-import" aria-hidden="true"></i>
+                                <span>Import</span>
+                            </a>
+                        </div>
                     </li>
                 </ul>
             </div>
@@ -398,39 +372,37 @@ user_avatar_dropdown %}
                     class="nav-link dropdown-toggle {% if request.endpoint and 'admin' in request.endpoint %}active{% endif %}"
                     href="#"
                     id="adminDropdownMobile"
-                    role="menuitem"
+                    role="button"
                     aria-haspopup="true"
                     aria-expanded="false"
                     title="Admin">
                     <i class="fas fa-cog" aria-hidden="true"></i>
                 </a>
                 <ul class="dropdown-menu" aria-labelledby="adminDropdownMobile" role="menu">
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}"
-                            href="{{ url_for('admin.dashboard') }}"
-                            role="menuitem">
-                            <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
-                            <span>Dashboard</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'admin.list_users' %}active{% endif %}"
-                            href="{{ url_for('admin.list_users') }}"
-                            role="menuitem">
-                            <i class="fas fa-users" aria-hidden="true"></i>
-                            <span>Users</span>
-                        </a>
-                    </li>
-                    <li role="group">
-                        <a
-                            class="dropdown-item {% if request.endpoint == 'admin.create_user' %}active{% endif %}"
-                            href="{{ url_for('admin.create_user') }}"
-                            role="menuitem">
-                            <i class="fas fa-user-plus" aria-hidden="true"></i>
-                            <span>Create User</span>
-                        </a>
+                    <li role="none">
+                        <div role="group" aria-label="Admin Actions">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}"
+                                href="{{ url_for('admin.dashboard') }}"
+                                role="menuitem">
+                                <i class="fas fa-tachometer-alt" aria-hidden="true"></i>
+                                <span>Dashboard</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'admin.list_users' %}active{% endif %}"
+                                href="{{ url_for('admin.list_users') }}"
+                                role="menuitem">
+                                <i class="fas fa-users" aria-hidden="true"></i>
+                                <span>Users</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'admin.create_user' %}active{% endif %}"
+                                href="{{ url_for('admin.create_user') }}"
+                                role="menuitem">
+                                <i class="fas fa-user-plus" aria-hidden="true"></i>
+                                <span>Create User</span>
+                            </a>
+                        </div>
                     </li>
                 </ul>
             </div>
@@ -456,7 +428,7 @@ user_avatar_dropdown %}
                     <div class="user-info" role="none"> {{ user_avatar_dropdown(current_user) }} </div>
                     <div class="dropdown-divider" role="separator"></div>
                     <!-- Menu Items -->
-                    <div class="px-2" role="group">
+                    <div class="px-2" role="group" aria-label="User Actions">
                         <a href="{{ url_for('auth.profile') }}" class="dropdown-item" role="menuitem">
                             <i class="fas fa-user" aria-hidden="true"></i>
                             <span>Profile</span>
@@ -467,7 +439,7 @@ user_avatar_dropdown %}
                         </a>
                     </div>
                     <div class="dropdown-divider" role="separator"></div>
-                    <div class="px-2" role="group">
+                    <div class="px-2" role="group" aria-label="Support Actions">
                         <a href="{{ url_for('main.help_page') }}" class="dropdown-item" role="menuitem">
                             <i class="fas fa-question-circle" aria-hidden="true"></i>
                             <span>Help</span>

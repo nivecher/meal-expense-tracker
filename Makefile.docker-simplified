@@ -1,0 +1,103 @@
+# ============================================
+# Simplified Docker Commands for Makefile
+# ============================================
+
+# Docker settings
+DOCKER_COMPOSE = docker-compose -f docker-compose.yml
+CONTAINER_NAME = $(APP_NAME)-app
+IMAGE_NAME = $(APP_NAME)
+TARGET_PLATFORM ?= linux/amd64
+
+# Enable BuildKit (now that we have it installed)
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
+# ============================================
+# Simplified Docker Commands
+# ============================================
+
+## Build for specific target (development, production, lambda)
+.PHONY: docker-build
+docker-build: validate-env
+	@echo "\033[1m🔨 Building Docker image for $(TARGET) target...\033[0m"
+	@docker buildx build \
+		--platform $(TARGET_PLATFORM) \
+		--target $(or $(TARGET),development) \
+		-t $(IMAGE_NAME):$(or $(TAG),latest) \
+		--load \
+		. || (echo "\033[1;31m❌ Docker build failed\033[0m"; exit 1)
+	@echo "\033[1;32m✅ Docker image built successfully\033[0m"
+
+## Build for multiple platforms
+.PHONY: docker-build-multi
+docker-build-multi: validate-env
+	@echo "\033[1m🔨 Building multi-platform Docker image...\033[0m"
+	@docker buildx build \
+		--platform linux/amd64,linux/arm64 \
+		--target $(or $(TARGET),development) \
+		-t $(IMAGE_NAME):$(or $(TAG),latest) \
+		--push \
+		. || (echo "\033[1;31m❌ Multi-platform build failed\033[0m"; exit 1)
+	@echo "\033[1;32m✅ Multi-platform Docker image built successfully\033[0m"
+
+## Quick development build
+.PHONY: docker-dev
+docker-dev: TARGET=development TAG=dev
+docker-dev: docker-build
+
+## Quick production build
+.PHONY: docker-prod
+docker-prod: TARGET=production TAG=prod
+docker-prod: docker-build
+
+## Quick lambda build
+.PHONY: docker-lambda
+docker-lambda: TARGET=lambda TAG=lambda
+docker-lambda: docker-build
+
+## Start development environment
+.PHONY: docker-up
+docker-up:
+	@echo "\033[1m🚀 Starting development environment...\033[0m"
+	$(DOCKER_COMPOSE) up -d
+	@echo "\033[1;32m✅ Development environment started\033[0m"
+	@echo "\033[1;36m📱 Web app: http://localhost:8000\033[0m"
+	@echo "\033[1;36m🗄️  Database: localhost:5433\033[0m"
+	@echo "\033[1;36m🔧 Adminer: http://localhost:8081\033[0m"
+
+## Stop development environment
+.PHONY: docker-down
+docker-down:
+	@echo "\033[1m🛑 Stopping development environment...\033[0m"
+	$(DOCKER_COMPOSE) down
+	@echo "\033[1;32m✅ Development environment stopped\033[0m"
+
+## View logs
+.PHONY: docker-logs
+docker-logs:
+	$(DOCKER_COMPOSE) logs -f
+
+## Clean up Docker resources
+.PHONY: docker-clean
+docker-clean: docker-down
+	@echo "\033[1m🧹 Cleaning up Docker resources...\033[0m"
+	@docker system prune -f
+	@docker volume prune -f
+	@echo "\033[1;32m✅ Docker cleanup completed\033[0m"
+
+## Rebuild and restart (development)
+.PHONY: docker-rebuild
+docker-rebuild: docker-down docker-dev docker-up
+	@echo "\033[1;32m✅ Rebuild and restart completed\033[0m"
+
+# ============================================
+# Usage Examples
+# ============================================
+# make docker-dev          # Build development image
+# make docker-prod         # Build production image
+# make docker-lambda       # Build lambda image
+# make docker-build TARGET=production TAG=v1.0.0  # Custom build
+# make docker-build-multi TARGET=production        # Multi-platform build
+# make docker-up           # Start dev environment
+# make docker-down         # Stop dev environment
+# make docker-rebuild      # Rebuild and restart

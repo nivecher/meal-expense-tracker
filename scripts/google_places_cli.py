@@ -2,15 +2,16 @@
 """
 Google Places CLI Utility
 
-A comprehensive command-line tool for exploring Google Places data to help with
-mapping design and gaining insights about places. Uses GOOGLE_MAPS_API_KEY from .env.
+A comprehensive command-line tool for exploring Google Places data using the new Google Places API.
+Uses GOOGLE_MAPS_API_KEY from .env.
 
 Features:
 - Search places by text, location, or place ID
 - Get comprehensive place details with all available fields
-- Format output in multiple ways (JSON, table, summary)
+- Format output in multiple ways (JSON, table, summary, detailed, missing fields)
 - Analyze place data for mapping insights
 - Export data for further analysis
+- Show missing fields analysis for data completeness
 """
 
 import argparse
@@ -19,117 +20,155 @@ import os
 import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.error import HTTPError
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
-# Load environment variables from .env file if it exists
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Configuration
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
-PLACES_API_BASE_URL = "https://maps.googleapis.com/maps/api/place"
+NEW_PLACES_API_BASE = "https://places.googleapis.com/v1/places"
 GEOCODE_API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
-# All available fields for comprehensive data collection
+# Field masks for different data categories (New API)
+FIELD_MASKS = {
+    "basic": "displayName,formattedAddress,location,rating,userRatingCount,priceLevel",
+    "contact": "displayName,formattedAddress,nationalPhoneNumber,websiteUri,editorialSummary",
+    "services": "displayName,paymentOptions,accessibilityOptions,parkingOptions,restroom,outdoorSeating",
+    "food": "displayName,servesBreakfast,servesLunch,servesDinner,servesBeer,servesWine,servesBrunch,servesVegetarianFood",
+    "comprehensive": "displayName,formattedAddress,nationalPhoneNumber,websiteUri,location,rating,userRatingCount,priceLevel,editorialSummary,paymentOptions,accessibilityOptions,parkingOptions,restroom,outdoorSeating,servesBreakfast,servesLunch,servesDinner,servesBeer,servesWine,servesBrunch,servesVegetarianFood,delivery,dineIn,takeout,reservable,businessStatus,primaryType,types,addressComponents,regularOpeningHours,currentOpeningHours,plusCode,photos,reviews,generativeSummary,liveMusic,menuForChildren,servesCocktails,servesDessert,servesCoffee,goodForChildren,allowsDogs,goodForGroups,goodForWatchingSports",
+    "all": "*",  # Get all available fields
+}
+
+# All available fields for comprehensive data collection (New API structure)
 ALL_PLACE_FIELDS = [
     # Basic Data Fields
-    "place_id",
+    "id",
     "name",
-    "formatted_address",
-    "address_components",
-    "geometry",
+    "displayName",
+    "formattedAddress",
+    "addressComponents",
+    "location",
     "types",
-    "url",
-    "vicinity",
-    "plus_code",
-    "utc_offset",
+    "primaryType",
+    "googleMapsUri",
+    "plusCode",
+    "utcOffsetMinutes",
     # Contact Data Fields
-    "formatted_phone_number",
-    "international_phone_number",
-    "website",
-    "opening_hours",
-    "current_opening_hours",
-    "secondary_opening_hours",
+    "nationalPhoneNumber",
+    "internationalPhoneNumber",
+    "websiteUri",
+    "regularOpeningHours",
+    "currentOpeningHours",
+    "currentSecondaryOpeningHours",
+    "regularSecondaryOpeningHours",
     # Atmosphere Data Fields
     "rating",
-    "user_ratings_total",
-    "price_level",
+    "userRatingCount",
+    "priceLevel",
+    "priceRange",
     "reviews",
     "photos",
     # Business Status Fields
-    "business_status",
-    "permanently_closed",
-    # Service & Dining Fields (Enterprise tier - very valuable for meal tracking!)
-    "serves_breakfast",
-    "serves_lunch",
-    "serves_dinner",
-    "serves_beer",
-    "serves_wine",
-    "serves_brunch",
-    "serves_dessert",
-    "serves_vegetarian_food",
-    # Service Options (Enterprise tier)
+    "businessStatus",
+    "primaryTypeDisplayName",
+    # Service & Dining Fields
+    "servesBreakfast",
+    "servesLunch",
+    "servesDinner",
+    "servesBeer",
+    "servesWine",
+    "servesBrunch",
+    "servesDessert",
+    "servesVegetarianFood",
+    "servesCocktails",
+    "servesCoffee",
+    # Service Options
     "delivery",
     "takeout",
-    "dine_in",
-    "curbside_pickup",
+    "dineIn",
+    "curbsidePickup",
     "reservable",
     # Accessibility & Amenities
-    "wheelchair_accessible_entrance",
-    "parking_options",
-    "payment_options",
-    # Additional Enterprise Fields
-    "editorial_summary",
-    "current_opening_hours",
-    "secondary_opening_hours",
+    "accessibilityOptions",
+    "parkingOptions",
+    "paymentOptions",
+    "restroom",
+    "outdoorSeating",
+    "liveMusic",
+    "menuForChildren",
+    "goodForChildren",
+    "allowsDogs",
+    "goodForGroups",
+    "goodForWatchingSports",
+    # Additional Fields
+    "editorialSummary",
+    "generativeSummary",
+    "addressDescriptor",
+    "googleMapsLinks",
+    "reviewSummary",
+    "timeZone",
+    "postalAddress",
 ]
 
-# Field categories for organized display
+# Field categories for organized display (New API structure)
 FIELD_CATEGORIES = {
-    "basic_info": ["place_id", "name", "formatted_address", "vicinity", "url", "editorial_summary"],
-    "contact": ["formatted_phone_number", "international_phone_number", "website"],
-    "ratings": ["rating", "user_ratings_total", "reviews"],
-    "business": ["types", "price_level", "business_status", "permanently_closed"],
-    "location": ["geometry", "address_components", "plus_code", "utc_offset"],
-    "hours": ["opening_hours", "current_opening_hours", "secondary_opening_hours"],
-    "media": ["photos"],
-    "dining_services": [
-        "serves_breakfast",
-        "serves_lunch",
-        "serves_dinner",
-        "serves_brunch",
-        "serves_dessert",
-        "serves_vegetarian_food",
-        "serves_beer",
-        "serves_wine",
+    "basic_info": ["id", "name", "displayName", "formattedAddress", "googleMapsUri", "editorialSummary"],
+    "contact": ["nationalPhoneNumber", "internationalPhoneNumber", "websiteUri"],
+    "ratings": ["rating", "userRatingCount", "reviews", "reviewSummary"],
+    "business": ["types", "primaryType", "priceLevel", "priceRange", "businessStatus", "primaryTypeDisplayName"],
+    "location": ["location", "addressComponents", "plusCode", "utcOffsetMinutes", "addressDescriptor", "postalAddress"],
+    "hours": [
+        "regularOpeningHours",
+        "currentOpeningHours",
+        "currentSecondaryOpeningHours",
+        "regularSecondaryOpeningHours",
     ],
-    "service_options": ["delivery", "takeout", "dine_in", "curbside_pickup", "reservable"],
-    "accessibility": ["wheelchair_accessible_entrance", "parking_options", "payment_options"],
+    "media": ["photos", "generativeSummary"],
+    "dining_services": [
+        "servesBreakfast",
+        "servesLunch",
+        "servesDinner",
+        "servesBrunch",
+        "servesDessert",
+        "servesVegetarianFood",
+        "servesBeer",
+        "servesWine",
+        "servesCocktails",
+        "servesCoffee",
+    ],
+    "service_options": ["delivery", "takeout", "dineIn", "curbsidePickup", "reservable"],
+    "accessibility": ["accessibilityOptions", "parkingOptions", "paymentOptions", "restroom", "outdoorSeating"],
 }
 
 
-def _make_api_request(url: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _make_api_request(
+    url: str, headers: Dict[str, str], data: Optional[Dict[str, Any]] = None
+) -> Optional[Dict[str, Any]]:
     """Make a request to Google APIs with proper error handling.
 
     Args:
         url: API endpoint URL
-        params: Query parameters
+        headers: Request headers
+        data: Optional request data for POST requests
 
     Returns:
         Parsed JSON response or None if request fails
     """
     try:
-        full_url = f"{url}?{urlencode(params)}"
-        response = urlopen(Request(full_url, headers={"User-Agent": "GooglePlacesCLI/1.0"}))
-        return json.loads(response.read().decode())
-    except HTTPError as e:
-        print(f"HTTP Error {e.code}: {e.reason}")
-        if e.code == 403:
+        if data:
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+        else:
+            response = requests.get(url, headers=headers, timeout=10)
+
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP Error {e.response.status_code}: {e.response.reason}")
+        if e.response.status_code == 403:
             print("Check your API key and ensure Places API is enabled")
-        elif e.code == 429:
+        elif e.response.status_code == 429:
             print("API quota exceeded. Try again later.")
     except Exception as e:
         print(f"Error making API request: {str(e)}")
@@ -149,8 +188,15 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
         print("Error: GOOGLE_MAPS_API_KEY environment variable is not set")
         return None
 
+    # Geocoding still uses the classic API
     params = {"address": address, "key": GOOGLE_MAPS_API_KEY}
-    data = _make_api_request(GEOCODE_API_URL, params)
+    try:
+        response = requests.get(GEOCODE_API_URL, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        print(f"Error geocoding address: {e}")
+        return None
 
     if data and data.get("status") == "OK" and data.get("results"):
         location = data["results"][0]["geometry"]["location"]
@@ -161,7 +207,7 @@ def geocode_address(address: str) -> Optional[Tuple[float, float]]:
 def search_places_by_text(
     query: str, location: Optional[Tuple[float, float]] = None, radius: int = 50000, max_results: int = 20
 ) -> List[Dict[str, Any]]:
-    """Search for places using text query.
+    """Search for places using text query with new Google Places API.
 
     Args:
         query: Text query to search for
@@ -176,25 +222,32 @@ def search_places_by_text(
         print("Error: GOOGLE_MAPS_API_KEY environment variable is not set")
         return []
 
-    url = f"{PLACES_API_BASE_URL}/textsearch/json"
-    params = {"query": query, "key": GOOGLE_MAPS_API_KEY, "fields": ",".join(ALL_PLACE_FIELDS)}
+    url = f"{NEW_PLACES_API_BASE}:searchText"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        "X-Goog-FieldMask": FIELD_MASKS["comprehensive"],
+    }
+
+    payload = {"textQuery": query, "maxResultCount": min(max_results, 20), "includedType": "restaurant"}
 
     if location:
-        params["location"] = f"{location[0]},{location[1]}"
-        params["radius"] = min(radius, 50000)
+        payload["locationBias"] = {
+            "circle": {"center": {"latitude": location[0], "longitude": location[1]}, "radius": min(radius, 50000.0)}
+        }
 
-    data = _make_api_request(url, params)
-    if not data or data.get("status") != "OK":
-        print(f"Search failed: {data.get('status', 'Unknown error') if data else 'No response'}")
+    data = _make_api_request(url, headers, payload)
+    if not data:
+        print("Search failed: No response from API")
         return []
 
-    return data.get("results", [])[:max_results]
+    return data.get("places", [])[:max_results]
 
 
 def search_places_nearby(
     location: Tuple[float, float], radius: int = 5000, place_type: str = "restaurant", max_results: int = 20
 ) -> List[Dict[str, Any]]:
-    """Search for places near a location.
+    """Search for places near a location using new Google Places API.
 
     Args:
         location: (latitude, longitude) tuple
@@ -209,28 +262,35 @@ def search_places_nearby(
         print("Error: GOOGLE_MAPS_API_KEY environment variable is not set")
         return []
 
-    url = f"{PLACES_API_BASE_URL}/nearbysearch/json"
-    params = {
-        "location": f"{location[0]},{location[1]}",
-        "radius": min(radius, 50000),
-        "type": place_type,
-        "key": GOOGLE_MAPS_API_KEY,
-        "fields": ",".join(ALL_PLACE_FIELDS),
+    url = f"{NEW_PLACES_API_BASE}:searchNearby"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        "X-Goog-FieldMask": FIELD_MASKS["comprehensive"],
     }
 
-    data = _make_api_request(url, params)
-    if not data or data.get("status") != "OK":
-        print(f"Search failed: {data.get('status', 'Unknown error') if data else 'No response'}")
+    payload = {
+        "locationRestriction": {
+            "circle": {"center": {"latitude": location[0], "longitude": location[1]}, "radius": min(radius, 50000.0)}
+        },
+        "maxResultCount": min(max_results, 20),
+        "includedTypes": [place_type],
+    }
+
+    data = _make_api_request(url, headers, payload)
+    if not data:
+        print("Search failed: No response from API")
         return []
 
-    return data.get("results", [])[:max_results]
+    return data.get("places", [])[:max_results]
 
 
-def get_place_details(place_id: str) -> Optional[Dict[str, Any]]:
-    """Get comprehensive details for a specific place.
+def get_place_details(place_id: str, field_mask: str = "all") -> Optional[Dict[str, Any]]:
+    """Get comprehensive details for a specific place using new Google Places API.
 
     Args:
         place_id: Google Place ID
+        field_mask: Field mask to specify which data to retrieve
 
     Returns:
         Place details dictionary or None if not found
@@ -239,77 +299,688 @@ def get_place_details(place_id: str) -> Optional[Dict[str, Any]]:
         print("Error: GOOGLE_MAPS_API_KEY environment variable is not set")
         return None
 
-    url = f"{PLACES_API_BASE_URL}/details/json"
-    params = {"place_id": place_id, "fields": ",".join(ALL_PLACE_FIELDS), "key": GOOGLE_MAPS_API_KEY}
+    url = f"{NEW_PLACES_API_BASE}/{place_id}"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
+        "X-Goog-FieldMask": FIELD_MASKS.get(field_mask, field_mask) if field_mask != "all" else "*",
+    }
 
-    data = _make_api_request(url, params)
-    if not data or data.get("status") != "OK":
-        print(f"Failed to get place details: {data.get('status', 'Unknown error') if data else 'No response'}")
+    data = _make_api_request(url, headers)
+    if not data:
+        print("Failed to get place details: No response from API")
         return None
 
-    return data.get("result")
+    return data
+
+
+def _format_price_level(price_level: str) -> str:
+    """Format price level to readable text."""
+    if not price_level:
+        return "Not specified"
+
+    price_mapping = {
+        "PRICE_LEVEL_FREE": "Free",
+        "PRICE_LEVEL_INEXPENSIVE": "Inexpensive ($)",
+        "PRICE_LEVEL_MODERATE": "Moderate ($$)",
+        "PRICE_LEVEL_EXPENSIVE": "Expensive ($$$)",
+        "PRICE_LEVEL_VERY_EXPENSIVE": "Very Expensive ($$$$)",
+    }
+
+    return price_mapping.get(price_level, price_level)
 
 
 def _format_opening_hours(place: Dict[str, Any]) -> str:
     """Format opening hours information."""
-    if "opening_hours" not in place:
-        return ""
+    regular_hours = place.get("regularOpeningHours", {})
+    if not regular_hours:
+        return "Hours not available"
 
-    hours = place["opening_hours"]
-    if hours.get("weekday_text"):
-        return "\n".join([f"  {day}" for day in hours["weekday_text"]])
-    elif hours.get("open_now") is not None:
-        return f"Open now: {hours['open_now']}"
-    return ""
+    weekday_descriptions = regular_hours.get("weekdayDescriptions", [])
+    if weekday_descriptions:
+        return "\n".join([f"   • {desc}" for desc in weekday_descriptions])
+
+    return "Hours not available"
 
 
 def _format_dining_services(place: Dict[str, Any]) -> List[str]:
-    """Format dining services information."""
-    service_fields = [
-        "serves_breakfast",
-        "serves_lunch",
-        "serves_dinner",
-        "serves_brunch",
-        "serves_dessert",
-        "serves_vegetarian_food",
-        "serves_beer",
-        "serves_wine",
-    ]
+    """Format dining services information with icons and better categorization."""
+    service_mapping = {
+        "serves_breakfast": "🌅 Breakfast",
+        "serves_lunch": "🍽️ Lunch",
+        "serves_dinner": "🌙 Dinner",
+        "serves_brunch": "🥞 Brunch",
+        "serves_dessert": "🍰 Dessert",
+        "serves_vegetarian_food": "🥗 Vegetarian",
+        "serves_beer": "🍺 Beer",
+        "serves_wine": "🍷 Wine",
+    }
 
     dining_services = []
-    for field in service_fields:
+    for field, display_name in service_mapping.items():
         if place.get(field):
-            service_name = field.replace("serves_", "").replace("_", " ").title()
-            dining_services.append(service_name)
+            dining_services.append(display_name)
+
     return dining_services
 
 
 def _format_service_options(place: Dict[str, Any]) -> List[str]:
-    """Format service options information."""
-    option_fields = ["delivery", "takeout", "dine_in", "curbside_pickup", "reservable"]
+    """Format service options information with icons and better categorization."""
+    option_mapping = {
+        "delivery": "🚚 Delivery",
+        "takeout": "🥡 Takeout",
+        "dine_in": "🍽️ Dine-in",
+        "curbside_pickup": "🚗 Curbside",
+        "reservable": "📅 Reservations",
+    }
 
     service_options = []
-    for field in option_fields:
+    for field, display_name in option_mapping.items():
         if place.get(field):
-            option_name = field.replace("_", " ").title()
-            service_options.append(option_name)
+            service_options.append(display_name)
+
     return service_options
 
 
 def _format_accessibility_info(place: Dict[str, Any]) -> List[str]:
-    """Format accessibility information."""
+    """Format accessibility information with icons and better display."""
     accessibility_info = []
 
     if place.get("wheelchair_accessible_entrance"):
-        accessibility_info.append("Wheelchair Accessible")
+        accessibility_info.append("♿ Wheelchair Accessible")
+
     if place.get("parking_options"):
-        accessibility_info.append("Parking Available")
+        parking_options = place.get("parking_options", [])
+        if isinstance(parking_options, list) and parking_options:
+            parking_types = [opt.get("name", "Parking") for opt in parking_options if isinstance(opt, dict)]
+            accessibility_info.append(f"🅿️ {', '.join(parking_types[:2])}")  # Limit to 2 parking types
+        else:
+            accessibility_info.append("🅿️ Parking Available")
+
     if place.get("payment_options"):
         payment_methods = place.get("payment_options", [])
-        if payment_methods:
-            accessibility_info.append(f"Payment: {', '.join(payment_methods)}")
+        if isinstance(payment_methods, list) and payment_methods:
+            # Format payment methods nicely
+            payment_display = []
+            for method in payment_methods[:3]:  # Limit to 3 payment methods
+                if isinstance(method, dict):
+                    payment_display.append(method.get("name", "Payment"))
+                else:
+                    payment_display.append(str(method))
+            accessibility_info.append(f"💳 {', '.join(payment_display)}")
 
     return accessibility_info
+
+
+def _categorize_place_types(types: List[str]) -> Dict[str, List[str]]:
+    """Categorize place types into different groups.
+
+    Args:
+        types: List of type strings
+
+    Returns:
+        Dictionary with categorized types
+    """
+    primary_keywords = ["restaurant", "food", "meal_takeaway", "meal_delivery"]
+    establishment_keywords = ["establishment", "point_of_interest", "store"]
+    food_keywords = [
+        "cafe",
+        "bakery",
+        "bar",
+        "pizza",
+        "sandwich",
+        "burger",
+        "chinese",
+        "italian",
+        "mexican",
+        "indian",
+        "thai",
+        "japanese",
+        "korean",
+        "vietnamese",
+        "mediterranean",
+        "american",
+        "french",
+        "greek",
+        "turkish",
+        "lebanese",
+        "vegetarian",
+        "vegan",
+        "seafood",
+        "steakhouse",
+        "diner",
+        "fast_food",
+        "fine_dining",
+        "casual_dining",
+    ]
+    service_keywords = ["delivery", "takeout", "dine_in", "reservation", "booking"]
+
+    categorized = {"primary": [], "establishment": [], "food": [], "service": [], "other": []}
+
+    for type_name in types:
+        formatted_name = type_name.replace("_", " ").title()
+
+        if type_name in primary_keywords:
+            categorized["primary"].append(formatted_name)
+        elif type_name in establishment_keywords:
+            categorized["establishment"].append(formatted_name)
+        elif any(food in type_name for food in food_keywords):
+            categorized["food"].append(formatted_name)
+        elif any(service in type_name for service in service_keywords):
+            categorized["service"].append(formatted_name)
+        else:
+            categorized["other"].append(formatted_name)
+
+    return categorized
+
+
+def _format_types_detailed(place: Dict[str, Any]) -> str:
+    """Format types information with better categorization and display.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        Formatted types string with categories
+    """
+    types = place.get("types", [])
+    if not types:
+        return "No types specified"
+
+    categorized = _categorize_place_types(types)
+
+    # Build formatted result with limits
+    result_parts = []
+
+    if categorized["primary"]:
+        result_parts.append(f"Primary: {', '.join(categorized['primary'][:3])}")
+
+    if categorized["food"]:
+        result_parts.append(f"Food: {', '.join(categorized['food'][:4])}")
+
+    if categorized["service"]:
+        result_parts.append(f"Services: {', '.join(categorized['service'][:3])}")
+
+    if categorized["establishment"]:
+        result_parts.append(f"Establishment: {', '.join(categorized['establishment'][:2])}")
+
+    if categorized["other"]:
+        result_parts.append(f"Other: {', '.join(categorized['other'][:3])}")
+
+    return " | ".join(result_parts)
+
+
+def _build_basic_info(place: Dict[str, Any]) -> List[str]:
+    """Build basic information section."""
+    name = place.get("name", "Unknown")
+    address = place.get("formatted_address", "No address")
+    phone = place.get("formatted_phone_number", "No phone")
+    website = place.get("website", "No website")
+    rating = place.get("rating", "N/A")
+    total_ratings = place.get("user_ratings_total", 0)
+    price_level = place.get("price_level")
+    price_str = "?" * price_level if price_level else "Not specified"
+    business_status = place.get("business_status", "Unknown")
+
+    return [
+        f"\n{'=' * 80}",
+        f"Name: {name}",
+        f"Address: {address}",
+        f"Phone: {phone}",
+        f"Website: {website}",
+        f"Rating: {rating}/5 ({total_ratings} reviews)",
+        f"Price Level: {price_str}",
+        f"Business Status: {business_status}",
+    ]
+
+
+def _extract_cuisine_types(place: Dict[str, Any]) -> List[str]:
+    """Extract cuisine types from place data.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        List of cuisine types
+    """
+    types = place.get("types", [])
+    cuisine_keywords = [
+        "chinese",
+        "italian",
+        "mexican",
+        "indian",
+        "thai",
+        "japanese",
+        "korean",
+        "vietnamese",
+        "mediterranean",
+        "american",
+        "french",
+        "greek",
+        "turkish",
+        "lebanese",
+        "vegetarian",
+        "vegan",
+        "seafood",
+        "steakhouse",
+        "pizza",
+        "sandwich",
+        "burger",
+        "cafe",
+        "bakery",
+        "bar",
+        "diner",
+        "fast_food",
+        "fine_dining",
+        "casual_dining",
+        "bbq",
+        "sushi",
+        "ramen",
+        "tapas",
+        "spanish",
+        "german",
+        "russian",
+        "brazilian",
+        "peruvian",
+        "ethiopian",
+    ]
+
+    cuisines = []
+    for type_name in types:
+        if any(cuisine in type_name.lower() for cuisine in cuisine_keywords):
+            formatted_cuisine = type_name.replace("_", " ").title()
+            cuisines.append(formatted_cuisine)
+
+    return cuisines
+
+
+def _format_description(place: Dict[str, Any]) -> str:
+    """Format description from editorial_summary.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        Formatted description string
+    """
+    editorial_summary = place.get("editorial_summary")
+    if not editorial_summary:
+        return "No description available"
+
+    if isinstance(editorial_summary, dict):
+        return editorial_summary.get("overview", "No description available")
+
+    return str(editorial_summary)
+
+
+def _build_additional_info(place: Dict[str, Any]) -> List[str]:
+    """Build additional information section."""
+    result = []
+
+    # Add description prominently if available
+    description = _format_description(place)
+    if description != "No description available":
+        result.append(f"\nDescription: {description}")
+
+    # Add cuisine information prominently
+    cuisines = _extract_cuisine_types(place)
+    if cuisines:
+        # Remove duplicates and limit to 5 most relevant
+        unique_cuisines = list(dict.fromkeys(cuisines))[:5]
+        result.append(f"\nCuisine: {', '.join(unique_cuisines)}")
+
+    # Add detailed types information
+    types_info = _format_types_detailed(place)
+    if types_info:
+        result.append(f"\nTypes: {types_info}")
+
+    # Add service information
+    dining_services = _format_dining_services(place)
+    if dining_services:
+        result.append(f"\nDining Services: {', '.join(dining_services)}")
+
+    service_options = _format_service_options(place)
+    if service_options:
+        result.append(f"Service Options: {', '.join(service_options)}")
+
+    accessibility_info = _format_accessibility_info(place)
+    if accessibility_info:
+        result.append(f"Accessibility: {', '.join(accessibility_info)}")
+
+    return result
+
+
+def _build_media_info(place: Dict[str, Any]) -> List[str]:
+    """Build media and reviews information section."""
+    result = []
+
+    # Format photos and reviews info
+    if "photos" in place and place["photos"]:
+        result.append(f"\nPhotos available: {len(place['photos'])}")
+
+    if "reviews" in place and place["reviews"]:
+        result.append(f"\nRecent reviews: {len(place['reviews'])}")
+
+    return result
+
+
+def _analyze_missing_fields(place: Dict[str, Any]) -> Dict[str, List[str]]:
+    """Analyze which fields are missing from the place data.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        Dictionary with missing fields categorized
+    """
+    missing = {
+        "basic_info": [],
+        "contact": [],
+        "ratings": [],
+        "business": [],
+        "location": [],
+        "hours": [],
+        "media": [],
+        "dining_services": [],
+        "service_options": [],
+        "accessibility": [],
+    }
+
+    # Check each category
+    for category, fields in FIELD_CATEGORIES.items():
+        for field in fields:
+            if field not in place or place[field] is None or place[field] == "":
+                missing[category].append(field)
+
+    return missing
+
+
+def _format_missing_fields_analysis(place: Dict[str, Any]) -> List[str]:
+    """Format missing fields analysis for display.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        List of formatted strings showing missing fields
+    """
+    missing = _analyze_missing_fields(place)
+    result = []
+
+    result.append("\n📊 MISSING FIELDS ANALYSIS:")
+    result.append("-" * 40)
+
+    total_missing = sum(len(fields) for fields in missing.values())
+    total_possible = len(ALL_PLACE_FIELDS)
+    completion_rate = ((total_possible - total_missing) / total_possible) * 100
+
+    result.append(
+        f"Data Completeness: {completion_rate:.1f}% ({total_possible - total_missing}/{total_possible} fields)"
+    )
+    result.append("")
+
+    # Show missing fields by category
+    for category, fields in missing.items():
+        if fields:
+            category_name = category.replace("_", " ").title()
+            result.append(f"❌ {category_name}:")
+            for field in fields[:5]:  # Limit to 5 fields per category
+                result.append(f"   • {field}")
+            if len(fields) > 5:
+                result.append(f"   ... and {len(fields) - 5} more")
+            result.append("")
+
+    # Show fields that are present
+    present_fields = []
+    for field in ALL_PLACE_FIELDS:
+        if field in place and place[field] is not None and place[field] != "":
+            present_fields.append(field)
+
+    if present_fields:
+        result.append("✅ AVAILABLE FIELDS:")
+        result.append("-" * 20)
+        for field in present_fields[:10]:  # Show first 10
+            result.append(f"   • {field}")
+        if len(present_fields) > 10:
+            result.append(f"   ... and {len(present_fields) - 10} more")
+        result.append("")
+
+    return result
+
+
+def _format_basic_restaurant_info(place: Dict[str, Any]) -> List[str]:
+    """Format basic restaurant information."""
+    display_name = place.get("displayName", {})
+    name = (
+        display_name.get("text")
+        if isinstance(display_name, dict)
+        else str(display_name) if display_name else "Unknown Restaurant"
+    )
+    address = place.get("formattedAddress", "Address not available")
+    phone = place.get("nationalPhoneNumber", "Phone not available")
+    website = place.get("websiteUri", "Website not available")
+    rating = place.get("rating", "N/A")
+    review_count = place.get("userRatingCount", "N/A")
+    price_level = place.get("priceLevel", "")
+    price_str = _format_price_level(price_level)
+    business_status = place.get("businessStatus", "Status unknown")
+
+    return [
+        "**Restaurant Details:**",
+        f"- **Name**: {name}",
+        f"- **Address**: {address}",
+        f"- **Phone**: {phone}",
+        f"- **Website**: {website}",
+        f"- **Rating**: {rating}/5 ({review_count} reviews)",
+        f"- **Price Level**: {price_str}",
+        f"- **Business Status**: {business_status}",
+        "",
+    ]
+
+
+def _format_business_info(place: Dict[str, Any]) -> List[str]:
+    """Format business information."""
+    types = place.get("types", [])
+    business_types = ", ".join([t.replace("_", " ").title() for t in types[:5]]) if types else "Not specified"
+    business_status = place.get("businessStatus", "Status unknown")
+
+    # Location info
+    location = place.get("location", {})
+    latitude = location.get("latitude", "N/A")
+    longitude = location.get("longitude", "N/A")
+
+    return [
+        "**Business Information:**",
+        f"- **Types**: {business_types}",
+        f"- **Coordinates**: {latitude}, {longitude}",
+        f"- **Business Status**: {business_status}",
+        "",
+    ]
+
+
+def _format_service_options(place: Dict[str, Any]) -> List[str]:
+    """Format service options."""
+    service_options = []
+    if place.get("delivery"):
+        service_options.append("✅ Delivery")
+    else:
+        service_options.append("❌ Delivery")
+
+    if place.get("takeout"):
+        service_options.append("✅ Takeout")
+    else:
+        service_options.append("❌ Takeout")
+
+    if place.get("dineIn"):
+        service_options.append("✅ Dine In")
+    else:
+        service_options.append("❌ Dine In")
+
+    if place.get("curbsidePickup"):
+        service_options.append("✅ Curbside Pickup")
+    else:
+        service_options.append("❌ Curbside Pickup")
+
+    if place.get("reservable"):
+        service_options.append("✅ Reservations")
+    else:
+        service_options.append("❌ Reservations")
+
+    return service_options
+
+
+def _format_dining_services(place: Dict[str, Any]) -> List[str]:
+    """Format dining services."""
+    dining_services = []
+    if place.get("servesBreakfast"):
+        dining_services.append("✅ Serves Breakfast")
+    else:
+        dining_services.append("❌ Serves Breakfast")
+
+    if place.get("servesLunch"):
+        dining_services.append("✅ Serves Lunch")
+    else:
+        dining_services.append("❌ Serves Lunch")
+
+    if place.get("servesDinner"):
+        dining_services.append("✅ Serves Dinner")
+    else:
+        dining_services.append("❌ Serves Dinner")
+
+    if place.get("servesBrunch"):
+        dining_services.append("✅ Serves Brunch")
+    else:
+        dining_services.append("❌ Serves Brunch")
+
+    if place.get("servesBeer"):
+        dining_services.append("✅ Serves Beer")
+    else:
+        dining_services.append("❌ Serves Beer")
+
+    if place.get("servesWine"):
+        dining_services.append("✅ Serves Wine")
+    else:
+        dining_services.append("❌ Serves Wine")
+
+    if place.get("servesDessert"):
+        dining_services.append("✅ Serves Dessert")
+    else:
+        dining_services.append("❌ Serves Dessert")
+
+    if place.get("servesVegetarianFood"):
+        dining_services.append("✅ Serves Vegetarian Food")
+    else:
+        dining_services.append("❌ Serves Vegetarian Food")
+
+    return dining_services
+
+
+def _format_services_and_hours(place: Dict[str, Any]) -> List[str]:
+    """Format services and hours information."""
+    result = ["**Services Available:**"]
+
+    # Get service options and dining services
+    service_options = _format_service_options(place)
+    dining_services = _format_dining_services(place)
+
+    # Special features
+    special_features = []
+    if place.get("wheelchairAccessibleEntrance"):
+        special_features.append("✅ Wheelchair Accessible")
+    else:
+        special_features.append("❌ Wheelchair Accessible")
+
+    # Add all services
+    result.extend(service_options)
+    result.extend(dining_services)
+    result.extend(special_features)
+    result.append("")
+
+    # Operating Hours
+    result.append("**Operating Hours:**")
+    hours_info = _format_opening_hours(place)
+    if hours_info:
+        result.append(hours_info)
+    else:
+        result.append("Hours not available")
+    result.append("")
+
+    return result
+
+
+def _format_additional_features(place: Dict[str, Any]) -> List[str]:
+    """Format additional features."""
+    result = ["**Additional Features:**"]
+
+    # Accessibility
+    accessibility_info = _format_accessibility_info(place)
+    if accessibility_info:
+        result.append("♿ **Accessibility:**")
+        for info in accessibility_info:
+            result.append(f"   • {info}")
+        result.append("")
+
+    # Cuisine information
+    cuisines = _extract_cuisine_types(place)
+    if cuisines:
+        result.append("🍽️ **Cuisine Types:**")
+        for cuisine in cuisines[:5]:
+            result.append(f"   • {cuisine}")
+        result.append("")
+
+    # Description
+    description = _format_description(place)
+    if description != "No description available":
+        result.extend(["📝 **Description:**", f"   {description}", ""])
+
+    return result
+
+
+def _format_reviews_and_links(place: Dict[str, Any]) -> List[str]:
+    """Format reviews and media information."""
+    result = []
+
+    # Media information
+    photos_count = len(place.get("photos", []))
+    reviews_count = len(place.get("reviews", []))
+
+    if photos_count > 0 or reviews_count > 0:
+        result.append("📸 **Media:**")
+        if photos_count > 0:
+            result.append(f"   • {photos_count} photos available")
+        if reviews_count > 0:
+            result.append(f"   • {reviews_count} recent reviews")
+        result.append("")
+
+    return result
+
+
+def _format_place_detailed_info(place: Dict[str, Any]) -> List[str]:
+    """Format place information in a clean, detailed way like the new API example.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        List of formatted strings
+    """
+    result = []
+
+    # Header
+    result.extend(["=" * 80, "📍 GOOGLE PLACES API - DETAILED RESTAURANT INFORMATION (NEW API)", "=" * 80, ""])
+
+    # Format different sections
+    result.extend(_format_basic_restaurant_info(place))
+    result.extend(_format_business_info(place))
+    result.extend(_format_services_and_hours(place))
+    result.extend(_format_additional_features(place))
+    result.extend(_format_reviews_and_links(place))
+
+    # Missing fields analysis
+    result.extend(_format_missing_fields_analysis(place))
+
+    result.append("=" * 80)
+    return result
 
 
 def format_place_summary(place: Dict[str, Any]) -> str:
@@ -321,68 +992,31 @@ def format_place_summary(place: Dict[str, Any]) -> str:
     Returns:
         Formatted string summary
     """
-    name = place.get("name", "Unknown")
-    address = place.get("formatted_address", "No address")
-    phone = place.get("formatted_phone_number", "No phone")
-    website = place.get("website", "No website")
-    rating = place.get("rating", "N/A")
-    total_ratings = place.get("user_ratings_total", 0)
-    price_level = place.get("price_level")
-    price_str = "?" * price_level if price_level else "Not specified"
-    types = ", ".join(place.get("types", []))
-    business_status = place.get("business_status", "Unknown")
+    result = _build_basic_info(place)
+    result.extend(_build_additional_info(place))
 
-    # Get formatted information
+    # Add hours information
     hours_info = _format_opening_hours(place)
-    dining_services = _format_dining_services(place)
-    service_options = _format_service_options(place)
-    accessibility_info = _format_accessibility_info(place)
-
-    # Format photos and reviews info
-    photos_info = ""
-    if "photos" in place and place["photos"]:
-        photos_info = f"Photos available: {len(place['photos'])}"
-
-    reviews_info = ""
-    if "reviews" in place and place["reviews"]:
-        reviews_info = f"Recent reviews: {len(place['reviews'])}"
-
-    # Build result
-    result = [
-        f"\n{'=' * 80}",
-        f"Name: {name}",
-        f"Address: {address}",
-        f"Phone: {phone}",
-        f"Website: {website}",
-        f"Rating: {rating}/5 ({total_ratings} reviews)",
-        f"Price Level: {price_str}",
-        f"Types: {types}",
-        f"Business Status: {business_status}",
-    ]
-
-    # Add optional information
-    if place.get("editorial_summary"):
-        result.append(f"Description: {place['editorial_summary']}")
-
-    if dining_services:
-        result.append(f"Dining Services: {', '.join(dining_services)}")
-
-    if service_options:
-        result.append(f"Service Options: {', '.join(service_options)}")
-
-    if accessibility_info:
-        result.append(f"Accessibility: {', '.join(accessibility_info)}")
-
     if hours_info:
         result.extend(["\nOpening Hours:", hours_info])
 
-    if photos_info:
-        result.append(f"\n{photos_info}")
-
-    if reviews_info:
-        result.append(f"\n{reviews_info}")
+    # Add media information
+    result.extend(_build_media_info(place))
 
     result.append("=" * 80)
+    return "\n".join(result)
+
+
+def format_place_detailed(place: Dict[str, Any]) -> str:
+    """Format place data into a detailed, clean summary with missing fields analysis.
+
+    Args:
+        place: Place data dictionary
+
+    Returns:
+        Formatted string summary with detailed information
+    """
+    result = _format_place_detailed_info(place)
     return "\n".join(result)
 
 
@@ -398,27 +1032,44 @@ def format_place_table(places: List[Dict[str, Any]]) -> str:
     if not places:
         return "No places found."
 
-    # Define table columns
-    headers = ["Name", "Address", "Rating", "Price", "Types", "Status"]
+    # Define table columns with more relevant fields
+    headers = ["Name", "Description", "Cuisine", "Rating", "Price", "Services", "Status"]
     rows = []
 
     for place in places:
+        # Name (truncated)
         name = (
-            place.get("name", "Unknown")[:30] + "..."
-            if len(place.get("name", "")) > 30
+            place.get("name", "Unknown")[:25] + "..."
+            if len(place.get("name", "")) > 25
             else place.get("name", "Unknown")
         )
-        address = (
-            place.get("formatted_address", "No address")[:40] + "..."
-            if len(place.get("formatted_address", "")) > 40
-            else place.get("formatted_address", "No address")
-        )
+
+        # Description (editorial_summary or first part of address)
+        description = _format_description(place)
+        description = description[:35] + "..." if len(description) > 35 else description
+
+        # Cuisine (extracted from types)
+        cuisines = _extract_cuisine_types(place)
+        cuisine = ", ".join(cuisines[:3]) if cuisines else "N/A"
+        cuisine = cuisine[:20] + "..." if len(cuisine) > 20 else cuisine
+
+        # Rating
         rating = f"{place.get('rating', 'N/A')}/5 ({place.get('user_ratings_total', 0)})"
+
+        # Price level
         price = "?" * place.get("price_level", 0) if place.get("price_level") else "N/A"
-        types = ", ".join(place.get("types", [])[:2])  # Show first 2 types
+
+        # Service options (key services only)
+        service_options = _format_service_options(place)
+        dining_services = _format_dining_services(place)
+        all_services = service_options + dining_services
+        services = ", ".join(all_services[:3]) if all_services else "N/A"
+        services = services[:25] + "..." if len(services) > 25 else services
+
+        # Status
         status = place.get("business_status", "Unknown")
 
-        rows.append([name, address, rating, price, types, status])
+        rows.append([name, description, cuisine, rating, price, services, status])
 
     # Calculate column widths
     col_widths = [len(header) for header in headers]
@@ -725,12 +1376,21 @@ Examples:
     # Common options
     for subparser in [search_parser, nearby_parser, details_parser]:
         subparser.add_argument(
-            "--format", choices=["json", "table", "summary"], default="summary", help="Output format (default: summary)"
+            "--format",
+            choices=["json", "table", "summary", "detailed", "missing"],
+            default="summary",
+            help="Output format (default: summary)",
         )
         subparser.add_argument("--analyze", action="store_true", help="Show data analysis")
         subparser.add_argument("--export", help="Export results to file")
         subparser.add_argument(
             "--export-format", choices=["json", "csv"], default="json", help="Export format (default: json)"
+        )
+        subparser.add_argument(
+            "--field-mask",
+            choices=list(FIELD_MASKS.keys()) + ["all"],
+            default="comprehensive",
+            help="Field mask to use",
         )
 
     return parser
@@ -767,7 +1427,7 @@ def _execute_nearby_command(args) -> List[Dict[str, Any]]:
 
 def _execute_details_command(args) -> List[Dict[str, Any]]:
     """Execute details command."""
-    place = get_place_details(args.place_id)
+    place = get_place_details(args.place_id, getattr(args, "field_mask", "all"))
     if place:
         return [place]
     else:
@@ -781,6 +1441,12 @@ def _output_results(places: List[Dict[str, Any]], format_type: str) -> None:
         print(json.dumps(places, indent=2, ensure_ascii=False))
     elif format_type == "table":
         print(format_place_table(places))
+    elif format_type == "detailed":
+        for place in places:
+            print(format_place_detailed(place))
+    elif format_type == "missing":
+        for place in places:
+            print(format_place_detailed(place))  # Detailed format includes missing fields analysis
     else:  # summary
         for place in places:
             print(format_place_summary(place))
