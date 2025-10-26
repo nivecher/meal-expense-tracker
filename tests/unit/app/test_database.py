@@ -52,13 +52,13 @@ class TestDatabaseModule:
         """Test getting database URI from environment variable with postgres://."""
         with patch.dict(os.environ, {"DATABASE_URL": "postgres://user:pass@host:5432/db"}):
             uri = _get_database_uri()
-            assert uri == "postgresql://user:pass@host:5432/db"
+            assert uri == "postgresql+pg8000://user:pass@host:5432/db"
 
     def test_get_database_uri_from_env_postgresql(self):
         """Test getting database URI from environment variable with postgresql://."""
         with patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@host:5432/db"}):
             uri = _get_database_uri()
-            assert uri == "postgresql://user:pass@host:5432/db"
+            assert uri == "postgresql+pg8000://user:pass@host:5432/db"
 
     def test_get_database_uri_from_env_mysql(self):
         """Test getting database URI from environment variable with mysql://."""
@@ -245,15 +245,15 @@ class TestDatabaseModule:
                     get_engine()
 
     def test_database_uri_postgres_conversion_edge_cases(self):
-        """Test postgres:// to postgresql:// conversion edge cases."""
+        """Test postgres:// to postgresql+pg8000:// conversion edge cases."""
         test_cases = [
-            ("postgres://user:pass@host:5432/db", "postgresql://user:pass@host:5432/db"),
+            ("postgres://user:pass@host:5432/db", "postgresql+pg8000://user:pass@host:5432/db"),
             (
                 "postgres://user:pass@host:5432/db?sslmode=require",
-                "postgresql://user:pass@host:5432/db?sslmode=require",
+                "postgresql+pg8000://user:pass@host:5432/db?sslmode=require",
             ),
-            ("postgres://user:pass@host:5432/db#fragment", "postgresql://user:pass@host:5432/db#fragment"),
-            ("postgresql://user:pass@host:5432/db", "postgresql://user:pass@host:5432/db"),  # Already correct
+            ("postgres://user:pass@host:5432/db#fragment", "postgresql+pg8000://user:pass@host:5432/db#fragment"),
+            ("postgresql://user:pass@host:5432/db", "postgresql+pg8000://user:pass@host:5432/db"),
         ]
 
         for input_uri, expected_uri in test_cases:
@@ -267,7 +267,7 @@ class TestDatabaseModule:
 
         with patch.dict(os.environ, {"DATABASE_URL": "postgresql://env:pass@host:5432/envdb"}):
             uri = _get_database_uri(app)
-            assert uri == "postgresql://env:pass@host:5432/envdb"
+            assert uri == "postgresql+pg8000://env:pass@host:5432/envdb"
 
     def test_database_uri_app_config_fallback(self, app):
         """Test that app config is used when no environment variable is set."""

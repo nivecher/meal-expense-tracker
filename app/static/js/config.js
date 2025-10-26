@@ -37,4 +37,13 @@ if (config.colors) {
   window.MEAL_TRACKER_COLORS = config.colors;
 }
 
+// Make cuisines and meal types globally available
+if (config.cuisines) {
+  window.MEAL_TRACKER_CUISINES = config.cuisines;
+}
+
+if (config.mealTypes) {
+  window.MEAL_TRACKER_MEAL_TYPES = config.mealTypes;
+}
+
 export default config;

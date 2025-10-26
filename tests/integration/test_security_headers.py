@@ -84,6 +84,11 @@ class TestSecurityHeaders:
         assert "https://cdn.jsdelivr.net" in csp
         assert "https://cdnjs.cloudflare.com" in csp
 
+        # Should allow Google Maps and Places APIs for restaurant search
+        assert "https://maps.googleapis.com" in csp
+        assert "https://maps.gstatic.com" in csp
+        assert "https://places.googleapis.com" in csp
+
     def test_permissions_policy(self, client):
         """Test that Permissions Policy is set."""
         response = client.get("/")

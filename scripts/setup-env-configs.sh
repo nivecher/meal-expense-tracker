@@ -16,11 +16,7 @@ get_instance_type() {
 # Function to get database instance class
 get_db_instance_class() {
   local env=$1
-  if [ "$env" = "prod" ]; then
-    echo "db.t3.medium"
-  else
-    echo "db.t3.micro"
-  fi
+  echo "db.t3.micro"
 }
 
 # Function to get database storage size

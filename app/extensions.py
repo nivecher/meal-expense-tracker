@@ -8,7 +8,6 @@ from typing import Any, Optional, Union, cast
 
 from flask import Flask, request, url_for
 from flask.wrappers import Response
-from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
@@ -16,22 +15,22 @@ from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
-from flask_session import Session
-
 logger = logging.getLogger(__name__)
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
 
-# Initialize JWT for token-based authentication
-jwt = JWTManager()
 
 # Initialize LoginManager for session-based authentication
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 
 # Initialize rate limiter to prevent abuse
-limiter = Limiter(key_func=get_remote_address, default_limits=["400 per day", "100 per hour"], storage_uri="memory://")
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["400 per day", "100 per hour"],
+    storage_uri="memory://",
+)
 
 # Initialize CSRF protection (will be conditionally configured based on environment)
 csrf = CSRFProtect()
@@ -39,105 +38,15 @@ csrf = CSRFProtect()
 # Initialize Flask-Migrate for database migrations
 migrate = Migrate()
 
-# Initialize Flask-Session
-flask_session = Session()
-
 
 def _log_session_config(app: Flask) -> None:
     """Log session configuration for debugging - Single responsibility."""
-    session_type = app.config.get("SESSION_TYPE")
-
-    if session_type == "dynamodb":
-        app.logger.info("Session backend: dynamodb")
-        table = app.config.get("SESSION_DYNAMODB_TABLE")
-        region = app.config.get("SESSION_DYNAMODB_REGION")
-        endpoint = app.config.get("SESSION_DYNAMODB_ENDPOINT_URL")
-        key_prefix = app.config.get("SESSION_KEY_PREFIX", "")
-
-        app.logger.info("  Table: %s, Region: %s, Endpoint: %s", table, region, endpoint or "AWS default")
-        if key_prefix:
-            app.logger.info("  Key prefix: %s", key_prefix)
-    elif session_type is None:
-        app.logger.info("Session backend: signed-cookies (Flask default)")
-        app.logger.info("  Cookie name: %s", app.config.get("SESSION_COOKIE_NAME", "session"))
-        app.logger.info("  Cookie secure: %s", app.config.get("SESSION_COOKIE_SECURE", False))
-        app.logger.info("  Session lifetime: %s seconds", app.config.get("PERMANENT_SESSION_LIFETIME", 3600))
-    else:
-        app.logger.info("Session backend: %s", session_type)
-
-
-def _validate_dynamodb_session_config(app: Flask) -> None:
-    """Validate DynamoDB session configuration - Single responsibility."""
-    if app.config.get("SESSION_TYPE") != "dynamodb":
-        return
-
-    _validate_required_configs(app)
-    table_name = _validate_table_name_format(app)
-    _test_dynamodb_connection(app, table_name)
-    app.logger.info("DynamoDB session configuration validated successfully")
-
-
-def _validate_required_configs(app: Flask) -> None:
-    """Validate required DynamoDB session configuration parameters."""
-    required_configs = {"SESSION_DYNAMODB_TABLE": "DynamoDB table name", "SESSION_DYNAMODB_REGION": "AWS region"}
-
-    missing_configs = []
-    for config_key, description in required_configs.items():
-        if not app.config.get(config_key):
-            missing_configs.append(f"{config_key} ({description})")
-
-    if missing_configs:
-        error_msg = f"Missing required DynamoDB session configuration: {', '.join(missing_configs)}"
-        app.logger.error(error_msg)
-        raise ValueError(error_msg)
-
-
-def _validate_table_name_format(app: Flask) -> str:
-    """Validate DynamoDB table name format."""
-    table_name = app.config.get("SESSION_DYNAMODB_TABLE", "")
-    if not table_name.replace("-", "").replace("_", "").isalnum():
-        raise ValueError(
-            f"Invalid DynamoDB table name: {table_name}. Must contain only alphanumeric characters, hyphens, and underscores."
-        )
-    return table_name
-
-
-def _test_dynamodb_connection(app: Flask, table_name: str) -> None:
-    """Test DynamoDB connection and permissions."""
-    try:
-        dynamodb_resource = app.config.get("SESSION_DYNAMODB")
-        if dynamodb_resource:
-            # Test connection by attempting to describe the table with retry logic
-            table = dynamodb_resource.Table(table_name)
-            table.load()  # This will raise an exception if table doesn't exist or connection fails
-            app.logger.info("DynamoDB session table connection verified: %s", table_name)
-            app.logger.info("Table status: %s", table.table_status)
-
-            # Test basic table operations to ensure permissions are correct
-            try:
-                _test_dynamodb_permissions(table)
-                app.logger.info("DynamoDB table permissions verified successfully")
-            except Exception as perm_error:
-                app.logger.warning("DynamoDB table permissions test failed: %s", str(perm_error))
-                app.logger.warning("This may indicate insufficient IAM permissions")
-        else:
-            app.logger.warning("SESSION_DYNAMODB resource not configured - Flask-Session will create its own")
-    except Exception as e:
-        app.logger.error("DynamoDB session table verification failed: %s", str(e))
-        # Don't fail startup - let Flask-Session handle the error gracefully
-        app.logger.info("Note: Ensure the DynamoDB table '%s' exists and is accessible", table_name)
-        app.logger.info("Check IAM permissions and network connectivity")
-
-
-def _test_dynamodb_permissions(table) -> None:
-    """Test DynamoDB table permissions."""
-    try:
-        # Try a simple scan operation to verify permissions
-        table.scan(Limit=1)
-        # Note: We can't access app logger from table object, so we'll log success at caller level
-    except Exception as perm_error:
-        # Note: We can't access app logger from table object, so we'll log warning at caller level
-        raise perm_error
+    app.logger.info("Session backend: signed-cookies (Flask default)")
+    app.logger.info("  Cookie name: %s", app.config.get("SESSION_COOKIE_NAME", "session"))
+    app.logger.info("  Cookie secure: %s", app.config.get("SESSION_COOKIE_SECURE", False))
+    app.logger.info("  Cookie httponly: %s", app.config.get("SESSION_COOKIE_HTTPONLY", True))
+    app.logger.info("  Cookie samesite: %s", app.config.get("SESSION_COOKIE_SAMESITE", "Lax"))
+    app.logger.info("  Session lifetime: %s seconds", app.config.get("PERMANENT_SESSION_LIFETIME", 3600))
 
 
 def _configure_csrf_handlers(app: Flask) -> None:
@@ -203,7 +112,6 @@ def init_app(app: Flask) -> None:
     """Initialize all extensions with the Flask application."""
     # Initialize core extensions
     db.init_app(app)
-    jwt.init_app(app)
     login_manager.init_app(app)
 
     # Configure Flask-Migrate with Lambda-aware directory handling
@@ -222,38 +130,20 @@ def init_app(app: Flask) -> None:
 
     migrate.init_app(app, db, directory=migration_dir)
 
-    # Initialize Flask-Session based on session type
-    session_type = app.config.get("SESSION_TYPE")
-
-    if session_type == "dynamodb":
-        # Validate DynamoDB configuration
-        _validate_dynamodb_session_config(app)
-        flask_session.init_app(app)
-    elif session_type is None:
-        # Using Flask's default signed cookie sessions - no Flask-Session needed
-        app.logger.info("Using Flask's default signed cookie sessions (ideal for Lambda)")
-    elif session_type == "filesystem":
-        # Use CacheLib backend directly for filesystem sessions
-        app.logger.info("Using filesystem session with CacheLib backend")
-        flask_session.init_app(app)
-    else:
-        # Other session types (redis, etc.)
-        flask_session.init_app(app)
+    # Use Flask's built-in signed cookie sessions - no external session backend needed
+    app.logger.info("Using Flask's default signed cookie sessions (ideal for all environments)")
 
     _log_session_config(app)
 
     # Initialize rate limiter
     limiter.init_app(app)
 
-    # Configure JWT settings
+    # Configure CSRF secret key (same as Flask SECRET_KEY for consistency)
     secret_key = app.config.get("SECRET_KEY")
     fallback_key = "dev-key-change-in-production"  # nosec B105 - Development fallback key
     if not secret_key or secret_key == fallback_key:
-        app.logger.warning("Using fallback JWT secret key - ensure SECRET_KEY is set in production")
+        app.logger.warning("Using fallback CSRF secret key - ensure SECRET_KEY is set in production")
         secret_key = fallback_key
-    app.config["JWT_SECRET_KEY"] = secret_key
-    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 3600  # 1 hour
-    app.config["JWT_REFRESH_TOKEN_EXPIRES"] = 2592000  # 30 days
 
     # Check if we're running in AWS Lambda environment
     import os

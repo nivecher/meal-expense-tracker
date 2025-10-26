@@ -8,6 +8,7 @@ from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from werkzeug.datastructures import FileStorage
 
+from app.constants.cuisines import format_cuisine_type
 from app.expenses.models import Expense
 from app.extensions import db
 from app.restaurants.exceptions import (
@@ -15,7 +16,6 @@ from app.restaurants.exceptions import (
     DuplicateRestaurantError,
 )
 from app.restaurants.models import Restaurant
-from app.utils.cuisine_formatter import format_cuisine_type
 from app.utils.geo_utils import calculate_distance_km, validate_coordinates
 from app.utils.service_level_detector import ServiceLevel, ServiceLevelDetector
 
@@ -216,7 +216,7 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
                 "visit_count": row.visit_count,
                 "total_spent": float(row.total_spent) if row.total_spent else 0.0,
                 "last_visit": row.last_visit,
-                "avg_price_per_person": float(row.avg_price_per_person) if row.avg_price_per_person else 0.0,
+                "avg_price_per_person": (float(row.avg_price_per_person) if row.avg_price_per_person else 0.0),
             }
         )
         restaurants.append(restaurant)
@@ -329,7 +329,10 @@ def _get_sort_field(sort_by: str):
         "avg_price_per_person": func.coalesce(
             func.avg(
                 case(
-                    (Expense.party_size.isnot(None) & (Expense.party_size > 1), Expense.amount / Expense.party_size),
+                    (
+                        Expense.party_size.isnot(None) & (Expense.party_size > 1),
+                        Expense.amount / Expense.party_size,
+                    ),
                     else_=None,
                 )
             ),
@@ -1089,7 +1092,10 @@ def delete_restaurant_by_id(restaurant_id: int, user_id: int) -> Tuple[bool, str
             if expense_count == 1:
                 return True, "Restaurant and 1 associated expense deleted successfully."
             else:
-                return True, f"Restaurant and {expense_count} associated expenses deleted successfully."
+                return (
+                    True,
+                    f"Restaurant and {expense_count} associated expenses deleted successfully.",
+                )
         else:
             # No expenses, just delete the restaurant
             db.session.delete(restaurant)
@@ -1156,13 +1162,13 @@ def detect_service_level_from_google_data(google_data: Dict[str, Any]) -> Tuple[
 
 
 def validate_restaurant_service_level(
-    restaurant: Restaurant, google_service_level: str, confidence: float
+    current_data: dict, google_service_level: str, confidence: float
 ) -> Tuple[bool, str, Optional[str]]:
     """
     Validate restaurant service level against Google data.
 
     Args:
-        restaurant: Restaurant instance to validate
+        current_data: Current form data dictionary to validate
         google_service_level: Service level detected from Google
         confidence: Confidence score of the detection
 
@@ -1172,13 +1178,14 @@ def validate_restaurant_service_level(
     if google_service_level == "unknown" or confidence <= 0.3:
         return False, "", None
 
-    if restaurant.service_level and restaurant.service_level != google_service_level:
+    current_service_level = current_data.get("service_level")
+    if current_service_level and current_service_level != google_service_level:
         return (
             True,
-            f"Service Level: '{restaurant.service_level}' vs Google: '{google_service_level}' (confidence: {confidence:.2f})",
+            f"Service Level: '{current_service_level}' vs Google: '{google_service_level}' (confidence: {confidence:.2f})",
             google_service_level,
         )
-    elif not restaurant.service_level:
+    elif not current_service_level:
         return (
             True,
             f"Service Level: Not set vs Google: '{google_service_level}' (confidence: {confidence:.2f})",
@@ -1251,7 +1258,9 @@ def search_restaurants_by_location(
     # Get all restaurants for the user that have coordinates
     restaurants = db.session.scalars(
         select(Restaurant).where(
-            Restaurant.user_id == user_id, Restaurant.latitude.isnot(None), Restaurant.longitude.isnot(None)
+            Restaurant.user_id == user_id,
+            Restaurant.latitude.isnot(None),
+            Restaurant.longitude.isnot(None),
         )
     ).all()
 
@@ -1299,6 +1308,10 @@ def get_restaurants_with_coordinates(user_id: int) -> List[Restaurant]:
     """
     return db.session.scalars(
         select(Restaurant)
-        .where(Restaurant.user_id == user_id, Restaurant.latitude.isnot(None), Restaurant.longitude.isnot(None))
+        .where(
+            Restaurant.user_id == user_id,
+            Restaurant.latitude.isnot(None),
+            Restaurant.longitude.isnot(None),
+        )
         .order_by(Restaurant.name)
     ).all()

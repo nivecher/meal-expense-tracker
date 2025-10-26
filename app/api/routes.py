@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Tuple, cast
+from typing import Any, Optional, Tuple, cast
 
 from flask import Response, current_app, jsonify, request
 from flask_login import current_user, login_required
@@ -10,6 +10,7 @@ from app.auth.models import User
 from app.categories import services as category_services
 from app.expenses import services as expense_services
 from app.restaurants import services as restaurant_services
+from app.restaurants.models import Restaurant
 
 from . import bp, validate_api_csrf
 from .schemas import CategorySchema, ExpenseSchema, RestaurantSchema
@@ -40,13 +41,19 @@ def _create_api_response(
 
 def _handle_validation_error(error: ValidationError) -> Tuple[Response, int]:
     """Handle validation errors consistently."""
-    return jsonify({"status": "error", "message": "Validation failed", "errors": error.messages}), 400
+    return (
+        jsonify({"status": "error", "message": "Validation failed", "errors": error.messages}),
+        400,
+    )
 
 
 def _handle_service_error(error: Exception, operation: str) -> Tuple[Response, int]:
     """Handle service layer errors consistently."""
     current_app.logger.error(f"Error in {operation}: {str(error)}", exc_info=True)
-    return jsonify({"status": "error", "message": f"Failed to {operation}", "error": str(error)}), 500
+    return (
+        jsonify({"status": "error", "message": f"Failed to {operation}", "error": str(error)}),
+        500,
+    )
 
 
 # Health Check
@@ -198,7 +205,9 @@ def create_restaurant() -> Tuple[Response, int]:
         data = restaurant_schema.load(request.get_json())
         restaurant = restaurant_services.create_restaurant_for_user(user.id, data)
         return _create_api_response(
-            data=restaurant_schema.dump(restaurant), message="Restaurant created successfully", code=201
+            data=restaurant_schema.dump(restaurant),
+            message="Restaurant created successfully",
+            code=201,
         )
     except ValidationError as e:
         return _handle_validation_error(e)
@@ -236,7 +245,8 @@ def update_restaurant(restaurant_id: int) -> Tuple[Response, int]:
         data = restaurant_schema.load(request.get_json())
         updated_restaurant = restaurant_services.update_restaurant_for_user(restaurant, data)
         return _create_api_response(
-            data=restaurant_schema.dump(updated_restaurant), message="Restaurant updated successfully"
+            data=restaurant_schema.dump(updated_restaurant),
+            message="Restaurant updated successfully",
         )
     except ValidationError as e:
         return _handle_validation_error(e)
@@ -293,92 +303,122 @@ def check_restaurant_exists() -> Response:
 def validate_restaurant() -> Tuple[Response, int]:
     """Validate restaurant information using Google Places API."""
     try:
-        data = request.get_json()
-        if not data:
-            return _create_api_response(message="JSON data required", status="error", code=400)
+        # Validate input data
+        validation_error = _validate_restaurant_input()
+        if validation_error:
+            return validation_error
 
-        restaurant_id = data.get("restaurant_id")
-        google_place_id = data.get("google_place_id", "").strip()
-        fix_mismatches = data.get("fix_mismatches", False)
-
-        if not restaurant_id:
-            return _create_api_response(message="Restaurant ID is required", status="error", code=400)
-
-        # Get the restaurant
-        from app.restaurants.models import Restaurant
-
-        restaurant = Restaurant.query.get(restaurant_id)
+        # Get and validate restaurant
+        restaurant, place_id_to_use = _get_and_validate_restaurant()
         if not restaurant:
             return _create_api_response(message="Restaurant not found", status="error", code=404)
 
-        # Check if user owns this restaurant
-        user = _get_current_user()
-        if restaurant.user_id != user.id:
-            return _create_api_response(message="Access denied", status="error", code=403)
-
-        # Use the restaurant's Google Place ID or the one provided
-        place_id_to_use = google_place_id or restaurant.google_place_id
-        if not place_id_to_use:
-            return _create_api_response(message="No Google Place ID available for validation", status="error", code=400)
-
-        # Validate using the same logic as CLI
+        # Validate with Google Places API
         validation_result = _validate_restaurant_with_google_api(place_id_to_use)
-
         if not validation_result.get("valid"):
             return _create_api_response(data=validation_result, message="Validation failed", status="error", code=400)
 
-        # Check for mismatches
-        mismatches, fixes_to_apply = _check_restaurant_mismatches_api(restaurant, validation_result)
-
-        # Apply fixes if requested
-        if fix_mismatches and fixes_to_apply:
-            _apply_restaurant_fixes_api(restaurant, fixes_to_apply)
-
-        # Prepare current restaurant data for comparison
-        current_data = {
-            "name": restaurant.name,
-            "address_line_1": restaurant.address_line_1,
-            "address_line_2": restaurant.address_line_2,
-            "service_level": restaurant.service_level,
-            "rating": restaurant.rating,
-            "price_level": restaurant.price_level,
-            "phone": restaurant.phone,
-            "website": restaurant.website,
-            "description": restaurant.description,
-        }
-
-        # Prepare Google data in the same format for comparison
-        google_data = {
-            "name": validation_result.get("google_name"),
-            "address_line_1": validation_result.get("google_address_line_1"),
-            "address_line_2": validation_result.get("google_address_line_2"),
-            "service_level": (
-                validation_result.get("google_service_level", [None, 0.0])[0]
-                if validation_result.get("google_service_level")
-                else None
-            ),
-            "rating": validation_result.get("google_rating"),
-            "price_level": validation_result.get("google_price_level"),
-            "phone": validation_result.get("google_phone"),
-            "website": validation_result.get("google_website"),
-            "description": None,  # Google Places doesn't provide descriptions
-        }
-
-        return _create_api_response(
-            data={
-                "valid": True,
-                "mismatches": mismatches,
-                "fixes": fixes_to_apply,
-                "current_data": current_data,
-                "google_data": google_data,
-                "restaurant_updated": fix_mismatches and bool(fixes_to_apply),
-            },
-            message="Restaurant validated successfully",
-        )
+        # Process validation results
+        return _process_validation_results(restaurant, validation_result)
 
     except Exception as e:
         current_app.logger.error(f"Error validating restaurant: {e}")
         return _create_api_response(message=f"Failed to validate restaurant: {str(e)}", status="error", code=500)
+
+
+def _validate_restaurant_input() -> Optional[Tuple[Response, int]]:
+    """Validate input parameters for restaurant validation."""
+    data = request.get_json()
+    if not data:
+        return _create_api_response(message="JSON data required", status="error", code=400)
+
+    restaurant_id = data.get("restaurant_id")
+    if not restaurant_id:
+        return _create_api_response(message="Restaurant ID is required", status="error", code=400)
+
+    form_data = data.get("form_data")
+    if not form_data:
+        return _create_api_response(message="form_data is required for validation", status="error", code=400)
+
+    return None
+
+
+def _get_and_validate_restaurant() -> Tuple[Optional[Restaurant], Optional[str]]:
+    """Get restaurant and validate user permissions."""
+    data = request.get_json()
+    restaurant_id = data.get("restaurant_id")
+    google_place_id = data.get("google_place_id", "").strip()
+
+    restaurant = Restaurant.query.get(restaurant_id)
+
+    if not restaurant:
+        return None, None
+
+    # Check if user owns this restaurant
+    user = _get_current_user()
+    if restaurant.user_id != user.id:
+        return None, None
+
+    # Use the restaurant's Google Place ID or the one provided
+    place_id_to_use = google_place_id or restaurant.google_place_id
+    if not place_id_to_use:
+        return None, None
+
+    return restaurant, place_id_to_use
+
+
+def _process_validation_results(restaurant, validation_result) -> Tuple[Response, int]:
+    """Process validation results and return response."""
+    data = request.get_json()
+    form_data = data.get("form_data")
+    fix_mismatches = data.get("fix_mismatches", False)
+
+    # Use form data for comparison
+    current_data = form_data
+
+    # Check for mismatches
+    mismatches, fixes_to_apply = _check_restaurant_mismatches_api(current_data, validation_result)
+
+    # Apply fixes if requested
+    if fix_mismatches and fixes_to_apply:
+        _apply_restaurant_fixes_api(restaurant, fixes_to_apply)
+
+    # Prepare Google data in the same format for comparison
+    google_data = {
+        "name": validation_result.get("google_name"),
+        "address_line_1": validation_result.get("google_address_line_1"),
+        "address_line_2": validation_result.get("google_address_line_2"),
+        "city": validation_result.get("google_city"),
+        "state": validation_result.get("google_state"),
+        "state_long": validation_result.get("google_state_long"),
+        "state_short": validation_result.get("google_state_short"),
+        "postal_code": validation_result.get("google_postal_code"),
+        "country": validation_result.get("google_country"),
+        "type": validation_result.get("primary_type"),
+        "cuisine": validation_result.get("google_cuisine"),
+        "service_level": (
+            validation_result.get("google_service_level", [None, 0.0])[0]
+            if validation_result.get("google_service_level")
+            else None
+        ),
+        "rating": validation_result.get("google_rating"),
+        "price_level": validation_result.get("google_price_level"),
+        "phone": validation_result.get("google_phone"),
+        "website": validation_result.get("google_website"),
+        "description": None,  # Google Places doesn't provide descriptions
+    }
+
+    return _create_api_response(
+        data={
+            "valid": True,
+            "mismatches": mismatches,
+            "fixes": fixes_to_apply,
+            "current_data": current_data,
+            "google_data": google_data,
+            "restaurant_updated": fix_mismatches and bool(fixes_to_apply),
+        },
+        message="Restaurant validated successfully",
+    )
 
 
 def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
@@ -397,7 +437,10 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
         place = places_service.get_place_details(google_place_id, "comprehensive")
 
         if not place:
-            return {"valid": False, "errors": ["Failed to retrieve place data from Google Places API"]}
+            return {
+                "valid": False,
+                "errors": ["Failed to retrieve place data from Google Places API"],
+            }
 
         # Extract restaurant data using the service
         google_data = places_service.extract_restaurant_data(place)
@@ -410,6 +453,8 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
             "google_address_line_2": google_data.get("address_line_2"),
             "google_city": google_data.get("city"),
             "google_state": google_data.get("state"),
+            "google_state_long": google_data.get("state_long"),
+            "google_state_short": google_data.get("state_short"),
             "google_postal_code": google_data.get("postal_code"),
             "google_country": google_data.get("country"),
             "google_rating": google_data.get("rating"),
@@ -431,32 +476,65 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
         return {"valid": False, "errors": [f"Unexpected error: {str(e)}"]}
 
 
-def _check_restaurant_mismatches_api(restaurant, validation_result: dict) -> tuple[list[str], dict[str, str]]:
-    """Check for mismatches between restaurant data and Google data."""
+def _check_restaurant_mismatches_api(current_data, validation_result: dict) -> tuple[list[str], dict[str, str]]:
+    """Check for mismatches between current data and Google data."""
     mismatches = []
     fixes_to_apply = {}
 
     # Check name mismatch
-    _check_name_mismatch_api(restaurant, validation_result, mismatches, fixes_to_apply)
+    _check_name_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
 
     # Check address mismatches
-    _check_address_mismatches_api(restaurant, validation_result, mismatches, fixes_to_apply)
+    _check_address_mismatches_api(current_data, validation_result, mismatches, fixes_to_apply)
 
     # Check service level mismatch
-    _check_service_level_mismatch_api(restaurant, validation_result, mismatches, fixes_to_apply)
+    _check_service_level_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
+
+    # Check state mismatch
+    _check_state_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
 
     return mismatches, fixes_to_apply
 
 
-def _check_name_mismatch_api(restaurant, validation_result, mismatches, fixes_to_apply):
+def _check_name_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply):
     """Check for name mismatch."""
     google_name = validation_result.get("google_name")
-    if google_name and google_name.lower() != restaurant.name.lower():
-        mismatches.append(f"Name: '{restaurant.name}' vs Google: '{google_name}'")
+    current_name = current_data.get("name")
+    if google_name and google_name.lower() != current_name.lower():
+        mismatches.append(f"Name: '{current_name}' vs Google: '{google_name}'")
         fixes_to_apply["name"] = google_name
 
 
-def _check_address_mismatches_api(restaurant, validation_result, mismatches, fixes_to_apply):
+def _check_state_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply):
+    """Check for state field mismatches using multiple comparison methods."""
+    from app.restaurants.cli import (
+        _states_match_directly,
+        _states_match_with_us_library,
+    )
+
+    google_state = validation_result.get("google_state")
+    google_state_long = validation_result.get("google_state_long")
+    google_state_short = validation_result.get("google_state_short")
+    current_state = current_data.get("state")
+
+    if not ((google_state or google_state_long or google_state_short) and current_state):
+        return
+
+    # Check direct string matches first
+    if _states_match_directly(current_state, google_state, google_state_long, google_state_short):
+        return
+
+    # Try US library matching as fallback
+    if _states_match_with_us_library(current_state, google_state, google_state_long, google_state_short):
+        return
+
+    # If no matches found, report mismatch
+    google_display = google_state_long or google_state or google_state_short or "Unknown"
+    mismatches.append(f"State: '{current_state}' vs Google: '{google_display}'")
+    fixes_to_apply["state"] = google_state_long or google_state or google_state_short
+
+
+def _check_address_mismatches_api(current_data, validation_result, mismatches, fixes_to_apply):
     """Check for address field mismatches."""
     address_fields = [
         ("google_address_line_1", "address_line_1", "Address Line 1"),
@@ -467,16 +545,16 @@ def _check_address_mismatches_api(restaurant, validation_result, mismatches, fix
         ("google_country", "country", "Country"),
     ]
 
-    for google_field, restaurant_field, display_name in address_fields:
+    for google_field, current_field, display_name in address_fields:
         google_value = validation_result.get(google_field)
-        restaurant_value = getattr(restaurant, restaurant_field)
+        current_value = current_data.get(current_field)
 
-        if google_value and restaurant_value and google_value.lower() != restaurant_value.lower():
-            mismatches.append(f"{display_name}: '{restaurant_value}' vs Google: '{google_value}'")
-            fixes_to_apply[restaurant_field] = google_value
+        if google_value and current_value and google_value.lower() != current_value.lower():
+            mismatches.append(f"{display_name}: '{current_value}' vs Google: '{google_value}'")
+            fixes_to_apply[current_field] = google_value
 
 
-def _check_service_level_mismatch_api(restaurant, validation_result, mismatches, fixes_to_apply):
+def _check_service_level_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply):
     """Check for service level mismatch."""
     google_service_level_data = validation_result.get("google_service_level")
     if google_service_level_data:
@@ -484,7 +562,7 @@ def _check_service_level_mismatch_api(restaurant, validation_result, mismatches,
         from app.restaurants.services import validate_restaurant_service_level
 
         has_mismatch, mismatch_message, suggested_fix = validate_restaurant_service_level(
-            restaurant, google_service_level, confidence
+            current_data, google_service_level, confidence
         )
 
         if has_mismatch:

@@ -293,7 +293,11 @@ def format_location_with_within(
         Tuple of (main_location, location_within)
     """
     main_location = format_location_display(
-        address=address, city=city, state=state, include_postal_code=include_postal_code, postal_code=postal_code
+        address=address,
+        city=city,
+        state=state,
+        include_postal_code=include_postal_code,
+        postal_code=postal_code,
     )
 
     # Clean up located_within - it should not be the same as city
@@ -369,7 +373,11 @@ def restaurant_table_location_display(restaurant) -> tuple[str, Optional[str]]:
 
     # Format city and state only (no address)
     city_state = format_location_display(
-        address=None, city=city, state=state, include_postal_code=False, postal_code=None  # No address for table view
+        address=None,
+        city=city,
+        state=state,
+        include_postal_code=False,
+        postal_code=None,  # No address for table view
     )
 
     # Clean up located_within - it should not be the same as city
@@ -587,4 +595,21 @@ def init_app(app: Flask):
     app.jinja_env.filters["restaurant_address_display"] = restaurant_address_display
     app.jinja_env.filters["restaurant_address_only"] = restaurant_address_only
     app.jinja_env.filters["restaurant_address_with_maps"] = restaurant_address_with_maps
+    app.jinja_env.filters["format_primary_type"] = format_primary_type_display
     app.jinja_env.filters["split"] = split_string
+
+
+def format_primary_type_display(primary_type):
+    """Format a primary type for display by converting underscores to spaces and capitalizing words.
+
+    Args:
+        primary_type: The raw primary type from Google Places API
+
+    Returns:
+        Formatted display string or empty string if input is None/empty
+    """
+    if not primary_type:
+        return ""
+
+    # Convert underscores to spaces and title case
+    return primary_type.replace("_", " ").title()

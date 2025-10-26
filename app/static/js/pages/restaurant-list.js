@@ -224,13 +224,13 @@ function initTooltips() {
     // Handle standard tooltip triggers
     const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
     tooltipTriggerList.forEach((tooltipTriggerEl) => {
-      new bootstrap.Tooltip(tooltipTriggerEl);
+      new bootstrap.Tooltip(tooltipTriggerEl); // eslint-disable-line no-new
     });
 
     // Handle custom tooltip triggers (for elements that also have other data-bs-toggle attributes)
     const customTooltipTriggerList = document.querySelectorAll('[data-tooltip="true"]');
     customTooltipTriggerList.forEach((tooltipTriggerEl) => {
-      new bootstrap.Tooltip(tooltipTriggerEl);
+      new bootstrap.Tooltip(tooltipTriggerEl); // eslint-disable-line no-new
     });
   };
 
@@ -242,7 +242,7 @@ function initTooltips() {
   }
 
   // Fix tooltip stuck issue on dropdown buttons - use event delegation
-  document.addEventListener('show.bs.dropdown', (event) => {
+  document.addEventListener('show.bs.dropdown', (_event) => {
     // Hide any visible tooltips when dropdown opens
     const tooltips = document.querySelectorAll('.tooltip');
     tooltips.forEach((tooltip) => {

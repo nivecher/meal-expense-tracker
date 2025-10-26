@@ -22,4 +22,10 @@ def init_app(app: Flask) -> None:
     app.logger.debug("Admin module initialized with web interface and remote administration")
 
 
-__all__ = ["LambdaAdminHandler", "BaseAdminOperation", "AdminOperationRegistry", "init_app", "admin_bp"]
+__all__ = [
+    "LambdaAdminHandler",
+    "BaseAdminOperation",
+    "AdminOperationRegistry",
+    "init_app",
+    "admin_bp",
+]

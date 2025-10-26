@@ -4,15 +4,7 @@ output "lambda_function_arn" {
   value       = aws_lambda_function.main.arn
 }
 
-output "lambda_layer_version_arn" {
-  description = "The ARN of the Lambda layer version"
-  value       = aws_lambda_layer_version.python_dependencies.arn
-}
-
-output "lambda_layer_s3_object" {
-  description = "The S3 object information for the Lambda layer package"
-  value       = aws_s3_object.lambda_layer_package[0]
-}
+# No layer outputs needed for container images
 
 output "invoke_arn" {
   description = "The ARN to be used for invoking Lambda Function from API Gateway"
@@ -73,10 +65,10 @@ output "dlq_arn" {
   value       = var.create_dlq ? aws_sns_topic.lambda_dlq[0].arn : null
 }
 
-# Security Group Outputs
+# Security Group Outputs (optional if Lambda is not in VPC)
 output "security_group_id" {
-  description = "The ID of the security group attached to the Lambda function"
-  value       = aws_security_group.lambda.id
+  description = "The ID of the security group attached to the Lambda function (empty if Lambda is not in VPC)"
+  value       = var.vpc_id != "" ? aws_security_group.lambda[0].id : ""
 }
 
 # The Dead Letter Queue ARN is now managed in the root module

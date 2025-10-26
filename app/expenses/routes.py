@@ -171,7 +171,9 @@ def _handle_expense_creation(form: ExpenseForm, is_ajax: bool) -> ResponseReturn
         Response with appropriate success/error message
     """
     try:
-        expense, error = expense_services.create_expense(current_user.id, form)
+        # Get receipt file if uploaded
+        receipt_file = request.files.get("receipt_image")
+        expense, error = expense_services.create_expense(current_user.id, form, receipt_file)
 
         if error:
             return _handle_creation_error(error, form, is_ajax)
@@ -270,7 +272,16 @@ def add_expense() -> ResponseReturnValue:
         if not form.validate():
             current_app.logger.warning(f"Form validation failed. Errors: {form.errors}")
             if is_ajax:
-                return jsonify({"success": False, "message": "Form validation failed", "errors": form.errors}), 400
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "Form validation failed",
+                            "errors": form.errors,
+                        }
+                    ),
+                    400,
+                )
             return render_template("expenses/form.html", form=form, is_edit=False)
 
         # Process valid form submission
@@ -293,7 +304,9 @@ def add_expense() -> ResponseReturnValue:
     )
 
 
-def _get_expense_for_editing(expense_id: int) -> Tuple[Optional[Expense], Optional[ResponseReturnValue]]:
+def _get_expense_for_editing(
+    expense_id: int,
+) -> Tuple[Optional[Expense], Optional[ResponseReturnValue]]:
     """Retrieve an expense for editing or return an error response.
 
     Args:
@@ -356,7 +369,9 @@ def edit_expense(expense_id: int) -> ResponseReturnValue:
     return _process_edit_request(expense)
 
 
-def _initialize_expense_edit(expense_id: int) -> Tuple[Optional[Expense], Optional[ResponseReturnValue]]:
+def _initialize_expense_edit(
+    expense_id: int,
+) -> Tuple[Optional[Expense], Optional[ResponseReturnValue]]:
     """Initialize the expense edit process.
 
     Args:
@@ -472,16 +487,21 @@ def _handle_expense_update(
     form = _reinitialize_form_with_data(form, categories, restaurants)
 
     if form.validate():
-        updated_expense, error = expense_services.update_expense(expense, form)
+        # Get receipt file if uploaded
+        receipt_file = request.files.get("receipt_image")
+        delete_receipt = request.form.get("delete_receipt", "false").lower() == "true"
+        updated_expense, error = expense_services.update_expense(expense, form, receipt_file, delete_receipt)
         if error:
             return _handle_update_error(error, is_ajax)
-        return _handle_update_success(expense.id, is_ajax)
+        return _handle_update_success(expense.id, is_ajax, receipt_deleted=delete_receipt)
 
     return _handle_validation_errors(form, expense, is_ajax)
 
 
 def _reinitialize_form_with_data(
-    form: ExpenseForm, categories: list[tuple[int, str, str, str]], restaurants: list[tuple[str, str]]
+    form: ExpenseForm,
+    categories: list[tuple[int, str, str, str]],
+    restaurants: list[tuple[str, str]],
 ) -> ExpenseForm:
     """Reinitialize form with submitted data and choices."""
     form_data = request.form.to_dict()
@@ -502,15 +522,22 @@ def _handle_update_error(error: str, is_ajax: bool) -> ResponseReturnValue:
     return render_template("expenses/form.html", form=ExpenseForm(), is_edit=True), 400
 
 
-def _handle_update_success(expense_id: int, is_ajax: bool) -> ResponseReturnValue:
+def _handle_update_success(expense_id: int, is_ajax: bool, receipt_deleted: bool = False) -> ResponseReturnValue:
     """Handle successful update response."""
     if is_ajax:
+        message = "Receipt deleted successfully!" if receipt_deleted else "Expense updated successfully!"
         return {
             "success": True,
-            "message": "Expense updated successfully!",
+            "message": message,
             "redirect": url_for("expenses.expense_details", expense_id=expense_id),
         }
-    flash("Expense updated successfully!", "success")
+
+    # Set appropriate flash message
+    if receipt_deleted:
+        flash("Receipt deleted successfully!", "success")
+    else:
+        flash("Expense updated successfully!", "success")
+
     return redirect(url_for("expenses.expense_details", expense_id=expense_id))
 
 
@@ -522,7 +549,10 @@ def _handle_validation_errors(form: ExpenseForm, expense: Expense, is_ajax: bool
 
 
 def _render_expense_form(
-    form: ExpenseForm, expense: Expense, categories: list[tuple[int, str, str, str]], is_edit: bool = False
+    form: ExpenseForm,
+    expense: Expense,
+    categories: list[tuple[int, str, str, str]],
+    is_edit: bool = False,
 ) -> str:
     """Render the expense form template."""
     if request.method == "GET":
@@ -713,12 +743,18 @@ def import_expenses():
                 if success:
                     # Show success message for imported expenses
                     if result_data.get("success_count", 0) > 0:
-                        flash(f"Successfully imported {result_data['success_count']} expenses.", "success")
+                        flash(
+                            f"Successfully imported {result_data['success_count']} expenses.",
+                            "success",
+                        )
 
                     # Show warning toast for skipped items (duplicates and restaurant warnings)
                     if result_data.get("has_warnings", False):
                         warning_count = result_data.get("skipped_count", 0)
-                        flash(f"{warning_count} items were skipped (duplicates or restaurant warnings).", "warning")
+                        flash(
+                            f"{warning_count} items were skipped (duplicates or restaurant warnings).",
+                            "warning",
+                        )
 
                     # If there are warnings but success, show import summary before redirecting
                     if result_data.get("has_warnings", False) and result_data.get("info_messages"):
@@ -741,7 +777,10 @@ def import_expenses():
 
                     # Render template with error details
                     return render_template(
-                        "expenses/import.html", form=form, errors=detailed_errors, import_summary=result_data
+                        "expenses/import.html",
+                        form=form,
+                        errors=detailed_errors,
+                        import_summary=result_data,
                     )
 
             except ValueError as e:
@@ -752,7 +791,9 @@ def import_expenses():
                 current_app.logger.error("Unexpected error during import: %s", str(e))
                 flash("An unexpected error occurred during import", "danger")
                 return render_template(
-                    "expenses/import.html", form=form, errors=["An unexpected error occurred during import"]
+                    "expenses/import.html",
+                    form=form,
+                    errors=["An unexpected error occurred during import"],
                 )
         else:
             flash("Please select a file to upload", "danger")
@@ -813,7 +854,16 @@ def create_tag():
 
     try:
         tag = expense_services.create_tag(current_user.id, name, color, description)
-        return jsonify({"success": True, "tag": tag.to_dict(), "message": f"Tag '{name}' created successfully"}), 201
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "tag": tag.to_dict(),
+                    "message": f"Tag '{name}' created successfully",
+                }
+            ),
+            201,
+        )
     except ValueError as e:
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:
@@ -848,7 +898,13 @@ def update_tag(tag_id):
         tag = expense_services.update_tag(current_user.id, tag_id, name, color, description)
         if tag:
             return (
-                jsonify({"success": True, "tag": tag.to_dict(), "message": f"Tag '{name}' updated successfully"}),
+                jsonify(
+                    {
+                        "success": True,
+                        "tag": tag.to_dict(),
+                        "message": f"Tag '{name}' updated successfully",
+                    }
+                ),
                 200,
             )
         else:

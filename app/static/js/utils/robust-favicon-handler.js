@@ -448,13 +448,18 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
     // Check if this domain should skip Google Favicon V2 API
     const shouldSkipGoogle = skipGoogleFaviconDomains.has(domain);
 
+    // Filter out sources to skip
+    const sourcesToTry = FAVICON_SOURCES.filter((source) =>
+      !(shouldSkipGoogle && source.name === 'google-favicon-v2'),
+    );
+
     // Try each favicon source in sequence until one works
-    for (const source of FAVICON_SOURCES) {
-      // Skip Google Favicon V2 API for problematic domains
-      if (shouldSkipGoogle && source.name === 'google-favicon-v2') {
-        continue;
+    const tryNextSource = async(index) => {
+      if (index >= sourcesToTry.length) {
+        return false; // All sources failed
       }
 
+      const source = sourcesToTry[index];
       const src = source.url(domain);
       const result = await tryFaviconSource(src, source.timeout);
 
@@ -463,8 +468,16 @@ export async function loadFaviconWithFallback(imgElement, website, options = {})
         faviconCache.set(cacheKey, { success: true, src: result });
         imgElement.src = result;
         imgElement.style.opacity = '1';
-        return; // Exit early on success
+        return true;
       }
+
+      // Try next source
+      return tryNextSource(index + 1);
+    };
+
+    const success = await tryNextSource(0);
+    if (success) {
+      return; // Exit early on success
     }
 
     // If we get here, all sources failed

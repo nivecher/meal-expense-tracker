@@ -70,7 +70,7 @@
             </div>
             {% endif %} {% endwith %}
             <!-- Toast Container -->
-            <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3"> </div>
+            <div id="toastContainer" class="toast-container position-fixed bottom-0 end-0 p-3"> </div>
             {% block content %} {% endblock content %}
         </main>
         <footer class="footer mt-5 py-4 bg-light">
@@ -111,7 +111,9 @@
                     "red": "#dc3545",
                     "purple": "#6f42c1",
                     "blue": "#0d6efd"
-                }
+                },
+                "cuisines": {{ cuisine_names|tojson }},
+                "mealTypes": {{ meal_types|tojson }}
             }'>
         </div>
         <!-- Unified Error Handler already loaded above -->
@@ -153,5 +155,74 @@
 
         <!-- Robust favicon handling -->
         <script type="module" src="{{ url_for('static', filename='js/utils/robust-favicon-handler.js') }}"></script>
+
+        <!-- Flash to Toast Converter -->
+        <script>
+            // Convert flash messages to toasts
+            document.addEventListener('DOMContentLoaded', function() {
+                const flashMessages = document.querySelectorAll('.flash-messages .alert');
+
+                flashMessages.forEach(function(alert) {
+                    const message = alert.querySelector('.alert-message').textContent;
+                    const category = alert.classList.contains('alert-success') ? 'success' :
+                                   alert.classList.contains('alert-danger') ? 'error' : 'info';
+
+                    // Show toast using existing system
+                    if (category === 'success') {
+                        showToast('Success', message, 'success');
+                    } else if (category === 'error') {
+                        showToast('Error', message, 'danger');
+                    }
+
+                    // Hide the original flash message
+                    alert.style.display = 'none';
+                });
+            });
+
+            // Global toast functions (compatible with existing system)
+            function showToast(title, message, type = 'info') {
+                const toastContainer = document.getElementById('toastContainer');
+                if (!toastContainer) {
+                    console.error('Toast container not found');
+                    return;
+                }
+
+                const toastId = `toast-${Date.now()}`;
+                const toastHtml = `
+                    <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                <strong>${title}:</strong> ${message}
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                `;
+
+                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+                const toastElement = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastElement, {
+                    autohide: true,
+                    delay: type === 'danger' ? 0 : 3000
+                });
+
+                toast.show();
+
+                // Remove the toast element after it's hidden
+                toastElement.addEventListener('hidden.bs.toast', () => {
+                    toastElement.remove();
+                });
+            }
+
+            // Convenience functions for common use cases
+            function showSuccessToast(message) {
+                showToast('Success', message, 'success');
+            }
+
+            function showErrorToast(message) {
+                showToast('Error', message, 'danger');
+            }
+        </script>
     </body>
 </html>

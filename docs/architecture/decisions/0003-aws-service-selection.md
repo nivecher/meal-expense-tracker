@@ -30,10 +30,10 @@ For each component, we considered the following options:
 
 1. **Database**:
 
-- Amazon RDS (PostgreSQL)
-  - Amazon DynamoDB
-  - Amazon Aurora
-  - Self-managed PostgreSQL on EC2
+- Amazon RDS (PostgreSQL) **[SELECTED]**
+  - Amazon DynamoDB **[REJECTED - not suitable for relational data]**
+  - Amazon Aurora **[REJECTED - unnecessary complexity for this use case]**
+  - Self-managed PostgreSQL on EC2 **[REJECTED - operational complexity]**
 
 1. **API Gateway**:
 
@@ -112,12 +112,6 @@ For each component, we considered the following options:
 - ❌ Higher maintenance
 
 ### Database Alternatives
-
-**DynamoDB**
-
-- ✅ Serverless NoSQL
-- ❌ Not ideal for complex queries
-- ❌ Limited transaction support
 
 **Aurora**
 

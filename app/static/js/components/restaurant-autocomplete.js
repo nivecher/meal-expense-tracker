@@ -76,7 +76,7 @@ class RestaurantAutocomplete {
     this.input.addEventListener('input', (e) => {
       console.log('Input event triggered, value:', e.target.value);
       clearTimeout(timeout);
-      timeout = setTimeout(() => this.handleInput(e.target.value), 300);
+      timeout = setTimeout(() => this.handleInput(e.target.value), 500); // Increased debounce for cost savings
     });
 
     // Click outside to close
@@ -105,7 +105,7 @@ class RestaurantAutocomplete {
 
   async handleInput(query) {
     console.log('handleInput called with query:', query);
-    if (query.length < 2) {
+    if (query.length < 3) { // Increased minimum length for cost savings
       console.log('Query too short, hiding suggestions');
       this.hideSuggestions();
       return;

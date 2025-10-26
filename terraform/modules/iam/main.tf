@@ -9,7 +9,7 @@ resource "aws_iam_policy" "lambda_combined" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Secrets Manager access
+      # Secrets Manager access for Supabase
       {
         Effect = "Allow"
         Action = [
@@ -17,29 +17,8 @@ resource "aws_iam_policy" "lambda_combined" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = [
-          var.db_secret_arn
+          "arn:aws:secretsmanager:${var.region}:${var.account_id}:secret:${var.app_name}/${var.environment}/supabase-*"
         ]
-      },
-      # RDS Database Access
-      {
-        Effect = "Allow"
-        Action = [
-          "rds-db:connect",
-          "rds-db:executeStatement",
-          "rds-db:select"
-        ]
-        Resource = [
-          "arn:aws:rds-db:${var.region}:${var.account_id}:dbuser:${var.db_instance_identifier}/${var.db_username}"
-        ]
-      },
-      # RDS Management
-      {
-        Effect = "Allow"
-        Action = [
-          "rds:DescribeDBInstances",
-          "rds:DescribeDBClusters"
-        ]
-        Resource = "*"
       },
       # CloudWatch Logs
       {
@@ -53,18 +32,6 @@ resource "aws_iam_policy" "lambda_combined" {
           "arn:aws:logs:*:*:*"
         ]
       },
-      # VPC Networking
-      {
-        Effect = "Allow"
-        Action = [
-          "ec2:CreateNetworkInterface",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:DeleteNetworkInterface",
-          "ec2:AssignPrivateIpAddresses",
-          "ec2:UnassignPrivateIpAddresses"
-        ]
-        Resource = ["*"]
-      },
       # SNS Publish for Dead Letter Queue
       {
         Effect = "Allow"
@@ -75,15 +42,16 @@ resource "aws_iam_policy" "lambda_combined" {
           "*" # Temporarily using wildcard to test, will scope down after verification
         ]
       },
-      # KMS Decrypt for Secrets Manager
+      # KMS access for Secrets Manager and S3 encryption
       {
         Effect = "Allow"
         Action = [
           "kms:Decrypt",
-          "kms:DescribeKey"
+          "kms:DescribeKey",
+          "kms:GenerateDataKey"
         ]
         Resource = [
-          "*" # This should be scoped to the specific KMS key ARN when known
+          "*" # This should be scoped to specific KMS key ARNs when known
         ]
       },
       # SSM Parameter Store access for Google API keys
@@ -98,28 +66,6 @@ resource "aws_iam_policy" "lambda_combined" {
           "arn:aws:ssm:${var.region}:${var.account_id}:parameter/${var.app_name}/${var.environment}/google/*"
         ]
       },
-      # DynamoDB access for session management
-      {
-        Effect = "Allow"
-        Action = [
-          "dynamodb:GetItem",
-          "dynamodb:PutItem",
-          "dynamodb:UpdateItem",
-          "dynamodb:DeleteItem",
-          "dynamodb:Query",
-          "dynamodb:Scan",
-          "dynamodb:BatchGetItem",
-          "dynamodb:BatchWriteItem",
-          "dynamodb:ConditionCheckItem",
-          "dynamodb:DescribeTable",
-          "dynamodb:DescribeTimeToLive",
-          "dynamodb:UpdateTimeToLive"
-        ]
-        Resource = [
-          "arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.app_name}-${var.environment}-sessions",
-          "arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.app_name}-${var.environment}-sessions/index/*"
-        ]
-      },
       # AWS SES access for email functionality
       {
         Effect = "Allow"
@@ -128,6 +74,20 @@ resource "aws_iam_policy" "lambda_combined" {
           "ses:SendRawEmail"
         ]
         Resource = "*"
+      },
+      # S3 access for receipt storage
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.app_name}-${var.environment}-receipts",
+          "arn:aws:s3:::${var.app_name}-${var.environment}-receipts/*"
+        ]
       }
     ]
   })

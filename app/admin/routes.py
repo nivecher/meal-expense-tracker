@@ -39,40 +39,42 @@ def generate_secure_password(length: int = 12) -> str:
     return password
 
 
-def send_password_reset_email(user: User, new_password: str) -> bool:
-    """Send password reset email to user.
+def send_password_reset_notification(user: User, new_password: str) -> bool:
+    """Send password reset notification to user.
 
     Args:
-        user: User object to send email to
+        user: User object to send notification to
         new_password: The new password to send
 
     Returns:
-        True if email was sent successfully, False otherwise
+        True if notification was sent successfully, False otherwise
     """
     try:
-        from app.services.email_service import is_email_enabled
-        from app.services.email_service import send_password_reset_email as send_email
+        from app.services.notification_service import (
+            is_notifications_enabled,
+            send_password_reset_notification,
+        )
 
-        # Check if email is enabled
-        if not is_email_enabled():
+        # Check if notifications are enabled
+        if not is_notifications_enabled():
             current_app.logger.info(
-                f"Email disabled, logging password reset for user {user.username} ({user.email}): {new_password}"
+                f"Notifications disabled, logging password reset for user {user.username} ({user.email}): {new_password}"
             )
             return False
 
-        # Try to send email
-        email_sent = send_email(user.email, user.username, new_password)
+        # Try to send notification
+        notification_sent = send_password_reset_notification(user.email, user.username, new_password)
 
-        if not email_sent:
+        if not notification_sent:
             # Fallback: log the password reset
             current_app.logger.warning(
-                f"Email failed, logging password reset for user {user.username} ({user.email}): {new_password}"
+                f"Notification failed, logging password reset for user {user.username} ({user.email}): {new_password}"
             )
 
-        return email_sent
+        return notification_sent
 
     except Exception as e:
-        current_app.logger.error(f"Failed to send password reset email: {e}")
+        current_app.logger.error(f"Failed to send password reset notification: {e}")
         # Fallback: log the password reset
         current_app.logger.info(f"Password reset for user {user.username} ({user.email}): {new_password}")
         return False
@@ -100,17 +102,17 @@ def dashboard():
             "inactive_users": total_users - active_users,
         }
 
-        # Check email status
-        from app.services.email_service import is_email_enabled
+        # Check notification status
+        from app.services.notification_service import is_notifications_enabled
 
-        email_enabled = is_email_enabled()
+        notifications_enabled = is_notifications_enabled()
 
         return render_template(
             "admin/dashboard.html",
             title="Admin Dashboard",
             stats=stats,
             recent_users=recent_users,
-            email_enabled=email_enabled,
+            notifications_enabled=notifications_enabled,
         )
 
     except Exception as e:
@@ -187,7 +189,10 @@ def view_user(user_id: int):
         }
 
         return render_template(
-            "admin/user_detail.html", title=f"User: {user.get_display_name()}", user=user, stats=stats
+            "admin/user_detail.html",
+            title=f"User: {user.get_display_name()}",
+            user=user,
+            stats=stats,
         )
 
     except Exception as e:
@@ -212,13 +217,26 @@ def reset_user_password(user_id: int):
         user.set_password(new_password)
         db.session.add(user)
 
-        # Send email with new password
-        email_sent = send_password_reset_email(user, new_password)
+        # Subscribe user email to SNS topic for future notifications
+        from app.services.notification_service import subscribe_email_to_notifications
 
-        if email_sent:
+        subscription_success = subscribe_email_to_notifications(user.email)
+
+        # Send notification with new password
+        notification_sent = send_password_reset_notification(user, new_password)
+
+        if notification_sent and subscription_success:
             flash(f"Password reset successfully. New password sent to {user.email}", "success")
+        elif notification_sent:
+            flash(
+                f"Password reset but email subscription failed. New password: {new_password}",
+                "warning",
+            )
         else:
-            flash(f"Password reset but email failed to send. New password: {new_password}", "warning")
+            flash(
+                f"Password reset but notification failed to send. New password: {new_password}",
+                "warning",
+            )
 
         return redirect(url_for("admin.view_user", user_id=user_id))
 
@@ -345,7 +363,7 @@ def _extract_user_form_data() -> Dict[str, Any]:
         "last_name": request.form.get("last_name", "").strip(),
         "is_admin": request.form.get("is_admin") == "on",
         "is_active": request.form.get("is_active") == "on",
-        "send_password_email": request.form.get("send_password_email") == "on",
+        "send_password_notification": request.form.get("send_password_notification") == "on",
     }
 
 
@@ -395,32 +413,38 @@ def _create_user_from_form_data(form_data: Dict[str, Any], password: str) -> Use
     return user
 
 
-def _handle_password_email(user: User, password: str, send_email: bool) -> None:
-    """Handle sending password email to new user.
+def _handle_password_notification(user: User, password: str, send_notification: bool) -> None:
+    """Handle sending password notification to new user.
 
     Args:
         user: User object
         password: Generated password
-        send_email: Whether to send email
+        send_notification: Whether to send notification
     """
-    if not send_email:
+    if not send_notification:
         flash(f"User created successfully. Password: {password}", "success")
         return
 
     try:
-        from app.services.email_service import is_email_enabled, send_welcome_email
+        from app.services.notification_service import (
+            is_notifications_enabled,
+            send_welcome_notification,
+        )
 
-        if not is_email_enabled():
-            flash(f"User created successfully. Password: {password} (Email disabled)", "success")
+        if not is_notifications_enabled():
+            flash(
+                f"User created successfully. Password: {password} (Notifications disabled)",
+                "success",
+            )
         else:
-            email_sent = send_welcome_email(user.email, user.username, password)
-            if email_sent:
-                flash(f"User created and welcome email sent to {user.email}", "success")
+            notification_sent = send_welcome_notification(user.email, user.username, password)
+            if notification_sent:
+                flash(f"User created and welcome notification sent to {user.email}", "success")
             else:
-                flash(f"User created but email failed. Password: {password}", "warning")
+                flash(f"User created but notification failed. Password: {password}", "warning")
     except Exception as e:
-        current_app.logger.error(f"Failed to send welcome email: {e}")
-        flash(f"User created but email failed. Password: {password}", "warning")
+        current_app.logger.error(f"Failed to send welcome notification: {e}")
+        flash(f"User created but notification failed. Password: {password}", "warning")
 
 
 @bp.route("/users/create", methods=["GET", "POST"])
@@ -445,8 +469,13 @@ def create_user():
         password = generate_secure_password()
         user = _create_user_from_form_data(form_data, password)
 
-        # Handle password email
-        _handle_password_email(user, password, form_data["send_password_email"])
+        # Subscribe user email to SNS topic for future notifications
+        from app.services.notification_service import subscribe_email_to_notifications
+
+        subscribe_email_to_notifications(user.email)
+
+        # Handle password notification
+        _handle_password_notification(user, password, form_data["send_password_notification"])
 
         return redirect(url_for("admin.view_user", user_id=user.id))
 

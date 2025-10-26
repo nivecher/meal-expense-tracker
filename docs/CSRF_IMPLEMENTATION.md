@@ -200,7 +200,7 @@ SECRET_KEY=your-secret-key
 
 CSRF protection works in both local development and Lambda environments:
 
-- Session management via DynamoDB
+- Session management via signed cookies
 - Token generation and validation
 - CORS headers properly configured
 
@@ -211,7 +211,7 @@ CSRF protection works in both local development and Lambda environments:
 1. **Token Not Found**: Check meta tag and form input presence
 2. **Validation Failures**: Verify session is active and token is fresh
 3. **CORS Errors**: Ensure API Gateway allows `X-CSRFToken` header
-4. **Session Issues**: Check DynamoDB session configuration
+4. **Session Issues**: Check session configuration (now using signed cookies)
 
 ### Debug Steps
 

@@ -29,7 +29,12 @@ function getRestaurantCellValue(row, columnIndex) {
 
   const { sortValue } = cell.dataset;
   if (sortValue !== null && sortValue !== undefined) {
-    if (columnIndex === 1) { // Rating column
+    if (columnIndex === 1) { // Location column - handle special location sorting
+      if (sortValue === 'No location') {
+        return 'ZZZ'; // Put "No location" at the end
+      }
+      return sortValue.toLowerCase();
+    } else if (columnIndex === 3) { // Rating column
       return parseFloat(sortValue) || 0;
     } else if (columnIndex === 2) { // Price level column
       return parseInt(sortValue, 10) || 0;

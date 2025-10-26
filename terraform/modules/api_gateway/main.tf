@@ -8,8 +8,11 @@ data "aws_route53_zone" "main" {
 
 # Look up the existing ACM certificate in us-east-1 if cert_domain is provided
 data "aws_acm_certificate" "main" {
-  domain   = var.cert_domain
-  statuses = ["ISSUED"]
+  domain      = var.cert_domain
+  statuses    = ["ISSUED"]
+  key_types   = ["RSA_2048"]
+  types       = ["AMAZON_ISSUED"]
+  most_recent = true # Use the most recently issued certificate
 
   # We need to use a provider configured for us-east-1 for ACM certificates used by API Gateway
   provider = aws.us-east-1

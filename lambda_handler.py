@@ -151,8 +151,8 @@ def _convert_apigw_v2_to_v1(event: Dict[str, Any]) -> Dict[str, Any]:
 def _validate_session_config(app: Flask) -> None:
     """Validate session configuration for Lambda deployment.
 
-    Ensures that DynamoDB session configuration is properly set up
-    for the Lambda environment.
+    Ensures that session configuration is properly set up
+    for the Lambda environment using signed cookie sessions.
 
     Args:
         app: Flask application instance
@@ -162,54 +162,10 @@ def _validate_session_config(app: Flask) -> None:
     """
     session_type = app.config.get("SESSION_TYPE")
 
-    if session_type == "dynamodb":
-        table_name = os.environ.get("SESSION_DYNAMODB_TABLE")
-        # Use SESSION_DYNAMODB_REGION with fallback to built-in AWS_REGION
-        aws_region = os.environ.get("SESSION_DYNAMODB_REGION") or os.environ.get("AWS_REGION")
-
-        required_configs = {
-            "SESSION_DYNAMODB_TABLE": table_name,
-            "SESSION_DYNAMODB_REGION/AWS_REGION": aws_region,
-        }
-
-        missing_configs = [key for key, value in required_configs.items() if not value]
-
-        if missing_configs:
-            error_msg = f"Missing required session environment variables for Lambda: {', '.join(missing_configs)}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
-
-        # Log session configuration for debugging
-        logger.info("Lambda session configuration validated:")
-        logger.info("  Type: %s", session_type)
-        logger.info("  Table: %s", table_name)
-        logger.info("  Region: %s", aws_region)
-
-        # Test DynamoDB table existence in Lambda environment with retry logic
-        try:
-            import boto3
-            from botocore.config import Config
-
-            # Configure boto3 with retry logic
-            boto_config = Config(region_name=aws_region, retries={"max_attempts": 3, "mode": "adaptive"})
-
-            dynamodb = boto3.resource("dynamodb", config=boto_config)
-            table = dynamodb.Table(table_name)
-            table.load()  # This will fail if table doesn't exist
-            logger.info("DynamoDB session table verified: %s", table_name)
-        except Exception as e:
-            logger.error("DynamoDB session table validation failed: %s", str(e))
-            logger.error("Ensure the DynamoDB table exists before Lambda deployment")
-            # This is critical - raise the error to prevent Flask-Session from trying to create table
-            raise RuntimeError(f"DynamoDB session table '{table_name}' is not accessible")
-
-    elif session_type == "filesystem":
-        logger.warning("Using filesystem sessions in Lambda - this may cause issues with session persistence")
-    elif session_type is None:
+    if session_type is None:
         logger.info("Using Flask's default signed cookie sessions (ideal for Lambda)")
-
     else:
-        logger.info("Session configuration validated for type: %s", session_type)
+        logger.warning(f"Unexpected session type in Lambda: {session_type}. Using signed cookie sessions instead.")
 
 
 def handle_migration(app: Flask) -> Dict[str, Any]:
@@ -376,7 +332,7 @@ def _enhance_security_headers(headers: Dict[str, str]) -> None:
             "https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net "
             "https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' "
             "https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
-            "img-src 'self' data: https: blob:; connect-src 'self' https://maps.googleapis.com "
+            "img-src 'self' data: https: blob: https://places.googleapis.com https://maps.googleapis.com; connect-src 'self' https://maps.googleapis.com "
             "https://places.googleapis.com https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';"
         )
 

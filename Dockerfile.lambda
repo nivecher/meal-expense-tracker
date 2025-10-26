@@ -1,0 +1,30 @@
+# AWS Lambda Container Image with Python 3.13
+FROM public.ecr.aws/lambda/python:3.13
+
+# Copy application code
+COPY app/ ${LAMBDA_TASK_ROOT}/app/
+COPY wsgi.py ${LAMBDA_TASK_ROOT}/
+COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
+COPY lambda_init.py ${LAMBDA_TASK_ROOT}/
+COPY config.py ${LAMBDA_TASK_ROOT}/
+COPY requirements.txt ${LAMBDA_TASK_ROOT}/
+COPY migrations/ ${LAMBDA_TASK_ROOT}/migrations/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install python-dotenv for local development (optional in Lambda)
+RUN pip install --no-cache-dir python-dotenv==1.1.1
+
+# Set proper permissions
+RUN chmod 755 ${LAMBDA_TASK_ROOT} && \
+    chmod 644 ${LAMBDA_TASK_ROOT}/*.py && \
+    chmod 755 ${LAMBDA_TASK_ROOT}/app && \
+    chmod 644 ${LAMBDA_TASK_ROOT}/app/*.py && \
+    chmod 755 ${LAMBDA_TASK_ROOT}/app/*/
+
+# Create necessary __init__.py files (only for modules that don't have them)
+RUN echo "" > ${LAMBDA_TASK_ROOT}/__init__.py
+
+# Command to run the Lambda function (AWS Lambda expects this format)
+CMD ["wsgi.lambda_handler"]

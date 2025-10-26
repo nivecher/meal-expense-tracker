@@ -226,6 +226,9 @@ export class MapRestaurantSearch {
           <div id="results-header" class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">
               <i class="fas fa-utensils me-2"></i>Search Results
+              <span id="location-indicator" class="badge bg-success ms-2 d-none">
+                <i class="fas fa-map-marker-alt me-1"></i>Location-based
+              </span>
             </h5>
             <span id="results-count" class="badge bg-primary fs-6">0 restaurants found</span>
           </div>
@@ -235,7 +238,8 @@ export class MapRestaurantSearch {
               <div class="text-center text-muted py-5">
                 <i class="fas fa-search fa-3x mb-3"></i>
                 <h6>Find restaurants in your area</h6>
-                <p class="mb-0">Click "Search" to discover nearby dining options, or enter specific criteria above</p>
+                <p class="mb-2">Click "Search" or "Use My Location" to discover nearby dining options</p>
+                <small class="text-muted">Leave the search box empty to find all restaurants in your area</small>
               </div>
             </div>
           </div>
@@ -404,7 +408,7 @@ export class MapRestaurantSearch {
     useLocationBtn.disabled = true;
 
     statusDiv.classList.remove('d-none');
-    statusText.textContent = 'Getting your location...';
+    statusText.textContent = 'Requesting location permission...';
 
     try {
       const position = await this.getCurrentPosition();
@@ -413,14 +417,15 @@ export class MapRestaurantSearch {
         lng: position.coords.longitude,
       };
 
-      // Update map center (let fitMapToMarkers handle the zoom)
+      // Update map center and show user location
       this.map.setCenter(this.currentLocation);
+      this.addCurrentLocationMarker();
 
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-success');
-      statusText.innerHTML = '<i class="fas fa-check-circle me-2"></i>Location found! Searching for nearby restaurants...';
+      statusText.innerHTML = '<i class="fas fa-check-circle me-2"></i>Location found! Searching for restaurants in your area...';
 
-      // Perform search automatically
+      // Perform search automatically with location-based results
       await this.performSearch();
 
       // Hide status after 3 seconds
@@ -428,15 +433,38 @@ export class MapRestaurantSearch {
         statusDiv.classList.add('d-none');
       }, 3000);
 
-    } catch {
+    } catch (error) {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
-      statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
 
-      // Hide status after 5 seconds
+      // Provide more specific error messages based on error type
+      let errorMessage = '<i class="fas fa-exclamation-triangle me-2"></i>';
+
+      if (error.message.includes('Geolocation is not supported')) {
+        errorMessage += 'Location services not available. You can still search by text or drag the map to your area.';
+      } else if (error.message.includes('User denied')) {
+        errorMessage += 'Location access denied. You can still search by text or drag the map to your area.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage += 'Location request timed out. Try again or search by text.';
+      } else {
+        errorMessage += 'Could not get your location. You can still search by text or drag the map to your area.';
+      }
+
+      statusText.innerHTML = errorMessage;
+
+      // Show help text about manual location setting
+      const helpText = document.createElement('div');
+      helpText.className = 'mt-2 small text-muted';
+      helpText.innerHTML = '<i class="fas fa-info-circle me-1"></i>Tip: You can drag the map to your area and search for better results.';
+      statusText.parentNode.appendChild(helpText);
+
+      // Hide status after 7 seconds for error messages
       setTimeout(() => {
         statusDiv.classList.add('d-none');
-      }, 5000);
+        if (helpText.parentNode) {
+          helpText.parentNode.removeChild(helpText);
+        }
+      }, 7000);
     } finally {
       // Reset button state
       useLocationBtn.innerHTML = originalText;
@@ -471,7 +499,7 @@ export class MapRestaurantSearch {
         statusDiv.classList.add('d-none');
       }, 3000);
 
-    } catch {
+    } catch (_error) {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
       statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
@@ -490,11 +518,31 @@ export class MapRestaurantSearch {
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000, // 5 minutes
-      });
+      navigator.geolocation.getCurrentPosition(
+        resolve,
+        (error) => {
+          // Provide more specific error messages for better user feedback
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              reject(new Error('User denied geolocation request'));
+              break;
+            case error.POSITION_UNAVAILABLE:
+              reject(new Error('Location information unavailable'));
+              break;
+            case error.TIMEOUT:
+              reject(new Error('Location request timed out'));
+              break;
+            default:
+              reject(new Error(`Geolocation error: ${error.message}`));
+              break;
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000, // Increased timeout for better success rate
+          maximumAge: 300000, // 5 minutes
+        },
+      );
     });
   }
 
@@ -518,6 +566,14 @@ export class MapRestaurantSearch {
       // If no query provided, search for restaurants in the area
       const searchQuery = query || 'restaurants';
 
+      // Update search input placeholder to show it's searching for restaurants
+      if (!query) {
+        searchInput.placeholder = 'Searching for restaurants in your area...';
+        setTimeout(() => {
+          searchInput.placeholder = 'Name, cuisine, location...';
+        }, 2000);
+      }
+
       // Always use current map center for search location
       const mapCenter = this.map.getCenter();
       const searchLocation = {
@@ -534,7 +590,7 @@ export class MapRestaurantSearch {
         cuisine: filters.cuisine || '',
         minRating: filters.minRating || '',
         maxPriceLevel: filters.maxPriceLevel || '',
-        maxResults: filters.maxResults || 20,
+        maxResults: filters.maxResults || 10, // Reduced for cost savings
       };
 
       // Remove empty parameters
@@ -553,7 +609,7 @@ export class MapRestaurantSearch {
       // Call callback
       this.options.onResults(results);
 
-    } catch {
+    } catch (error) {
       console.error('Search error:', error);
       this.options.onError(error);
       this.showError(error.message);
@@ -598,12 +654,85 @@ export class MapRestaurantSearch {
     return data.data;
   }
 
+  sortResultsByDistance(results) {
+    if (!this.currentLocation || !results || results.length === 0) {
+      return results;
+    }
+
+    // Calculate distance for each restaurant and sort by distance
+    const resultsWithDistance = results.map((restaurant) => {
+      const distance = this.calculateDistance(
+        this.currentLocation.lat,
+        this.currentLocation.lng,
+        restaurant.latitude || (restaurant.geometry && restaurant.geometry.location ? restaurant.geometry.location.lat : null),
+        restaurant.longitude || (restaurant.geometry && restaurant.geometry.location ? restaurant.geometry.location.lng : null),
+      );
+
+      return {
+        ...restaurant,
+        distance,
+        distanceText: this.formatDistance(distance),
+      };
+    }).filter((restaurant) => restaurant.distance !== null); // Filter out restaurants without valid coordinates
+
+    // Sort by distance (closest first)
+    return resultsWithDistance.sort((a, b) => a.distance - b.distance);
+  }
+
+  calculateDistance(lat1, lng1, lat2, lng2) {
+    if (!lat2 || !lng2) return null;
+
+    // Haversine formula to calculate distance between two points on Earth
+    const R = 3959; // Earth's radius in miles (use 6371 for kilometers)
+    const dLat = this.toRadians(lat2 - lat1);
+    const dLng = this.toRadians(lng2 - lng1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in miles
+  }
+
+  toRadians(degrees) {
+    return degrees * (Math.PI / 180);
+  }
+
+  formatDistance(distance) {
+    if (distance === null) return '';
+
+    if (this.locale.useMiles) {
+      if (distance < 0.1) {
+        return `${Math.round(distance * 5280)} ft`;
+      } else if (distance < 1) {
+        return `${(distance * 0.621371).toFixed(1)} mi`;
+      }
+      return `${distance.toFixed(1)} mi`;
+
+    }
+    if (distance < 0.1) {
+      return `${Math.round(distance * 1000)} m`;
+    }
+    return `${(distance * 1.60934).toFixed(1)} km`;
+
+  }
+
   displayResults(results) {
     const resultsContainer = this.container.querySelector('#search-results');
     const resultsCount = this.container.querySelector('#results-count');
+    const locationIndicator = this.container.querySelector('#location-indicator');
 
-    // Store current results for selection
-    this.currentResults = results;
+    // Sort results by distance from search location (closest first)
+    const sortedResults = this.sortResultsByDistance(results.results);
+
+    // Store current results for selection (use sorted results for consistent ordering)
+    this.currentResults = {
+      ...results,
+      results: sortedResults,
+    };
 
     // Clear existing markers
     this.clearMarkers();
@@ -619,18 +748,30 @@ export class MapRestaurantSearch {
         </div>
       `;
       resultsCount.textContent = '0 restaurants found';
+
+      // Hide location indicator if no results
+      locationIndicator.classList.add('d-none');
       return;
     }
 
     // Update results count
-    const count = results.results.length;
+    const count = sortedResults.length;
     resultsCount.textContent = `${count} restaurant${count !== 1 ? 's' : ''} found`;
 
-    // Create markers and result cards in grid layout
-    const resultsHtml = results.results.map((restaurant, index) => {
-      // Create marker
-      this.createMarker(restaurant, index);
+    // Show location indicator if we have location and search was location-based
+    if (this.currentLocation) {
+      locationIndicator.classList.remove('d-none');
+    } else {
+      locationIndicator.classList.add('d-none');
+    }
 
+    // Create markers and result cards in grid layout (using sorted results)
+    sortedResults.forEach((restaurant, index) => {
+      // Create marker for this restaurant at its sorted position
+      this.createMarker(restaurant, index);
+    });
+
+    const resultsHtml = sortedResults.map((restaurant, index) => {
       // Create result card in grid column
       return `
         <div class="col-lg-4 col-md-6 col-sm-12">
@@ -678,7 +819,7 @@ export class MapRestaurantSearch {
 
     // Add click listener
     marker.addListener('click', () => {
-      this.selectRestaurant(index, restaurant);
+      this.selectRestaurant(index);
     });
 
     this.markers.push(marker);
@@ -747,17 +888,15 @@ export class MapRestaurantSearch {
     console.log(`Restaurant ${restaurant.name} photos:`, restaurant.photos);
 
     if (restaurant.photos && restaurant.photos.length > 0) {
-      const firstPhoto = restaurant.photos[0];
+      const [firstPhoto] = restaurant.photos;
       console.log(`First photo for ${restaurant.name}:`, firstPhoto);
 
       if (firstPhoto.url) {
-        // New format: photo already has URL
+        // New Places API format: photo has direct URL
         photoUrl = firstPhoto.url;
-        console.log(`Using existing URL for ${restaurant.name}:`, photoUrl);
-      } else if (firstPhoto.photo_reference) {
-        // Old format: build URL from photo_reference
-        photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=300&photoreference=${firstPhoto.photo_reference}&key=${this.options.googleMapsApiKey}`;
-        console.log(`Built URL for ${restaurant.name}:`, photoUrl);
+        console.log(`Using Places API photo URL for ${restaurant.name}:`, photoUrl);
+      } else {
+        console.log(`No photo URL available for ${restaurant.name}`);
       }
     } else {
       console.log(`No photos found for ${restaurant.name}`);
@@ -796,9 +935,11 @@ export class MapRestaurantSearch {
         ` : ''}
 
         ${photoUrl ? `
-          <img src="${photoUrl}" class="card-img-top" alt="${restaurant.name}" style="height: 140px; object-fit: cover;" loading="lazy">
+          <img src="${photoUrl}" class="card-img-top" alt="${restaurant.name}" style="height: 140px; object-fit: cover;" loading="lazy"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'; console.error('Failed to load image:', this.src);"
+               onload="console.log('Image loaded successfully:', this.src);">
         ` : `
-          <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 140px;">
+          <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 140px; display: none;">
             <i class="fas fa-utensils fa-2x text-muted"></i>
           </div>
         `}
@@ -815,6 +956,11 @@ export class MapRestaurantSearch {
                   </span>
                 ` : ''}
               </h6>
+              ${restaurant.distanceText ? `
+                <div class="text-muted small">
+                  <i class="fas fa-map-marker-alt me-1"></i>${restaurant.distanceText} away
+                </div>
+              ` : ''}
             </div>
             ${rating > 0 ? `
               <div class="d-flex align-items-center text-end">
@@ -1064,7 +1210,7 @@ export class MapRestaurantSearch {
   }
 
   selectRestaurant(index) {
-    // Get restaurant data from the current results
+    // Get restaurant data from the sorted results
     const restaurant = this.currentResults?.results?.[index];
     if (!restaurant) return;
 
@@ -1115,7 +1261,7 @@ export class MapRestaurantSearch {
       card.style.transform = 'scale(1)';
     });
 
-    // Reset all markers to red with numbers
+    // Reset all markers to red with numbers (use sorted results for numbering)
     this.markers.forEach((marker, index) => {
       if (marker.content) {
         // AdvancedMarkerElement
@@ -1245,7 +1391,7 @@ export class MapRestaurantSearch {
         }, 3000);
       }
 
-    } catch {
+    } catch (error) {
       console.warn('Could not get current location:', error);
 
       // Show error message
@@ -1322,7 +1468,7 @@ export class MapRestaurantSearch {
     if (window.addToMyRestaurants && typeof window.addToMyRestaurants === 'function') {
       try {
         window.addToMyRestaurants(placeId);
-      } catch {
+      } catch (error) {
         console.error('Error calling global addToMyRestaurants:', error);
       }
     } else {

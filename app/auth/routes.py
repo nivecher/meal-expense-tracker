@@ -246,10 +246,22 @@ def detect_timezone():
 
         timezone_mappings = [
             # North America
-            {"bounds": {"north": 71, "south": 25, "west": -130, "east": -114}, "tz": "America/Los_Angeles"},
-            {"bounds": {"north": 71, "south": 25, "west": -114, "east": -104}, "tz": "America/Denver"},
-            {"bounds": {"north": 71, "south": 25, "west": -104, "east": -80}, "tz": "America/Chicago"},
-            {"bounds": {"north": 71, "south": 25, "west": -80, "east": -60}, "tz": "America/New_York"},
+            {
+                "bounds": {"north": 71, "south": 25, "west": -130, "east": -114},
+                "tz": "America/Los_Angeles",
+            },
+            {
+                "bounds": {"north": 71, "south": 25, "west": -114, "east": -104},
+                "tz": "America/Denver",
+            },
+            {
+                "bounds": {"north": 71, "south": 25, "west": -104, "east": -80},
+                "tz": "America/Chicago",
+            },
+            {
+                "bounds": {"north": 71, "south": 25, "west": -80, "east": -60},
+                "tz": "America/New_York",
+            },
             # Europe
             {"bounds": {"north": 71, "south": 35, "west": -10, "east": 15}, "tz": "Europe/London"},
             {"bounds": {"north": 71, "south": 35, "west": 15, "east": 30}, "tz": "Europe/Berlin"},
@@ -258,7 +270,10 @@ def detect_timezone():
             {"bounds": {"north": 71, "south": 10, "west": 105, "east": 135}, "tz": "Asia/Shanghai"},
             {"bounds": {"north": 71, "south": 25, "west": 135, "east": 180}, "tz": "Asia/Tokyo"},
             # Australia
-            {"bounds": {"north": -10, "south": -45, "west": 110, "east": 155}, "tz": "Australia/Sydney"},
+            {
+                "bounds": {"north": -10, "south": -45, "west": 110, "east": 155},
+                "tz": "Australia/Sydney",
+            },
         ]
 
         detected_timezone = "UTC"  # Default fallback
@@ -274,11 +289,28 @@ def detect_timezone():
             detected_timezone = "UTC"
 
         return jsonify(
-            {"success": True, "timezone": detected_timezone, "confidence": "medium", "method": "coordinate_lookup"}
+            {
+                "success": True,
+                "timezone": detected_timezone,
+                "confidence": "medium",
+                "method": "coordinate_lookup",
+            }
         )
 
     except (ValueError, TypeError, KeyError):
-        return jsonify({"success": False, "error": "Invalid coordinates provided", "timezone": "UTC"}), 400
+        return (
+            jsonify({"success": False, "error": "Invalid coordinates provided", "timezone": "UTC"}),
+            400,
+        )
     except Exception as e:
         current_app.logger.error(f"Timezone detection API error: {e}")
-        return jsonify({"success": False, "error": "Server error during timezone detection", "timezone": "UTC"}), 500
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Server error during timezone detection",
+                    "timezone": "UTC",
+                }
+            ),
+            500,
+        )

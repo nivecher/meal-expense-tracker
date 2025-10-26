@@ -250,7 +250,10 @@ class MigrationManager:
         return [], "Could not access migration files: migrations directory not found"
 
     def _determine_migration_state(
-        self, db_info: Dict[str, Any], current_revision: Optional[str], available_revisions: List[str]
+        self,
+        db_info: Dict[str, Any],
+        current_revision: Optional[str],
+        available_revisions: List[str],
     ) -> str:
         """Determine the current migration state."""
         if not db_info["has_main_tables"]:
@@ -358,7 +361,10 @@ class MigrationManager:
     def _set_migration_revision(self, revision: str) -> None:
         """Set the current migration revision."""
         db.session.execute(text("DELETE FROM alembic_version"))
-        db.session.execute(text("INSERT INTO alembic_version (version_num) VALUES (:revision)"), {"revision": revision})
+        db.session.execute(
+            text("INSERT INTO alembic_version (version_num) VALUES (:revision)"),
+            {"revision": revision},
+        )
 
     def fix_migration_history(self) -> Dict[str, Any]:
         """
@@ -577,7 +583,11 @@ class MigrationManager:
                 elif "connection" in error_msg.lower():
                     error_msg = f"Database connection issue: {error_msg}"
 
-                return {"success": False, "message": f"Migration failed: {error_msg}", "error": str(e)}
+                return {
+                    "success": False,
+                    "message": f"Migration failed: {error_msg}",
+                    "error": str(e),
+                }
 
     def _handle_post_upgrade_verification(self, migration_data: Dict[str, Any], final_state: Dict[str, Any]) -> None:
         """Verify schema and optionally stamp back one revision and re-apply if needed."""
@@ -635,7 +645,11 @@ class MigrationManager:
 
         else:
             logger.warning(f"Unknown migration state: {state_info['state']}")
-            return {"success": False, "message": f"Unknown migration state: {state_info['state']}", "data": state_info}
+            return {
+                "success": False,
+                "message": f"Unknown migration state: {state_info['state']}",
+                "data": state_info,
+            }
 
 
 # Global migration manager instance

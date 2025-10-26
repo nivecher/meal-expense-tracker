@@ -132,9 +132,13 @@ def _build_search_params(query, cuisine, lat, lng, radius_miles, api_key):
     if lat and lng:
         location = (float(lat), float(lng))
 
-    # Use the centralized search with fallback logic
+    # Use the centralized search with fallback logic and optimized field masks
     places = places_service.search_places_with_fallback(
-        query=search_query, location=location, radius_miles=float(radius_miles), cuisine=cuisine, max_results=20
+        query=search_query,
+        location=location,
+        radius_miles=float(radius_miles),
+        cuisine=cuisine,
+        max_results=10,
     )
 
     # Return the places data directly (the route will handle the response formatting)
@@ -207,7 +211,7 @@ def _enhance_place_with_details(processed_place, places_service):
         return processed_place
 
     try:
-        detailed_place = places_service.get_place_details(place_id, "address")
+        detailed_place = places_service.get_place_details(place_id, "comprehensive")
         if detailed_place and detailed_place.get("addressComponents"):
             # Debug: Log the raw address components
             current_app.logger.info(f"Raw address components for {place_id}: {detailed_place['addressComponents']}")
@@ -277,13 +281,28 @@ def search_places():
     try:
         from app.services.google_places_service import get_google_places_service
 
+        # Check for API key availability
+        try:
+            places_service = get_google_places_service()
+        except ValueError as e:
+            if "API key" in str(e):
+                return (
+                    jsonify({"error": "Google Places API key not configured. Please configure GOOGLE_MAPS_API_KEY."}),
+                    503,
+                )
+            raise
+
         # Get places using centralized service
         places = _build_search_params(
-            params["query"], params["cuisine"], params["lat"], params["lng"], params["radius_miles"], params["api_key"]
+            params["query"],
+            params["cuisine"],
+            params["lat"],
+            params["lng"],
+            params["radius_miles"],
+            params["api_key"],
         )
 
         # Process results using centralized service
-        places_service = get_google_places_service()
         results = _process_search_results(places, params, places_service)
 
         return jsonify(
@@ -294,10 +313,10 @@ def search_places():
                         "query": params["query"],
                         "lat": params["lat"],
                         "lng": params["lng"],
-                        "radius_miles": float(params["radius_miles"]) if params["radius_miles"] else None,
+                        "radius_miles": (float(params["radius_miles"]) if params["radius_miles"] else None),
                         "cuisine": params["cuisine"],
                         "min_rating": float(params["min_rating"]) if params["min_rating"] else None,
-                        "max_price_level": int(params["max_price_level"]) if params["max_price_level"] else None,
+                        "max_price_level": (int(params["max_price_level"]) if params["max_price_level"] else None),
                     },
                 },
                 "status": "OK",
@@ -307,6 +326,35 @@ def search_places():
     except Exception as e:
         current_app.logger.error(f"Google Places API error: {e}")
         return jsonify({"error": "Failed to fetch places data"}), 500
+
+
+def _map_google_primary_type_to_form_type(primary_type: str) -> str:
+    """Map Google Places API primaryType to restaurant form type choices.
+
+    Args:
+        primary_type: The primaryType from Google Places API
+
+    Returns:
+        Form type choice that matches the primaryType, defaults to 'other' for non-restaurant types
+    """
+    if not primary_type:
+        return "other"
+
+    # Use the centralized restaurant type mapping
+    from app.constants.restaurant_types import get_restaurant_type_for_google_type
+
+    display_type = get_restaurant_type_for_google_type(primary_type)
+    if display_type:
+        return display_type.lower().replace(" ", "_")
+
+    # For unmapped types, check if it's a food establishment
+    from app.constants.restaurant_types import is_food_establishment
+
+    if is_food_establishment(primary_type):
+        return "restaurant"  # Default for food establishments
+
+    # Default to "other" for non-food establishments
+    return "other"
 
 
 @bp.route("/api/places/details/<place_id>", methods=["GET"])
@@ -376,10 +424,14 @@ def get_place_details(place_id):
         current_app.logger.info(f"Parsed Address - Postal: '{address_data.get('postal_code')}'")
         current_app.logger.info(f"Parsed Address - Country: '{address_data.get('country')}'")
         current_app.logger.info("=== END GOOGLE PLACES DATA DEBUG ===")
+        # Map Google Places primaryType to form type choices
+        primary_type = place.get("primaryType", "")
+        mapped_type = _map_google_primary_type_to_form_type(primary_type)
+
         mapped_data = {
             # Basic Information
             "name": restaurant_name,
-            "type": "restaurant",  # Default for Google Places restaurants
+            "type": mapped_type,  # Map from Google Places primaryType
             "description": generate_description(place),
             # Location Information (parsed from addressComponents using standardized mapping)
             "address_line_1": address_data.get("address_line_1", ""),  # Primary street address
@@ -462,74 +514,19 @@ def get_place_details(place_id):
         return jsonify({"error": "Failed to fetch place details"}), 500
 
 
-def get_cuisine_choices():
-    """Get list of cuisine choices for dropdowns."""
-    return [
-        "Afghan",
-        "Albanian",
-        "American",
-        "Argentine",
-        "Bangladeshi",
-        "Barbecue",
-        "Bosnian",
-        "Brazilian",
-        "Bulgarian",
-        "Cajun/Creole",
-        "Cambodian",
-        "Chinese",
-        "Croatian",
-        "Czech",
-        "Danish",
-        "Estonian",
-        "Ethiopian",
-        "Filipino",
-        "Finnish",
-        "French",
-        "German",
-        "Greek",
-        "Hungarian",
-        "Indian",
-        "Indonesian",
-        "Irish",
-        "Italian",
-        "Japanese",
-        "Korean",
-        "Lebanese",
-        "Mediterranean",
-        "Mexican",
-        "Middle Eastern",
-        "Mongolian",
-        "Moroccan",
-        "Myanmar",
-        "Nepalese",
-        "Norwegian",
-        "Pakistani",
-        "Peruvian",
-        "Persian",
-        "Pizza",
-        "Polish",
-        "Romanian",
-        "Russian",
-        "Seafood",
-        "Spanish",
-        "Steakhouse",
-        "Sushi",
-        "Swedish",
-        "Taiwanese",
-        "Tex-Mex",
-        "Thai",
-        "Turkish",
-        "Ukrainian",
-        "Vietnamese",
-    ]
-
-
 def _convert_price_level_to_int(price_level):
     """Convert Google Places price level to integer using centralized service."""
     from app.services.google_places_service import get_google_places_service
 
     places_service = get_google_places_service()
     return places_service.convert_price_level_to_int(price_level)
+
+
+def get_cuisine_choices():
+    """Get list of cuisine choices for dropdowns using centralized constants."""
+    from app.constants import get_cuisine_names
+
+    return get_cuisine_names()
 
 
 def detect_chain_restaurant(name, place_data=None):
@@ -653,7 +650,8 @@ def _create_ajax_error_response(exception, restaurant_id=None):
                     "message": exception.message,
                     "restaurant_id": exception.existing_restaurant.id,
                     "redirect_url": url_for(
-                        "restaurants.restaurant_details", restaurant_id=exception.existing_restaurant.id
+                        "restaurants.restaurant_details",
+                        restaurant_id=exception.existing_restaurant.id,
                     ),
                 }
             ),
@@ -661,7 +659,10 @@ def _create_ajax_error_response(exception, restaurant_id=None):
         )
 
     # Generic error
-    return jsonify({"status": "error", "message": f"Error saving restaurant: {str(exception)}"}), 400
+    return (
+        jsonify({"status": "error", "message": f"Error saving restaurant: {str(exception)}"}),
+        400,
+    )
 
 
 def _handle_restaurant_creation_success(restaurant, is_new, is_ajax):
@@ -717,9 +718,12 @@ def add_restaurant():
 
     # Handle form validation errors for AJAX requests
     if request.method == "POST" and is_ajax:
-        return jsonify({"status": "error", "message": "Form validation failed", "errors": form.errors}), 400
+        return (
+            jsonify({"status": "error", "message": "Form validation failed", "errors": form.errors}),
+            400,
+        )
 
-    return render_template("restaurants/form.html", form=form, is_edit=False, cuisine_choices=get_cuisine_choices())
+    return render_template("restaurants/form.html", form=form, is_edit=False)
 
 
 @bp.route("/<int:restaurant_id>", methods=["GET", "POST"])
@@ -818,9 +822,7 @@ def edit_restaurant(restaurant_id):
         # Pre-populate form with existing data
         form = RestaurantForm(obj=restaurant)
 
-    return render_template(
-        "restaurants/form.html", form=form, is_edit=True, restaurant=restaurant, cuisine_choices=get_cuisine_choices()
-    )
+    return render_template("restaurants/form.html", form=form, is_edit=True, restaurant=restaurant)
 
 
 @bp.route("/delete/<int:restaurant_id>", methods=["POST"])
@@ -838,7 +840,11 @@ def delete_restaurant(restaurant_id):
         if request.is_json or request.content_type == "application/json":
             if success:
                 return jsonify(
-                    {"success": True, "message": str(message), "redirect": url_for("restaurants.list_restaurants")}
+                    {
+                        "success": True,
+                        "message": str(message),
+                        "redirect": url_for("restaurants.list_restaurants"),
+                    }
                 )
             else:
                 return jsonify({"success": False, "error": str(message)}), 400
@@ -850,7 +856,10 @@ def delete_restaurant(restaurant_id):
     except Exception as e:
         current_app.logger.error(f"Error deleting restaurant {restaurant_id}: {str(e)}")
         if request.is_json or request.content_type == "application/json":
-            return jsonify({"success": False, "error": "An error occurred while deleting the restaurant"}), 500
+            return (
+                jsonify({"success": False, "error": "An error occurred while deleting the restaurant"}),
+                500,
+            )
 
         flash("An error occurred while deleting the restaurant", "error")
         return redirect(url_for("restaurants.list_restaurants"))
@@ -920,7 +929,9 @@ def export_restaurants():
     # Default to CSV format
     output = io.StringIO()
     writer = csv.DictWriter(
-        output, fieldnames=restaurants[0].keys() if restaurants else [], quoting=csv.QUOTE_NONNUMERIC
+        output,
+        fieldnames=restaurants[0].keys() if restaurants else [],
+        quoting=csv.QUOTE_NONNUMERIC,
     )
     writer.writeheader()
     writer.writerows(restaurants)
@@ -1009,6 +1020,13 @@ def _handle_import_error(result_data):
         current_app.logger.error(f"Import errors: {result_data['error_details']}")
 
 
+@bp.route("/cost-monitoring")
+@login_required
+def cost_monitoring():
+    """Display Google API cost monitoring dashboard."""
+    return render_template("admin/cost_monitoring.html")
+
+
 @bp.route("/import", methods=["GET", "POST"])
 @login_required
 def import_restaurants():
@@ -1070,7 +1088,10 @@ def find_places():
 
     if not google_maps_map_id:
         current_app.logger.warning("Google Maps Map ID is not configured - Advanced Markers will not be available")
-        flash("Google Maps Map ID is not configured. Advanced Markers functionality will be limited.", "warning")
+        flash(
+            "Google Maps Map ID is not configured. Advanced Markers functionality will be limited.",
+            "warning",
+        )
 
     # Ensure Map ID is a string (handle None case)
     google_maps_map_id = str(google_maps_map_id) if google_maps_map_id is not None else ""
@@ -1183,7 +1204,10 @@ def _prepare_restaurant_form(data, csrf_token):
     if not form.validate():
         errors = {field: errors[0] for field, errors in form.errors.items()}
         current_app.logger.warning(f"Form validation failed: {errors}")
-        return None, (jsonify({"success": False, "message": "Validation failed", "errors": errors}), 400)
+        return None, (
+            jsonify({"success": False, "message": "Validation failed", "errors": errors}),
+            400,
+        )
 
     return form, None
 
@@ -1232,7 +1256,10 @@ def _create_restaurant_from_form(form):
         )
     except Exception as e:
         current_app.logger.error(f"Error creating restaurant: {str(e)}", exc_info=True)
-        return None, (jsonify({"success": False, "message": "An error occurred while creating the restaurant"}), 500)
+        return None, (
+            jsonify({"success": False, "message": "An error occurred while creating the restaurant"}),
+            500,
+        )
 
 
 @bp.route("/check-restaurant-exists", methods=["POST"])
@@ -1380,14 +1407,23 @@ def search_restaurants_by_location_api():
 
         # Validate required parameters
         if latitude is None or longitude is None:
-            return jsonify({"success": False, "message": "latitude and longitude are required parameters"}), 400
+            return (
+                jsonify({"success": False, "message": "latitude and longitude are required parameters"}),
+                400,
+            )
 
         # Validate parameter ranges
         if not (-90 <= latitude <= 90):
-            return jsonify({"success": False, "message": "latitude must be between -90 and 90"}), 400
+            return (
+                jsonify({"success": False, "message": "latitude must be between -90 and 90"}),
+                400,
+            )
 
         if not (-180 <= longitude <= 180):
-            return jsonify({"success": False, "message": "longitude must be between -180 and 180"}), 400
+            return (
+                jsonify({"success": False, "message": "longitude must be between -180 and 180"}),
+                400,
+            )
 
         if radius_km <= 0:
             return jsonify({"success": False, "message": "radius_km must be positive"}), 400
@@ -1397,7 +1433,11 @@ def search_restaurants_by_location_api():
 
         # Perform the search
         results = search_restaurants_by_location(
-            user_id=current_user.id, latitude=latitude, longitude=longitude, radius_km=radius_km, limit=limit
+            user_id=current_user.id,
+            latitude=latitude,
+            longitude=longitude,
+            radius_km=radius_km,
+            limit=limit,
         )
 
         return jsonify(
@@ -1405,7 +1445,12 @@ def search_restaurants_by_location_api():
                 "success": True,
                 "results": results,
                 "count": len(results),
-                "search_params": {"latitude": latitude, "longitude": longitude, "radius_km": radius_km, "limit": limit},
+                "search_params": {
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "radius_km": radius_km,
+                    "limit": limit,
+                },
             }
         )
 

@@ -23,29 +23,15 @@ class TestAdminInit:
         from app.admin.operations import (
             AdminOperationRegistry,
             BaseAdminOperation,
-            CreateUserOperation,
-            DatabaseMaintenanceOperation,
-            InitializeDatabaseOperation,
-            ListUsersOperation,
-            RecentActivityOperation,
-            RunMigrationsOperation,
-            SystemStatsOperation,
-            UpdateUserOperation,
-            ValidateRestaurantsOperation,
+            get_operation_info,
+            list_operations,
         )
         from app.admin.routes import bp
 
         # Verify all imports are successful
         assert BaseAdminOperation is not None
-        assert ListUsersOperation is not None
-        assert CreateUserOperation is not None
-        assert UpdateUserOperation is not None
-        assert SystemStatsOperation is not None
-        assert RecentActivityOperation is not None
-        assert InitializeDatabaseOperation is not None
-        assert DatabaseMaintenanceOperation is not None
-        assert ValidateRestaurantsOperation is not None
-        assert RunMigrationsOperation is not None
+        assert get_operation_info is not None
+        assert list_operations is not None
         assert AdminOperationRegistry is not None
         assert bp is not None
         assert LambdaAdminHandler is not None

@@ -8,10 +8,10 @@ from flask import Flask
 from app.admin.routes import (
     _create_user_from_form_data,
     _extract_user_form_data,
-    _handle_password_email,
+    _handle_password_notification,
     _validate_user_form_data,
     generate_secure_password,
-    send_password_reset_email,
+    send_password_reset_notification,
 )
 
 
@@ -137,10 +137,10 @@ class TestAdminRoutes:
         except TypeError:
             pass  # Expected
 
-    def test_send_password_reset_email_basic(self, mock_user):
-        """Test basic password reset email functionality."""
+    def test_send_password_reset_notification_basic(self, mock_user):
+        """Test basic password reset notification functionality."""
         # Test that function exists and can be called
-        assert callable(send_password_reset_email)
+        assert callable(send_password_reset_notification)
 
     def test_extract_user_form_data(self, app):
         """Test extracting user form data."""
@@ -154,7 +154,7 @@ class TestAdminRoutes:
                 "last_name": "User",
                 "is_admin": "on",
                 "is_active": "on",
-                "send_password_email": "on",
+                "send_password_notification": "on",
             },
         ):
             form_data = _extract_user_form_data()
@@ -165,7 +165,7 @@ class TestAdminRoutes:
             assert form_data["last_name"] == "User"
             assert form_data["is_admin"] is True
             assert form_data["is_active"] is True
-            assert form_data["send_password_email"] is True
+            assert form_data["send_password_notification"] is True
 
     def test_extract_user_form_data_empty(self, app):
         """Test extracting user form data with empty form."""
@@ -178,7 +178,7 @@ class TestAdminRoutes:
             assert form_data["last_name"] == ""
             assert form_data["is_admin"] is False
             assert form_data["is_active"] is False
-            assert form_data["send_password_email"] is False
+            assert form_data["send_password_notification"] is False
 
     def test_validate_user_form_data_valid(self):
         """Test validating valid user form data."""
@@ -189,7 +189,7 @@ class TestAdminRoutes:
             "last_name": "User",
             "is_admin": True,
             "is_active": True,
-            "send_password_email": True,
+            "send_password_notification": True,
         }
 
         with patch("app.admin.routes.User") as mock_user_class:
@@ -210,7 +210,7 @@ class TestAdminRoutes:
             "last_name": "User",
             "is_admin": True,
             "is_active": True,
-            "send_password_email": True,
+            "send_password_notification": True,
         }
 
         is_valid, error_message = _validate_user_form_data(form_data)
@@ -226,7 +226,7 @@ class TestAdminRoutes:
             "last_name": "User",
             "is_admin": True,
             "is_active": True,
-            "send_password_email": True,
+            "send_password_notification": True,
         }
 
         with patch("app.admin.routes.User") as mock_user_class:
@@ -248,7 +248,7 @@ class TestAdminRoutes:
             "last_name": "User",
             "is_admin": True,
             "is_active": True,
-            "send_password_email": True,
+            "send_password_notification": True,
         }
 
         with app.app_context():
@@ -264,17 +264,17 @@ class TestAdminRoutes:
                     mock_db.session.add.assert_called_once_with(mock_user)
                     mock_db.session.flush.assert_called_once()
 
-    def test_handle_password_email_disabled(self, app, mock_user):
-        """Test handling password email when disabled."""
+    def test_handle_password_notification_disabled(self, app, mock_user):
+        """Test handling password notification when disabled."""
         with app.test_request_context():
             with patch("app.admin.routes.flash") as mock_flash:
-                _handle_password_email(mock_user, "password123", False)
+                _handle_password_notification(mock_user, "password123", False)
                 mock_flash.assert_called_once_with("User created successfully. Password: password123", "success")
 
-    def test_handle_password_email_basic(self, app, mock_user):
-        """Test basic password email handling functionality."""
+    def test_handle_password_notification_basic(self, app, mock_user):
+        """Test basic password notification handling functionality."""
         # Test that function exists and can be called
-        assert callable(_handle_password_email)
+        assert callable(_handle_password_notification)
 
 
 class TestAdminRoutesAdditional:
@@ -321,7 +321,7 @@ class TestAdminRoutesAdditional:
             assert form_data["last_name"] == ""
             assert form_data["is_admin"] is False
             assert form_data["is_active"] is False
-            assert form_data["send_password_email"] is False
+            assert form_data["send_password_notification"] is False
 
     def test_validate_user_form_data_edge_cases(self):
         """Test validating user form data with edge cases."""
@@ -333,7 +333,7 @@ class TestAdminRoutesAdditional:
             "last_name": "User",
             "is_admin": True,
             "is_active": True,
-            "send_password_email": True,
+            "send_password_notification": True,
         }
 
         is_valid, error_message = _validate_user_form_data(form_data)
@@ -350,7 +350,7 @@ class TestAdminRoutesAdditional:
             "last_name": "",
             "is_admin": False,
             "is_active": True,
-            "send_password_email": False,
+            "send_password_notification": False,
         }
 
         with app.app_context():
@@ -366,24 +366,24 @@ class TestAdminRoutesAdditional:
                     mock_db.session.add.assert_called_once_with(mock_user)
                     mock_db.session.flush.assert_called_once()
 
-    def test_send_password_reset_email_edge_cases(self):
-        """Test sending password reset email with edge cases."""
+    def test_send_password_reset_notification_edge_cases(self):
+        """Test sending password reset notification with edge cases."""
         # Test that function exists and can be called
-        assert callable(send_password_reset_email)
+        assert callable(send_password_reset_notification)
 
-    def test_handle_password_email_edge_cases(self, app):
-        """Test handling password email with edge cases."""
+    def test_handle_password_notification_edge_cases(self, app):
+        """Test handling password notification with edge cases."""
         # Test with None user
         with app.test_request_context():
             with patch("app.admin.routes.flash") as mock_flash:
-                _handle_password_email(None, "password123", False)
+                _handle_password_notification(None, "password123", False)
                 mock_flash.assert_called_once_with("User created successfully. Password: password123", "success")
 
         # Test with empty password
         mock_user = Mock()
         with app.test_request_context():
             with patch("app.admin.routes.flash") as mock_flash:
-                _handle_password_email(mock_user, "", False)
+                _handle_password_notification(mock_user, "", False)
                 mock_flash.assert_called_once_with("User created successfully. Password: ", "success")
 
 

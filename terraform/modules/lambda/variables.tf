@@ -2,14 +2,15 @@
 # Core Configuration
 # ======================
 variable "vpc_cidr" {
-  description = "The CIDR block of the VPC"
+  description = "The CIDR block of the VPC (optional if Lambda is not in VPC)"
   type        = string
+  default     = "10.0.0.0/16" # Default for when VPC is used
 
   validation {
+    # Allow empty string or valid IPv4 CIDR block
     # This regex validates an IPv4 CIDR block (e.g., 10.0.0.0/16)
-    # It allows optional CIDR notation (e.g., 192.168.1.1 or 10.0.0.0/16)
-    condition     = can(regex("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}(?:/[0-9]{1,2})?$", var.vpc_cidr))
-    error_message = "Must be a valid IPv4 CIDR block (e.g., 10.0.0.0/16)."
+    condition     = var.vpc_cidr == "" || can(regex("^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}(?:/[0-9]{1,2})?$", var.vpc_cidr))
+    error_message = "Must be empty string or a valid IPv4 CIDR block (e.g., 10.0.0.0/16)."
   }
 }
 
@@ -36,15 +37,15 @@ variable "aws_region" {
 
 # Lambda Function Configuration
 variable "handler" {
-  description = "The function entrypoint in your code"
+  description = "The function entrypoint in your code (not needed for container images)"
   type        = string
-  default     = "wsgi.lambda_handler"
+  default     = "lambda_handler"
 }
 
 variable "runtime" {
-  description = "The runtime environment for the Lambda function"
+  description = "The runtime environment for the Lambda function (not needed for container images)"
   type        = string
-  default     = "python3.13"
+  default     = "provided.al2"
 }
 
 variable "memory_size" {
@@ -83,10 +84,11 @@ variable "architectures" {
   default     = ["arm64", "x86_64"]
 }
 
-# Deployment Package
+# Deployment Package (optional for container images)
 variable "s3_bucket" {
-  description = "S3 bucket containing the Lambda deployment package"
+  description = "S3 bucket containing the Lambda deployment package (required for Zip packages, optional for Image packages)"
   type        = string
+  default     = ""
 }
 
 variable "log_retention_in_days" {
@@ -107,33 +109,20 @@ variable "dlq_topic_name" {
   default     = ""
 }
 
-# Lambda Layer Variables
-variable "layer_s3_bucket" {
-  description = "S3 bucket where the Lambda layer package will be stored. Leave empty to skip layer creation."
+# No layer variables needed for container images
+
+# Container image URI is constructed from ECR repository data source
+
+variable "package_type" {
+  description = "Package type for the Lambda function (Zip or Image)"
   type        = string
-  default     = ""
+  default     = "Image"
 }
 
-variable "layer_s3_key" {
-  description = "S3 key where the Lambda layer package will be stored in the bucket"
-  type        = string
-  default     = ""
-}
-
-variable "layer_local_path" {
-  description = "Local filesystem path to the Lambda layer zip file. Required if layer_s3_bucket is set."
-  type        = string
-  default     = ""
-}
-
-variable "app_local_path" {
-  description = "Local filesystem path to the Lambda application zip file. Required if app_s3_bucket is set."
-  type        = string
-  default     = ""
-}
-
+# Note: compatible_runtimes is only used for Zip packages with layers
+# Container images don't need this configuration
 variable "compatible_runtimes" {
-  description = "List of compatible runtimes for the Lambda layer"
+  description = "List of compatible runtimes for the Lambda layer (only used for Zip packages)"
   type        = list(string)
   default     = ["python3.13"]
 }
@@ -145,8 +134,9 @@ variable "compatible_architectures" {
 }
 
 variable "s3_key" {
-  description = "S3 key of the deployment package"
+  description = "S3 key of the deployment package (required for Zip packages, optional for Image packages)"
   type        = string
+  default     = ""
 }
 
 # VPC Configuration
@@ -196,9 +186,25 @@ variable "db_security_group_id" {
   }
 }
 
+variable "rds_proxy_security_group_id" {
+  description = "The security group ID of the RDS Proxy that the Lambda function needs to access"
+  type        = string
+
+  validation {
+    condition     = can(regex("^sg-", var.rds_proxy_security_group_id)) || var.rds_proxy_security_group_id == ""
+    error_message = "The rds_proxy_security_group_id must be a valid security group ID starting with 'sg-' or an empty string."
+  }
+}
+
 variable "app_secret_key_arn" {
   description = "The ARN of the SSM parameter containing the application secret key"
   type        = string
+}
+
+variable "notification_topic_arn" {
+  description = "ARN of the SNS topic for notifications"
+  type        = string
+  default     = ""
 }
 
 variable "db_protocol" {
@@ -223,23 +229,6 @@ variable "db_name" {
   description = "Database name for direct connection in non-prod environments."
   type        = string
   default     = null
-}
-
-variable "session_type" {
-  description = "The type of session storage to use (e.g., 'dynamodb', 'filesystem')"
-  type        = string
-  default     = "dynamodb"
-
-  validation {
-    condition     = contains(["dynamodb", "dynamodb-boto3", "redis", "memcached"], var.session_type)
-    error_message = "Session type must be one of: dynamodb, redis, memcached"
-  }
-}
-
-variable "session_table_name" {
-  description = "The name of the DynamoDB table to use for session storage"
-  type        = string
-  default     = "flask_sessions"
 }
 
 variable "api_gateway_domain_name" {
@@ -268,6 +257,7 @@ variable "enable_otel_tracing" {
   default     = false
 }
 
+
 # KMS
 variable "kms_key_arn" {
   description = "The ARN of the KMS key to use for encryption"
@@ -279,11 +269,6 @@ variable "lambda_combined_policy_arn" {
   type        = string
 }
 
-variable "dynamodb_table_arn" {
-  description = "ARN of the DynamoDB table for sessions (ensures dependency)"
-  type        = string
-  default     = ""
-}
 
 # Email Configuration
 variable "mail_enabled" {

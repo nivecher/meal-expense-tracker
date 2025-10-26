@@ -293,6 +293,7 @@ class TestRestaurantCLI:
                     "types": ["restaurant", "food"],
                     "primary_type": "restaurant",
                 }
+                mock_service.analyze_restaurant_types.return_value = ("American", "casual_dining")
 
                 mock_restaurant.google_place_id = "test_place_id"
 
@@ -348,7 +349,7 @@ class TestRestaurantCLI:
 
                 result = _validate_restaurant_with_google(mock_restaurant)
                 assert result["valid"] is False
-                assert "Google Maps API key not found" in result["errors"][0]
+                assert "Google Places API key not configured" in result["errors"][0]
 
     def test_validate_restaurant_with_google_import_error(self, app, mock_restaurant):
         """Test validating restaurant with import error."""
@@ -554,6 +555,127 @@ class TestRestaurantCLI:
             assert "Service level mismatch" in mismatches[0]
             assert fixes["service_level"] == "fine_dining"
 
+    def test_check_restaurant_mismatches_price_level(self, mock_restaurant):
+        """Test checking restaurant mismatches for price level."""
+        # Set restaurant price level to 2
+        mock_restaurant.price_level = 2
+
+        validation_result = {
+            "google_name": "Test Restaurant",
+            "google_street_address": "123 Main St",
+            "google_service_level": None,
+            "google_price_level": 3,  # Different price level
+        }
+
+        with patch("app.services.google_places_service.get_google_places_service") as mock_get_service:
+            mock_service = mock_get_service.return_value
+            mock_service.convert_price_level_to_int.return_value = 3  # Return as-is for integer input
+
+            mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+            assert len(mismatches) == 1
+            assert "Price Level: '$$ (Moderate)' vs Google: '$$$ (Expensive)'" in mismatches[0]
+            assert fixes["price_level"] == 3
+
+    def test_check_restaurant_mismatches_price_level_none_vs_set(self, mock_restaurant):
+        """Test checking restaurant mismatches when restaurant has no price level but Google does."""
+        # Set restaurant price level to None
+        mock_restaurant.price_level = None
+
+        validation_result = {
+            "google_name": "Test Restaurant",
+            "google_street_address": "123 Main St",
+            "google_service_level": None,
+            "google_price_level": 2,  # Google has price level
+        }
+
+        with patch("app.services.google_places_service.get_google_places_service") as mock_get_service:
+            mock_service = mock_get_service.return_value
+            mock_service.convert_price_level_to_int.return_value = 2  # Return as-is for integer input
+
+            mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+            assert len(mismatches) == 1
+            assert "Price Level: 'Not set' vs Google: '$$ (Moderate)'" in mismatches[0]
+            assert fixes["price_level"] == 2
+
+    def test_check_restaurant_mismatches_price_level_string_conversion(self, mock_restaurant):
+        """Test checking restaurant mismatches with Google string price level format."""
+        # Set restaurant price level to 1
+        mock_restaurant.price_level = 1
+
+        validation_result = {
+            "google_name": "Test Restaurant",
+            "google_street_address": "123 Main St",
+            "google_service_level": None,
+            "google_price_level": "PRICE_LEVEL_INEXPENSIVE",  # Google string format
+        }
+
+        with patch("app.services.google_places_service.get_google_places_service") as mock_get_service:
+            mock_service = mock_get_service.return_value
+            mock_service.convert_price_level_to_int.return_value = 1  # Convert string to int
+
+            mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+            # Should not have mismatch since both are 1 after conversion
+            assert len(mismatches) == 0
+            assert "price_level" not in fixes
+
+    def test_format_price_level_display(self):
+        """Test the price level display formatting function."""
+        from app.restaurants.cli import _format_price_level_display
+
+        # Test various price levels
+        assert _format_price_level_display(0) == "Free"
+        assert _format_price_level_display(1) == "$ (Inexpensive)"
+        assert _format_price_level_display(2) == "$$ (Moderate)"
+        assert _format_price_level_display(3) == "$$$ (Expensive)"
+        assert _format_price_level_display(4) == "$$$$ (Very Expensive)"
+        assert _format_price_level_display(None) == "Not set"
+        assert _format_price_level_display(99) == "99"  # Unknown level
+
+    def test_check_restaurant_mismatches_cuisine(self, mock_restaurant):
+        """Test checking restaurant mismatches for cuisine."""
+        # Set restaurant cuisine to 'Italian'
+        mock_restaurant.cuisine = "Italian"
+
+        validation_result = {"google_cuisine": "American"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 1
+        assert "Cuisine: 'Italian' vs Google: 'American'" in mismatches[0]
+        assert fixes["cuisine"] == "American"
+
+    def test_check_restaurant_mismatches_cuisine_none_vs_set(self, mock_restaurant):
+        """Test checking restaurant mismatches when restaurant has no cuisine but Google does."""
+        # Set restaurant cuisine to None
+        mock_restaurant.cuisine = None
+
+        validation_result = {"google_cuisine": "Mexican"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 1
+        assert "Cuisine: 'Not set' vs Google: 'Mexican'" in mismatches[0]
+        assert fixes["cuisine"] == "Mexican"
+
+    def test_check_restaurant_mismatches_cuisine_match(self, mock_restaurant):
+        """Test checking restaurant mismatches when cuisines match."""
+        # Set restaurant cuisine to match Google
+        mock_restaurant.cuisine = "Chinese"
+
+        validation_result = {"google_cuisine": "Chinese"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 0
+        assert "cuisine" not in fixes
+
+    def test_check_restaurant_mismatches_cuisine_no_google_data(self, mock_restaurant):
+        """Test checking restaurant mismatches when Google has no cuisine data."""
+        mock_restaurant.cuisine = "Italian"
+
+        validation_result = {"google_cuisine": None}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 0
+        assert "cuisine" not in fixes
+
     def test_apply_restaurant_fixes_dry_run(self, mock_restaurant):
         """Test applying restaurant fixes in dry run mode."""
         fixes = {"name": "New Name", "address": "New Address"}
@@ -562,6 +684,166 @@ class TestRestaurantCLI:
         assert result is True
         # In dry run, no actual changes should be made
         assert mock_restaurant.name == "Test Restaurant"
+
+    @patch("app.restaurants.cli.db")
+    def test_apply_restaurant_fixes_cuisine(self, mock_db, mock_restaurant):
+        """Test applying restaurant fixes with cuisine field."""
+        fixes = {"cuisine": "Japanese"}
+
+        result = _apply_restaurant_fixes(mock_restaurant, fixes, dry_run=False)
+        assert result is True
+        assert mock_restaurant.cuisine == "Japanese"
+
+    def test_check_restaurant_mismatches_phone(self, mock_restaurant):
+        """Test checking restaurant mismatches for phone."""
+        # Set restaurant phone to '(555) 123-4567'
+        mock_restaurant.phone = "(555) 123-4567"
+
+        validation_result = {"google_phone": "+1-555-987-6543"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 1
+        assert "Phone: '(555) 123-4567' vs Google: '+1-555-987-6543'" in mismatches[0]
+        assert fixes["phone"] == "+1-555-987-6543"
+
+    def test_check_restaurant_mismatches_phone_none_vs_set(self, mock_restaurant):
+        """Test checking restaurant mismatches when restaurant has no phone but Google does."""
+        # Set restaurant phone to None
+        mock_restaurant.phone = None
+
+        validation_result = {"google_phone": "(555) 111-2222"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 1
+        assert "Phone: 'Not set' vs Google: '(555) 111-2222'" in mismatches[0]
+        assert fixes["phone"] == "(555) 111-2222"
+
+    def test_check_restaurant_mismatches_phone_match(self, mock_restaurant):
+        """Test checking restaurant mismatches when phones match."""
+        # Set restaurant phone to match Google
+        mock_restaurant.phone = "(555) 333-4444"
+
+        validation_result = {"google_phone": "(555) 333-4444"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 0
+        assert "phone" not in fixes
+
+    def test_check_restaurant_mismatches_phone_no_google_data(self, mock_restaurant):
+        """Test checking restaurant mismatches when Google has no phone data."""
+        mock_restaurant.phone = "(555) 123-4567"
+
+        validation_result = {"google_phone": None}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 0
+        assert "phone" not in fixes
+
+    def test_check_restaurant_mismatches_website(self, mock_restaurant):
+        """Test checking restaurant mismatches for website."""
+        # Set restaurant website to 'https://old-site.com'
+        mock_restaurant.website = "https://old-site.com"
+
+        validation_result = {"google_website": "https://new-site.com"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 1
+        assert "Website: 'https://old-site.com' vs Google: 'https://new-site.com'" in mismatches[0]
+        assert fixes["website"] == "https://new-site.com"
+
+    def test_check_restaurant_mismatches_website_none_vs_set(self, mock_restaurant):
+        """Test checking restaurant mismatches when restaurant has no website but Google does."""
+        # Set restaurant website to None
+        mock_restaurant.website = None
+
+        validation_result = {"google_website": "https://example.com"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 1
+        assert "Website: 'Not set' vs Google: 'https://example.com'" in mismatches[0]
+        assert fixes["website"] == "https://example.com"
+
+    def test_check_restaurant_mismatches_website_match(self, mock_restaurant):
+        """Test checking restaurant mismatches when websites match."""
+        # Set restaurant website to match Google
+        mock_restaurant.website = "https://restaurant.com"
+
+        validation_result = {"google_website": "https://restaurant.com"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 0
+        assert "website" not in fixes
+
+    def test_check_restaurant_mismatches_website_no_google_data(self, mock_restaurant):
+        """Test checking restaurant mismatches when Google has no website data."""
+        mock_restaurant.website = "https://old-site.com"
+
+        validation_result = {"google_website": None}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 0
+        assert "website" not in fixes
+
+    def test_check_restaurant_mismatches_type(self, mock_restaurant):
+        """Test checking restaurant mismatches for type field."""
+        mock_restaurant.type = "cafe"
+
+        validation_result = {"primary_type": "restaurant"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 1
+        assert "Type: 'cafe' vs Google: 'restaurant'" in mismatches
+        assert fixes["type"] == "restaurant"
+
+    def test_check_restaurant_mismatches_type_none_vs_set(self, mock_restaurant):
+        """Test checking restaurant mismatches when local type is None but Google has primary type."""
+        mock_restaurant.type = None
+
+        validation_result = {"primary_type": "restaurant"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 1
+        assert "Type: 'Not set' vs Google: 'restaurant'" in mismatches
+        assert fixes["type"] == "restaurant"
+
+    def test_check_restaurant_mismatches_type_match(self, mock_restaurant):
+        """Test checking restaurant mismatches when type matches Google primary type."""
+        mock_restaurant.type = "restaurant"
+
+        validation_result = {"primary_type": "restaurant"}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 0
+        assert "type" not in fixes
+
+    def test_check_restaurant_mismatches_type_no_google_data(self, mock_restaurant):
+        """Test checking restaurant mismatches when Google has no primary type data."""
+        mock_restaurant.type = "restaurant"
+
+        validation_result = {"primary_type": None}
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        assert len(mismatches) == 0
+        assert "type" not in fixes
+
+    @patch("app.restaurants.cli.db")
+    def test_apply_restaurant_fixes_phone_and_website(self, mock_db, mock_restaurant):
+        """Test applying restaurant fixes with phone and website fields."""
+        fixes = {"phone": "+1-555-999-8888", "website": "https://updated-site.com"}
+
+        result = _apply_restaurant_fixes(mock_restaurant, fixes, dry_run=False)
+        assert result is True
+        assert mock_restaurant.phone == "+1-555-999-8888"
+        assert mock_restaurant.website == "https://updated-site.com"
+
+    @patch("app.restaurants.cli.db")
+    def test_apply_restaurant_fixes_type(self, mock_db, mock_restaurant):
+        """Test applying restaurant fixes with type field."""
+        fixes = {"type": "restaurant"}
+
+        result = _apply_restaurant_fixes(mock_restaurant, fixes, dry_run=False)
+        assert result is True
+        assert mock_restaurant.type == "restaurant"
 
     @patch("app.restaurants.cli.db")
     def test_apply_restaurant_fixes_actual(self, mock_db, mock_restaurant):
@@ -605,7 +887,7 @@ class TestRestaurantCLI:
             assert "⭐ Google Rating: 4.5/5.0" in captured.out
             assert "📞 Phone: +1-555-1234" in captured.out
             assert "🌐 Website: https://example.com" in captured.out
-            assert "💲 Price Level: 💰💰" in captured.out
+            assert "💲 Price Level: $$ (Moderate)" in captured.out
             assert "🏷️  Types: restaurant, food" in captured.out
             assert "🍽️  Service Level: Casual Dining (confidence: 0.80)" in captured.out
 

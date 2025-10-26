@@ -37,7 +37,7 @@ DOCKER_COMPOSE_DEV = $(DOCKER_COMPOSE) -f docker-compose.dev.yml
 CONTAINER_NAME = $(APP_NAME)-app
 IMAGE_NAME = $(APP_NAME)
 VOLUME_NAME = $(APP_NAME)-db
-TARGET_PLATFORM ?= linux/amd64
+TARGET_PLATFORM ?= linux/arm64
 
 # Terraform settings
 ENV ?= dev

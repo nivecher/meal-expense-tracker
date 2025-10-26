@@ -45,7 +45,11 @@ def validate_api_csrf(f):
             current_app.logger.warning(f"CSRF validation failed: {str(e)}")
             return (
                 jsonify(
-                    {"status": "error", "message": "CSRF token is invalid or expired", "error_type": "csrf_invalid"}
+                    {
+                        "status": "error",
+                        "message": "CSRF token is invalid or expired",
+                        "error_type": "csrf_invalid",
+                    }
                 ),
                 403,
             )

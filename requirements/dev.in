@@ -28,7 +28,6 @@ types-urllib3>=1.26.0                  # Type stubs for urllib3 (HTTP library, u
 types-Flask>=1.1.6,<2.0.0              # Type stubs for Flask (web framework)
 types-Flask-SQLAlchemy>=2.5.9,<3.0.0   # Type stubs for Flask-SQLAlchemy (ORM integration for Flask)
 types-Werkzeug>=1.0.0,<2.0.0           # Type stubs for Werkzeug (WSGI utilities, used by Flask)
-types-PyJWT>=1.7.1,<2.0.0              # Type stubs for PyJWT (JWT encoding/decoding)
 types-requests>=2.31.0,<3.0.0          # Type stubs for requests (HTTP client)
 types-python-dateutil>=2.8.0,<3.0.0    # Type stubs for python-dateutil (date/time parsing and arithmetic)
 types-pytz>=2024.1.0,<2026.0.0         # Type stubs for pytz (timezone support)
@@ -41,7 +40,6 @@ types-SQLAlchemy>=1.4.0,<2.0.0         # Type stubs for SQLAlchemy (ORM)
 types-PyYAML>=6.0.12,<7.0.0            # Type stubs for PyYAML (YAML parsing and serialization)
 types-jsonschema>=4.24.0,<5.0.0        # Type stubs for jsonschema (JSON Schema validation)
 types-setuptools>=80.0.0,<81.0.0       # Type stubs for setuptools (Python packaging utilities)
-mypy-boto3-dynamodb>=1.40.0            # Type stubs for boto3 DynamoDB service
 
 boto3-stubs>=1.40.6                    # Type stubs for boto3 (AWS SDK for Python)
 botocore-stubs>=1.38.46                # Type stubs for botocore (core of boto3)

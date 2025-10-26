@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from flask import (
     Response,
+    abort,
     current_app,
     flash,
     redirect,
@@ -24,6 +25,48 @@ from app.extensions import db
 from app.restaurants.models import Restaurant
 
 from . import bp
+
+
+@bp.app_template_global()
+def get_receipt_url(storage_path):
+    """Generate URL for accessing a receipt file."""
+    from app.expenses.utils import get_receipt_url
+
+    return get_receipt_url(storage_path)
+
+
+@bp.route("/uploads/<filename>")
+@login_required
+def serve_uploaded_file(filename):
+    """Serve uploaded receipt files.
+
+    Args:
+        filename: The name of the file to serve
+
+    Returns:
+        The requested file or 404 if not found
+    """
+    # Verify the user owns an expense with this receipt
+    from app.expenses.models import Expense
+
+    # Check both old format (uploads/filename) and new format (filename)
+    expense = Expense.query.filter(
+        (Expense.receipt_image == f"uploads/{filename}") | (Expense.receipt_image == filename),
+        Expense.user_id == current_user.id,
+    ).first()
+
+    if not expense:
+        abort(404)
+
+    upload_folder = current_app.config.get("UPLOAD_FOLDER")
+    return send_from_directory(upload_folder, filename)
+
+
+@bp.route("/expense-statistics")
+@login_required
+def expense_statistics():
+    """Redirect to expense statistics page."""
+    return redirect(url_for("reports.expense_statistics"))
 
 
 @bp.route("/favicon.ico")
@@ -60,9 +103,9 @@ def help_page():
         Rendered help page template with all feature information
     """
     # Import all the constants for displaying options
+    from app.constants import MEAL_TYPES
     from app.constants.categories import get_default_categories
     from app.constants.cuisines import get_cuisine_color, get_cuisine_constants
-    from app.constants.meal_types import get_meal_type_constants
 
     # Get cuisine constants but override colors with centralized Bootstrap colors
     cuisines = get_cuisine_constants()
@@ -70,7 +113,10 @@ def help_page():
         cuisine["color"] = get_cuisine_color(cuisine["name"])
 
     return render_template(
-        "main/help.html", meal_types=get_meal_type_constants(), cuisines=cuisines, categories=get_default_categories()
+        "main/help.html",
+        meal_types=list(MEAL_TYPES.values()),
+        cuisines=cuisines,
+        categories=get_default_categories(),
     )
 
 
@@ -139,7 +185,11 @@ def index():
 
     # Get recent expenses (last 5)
     recent_expenses = db.session.execute(
-        select(Expense, Restaurant.name.label("restaurant_name"), Restaurant.website.label("restaurant_website"))
+        select(
+            Expense,
+            Restaurant.name.label("restaurant_name"),
+            Restaurant.website.label("restaurant_website"),
+        )
         .outerjoin(Restaurant, Expense.restaurant_id == Restaurant.id)
         .where(Expense.user_id == user_id)
         .order_by(Expense.date.desc(), Expense.created_at.desc())
@@ -228,7 +278,7 @@ def user_tag_css():
         headers={
             "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
             "ETag": etag,  # ETag for cache validation
-            "Last-Modified": max_updated_at.strftime("%a, %d %b %Y %H:%M:%S GMT") if max_updated_at else None,
+            "Last-Modified": (max_updated_at.strftime("%a, %d %b %Y %H:%M:%S GMT") if max_updated_at else None),
         },
     )
 

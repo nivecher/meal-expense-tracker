@@ -115,7 +115,7 @@ include 'includes/breadcrumb.html' %}
                     <label for="cuisine" class="form-label">Cuisine</label>
                     <select class="form-control" id="cuisine" name="cuisine">
                         <option value="">All Cuisines</option>
-                        {% for cuisine in cuisines %}
+                        {% for cuisine in cuisine_names %}
                         <option value="{{ cuisine }}" {% if request.args.get('cuisine') == cuisine %}selected{% endif %}>{{ cuisine }}</option>
                         {% endfor %}
                     </select>
@@ -537,7 +537,7 @@ include 'includes/breadcrumb.html' %}
                                         </div>
                                     </div>
                                 </td>
-                                <td data-sort-value="{% if restaurant.get('city') or restaurant.get('state') %}{{ restaurant.get('city', '') }}, {{ restaurant.get('state', '') }}{% else %}No location{% endif %}">
+                                <td data-sort-value="{% if restaurant.get('city') or restaurant.get('state') %}{{ restaurant.get('state', '') }}, {{ restaurant.get('city', '') }}{% else %}No location{% endif %}">
                                     {% if restaurant.get('city') or restaurant.get('state') %}
                                         {% set city = restaurant.get('city', '') %}
                                         {% set state = restaurant.get('state', '') %}

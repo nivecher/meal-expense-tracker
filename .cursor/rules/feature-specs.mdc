@@ -74,16 +74,16 @@ alwaysApply: true
 "As a user, I want secure access to my expense data so that my financial information remains private and protected."
 
 ### Acceptance Criteria
-- [ ] User can register with email and password
-- [ ] User can log in securely
-- [ ] Password reset functionality works
-- [ ] Session management is secure
-- [ ] User can log out from all devices
-- [ ] Failed login attempts are limited
+- [x] User can register with email and password
+- [x] User can log in securely
+- [x] Password reset functionality works
+- [x] Session management is secure
+- [x] User can log out from all devices
+- [x] Failed login attempts are limited
 
 ### Technical Requirements
-- JWT token authentication
-- Password hashing with bcrypt
+- Session-based authentication (Flask-Login)
+- Password hashing with pbkdf2:sha256
 - Rate limiting on login attempts
 - Secure session management
 - CSRF protection
@@ -201,16 +201,16 @@ alwaysApply: true
 "As a user, I want secure access to my expense data so that my financial information remains private and protected."
 
 ### Acceptance Criteria
-- [ ] User can register with email and password
-- [ ] User can log in securely
-- [ ] Password reset functionality works
-- [ ] Session management is secure
-- [ ] User can log out from all devices
-- [ ] Failed login attempts are limited
+- [x] User can register with email and password
+- [x] User can log in securely
+- [x] Password reset functionality works
+- [x] Session management is secure
+- [x] User can log out from all devices
+- [x] Failed login attempts are limited
 
 ### Technical Requirements
-- JWT token authentication
-- Password hashing with bcrypt
+- Session-based authentication (Flask-Login)
+- Password hashing with pbkdf2:sha256
 - Rate limiting on login attempts
 - Secure session management
 - CSRF protection

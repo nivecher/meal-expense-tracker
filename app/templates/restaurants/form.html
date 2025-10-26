@@ -84,27 +84,53 @@
                                         <h5>
                                             <i class="fas fa-info-circle me-2 text-primary"></i>Restaurant Information
                                         </h5>
-                                        <button type="button"
-                                                class="btn btn-outline-primary btn-sm"
-                                                id="validate-restaurant-btn"
-                                                data-action="validate-restaurant"
-                                                data-restaurant-id="{{ restaurant.id if restaurant else '' }}"
-                                                title="Validate restaurant information with Google Places"
-                                                aria-label="Validate restaurant information"
-                                                disabled>
-                                            <i class="fas fa-check-circle me-1"></i> Validate
-                                        </button>
+                                        <div class="d-flex gap-2">
+                                            <button type="button"
+                                                    class="btn btn-outline-primary btn-sm"
+                                                    id="validate-restaurant-btn"
+                                                    data-action="validate-restaurant"
+                                                    data-restaurant-id="{{ restaurant.id if restaurant else '' }}"
+                                                    title="Validate restaurant information with Google Places"
+                                                    aria-label="Validate restaurant information"
+                                                    disabled>
+                                                <i class="fas fa-check-circle me-1"></i> Validate
+                                            </button>
+                                            <div id="validation-status" class="d-none">
+                                                <span class="badge bg-success" id="validation-status-good">
+                                                    <i class="fas fa-check-circle me-1"></i>Valid
+                                                </span>
+                                                <span class="badge bg-warning text-dark d-none" id="validation-status-warnings">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i>Issues Found
+                                                </span>
+                                                <span class="badge bg-danger d-none" id="validation-status-errors">
+                                                    <i class="fas fa-exclamation-circle me-1"></i>Errors
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label for="name" class="form-label">Restaurant Name *</label>
-                                        {{ form.name(class_="form-control" + (" is-invalid" if form.name.errors else "") ,
-                                        placeholder="Enter restaurant name", autocomplete="organization") }}
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <label for="name" class="form-label">Restaurant Name *</label>
+                                            <div class="validation-indicator" id="name-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                            </div>
+                                        </div>
+                                        {{ form.name(class_="form-control" + (" is-invalid" if form.name.errors else ""),
+                                                     placeholder="Enter restaurant name",
+                                                     autocomplete="organization",
+                                                     data_field="name") }}
                                         {% for error in form.name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                     <div class="col-md-3">
-                                        <label for="type" class="form-label">Type</label>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <label for="type" class="form-label mb-0">Type</label>
+                                            <div class="validation-indicator" id="type-validation-indicator"></div>
+                                        </div>
                                         {{ form.type(class_="form-select" + (" is-invalid" if form.type.errors else "") ) }}
                                         {% for error in form.type.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
@@ -120,33 +146,52 @@
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label for="located_within" class="form-label">Location Within</label>
-                                        {{ form.located_within(class_="form-control" + (" is-invalid" if form.located_within.errors else "") ,
-                                        placeholder="e.g., mall, airport, hotel", autocomplete="off") }}
+                                        {{ form.located_within(class_="form-control" + (" is-invalid" if form.located_within.errors else ""),
+                                                               placeholder="e.g., mall, airport, hotel",
+                                                               autocomplete="off") }}
                                         {% for error in form.located_within.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="cuisine" class="form-label">Cuisine</label>
-                                        <select name="cuisine" id="cuisine" class="form-select{{ ' is-invalid' if form.cuisine.errors else '' }}">
-                                            <option value="">Select Cuisine (Optional)</option>
-                                            {% for cuisine in cuisine_choices %}
-                                                <option value="{{ cuisine }}"
-                                                    {{ 'selected' if form.cuisine.data == cuisine else '' }}>
-                                                    {{ cuisine }}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <label for="cuisine" class="form-label">Cuisine</label>
+                                            <div class="validation-indicator" id="cuisine-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                            </div>
+                                        </div>
+                                        {{ form.cuisine(class_="form-select" + (" is-invalid" if form.cuisine.errors else ""), data_field="cuisine") }}
                                         {% for error in form.cuisine.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                 </div>
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label for="service_level" class="form-label">Service Level</label>
-                                        {{ form.service_level(class_="form-select" + (" is-invalid" if form.service_level.errors else "") ) }}
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <label for="service_level" class="form-label">Service Level</label>
+                                            <div class="validation-indicator" id="service_level-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                            </div>
+                                        </div>
+                                        {{ form.service_level(class_="form-select" + (" is-invalid" if form.service_level.errors else ""),
+                                                              data_field="service_level") }}
                                         {% for error in form.service_level.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                     <div class="col-md-6">
-                                        <label for="price_level" class="form-label">Price Level</label>
-                                        {{ form.price_level(class_="form-select" + (" is-invalid" if form.price_level.errors else "") ) }}
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <label for="price_level" class="form-label">Price Level</label>
+                                            <div class="validation-indicator" id="price_level-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                            </div>
+                                        </div>
+                                        {{ form.price_level(class_="form-select" + (" is-invalid" if form.price_level.errors else ""),
+                                                             data_field="price_level") }}
                                         {% for error in form.price_level.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                 </div>
@@ -155,13 +200,15 @@
                                         <label for="rating" class="form-label">Your Rating</label>
                                         {{ form.rating(class_="form-control" + (" is-invalid" if form.rating.errors else "") ) }}
                                         {% for error in form.rating.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        <div class="validation-indicator" id="rating-validation-indicator"></div>
                                     </div>
                                 </div>
                                 <div class="row g-3">
                                     <div class="col-12">
                                         <label for="description" class="form-label">Description</label>
-                                        {{ form.description(class_="form-control" + (" is-invalid" if form.description.errors
-                                                                                else "") , rows="5", placeholder="Brief description of the restaurant") }}
+                                        {{ form.description(class_="form-control" + (" is-invalid" if form.description.errors else ""),
+                                                            rows="5",
+                                                            placeholder="Brief description of the restaurant") }}
                                         {% for error in form.description.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                 </div>
@@ -179,74 +226,100 @@
                                 <!-- Address Fields -->
                                 <div class="row g-3">
                                         <div class="col-md-8">
-                                            <label for="address_line_1" class="form-label">Address Line 1</label>
-                                            {{ form.address_line_1(class_="form-control" + (" is-invalid" if form.address_line_1.errors else "") ,
-                                            id="address_line_1",
-                                            placeholder="Street Address",
-                                            autocomplete="address-line1") }}
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label for="address_line_1" class="form-label">Address Line 1</label>
+                                                <div class="validation-indicator" id="address_line_1-validation-indicator">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-question-circle text-secondary"></i>
+                                                        Not validated
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            {{ form.address_line_1(class_="form-control" + (" is-invalid" if form.address_line_1.errors else ""),
+                                                                   id="address_line_1",
+                                                                   placeholder="Street Address",
+                                                                   autocomplete="address-line1",
+                                                                   data_field="address_line_1") }}
                                             <div id="address_line_1-error" class="text-danger small mt-1 d-none"></div>
                                             {% for error in form.address_line_1.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
                                         <div class="col-md-4">
                                             <label for="address_line_2" class="form-label">Address Line 2</label>
-                                            {{ form.address_line_2(class_="form-control" + (" is-invalid" if form.address_line_2.errors else "") ,
-                                            id="address_line_2",
-                                            placeholder="Apt, suite, unit, etc.",
-                                            autocomplete="address-line2"
-                                            ) }}
+                                            {{ form.address_line_2(class_="form-control" + (" is-invalid" if form.address_line_2.errors else ""),
+                                                                   id="address_line_2",
+                                                                   placeholder="Apt, suite, unit, etc.",
+                                                                   autocomplete="address-line2") }}
                                             {% for error in form.address_line_2.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                            <div class="validation-indicator" id="address_line_2-validation-indicator"></div>
                                         </div>
                                         <div id="address-suggestions" class="mt-2"></div>
                                         <div id="address-valid-indicator" class="mt-2 small"></div>
                                         <div class="col-md-6">
                                             <label for="city" class="form-label">City</label>
-                                            {{ form.city(class_="form-control" + (" is-invalid" if form.city.errors else "") ,
-                                            id="city",
-                                            placeholder="City",
-                                            autocomplete="address-level2"
-                                            ) }}
+                                            {{ form.city(class_="form-control" + (" is-invalid" if form.city.errors else ""),
+                                                         id="city",
+                                                         placeholder="City",
+                                                         autocomplete="address-level2") }}
                                             {% for error in form.city.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                            <div class="validation-indicator" id="city-validation-indicator"></div>
                                         </div>
                                         <div class="col-md-3">
                                             <label for="state" class="form-label">State/Province</label>
-                                            {{ form.state(class_="form-control" + (" is-invalid" if form.state.errors else "") ,
-                                            id="state",
-                                            placeholder="State/Province",
-                                            autocomplete="address-level1"
-                                            ) }}
+                                            {{ form.state(class_="form-select" + (" is-invalid" if form.state.errors else ""),
+                                                          id="state") }}
                                             {% for error in form.state.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                            <div class="validation-indicator" id="state-validation-indicator"></div>
                                         </div>
                                         <div class="col-md-3">
                                             <label for="postal_code" class="form-label">Postal Code</label>
-                                            {{ form.postal_code(class_="form-control" + (" is-invalid" if
-                                                                                        form.postal_code.errors else "") ,
-                                            id="postal_code",
-                                            placeholder="Postal code",
-                                            autocomplete="postal-code"
-                                            ) }}
+                                            {{ form.postal_code(class_="form-control" + (" is-invalid" if form.postal_code.errors else ""),
+                                                                id="postal_code",
+                                                                placeholder="Postal code",
+                                                                autocomplete="postal-code") }}
                                             {% for error in form.postal_code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                            <div class="validation-indicator" id="postal_code-validation-indicator"></div>
                                         </div>
                                         <div class="col-md-6">
                                             <label for="country" class="form-label">Country</label>
-                                            {{ form.country(class_="form-control" + (" is-invalid" if form.country.errors else
-                                                                                        "") ,
-                                            id="country",
-                                            placeholder="Country",
-                                            autocomplete="country"
-                                            ) }}
+                                            {{ form.country(class_="form-control" + (" is-invalid" if form.country.errors else ""),
+                                                             id="country",
+                                                             placeholder="Country",
+                                                             autocomplete="country") }}
                                             {% for error in form.country.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                            <div class="validation-indicator" id="country-validation-indicator"></div>
                                         </div>
                                         <div class="col-md-6">
-                                            <label for="phone" class="form-label">Phone Number</label>
-                                            {{ form.phone(class_="form-control" + (" is-invalid" if form.phone.errors else "") ,
-                                            placeholder="Phone number", autocomplete="tel") }}
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label for="phone" class="form-label">Phone Number</label>
+                                                <div class="validation-indicator" id="phone-validation-indicator">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-question-circle text-secondary"></i>
+                                                        Not validated
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            {{ form.phone(class_="form-control" + (" is-invalid" if form.phone.errors else ""),
+                                                         placeholder="Phone number",
+                                                         autocomplete="tel",
+                                                         data_field="phone") }}
                                             {% for error in form.phone.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
                                         <div class="col-12">
-                                            <label for="website" class="form-label">Website</label>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label for="website" class="form-label">Website</label>
+                                                <div class="validation-indicator" id="website-validation-indicator">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-question-circle text-secondary"></i>
+                                                        Not validated
+                                                    </small>
+                                                </div>
+                                            </div>
                                             <div class="input-group">
-                                                {{ form.website(class_="form-control" + (" is-invalid" if form.website.errors else
-                                                                                            "") , placeholder="https://example.com", id="website", autocomplete="url") }}
+                                                {{ form.website(class_="form-control" + (" is-invalid" if form.website.errors else ""),
+                                                                    placeholder="https://example.com",
+                                                                    id="website",
+                                                                    autocomplete="url",
+                                                                    data_field="website") }}
                                                 <button type="button"
                                                         class="btn btn-outline-secondary"
                                                         id="open-website-btn"
@@ -300,7 +373,6 @@
                                 </div>
                             </div>
 
-                            <hr class="section-divider">
 
                             <!-- Additional Information Section -->
                             <div class="form-section">
@@ -312,7 +384,9 @@
                                 <div class="row g-3">
                                     <div class="col-12">
                                         <label for="notes" class="form-label">Notes</label>
-                                        {{ form.notes(class_="form-control" + (" is-invalid" if form.notes.errors else "") , rows="3", placeholder="Additional notes about the restaurant") }}
+                                        {{ form.notes(class_="form-control" + (" is-invalid" if form.notes.errors else ""),
+                                                     rows="3",
+                                                     placeholder="Additional notes about the restaurant") }}
                                         {% for error in form.notes.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                 </div>

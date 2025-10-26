@@ -45,7 +45,10 @@ def _create_error_response(
         return response
 
     # For web requests, render an error template
-    return (render_template("errors/error.html", message=message, status_code=status_code), status_code)
+    return (
+        render_template("errors/error.html", message=message, status_code=status_code),
+        status_code,
+    )
 
 
 @bp.app_errorhandler(404)

@@ -34,7 +34,10 @@ class ServiceLevelDetector:
     # Price level thresholds for service level detection
     PRICE_LEVEL_THRESHOLDS = {
         ServiceLevel.FINE_DINING: (3, 4),  # Expensive to Very Expensive
-        ServiceLevel.CASUAL_DINING: (1, 3),  # Inexpensive to Expensive (broader range for casual dining)
+        ServiceLevel.CASUAL_DINING: (
+            1,
+            3,
+        ),  # Inexpensive to Expensive (broader range for casual dining)
         ServiceLevel.FAST_CASUAL: (1, 2),  # Inexpensive to Moderate
         ServiceLevel.QUICK_SERVICE: (0, 1),  # Free to Inexpensive
     }
@@ -534,15 +537,36 @@ def _calculate_reviews_score(reviews: list, score_type: str) -> float:
     # Define keyword scoring rules for each service type
     keyword_rules = {
         "fine_dining": {
-            "positive": (["prix fixe", "chef", "elegant", "wine list", "sommelier", "formal", "dress code"], 1.0),
-            "neutral": (["family-friendly", "comfort food", "generous portions", "wait staff"], 0.5),
+            "positive": (
+                ["prix fixe", "chef", "elegant", "wine list", "sommelier", "formal", "dress code"],
+                1.0,
+            ),
+            "neutral": (
+                ["family-friendly", "comfort food", "generous portions", "wait staff"],
+                0.5,
+            ),
         },
         "fast_casual": {
-            "positive": (["fresh ingredients", "customizable", "made to order", "healthy", "assembly line"], 0.5),
+            "positive": (
+                ["fresh ingredients", "customizable", "made to order", "healthy", "assembly line"],
+                0.5,
+            ),
             "negative": (["fast", "quick", "cheap", "convenient", "drive-thru"], -1.0),
         },
         "quick_service": {
-            "positive": (["fast", "quick", "cheap", "convenient", "drive-thru", "fast food", "takeout", "to-go"], 1.0),
+            "positive": (
+                [
+                    "fast",
+                    "quick",
+                    "cheap",
+                    "convenient",
+                    "drive-thru",
+                    "fast food",
+                    "takeout",
+                    "to-go",
+                ],
+                1.0,
+            ),
             "negative": (["fresh ingredients", "customizable", "made to order", "healthy"], -0.5),
         },
     }

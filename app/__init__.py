@@ -1,17 +1,20 @@
 import logging
+import os
 from typing import Optional, Union
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import get_config
 
-from .extensions import jwt
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-__all__ = ["create_app", "jwt"]
+__all__ = ["create_app"]
 
 
 def create_app(config_name: Optional[str] = None) -> Flask:
@@ -163,8 +166,8 @@ def _set_security_headers(response, content_type: str) -> None:
             "script-src 'self' 'unsafe-inline' https://code.jquery.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://maps.googleapis.com https://maps.gstatic.com; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
             "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
-            "img-src 'self' data: https: blob:; "
-            "connect-src 'self' https://places.googleapis.com https://maps.googleapis.com https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https: blob: https://places.googleapis.com https://maps.googleapis.com; "
+            "connect-src 'self' https://maps.googleapis.com https://places.googleapis.com https://cdn.jsdelivr.net; "
             "frame-ancestors 'none'; "
             "object-src 'none'; "
             "base-uri 'self';"
@@ -207,9 +210,6 @@ def _initialize_components(app: Flask) -> None:
     # Initialize the database
     init_database(app)
 
-    # Configure JWT settings
-    _configure_jwt_handlers(app)
-
     # Register blueprints
     _register_blueprints(app)
 
@@ -228,9 +228,10 @@ def _initialize_components(app: Flask) -> None:
     logger.debug("Template filters initialized")
 
     # Initialize context processors
-    from .utils.context_processors import inject_user_context
+    from .utils.context_processors import inject_cuisine_data, inject_user_context
 
     app.context_processor(inject_user_context)
+    app.context_processor(inject_cuisine_data)
     logger.debug("Context processors initialized")
 
     # Configure CORS
@@ -259,18 +260,6 @@ def _initialize_admin_and_cli(app: Flask) -> None:
     register_expenses_commands(app)
     register_restaurant_commands(app)
     logger.debug("Initialized CLI commands")
-
-
-def _configure_jwt_handlers(app: Flask) -> None:
-    """Configure JWT error handlers."""
-
-    @jwt.invalid_token_loader
-    def invalid_token_callback(error: str) -> Union[str, tuple]:
-        return jsonify({"status": "error", "message": "Invalid or expired token", "error": str(error)}), 401
-
-    @jwt.unauthorized_loader
-    def missing_token_callback(error: str) -> Union[str, tuple]:
-        return jsonify({"status": "error", "message": "Missing authorization token", "error": str(error)}), 401
 
 
 def _register_blueprints(app: Flask) -> None:
@@ -339,7 +328,15 @@ def _configure_cors(app: Flask) -> None:
             resources={
                 r"/*": {
                     "origins": "*",  # Allow all origins
-                    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],  # All methods
+                    "methods": [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "OPTIONS",
+                        "HEAD",
+                        "PATCH",
+                    ],  # All methods
                     "allow_headers": "*",  # Allow all headers
                     "expose_headers": [
                         "Content-Length",

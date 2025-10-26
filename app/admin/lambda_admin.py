@@ -85,7 +85,8 @@ class LambdaAdminHandler:
             return {
                 "statusCode": 200,
                 "body": json.dumps(
-                    {**result, "operation": operation_name, "timestamp": self._get_timestamp()}, default=str
+                    {**result, "operation": operation_name, "timestamp": self._get_timestamp()},
+                    default=str,
                 ),
                 "headers": {"Content-Type": "application/json"},
             }

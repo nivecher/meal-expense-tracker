@@ -23,61 +23,16 @@ data "aws_ssm_parameter" "app_secret_key" {
   ]
 }
 
+# Get ECR repository for container images
+data "aws_ecr_repository" "lambda" {
+  name = "${var.app_name}-${var.environment}-lambda"
+}
+
 # Note: DB_URL will be constructed at runtime in the Lambda function using the secret
 
-# S3 Object for Lambda Layer Package
-resource "aws_s3_object" "lambda_layer_package" {
-  count = var.layer_s3_bucket != "" && var.layer_s3_key != "" ? 1 : 0
+# No S3 objects needed for container images - everything is in the container
 
-  bucket = var.layer_s3_bucket
-  key    = var.layer_s3_key
-  source = var.layer_local_path
-  etag   = filemd5(var.layer_local_path)
-
-  # Ensure the object is recreated when the source file changes
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# S3 Object for Lambda Application Package
-resource "aws_s3_object" "lambda_app_package" {
-  bucket = var.s3_bucket
-  key    = var.s3_key
-  source = var.app_local_path
-  etag   = filemd5(var.app_local_path)
-
-  # Ensure the object is recreated when the source file changes
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Lambda Layer for Python Dependencies
-resource "aws_lambda_layer_version" "python_dependencies" {
-  layer_name               = "${var.app_name}-${var.environment}-dependencies"
-  description              = "Python dependencies for ${var.app_name} in ${var.environment}"
-  s3_bucket                = var.layer_s3_bucket
-  s3_key                   = var.layer_s3_key
-  s3_object_version        = try(aws_s3_object.lambda_layer_package[0].version_id, null)
-  compatible_runtimes      = var.compatible_runtimes
-  compatible_architectures = var.compatible_architectures
-
-  # Ensure the layer is recreated when the S3 object changes
-  lifecycle {
-    create_before_destroy = true
-
-    # Ignore changes to the source code hash as we're using S3 object versioning
-    ignore_changes = [
-      source_code_hash
-    ]
-  }
-
-  # Depend on the S3 object to ensure it's created first
-  depends_on = [
-    aws_s3_object.lambda_layer_package
-  ]
-}
+# No Lambda layers needed for container images - dependencies are in the container
 
 # CloudWatch Log Group for Lambda
 resource "aws_cloudwatch_log_group" "lambda" {
@@ -181,14 +136,16 @@ resource "aws_iam_role_policy" "lambda_policy" {
         ]
         Resource = "*"
       },
-      # Secrets Manager access
+      # Secrets Manager access for Supabase
       {
         Effect = "Allow"
         Action = [
-          "secretsmanager:GetSecretValue"
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
         ]
         Resource = [
-          var.db_secret_arn
+          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${var.app_name}/${var.environment}/supabase-*",
+          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${var.app_name}*supabase*"
         ]
       },
       # SSM Parameter Store access for application configuration
@@ -230,11 +187,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# Attach AWS managed policy for VPC access if VPC is configured
-resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
+# VPC policy attachment removed - not using VPC anymore
 
 # Attach the combined IAM policy from the IAM module
 resource "aws_iam_role_policy_attachment" "lambda_combined" {
@@ -249,39 +202,34 @@ resource "aws_iam_role_policy_attachment" "lambda_xray" {
   policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
 }
 
-# Get the latest OpenTelemetry Lambda Layer
-# ARN format: arn:aws:lambda:${var.aws_region}:901920570463:layer:aws-otel-collector-${var.aws_region}:1
-
-locals {
-  otel_layer_arn = "arn:aws:lambda:${var.aws_region}:901920570463:layer:aws-otel-collector-${var.aws_region}:1"
-
-  # Base layers (Python dependencies if configured)
-  base_layers = var.layer_s3_bucket != "" && var.layer_s3_key != "" ? [aws_lambda_layer_version.python_dependencies.arn] : []
-
-  # Add OpenTelemetry layer if enabled
-  all_layers = var.enable_otel_tracing ? concat(local.base_layers, [local.otel_layer_arn]) : local.base_layers
-
-  db_url = "${var.db_protocol}://${var.db_username}:${var.db_password}@${var.db_host}:${var.db_port}/${var.db_name}"
-
-  # Force dependency on DynamoDB table (ensures table exists before Lambda)
-  dynamodb_dependency = var.dynamodb_table_arn != "" ? var.dynamodb_table_arn : null
-}
 
 # Lambda Function
 resource "aws_lambda_function" "main" {
   function_name = "${var.app_name}-${var.environment}"
   role          = aws_iam_role.lambda_role.arn
-  handler       = var.handler
-  runtime       = var.runtime
   architectures = var.architectures
   memory_size   = var.memory_size
   timeout       = var.run_migrations ? max(var.timeout, 300) : var.timeout # Min 5 min for migrations
   publish       = true
 
-  # Ensure DynamoDB table exists before Lambda deployment
+  # Package type - determines deployment method
+  package_type = var.package_type
+
+  # Handler and runtime only needed for ZIP packages
+  handler = var.package_type == "Zip" ? var.handler : null
+  runtime = var.package_type == "Zip" ? var.runtime : null
+
+  # Container image URI for Image packages - use latest tag for easier iteration
+  # Note: Must ensure the image is tagged as 'latest' when pushing to ECR
+  image_uri = var.package_type == "Image" ? "${data.aws_ecr_repository.lambda.repository_url}:latest" : null
+
+  # S3 configuration for ZIP packages (only if package_type is Zip)
+  s3_bucket = var.package_type == "Zip" ? var.s3_bucket : null
+  s3_key    = var.package_type == "Zip" ? var.s3_key : null
+
+  # Ensure IAM roles are attached before Lambda deployment
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic_execution,
-    aws_iam_role_policy_attachment.lambda_vpc_access,
     aws_iam_role_policy_attachment.lambda_combined,
   ]
 
@@ -290,13 +238,20 @@ resource "aws_lambda_function" "main" {
     mode = var.enable_xray_tracing ? "Active" : "PassThrough"
   }
 
-  # Use S3 for deployment package
-  s3_bucket        = var.s3_bucket
-  s3_key           = var.s3_key
-  source_code_hash = fileexists(var.app_local_path) ? filebase64sha256(var.app_local_path) : null
+  # Container image URI for Image package type (not used for ZIP packages)
+  # image_uri = var.package_type == "Image" ? "${data.aws_ecr_repository.lambda.repository_url}:latest" : null
 
-  # Attach the required layers
-  layers = local.all_layers
+  # Source code hash for Zip packages (not needed for container images)
+  source_code_hash = var.package_type == "Zip" ? null : null
+
+  # Lifecycle rules to prevent unnecessary updates
+  lifecycle {
+    # Ignore source_code_hash changes for all package types
+    # This prevents unnecessary updates when only metadata changes
+    ignore_changes = [
+      source_code_hash,
+    ]
+  }
 
   # Environment variables including enhanced monitoring
   environment {
@@ -314,10 +269,9 @@ resource "aws_lambda_function" "main" {
         GOOGLE_MAPS_API_KEY = data.aws_ssm_parameter.google_maps_api_key.value
         GOOGLE_MAPS_MAP_ID  = data.aws_ssm_parameter.google_maps_map_id.value
 
-        # Email configuration (AWS SES)
-        MAIL_ENABLED        = var.mail_enabled ? "true" : "false"
-        MAIL_DEFAULT_SENDER = var.mail_default_sender
-        AWS_SES_REGION      = var.aws_ses_region
+        # Notification configuration (AWS SNS)
+        NOTIFICATIONS_ENABLED = "true"
+        # SNS_TOPIC_ARN will be constructed at runtime in config.py
 
         # Database configuration will be set at runtime via the secret
 
@@ -331,16 +285,15 @@ resource "aws_lambda_function" "main" {
         # Application configuration
         FLASK_ENV           = "production"
         ENABLE_AWS_SERVICES = "true"
-        DATABASE_URL        = local.db_url
+        # DATABASE_URL not set - Lambda will read from Secrets Manager directly
+        DATABASE_SECRET_NAME = "meal-expense-tracker/${var.environment}/supabase-connection"
 
         # Security configuration - include both custom domain and API Gateway execution URL
         ALLOWED_REFERRER_DOMAINS = "${var.server_name},${var.api_gateway_domain_name}"
+        SERVER_NAME              = var.server_name
+        API_GATEWAY_DOMAIN_NAME  = var.api_gateway_domain_name
 
-        # DynamoDB session configuration (available but not used in Lambda)
-        SESSION_DYNAMODB_TABLE    = var.session_table_name
-        SESSION_DYNAMODB_REGION   = data.aws_region.current.name # Optional: falls back to built-in AWS_REGION
-        SESSION_DYNAMODB_ENDPOINT = ""                           # Use AWS default endpoint
-        SESSION_TIMEOUT           = "3600"                       # 1 hour session timeout
+        SESSION_TIMEOUT = "3600" # 1 hour session timeout
 
         # X-Ray tracing is enabled via IAM permissions and X-Ray daemon
         # _X_AMZN_TRACE_ID is automatically set by Lambda when X-Ray tracing is enabled
@@ -361,10 +314,13 @@ resource "aws_lambda_function" "main" {
     )
   }
 
-  # VPC configuration if VPC ID is provided
-  vpc_config {
-    subnet_ids         = var.subnet_ids
-    security_group_ids = [aws_security_group.lambda.id]
+  # VPC configuration only if subnet IDs are provided (optional for Lambda without VPC)
+  dynamic "vpc_config" {
+    for_each = length(var.subnet_ids) > 0 ? [1] : []
+    content {
+      subnet_ids         = var.subnet_ids
+      security_group_ids = var.vpc_id != "" ? [aws_security_group.lambda[0].id] : []
+    }
   }
 
   # Dead Letter Queue configuration if enabled
@@ -386,12 +342,27 @@ resource "aws_lambda_function" "main" {
   )
 }
 
-resource "aws_security_group_rule" "lambda_to_rds" {
+# Security group rules for Lambda→Aurora and Lambda→RDS Proxy
+resource "aws_security_group_rule" "lambda_to_aurora" {
+  count = var.vpc_id != "" ? 1 : 0
+
   type                     = "egress"
   from_port                = 5432
   to_port                  = 5432
   protocol                 = "tcp"
-  security_group_id        = aws_security_group.lambda.id
+  security_group_id        = aws_security_group.lambda[0].id
   source_security_group_id = var.db_security_group_id
-  description              = "Allow Lambda to access RDS"
+  description              = "Allow Lambda to access Aurora via RDS Proxy"
+}
+
+resource "aws_security_group_rule" "lambda_to_rds_proxy" {
+  count = var.vpc_id != "" ? 1 : 0
+
+  type                     = "egress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.lambda[0].id
+  source_security_group_id = var.rds_proxy_security_group_id
+  description              = "Allow Lambda to access RDS Proxy"
 }

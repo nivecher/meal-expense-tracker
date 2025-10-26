@@ -6,8 +6,8 @@ from flask import Flask
 
 from app.constants.cuisines import (
     get_cuisine_color,
-    get_cuisine_css_class,
     get_cuisine_icon,
+    validate_cuisine_name,
 )
 from app.constants.meal_type_colors import get_meal_type_color
 from app.constants.meal_types import get_meal_type_icon
@@ -115,11 +115,21 @@ def cuisine_css_class_filter(cuisine_name: str) -> str:
     Returns:
         CSS class string
     """
-    return get_cuisine_css_class(cuisine_name)
+    if not cuisine_name or not isinstance(cuisine_name, str):
+        return "cuisine-default"
+
+    # Normalize to lowercase and replace spaces with hyphens for CSS class
+    normalized_name = cuisine_name.strip().lower().replace(" ", "-")
+
+    # Validate cuisine exists
+    if validate_cuisine_name(cuisine_name):
+        return normalized_name
+
+    return "cuisine-default"
 
 
 def meal_type_css_class_filter(meal_type: str) -> str:
-    """Get the CSS class for a meal type using centralized approach.
+    """Get the CSS class for a meal type.
 
     Args:
         meal_type: The meal type name
@@ -127,9 +137,19 @@ def meal_type_css_class_filter(meal_type: str) -> str:
     Returns:
         CSS class name string
     """
-    from app.constants.meal_types import get_meal_type_css_class
+    from app.constants import validate_meal_type_name
 
-    return get_meal_type_css_class(meal_type)
+    if not meal_type or not isinstance(meal_type, str):
+        return "meal-type-default"
+
+    # Normalize to lowercase and replace spaces with hyphens for CSS class
+    normalized_name = meal_type.strip().lower().replace(" ", "-")
+
+    # Validate meal type exists
+    if validate_meal_type_name(meal_type):
+        return normalized_name
+
+    return "meal-type-default"
 
 
 def order_type_icon(order_type: str) -> str:

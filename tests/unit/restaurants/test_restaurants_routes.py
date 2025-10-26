@@ -427,6 +427,64 @@ class TestRestaurantsRoutes:
             cuisine, service_level = mock_places_service.analyze_restaurant_types([], {"name": "Generic Restaurant"})
             assert cuisine is None
 
+    def test_analyze_restaurant_types_dessert_shop_quick_service(self, app):
+        """Test that inexpensive dessert shops are classified as quick service."""
+        place_data = {"primaryType": "dessert_shop", "priceLevel": "PRICE_LEVEL_INEXPENSIVE"}
+
+        with app.app_context():
+            # Use the actual service instead of mocking to test the logic
+            from app.services.google_places_service import GooglePlacesService
+
+            service = GooglePlacesService(api_key="test_key")  # Won't actually call API
+
+            # Test the detection logic directly
+            service_level, confidence = service.detect_service_level_from_data(place_data)
+            assert service_level == "quick_service"
+            assert confidence >= 0.6  # Should have reasonable confidence after simplification
+
+    def test_analyze_restaurant_types_expensive_dessert_shop_casual_dining(self, app):
+        """Test that expensive dessert shops are classified as casual dining."""
+        place_data = {"primaryType": "dessert_shop", "priceLevel": "PRICE_LEVEL_EXPENSIVE"}
+
+        with app.app_context():
+            from app.services.google_places_service import GooglePlacesService
+
+            service = GooglePlacesService(api_key="test_key")
+
+            # Test the detection logic directly
+            service_level, confidence = service.detect_service_level_from_data(place_data)
+            # Expensive dessert shops should be casual dining since they have sit-down service
+            assert service_level == "casual_dining"
+
+    def test_analyze_restaurant_types_fast_food_primary_type_casual_dining(self, app):
+        """Test that fast_food_restaurant as primary type is classified as casual dining (simplified logic)."""
+        place_data = {"primaryType": "fast_food_restaurant", "priceLevel": "PRICE_LEVEL_MODERATE"}
+
+        with app.app_context():
+            from app.services.google_places_service import GooglePlacesService
+
+            service = GooglePlacesService(api_key="test_key")
+
+            # Test the detection logic directly
+            service_level, confidence = service.detect_service_level_from_data(place_data)
+            assert service_level == "casual_dining"  # Simplified logic classifies fast food as casual dining
+            assert confidence >= 0.6  # Should have reasonable confidence after simplification
+
+    def test_format_primary_type_for_display(self, app):
+        """Test formatting primary types for display."""
+        with app.app_context():
+            from app.services.google_places_service import GooglePlacesService
+
+            service = GooglePlacesService(api_key="test_key")
+
+            # Test various primary types
+            assert service.format_primary_type_for_display("fast_food_restaurant") == "Fast Food Restaurant"
+            assert service.format_primary_type_for_display("ice_cream_shop") == "Ice Cream Shop"
+            assert service.format_primary_type_for_display("dessert_shop") == "Dessert Shop"
+            assert service.format_primary_type_for_display("coffee_shop") == "Coffee Shop"
+            assert service.format_primary_type_for_display("") is None
+            assert service.format_primary_type_for_display(None) is None
+
     def test_detect_chain_restaurant_mcdonalds(self, app):
         """Test detecting McDonald's as chain."""
         with patch("app.services.google_places_service.get_google_places_service") as mock_get_service:

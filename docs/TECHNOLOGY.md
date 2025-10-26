@@ -41,8 +41,7 @@ This document outlines the technology choices and architecture decisions for the
 - **Authentication & Security**:
 
   - Flask-Login for session-based authentication
-  - JWT for API token authentication
-  - Flexible session storage (DynamoDB for AWS, signed cookies for Lambda)
+  - Signed cookie sessions for all environments (no external storage required)
   - Flask-Limiter for rate limiting
   - CSRF protection (disabled in Lambda, enabled in development)
 

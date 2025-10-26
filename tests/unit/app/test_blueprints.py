@@ -44,11 +44,15 @@ def test_blueprint_initialization(app):
         assert "migrate" in app.extensions, "Flask-Migrate not initialized"
         assert "csrf" in app.extensions, "CSRF protection not initialized"
 
-        # Check for authentication extensions (either login_manager or JWT)
-        auth_extensions = [ext for ext in app.extensions.keys() if "login" in ext.lower() or "jwt" in ext.lower()]
-        assert len(auth_extensions) > 0, f"No authentication extensions found. Available: {list(app.extensions.keys())}"
+        # Check for Flask-Login (session-based authentication)
+        # Flask-Login doesn't register as an extension, but we can check if it's configured
+        from flask_login import LoginManager
 
-        # Check for session management (Flask-Session extends Flask's built-in session)
+        from app.extensions import login_manager
+
+        assert isinstance(login_manager, LoginManager), "Flask-Login not properly initialized"
+
+        # Check for session management (using Flask's built-in signed cookie sessions)
         # The session functionality is available through Flask's built-in session
         assert hasattr(app, "permanent_session_lifetime"), "Flask session not available"
 

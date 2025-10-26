@@ -75,7 +75,7 @@ class Restaurant(BaseModel):
 
     # Contact Information
     phone: Mapped[Optional[str]] = db.Column(db.String(20), comment="Contact phone number")
-    website: Mapped[Optional[str]] = db.Column(db.String(200), comment="Restaurant website URL")
+    website: Mapped[Optional[str]] = db.Column(db.String(500), comment="Restaurant website URL")
     email: Mapped[Optional[str]] = db.Column(db.String(100), comment="Contact email")
     google_place_id: Mapped[Optional[str]] = db.Column(
         db.String(255), index=True, comment="Google Place ID for the restaurant"
@@ -84,7 +84,9 @@ class Restaurant(BaseModel):
     # Business Details - User Customizable
     cuisine: Mapped[Optional[str]] = db.Column(db.String(100), index=True, comment="Type of cuisine")
     service_level: Mapped[Optional[str]] = db.Column(
-        db.String(50), index=True, comment="Service level (fine_dining, casual_dining, fast_casual, quick_service)"
+        db.String(50),
+        index=True,
+        comment="Service level (fine_dining, casual_dining, fast_casual, quick_service)",
     )
     is_chain: Mapped[bool] = db.Column(
         db.Boolean,
@@ -94,10 +96,12 @@ class Restaurant(BaseModel):
     )
     rating: Mapped[Optional[float]] = db.Column(db.Float, comment="User's personal rating (1.0-5.0)")
     price_level: Mapped[Optional[int]] = db.Column(
-        db.Integer, comment="Price level from Google Places (0=Free, 1=$1-10, 2=$11-30, 3=$31-60, 4=$61+)"
+        db.Integer,
+        comment="Price level from Google Places (0=Free, 1=$1-10, 2=$11-30, 3=$31-60, 4=$61+)",
     )
     primary_type: Mapped[Optional[str]] = db.Column(
-        db.String(100), comment="Primary business type from Google Places API (e.g., restaurant, cafe, bar)"
+        db.String(100),
+        comment="Primary business type from Google Places API (e.g., restaurant, cafe, bar)",
     )
     latitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Restaurant latitude coordinate")
     longitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Restaurant longitude coordinate")

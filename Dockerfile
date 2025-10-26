@@ -101,30 +101,49 @@ CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-class", "gevent", "--worker
 # ============================================
 FROM public.ecr.aws/lambda/python:3.13 AS lambda
 
-# Install minimal system dependencies
-RUN dnf install -y gcc python3-devel libffi-devel openssl-devel \
+# Install system dependencies for building Python packages
+RUN dnf install -y \
+    gcc \
+    python3-devel \
+    libffi-devel \
+    openssl-devel \
+    postgresql-devel \
+    postgresql-libs \
     && dnf clean all
 
 WORKDIR ${LAMBDA_TASK_ROOT}
 
-# Copy requirements and install production dependencies only
+# Copy requirements first for better layer caching
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Python dependencies with proper architecture support
+RUN pip install --no-cache-dir --upgrade pip wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . ${LAMBDA_TASK_ROOT}
 
-# Set permissions and create directories
+# Create necessary directories and set permissions
 RUN mkdir -p ${LAMBDA_TASK_ROOT}/instance \
+    ${LAMBDA_TASK_ROOT}/migrations/versions \
     && chown -R 1001:0 ${LAMBDA_TASK_ROOT} \
-    && chmod -R 755 ${LAMBDA_TASK_ROOT} \
-    && chmod +x ${LAMBDA_TASK_ROOT}/entrypoint.sh
+    && chmod -R 755 ${LAMBDA_TASK_ROOT}
+
+# Copy and set up entrypoint if it exists
+RUN if [ -f "${LAMBDA_TASK_ROOT}/docker-entrypoint.sh" ]; then \
+        chmod +x ${LAMBDA_TASK_ROOT}/docker-entrypoint.sh; \
+    fi
 
 # Lambda environment variables
 ENV PYTHONPATH=/var/task \
     LAMBDA_TASK_ROOT=/var/task \
     FLASK_APP=wsgi:app \
-    FLASK_ENV=production
+    FLASK_ENV=production \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
+# Switch to non-root user for security
 USER 1001
+
+# Set the Lambda handler
 CMD ["wsgi.lambda_handler"]

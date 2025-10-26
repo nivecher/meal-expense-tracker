@@ -266,11 +266,23 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
         from app.services.google_places_service import get_google_places_service
 
         if restaurant.google_place_id:
-            places_service = get_google_places_service()
+            try:
+                places_service = get_google_places_service()
+            except ValueError as e:
+                if "API key" in str(e):
+                    return {
+                        "valid": False,
+                        "errors": ["Google Places API key not configured - cannot validate"],
+                    }
+                raise
+
             place_data = places_service.get_place_details(restaurant.google_place_id, "comprehensive")
 
             if not place_data:
-                return {"valid": False, "errors": ["Failed to retrieve place data from Google Places API"]}
+                return {
+                    "valid": False,
+                    "errors": ["Failed to retrieve place data from Google Places API"],
+                }
 
             # Extract restaurant data using the service
             google_data = places_service.extract_restaurant_data(place_data)
@@ -297,6 +309,7 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                 # Legacy field for backward compatibility
                 "google_street_address": google_data.get("street_address"),
                 "google_service_level": places_service.detect_service_level_from_data(place_data),
+                "google_cuisine": places_service.analyze_restaurant_types(google_data.get("types", []), place_data)[0],
                 "errors": [],
             }
         else:
@@ -520,6 +533,21 @@ def _check_restaurant_mismatches(restaurant: Restaurant, validation_result: dict
     # Check service level mismatch
     _check_service_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
 
+    # Check price level mismatch
+    _check_price_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    # Check cuisine mismatch
+    _check_cuisine_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    # Check phone mismatch
+    _check_phone_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    # Check website mismatch
+    _check_website_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    # Check type mismatch
+    _check_type_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
     return mismatches, fixes_to_apply
 
 
@@ -555,66 +583,70 @@ def _check_address_mismatches(
             fixes_to_apply[restaurant_field] = google_value
 
     # Handle state field with specialized matching
-    _check_state_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+    current_data = {
+        "state": restaurant.state,
+        "country": restaurant.country,
+    }
+    _check_state_mismatch(current_data, validation_result, mismatches, fixes_to_apply)
 
 
-def _check_state_mismatch(
-    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
-) -> None:
+def _check_state_mismatch(current_data: dict, validation_result: dict, mismatches: list, fixes_to_apply: dict) -> None:
     """Check for state field mismatches using multiple comparison methods."""
 
     google_state = validation_result.get("google_state")
     google_state_long = validation_result.get("google_state_long")
     google_state_short = validation_result.get("google_state_short")
-    restaurant_state = restaurant.state
+    current_state = current_data.get("state")
 
-    if not ((google_state or google_state_long or google_state_short) and restaurant_state):
+    if not ((google_state or google_state_long or google_state_short) and current_state):
         return
 
     # Check direct string matches first
-    if _states_match_directly(restaurant_state, google_state, google_state_long, google_state_short):
+    if _states_match_directly(current_state, google_state, google_state_long, google_state_short):
         return
 
     # Try US library matching as fallback
-    if _states_match_with_us_library(restaurant_state, google_state, google_state_long, google_state_short):
+    if _states_match_with_us_library(current_state, google_state, google_state_long, google_state_short):
         return
 
     # No matches found - report mismatch
-    mismatches.append(f"State: '{restaurant_state}' vs Google: '{google_state}'")
-    fixes_to_apply["state"] = google_state
+    # Use long version for display if available, otherwise fall back to regular state
+    display_state = google_state_long or google_state
+    mismatches.append(f"State: '{current_state}' vs Google: '{display_state}'")
+    fixes_to_apply["state"] = google_state_long or google_state
 
 
 def _states_match_directly(
-    restaurant_state: str, google_state: str, google_state_long: str, google_state_short: str
+    current_state: str, google_state: str, google_state_long: str, google_state_short: str
 ) -> bool:
-    """Check if restaurant state matches any Google state format directly."""
-    restaurant_state_lower = restaurant_state.lower()
+    """Check if current state matches any Google state format directly."""
+    current_state_lower = current_state.lower()
 
-    if google_state and google_state.lower() == restaurant_state_lower:
+    if google_state and google_state.lower() == current_state_lower:
         return True
-    if google_state_long and google_state_long.lower() == restaurant_state_lower:
+    if google_state_long and google_state_long.lower() == current_state_lower:
         return True
-    if google_state_short and google_state_short.lower() == restaurant_state_lower:
+    if google_state_short and google_state_short.lower() == current_state_lower:
         return True
 
     return False
 
 
 def _states_match_with_us_library(
-    restaurant_state: str, google_state: str, google_state_long: str, google_state_short: str
+    current_state: str, google_state: str, google_state_long: str, google_state_short: str
 ) -> bool:
     """Check if states match using US library normalization."""
     import us
 
-    restaurant_state_obj = us.states.lookup(restaurant_state)
-    if not restaurant_state_obj:
+    current_state_obj = us.states.lookup(current_state)
+    if not current_state_obj:
         return False
 
     # Check each Google state format
     for google_state_value in [google_state, google_state_long, google_state_short]:
         if google_state_value:
             google_state_obj = us.states.lookup(google_state_value)
-            if google_state_obj and restaurant_state_obj.abbr == google_state_obj.abbr:
+            if google_state_obj and current_state_obj.abbr == google_state_obj.abbr:
                 return True
 
     return False
@@ -630,14 +662,129 @@ def _check_service_level_mismatch(
         google_service_level, confidence = google_service_level_data
         from app.restaurants.services import validate_restaurant_service_level
 
+        # Create current_data from restaurant for validation
+        current_data = {
+            "service_level": restaurant.service_level,
+        }
+
         has_mismatch, mismatch_message, suggested_fix = validate_restaurant_service_level(
-            restaurant, google_service_level, confidence
+            current_data, google_service_level, confidence
         )
 
         if has_mismatch:
             mismatches.append(mismatch_message)
             if suggested_fix:
                 fixes_to_apply["service_level"] = suggested_fix
+
+
+def _check_price_level_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for price level mismatches."""
+    google_price_level_raw = validation_result.get("google_price_level")
+
+    if google_price_level_raw is not None:
+        # Convert Google price level to integer for comparison
+        from app.services.google_places_service import get_google_places_service
+
+        places_service = get_google_places_service()
+        google_price_level = places_service.convert_price_level_to_int(google_price_level_raw)
+        restaurant_price_level = restaurant.price_level
+
+        # Check for mismatch (including None vs non-None)
+        if restaurant_price_level != google_price_level:
+            restaurant_display = _format_price_level_display(restaurant_price_level)
+            google_display = _format_price_level_display(google_price_level)
+
+            mismatches.append(f"Price Level: '{restaurant_display}' vs Google: '{google_display}'")
+            fixes_to_apply["price_level"] = google_price_level
+
+
+def _format_price_level_display(price_level):
+    """Format price level for display in mismatch messages."""
+    if price_level is None:
+        return "Not set"
+
+    price_levels = {
+        0: "Free",
+        1: "$ (Inexpensive)",
+        2: "$$ (Moderate)",
+        3: "$$$ (Expensive)",
+        4: "$$$$ (Very Expensive)",
+    }
+    return price_levels.get(price_level, str(price_level))
+
+
+def _check_cuisine_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for cuisine mismatches."""
+    google_cuisine = validation_result.get("google_cuisine")
+
+    if google_cuisine is not None:
+        restaurant_cuisine = restaurant.cuisine
+
+        # Check for mismatch (including None vs non-None)
+        if restaurant_cuisine != google_cuisine:
+            restaurant_display = restaurant_cuisine or "Not set"
+            google_display = google_cuisine or "Not set"
+
+            mismatches.append(f"Cuisine: '{restaurant_display}' vs Google: '{google_display}'")
+            fixes_to_apply["cuisine"] = google_cuisine
+
+
+def _check_phone_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for phone mismatches."""
+    google_phone = validation_result.get("google_phone")
+
+    if google_phone is not None:
+        restaurant_phone = restaurant.phone
+
+        # Check for mismatch (including None vs non-None)
+        if restaurant_phone != google_phone:
+            restaurant_display = restaurant_phone or "Not set"
+            google_display = google_phone or "Not set"
+
+            mismatches.append(f"Phone: '{restaurant_display}' vs Google: '{google_display}'")
+            fixes_to_apply["phone"] = google_phone
+
+
+def _check_website_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for website mismatches."""
+    google_website = validation_result.get("google_website")
+
+    if google_website is not None:
+        restaurant_website = restaurant.website
+
+        # Check for mismatch (including None vs non-None)
+        if restaurant_website != google_website:
+            restaurant_display = restaurant_website or "Not set"
+            google_display = google_website or "Not set"
+
+            mismatches.append(f"Website: '{restaurant_display}' vs Google: '{google_display}'")
+            fixes_to_apply["website"] = google_website
+
+
+def _check_type_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for type mismatches."""
+    google_primary_type = validation_result.get("primary_type")
+
+    if google_primary_type is not None:
+        restaurant_type = restaurant.type
+
+        # Check for mismatch (including None vs non-None)
+        if restaurant_type != google_primary_type:
+            restaurant_display = restaurant_type or "Not set"
+            google_display = google_primary_type or "Not set"
+
+            mismatches.append(f"Type: '{restaurant_display}' vs Google: '{google_display}'")
+            fixes_to_apply["type"] = google_primary_type
 
 
 def _apply_restaurant_fixes(restaurant: Restaurant, fixes_to_apply: dict[str, str], dry_run: bool) -> bool:
@@ -668,6 +815,11 @@ def _apply_restaurant_field_fixes(restaurant: Restaurant, fixes_to_apply: dict[s
         "postal_code": "postal_code",
         "country": "country",
         "service_level": "service_level",
+        "price_level": "price_level",
+        "cuisine": "cuisine",
+        "phone": "phone",
+        "website": "website",
+        "type": "type",
     }
 
     for fix_key, field_name in field_mappings.items():
@@ -733,8 +885,8 @@ def _display_google_basic_info(validation_result: dict) -> None:
         click.echo(f"   🌐 Website: {validation_result['google_website']}")
     if validation_result.get("google_price_level"):
         price_level = validation_result["google_price_level"]
-        price_symbols = "💰" * price_level if isinstance(price_level, int) else price_level
-        click.echo(f"   💲 Price Level: {price_symbols}")
+        price_display = _format_price_level_display(price_level)
+        click.echo(f"   💲 Price Level: {price_display}")
     if validation_result.get("types"):
         # Handle both list and single value
         types_data = validation_result["types"]
@@ -1089,10 +1241,16 @@ def _handle_place_id_finding(
 @click.option("--restaurant-id", type=int, help="Validate a specific restaurant by ID")
 @click.option("--fix-mismatches", is_flag=True, help="Automatically fix name/address mismatches from Google")
 @click.option(
-    "--update-service-levels", is_flag=True, help="Update service levels for restaurants without Google Place IDs"
+    "--update-service-levels",
+    is_flag=True,
+    help="Update service levels for restaurants without Google Place IDs",
 )
 @click.option("--find-place-id", is_flag=True, help="Find Google Place ID matches for restaurants without one")
-@click.option("--closest", is_flag=True, help="Automatically select closest match when multiple options are found")
+@click.option(
+    "--closest",
+    is_flag=True,
+    help="Automatically select closest match when multiple options are found",
+)
 @click.option("--dry-run", is_flag=True, help="Show what would be fixed without making changes")
 @with_appcontext
 def validate_restaurants(

@@ -340,7 +340,7 @@ class Expense(BaseModel):
             "party_size": self.party_size,
             "date": self.date.isoformat() if self.date else None,
             "formatted_amount": self.formatted_amount,
-            "price_per_person": float(self.price_per_person) if self.price_per_person is not None else None,
+            "price_per_person": (float(self.price_per_person) if self.price_per_person is not None else None),
             "formatted_price_per_person": self.formatted_price_per_person,
             "is_recent": self.is_recent,
             "receipt_image": self.receipt_image,

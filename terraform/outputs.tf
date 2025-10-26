@@ -40,31 +40,13 @@ output "lambda_function_arn" {
   value       = module.lambda.lambda_function_arn
 }
 
-output "lambda_layer_version_arn" {
-  description = "The ARN of the Lambda layer version"
-  value       = module.lambda.lambda_layer_version_arn
-}
+# Lambda layer output removed - no longer using layers
 
-# RDS Outputs
-output "rds_endpoint" {
-  description = "The connection endpoint for the RDS instance"
-  value       = module.rds.db_endpoint
-}
-
-output "rds_database_name" {
-  description = "The name of the database"
-  value       = module.rds.db_name
-}
-
-output "rds_username" {
-  description = "The master username for the database"
-  value       = module.rds.db_username
-  sensitive   = true
-}
-
-output "rds_port" {
-  description = "The port on which the RDS instance accepts connections"
-  value       = module.rds.db_port
+# Database Outputs (Supabase - external PostgreSQL)
+# No Aurora outputs needed - using Supabase
+output "database_type" {
+  description = "Type of database being used"
+  value       = "Supabase (external PostgreSQL)"
 }
 
 output "lambda_function_name" {
@@ -81,42 +63,6 @@ output "lambda_invoke_arn" {
 output "lambda_security_group_id" {
   description = "The ID of the Lambda security group"
   value       = module.lambda.security_group_id
-}
-
-output "rds_security_group_id" {
-  description = "The ID of the RDS security group"
-  value       = module.rds.db_security_group_id
-}
-
-output "db_endpoint" {
-  description = "The connection endpoint for the RDS instance"
-  value       = module.rds.db_endpoint
-  sensitive   = true
-}
-
-output "db_secret_arn" {
-  description = "The ARN of the database secret in Secrets Manager"
-  value       = module.rds.db_secret_arn
-}
-
-output "vpc_id" {
-  description = "The ID of the VPC"
-  value       = module.network.vpc_id
-}
-
-output "private_subnet_ids" {
-  description = "List of private subnet IDs"
-  value       = module.network.private_subnet_ids
-}
-
-output "public_subnet_ids" {
-  description = "List of public subnet IDs"
-  value       = module.network.public_subnet_ids
-}
-
-output "lambda_deployment_bucket" {
-  description = "The name of the S3 bucket used for Lambda deployment packages"
-  value       = aws_s3_bucket.lambda_deployment.bucket
 }
 
 output "kms_key_arn" {
@@ -146,4 +92,40 @@ output "aws_region" {
 output "aws_account_id" {
   description = "The AWS account ID"
   value       = data.aws_caller_identity.current.account_id
+}
+
+# S3 Outputs
+output "receipts_bucket_id" {
+  description = "The ID of the S3 bucket for receipts"
+  value       = module.s3.bucket_id
+}
+
+output "receipts_bucket_arn" {
+  description = "The ARN of the S3 bucket for receipts"
+  value       = module.s3.bucket_arn
+}
+
+output "receipts_bucket_name" {
+  description = "The name of the S3 bucket for receipts"
+  value       = module.s3.bucket_name
+}
+
+output "receipts_bucket_domain_name" {
+  description = "The domain name of the S3 bucket for receipts"
+  value       = module.s3.bucket_domain_name
+}
+
+output "receipts_bucket_regional_domain_name" {
+  description = "The regional domain name of the S3 bucket for receipts"
+  value       = module.s3.bucket_regional_domain_name
+}
+
+output "logs_bucket_id" {
+  description = "The ID of the S3 bucket for access logs"
+  value       = module.s3.logs_bucket_id
+}
+
+output "logs_bucket_arn" {
+  description = "The ARN of the S3 bucket for access logs"
+  value       = module.s3.logs_bucket_arn
 }

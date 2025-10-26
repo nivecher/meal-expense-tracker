@@ -38,6 +38,7 @@ show_help() {
   echo "  -l, --layer       Package dependencies layer (architecture-aware)"
   echo "  -b, --both        Package both app and layer"
   echo "  -f, -        Package app only for current architecture (DEFAULT)"
+  echo "  --docker          Package as Docker container for Lambda deployment"
   echo "  --arm64           Build for ARM64 only"
   echo "  --x86_64          Build for x86_64 only"
   echo "  -h, --help        Show this help message"
@@ -47,6 +48,7 @@ show_help() {
   echo "  $0 -a             # Package app only"
   echo "  $0 -l             # Package layer only (architecture-aware)"
   echo "  $0 -b             # Package both app and layer"
+  echo "  $0 --docker       # Package as Docker container for Lambda"
   echo "  $0 -f --arm64     # build for ARM64 only"
 }
 
@@ -120,6 +122,27 @@ package_app() {
   [ -f "requirements.txt" ] && cp requirements.txt "${app_temp_dir}/"
   [ -f "config.py" ] && cp config.py "${app_temp_dir}/"
 
+  # Install dependencies to app package (for Lambda functions without layers)
+  echo -e "${YELLOW}[*] Installing dependencies to app package...${NC}"
+  if [ -f "requirements.txt" ]; then
+    # Create site-packages directory in app package
+    mkdir -p "${app_temp_dir}/python/lib/python${PYTHON_VERSION}/site-packages"
+
+    # Install dependencies to app package
+    if [ "$use_local_venv" = true ]; then
+      # Use local virtual environment for app packaging
+      echo -e "${YELLOW}[*] Installing dependencies to app using local venv...${NC}"
+      pip install -r requirements.txt --target "${app_temp_dir}/python/lib/python${PYTHON_VERSION}/site-packages" --no-cache-dir
+    else
+      # Use system Python directly
+      echo -e "${YELLOW}[*] Installing dependencies to app using system Python...${NC}"
+      python3 -m pip install -r requirements.txt --target "${app_temp_dir}/python/lib/python${PYTHON_VERSION}/site-packages" --no-cache-dir
+    fi
+
+    # Create version-agnostic symlink
+    (cd "${app_temp_dir}/python/lib" && ln -sf "python${PYTHON_VERSION}" python3.13)
+  fi
+
   # Copy migrations if they exist (lightweight)
   if [ -d "migrations" ]; then
     echo -e "${YELLOW}[*] Copying migrations...${NC}"
@@ -165,6 +188,7 @@ package_app() {
 PACKAGE_APP=true
 PACKAGE_LAYER=false
 PACKAGE_MODE=true
+PACKAGE_DOCKER=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -174,6 +198,7 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   -l | --layer)
+    PACKAGE_APP=false
     PACKAGE_LAYER=true
     shift
     ;;
@@ -181,6 +206,18 @@ while [[ $# -gt 0 ]]; do
     PACKAGE_APP=true
     PACKAGE_LAYER=false
     PACKAGE_MODE=true
+    shift
+    ;;
+  -b | --both)
+    PACKAGE_APP=true
+    PACKAGE_LAYER=true
+    shift
+    ;;
+  --docker)
+    PACKAGE_DOCKER=true
+    PACKAGE_APP=false
+    PACKAGE_LAYER=false
+    PACKAGE_MODE=false
     shift
     ;;
   --arm64)
@@ -207,6 +244,7 @@ echo -e "${GREEN}=== Lambda Package Script ===${NC}"
 echo "Architecture: ${ARCHITECTURE}"
 echo "Python Version: ${PYTHON_VERSION}"
 echo "Mode: ${PACKAGE_MODE}"
+echo "Docker Mode: ${PACKAGE_DOCKER}"
 
 # layer packaging (architecture-aware)
 package_layer() {
@@ -223,29 +261,11 @@ package_layer() {
   local current_arch
   current_arch=$(uname -m)
 
-  # Always use Docker for cross-architecture builds to avoid virtual environment issues
-  if [ "$current_arch" = "x86_64" ] && [ "$ARCHITECTURE" = "arm64" ]; then
-    echo -e "${YELLOW}[*] Cross-architecture build detected (x86_64 → ARM64)${NC}"
-    echo -e "${YELLOW}[*] Using Docker build for ARM64 compatibility...${NC}"
-    package_layer_docker
-    return $?
-  elif [ "$current_arch" = "aarch64" ] && [ "$ARCHITECTURE" = "x86_64" ]; then
-    echo -e "${YELLOW}[*] Cross-architecture build detected (ARM64 → x86_64)${NC}"
-    echo -e "${YELLOW}[*] Using Docker build for x86_64 compatibility...${NC}"
-    package_layer_docker
-    return $?
-  fi
+  # Try local virtual environment first for cross-architecture builds
+  # Most Python packages are architecture-independent
+  echo -e "${YELLOW}[*] Attempting local virtual environment build for ${ARCHITECTURE}...${NC}"
 
-  # For native architecture, check if we have compiled extensions
-  if grep -qE "(psycopg2-binary|cryptography|numpy|pillow|scipy|lxml|pandas)" requirements.txt; then
-    echo -e "${YELLOW}[*] Found compiled extensions for native architecture build${NC}"
-  fi
-
-  # Create directories
-  mkdir -p "${layer_temp_dir}/python/lib/python${PYTHON_VERSION}/site-packages"
-  mkdir -p "${output_dir}"
-
-  # Try to use local Python environment first
+  # Try to use local Python environment first (works for most Python packages)
   local use_local_venv=false
   if [ -d "venv" ] || [ -d ".venv" ]; then
     echo -e "${YELLOW}[*] Found local virtual environment, testing...${NC}"
@@ -259,7 +279,7 @@ package_layer() {
 
     # Test pip functionality with a more comprehensive check
     if pip --version >/dev/null 2>&1 && python3 -c "import pip._internal.operations.build" >/dev/null 2>&1; then
-      echo -e "${YELLOW}[*] Using local virtual environment...${NC}"
+      echo -e "${YELLOW}[*] Using local virtual environment for layer packaging...${NC}"
       use_local_venv=true
     else
       echo -e "${YELLOW}[*] Local virtual environment has issues (pip internal modules missing), falling back to system Python...${NC}"
@@ -268,8 +288,8 @@ package_layer() {
   fi
 
   if [ "$use_local_venv" = true ]; then
-    # Install dependencies using local virtual environment
-    echo -e "${YELLOW}[*] Installing dependencies to layer...${NC}"
+    # Use local virtual environment for layer packaging
+    echo -e "${YELLOW}[*] Installing dependencies to layer using local venv...${NC}"
     pip install -r requirements.txt --target "${layer_temp_dir}/python/lib/python${PYTHON_VERSION}/site-packages" --no-cache-dir
 
     # Deactivate virtual environment
@@ -277,10 +297,30 @@ package_layer() {
 
   else
     # Use system Python directly
-    echo -e "${YELLOW}[*] Using system Python...${NC}"
-    echo -e "${YELLOW}[*] Installing dependencies to layer...${NC}"
+    echo -e "${YELLOW}[*] Using system Python for layer packaging...${NC}"
     python3 -m pip install -r requirements.txt --target "${layer_temp_dir}/python/lib/python${PYTHON_VERSION}/site-packages" --no-cache-dir
   fi
+
+  # Check if we have architecture-specific packages that require Docker
+  if grep -qE "(psycopg2[^-]binary|psycopg2==|cryptography|numpy|pillow|scipy|lxml|pandas)" requirements.txt; then
+    echo -e "${YELLOW}[*] Found architecture-specific packages that require Docker cross-compilation${NC}"
+    echo -e "${YELLOW}[*] Using Docker to build layer for ${ARCHITECTURE}...${NC}"
+
+    # Use Docker for architecture-specific packages
+    if ! package_layer_docker; then
+      echo -e "${YELLOW}[!] Docker layer packaging failed, falling back to local build${NC}"
+      echo -e "${YELLOW}[!] Warning: Local build may not work correctly for ${ARCHITECTURE} architecture${NC}"
+      echo -e "${YELLOW}[!] Consider using Docker for production deployments${NC}"
+      # Continue with local build instead of failing
+    else
+      # Skip the local layer packaging since we used Docker successfully
+      return 0
+    fi
+  fi
+
+  # Create directories
+  mkdir -p "${layer_temp_dir}/python/lib/python${PYTHON_VERSION}/site-packages"
+  mkdir -p "${output_dir}"
 
   # Create version-agnostic symlink for better compatibility
   echo -e "${YELLOW}[*] Creating compatibility symlinks...${NC}"
@@ -433,7 +473,68 @@ EOF
   echo -e "${GREEN}[✓] Package size: $(du -h "${output_dir}/${zip_name}" | cut -f1)${NC}"
 }
 
-if [ "$PACKAGE_APP" = true ]; then
+# Docker container packaging for Lambda deployment
+package_docker() {
+  echo -e "${GREEN}[*] Packaging Docker container for Lambda deployment...${NC}"
+
+  # Check if Docker is available
+  if ! command -v docker &>/dev/null; then
+    echo -e "${RED}[!] Docker is not installed. Cannot build container.${NC}"
+    exit 1
+  fi
+
+  # Check if Docker is running
+  if ! docker info &>/dev/null; then
+    echo -e "${RED}[!] Docker is not running. Please start Docker first.${NC}"
+    exit 1
+  fi
+
+  # Set platform for cross-compilation
+  local platform="linux/${ARCHITECTURE}"
+  local image_name="meal-expense-tracker-lambda"
+  local image_tag="${ARCHITECTURE}-$(date +%Y%m%d%H%M%S)"
+
+  echo -e "${YELLOW}[*] Building Docker image for platform: ${platform}${NC}"
+  echo -e "${YELLOW}[*] Image: ${image_name}:${image_tag}${NC}"
+
+  # Build the Lambda container image
+  if ! docker build \
+    --target lambda \
+    --platform "${platform}" \
+    --tag "${image_name}:${image_tag}" \
+    --tag "${image_name}:latest" \
+    .; then
+    echo -e "${RED}[!] Failed to build Lambda container image${NC}"
+    exit 1
+  fi
+
+  echo -e "${GREEN}[✓] Lambda container image built successfully${NC}"
+  echo -e "${GREEN}[✓] Image: ${image_name}:${image_tag}${NC}"
+
+  # Show image size
+  local image_size
+  image_size=$(docker images --format "table {{.Size}}" "${image_name}:${image_tag}" | tail -n 1)
+  echo -e "${GREEN}[✓] Image size: ${image_size}${NC}"
+
+  # Show deployment instructions
+  echo -e "\n${YELLOW}=== Docker Container Deployment Instructions ===${NC}"
+  echo "To deploy to Lambda:"
+  echo "1. Tag and push the image to your ECR repository:"
+  echo "   aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account>.dkr.ecr.us-east-1.amazonaws.com"
+  echo "   docker tag ${image_name}:${image_tag} <account>.dkr.ecr.us-east-1.amazonaws.com/${image_name}:${image_tag}"
+  echo "   docker push <account>.dkr.ecr.us-east-1.amazonaws.com/${image_name}:${image_tag}"
+  echo ""
+  echo "2. Create a Lambda function using the pushed image"
+  echo "3. Set handler to: wsgi.lambda_handler"
+  echo "4. Set architecture to: ${ARCHITECTURE}"
+  echo "5. Configure environment variables (DATABASE_URL, GOOGLE_MAPS_API_KEY, etc.)"
+  echo ""
+  echo "For automated deployment, use: scripts/package-docker-lambda.sh --push"
+}
+
+if [ "$PACKAGE_DOCKER" = true ]; then
+  package_docker
+elif [ "$PACKAGE_APP" = true ]; then
   package_app
 fi
 
@@ -444,7 +545,10 @@ fi
 echo -e "${GREEN}[✓] packaging complete!${NC}"
 
 # Show deployment instructions
-if [ "$PACKAGE_APP" = true ]; then
+if [ "$PACKAGE_DOCKER" = true ]; then
+  echo -e "\n${YELLOW}Docker container packaging completed!${NC}"
+  echo -e "Use the deployment instructions shown above to deploy to Lambda."
+elif [ "$PACKAGE_APP" = true ]; then
   echo -e "\n${YELLOW}To deploy:${NC}"
   echo "1. Upload ${BASE_OUTPUT_DIR}/${ARCHITECTURE}/app/app-${ARCHITECTURE}.zip to your Lambda function"
   echo "2. Set handler to 'wsgi.lambda_handler'"
