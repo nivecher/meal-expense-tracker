@@ -142,3 +142,6 @@ test-data/
 
 # Local configuration
 local_settings.py
+
+# Static files (now served by CloudFront + S3)
+app/static/
