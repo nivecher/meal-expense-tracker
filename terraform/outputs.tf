@@ -30,6 +30,11 @@ output "api_domain_target_domain" {
   value       = module.api_gateway.domain_target_domain_name
 }
 
+output "api_gateway_target_domain" {
+  description = "The target domain for CloudFront to connect to API Gateway"
+  value       = module.api_gateway.domain_target_domain_name
+}
+
 output "api_custom_domain_url" {
   description = "The full URL of the API using the custom domain"
   value       = module.api_gateway.domain_name != null ? "https://${module.api_gateway.domain_name}" : null
@@ -128,4 +133,25 @@ output "logs_bucket_id" {
 output "logs_bucket_arn" {
   description = "The ARN of the S3 bucket for access logs"
   value       = module.s3.logs_bucket_arn
+}
+
+# CloudFront Outputs
+output "cloudfront_distribution_id" {
+  description = "The ID of the CloudFront distribution"
+  value       = module.cloudfront.distribution_id
+}
+
+output "cloudfront_distribution_domain_name" {
+  description = "The domain name of the CloudFront distribution"
+  value       = module.cloudfront.distribution_domain_name
+}
+
+output "cloudfront_url" {
+  description = "The CloudFront distribution URL"
+  value       = module.cloudfront.distribution_url
+}
+
+output "static_bucket_name" {
+  description = "The name of the S3 bucket for static files"
+  value       = module.cloudfront.bucket_name
 }

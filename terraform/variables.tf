@@ -51,7 +51,13 @@ variable "base_domain" {
 variable "api_subdomain" {
   type        = string
   default     = "meals"
-  description = "Subdomain for the API (e.g., 'api' or 'meals')"
+  description = "Subdomain for the main application (e.g., 'meals' for meals.dev.nivecher.com)"
+}
+
+variable "api_domain_prefix" {
+  type        = string
+  default     = "api"
+  description = "Prefix for API Gateway domain (e.g., 'api' for api.meals.dev.nivecher.com)"
 }
 
 # ======================

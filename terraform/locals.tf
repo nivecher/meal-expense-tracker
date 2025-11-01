@@ -29,6 +29,9 @@ locals {
   # API domain name based on environment
   api_domain_name = var.environment == "prod" ? "${var.api_subdomain}.${var.base_domain}" : "${var.api_subdomain}.${var.environment}.${var.base_domain}"
 
+  # API domain prefix for constructing API Gateway domain
+  api_domain_prefix = var.api_domain_prefix != null ? var.api_domain_prefix : "api"
+
   # Set budget amount based on environment
   budget_amount = var.environment == "prod" ? "20.0" : "5.0"
 

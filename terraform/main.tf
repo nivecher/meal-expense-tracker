@@ -118,6 +118,73 @@ module "iam" {
   tags                   = local.tags
 }
 
+# Lambda function configuration (must come before API Gateway)
+module "lambda" {
+  source = "./modules/lambda"
+
+  app_name    = var.app_name
+  environment = var.environment
+  server_name = local.api_domain_name
+  aws_region  = var.aws_region
+
+  app_secret_key_arn = aws_ssm_parameter.app_secret_key.arn
+
+  # Lambda WITHOUT VPC (using Supabase external database)
+  vpc_id     = ""
+  vpc_cidr   = ""
+  subnet_ids = []
+
+  kms_key_arn = aws_kms_key.main.arn
+
+  # Database configuration - Using Supabase
+  db_protocol                 = "postgresql"
+  db_secret_arn               = ""
+  db_security_group_id        = ""
+  rds_proxy_security_group_id = ""
+  db_username                 = ""
+  db_host                     = ""
+  db_port                     = ""
+  db_name                     = ""
+
+  api_gateway_domain_name   = ""  # Will be set after API Gateway is created
+  api_gateway_execution_arn = ""  # Will be set after API Gateway is created
+
+  memory_size   = var.lambda_memory_size
+  timeout       = var.lambda_timeout
+  architectures = [var.lambda_architecture]
+
+  package_type = "Image"
+
+  run_migrations = var.run_migrations
+  log_level      = var.log_level
+
+  lambda_combined_policy_arn = module.iam.lambda_combined_policy_arn
+
+  enable_xray_tracing = true
+  enable_otel_tracing = false
+  create_dlq          = true
+
+  extra_environment_variables = {
+    SESSION_TIMEOUT    = "3600"
+    ENVIRONMENT        = var.environment
+    APP_NAME           = var.app_name
+    S3_RECEIPTS_BUCKET = module.s3.bucket_name
+  }
+
+  notification_topic_arn = aws_sns_topic.notifications.arn
+
+  tags = merge(local.tags, {
+    Name        = "${var.app_name}-${var.environment}-lambda"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  })
+
+  depends_on = [
+    aws_sns_topic.notifications,
+    module.s3
+  ]
+}
+
 # API Gateway Module
 module "api_gateway" {
   source = "./modules/api_gateway"
@@ -129,14 +196,17 @@ module "api_gateway" {
   lambda_function_name = module.lambda.name
   logs_kms_key_arn     = aws_kms_key.main.arn
 
-  domain_name     = local.domain_name
-  cert_domain     = local.cert_domain
-  api_domain_name = local.api_domain_name
+  domain_name           = local.domain_name
+  cert_domain           = local.cert_domain
+  api_domain_prefix     = local.api_domain_prefix
+  # Don't set api_domain_name - let it be constructed as api.{domain_name}
+  create_route53_record = true  # API Gateway handles its own routing
 
   api_cors_allow_origins = [
     "https://${local.api_domain_name}",
     "http://localhost:5000",
-    "https://localhost:5000"
+    "https://localhost:5000",
+    "https://d2grggsm6jo80a.cloudfront.net"  # CloudFront distribution domain
   ]
   api_cors_allow_credentials = true
   api_cors_allow_headers     = ["*"]
@@ -158,7 +228,8 @@ module "api_gateway" {
   }
 
   depends_on = [
-    aws_kms_key.main
+    aws_kms_key.main,
+    module.lambda
   ]
 }
 
@@ -218,73 +289,35 @@ module "s3" {
   ]
 }
 
-# Lambda function configuration
-module "lambda" {
-  source = "./modules/lambda"
+# Get Route53 zone and ACM certificate for CloudFront
+data "aws_route53_zone" "main" {
+  name         = local.domain_name
+  private_zone = false
+}
 
-  app_name    = var.app_name
-  environment = var.environment
-  server_name = local.api_domain_name
-  aws_region  = var.aws_region
+data "aws_acm_certificate" "main" {
+  domain      = local.cert_domain
+  statuses    = ["ISSUED"]
+  most_recent = true
+  provider    = aws.us-east-1
+}
 
-  app_secret_key_arn = aws_ssm_parameter.app_secret_key.arn
+# CloudFront Distribution with Smart Routing
+module "cloudfront" {
+  source = "./modules/cloudfront"
 
-  # Lambda WITHOUT VPC (using Supabase external database)
-  # No VPC needed since we're not connecting to Aurora anymore!
-  vpc_id     = ""
-  vpc_cidr   = ""
-  subnet_ids = []
+  s3_bucket_name         = "${var.app_name}-${var.environment}-static"
+  app_name               = var.app_name
+  environment            = var.environment
+  api_gateway_endpoint = module.api_gateway.api_endpoint  # Use full API Gateway endpoint URL
+  aliases              = [local.api_domain_name]
+  acm_certificate_arn    = data.aws_acm_certificate.main.arn
+  domain_aliases         = [local.api_domain_name]
+  route53_zone_id        = data.aws_route53_zone.main.zone_id
 
-  kms_key_arn = aws_kms_key.main.arn
-
-  # Database configuration - Using Supabase (external PostgreSQL)
-  # Lambda will read DATABASE_URL from AWS Secrets Manager
-  # No VPC needed since connecting via HTTPS over internet
-  db_protocol                 = "postgresql"
-  db_secret_arn               = "" # Using Supabase, not Aurora
-  db_security_group_id        = "" # No security groups needed outside VPC
-  rds_proxy_security_group_id = "" # No RDS Proxy needed
-  db_username                 = "" # Not needed for Supabase
-  db_host                     = "" # Not needed for Supabase
-  db_port                     = "" # Not needed for Supabase
-  db_name                     = "" # Not needed for Supabase
-
-  api_gateway_domain_name   = module.api_gateway.api_endpoint
-  api_gateway_execution_arn = module.api_gateway.api_execution_arn
-
-  memory_size   = var.lambda_memory_size
-  timeout       = var.lambda_timeout
-  architectures = [var.lambda_architecture]
-
-  # Package type - use Image for container deployment
-  package_type = "Image"
-
-  run_migrations = var.run_migrations
-  log_level      = var.log_level
-
-  lambda_combined_policy_arn = module.iam.lambda_combined_policy_arn
-
-  enable_xray_tracing = true
-  enable_otel_tracing = false
-  create_dlq          = true
-
-  extra_environment_variables = {
-    SESSION_TIMEOUT     = "3600"
-    ENVIRONMENT        = var.environment
-    APP_NAME           = var.app_name
-    S3_RECEIPTS_BUCKET = module.s3.bucket_name
-  }
-
-  notification_topic_arn = aws_sns_topic.notifications.arn
-
-  tags = merge(local.tags, {
-    Name        = "${var.app_name}-${var.environment}-lambda"
-    Environment = var.environment
-    ManagedBy   = "terraform"
-  })
+  tags = local.tags
 
   depends_on = [
-    aws_sns_topic.notifications,
-    module.s3
+    module.api_gateway
   ]
 }
