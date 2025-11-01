@@ -700,8 +700,14 @@ def update_expense(
     try:
         current_app.logger.info("Updating expense with form data: %s", form.data)
 
+        # Get user timezone for proper time handling
+        from app.auth.models import User
+        from app.extensions import db
+
+        user = db.session.get(User, expense.user_id)
+        user_timezone = user.timezone if user and user.timezone else "UTC"
         # Process form data
-        expense_data = _process_expense_form_data(form)
+        expense_data = _process_expense_form_data(form, user_timezone)
         if isinstance(expense_data, str):  # Error message
             return None, expense_data
 
@@ -1374,7 +1380,9 @@ def _find_or_create_restaurant(
 
     # Strategy 1: Exact name + address match (if address provided)
     if restaurant_address:
-        existing = Restaurant.query.filter_by(user_id=user_id, name=restaurant_name, address=restaurant_address).first()
+        existing = Restaurant.query.filter_by(
+            user_id=user_id, name=restaurant_name, address_line_1=restaurant_address
+        ).first()
         if existing:
             return existing, None
 
@@ -1383,7 +1391,7 @@ def _find_or_create_restaurant(
             new_restaurant = Restaurant(
                 user_id=user_id,
                 name=restaurant_name,
-                address=restaurant_address,
+                address_line_1=restaurant_address,
                 city=None,  # Will be filled by user later if needed
             )
             db.session.add(new_restaurant)

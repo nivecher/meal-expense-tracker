@@ -340,12 +340,12 @@ def _map_google_primary_type_to_form_type(primary_type: str) -> str:
     if not primary_type:
         return "other"
 
-    # Use the centralized restaurant type mapping
-    from app.constants.restaurant_types import get_restaurant_type_for_google_type
+    # Check if the Google type directly maps to a form field value
+    from app.constants.restaurant_types import GOOGLE_RESTAURANT_TYPE_MAPPING
 
-    display_type = get_restaurant_type_for_google_type(primary_type)
-    if display_type:
-        return display_type.lower().replace(" ", "_")
+    primary_type_lower = primary_type.strip().lower()
+    if primary_type_lower in GOOGLE_RESTAURANT_TYPE_MAPPING:
+        return primary_type_lower
 
     # For unmapped types, check if it's a food establishment
     from app.constants.restaurant_types import is_food_establishment

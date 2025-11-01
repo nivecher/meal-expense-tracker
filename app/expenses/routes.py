@@ -837,17 +837,9 @@ def create_tag():
     if not data:
         return jsonify({"success": False, "message": "No data provided"}), 400
 
-    # Debug: Log the received data
-    current_app.logger.info(f"Creating tag with data: {data}")
-    print(f"DEBUG: Creating tag with data: {data}")
-
     name = data.get("name", "").strip()
     color = data.get("color", "#6c757d")
     description = data.get("description", "").strip()
-
-    # Debug: Log extracted values
-    current_app.logger.info(f"Extracted values - name: '{name}', color: '{color}', description: '{description}'")
-    print(f"DEBUG: Extracted values - name: '{name}', color: '{color}', description: '{description}'")
 
     if not name:
         return jsonify({"success": False, "message": "Tag name is required"}), 400
@@ -879,17 +871,9 @@ def update_tag(tag_id):
     if not data:
         return jsonify({"success": False, "message": "No data provided"}), 400
 
-    # Debug: Log the received data
-    current_app.logger.info(f"Updating tag {tag_id} with data: {data}")
-    print(f"DEBUG: Updating tag {tag_id} with data: {data}")
-
     name = data.get("name", "").strip()
     color = data.get("color", "#6c757d")
     description = data.get("description", "").strip()
-
-    # Debug: Log extracted values
-    current_app.logger.info(f"Extracted values - name: '{name}', color: '{color}', description: '{description}'")
-    print(f"DEBUG: Extracted values - name: '{name}', color: '{color}', description: '{description}'")
 
     if not name:
         return jsonify({"success": False, "message": "Tag name is required"}), 400
