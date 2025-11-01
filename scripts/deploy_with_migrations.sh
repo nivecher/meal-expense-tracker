@@ -303,6 +303,23 @@ cleanup() {
   rm -f terraform/terraform.tfplan
 }
 
+# Sync static files to S3 for CloudFront
+sync_static_files() {
+  log_info "Syncing static files to S3 for CloudFront..."
+
+  if [ ! -f "${PROJECT_ROOT}/scripts/sync_static_to_s3.sh" ]; then
+    log_warning "Static file sync script not found, skipping..."
+    return 0
+  fi
+
+  # Run the sync script
+  if bash "${PROJECT_ROOT}/scripts/sync_static_to_s3.sh"; then
+    log_success "Static files synced to S3"
+  else
+    log_warning "Static file sync failed, but continuing deployment..."
+  fi
+}
+
 # Main deployment function
 main() {
   log_info "Starting deployment process..."
@@ -315,6 +332,7 @@ main() {
   build_docker_image
   package_lambda
   deploy_terraform
+  sync_static_files  # Sync static files to S3 for CloudFront
   wait_for_lambda
   test_lambda
   check_migration_status
