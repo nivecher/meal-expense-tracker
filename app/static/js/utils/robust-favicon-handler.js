@@ -14,7 +14,7 @@
 const FAVICON_SOURCES = [
   {
     name: 'google-favicon-v2',
-    url: (domain) => `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=64`,
+    url: (domain) => `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=64`,
     timeout: 2500,
     quality: 'high', // Best quality when available
   },
@@ -812,7 +812,7 @@ function suppressFaviconCORSErrors() {
     if (event.target && event.target.tagName === 'IMG' &&
         event.target.src && (
       event.target.src.includes('t1.gstatic.com/faviconV2') ||
-          event.target.src.includes('t2.gstatic.com/faviconV2') ||
+          event.target.src.includes('t3.gstatic.com/faviconV2') ||
           event.target.src.includes('favicon.ico') ||
           event.target.src.includes('google.com/s2/favicons') ||
           event.target.src.includes('favicons.githubusercontent.com') ||
@@ -829,7 +829,7 @@ function suppressFaviconCORSErrors() {
   window.onerror = function(message, _source, _lineno, _colno, _error, ...args) {
     if (message && (
       message.includes('t1.gstatic.com/faviconV2') ||
-        message.includes('t2.gstatic.com/faviconV2') ||
+        message.includes('t3.gstatic.com/faviconV2') ||
         message.includes('favicon.ico') ||
         message.includes('CORS') ||
         message.includes('404 (Not Found)')
@@ -847,7 +847,7 @@ function suppressFaviconCORSErrors() {
   window.onunhandledrejection = function(event, ...args) {
     if (event.reason && event.reason.message && (
       event.reason.message.includes('t1.gstatic.com/faviconV2') ||
-        event.reason.message.includes('t2.gstatic.com/faviconV2') ||
+        event.reason.message.includes('t3.gstatic.com/faviconV2') ||
         event.reason.message.includes('favicon.ico') ||
         event.reason.message.includes('404')
     )) {
@@ -874,7 +874,7 @@ function suppressFaviconCORSErrors() {
         (message.includes('favicon.ico') && message.includes('404')) ||
         (message.includes('google.com/s2/favicons') && message.includes('404')) ||
         (message.includes('t1.gstatic.com/faviconV2') && message.includes('404')) ||
-        (message.includes('t2.gstatic.com/faviconV2') && message.includes('404')) ||
+        (message.includes('t3.gstatic.com/faviconV2') && message.includes('404')) ||
         (message.includes('favicons.githubusercontent.com') && message.includes('404')) ||
         (message.includes('logo.clearbit.com') && message.includes('404'))) {
       return; // Don't log favicon errors
@@ -891,7 +891,7 @@ function suppressFaviconCORSErrors() {
         (message.includes('favicon.ico') && message.includes('404')) ||
         (message.includes('google.com/s2/favicons') && message.includes('404')) ||
         (message.includes('t1.gstatic.com/faviconV2') && message.includes('404')) ||
-        (message.includes('t2.gstatic.com/faviconV2') && message.includes('404')) ||
+        (message.includes('t3.gstatic.com/faviconV2') && message.includes('404')) ||
         (message.includes('favicons.githubusercontent.com') && message.includes('404')) ||
         (message.includes('logo.clearbit.com') && message.includes('404'))) {
       return; // Don't log favicon warnings
@@ -907,7 +907,7 @@ function suppressFaviconCORSErrors() {
         (message.includes('favicon.ico') && message.includes('CORS')) ||
         (message.includes('google.com/s2/favicons') && message.includes('404')) ||
         (message.includes('t1.gstatic.com/faviconV2') && message.includes('404')) ||
-        (message.includes('t2.gstatic.com/faviconV2') && message.includes('404')) ||
+        (message.includes('t3.gstatic.com/faviconV2') && message.includes('404')) ||
         (message.includes('favicons.githubusercontent.com') && message.includes('404')) ||
         (message.includes('logo.clearbit.com') && message.includes('404'))) {
       return; // Don't log favicon network errors
@@ -923,7 +923,7 @@ function suppressFaviconCORSErrors() {
       if (typeof url === 'string' && (
         url.includes('google.com/s2/favicons') ||
           url.includes('t1.gstatic.com/faviconV2') ||
-          url.includes('t2.gstatic.com/faviconV2') ||
+          url.includes('t3.gstatic.com/faviconV2') ||
           url.includes('favicons.githubusercontent.com') ||
           url.includes('logo.clearbit.com') ||
           url.includes('favicon.ico')
@@ -943,7 +943,7 @@ function suppressFaviconCORSErrors() {
   XMLHttpRequest.prototype.open = function(method, url, ...args) {
     if (typeof url === 'string' && (
       url.includes('t1.gstatic.com/faviconV2') ||
-        url.includes('t2.gstatic.com/faviconV2') ||
+        url.includes('t3.gstatic.com/faviconV2') ||
         url.includes('google.com/s2/favicons') ||
         url.includes('favicons.githubusercontent.com') ||
         url.includes('logo.clearbit.com') ||

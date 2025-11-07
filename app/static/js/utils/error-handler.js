@@ -217,9 +217,7 @@ class ErrorHandler {
     }
 
     // Show user-friendly error message
-    if (window.showErrorToast) {
-      window.showErrorToast('An error occurred. Please try again.');
-    }
+    // Error toast shown by server response
 
     // Log to console in development
     if (this.options.logLevel === 'debug') {

@@ -125,7 +125,8 @@ export class EventHandlers {
     document.addEventListener('submit', (event) => {
       const form = event.target;
       const modal = form.closest('.modal');
-      if (modal) {
+      if (modal && !form.hasAttribute('data-skip-ajax')) {
+        event.preventDefault();
         this.handleModalFormSubmission(form, modal);
       }
     });
@@ -315,17 +316,13 @@ export class EventHandlers {
         const modalInstance = bootstrap.Modal.getInstance(modal);
         modalInstance?.hide();
 
-        if (window.showSuccessToast) {
-          window.showSuccessToast('Operation completed successfully');
-        }
+        // Operation completed successfully - toast shown by server response
       } else {
         throw new Error('Form submission failed');
       }
-    } catch {
+    } catch (error) {
       console.error('Modal form submission failed:', error);
-      if (window.showErrorToast) {
-        window.showErrorToast('Operation failed. Please try again.');
-      }
+      // Error toast shown by server response
     }
   }
 

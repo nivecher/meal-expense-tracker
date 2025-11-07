@@ -17,99 +17,8 @@ function getCSRFToken() {
   return token ? token.getAttribute('content') : '';
 }
 
-// Toast notification functions
-function createToastContainer() {
-  let container = document.getElementById('toastContainer');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'toastContainer';
-    container.className = 'toast-container position-fixed top-0 end-0 p-3';
-    container.style.zIndex = '1055';
-    document.body.appendChild(container);
-  }
-  return container;
-}
-
-function getIconForType(type) {
-  const icons = {
-    success: 'fa-check-circle',
-    error: 'fa-exclamation-circle',
-    warning: 'fa-exclamation-triangle',
-    info: 'fa-info-circle',
-  };
-  return icons[type] || icons.info;
-}
-
-function showToast(title, message, type = 'info', duration = 5000, actions = null) {
-  const toastContainer = createToastContainer();
-  const toastId = `toast-${Date.now()}`;
-
-  // Determine styling based on type
-  const bgClass = `bg-${type}`;
-  const textClass = type === 'warning' ? 'text-dark' : 'text-white';
-  const iconClass = getIconForType(type);
-
-  // Build actions HTML if provided
-  let actionsHtml = '';
-  if (actions && Array.isArray(actions)) {
-    actionsHtml = `<div class="mt-2">${
-      actions.map((action) =>
-        `<button class="btn btn-sm ${action.class || 'btn-outline-light'} me-2"
-                 data-action="${action.action || 'default'}"
-                 data-action-data='${JSON.stringify(action.data || {})}'>${action.icon ? `<i class="${action.icon} me-1"></i>` : ''}${action.text}</button>`,
-      ).join('')
-    }</div>`;
-  }
-
-  const toastHtml = `
-    <div id="${toastId}" class="toast ${bgClass} ${textClass}" role="alert"
-         aria-live="assertive" aria-atomic="true">
-      <div class="toast-header ${bgClass} ${textClass}">
-        <i class="fas ${iconClass} me-2"></i>
-        <strong class="me-auto">${title}</strong>
-        <button type="button" class="btn-close ${type === 'warning' ? 'btn-close-dark' : 'btn-close-white'}"
-                data-bs-dismiss="toast" aria-label="Close"></button>
-      </div>
-      <div class="toast-body">
-        ${message.replace(/\n/g, '<br>')}
-        ${actionsHtml}
-      </div>
-    </div>
-  `;
-
-  toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-
-  const toastElement = document.getElementById(toastId);
-  const toast = new bootstrap.Toast(toastElement, {
-    autohide: duration > 0,
-    delay: duration,
-  });
-
-  toast.show();
-
-  // Clean up after toast is hidden
-  toastElement.addEventListener('hidden.bs.toast', () => {
-    toastElement.remove();
-  });
-
-  return toast;
-}
-
-function showSuccessToast(message, title = 'Success', duration = 4000) {
-  showToast(title, message, 'success', duration);
-}
-
-function showErrorToast(message, title = 'Error', duration = 0) {
-  showToast(title, message, 'danger', duration);
-}
-
-function showWarningToast(message, title = 'Warning', duration = 7000, actions = null) {
-  showToast(title, message, 'warning', duration, actions);
-}
-
-function showInfoToast(message, title = 'Info', duration = 5000) {
-  showToast(title, message, 'info', duration);
-}
+// Import toast functions
+import { toast } from '../utils/notifications.js';
 
 function updateWebsiteButton() {
   const websiteField = document.getElementById('website');
@@ -131,62 +40,14 @@ function updateValidateButton() {
   }
 }
 
-function showSuccessMessage(message) {
-  // Create a temporary alert
-  const alert = document.createElement('div');
-  alert.className = 'alert alert-success alert-dismissible fade show position-fixed';
-  alert.style.top = '20px';
-  alert.style.right = '20px';
-  alert.style.zIndex = '9999';
-  alert.innerHTML = `
-    ${message}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-  `;
-
-  document.body.appendChild(alert);
-
-  // Auto-remove after 3 seconds
-  setTimeout(() => {
-    if (alert.parentNode) {
-      alert.remove();
-    }
-  }, 3000);
-}
-
-function showErrorMessage(message) {
-  // Create a temporary alert
-  const alert = document.createElement('div');
-  alert.className = 'alert alert-danger alert-dismissible fade show position-fixed';
-  alert.style.top = '20px';
-  alert.style.right = '20px';
-  alert.style.zIndex = '9999';
-  alert.innerHTML = `
-    ${message}
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-  `;
-
-  document.body.appendChild(alert);
-
-  // Auto-remove after 5 seconds
-  setTimeout(() => {
-    if (alert.parentNode) {
-      alert.remove();
-    }
-  }, 5000);
-}
-
 function showValidationLoading() {
   // Show loading toast instead of modal
-  showInfoToast(
-    'Validating Restaurant',
-    'Validating restaurant information with Google Places...',
-    0, // No auto-hide for loading state
-  );
+  toast.info('Validating restaurant information with Google Places...', 0);
 }
 
 function showValidationError(message) {
   // Use toast notification instead of modal for better UX
-  showErrorToast(message, 'Validation Failed', 0); // 0 = no auto-hide for errors
+  toast.error(message, 0); // No auto-hide for errors
 }
 
 // Validation UI functions
@@ -378,7 +239,7 @@ function updateValidationStatus(status, mismatchCount = 0) {
 
 function applyAllFixes() {
   if (!validationData || !validationData.fixes) {
-    showErrorToast('No validation data available for fixes', 'Error', 3000);
+    toast.error('No validation data available for fixes');
     return;
   }
 
@@ -410,12 +271,12 @@ function applyAllFixes() {
   });
 
   if (appliedCount > 0) {
-    showSuccessToast(`Applied ${appliedCount} fix${appliedCount !== 1 ? 'es' : ''}`, 'All Fixes Applied', 3000);
+    toast.success(`Applied ${appliedCount} fix${appliedCount !== 1 ? 'es' : ''}`);
 
     // Update validation status to reflect that issues are resolved
     updateValidationStatus('valid', 0);
   } else {
-    showWarningToast('No fixes could be applied', 'Warning', 3000);
+    toast.warning('No fixes could be applied');
   }
 }
 
@@ -426,7 +287,7 @@ async function applyFixes(_fixes) {
   const restaurantId = restaurantIdField ? restaurantIdField.getAttribute('data-restaurant-id') : '';
 
   if (!placeId || !restaurantId) {
-    showErrorMessage('Missing required data for applying fixes.');
+    toast.error('Missing required data for applying fixes.');
     return;
   }
 
@@ -448,19 +309,19 @@ async function applyFixes(_fixes) {
 
     if (result.status === 'success') {
       if (result.data.restaurant_updated) {
-        showSuccessMessage('Restaurant information updated successfully!');
+        toast.success('Restaurant information updated successfully!');
       } else {
-        showSuccessMessage('No changes were needed - restaurant information is already up to date.');
+        toast.success('No changes were needed - restaurant information is already up to date.');
       }
 
       // Show success message for applied fixes
-      showSuccessToast('Fixes Applied', 'Restaurant information has been updated with Google Places data.');
+      toast.success('Restaurant information has been updated with Google Places data.');
     } else {
-      showErrorMessage(`Failed to apply fixes: ${result.message || 'Unknown error'}`);
+      toast.error(`Failed to apply fixes: ${result.message || 'Unknown error'}`);
     }
 
   } catch {
-    showErrorMessage('Network error occurred while applying fixes. Please try again.');
+    toast.error('Network error occurred while applying fixes. Please try again.');
   }
 }
 
@@ -477,30 +338,11 @@ function showValidationResults(results) {
     updateFieldValidationIndicators(data);
 
     if (mismatchCount > 0) {
-      // Show detailed mismatch information with fix options
+      // Show detailed mismatch information
       const mismatchDetails = data.mismatches.map((mismatch) => `• ${mismatch}`).join('\n');
-      const actions = [
-        {
-          text: 'Fix All Issues',
-          class: 'btn-warning',
-          icon: 'fas fa-magic',
-          action: 'apply-all-fixes',
-          data: data.fixes,
-        },
-      ];
-
-      showWarningToast(
-        'Validation Issues Found',
-        `Found ${mismatchCount} mismatch(es) with Google Places data:\n${mismatchDetails}`,
-        0, // Don't auto-hide for important validation results
-        actions,
-      );
+      toast.warning(`Found ${mismatchCount} mismatch(es) with Google Places data:\n${mismatchDetails}`, 0);
     } else {
-      showSuccessToast(
-        'Validation Complete',
-        'Restaurant information validated successfully! All data matches Google Places.',
-        4000,
-      );
+      toast.success('Restaurant information validated successfully! All data matches Google Places.');
     }
   } else {
     updateValidationStatus('error');
@@ -571,7 +413,7 @@ function clearPlaceId() {
     }
 
     // Show success message
-    showSuccessMessage('Google Place ID cleared successfully');
+    toast.success('Google Place ID cleared successfully');
   }
 }
 
@@ -583,12 +425,12 @@ async function validateRestaurantData() {
   const restaurantId = restaurantIdField ? restaurantIdField.getAttribute('data-restaurant-id') : '';
 
   if (!placeId) {
-    showErrorMessage('No Google Place ID found. Please search for a restaurant first.');
+    toast.error('No Google Place ID found. Please search for a restaurant first.');
     return;
   }
 
   if (!restaurantId) {
-    showErrorMessage('Restaurant ID not found. Please refresh the page and try again.');
+    toast.error('Restaurant ID not found. Please refresh the page and try again.');
     return;
   }
 

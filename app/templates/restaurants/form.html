@@ -430,9 +430,9 @@
 {% block scripts %}
     {{ super() }}
     <!-- Load restaurant autocomplete (does not require client Maps JS) -->
-    <script type="module" src="{{ url_for('static', filename='js/components/restaurant-autocomplete.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/components/restaurant-autocomplete.js') }}?v=2.5"></script>
     <!-- Restaurant form module removed - using simplified autocomplete instead -->
 
     <!-- Restaurant form functionality -->
-    <script src="{{ url_for('static', filename='js/pages/restaurant-form.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/restaurant-form.js') }}?v=2.0"></script>
 {% endblock scripts %}

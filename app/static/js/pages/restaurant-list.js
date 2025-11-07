@@ -4,44 +4,7 @@
  */
 
 import { initializeRobustFaviconHandling } from '../utils/robust-favicon-handler.js';
-
-// Utility functions - defined first
-function createToastContainer() {
-  const container = document.createElement('div');
-  container.id = 'toastContainer';
-  container.className = 'toast-container position-fixed top-0 end-0 p-3';
-  container.style.zIndex = '1055';
-  document.body.appendChild(container);
-  return container;
-}
-
-function showToast(title, message, type = 'info') {
-  const toastContainer = document.getElementById('toastContainer') || createToastContainer();
-  const toastId = `toast-${Date.now()}`;
-  const toastHtml = `
-        <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">
-                    <strong>${title}</strong><br>${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    `;
-  toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-
-  const toastElement = document.getElementById(toastId);
-  const toast = new bootstrap.Toast(toastElement, {
-    autohide: true,
-    delay: 5000,
-  });
-  toast.show();
-
-  // Remove the toast element after it's hidden
-  toastElement.addEventListener('hidden.bs.toast', () => {
-    toastElement.remove();
-  });
-}
+import { toast } from '../utils/notifications.js';
 
 function setCookie(name, value, days) {
   const expires = new Date();
@@ -136,7 +99,7 @@ function initDeleteRestaurant() {
         })
           .then((response) => {
             if (response.ok) {
-              showToast('Success', 'Restaurant deleted successfully.', 'success');
+              toast.success('Restaurant deleted successfully.');
               // Remove the row from the table
               const row = document.querySelector(`[data-restaurant-id="${restaurantId}"]`);
               if (row) {
@@ -147,7 +110,7 @@ function initDeleteRestaurant() {
             } else {
               return response.json().then((data) => {
                 if (data.error) {
-                  showToast('Error', data.error, 'danger');
+                  toast.error(data.error);
                 } else {
                   window.location.reload();
                 }
@@ -156,7 +119,7 @@ function initDeleteRestaurant() {
           })
           .catch((error) => {
             console.error('Error:', error);
-            showToast('Error', 'An error occurred while deleting the restaurant.', 'danger');
+            toast.error('An error occurred while deleting the restaurant.');
           });
       };
     }

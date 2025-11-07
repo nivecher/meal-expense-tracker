@@ -6,7 +6,7 @@
  * @author Meal Expense Tracker Team
  */
 
-import { initNotifications } from './utils/notifications.js';
+import { toast } from './utils/notifications.js';
 import { EventHandlers } from './components/event-handlers.js';
 import {
   clearFaviconCache,
@@ -203,8 +203,7 @@ async function init() {
     // Initialize core UI components
     initUI();
 
-    // Initialize enhanced toast notifications
-    initNotifications();
+    // Toast system is ready (no initialization needed)
 
     // Initialize event handlers (replaces inline onclick handlers)
     new EventHandlers(); // eslint-disable-line no-new
@@ -300,10 +299,10 @@ async function init() {
     }));
 
     // Show welcome message if this is a fresh page load
-    if (window.showSuccessToast && !sessionStorage.getItem('app-initialized')) {
+    if (!sessionStorage.getItem('app-initialized')) {
       sessionStorage.setItem('app-initialized', 'true');
       setTimeout(() => {
-        window.showInfoToast('Application ready! 🎉', 'Info', 2000);
+        toast.info('Application ready! 🎉');
       }, 500);
     }
 
@@ -316,11 +315,7 @@ async function init() {
     console.error('❌ Failed to initialize application:', error);
 
     // Show error feedback
-    if (window.showErrorToast) {
-      window.showErrorToast('Failed to initialize application. Please refresh the page.');
-    } else {
-      alert('Failed to initialize application. Please refresh the page.');
-    }
+    toast.error('Failed to initialize application. Please refresh the page.');
   }
 }
 

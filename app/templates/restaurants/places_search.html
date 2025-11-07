@@ -48,7 +48,7 @@ url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Fin
         <!-- Load map-based restaurant search component -->
         <script type="module" src="{{ url_for('static', filename='js/components/map-restaurant-search.js') }}"></script>
         <!-- Load places search page functionality -->
-        <script src="{{ url_for('static', filename='js/pages/places-search.js') }}"></script>
+        <script type="module" src="{{ url_for('static', filename='js/pages/places-search.js') }}"></script>
 
         <script>
             // Load configuration from JSON script tag
@@ -81,5 +81,5 @@ url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Fin
             };
         </script>
         {% endblock scripts %}
-    </div></div
->
+    </div>
+</div>
