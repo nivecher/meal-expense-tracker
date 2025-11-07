@@ -4,7 +4,35 @@
 
 This document outlines the comprehensive cost reduction strategies implemented to minimize Google API usage and associated costs while maintaining functionality and user experience.
 
+**IMPORTANT: This application is now restricted to Google Places API Essentials tier only.** All Pro/Enterprise tier features (photos, reviews, advanced amenities, etc.) have been disabled to control costs.
+
 ## Cost Reduction Strategies Implemented
+
+### 0. Essentials Tier Restriction (NEW)
+
+**Strategy**: Restrict all Google Places API calls to Essentials tier only.
+
+**Implementation**: `app/services/google_places_service.py`
+
+- **Disabled Pro/Enterprise Features**:
+
+  - Photos (requires separate API calls - $0.007 each)
+  - Reviews (Pro+ tier)
+  - Editorial summaries (Pro+ tier)
+  - Advanced amenities (parking, outdoor seating, etc.)
+  - Payment options (Pro+ tier)
+  - Advanced accessibility options (Pro+ tier)
+  - Live music, menu information, etc.
+
+- **Retained Essentials Tier Features**:
+  - Text Search ($0.032 per request)
+  - Nearby Search ($0.032 per request)
+  - Place Details (basic info - $0.017 per request)
+  - Autocomplete ($0.00283 per request)
+  - Basic contact info and hours
+  - Basic service options (takeout, delivery, dine-in, reservations)
+
+**Expected Savings**: Eliminates all Pro+ API calls and associated costs. Only Essentials tier pricing applies.
 
 ### 1. Intelligent Caching System
 
@@ -76,29 +104,36 @@ This document outlines the comprehensive cost reduction strategies implemented t
 
 ## Cost Impact Analysis
 
-### Before Optimization (Estimated Monthly Costs)
+### Essentials Tier Only (Current Implementation)
 
-| API Type      | Calls/Day | Cost/Call | Daily Cost | Monthly Cost |
-| ------------- | --------- | --------- | ---------- | ------------ |
-| Text Search   | 200       | $0.032    | $6.40      | $192.00      |
-| Nearby Search | 100       | $0.032    | $3.20      | $96.00       |
-| Place Details | 300       | $0.017    | $5.10      | $153.00      |
-| Photos        | 500       | $0.007    | $3.50      | $105.00      |
-| Autocomplete  | 1000      | $0.00283  | $2.83      | $84.90       |
-| **Total**     | **2100**  | -         | **$21.03** | **$630.90**  |
+**All Pro/Enterprise tier features have been disabled.** Only Essentials tier API calls are made.
 
-### After Optimization (Estimated Monthly Costs)
+| API Type      | Calls/Day | Cost/Call  | Daily Cost | Monthly Cost |
+| ------------- | --------- | ---------- | ---------- | ------------ |
+| Text Search   | 200       | $0.032     | $6.40      | $192.00      |
+| Nearby Search | 100       | $0.032     | $3.20      | $96.00       |
+| Place Details | 300       | $0.017     | $5.10      | $153.00      |
+| Autocomplete  | 1000      | $0.00283   | $2.83      | $84.90       |
+| **Photos**    | **0**     | **$0.007** | **$0.00**  | **$0.00**    |
+| **Total**     | **1600**  | -          | **$15.53** | **$465.90**  |
 
-| API Type      | Calls/Day | Reduction | New Calls | Daily Cost  | Monthly Cost |
-| ------------- | --------- | --------- | --------- | ----------- | ------------ |
-| Text Search   | 200       | 70%       | 60        | $1.92       | $57.60       |
-| Nearby Search | 100       | 50%       | 50        | $1.60       | $48.00       |
-| Place Details | 300       | 80%       | 60        | $1.02       | $30.60       |
-| Photos        | 500       | 60%       | 200       | $1.40       | $42.00       |
-| Autocomplete  | 1000      | 70%       | 300       | $0.85       | $25.47       |
-| **Total**     | **670**   | **68%**   | **$6.79** | **$203.67** |
+### With Caching Optimization (Current + Caching)
 
-### **Total Monthly Savings: $427.23 (68% reduction)**
+| API Type      | Calls/Day | Cached   | Actual API | Daily Cost | Monthly Cost |
+| ------------- | --------- | -------- | ---------- | ---------- | ------------ |
+| Text Search   | 200       | 140      | 60         | $1.92      | $57.60       |
+| Nearby Search | 100       | 50       | 50         | $1.60      | $48.00       |
+| Place Details | 300       | 240      | 60         | $1.02      | $30.60       |
+| Autocomplete  | 1000      | 700      | 300        | $0.85      | $25.47       |
+| **Total**     | **1600**  | **1130** | **470**    | **$5.39**  | **$161.67**  |
+
+### **Total Monthly Cost: $161.67 (65% reduction from pre-optimization, 100% of Pro+ costs eliminated)**
+
+**Key Savings**:
+
+- **Eliminated all photo API costs** ($105/month saved)
+- **Maintained core functionality** with Essentials tier features
+- **Caching provides additional 65% reduction** on Essentials tier usage
 
 ## Implementation Status
 

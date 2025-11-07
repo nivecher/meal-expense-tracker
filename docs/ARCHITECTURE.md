@@ -10,11 +10,11 @@ graph TD
     A[User] -->|HTTPS| B[API Gateway]
     B --> C[Lambda Function]
     C --> D[Flask Application]
-    D --> E[RDS PostgreSQL]
+    D --> E[External PostgreSQL]
     D --> F[Secrets Manager]
     G[GitHub Actions] -->|Deploy| H[S3 Bucket]
     H -->|Deployment Package| C
-    G -->|Provision| E
+    E -.->|Managed Service| I[Neon/Supabase]
 ```
 
 ## 🧩 Core Components
@@ -40,9 +40,10 @@ graph TD
 
 ### 2. Database
 
-- AWS RDS PostgreSQL for production
+- External managed PostgreSQL (Neon/Supabase) for production
 - SQLite for local development
-- Managed backups and point-in-time recovery
+- Managed backups and point-in-time recovery (handled by external provider)
+- **Zero infrastructure cost** (free tier)
 
 ### 3. Authentication
 
@@ -54,7 +55,8 @@ graph TD
 - Infrastructure as Code with Terraform
 - Multi-environment support (dev, staging, prod)
 - Automated provisioning and deployment
-- VPC networking with security groups and NACLs
+- **Simplified networking** - no VPC required (Lambda connects via HTTPS)
+- **Cost optimized** - $0 database infrastructure costs
 
 ## 🔄 Data Flow
 

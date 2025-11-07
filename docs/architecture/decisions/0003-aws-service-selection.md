@@ -30,7 +30,8 @@ For each component, we considered the following options:
 
 1. **Database**:
 
-- Amazon RDS (PostgreSQL) **[SELECTED]**
+- External managed PostgreSQL (Neon/Supabase) **[SELECTED - UPDATED]**
+  - Amazon RDS (PostgreSQL) **[REPLACED - cost optimization]**
   - Amazon DynamoDB **[REJECTED - not suitable for relational data]**
   - Amazon Aurora **[REJECTED - unnecessary complexity for this use case]**
   - Self-managed PostgreSQL on EC2 **[REJECTED - operational complexity]**
@@ -58,13 +59,16 @@ For each component, we considered the following options:
   - Automatic scaling to zero when not in use
   - Integrated with API Gateway
 
-### Database: Amazon RDS (PostgreSQL)
+### Database: External Managed PostgreSQL (Neon/Supabase) - UPDATED
 
-- **Why**: Managed relational database with PostgreSQL compatibility
+- **Why**: Cost optimization while maintaining PostgreSQL compatibility
 - **Details**:
-  - Managed backups and updates
-  - Multi-AZ deployment for high availability
-  - Point-in-time recovery
+  - **Zero infrastructure cost** (free tier)
+  - Managed backups and updates (handled by provider)
+  - Automatic scaling and high availability
+  - Point-in-time recovery included
+  - **$95/month cost savings** vs AWS RDS/Aurora
+  - No VPC complexity required
 
 ### API: Amazon API Gateway (HTTP API)
 
