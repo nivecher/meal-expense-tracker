@@ -10,7 +10,7 @@ This document provides detailed instructions for setting up and working with the
 - Docker and Docker Compose
 - AWS CLI (for deployment)
 - AWS SAM CLI (for local Lambda testing)
-- Terraform 1.5+ (for infrastructure management)
+- Terraform 1.13.5+ (for infrastructure management)
 - **AWS CLI**: For AWS service interaction
 
 ### Local Development Setup
