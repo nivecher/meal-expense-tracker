@@ -45,8 +45,75 @@ def create_app(config_name: Optional[str] = None) -> Flask:
     return app
 
 
+def _is_lambda_env_for_url_generation(app: Flask) -> tuple[bool, str]:
+    """Check if we're in Lambda environment and get server name."""
+    server_name = app.config.get("SERVER_NAME")
+    is_lambda = server_name and server_name != "localhost:5000" and "localhost" not in server_name
+    return is_lambda, server_name or ""
+
+
+def _create_lambda_url_for(app: Flask):
+    """Create a Lambda-aware url_for function."""
+    original_url_for = app.url_for
+
+    def lambda_url_for(endpoint, **values):
+        """Override url_for to use correct host in Lambda/API Gateway environment."""
+        is_lambda, server_name = _is_lambda_env_for_url_generation(app)
+
+        if is_lambda and "_external" not in values:
+            # Force external URLs in Lambda to use the configured SERVER_NAME
+            values["_external"] = True
+            url = original_url_for(endpoint, **values)
+            # Replace the host in the generated URL
+            if "://" in url:
+                protocol, rest = url.split("://", 1)
+                if "/" in rest:
+                    host, path = rest.split("/", 1)
+                    url = f"{protocol}://{server_name}/{path}"
+                else:
+                    url = f"{protocol}://{server_name}"
+            return url
+        else:
+            return original_url_for(endpoint, **values)
+
+    return lambda_url_for
+
+
+def _create_lambda_redirect(app: Flask):
+    """Create a Lambda-aware redirect function."""
+    from flask import redirect as original_redirect
+
+    def lambda_redirect(location, code=302):
+        """Override redirect to fix Location headers in Lambda environment."""
+        is_lambda, server_name = _is_lambda_env_for_url_generation(app)
+
+        if is_lambda and location.startswith("http"):
+            # Check if the location uses API Gateway domain
+            if "execute-api" in location or "amazonaws.com" in location:
+                # Replace the host in the redirect URL
+                if "://" in location:
+                    protocol, rest = location.split("://", 1)
+                    if "/" in rest:
+                        host, path = rest.split("/", 1)
+                        location = f"{protocol}://{server_name}/{path}"
+                    else:
+                        location = f"{protocol}://{server_name}"
+
+        return original_redirect(location, code)
+
+    return lambda_redirect
+
+
 def _configure_request_handlers(app: Flask) -> None:
     """Configure request and response handlers."""
+
+    # Override url_for to use correct host in Lambda environment
+    app.url_for = _create_lambda_url_for(app)
+
+    # Override redirect to fix Location headers in Lambda environment
+    import flask
+
+    flask.redirect = _create_lambda_redirect(app)
 
     # Configure static file headers
     @app.after_request
@@ -71,64 +138,39 @@ def _configure_request_handlers(app: Flask) -> None:
 def _fix_content_type_headers(response) -> str:
     """Fix content-type headers for different file types."""
     content_type = response.headers.get("Content-Type", "")
+    path = request.path
 
     # Skip service worker - it has its own content type handling
-    if request.path == "/service-worker.js":
+    if path == "/service-worker.js":
         return content_type
 
-    # Fix CSS and JavaScript file content-type headers
-    if request.path and any(request.path.endswith(ext) for ext in [".css", ".js"]):
-        return _fix_css_js_headers(response)
+    # Content type mappings
+    if path:
+        # CSS and JavaScript files
+        if path.endswith(".css"):
+            response.headers["Content-Type"] = "text/css; charset=utf-8"
+            return "text/css; charset=utf-8"
+        elif path.endswith(".js"):
+            response.headers["Content-Type"] = "text/javascript; charset=utf-8"
+            return "text/javascript; charset=utf-8"
 
-    # Fix font file content-type headers (no charset for fonts)
-    elif request.path and any(request.path.endswith(ext) for ext in [".woff2", ".woff", ".ttf", ".eot", ".otf"]):
-        return _fix_font_headers(response)
-
-    # Fix charset for HTML/text responses - ensure UTF-8 is properly set
-    elif content_type and ("text/" in content_type or "html" in content_type):
-        return _fix_html_text_headers(response, content_type)
-
-    return content_type
-
-
-def _fix_css_js_headers(response) -> str:
-    """Fix content-type headers for CSS and JavaScript files."""
-    mime_type_map = {
-        ".css": "text/css; charset=utf-8",
-        ".js": "text/javascript; charset=utf-8",
-    }
-    for ext, mime_type in mime_type_map.items():
-        if request.path.endswith(ext):
+        # Font files (no charset)
+        elif path.endswith(".woff2"):
+            response.headers["Content-Type"] = "font/woff2"
+            return "font/woff2"
+        elif path.endswith((".woff", ".ttf", ".eot", ".otf")):
+            ext = path.split(".")[-1]
+            mime_type = f"font/{ext}"
             response.headers["Content-Type"] = mime_type
             return mime_type
-    return response.headers.get("Content-Type", "")
 
+    # HTML/text responses - ensure UTF-8
+    if content_type and ("text/" in content_type or "html" in content_type):
+        base_content_type = content_type.split(";")[0].strip()
+        if "charset=" not in content_type:
+            response.headers["Content-Type"] = f"{base_content_type}; charset=utf-8"
+            return response.headers["Content-Type"]
 
-def _fix_font_headers(response) -> str:
-    """Fix content-type headers for font files."""
-    font_type_map = {
-        ".woff2": "font/woff2",
-        ".woff": "font/woff",
-        ".ttf": "font/ttf",
-        ".eot": "font/eot",
-        ".otf": "font/otf",
-    }
-    for ext, mime_type in font_type_map.items():
-        if request.path.endswith(ext):
-            response.headers["Content-Type"] = mime_type
-            return mime_type
-    return response.headers.get("Content-Type", "")
-
-
-def _fix_html_text_headers(response, content_type: str) -> str:
-    """Fix charset for HTML/text responses - ensure UTF-8 is properly set."""
-    base_content_type = content_type.split(";")[0].strip()
-    if "html" in base_content_type or "text/" in base_content_type:
-        # Remove existing charset if present and add utf-8
-        if "charset=" in base_content_type:
-            base_content_type = base_content_type.split("charset=")[0].rstrip("; ")
-        response.headers["Content-Type"] = f"{base_content_type}; charset=utf-8"
-        return response.headers["Content-Type"]
     return content_type
 
 
@@ -266,31 +308,19 @@ def _register_blueprints(app: Flask) -> None:
     """Register all application blueprints."""
     logger.debug("Registering blueprints...")
 
-    # Register core blueprints
-    _register_core_blueprints(app)
-
-    # Register feature blueprints
-    _register_feature_blueprints(app)
-
-
-def _register_core_blueprints(app: Flask) -> None:
-    """Register core application blueprints."""
-    # Main blueprint
+    # Register main blueprint
     from .main import bp as main_bp
 
     app.register_blueprint(main_bp)
-    logger.debug(f"Registered blueprint: {main_bp.name} at {main_bp.url_prefix or '/'}")
+    logger.debug(f"Registered blueprint: {main_bp.name} at /")
 
-    # Auth blueprint
-    from .auth import bp as auth_bp
+    # Register auth blueprint
     from .auth import init_app as init_auth
 
     init_auth(app)
-    logger.debug(f"Registered blueprint: {auth_bp.name} at /auth")
+    logger.debug("Registered auth blueprint at /auth")
 
-
-def _register_feature_blueprints(app: Flask) -> None:
-    """Register feature blueprints with error handling."""
+    # Register feature blueprints
     blueprint_configs = [
         ("restaurants", "/restaurants"),
         ("expenses", "/expenses"),
@@ -300,18 +330,13 @@ def _register_feature_blueprints(app: Flask) -> None:
     ]
 
     for module_name, url_prefix in blueprint_configs:
-        _register_single_blueprint(app, module_name, url_prefix)
-
-
-def _register_single_blueprint(app: Flask, module_name: str, url_prefix: str) -> None:
-    """Register a single blueprint with error handling."""
-    try:
-        module = __import__(f"app.{module_name}", fromlist=["bp"])
-        bp = module.bp
-        app.register_blueprint(bp, url_prefix=url_prefix)
-        logger.debug(f"Registered blueprint: {bp.name} at {url_prefix}")
-    except ImportError as e:
-        logger.warning(f"Could not import {module_name} blueprint: {e}")
+        try:
+            module = __import__(f"app.{module_name}", fromlist=["bp"])
+            bp = module.bp
+            app.register_blueprint(bp, url_prefix=url_prefix)
+            logger.debug(f"Registered blueprint: {bp.name} at {url_prefix}")
+        except ImportError as e:
+            logger.warning(f"Could not import {module_name} blueprint: {e}")
 
 
 def _configure_cors(app: Flask) -> None:

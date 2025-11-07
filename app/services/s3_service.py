@@ -147,27 +147,6 @@ class S3Service:
             current_app.logger.error(f"Unexpected error generating presigned URL: {str(e)}")
             return None
 
-    def file_exists(self, s3_key: str) -> bool:
-        """Check if a file exists in S3.
-
-        Args:
-            s3_key: The S3 key of the file
-
-        Returns:
-            True if file exists, False otherwise
-        """
-        try:
-            self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_key)
-            return True
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "404":
-                return False
-            current_app.logger.error(f"Error checking file existence: {str(e)}")
-            return False
-        except Exception as e:
-            current_app.logger.error(f"Unexpected error checking file existence: {str(e)}")
-            return False
-
 
 def get_s3_service() -> Optional[S3Service]:
     """Get S3 service instance if S3 is enabled."""

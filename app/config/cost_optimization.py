@@ -17,33 +17,29 @@ from typing import Dict
 # Google Places API cost optimization settings
 COST_OPTIMIZATION_SETTINGS = {
     # Field mask optimization - use minimal data by default
-    "default_field_mask": "search_essential",  # Instead of "comprehensive"
-    "search_field_mask": "search_essential",  # Essential data for search results
-    "details_field_mask": "place_details",  # Detailed data only when needed
+    "default_field_mask": "search_essential",
+    "search_field_mask": "search_essential",
+    "details_field_mask": "place_details",
     # Search result limits to reduce costs
-    "max_search_results": 20,  # Limit results per search
-    "max_autocomplete_results": 5,  # Limit autocomplete suggestions
+    "max_search_results": 20,
+    "max_autocomplete_results": 5,
     # Caching settings
-    "enable_caching": True,  # Enable API response caching
-    # Update cache_ttl_days to include dynamic adjustment logic
+    "enable_caching": True,
     "cache_ttl_days": {
         "place_details": 7,
-        "search_results": (1 if os.environ.get("ENV") == "production" else 0.5),  # Dynamic based on environment
+        "search_results": 1,
         "photos": 30,
     },
-    # Photo optimization
-    "max_photo_width": 300,  # Reduce photo size to save bandwidth
-    "max_photos_per_place": 3,  # Limit photos per place
+    # Photos disabled for Essentials tier
+    "disable_photos_essentials_tier": True,
     # Search strategy optimization
-    "prefer_nearby_search": True,  # Use nearby search when possible (cheaper)
-    "fallback_to_text_search": True,  # Fallback to text search if needed
-    "skip_photos_in_search": True,  # Skip photos in initial search (load on demand)
-    # Rate limiting
-    "requests_per_minute": 60,  # Limit API requests per minute
-    "requests_per_hour": 1000,  # Limit API requests per hour
+    "prefer_nearby_search": True,
+    "fallback_to_text_search": True,
+    "skip_photos_in_search": True,
+    # Basic rate limiting
+    "requests_per_minute": 60,
     # Cost monitoring
-    "log_api_costs": True,  # Log API usage for monitoring
-    "cost_alert_threshold": 100,  # Alert when daily costs exceed threshold
+    "log_api_costs": True,
 }
 
 
@@ -173,13 +169,15 @@ class CostOptimizer:
         Returns:
             Dictionary with cost estimates
         """
-        # Google Places API pricing (as of 2024)
+        # Google Places API pricing - ESSENTIALS TIER ONLY (as of 2024)
+        # Essentials tier pricing (no Pro/Enterprise features)
         pricing = {
-            "text_search": 0.032,  # $0.032 per request
-            "nearby_search": 0.032,  # $0.032 per request
-            "place_details": 0.017,  # $0.017 per request
-            "place_photos": 0.007,  # $0.007 per request
-            "autocomplete": 0.00283,  # $0.00283 per request
+            "text_search": 0.032,  # $0.032 per request (Essentials)
+            "nearby_search": 0.032,  # $0.032 per request (Essentials)
+            "place_details": 0.017,  # $0.017 per request (Essentials)
+            # Photos are Pro+ tier - REMOVED from Essentials
+            # "place_photos": 0.007,  # $0.007 per request (Pro+ only)
+            "autocomplete": 0.00283,  # $0.00283 per request (Essentials)
         }
 
         costs = {}
@@ -193,81 +191,3 @@ class CostOptimizer:
 
         costs["total"] = total_cost
         return costs
-
-    @staticmethod
-    def get_cost_savings_with_cache(
-        cache_hit_rate: float, daily_api_calls: int, avg_cost_per_call: float
-    ) -> Dict[str, float]:
-        """Calculate cost savings from caching.
-
-        Args:
-            cache_hit_rate: Cache hit rate (0.0 to 1.0)
-            daily_api_calls: Number of API calls per day
-            avg_cost_per_call: Average cost per API call
-
-        Returns:
-            Dictionary with savings calculations
-        """
-        total_daily_cost = daily_api_calls * avg_cost_per_call
-        cached_calls = daily_api_calls * cache_hit_rate
-        savings = cached_calls * avg_cost_per_call
-        remaining_cost = total_daily_cost - savings
-
-        return {
-            "total_daily_cost": total_daily_cost,
-            "cached_calls": cached_calls,
-            "savings": savings,
-            "remaining_cost": remaining_cost,
-            "savings_percentage": (savings / total_daily_cost) * 100 if total_daily_cost > 0 else 0,
-        }
-
-    @staticmethod
-    def optimize_search_strategy(query: str, has_location: bool) -> Dict[str, any]:
-        """Recommend optimal search strategy based on query characteristics.
-
-        Args:
-            query: Search query string
-            has_location: Whether user location is available
-
-        Returns:
-            Dictionary with optimization recommendations
-        """
-        recommendations = {
-            "preferred_method": "text_search",
-            "field_mask": "search_essential",
-            "max_results": 20,
-            "reason": "Default recommendation",
-        }
-
-        # Analyze query characteristics
-        query_lower = query.lower()
-
-        if has_location and len(query.split()) <= 2:
-            # Short query with location - use nearby search (cheaper)
-            recommendations.update(
-                {
-                    "preferred_method": "nearby_search",
-                    "reason": "Short query with location - nearby search is more cost-effective",
-                }
-            )
-        elif "restaurant" in query_lower or "food" in query_lower:
-            # Generic food query - use nearby search if location available
-            if has_location:
-                recommendations.update(
-                    {
-                        "preferred_method": "nearby_search",
-                        "field_mask": "search_basic",
-                        "reason": "Generic food query with location - nearby search recommended",
-                    }
-                )
-        elif len(query.split()) > 3:
-            # Complex query - use text search with minimal field mask
-            recommendations.update(
-                {
-                    "field_mask": "search_minimal",
-                    "max_results": 15,
-                    "reason": "Complex query - minimal field mask to reduce costs",
-                }
-            )
-
-        return recommendations

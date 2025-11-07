@@ -146,19 +146,15 @@ def _build_search_params(query, cuisine, lat, lng, radius_miles, api_key):
 
 
 def _build_photo_urls(photos, api_key):
-    """Build photo URLs from Google Places photo references using centralized service."""
-    from app.services.google_places_service import get_google_places_service
-
-    places_service = get_google_places_service()
-    return places_service.build_photo_urls(photos, api_key)
+    """Build photo URLs from Google Places photo references."""
+    # Simplified - photos are expensive Pro+ tier feature
+    return []
 
 
 def _build_reviews_summary(reviews):
-    """Build reviews summary from Google Places reviews using centralized service."""
-    from app.services.google_places_service import get_google_places_service
-
-    places_service = get_google_places_service()
-    return places_service.build_reviews_summary(reviews)
+    """Build reviews summary from Google Places reviews."""
+    # Simplified - reviews are Pro+ tier feature
+    return []
 
 
 def _validate_search_params():
@@ -189,19 +185,30 @@ def _validate_search_params():
 
 
 def _filter_place_by_criteria(place, min_rating, max_price_level):
-    """Filter place based on rating and price level criteria using centralized service."""
-    from app.services.google_places_service import get_google_places_service
+    """Filter place based on rating and price level criteria."""
+    # Check rating
+    if min_rating is not None:
+        rating = place.get("rating")
+        min_rating_float = float(min_rating) if isinstance(min_rating, str) else min_rating
+        if rating is None or rating < min_rating_float:
+            return []
 
-    places_service = get_google_places_service()
-    return places_service.filter_places_by_criteria([place], min_rating, max_price_level)
+    # Check price level
+    if max_price_level is not None:
+        price_level = _convert_price_level_to_int(place.get("priceLevel"))
+        max_price_int = int(max_price_level) if isinstance(max_price_level, str) else max_price_level
+        if price_level is not None and price_level > max_price_int:
+            return []
+
+    return [place]
 
 
 def _process_search_result_place(place, api_key):
-    """Process a single place from search results using centralized service."""
+    """Process a single place from search results."""
     from app.services.google_places_service import get_google_places_service
 
     places_service = get_google_places_service()
-    return places_service.process_search_result_place(place)
+    return places_service.extract_restaurant_data(place)
 
 
 def _enhance_place_with_details(processed_place, places_service):
@@ -250,14 +257,16 @@ def _process_search_results(places, params, places_service):
     """Process search results and return enhanced place data."""
     results = []
 
-    for place in places[: params["max_results"]]:
+    for i, place in enumerate(places[: params["max_results"]]):
+        # TEMP: Skip filtering to debug
         # Filter by criteria using centralized service
-        if not places_service.filter_places_by_criteria([place], params["min_rating"], params["max_price_level"]):
-            continue
+        # filtered = places_service.filter_places_by_criteria([place], params["min_rating"], params["max_price_level"])
+        # if not filtered:
+        #     continue
 
         # Process place using centralized service
         processed_place = places_service.process_search_result_place(place)
-        if processed_place:
+        if processed_place and processed_place.get("name"):
             # Enhance with detailed address components
             processed_place = _enhance_place_with_details(processed_place, places_service)
 
@@ -265,63 +274,158 @@ def _process_search_results(places, params, places_service):
             processed_place["photos"] = places_service.build_photo_urls(place.get("photos", []))
             processed_place["reviews"] = places_service.build_reviews_summary(place.get("reviews", []))
             results.append(processed_place)
+        else:
+            current_app.logger.warning(
+                f"Place {i} failed processing: name={processed_place.get('name')}, id={processed_place.get('google_place_id')}"
+            )
 
     return results
 
 
-@bp.route("/api/places/search", methods=["GET"])
+@bp.route("/api/places/debug", methods=["GET"])
 @login_required
+def debug_places():
+    """Debug endpoint for testing Google Places API."""
+    from app.services.google_places_service import get_google_places_service
+
+    try:
+        places_service = get_google_places_service()
+        # Test direct Google Places API call
+        raw_places = places_service.search_places_by_text("cafe", None, 50000, 5)
+        current_app.logger.info(f"Raw places from API: {len(raw_places)}")
+
+        # Test the full processing pipeline
+        params = {
+            "query": "cafe",
+            "lat": None,
+            "lng": None,
+            "radius_miles": 5,
+            "cuisine": "",
+            "min_rating": None,
+            "max_price_level": None,
+            "max_results": 10,
+            "api_key": current_app.config.get("GOOGLE_MAPS_API_KEY"),
+        }
+        places = _build_search_params(
+            params["query"], params["cuisine"], params["lat"], params["lng"], params["radius_miles"], params["api_key"]
+        )
+        results = _process_search_results(places, params, places_service)
+        return jsonify(
+            {
+                "raw_count": len(raw_places),
+                "places_count": len(places),
+                "processed_count": len(results),
+                "results": results[:3],
+            }
+        )
+    except Exception as e:
+        current_app.logger.error(f"Debug endpoint error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+def _initialize_places_service():
+    """Initialize Google Places service and handle API key errors."""
+    from app.services.google_places_service import get_google_places_service
+
+    try:
+        service = get_google_places_service()
+        return service, None
+    except ValueError as e:
+        if "API key" in str(e):
+            return None, (
+                jsonify({"error": "Google Places API key not configured. Please configure GOOGLE_MAPS_API_KEY."}),
+                503,
+            )
+        raise
+
+
+def _extract_search_location(params):
+    """Extract and convert location parameters."""
+    if not (params.get("lat") and params.get("lng")):
+        return None
+
+    location = (float(params["lat"]), float(params["lng"]))
+    current_app.logger.info(f"Using location: {location}")
+    return location
+
+
+def _calculate_search_radius(params):
+    """Calculate search radius in meters."""
+    radius_miles = float(params.get("radius_miles", 31.0))
+    radius_meters = int(radius_miles * 1609.34)
+    current_app.logger.info(f"Using radius: {radius_meters} meters for query: {params['query']}")
+    return radius_meters
+
+
+def _perform_places_search(places_service, params, location, radius_meters):
+    """Perform Google Places search with fallback logic."""
+    max_results = min(10, int(params.get("max_results", 20)))
+
+    # Try text search with location bias first
+    current_app.logger.info(
+        f"Calling search_places_by_text with query='{params['query']}', location={location}, radius={radius_meters}"
+    )
+    places = places_service.search_places_by_text(params["query"], location, radius_meters, max_results)
+    current_app.logger.info(f"Places API returned: {len(places)} places")
+
+    if places:
+        current_app.logger.info(f"First place: {places[0]}")
+
+    # If no results and we have location, try nearby search
+    if not places and location:
+        places = places_service.search_places_nearby(location, radius_meters, "restaurant", max_results)
+
+    return places
+
+
+def _format_search_response(results, params):
+    """Format the search results into JSON response."""
+    return jsonify(
+        {
+            "data": {
+                "results": results,
+                "search_params": {
+                    "query": params["query"],
+                    "lat": params["lat"],
+                    "lng": params["lng"],
+                    "radius_miles": (float(params["radius_miles"]) if params["radius_miles"] else None),
+                    "cuisine": params["cuisine"],
+                    "min_rating": float(params["min_rating"]) if params["min_rating"] else None,
+                    "max_price_level": (int(params["max_price_level"]) if params["max_price_level"] else None),
+                },
+            },
+            "status": "OK",
+        }
+    )
+
+
+@bp.route("/api/places/search", methods=["GET"])
 def search_places():
     """Search for places using Google Places API with comprehensive data."""
+    current_app.logger.info(f"Search API called with query: {request.args.get('query')}")
+
     # Validate parameters
     params, error_response, status_code = _validate_search_params()
     if error_response:
         return error_response, status_code
 
     try:
-        from app.services.google_places_service import get_google_places_service
+        # Initialize Google Places service
+        places_service, error_response = _initialize_places_service()
+        if error_response:
+            return error_response
 
-        # Check for API key availability
-        try:
-            places_service = get_google_places_service()
-        except ValueError as e:
-            if "API key" in str(e):
-                return (
-                    jsonify({"error": "Google Places API key not configured. Please configure GOOGLE_MAPS_API_KEY."}),
-                    503,
-                )
-            raise
+        # Extract search parameters
+        location = _extract_search_location(params)
+        radius_meters = _calculate_search_radius(params)
 
-        # Get places using centralized service
-        places = _build_search_params(
-            params["query"],
-            params["cuisine"],
-            params["lat"],
-            params["lng"],
-            params["radius_miles"],
-            params["api_key"],
-        )
+        # Perform search with fallback logic
+        places = _perform_places_search(places_service, params, location, radius_meters)
 
-        # Process results using centralized service
+        # Process results
         results = _process_search_results(places, params, places_service)
 
-        return jsonify(
-            {
-                "data": {
-                    "results": results,
-                    "search_params": {
-                        "query": params["query"],
-                        "lat": params["lat"],
-                        "lng": params["lng"],
-                        "radius_miles": (float(params["radius_miles"]) if params["radius_miles"] else None),
-                        "cuisine": params["cuisine"],
-                        "min_rating": float(params["min_rating"]) if params["min_rating"] else None,
-                        "max_price_level": (int(params["max_price_level"]) if params["max_price_level"] else None),
-                    },
-                },
-                "status": "OK",
-            }
-        )
+        return _format_search_response(results, params)
 
     except Exception as e:
         current_app.logger.error(f"Google Places API error: {e}")
@@ -357,6 +461,95 @@ def _map_google_primary_type_to_form_type(primary_type: str) -> str:
     return "other"
 
 
+def _log_place_debug_info(place_id, place, restaurant_name, address_data, price_level_value):
+    """Log debug information for place details."""
+    current_app.logger.info("=== GOOGLE PLACES DATA DEBUG ===")
+    current_app.logger.info(f"Place ID: {place_id}")
+    current_app.logger.info(f"Name: {restaurant_name}")
+    current_app.logger.info(f"Price Level (raw): {place.get('priceLevel')}")
+    current_app.logger.info(f"Price Level (converted): {price_level_value}")
+    current_app.logger.info(f"Rating: {place.get('rating')}")
+    current_app.logger.info(f"Types: {place.get('types', [])}")
+    current_app.logger.info(f"Primary Type: {place.get('primaryType')}")
+    current_app.logger.info(f"Formatted Address: {place.get('formattedAddress')}")
+    current_app.logger.info(f"Address Components Count: {len(place.get('addressComponents', []))}")
+    current_app.logger.info(f"Parsed Address - Line 1: '{address_data.get('address_line_1')}'")
+    current_app.logger.info(f"Parsed Address - City: '{address_data.get('city')}'")
+    current_app.logger.info(f"Parsed Address - State: '{address_data.get('state')}'")
+    current_app.logger.info("=== END GOOGLE PLACES DATA DEBUG ===")
+
+
+def _extract_restaurant_name(place):
+    """Extract restaurant name from Google Places data."""
+    return (
+        place.get("displayName", {}).get("text")
+        if isinstance(place.get("displayName"), dict)
+        else place.get("displayName", "")
+    )
+
+
+def _map_place_to_restaurant_data(place, place_id, places_service):
+    """Map Google Places data to restaurant form data."""
+    # Parse address components
+    address_components = place.get("addressComponents", [])
+    address_data = places_service.parse_address_components(address_components)
+
+    # Extract basic info
+    restaurant_name = _extract_restaurant_name(place)
+    price_level_value = _convert_price_level_to_int(place.get("priceLevel"))
+
+    # Analyze restaurant types
+    analysis_result = places_service.analyze_restaurant_types(place)
+    cuisine = analysis_result.get("cuisine_type", "american")
+    service_level = analysis_result.get("service_level", "casual_dining")
+
+    # Map primary type
+    primary_type = place.get("primaryType", "")
+    mapped_type = _map_google_primary_type_to_form_type(primary_type)
+
+    # Log debug info
+    _log_place_debug_info(place_id, place, restaurant_name, address_data, price_level_value)
+
+    return {
+        # Basic Information
+        "name": restaurant_name,
+        "type": mapped_type,
+        "description": generate_description(place),
+        # Location Information
+        "address_line_1": address_data.get("address_line_1", ""),
+        "address_line_2": address_data.get("address_line_2", ""),
+        "city": address_data.get("city", ""),
+        "state": address_data.get("state", ""),
+        "postal_code": address_data.get("postal_code", ""),
+        "country": address_data.get("country", ""),
+        # Contact Information
+        "phone": place.get("nationalPhoneNumber"),
+        "website": place.get("websiteUri"),
+        "email": None,
+        "google_place_id": place_id,
+        # Business Details
+        "cuisine": cuisine,
+        "service_level": service_level,
+        "is_chain": places_service.detect_chain_restaurant(restaurant_name, place),
+        "rating": place.get("rating"),
+        "notes": generate_notes(place),
+        # Additional Google Data
+        "formatted_address": place.get("formattedAddress"),
+        "types": place.get("types", []),
+        "primary_type": place.get("primaryType"),
+        "address_components": place.get("addressComponents", []),
+        "price_level": price_level_value,
+        "latitude": place.get("location", {}).get("latitude"),
+        "longitude": place.get("location", {}).get("longitude"),
+        "user_ratings_total": place.get("userRatingCount"),
+        # Service options
+        "takeout": place.get("takeout"),
+        "delivery": place.get("delivery"),
+        "dine_in": place.get("dineIn"),
+        "reservable": place.get("reservable"),
+    }
+
+
 @bp.route("/api/places/details/<place_id>", methods=["GET"])
 @login_required
 def get_place_details(place_id):
@@ -373,140 +566,16 @@ def get_place_details(place_id):
 
         # Use centralized service to get place details
         places_service = get_google_places_service()
-        place = places_service.get_place_details(place_id, "comprehensive")
+        place = places_service.get_place_details(place_id)
 
         if not place:
             current_app.logger.error(f"Failed to retrieve place details for {place_id}")
             return jsonify({"error": "Place not found"}), 404
 
-        # Debug: Log the address components received from Google Places API
-        address_components = place.get("addressComponents", [])
-        current_app.logger.info(f"Raw address components from Google Places API: {address_components}")
+        # Map place data to restaurant format
+        mapped_data = _map_place_to_restaurant_data(place, place_id, places_service)
 
-        # Parse address components using service layer
-        address_data = places_service.parse_address_components(address_components)
-        current_app.logger.info(f"Parsed address data: {address_data}")
-
-        # Get restaurant name from new API structure
-        restaurant_name = (
-            place.get("displayName", {}).get("text")
-            if isinstance(place.get("displayName"), dict)
-            else place.get("displayName", "")
-        )
-
-        # Determine cuisine and service level using centralized service
-        current_app.logger.info(f"Analyzing restaurant types for place: {restaurant_name}")
-        current_app.logger.info(f"Types from Google Places: {place.get('types', [])}")
-        current_app.logger.info(f"Primary Type: {place.get('primaryType', 'Unknown')}")
-        cuisine, service_level = places_service.analyze_restaurant_types(place.get("types", []), place)
-        current_app.logger.info(f"Classification results - Cuisine: {cuisine}, Service Level: {service_level}")
-
-        # Map all fields comprehensively for new API
-        price_level_value = _convert_price_level_to_int(place.get("priceLevel"))
-        current_app.logger.info(f"Price level conversion: {place.get('priceLevel')} -> {price_level_value}")
-        current_app.logger.info(f"Address data being used in mapping: {address_data}")
-
-        # Debug: Log key Google Places data
-        current_app.logger.info("=== GOOGLE PLACES DATA DEBUG ===")
-        current_app.logger.info(f"Place ID: {place_id}")
-        current_app.logger.info(f"Name: {restaurant_name}")
-        current_app.logger.info(f"Price Level (raw): {place.get('priceLevel')}")
-        current_app.logger.info(f"Price Level (converted): {price_level_value}")
-        current_app.logger.info(f"Rating: {place.get('rating')}")
-        current_app.logger.info(f"Types: {place.get('types', [])}")
-        current_app.logger.info(f"Primary Type: {place.get('primaryType')}")
-        current_app.logger.info(f"Formatted Address: {place.get('formattedAddress')}")
-        current_app.logger.info(f"Address Components Count: {len(address_components)}")
-        current_app.logger.info(f"Parsed Address - Line 1: '{address_data.get('address_line_1')}'")
-        current_app.logger.info(f"Parsed Address - Line 2: '{address_data.get('address_line_2')}'")
-        current_app.logger.info(f"Parsed Address - City: '{address_data.get('city')}'")
-        current_app.logger.info(f"Parsed Address - State: '{address_data.get('state')}'")
-        current_app.logger.info(f"Parsed Address - Postal: '{address_data.get('postal_code')}'")
-        current_app.logger.info(f"Parsed Address - Country: '{address_data.get('country')}'")
-        current_app.logger.info("=== END GOOGLE PLACES DATA DEBUG ===")
-        # Map Google Places primaryType to form type choices
-        primary_type = place.get("primaryType", "")
-        mapped_type = _map_google_primary_type_to_form_type(primary_type)
-
-        mapped_data = {
-            # Basic Information
-            "name": restaurant_name,
-            "type": mapped_type,  # Map from Google Places primaryType
-            "description": generate_description(place),
-            # Location Information (parsed from addressComponents using standardized mapping)
-            "address_line_1": address_data.get("address_line_1", ""),  # Primary street address
-            "address_line_2": address_data.get("address_line_2", ""),  # Secondary address (apartment/suite)
-            "city": address_data.get("city", ""),
-            "state": address_data.get("state", ""),
-            "postal_code": address_data.get("postal_code", ""),
-            "country": address_data.get("country", ""),
-            # Contact Information
-            "phone": place.get("nationalPhoneNumber"),
-            "website": place.get("websiteUri"),
-            "email": None,  # Google Places doesn't provide email
-            "google_place_id": place_id,
-            # Business Details
-            "cuisine": cuisine,
-            "service_level": service_level,
-            "is_chain": places_service.detect_chain_restaurant(restaurant_name, place),
-            "rating": place.get("rating"),
-            "notes": generate_notes(place),
-            # Additional Google Data (new API structure)
-            "formatted_address": place.get("formattedAddress"),
-            "types": place.get("types", []),
-            "primary_type": place.get("primaryType"),  # NEW: Primary business type
-            "address_components": place.get("addressComponents", []),
-            "price_level": price_level_value,
-            "opening_hours": place.get("regularOpeningHours", {}),
-            "current_opening_hours": place.get("currentOpeningHours", {}),
-            "location": place.get("location", {}),
-            # Extract coordinates from location for easier access
-            "latitude": place.get("location", {}).get("latitude"),
-            "longitude": place.get("location", {}).get("longitude"),
-            "editorial_summary": place.get("editorialSummary", {}),
-            "generative_summary": place.get("generativeSummary", {}),  # NEW: AI-generated summary
-            "user_ratings_total": place.get("userRatingCount"),
-            "plus_code": place.get("plusCode", {}),
-            "photos": place.get("photos", []),
-            "reviews": place.get("reviews", []),
-            # NEW: Enhanced restaurant data
-            "payment_options": place.get("paymentOptions", {}),
-            "accessibility_options": place.get("accessibilityOptions", {}),
-            "parking_options": place.get("parkingOptions", {}),
-            "restroom": place.get("restroom"),
-            "outdoor_seating": place.get("outdoorSeating"),
-            "takeout": place.get("takeout"),
-            "delivery": place.get("delivery"),
-            "dine_in": place.get("dineIn"),
-            "reservable": place.get("reservable"),
-            # Service options
-            "serves_breakfast": place.get("servesBreakfast"),
-            "serves_lunch": place.get("servesLunch"),
-            "serves_dinner": place.get("servesDinner"),
-            "serves_beer": place.get("servesBeer"),
-            "serves_wine": place.get("servesWine"),
-            "serves_brunch": place.get("servesBrunch"),
-            "serves_vegetarian_food": place.get("servesVegetarianFood"),
-            # NEW: Additional attributes from Places API (New)
-            "live_music": place.get("liveMusic"),
-            "menu_for_children": place.get("menuForChildren"),
-            "serves_cocktails": place.get("servesCocktails"),
-            "serves_dessert": place.get("servesDessert"),
-            "serves_coffee": place.get("servesCoffee"),
-            "good_for_children": place.get("goodForChildren"),
-            "allows_dogs": place.get("allowsDogs"),
-            "good_for_groups": place.get("goodForGroups"),
-            "good_for_watching_sports": place.get("goodForWatchingSports"),
-            # Note: business_status is time-sensitive and not stored permanently
-        }
-
-        # Debug logging before JSON response
-        current_app.logger.info(f"Final mapped_data price_level: {mapped_data.get('price_level')}")
-        current_app.logger.info(
-            f"Final mapped_data address fields: address_line_1='{mapped_data.get('address_line_1')}', address_line_2='{mapped_data.get('address_line_2')}', city='{mapped_data.get('city')}', state='{mapped_data.get('state')}', postal_code='{mapped_data.get('postal_code')}', country='{mapped_data.get('country')}'"
-        )
         current_app.logger.info(f"Final mapped_data keys: {list(mapped_data.keys())}")
-        current_app.logger.info(f"Final mapped_data description: {mapped_data.get('description')}")
         return jsonify(mapped_data)
 
     except requests.RequestException as e:
@@ -515,11 +584,24 @@ def get_place_details(place_id):
 
 
 def _convert_price_level_to_int(price_level):
-    """Convert Google Places price level to integer using centralized service."""
-    from app.services.google_places_service import get_google_places_service
+    """Convert Google Places price level to integer."""
+    if price_level is None:
+        return None
 
-    places_service = get_google_places_service()
-    return places_service.convert_price_level_to_int(price_level)
+    if isinstance(price_level, str):
+        price_map = {
+            "PRICE_LEVEL_FREE": 0,
+            "PRICE_LEVEL_INEXPENSIVE": 1,
+            "PRICE_LEVEL_MODERATE": 2,
+            "PRICE_LEVEL_EXPENSIVE": 3,
+            "PRICE_LEVEL_VERY_EXPENSIVE": 4,
+        }
+        return price_map.get(price_level)
+
+    if isinstance(price_level, int):
+        return max(0, min(4, price_level))
+
+    return None
 
 
 def get_cuisine_choices():

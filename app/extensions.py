@@ -6,7 +6,7 @@ This module initializes and configures all Flask extensions used in the applicat
 import logging
 from typing import Any, Optional, Union, cast
 
-from flask import Flask, request, url_for
+from flask import Flask, current_app, jsonify, redirect, request, url_for
 from flask.wrappers import Response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -108,13 +108,8 @@ def _configure_csrf_handlers(app: Flask) -> None:
             return cast(Response, redirect(url_for("auth.login", next=current_path)))
 
 
-def init_app(app: Flask) -> None:
-    """Initialize all extensions with the Flask application."""
-    # Initialize core extensions
-    db.init_app(app)
-    login_manager.init_app(app)
-
-    # Configure Flask-Migrate with Lambda-aware directory handling
+def _configure_migration_directory(app: Flask) -> None:
+    """Configure Flask-Migrate with Lambda-aware directory handling."""
     import os
 
     # In Lambda, we need to handle the read-only filesystem
@@ -130,10 +125,24 @@ def init_app(app: Flask) -> None:
 
     migrate.init_app(app, db, directory=migration_dir)
 
+
+def _configure_session_backend(app: Flask) -> None:
+    """Configure session backend and log configuration."""
     # Use Flask's built-in signed cookie sessions - no external session backend needed
     app.logger.info("Using Flask's default signed cookie sessions (ideal for all environments)")
 
     _log_session_config(app)
+
+
+def init_app(app: Flask) -> None:
+    """Initialize all extensions with the Flask application."""
+    # Initialize core extensions
+    db.init_app(app)
+    login_manager.init_app(app)
+
+    # Configure components
+    _configure_migration_directory(app)
+    _configure_session_backend(app)
 
     # Initialize rate limiter
     limiter.init_app(app)
@@ -169,6 +178,59 @@ def init_app(app: Flask) -> None:
     _configure_csrf_handlers(app)
 
 
+def _is_lambda_environment() -> bool:
+    """Check if running in AWS Lambda environment."""
+    server_name = current_app.config.get("SERVER_NAME")
+    return bool(server_name and server_name != "localhost:5000" and "localhost" not in server_name)
+
+
+def _fix_api_gateway_url(url: str, server_name: str) -> str:
+    """Replace API Gateway domain with CloudFront domain in URL."""
+    if not url:
+        return url
+
+    # Check for various API Gateway domain patterns
+    api_patterns = ["execute-api", "amazonaws.com", "api.dev.nivecher.com"]
+    if not any(pattern in url for pattern in api_patterns):
+        return url
+
+    if "://" in url:
+        protocol, rest = url.split("://", 1)
+        if "/" in rest:
+            host, path = rest.split("/", 1)
+            return f"{protocol}://{server_name}/{path}"
+        else:
+            return f"{protocol}://{server_name}"
+
+    return url
+
+
+def _handle_api_unauthorized() -> Response:
+    """Handle unauthorized API requests."""
+    response = jsonify({"status": "error", "message": "Authentication required", "code": 401})
+    response.status_code = 401
+    return response
+
+
+def _handle_web_unauthorized() -> Response:
+    """Handle unauthorized web requests with fixed URLs for Lambda."""
+    next_url = request.url
+    server_name = current_app.config.get("SERVER_NAME")
+
+    # Fix URLs in Lambda environment
+    if _is_lambda_environment() and server_name:
+        next_url = _fix_api_gateway_url(next_url, server_name)
+
+    # Generate login URL with fixed next parameter
+    login_url = url_for(login_manager.login_view, next=next_url, _external=True)
+
+    # Fix login URL if needed
+    if _is_lambda_environment() and server_name:
+        login_url = _fix_api_gateway_url(login_url, server_name)
+
+    return cast(Response, redirect(login_url))
+
+
 @login_manager.unauthorized_handler
 def unauthorized() -> Union[Response, str]:
     """Handle unauthorized requests.
@@ -176,13 +238,10 @@ def unauthorized() -> Union[Response, str]:
     For API requests, return a 401 JSON response.
     For web requests, redirect to the login page.
     """
-    from flask import jsonify, redirect
-
     if request.path.startswith("/api/"):
-        response = jsonify({"status": "error", "message": "Authentication required", "code": 401})
-        response.status_code = 401
-        return response
-    return cast(Response, redirect(url_for(login_manager.login_view, next=request.url)))
+        return _handle_api_unauthorized()
+
+    return _handle_web_unauthorized()
 
 
 @login_manager.user_loader

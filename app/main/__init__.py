@@ -20,6 +20,10 @@ def init_app(app):
     Args:
         app: The Flask application instance
     """
+    logger.info(f"Main blueprint routes before registration: {[rule.rule for rule in bp.url_map.iter_rules()]}")
     app.register_blueprint(bp)
     logger.info("Main blueprint registered")
+    logger.info(
+        f"Main blueprint routes after registration: {[rule.rule for rule in app.url_map.iter_rules() if 'main.' in rule.endpoint]}"
+    )
     return None

@@ -123,7 +123,7 @@ def get_cuisine_data(cuisine_name):
         if name.lower() == cuisine_lower:
             return data
 
-        return None
+    return None
 
 
 def get_cuisine_color(cuisine_name):

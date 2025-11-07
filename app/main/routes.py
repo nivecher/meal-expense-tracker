@@ -6,6 +6,7 @@ This module contains the route handlers for the main blueprint.
 
 import os
 from datetime import datetime, timezone
+from math import ceil
 
 from flask import (
     Response,
@@ -14,17 +15,37 @@ from flask import (
     flash,
     redirect,
     render_template,
+    request,
     send_from_directory,
     url_for,
 )
 from flask_login import current_user, login_required
 from sqlalchemy import func, select
 
+from app.expenses import services as expense_services
 from app.expenses.models import Expense, Tag
 from app.extensions import db
 from app.restaurants.models import Restaurant
 
 from . import bp
+
+# Constants for pagination
+PER_PAGE = 10  # Number of expenses per page
+SHOW_ALL = -1  # Special value to show all expenses
+
+
+def _get_page_size_from_cookie(cookie_name="expense_page_size", default_size=PER_PAGE):
+    """Get page size from cookie with validation and fallback."""
+    try:
+        cookie_value = request.cookies.get(cookie_name)
+        if cookie_value:
+            page_size = int(cookie_value)
+            # Validate page size is in allowed values
+            if page_size in [10, 25, 50, 100, SHOW_ALL]:
+                return page_size
+    except (ValueError, TypeError):
+        pass
+    return default_size
 
 
 @bp.app_template_global()
@@ -160,10 +181,15 @@ def contact():
     return render_template("main/contact.html", form=form)
 
 
+@bp.route("/test")
+def test():
+    return "Test route works"
+
+
 @bp.route("/")
 @login_required
 def index():
-    """Display the main dashboard with expense and restaurant summaries."""
+    """Display the main dashboard with welcome message, stats, and recent activity."""
     user_id = current_user.id
 
     # Get expense statistics
@@ -183,20 +209,20 @@ def index():
         )
     ).first()
 
-    # Get recent expenses (last 5)
+    # Get recent expenses (top 5 most recent)
     recent_expenses = db.session.execute(
         select(
             Expense,
             Restaurant.name.label("restaurant_name"),
             Restaurant.website.label("restaurant_website"),
         )
-        .outerjoin(Restaurant, Expense.restaurant_id == Restaurant.id)
+        .join(Restaurant, Expense.restaurant_id == Restaurant.id, isouter=True)
         .where(Expense.user_id == user_id)
         .order_by(Expense.date.desc(), Expense.created_at.desc())
         .limit(5)
     ).all()
 
-    # Get top restaurants by spending
+    # Get top restaurants by expense count (top 5)
     top_restaurants = db.session.execute(
         select(
             Restaurant.id,
@@ -204,17 +230,14 @@ def index():
             Restaurant.website,
             Restaurant.cuisine,
             func.count(Expense.id).label("visit_count"),
-            func.sum(Expense.amount).label("total_spent"),
+            func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
         )
-        .join(Expense, Expense.restaurant_id == Restaurant.id)
-        .where(Restaurant.user_id == user_id, Expense.user_id == user_id)
+        .join(Expense, Restaurant.id == Expense.restaurant_id)
+        .where(Restaurant.user_id == user_id)
         .group_by(Restaurant.id, Restaurant.name, Restaurant.website, Restaurant.cuisine)
-        .order_by(func.sum(Expense.amount).desc())
+        .order_by(func.count(Expense.id).desc())
         .limit(5)
     ).all()
-
-    # Import cuisine color function for template use
-    from app.constants.cuisines import get_cuisine_color
 
     return render_template(
         "main/dashboard.html",
@@ -222,8 +245,20 @@ def index():
         restaurant_stats=restaurant_stats,
         recent_expenses=recent_expenses,
         top_restaurants=top_restaurants,
-        get_cuisine_color=get_cuisine_color,
     )
+
+
+@bp.route("/index.html")
+@login_required
+def index_html():
+    """Serve the main dashboard for index.html requests (browser default)."""
+    return index()
+
+
+@bp.route("/index")
+def index_redirect():
+    """Redirect to the main index page."""
+    return redirect(url_for("main.index"))
 
 
 @bp.route("/css/user-tags.css")
