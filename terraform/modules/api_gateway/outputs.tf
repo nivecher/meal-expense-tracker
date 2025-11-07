@@ -37,3 +37,8 @@ output "effective_api_domain_name" {
   description = "The effective API domain name (constructed or provided)"
   value       = local.effective_api_domain_name
 }
+
+output "api_custom_domain" {
+  description = "The API Gateway custom domain name"
+  value       = length(aws_apigatewayv2_domain_name.main) > 0 ? aws_apigatewayv2_domain_name.main.domain_name : null
+}

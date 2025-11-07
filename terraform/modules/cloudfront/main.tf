@@ -65,8 +65,7 @@ resource "aws_cloudfront_distribution" "main" {
 
   # Origin 2: API Gateway for dynamic content
   origin {
-    # Extract domain from API Gateway endpoint URL
-    domain_name = replace(replace(var.api_gateway_endpoint, "https://", ""), "/", "")
+    domain_name = var.api_gateway_custom_domain
     origin_id   = "API-Gateway"
 
     custom_origin_config {
@@ -97,8 +96,18 @@ resource "aws_cloudfront_distribution" "main" {
     compress                 = true
     viewer_protocol_policy   = "redirect-to-https"
 
-    cache_policy_id          = "658327ea-f89d-4fab-a63d-7e88639e58f6"  # Managed-CachingDisabled
-    origin_request_policy_id = "b689b0a8-53d0-40ab-baf2-68738e2966ac"  # Managed-AllViewerExceptHostHeader
+    forwarded_values {
+      query_string = true
+      headers      = ["Accept", "Accept-Language", "Authorization", "Content-Type", "Origin", "Referer", "User-Agent"]  # Forward important headers but not Host
+      cookies {
+        forward = "all"
+      }
+    }
+
+    # Disable caching for API Gateway
+    min_ttl     = 0
+    default_ttl = 0
+    max_ttl     = 0
   }
 
   # Custom error responses for SPA

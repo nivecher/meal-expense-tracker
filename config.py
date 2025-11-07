@@ -36,6 +36,7 @@ class Config:
     # Google Maps API
     GOOGLE_MAPS_API_KEY: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
     GOOGLE_MAPS_MAP_ID: str = os.getenv("GOOGLE_MAPS_MAP_ID", "")
+    GOOGLE_API_REFERRER_DOMAIN: str = os.getenv("GOOGLE_API_REFERRER_DOMAIN", "localhost:5000")
 
     # Application settings
     APP_NAME: str = os.getenv("APP_NAME", "meal-expense-tracker")

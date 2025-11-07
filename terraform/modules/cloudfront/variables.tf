@@ -18,6 +18,11 @@ variable "api_gateway_endpoint" {
   type        = string
 }
 
+variable "api_gateway_custom_domain" {
+  description = "API Gateway custom domain name"
+  type        = string
+}
+
 variable "acm_certificate_arn" {
   description = "ACM certificate ARN for custom domain"
   type        = string

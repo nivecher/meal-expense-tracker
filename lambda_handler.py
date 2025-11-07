@@ -112,6 +112,17 @@ def _convert_apigw_v2_to_v1(event: Dict[str, Any]) -> Dict[str, Any]:
         cookie_header = "; ".join(cookies)
         headers["Cookie"] = cookie_header
 
+    # Fix Host header for CloudFront routing - replace API Gateway domain with CloudFront domain
+    # This ensures Flask generates correct redirect URLs
+    host_header = headers.get("host") or headers.get("Host", "")
+    if host_header and ("execute-api" in host_header or "amazonaws.com" in host_header):
+        # Get the configured server name (CloudFront domain) from environment
+        server_name = os.getenv("SERVER_NAME")
+        if server_name:
+            headers["Host"] = server_name
+            headers["host"] = server_name
+            logger.info(f"Replaced Host header from {host_header} to {server_name} for URL generation")
+
     # Convert v2.0 event to v1.0 format
     v1_event = {
         "httpMethod": http_context.get("method", "GET"),
@@ -534,11 +545,26 @@ def _handle_http_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handle HTTP API events."""
     app = get_or_create_app()
 
+    # Extract and log request details
+    http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
+    path = event.get("path") or event.get("rawPath") or event.get("requestContext", {}).get("http", {}).get("path")
+    logger.info(f"Processing request: {http_method} {path}")
+
     try:
         # Handle CORS preflight requests for OPTIONS method
-        http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
         if http_method == "OPTIONS":
             return _handle_cors_preflight()
+
+        # Fix Host header for URL generation before processing
+        headers = event.get("headers", {})
+        host_header = headers.get("host") or headers.get("Host", "")
+        if host_header and ("execute-api" in host_header or "amazonaws.com" in host_header):
+            server_name = os.getenv("SERVER_NAME")
+            if server_name:
+                headers["Host"] = server_name
+                headers["host"] = server_name
+                event["headers"] = headers
+                logger.info(f"Fixed Host header from {host_header} to {server_name} for URL generation")
 
         # Convert API Gateway v2.0 format to v1.0 format for awsgi compatibility
         # Note: With payload_format_version = "2.0", this conversion is always needed
@@ -610,6 +636,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         dict: Response in appropriate API Gateway format
     """
+    print(
+        f"*** LAMBDA_HANDLER START: routeKey: {event.get('routeKey', 'MISSING')} rawPath: {event.get('rawPath', 'MISSING')} ***"
+    )
+    logger.error(
+        f"*** LAMBDA_HANDLER START: routeKey: {event.get('routeKey', 'MISSING')} rawPath: {event.get('rawPath', 'MISSING')} ***"
+    )
     _ = context  # Mark as unused
 
     # Handle direct invocation for database operations

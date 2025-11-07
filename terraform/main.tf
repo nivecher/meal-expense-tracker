@@ -310,6 +310,7 @@ module "cloudfront" {
   app_name               = var.app_name
   environment            = var.environment
   api_gateway_endpoint = module.api_gateway.api_endpoint  # Use full API Gateway endpoint URL
+  api_gateway_custom_domain = module.api_gateway.api_custom_domain
   aliases              = [local.api_domain_name]
   acm_certificate_arn    = data.aws_acm_certificate.main.arn
   domain_aliases         = [local.api_domain_name]
