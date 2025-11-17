@@ -172,6 +172,14 @@ jobs:
             echo "No terraform directory found, skipping validation"
           fi
 
+      - name: Terraform Plan
+        run: |
+          if [ -d "terraform" ]; then
+            terraform -chdir=terraform plan -var-file=environments/dev/terraform.tfvars
+          else
+            echo "No terraform directory found, skipping plan"
+          fi
+
   # Security scanning
   security:
     name: Security Scan

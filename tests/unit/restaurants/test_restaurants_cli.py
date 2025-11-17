@@ -293,7 +293,12 @@ class TestRestaurantCLI:
                     "types": ["restaurant", "food"],
                     "primary_type": "restaurant",
                 }
-                mock_service.analyze_restaurant_types.return_value = ("American", "casual_dining")
+                mock_service.analyze_restaurant_types.return_value = {
+                    "cuisine_type": "American",
+                    "service_level": "casual_dining",
+                    "confidence": 0.8,
+                }
+                mock_service.detect_service_level_from_data.return_value = ("casual_dining", 0.8)
 
                 mock_restaurant.google_place_id = "test_place_id"
 

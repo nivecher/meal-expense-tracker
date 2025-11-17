@@ -306,9 +306,10 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                 "google_state_short": google_data.get("state_short"),
                 "google_postal_code": google_data.get("postal_code"),
                 "google_country": google_data.get("country"),
-                # Legacy field for backward compatibility
-                "google_street_address": google_data.get("street_address"),
-                "google_service_level": places_service.detect_service_level_from_data(place_data),
+                "google_service_level": {
+                    "level": places_service.detect_service_level_from_data(place_data)[0],
+                    "confidence": places_service.detect_service_level_from_data(place_data)[1],
+                },
                 "google_cuisine": places_service.analyze_restaurant_types(place_data).get("cuisine_type"),
                 "errors": [],
             }
