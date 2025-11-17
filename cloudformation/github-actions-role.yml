@@ -28,6 +28,10 @@ Resources:
                 'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubOrg}/${RepositoryName}:*'
               StringEquals:
                 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com'
+          - Effect: Allow
+            Principal:
+              AWS: 'arn:aws:sts::562427544284:assumed-role/AWSReservedSSO_AdministratorAccess_c93d252d500730e3/mtd37'
+            Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
         - arn:aws:iam::aws:policy/AWSLambda_FullAccess
@@ -67,6 +71,8 @@ Resources:
                   - kms:EnableKeyRotation
                   - kms:Get*
                   - kms:List*
+                  - kms:Decrypt
+                  - kms:GenerateDataKey
                   # ACM permissions
                   - acm:RequestCertificate
                   - acm:DeleteCertificate
