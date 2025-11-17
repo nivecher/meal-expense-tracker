@@ -51,6 +51,8 @@
 .section-header h5 {
   margin-bottom: 0;
   color: #495057;
+  display: flex; /* Ensure icon and text are aligned */
+  align-items: center; /* Vertically center content */
 }
 
 /* Horizontal rule styling */

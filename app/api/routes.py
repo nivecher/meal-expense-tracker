@@ -434,7 +434,7 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
         from app.services.google_places_service import get_google_places_service
 
         places_service = get_google_places_service()
-        place = places_service.get_place_details(google_place_id, "comprehensive")
+        place = places_service.get_place_details(google_place_id)
 
         if not place:
             return {

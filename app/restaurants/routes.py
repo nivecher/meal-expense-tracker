@@ -147,14 +147,18 @@ def _build_search_params(query, cuisine, lat, lng, radius_miles, api_key):
 
 def _build_photo_urls(photos, api_key):
     """Build photo URLs from Google Places photo references."""
-    # Simplified - photos are expensive Pro+ tier feature
-    return []
+    from app.services.google_places_service import get_google_places_service
+
+    service = get_google_places_service()
+    return service.build_photo_urls(photos, api_key)
 
 
 def _build_reviews_summary(reviews):
     """Build reviews summary from Google Places reviews."""
-    # Simplified - reviews are Pro+ tier feature
-    return []
+    from app.services.google_places_service import get_google_places_service
+
+    service = get_google_places_service()
+    return service.build_reviews_summary(reviews)
 
 
 def _validate_search_params():
@@ -186,21 +190,10 @@ def _validate_search_params():
 
 def _filter_place_by_criteria(place, min_rating, max_price_level):
     """Filter place based on rating and price level criteria."""
-    # Check rating
-    if min_rating is not None:
-        rating = place.get("rating")
-        min_rating_float = float(min_rating) if isinstance(min_rating, str) else min_rating
-        if rating is None or rating < min_rating_float:
-            return []
+    from app.services.google_places_service import get_google_places_service
 
-    # Check price level
-    if max_price_level is not None:
-        price_level = _convert_price_level_to_int(place.get("priceLevel"))
-        max_price_int = int(max_price_level) if isinstance(max_price_level, str) else max_price_level
-        if price_level is not None and price_level > max_price_int:
-            return []
-
-    return [place]
+    service = get_google_places_service()
+    return service.filter_places_by_criteria([place], min_rating, max_price_level)
 
 
 def _process_search_result_place(place, api_key):
@@ -208,7 +201,7 @@ def _process_search_result_place(place, api_key):
     from app.services.google_places_service import get_google_places_service
 
     places_service = get_google_places_service()
-    return places_service.extract_restaurant_data(place)
+    return places_service.process_search_result_place(place)
 
 
 def _enhance_place_with_details(processed_place, places_service):
@@ -218,7 +211,7 @@ def _enhance_place_with_details(processed_place, places_service):
         return processed_place
 
     try:
-        detailed_place = places_service.get_place_details(place_id, "comprehensive")
+        detailed_place = places_service.get_place_details(place_id)
         if detailed_place and detailed_place.get("addressComponents"):
             # Debug: Log the raw address components
             current_app.logger.info(f"Raw address components for {place_id}: {detailed_place['addressComponents']}")
@@ -490,9 +483,11 @@ def _extract_restaurant_name(place):
 
 def _map_place_to_restaurant_data(place, place_id, places_service):
     """Map Google Places data to restaurant form data."""
-    # Parse address components
-    address_components = place.get("addressComponents", [])
-    address_data = places_service.parse_address_components(address_components)
+    # Parse address - use formatted address since addressComponents requires Pro tier
+    formatted_address = place.get("formattedAddress", "")
+
+    # Parse the formatted address into components
+    address_data = places_service.parse_formatted_address(formatted_address)
 
     # Extract basic info
     restaurant_name = _extract_restaurant_name(place)
@@ -575,7 +570,6 @@ def get_place_details(place_id):
         # Map place data to restaurant format
         mapped_data = _map_place_to_restaurant_data(place, place_id, places_service)
 
-        current_app.logger.info(f"Final mapped_data keys: {list(mapped_data.keys())}")
         return jsonify(mapped_data)
 
     except requests.RequestException as e:

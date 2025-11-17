@@ -50,7 +50,7 @@ export function showToast(message, type = 'info', duration = 4000) {
       <div class="toast-body">
         <i class="fas ${iconClass} me-2"></i>
         ${message}
-        <button type="button" class="btn-close ${type === 'warning' ? 'btn-close-dark' : 'btn-close-white'} ms-2"
+        <button type="button" class="btn-close ${type === 'warning' ? 'btn-close-dark' : 'btn-close-white'}"
                 data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
     </div>

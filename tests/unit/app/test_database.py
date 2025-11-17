@@ -69,10 +69,12 @@ class TestDatabaseModule:
     def test_get_database_uri_lambda_environment_no_url(self):
         """Test getting database URI in Lambda environment without DATABASE_URL."""
         with patch.dict(os.environ, {"AWS_LAMBDA_FUNCTION_NAME": "my-function"}, clear=True):
-            with pytest.raises(
-                RuntimeError, match="DATABASE_URL environment variable must be set in Lambda environment"
-            ):
-                _get_database_uri()
+            with patch("app.database._get_database_uri_from_secrets_manager") as mock_secrets:
+                mock_secrets.side_effect = RuntimeError("Failed to retrieve secret")
+                with pytest.raises(
+                    RuntimeError, match="DATABASE_URL must be set or secret .* must be available in Lambda environment"
+                ):
+                    _get_database_uri()
 
     def test_get_database_uri_from_app_config(self, app):
         """Test getting database URI from app config."""

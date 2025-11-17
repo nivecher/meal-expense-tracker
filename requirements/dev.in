@@ -86,7 +86,7 @@ webdriver-manager>=4.0.0,<5.0.0         # Manages browser drivers for Selenium
 
 # Security
 bandit>=1.7.0,<2.0.0                    # Security linter for Python code
-safety>=2.3.0,<2.4.0                    # Checks installed dependencies for known security vulnerabilities
+safety>=3.0.0,<4.0.0                    # Checks installed dependencies for known security vulnerabilities
 
 # Documentation
 sphinx>=7.0.0,<8.0.0                    # Documentation generator

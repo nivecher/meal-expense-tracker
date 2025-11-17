@@ -44,7 +44,7 @@ window.addToMyRestaurants = async function(placeId) {
     // Create JSON data for adding restaurant
     const requestData = {
       name: restaurantData.name || '',
-      type: 'restaurant',
+      type: restaurantData.type || 'restaurant',
       description: restaurantData.description || '',
       address_line_1: restaurantData.address_line_1 || '',
       address_line_2: restaurantData.address_line_2 || '',

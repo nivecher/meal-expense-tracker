@@ -144,8 +144,8 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = [
-          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${var.app_name}/${var.environment}/supabase-*",
-          "arn:aws:secretsmanager:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:secret:${var.app_name}*supabase*"
+          "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${var.app_name}/${var.environment}/supabase-*",
+          "arn:aws:secretsmanager:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:secret:${var.app_name}*supabase*"
         ]
       },
       # SSM Parameter Store access for application configuration
@@ -157,7 +157,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "ssm:GetParametersByPath"
         ]
         Resource = [
-          "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.app_name}/${var.environment}/*"
+          "arn:aws:ssm:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:parameter/${var.app_name}/${var.environment}/*"
         ]
       },
       # KMS decryption for SSM parameters
@@ -168,7 +168,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "kms:DescribeKey"
         ]
         Resource = [
-          "arn:aws:kms:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:key/*"
+          "arn:aws:kms:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:key/*"
         ],
         Condition = {
           StringLike = {

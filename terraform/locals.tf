@@ -37,4 +37,12 @@ locals {
 
   # Use provided monthly_budget_amount or default to environment-based amount
   monthly_budget = coalesce(var.monthly_budget_amount, local.budget_amount)
+
+  # CORS origins for API Gateway
+  # These are the domains that browsers will send as the 'Origin' header
+  base_cors_origins = [
+    "https://${local.api_domain_name}",  # Main application domain (via CloudFront)
+    "http://localhost:5000",             # Local development
+    "https://localhost:5000"             # Local development with HTTPS
+  ]
 }

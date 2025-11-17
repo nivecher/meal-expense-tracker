@@ -16,6 +16,7 @@ docker tag meal-expense-tracker-dev-lambda:latest ${ECR_REPO}:latest
 docker tag meal-expense-tracker-dev-lambda:latest ${ECR_REPO}:${TIMESTAMP}
 
 echo "📤 Pushing images to ECR..."
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ECR_REPO}
 docker push ${ECR_REPO}:latest
 docker push ${ECR_REPO}:${TIMESTAMP}
 

@@ -368,10 +368,11 @@ export class MapRestaurantSearch {
       if (addButton) {
         e.stopPropagation(); // Prevent card selection
         const { placeId } = addButton.dataset;
-        if (placeId && placeId !== 'null' && placeId !== 'undefined') {
+        if (placeId && placeId !== 'null' && placeId !== 'undefined' && placeId.trim() !== '') {
           this.addToMyRestaurants(placeId);
         } else {
-          console.error('No valid place ID found on button. placeId:', placeId);
+          console.warn('Restaurant cannot be added: missing Google Place ID. This restaurant may need to be added manually.');
+          // TODO: Show user-friendly message or alternative action
         }
       }
     });
@@ -1014,9 +1015,15 @@ export class MapRestaurantSearch {
 
           <!-- Add button -->
           <div class="mt-auto">
-            <button class="btn btn-primary btn-sm w-100" data-place-id="${restaurant.place_id}" data-action="add-restaurant">
-              <i class="fas fa-plus me-1"></i>Add to My Restaurants
-            </button>
+            ${(restaurant.google_place_id && restaurant.google_place_id.trim() !== '') || (restaurant.place_id && restaurant.place_id.trim() !== '') ? `
+              <button class="btn btn-primary btn-sm w-100" data-place-id="${restaurant.google_place_id || restaurant.place_id}" data-action="add-restaurant">
+                <i class="fas fa-plus me-1"></i>Add to My Restaurants
+              </button>
+            ` : `
+              <button class="btn btn-outline-secondary btn-sm w-100" disabled title="This restaurant cannot be added automatically. Missing Google Place ID.">
+                <i class="fas fa-exclamation-triangle me-1"></i>Cannot Add Automatically
+              </button>
+            `}
           </div>
         </div>
       </div>

@@ -1083,11 +1083,9 @@ validate-tf-config:
 deploy-dev: validate-env check-lambda-package
 	@echo "\033[1m🚀 Deploying to dev environment...\033[0m"
 	@./scripts/deploy_lambda.sh \
-	  --function-name "$(LAMBDA_FUNCTION_NAME)-dev" \
-	  --environment dev \
-	  --profile "$(DEFAULT_AWS_PROFILE)" \
-	  --region "$(DEFAULT_AWS_REGION)" \
-	  --package both || (echo "\033[1;31m❌ Dev deployment failed\033[0m"; exit 1)
+	  --function "$(LAMBDA_FUNCTION_NAME)-dev" \
+	  --env dev \
+	  --no-package || (echo "\033[1;31m❌ Dev deployment failed\033[0m"; exit 1)
 	@echo "\033[1;32m✅ Dev deployment completed successfully\033[0m"
 
 ## Deploy to staging environment
@@ -1096,11 +1094,9 @@ deploy-staging: validate-env check-lambda-package
 	@echo "\033[1m🚀 Deploying to staging environment...\033[0m"
 	@read -p "This will deploy to the staging environment. Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "\033[1;33m⚠️  Aborting...\033[0m"; exit 1)
 	@./scripts/deploy_lambda.sh \
-	  --function-name "$(LAMBDA_FUNCTION_NAME)-staging" \
-	  --environment staging \
-	  --profile "$(DEFAULT_AWS_PROFILE)" \
-	  --region "$(DEFAULT_AWS_REGION)" \
-	  --package both || (echo "\033[1;31m❌ Staging deployment failed\033[0m"; exit 1)
+	  --function "$(LAMBDA_FUNCTION_NAME)-staging" \
+	  --env staging \
+	  --no-package || (echo "\033[1;31m❌ Staging deployment failed\033[0m"; exit 1)
 	@echo "\033[1;32m✅ Staging deployment completed successfully\033[0m"
 
 ## Deploy to production environment
@@ -1110,11 +1106,9 @@ deploy-prod: validate-env check-lambda-package
 	@echo "\033[1;31m⚠️  This will apply all pending changes to your production environment.\033[0m"
 	@read -p "Type 'production' to continue: " confirm && [ "$$confirm" = "production" ]
 	@./scripts/deploy_lambda.sh \
-	  --function-name "$(LAMBDA_FUNCTION_NAME)" \
-	  --environment prod \
-	  --profile "$(DEFAULT_AWS_PROFILE)" \
-	  --region "$(DEFAULT_AWS_REGION)" \
-	  --package both || (echo "\033[1;31m❌ Production deployment failed\033[0m"; exit 1)
+	  --function "$(LAMBDA_FUNCTION_NAME)" \
+	  --env prod \
+	  --no-package || (echo "\033[1;31m❌ Production deployment failed\033[0m"; exit 1)
 	@echo "\033[1;32m✅ Production deployment completed successfully\033[0m"
 
 ## Release to staging environment (tag-based)

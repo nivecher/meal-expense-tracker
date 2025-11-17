@@ -104,18 +104,13 @@ class TestExtensionsModule:
     def test_unauthorized_handler_web_request(self, app):
         """Test unauthorized handler for web requests."""
         with app.test_request_context("/test"):
-            with patch("app.extensions.request") as mock_request:
-                with patch("flask.redirect") as mock_redirect:
-                    with patch("app.extensions.url_for") as mock_url_for:
-                        mock_request.path = "/test"
-                        mock_request.url = "http://localhost/test"
-                        mock_redirect.return_value = "redirected"
-                        mock_url_for.return_value = "/auth/login"
+            with patch("app.extensions._handle_web_unauthorized") as mock_web_handler:
+                mock_web_handler.return_value = "redirected"
 
-                        unauthorized()
+                result = unauthorized()
 
-                        mock_redirect.assert_called_once()
-                        mock_url_for.assert_called_once()
+                mock_web_handler.assert_called_once()
+                assert result == "redirected"
 
     def test_load_user_success(self, app):
         """Test successful user loading."""

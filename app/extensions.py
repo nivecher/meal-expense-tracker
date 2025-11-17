@@ -164,7 +164,7 @@ def init_app(app: Flask) -> None:
 
     # Configure CSRF protection
     app.logger.info("Enabling CSRF protection")
-    csrf.init_app(app)
+    # Set CSRF configuration BEFORE initializing the extension
     app.config.update(
         WTF_CSRF_ENABLED=True,
         WTF_CSRF_CHECK_DEFAULT=False,  # RELAXED: Disable CSRF checking by default for testing
@@ -173,6 +173,8 @@ def init_app(app: Flask) -> None:
         WTF_CSRF_REFERRER_CHECK=False,
         WTF_CSRF_SECRET_KEY=secret_key,
     )
+    # Initialize CSRF protection AFTER configuration is set
+    csrf.init_app(app)
 
     # Configure CSRF handlers
     _configure_csrf_handlers(app)

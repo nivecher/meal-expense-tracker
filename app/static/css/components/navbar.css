@@ -133,6 +133,8 @@
   transition: var(--transition);
   width: 20px;
   text-align: center;
+  line-height: 1; /* Standardize line height */
+  vertical-align: middle; /* Align icons vertically */
 }
 
 .navbar-nav-desktop .nav-link:hover i {
@@ -190,6 +192,8 @@
 .navbar-nav-mobile .nav-link i {
   font-size: 1.2rem;
   transition: var(--transition);
+  line-height: 1; /* Standardize line height */
+  vertical-align: middle; /* Align icons vertically */
 }
 
 .navbar-nav-mobile .nav-link:hover i {
@@ -292,6 +296,7 @@
   border-radius: 50%;
   border: 2px solid var(--bs-primary);
   transition: var(--transition);
+  vertical-align: middle; /* Align image vertically */
 }
 
 .navbar-nav-user .nav-link:hover img {

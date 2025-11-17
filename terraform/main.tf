@@ -146,8 +146,8 @@ module "lambda" {
   db_port                     = ""
   db_name                     = ""
 
-  api_gateway_domain_name   = ""  # Will be set after API Gateway is created
-  api_gateway_execution_arn = ""  # Will be set after API Gateway is created
+  api_gateway_domain_name   = "" # Will be set after API Gateway is created
+  api_gateway_execution_arn = "" # Will be set after API Gateway is created
 
   memory_size   = var.lambda_memory_size
   timeout       = var.lambda_timeout
@@ -196,18 +196,15 @@ module "api_gateway" {
   lambda_function_name = module.lambda.name
   logs_kms_key_arn     = aws_kms_key.main.arn
 
-  domain_name           = local.domain_name
-  cert_domain           = local.cert_domain
-  api_domain_prefix     = local.api_domain_prefix
+  domain_name       = local.domain_name
+  cert_domain       = local.cert_domain
+  api_domain_prefix = local.api_domain_prefix
   # Don't set api_domain_name - let it be constructed as api.{domain_name}
-  create_route53_record = true  # API Gateway handles its own routing
+  create_route53_record = true # API Gateway handles its own routing
 
-  api_cors_allow_origins = [
-    "https://${local.api_domain_name}",
-    "http://localhost:5000",
-    "https://localhost:5000",
-    "https://d2grggsm6jo80a.cloudfront.net"  # CloudFront distribution domain
-  ]
+  # CORS configuration: Allow requests from the main domain and localhost
+  # CloudFront proxies requests transparently, so browser origin is the main domain
+  api_cors_allow_origins = local.base_cors_origins
   api_cors_allow_credentials = true
   api_cors_allow_headers     = ["*"]
   api_cors_expose_headers = [
@@ -306,15 +303,15 @@ data "aws_acm_certificate" "main" {
 module "cloudfront" {
   source = "./modules/cloudfront"
 
-  s3_bucket_name         = "${var.app_name}-${var.environment}-static"
-  app_name               = var.app_name
-  environment            = var.environment
-  api_gateway_endpoint = module.api_gateway.api_endpoint  # Use full API Gateway endpoint URL
+  s3_bucket_name            = "${var.app_name}-${var.environment}-static"
+  app_name                  = var.app_name
+  environment               = var.environment
+  api_gateway_endpoint      = module.api_gateway.api_endpoint # Use full API Gateway endpoint URL
   api_gateway_custom_domain = module.api_gateway.api_custom_domain
-  aliases              = [local.api_domain_name]
-  acm_certificate_arn    = data.aws_acm_certificate.main.arn
-  domain_aliases         = [local.api_domain_name]
-  route53_zone_id        = data.aws_route53_zone.main.zone_id
+  aliases                   = [local.api_domain_name]
+  acm_certificate_arn       = data.aws_acm_certificate.main.arn
+  domain_aliases            = [local.api_domain_name]
+  route53_zone_id           = data.aws_route53_zone.main.zone_id
 
   tags = local.tags
 
@@ -322,3 +319,11 @@ module "cloudfront" {
     module.api_gateway
   ]
 }
+
+# CORS Architecture:
+# 1. Users access: meals.dev.nivecher.com (CloudFront)
+# 2. CloudFront proxies API requests to API Gateway
+# 3. Browser origin remains: meals.dev.nivecher.com
+# 4. API Gateway CORS allows: meals.dev.nivecher.com ✅
+#
+# This is the standard, simple approach - no circular dependencies needed!

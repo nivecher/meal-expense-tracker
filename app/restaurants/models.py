@@ -507,7 +507,7 @@ class Restaurant(BaseModel):
 
             # Use centralized service for restaurant type analysis
             places_service = get_google_places_service()
-            cuisine, service_level = places_service.analyze_restaurant_types(types, place_data)
+            cuisine, service_level = places_service.analyze_restaurant_types(place_data)
 
             # Update the restaurant fields if we detected values
             if cuisine:

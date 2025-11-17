@@ -43,13 +43,15 @@ class ErrorHandler {
   }
 
   setupConsoleFilter() {
-    // Store original console methods
-    const originalConsole = {
+    // Store original console methods as instance property
+    this.originalConsole = {
       log: console.log,
       warn: console.warn,
       error: console.error,
       info: console.info,
       debug: console.debug,
+      group: console.group,
+      groupEnd: console.groupEnd,
     };
 
     // Filter patterns for common external library warnings
@@ -105,7 +107,7 @@ class ErrorHandler {
         this.logFilteredMessage('warn', args[0]);
         return;
       }
-      originalConsole.warn.apply(console, args);
+      this.originalConsole.warn.apply(console, args);
     };
 
     console.error = (...args) => {
@@ -114,7 +116,7 @@ class ErrorHandler {
         return;
       }
       this.logError(args[0], args[1]);
-      originalConsole.error.apply(console, args);
+      this.originalConsole.error.apply(console, args);
     };
 
     console.log = (...args) => {
@@ -122,7 +124,7 @@ class ErrorHandler {
         this.logFilteredMessage('log', args[0]);
         return;
       }
-      originalConsole.log.apply(console, args);
+      this.originalConsole.log.apply(console, args);
     };
   }
 
@@ -219,15 +221,17 @@ class ErrorHandler {
     // Show user-friendly error message
     // Error toast shown by server response
 
-    // Log to console in development
-    if (this.options.logLevel === 'debug') {
-      console.group('🚨 Application Error');
-      console.error('Type:', errorInfo.type);
-      console.error('Message:', errorInfo.message);
-      console.error('Timestamp:', new Date().toISOString());
-      if (errorInfo.filename) console.error('File:', errorInfo.filename);
-      if (errorInfo.lineno) console.error('Line:', errorInfo.lineno);
-      console.groupEnd();
+    // Temporarily disable console logging to prevent infinite loop
+    // TODO: Fix the console interception issue properly
+    // The error handler should not intercept its own console calls
+    if (false && this.options.logLevel === 'debug') {
+      this.originalConsole.group('🚨 Application Error');
+      this.originalConsole.error('Type:', errorInfo.type);
+      this.originalConsole.error('Message:', errorInfo.message);
+      this.originalConsole.error('Timestamp:', new Date().toISOString());
+      if (errorInfo.filename) this.originalConsole.error('File:', errorInfo.filename);
+      if (errorInfo.lineno) this.originalConsole.error('Line:', errorInfo.lineno);
+      this.originalConsole.groupEnd();
     }
   }
 

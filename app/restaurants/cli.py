@@ -41,7 +41,7 @@ def _search_google_places_by_name_and_address(name: str, address: str | None = N
             search_query += f" {address}"
 
         # Search for places
-        places = places_service.search_places_by_text(search_query, max_results=10, included_type="restaurant")
+        places = places_service.search_places_by_text(search_query, max_results=10)
 
         return places
 
@@ -276,7 +276,7 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                     }
                 raise
 
-            place_data = places_service.get_place_details(restaurant.google_place_id, "comprehensive")
+            place_data = places_service.get_place_details(restaurant.google_place_id)
 
             if not place_data:
                 return {
@@ -309,7 +309,7 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                 # Legacy field for backward compatibility
                 "google_street_address": google_data.get("street_address"),
                 "google_service_level": places_service.detect_service_level_from_data(place_data),
-                "google_cuisine": places_service.analyze_restaurant_types(google_data.get("types", []), place_data)[0],
+                "google_cuisine": places_service.analyze_restaurant_types(place_data).get("cuisine_type"),
                 "errors": [],
             }
         else:

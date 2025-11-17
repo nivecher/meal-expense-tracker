@@ -187,6 +187,48 @@ The Meal Expense Tracker Team
         return False
 
 
+def send_test_notification(user_email: str) -> bool:
+    """Send test notification to verify notification system is working.
+
+    Args:
+        user_email: User's email address
+
+    Returns:
+        True if notification was sent successfully, False otherwise
+    """
+    try:
+        subject = "Test Notification - Meal Expense Tracker"
+
+        message = f"""
+Hello,
+
+This is a test notification from the Meal Expense Tracker system.
+
+If you received this message, the notification system is working correctly.
+
+Test details:
+- Timestamp: {current_app.config.get('TESTING_TIMESTAMP', 'Not available')}
+- Recipient: {user_email}
+- System: Meal Expense Tracker
+
+This is an automated test message. No action is required.
+
+Best regards,
+The Meal Expense Tracker Team
+        """.strip()
+
+        # Send notification (SNS will handle email delivery)
+        success = send_notification(subject, message)
+
+        if success:
+            logger.info(f"Test notification sent for {user_email}")
+        return success
+
+    except Exception as e:
+        logger.error(f"Failed to send test notification for {user_email}: {e}")
+        return False
+
+
 def subscribe_email_to_notifications(email_address: str) -> bool:
     """Subscribe an email address to the SNS topic for notifications.
 

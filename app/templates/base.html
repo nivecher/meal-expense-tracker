@@ -166,7 +166,7 @@
                 flashMessages.forEach(function(alert) {
                     // Only convert if this is a page load (not an AJAX response)
                     if (!alert.closest('[data-ajax-response]')) {
-                        const message = alert.querySelector('.alert-message')?.textContent || alert.textContent.trim();
+                        const message = alert.querySelector('.alert-message')?.innerHTML || alert.textContent.trim();
                         const category = alert.classList.contains('alert-success') ? 'success' :
                                        alert.classList.contains('alert-danger') ? 'error' :
                                        alert.classList.contains('alert-warning') ? 'warning' : 'info';

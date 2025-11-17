@@ -102,6 +102,12 @@
   padding: 1rem;
   line-height: 1.5;
   font-size: 0.95rem;
+  display: flex; /* Make toast-body a flex container */
+  align-items: center; /* Vertically align items */
+}
+
+.toast-body .btn-close {
+  margin-left: auto; /* Push the close button to the far right */
 }
 
 /* Icons in toast body */
