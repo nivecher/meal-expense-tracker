@@ -204,7 +204,7 @@ module "api_gateway" {
 
   # CORS configuration: Allow requests from the main domain and localhost
   # CloudFront proxies requests transparently, so browser origin is the main domain
-  api_cors_allow_origins = local.base_cors_origins
+  api_cors_allow_origins     = local.base_cors_origins
   api_cors_allow_credentials = true
   api_cors_allow_headers     = ["*"]
   api_cors_expose_headers = [
