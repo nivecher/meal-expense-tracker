@@ -166,7 +166,7 @@ jobs:
       - name: Terraform validation
         run: |
           if [ -d "terraform" ]; then
-            terraform -chdir=terraform init -backend=false
+            terraform -chdir=terraform init
             terraform -chdir=terraform validate
           else
             echo "No terraform directory found, skipping validation"
