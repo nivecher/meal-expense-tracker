@@ -32,10 +32,16 @@ function showErrorMessage(message) {
   // Create new alert
   const alertDiv = document.createElement('div');
   alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-  alertDiv.innerHTML = `
-    ${message}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-  `;
+
+  // Append message as text node to prevent XSS - safely escape HTML
+  alertDiv.appendChild(document.createTextNode(message));
+
+  // Create and append close button separately
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'btn-close';
+  closeButton.setAttribute('data-bs-dismiss', 'alert');
+  alertDiv.appendChild(closeButton);
 
   // Insert at the top of the form
   const form = document.querySelector('form');
@@ -69,6 +75,45 @@ async function handleErrorResponse(response, form) {
   // Don't reload to preserve error info for debugging
 }
 
+/**
+ * Detect browser timezone using Intl API.
+ * This is the standard, non-intrusive way to detect user timezone.
+ *
+ * @returns {string} IANA timezone string (e.g., 'America/New_York') or 'UTC' as fallback
+ */
+function detectBrowserTimezone() {
+  try {
+    if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+      const options = Intl.DateTimeFormat().resolvedOptions();
+      if (options && options.timeZone && typeof options.timeZone === 'string') {
+        return options.timeZone;
+      }
+    }
+  } catch (error) {
+    console.warn('Timezone detection failed:', error);
+  }
+  return 'UTC';
+}
+
+/**
+ * Set timezone in registration form.
+ * Called on page load and before form submission.
+ */
+function setTimezoneForRegistration() {
+  const timezoneInput = document.getElementById('timezone');
+  const registerForm = document.getElementById('register-form');
+
+  if (timezoneInput && registerForm) {
+    const detectedTimezone = detectBrowserTimezone();
+    timezoneInput.value = detectedTimezone;
+    console.log('Timezone set:', detectedTimezone);
+    return true;
+  }
+
+  console.warn('Could not set timezone: form or input not found');
+  return false;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // Add error logging that persists across redirects
   window.addEventListener('error', (e) => {
@@ -90,6 +135,37 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Previous error found:', lastError);
     // Clear it after logging
     localStorage.removeItem('lastError');
+  }
+
+  // Detect and set timezone for registration form
+  const registerForm = document.getElementById('register-form');
+  if (registerForm) {
+    // Set timezone immediately
+    const wasSet = setTimezoneForRegistration();
+    if (wasSet) {
+      console.log('✅ Timezone detection initialized for registration form');
+    } else {
+      console.error('❌ Failed to initialize timezone detection');
+    }
+
+    // Also set timezone right before form submission as backup
+    registerForm.addEventListener(
+      'submit',
+      (event) => {
+        const tzInput = document.getElementById('timezone');
+        if (tzInput) {
+          const tz = detectBrowserTimezone();
+          tzInput.value = tz;
+          console.log('🔄 Timezone updated before submit:', tz);
+          console.log('📋 Form data includes timezone:', tzInput.value);
+        } else {
+          console.error('❌ Timezone input not found on submit!');
+        }
+      },
+      true, // Use capture phase to ensure it runs before form submits
+    );
+  } else {
+    console.warn('⚠️ Registration form not found');
   }
 
   // Simple form submission handler for auth forms

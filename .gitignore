@@ -117,6 +117,10 @@ tfsec-results.*
 
 # Security scanning
 bandit-report.json
+safety-report.json
+
+# Static uploads (receipts, user files)
+app/static/uploads/
 
 # Terraform
 .terraform/

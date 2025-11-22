@@ -80,7 +80,13 @@ def serve_uploaded_file(filename):
         abort(404)
 
     upload_folder = current_app.config.get("UPLOAD_FOLDER")
-    return send_from_directory(upload_folder, filename)
+
+    # Determine MIME type based on file extension
+    mimetype = None
+    if filename.lower().endswith(".pdf"):
+        mimetype = "application/pdf"
+
+    return send_from_directory(upload_folder, filename, mimetype=mimetype)
 
 
 @bp.route("/expense-statistics")

@@ -65,12 +65,12 @@ jobs:
       - name: Python linting
         run: |
           if command -v flake8 >/dev/null 2>&1; then
-            python -m flake8 app tests || echo "flake8 completed with warnings"
+            python -m flake8 app tests
           else
             echo "flake8 not found, skipping flake8 check"
           fi
           if command -v black >/dev/null 2>&1; then
-            python -m black --check app tests || echo "black check completed with warnings"
+            python -m black --check app tests
           else
             echo "black not found, skipping black check"
           fi
@@ -78,7 +78,7 @@ jobs:
       - name: JavaScript linting
         run: |
           if [ -f package.json ]; then
-            npm run lint:js || echo "JavaScript linting completed with warnings"
+            npm run lint:js
           else
             echo "No package.json found, skipping JavaScript linting"
           fi
@@ -213,8 +213,8 @@ jobs:
       - name: Safety check
         run: |
           if command -v safety >/dev/null 2>&1; then
-            safety check --json --output safety-report.json || true
-            safety check
+            safety scan --output json --save-as safety-report.json || true
+            safety scan
           else
             echo "safety not found, skipping safety check"
           fi

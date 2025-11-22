@@ -359,10 +359,8 @@ security-vulns: check-env
 		echo "\033[1;33m⚠️  Installing safety...\033[0m"; \
 		$(PIP) install safety; \
 	fi
-	@echo "\n\033[1m🔍 Scanning production dependencies...\033[0m"
-	@$(PYTHON) -m safety check -r requirements.txt || true
-	@echo "\n\033[1m🔍 Scanning development dependencies...\033[0m"
-	@$(PYTHON) -m safety check -r requirements-dev.txt || true
+	@echo "\n\033[1m🔍 Scanning dependencies...\033[0m"
+	@$(PYTHON) -m safety scan || true
 	@echo "\033[1;32m✅ Vulnerability scan completed\033[0m"
 
 ## Run Bandit security linter

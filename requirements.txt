@@ -76,10 +76,8 @@ itsdangerous==2.2.0
     #   flask-wtf
 jellyfish==1.2.1
     # via us
-jinja2==3.1.4
-    # via
-    #   -c constraints.txt
-    #   flask
+jinja2==3.1.6
+    # via flask
 jmespath==1.0.1
     # via
     #   boto3

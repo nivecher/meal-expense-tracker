@@ -295,9 +295,12 @@ def test_find_places_page(client, auth, test_user):
     assert b"Find Restaurants" in response.data
 
 
-def test_get_place_details_invalid_id(client, auth, test_user):
+def test_get_place_details_invalid_id(client, auth, test_user, app):
     """Test getting details for an invalid place ID."""
     auth.login("testuser_1", "testpass")
+
+    # Ensure no API key is configured for this test
+    app.config["GOOGLE_MAPS_API_KEY"] = None
 
     # Test the case where no API key is configured (which is the actual test environment)
     response = client.get(url_for("restaurants.get_place_details", place_id="invalid_id"))
