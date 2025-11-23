@@ -1,119 +1,93 @@
 /**
- * Console Warning Filter
+ * Simple Console Filter
  *
- * This utility helps filter out common CDN/library warnings
- * so you can focus on your application's actual issues.
- *
- * Usage: Include this script in development to filter noise
+ * Reduces console noise in production by filtering common library warnings.
+ * Enable debug mode with ?debug=true or localStorage.setItem('debug-mode', 'true')
  */
 
 (function() {
   'use strict';
 
+  // Enable debug mode via URL parameter or localStorage
+  const DEBUG_MODE = window.location.search.includes('debug=true') ||
+                     localStorage.getItem('debug-mode') === 'true';
+
+  // If debug mode is on, don't filter anything
+  if (DEBUG_MODE) {
+    console.log('🐛 Debug mode enabled - all console messages visible');
+    return;
+  }
+
   // Store original console methods
+  const originalLog = console.log;
   const originalWarn = console.warn;
   const originalError = console.error;
-  const originalLog = console.log;
 
-  // Common CDN/library warning patterns to filter
+  // Simple patterns to filter out
   const FILTERED_PATTERNS = [
-    // Bootstrap warnings
+    // Library warnings
     /Bootstrap.*deprecated/i,
-    /Bootstrap.*warning/i,
-
-    // jQuery warnings
     /jQuery.*deprecated/i,
-    /jQuery.*warning/i,
-
-    // Font Awesome warnings
     /Font Awesome.*deprecated/i,
-    /Font Awesome.*warning/i,
-
-    // Select2 warnings
     /Select2.*deprecated/i,
-    /Select2.*warning/i,
-
-    // Chart.js warnings
     /Chart\.js.*deprecated/i,
-    /Chart\.js.*warning/i,
 
-    // Generic CDN warnings
+    // CDN warnings
     /cdn\.jsdelivr\.net/i,
     /cdnjs\.cloudflare\.com/i,
-    /code\.jquery\.com/i,
 
-    // Browser compatibility warnings from external sources
+    // Browser compatibility warnings
     /webkit.*not supported/i,
     /text-size-adjust.*not supported/i,
     /color-adjust.*not supported/i,
+
+    // Application debug logs
+    /RestaurantAutocomplete.*called/i,
+    /RestaurantAutocomplete.*init/i,
+    /Setting up event listeners/i,
+    /Input event triggered/i,
+    /handleInput called/i,
+    /Got suggestions/i,
+    /Response data/i,
+    /Populating form/i,
+    /Document ready state/i,
+    /Application initialized successfully/i,
   ];
 
-  // Check if a message should be filtered
   function shouldFilter(message) {
-    if (typeof message !== 'string') {
-      return false;
-    }
-
-    return FILTERED_PATTERNS.some((pattern) => pattern.test(message));
+    return typeof message === 'string' &&
+           FILTERED_PATTERNS.some((pattern) => pattern.test(message));
   }
 
-  // Filtered console.warn
+  // Filter console.log (most common noise source)
+  console.log = function(...args) {
+    if (shouldFilter(args[0])) {
+      return; // Silent filter
+    }
+    originalLog.apply(console, args);
+  };
+
+  // Keep console.warn and console.error unfiltered for important issues
+  // Only filter obvious library warnings
   console.warn = function(...args) {
-    const message = args[0];
-    if (shouldFilter(message)) {
-      // Log to a separate filtered warnings object for debugging
-      if (!window.filteredWarnings) {
-        window.filteredWarnings = [];
-      }
-      window.filteredWarnings.push({
-        type: 'warn',
-        message,
-        timestamp: new Date().toISOString(),
-        stack: new Error().stack,
-      });
+    if (shouldFilter(args[0])) {
       return;
     }
     originalWarn.apply(console, args);
   };
 
-  // Filtered console.error
   console.error = function(...args) {
-    const message = args[0];
-    if (shouldFilter(message)) {
-      if (!window.filteredWarnings) {
-        window.filteredWarnings = [];
-      }
-      window.filteredWarnings.push({
-        type: 'error',
-        message,
-        timestamp: new Date().toISOString(),
-        stack: new Error().stack,
-      });
+    if (shouldFilter(args[0])) {
       return;
     }
     originalError.apply(console, args);
   };
 
-  // Add utility functions to inspect filtered warnings
-  window.getFilteredWarnings = function() {
-    return window.filteredWarnings || [];
+  // Simple debug toggle
+  window.toggleDebug = function() {
+    const newMode = !DEBUG_MODE;
+    localStorage.setItem('debug-mode', newMode.toString());
+    console.log('🔄 Debug mode toggled. Refresh page to apply changes.');
   };
-
-  window.clearFilteredWarnings = function() {
-    window.filteredWarnings = [];
-  };
-
-  window.showFilteredWarnings = function() {
-    const warnings = window.getFilteredWarnings();
-    console.group('🔍 Filtered Console Warnings');
-    warnings.forEach((warning, index) => {
-      console.log(`${index + 1}. [${warning.type.toUpperCase()}] ${warning.message}`);
-    });
-    console.groupEnd();
-    return warnings.length;
-  };
-
-  // Log that the filter is active
-  console.log('🔧 Console warning filter active. Use showFilteredWarnings() to see filtered messages.');
 
 })();

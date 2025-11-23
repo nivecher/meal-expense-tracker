@@ -1,0 +1,41 @@
+/**
+ * Select2 CSS Compatibility Fixes
+ * Fixes webkit prefix ordering issues in Select2 CSS
+ */
+
+/* Fix property ordering for Select2 single selection */
+
+.select2-container .select2-selection--single {
+  box-sizing: border-box;
+  cursor: pointer;
+  display: block;
+  height: 28px;
+  user-select: none;
+}
+
+/* Fix property ordering for Select2 multiple selection */
+
+.select2-container .select2-selection--multiple {
+  box-sizing: border-box;
+  cursor: pointer;
+  display: block;
+  min-height: 32px;
+  user-select: none;
+}
+
+/* Fix property ordering for Select2 results options */
+
+.select2-results__option {
+  padding: 6px;
+  user-select: none;
+}
+
+/* Additional Select2 compatibility fixes */
+
+.select2-container .select2-selection--single .select2-selection__rendered {
+  user-select: none;
+}
+
+.select2-container .select2-selection--multiple .select2-selection__rendered {
+  user-select: none;
+}

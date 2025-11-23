@@ -23,6 +23,7 @@ def init_app(app: "Flask") -> None:
     """
     # Import models here to avoid circular imports
     # Import routes after blueprint creation to avoid circular imports
+    from . import api  # noqa: F401
     from . import cli  # noqa: F401
     from . import routes  # noqa: F401
     from .models import User  # noqa: F401

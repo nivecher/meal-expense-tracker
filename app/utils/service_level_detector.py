@@ -34,7 +34,10 @@ class ServiceLevelDetector:
     # Price level thresholds for service level detection
     PRICE_LEVEL_THRESHOLDS = {
         ServiceLevel.FINE_DINING: (3, 4),  # Expensive to Very Expensive
-        ServiceLevel.CASUAL_DINING: (1, 3),  # Inexpensive to Expensive (broader range for casual dining)
+        ServiceLevel.CASUAL_DINING: (
+            1,
+            3,
+        ),  # Inexpensive to Expensive (broader range for casual dining)
         ServiceLevel.FAST_CASUAL: (1, 2),  # Inexpensive to Moderate
         ServiceLevel.QUICK_SERVICE: (0, 1),  # Free to Inexpensive
     }
@@ -413,10 +416,10 @@ def detect_service_level_from_name(restaurant_name: str) -> ServiceLevel:
 
 def detect_service_level_from_google_places(place_data: dict) -> ServiceLevel:
     """
-    Classify restaurant service level based on Google Places API data using comprehensive scoring logic.
+    Classify restaurant service level based on Google Places API types.
 
-    This approach uses actual restaurant data (price level, service options, reviews, amenities)
-    to classify restaurants into all four service levels: Fine Dining, Casual Dining, Fast Casual, QSR.
+    This uses Google's standard place types to classify restaurants into service levels.
+    Simple and reliable approach that follows Google's classification system.
 
     Args:
         place_data: Dictionary containing Google Places API response data
@@ -427,97 +430,155 @@ def detect_service_level_from_google_places(place_data: dict) -> ServiceLevel:
     if not place_data:
         return ServiceLevel.UNKNOWN
 
-    fast_casual_score = 0
-    fine_dining_score = 0
+    types = place_data.get("types", [])
+    if not types:
+        return ServiceLevel.UNKNOWN
 
-    # Calculate scores from different data sources
-    fine_dining_score += _calculate_price_score(place_data.get("priceLevel"), "fine_dining")
-    fast_casual_score += _calculate_price_score(place_data.get("priceLevel"), "fast_casual")
+    types_lower = [t.lower() for t in types]
 
-    fine_dining_score += _calculate_amenities_score(place_data, "fine_dining")
-    fast_casual_score += _calculate_amenities_score(place_data, "fast_casual")
-
-    fine_dining_score += _calculate_reviews_score(place_data.get("reviews", []), "fine_dining")
-    fast_casual_score += _calculate_reviews_score(place_data.get("reviews", []), "fast_casual")
-
-    # Classify based on final scores
-    if fine_dining_score >= 3:
-        return ServiceLevel.FINE_DINING
-    elif fine_dining_score >= 1:
-        return ServiceLevel.CASUAL_DINING
-    elif fast_casual_score > 1:
-        return ServiceLevel.FAST_CASUAL
-    else:
+    # Quick Service (Fast Food) - Google's primary indicators
+    if any(
+        indicator in types_lower
+        for indicator in [
+            "fast_food_restaurant",  # Google's primary fast food type
+            "fast_food",  # Alternative fast food type
+            "meal_takeaway",  # Takeaway food
+            "food_court",  # Food court vendors
+            "convenience_store",  # Convenience stores with food
+        ]
+    ):
         return ServiceLevel.QUICK_SERVICE
+
+    # Fast Casual - Counter service but higher quality
+    elif any(
+        indicator in types_lower
+        for indicator in [
+            "fast_casual_restaurant",  # Google's fast casual type
+            "fast_casual",  # Alternative fast casual type
+        ]
+    ):
+        return ServiceLevel.FAST_CASUAL
+
+    # Fine Dining - Upscale establishments
+    elif any(
+        indicator in types_lower
+        for indicator in [
+            "fine_dining_restaurant",  # Google's fine dining type
+            "fine_dining",  # Alternative fine dining type
+            "upscale_restaurant",  # Upscale restaurants
+        ]
+    ):
+        return ServiceLevel.FINE_DINING
+
+    # Casual Dining - Regular sit-down restaurants
+    elif "restaurant" in types_lower:
+        return ServiceLevel.CASUAL_DINING
+
+    # Unknown - no clear restaurant indicators
+    else:
+        return ServiceLevel.UNKNOWN
 
 
 def _calculate_price_score(price_level: Optional[int], score_type: str) -> float:
     """Calculate score based on price level."""
-    if not price_level:
+    if price_level is None:
         return 0.0
 
-    if score_type == "fine_dining":
-        if price_level == 4:
-            return 2.0
-        elif price_level == 3:
-            return 1.0
-    elif score_type == "fast_casual":
-        if price_level == 3:
-            return 1.0
-        elif price_level == 2:
-            return 1.0
-        elif price_level <= 1:
-            return -1.0
+    # Define price level mappings for each service type
+    price_mappings = {
+        "fine_dining": {4: 2.0, 3: 1.0},
+        "fast_casual": {3: 1.0, 2: 1.0, 1: -1.0, 0: -1.0},
+        "quick_service": {1: 2.0, 0: 2.0, 2: 1.0, 3: -1.0, 4: -1.0},
+    }
 
-    return 0.0
+    return price_mappings.get(score_type, {}).get(price_level, 0.0)
 
 
 def _calculate_amenities_score(place_data: dict, score_type: str) -> float:
     """Calculate score based on amenities and service options."""
-    score = 0.0
+    # Define amenity scoring rules for each service type
+    amenity_rules = {
+        "fine_dining": [("outdoorSeating", 0.5), ("servesAlcohol", 1.0), ("reservable", 2.0)],
+        "fast_casual": [("outdoorSeating", 1.0), ("servesAlcohol", 0.5)],
+        "quick_service": [
+            ("takeout", 1.0),
+            ("curbsidePickup", 0.5),
+            ("dineIn", 0.5, False),  # Special case: False value
+            ("reservable", -1.0),
+            ("servesAlcohol", -0.5),
+        ],
+    }
 
-    if score_type == "fine_dining":
-        if place_data.get("outdoorSeating"):
-            score += 0.5
-        if place_data.get("servesAlcohol"):
-            score += 1.0
-        if place_data.get("reservable"):
-            score += 2.0
-    elif score_type == "fast_casual":
+    score = 0.0
+    rules = amenity_rules.get(score_type, [])
+
+    for rule in rules:
+        if len(rule) == 3:  # Special case with expected value
+            key, points, expected_value = rule
+            if place_data.get(key) == expected_value:
+                score += points
+        else:  # Normal case
+            key, points = rule
+            if place_data.get(key):
+                score += points
+
+    # Special case for fast_casual: penalty for takeout-only
+    if score_type == "fast_casual":
         if place_data.get("dineIn") == False and place_data.get("takeout") == True:
             score -= 1.0
-        if place_data.get("outdoorSeating"):
-            score += 1.0
         if place_data.get("curbsidePickup"):
             score -= 1.0
-        if place_data.get("servesAlcohol"):
-            score += 0.5
 
     return score
 
 
 def _calculate_reviews_score(reviews: list, score_type: str) -> float:
     """Calculate score based on review content analysis."""
+    # Define keyword scoring rules for each service type
+    keyword_rules = {
+        "fine_dining": {
+            "positive": (
+                ["prix fixe", "chef", "elegant", "wine list", "sommelier", "formal", "dress code"],
+                1.0,
+            ),
+            "neutral": (
+                ["family-friendly", "comfort food", "generous portions", "wait staff"],
+                0.5,
+            ),
+        },
+        "fast_casual": {
+            "positive": (
+                ["fresh ingredients", "customizable", "made to order", "healthy", "assembly line"],
+                0.5,
+            ),
+            "negative": (["fast", "quick", "cheap", "convenient", "drive-thru"], -1.0),
+        },
+        "quick_service": {
+            "positive": (
+                [
+                    "fast",
+                    "quick",
+                    "cheap",
+                    "convenient",
+                    "drive-thru",
+                    "fast food",
+                    "takeout",
+                    "to-go",
+                ],
+                1.0,
+            ),
+            "negative": (["fresh ingredients", "customizable", "made to order", "healthy"], -0.5),
+        },
+    }
+
     score = 0.0
+    rules = keyword_rules.get(score_type, {})
 
     for review in reviews:
         review_text = review.get("text", "").lower()
 
-        if score_type == "fine_dining":
-            if any(
-                kw in review_text
-                for kw in ["prix fixe", "chef", "elegant", "wine list", "sommelier", "formal", "dress code"]
-            ):
-                score += 1.0
-            if any(kw in review_text for kw in ["family-friendly", "comfort food", "generous portions", "wait staff"]):
-                score += 0.5
-        elif score_type == "fast_casual":
-            if any(
-                kw in review_text
-                for kw in ["fresh ingredients", "customizable", "made to order", "healthy", "assembly line"]
-            ):
-                score += 0.5
-            if any(kw in review_text for kw in ["fast", "quick", "cheap", "convenient", "drive-thru"]):
-                score -= 1.0
+        for rule_type, (keywords, points) in rules.items():
+            if any(kw in review_text for kw in keywords):
+                score += points
 
     return score

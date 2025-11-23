@@ -1,76 +1,76 @@
 /* Restaurant Places Search Page Styles */
 
 .toast-container {
-    z-index: 11;
+  z-index: 11;
 }
 
 /* Map-based search specific styles */
 
 .map-container {
-    position: relative;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
 }
 
 .results-container {
-    height: 500px;
-    overflow-y: auto;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    background: white;
+  height: 500px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .results-list {
-    padding: 1rem;
+  padding: 1rem;
 }
 
 .restaurant-card {
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid #dee2e6;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #dee2e6;
 }
 
 .restaurant-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
 }
 
 .restaurant-card.border-primary {
-    border-color: #0d6efd !important;
-    box-shadow: 0 0 0 0.2rem rgb(13 110 253 / 25%);
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 0.2rem rgb(13 110 253 / 25%);
 }
 
 .price-level {
-    color: #28a745;
-    font-weight: bold;
+  color: #28a745;
+  font-weight: 700;
 }
 
 .search-controls {
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
 }
 
 .form-range {
-    cursor: pointer;
+  cursor: pointer;
 }
 
 .results-container::-webkit-scrollbar {
-    width: 6px;
+  width: 6px;
 }
 
 .results-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
+  background: #f1f1f1;
+  border-radius: 3px;
 }
 
 .results-container::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
+  background: #c1c1c1;
+  border-radius: 3px;
 }
 
 .results-container::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+  background: #a8a8a8;
 }

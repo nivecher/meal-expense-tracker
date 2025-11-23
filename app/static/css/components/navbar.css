@@ -133,6 +133,8 @@
   transition: var(--transition);
   width: 20px;
   text-align: center;
+  line-height: 1; /* Standardize line height */
+  vertical-align: middle; /* Align icons vertically */
 }
 
 .navbar-nav-desktop .nav-link:hover i {
@@ -190,6 +192,8 @@
 .navbar-nav-mobile .nav-link i {
   font-size: 1.2rem;
   transition: var(--transition);
+  line-height: 1; /* Standardize line height */
+  vertical-align: middle; /* Align icons vertically */
 }
 
 .navbar-nav-mobile .nav-link:hover i {
@@ -210,7 +214,6 @@
 }
 
 @keyframes dropdownFadeIn {
-
   from {
     opacity: 0;
     transform: translateY(-10px);
@@ -243,7 +246,7 @@
 .dropdown-item.active,
 .dropdown-item:active {
   background-color: var(--bs-primary) !important;
-  color: white !important;
+  color: #fff !important;
 }
 
 .dropdown-item i {
@@ -257,7 +260,6 @@
   opacity: 0.3;
   margin: var(--spacing-sm) var(--spacing-lg);
 }
-
 
 /* User Dropdown Section */
 
@@ -294,6 +296,7 @@
   border-radius: 50%;
   border: 2px solid var(--bs-primary);
   transition: var(--transition);
+  vertical-align: middle; /* Align image vertically */
 }
 
 .navbar-nav-user .nav-link:hover img {
@@ -304,7 +307,6 @@
 /* Responsive adjustments for user dropdown */
 
 @media (width <= 575.98px) {
-
   .navbar-nav-user .nav-link {
     padding: var(--spacing-xs) var(--spacing-sm);
   }
@@ -318,7 +320,6 @@
 /* Responsive Breakpoints */
 
 @media (width <= 1199.98px) {
-
   .navbar-nav-desktop {
     gap: 0;
   }
@@ -338,7 +339,6 @@
 }
 
 @media (width <= 991.98px) {
-
   .navbar {
     min-height: var(--navbar-height-mobile);
     padding: 0 var(--spacing-md);
@@ -366,7 +366,6 @@
 }
 
 @media (width <= 767.98px) {
-
   .navbar-nav-mobile {
     gap: 0;
     max-width: 300px;
@@ -386,7 +385,6 @@
 }
 
 @media (width <= 575.98px) {
-
   .navbar-nav-mobile {
     gap: 0;
     max-width: 250px;
@@ -408,7 +406,6 @@
 /* Very Small Screens - Compact Mobile Icons */
 
 @media (width <= 400px) {
-
   .navbar-nav-mobile {
     gap: 0;
     max-width: 200px;
@@ -462,7 +459,6 @@
 /* Print styles */
 
 @media print {
-
   .navbar {
     display: none;
   }

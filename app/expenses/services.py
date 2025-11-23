@@ -3,7 +3,7 @@
 import csv
 import io
 import json
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
@@ -112,7 +112,8 @@ def apply_filters(stmt, filters: Dict[str, Any]):
             or_(
                 # Restaurant fields
                 Restaurant.name.ilike(search_term),
-                Restaurant.address.ilike(search_term),
+                Restaurant.address_line_1.ilike(search_term),
+                Restaurant.address_line_2.ilike(search_term),
                 # Expense fields
                 Expense.notes.ilike(search_term),
                 Expense.meal_type.ilike(search_term),
@@ -322,6 +323,25 @@ def _process_date(date_value: Any) -> Tuple[Optional[date], Optional[str]]:
         return None, "Invalid date format. Please use YYYY-MM-DD format."
 
 
+def _process_time(time_value: Any) -> Tuple[Optional[time], Optional[str]]:
+    """Process and validate time from form data."""
+    if not time_value:
+        return None, None  # Time is optional
+
+    try:
+        if isinstance(time_value, str):
+            return datetime.strptime(time_value, "%H:%M").time(), None
+        # Accept native time objects
+        if hasattr(time_value, "time"):
+            return time_value.time(), None
+        if hasattr(time_value, "hour") and hasattr(time_value, "minute"):
+            return time_value, None
+        return None, "Invalid time format"
+    except (ValueError, TypeError, AttributeError) as e:
+        current_app.logger.error("Invalid time: %s. Error: %s", time_value, e)
+        return None, "Invalid time format. Please use HH:MM format."
+
+
 def _process_amount(amount_value: Any) -> Tuple[Optional[Decimal], Optional[str]]:
     """Process and validate amount from form data with smart amount support."""
     try:
@@ -412,7 +432,7 @@ def _process_tags(form: ExpenseForm) -> Tuple[Optional[list[str]], Optional[str]
     try:
         # Get tags from form data (sent as JSON string from JavaScript)
         tags_data = form.tags.data if hasattr(form, "tags") and form.tags.data else None
-        current_app.logger.info(f"Processing tags - raw data: {tags_data}")
+        current_app.logger.info(f"Processing tags - raw data: {tags_data}, type: {type(tags_data)}")
 
         if not tags_data:
             current_app.logger.info("No tags data found")
@@ -420,9 +440,12 @@ def _process_tags(form: ExpenseForm) -> Tuple[Optional[list[str]], Optional[str]
 
         # Parse JSON if it's a string
         if isinstance(tags_data, str):
+            # Try to parse as JSON first
             tags_list, error = _parse_tags_json(tags_data)
             if error:
-                return None, error
+                # If JSON parsing fails, treat as a single tag name (fallback for plain text)
+                current_app.logger.info(f"Tags data is not JSON, treating as single tag: {tags_data}")
+                tags_list = [tags_data.strip()] if tags_data.strip() else []
         else:
             tags_list = tags_data
 
@@ -450,12 +473,13 @@ def _add_tags_to_expense(expense_id: int, user_id: int, tags: list[str]) -> None
         current_app.logger.warning(f"Failed to add tags to expense {expense_id}: {str(e)}")
 
 
-def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], Optional[str]]:
+def create_expense(user_id: int, form: ExpenseForm, receipt_file=None) -> Tuple[Optional[Expense], Optional[str]]:
     """Create a new expense from form data.
 
     Args:
         user_id: The ID of the current user
         form: The validated expense form
+        receipt_file: Optional uploaded receipt file
 
     Returns:
         A tuple containing:
@@ -463,24 +487,60 @@ def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], 
         - Error message on failure, None on success
     """
     try:
+        # Get user timezone for proper time handling
+        from app.auth.models import User
+        from app.extensions import db
+
+        user = db.session.get(User, user_id)
+        user_timezone = user.timezone if user and user.timezone else "UTC"
         # Process form data
-        expense_data = _process_expense_form_data(form)
+        expense_data = _process_expense_form_data(form, user_timezone)
         if isinstance(expense_data, str):  # Error message
             return None, expense_data
 
-        category_id, restaurant_id, date_value, amount, tags = expense_data
+        category_id, restaurant_id, datetime_value, amount, tags = expense_data
+
+        # Handle receipt upload if provided
+        receipt_image_path = None
+        if receipt_file and receipt_file.filename:
+            try:
+                from flask import current_app
+
+                from app.expenses.utils import save_receipt_to_storage
+
+                upload_folder = current_app.config.get("UPLOAD_FOLDER")
+                storage_path, error = save_receipt_to_storage(receipt_file, upload_folder)
+
+                if error:
+                    return None, error
+
+                receipt_image_path = storage_path
+                current_app.logger.info(f"Receipt saved: {receipt_image_path}")
+            except Exception as e:
+                current_app.logger.error(f"Failed to save receipt: {str(e)}")
+                return None, f"Failed to save receipt: {str(e)}"
 
         # Create and save the expense
+        # Use current datetime in user's timezone if no datetime provided
+        if not datetime_value:
+            from app.auth.models import User
+            from app.utils.timezone_utils import get_current_time_in_user_timezone
+
+            user = db.session.get(User, user_id)
+            user_timezone = user.timezone if user and user.timezone else "UTC"
+            datetime_value = get_current_time_in_user_timezone(user_timezone)
+
         expense = Expense(
             user_id=user_id,
             amount=amount,
-            date=date_value or datetime.now(timezone.utc).date(),
+            date=datetime_value,
             notes=form.notes.data.strip() if form.notes.data else None,
             category_id=category_id,
             restaurant_id=restaurant_id,
             meal_type=form.meal_type.data or None,
             order_type=form.order_type.data or None,
             party_size=form.party_size.data,
+            receipt_image=receipt_image_path,
         )
 
         db.session.add(expense)
@@ -503,7 +563,9 @@ def create_expense(user_id: int, form: ExpenseForm) -> Tuple[Optional[Expense], 
         return None, f"An error occurred while creating the expense: {str(e)}"
 
 
-def _process_expense_form_data(form: ExpenseForm) -> Union[Tuple[int, Optional[int], date, Decimal, list[str]], str]:
+def _process_expense_form_data(
+    form: ExpenseForm, user_timezone: str = "UTC"
+) -> Union[Tuple[int, Optional[int], datetime, Decimal, list[str]], str]:
     """Process all form data for expense creation/update.
 
     Args:
@@ -524,6 +586,10 @@ def _process_expense_form_data(form: ExpenseForm) -> Union[Tuple[int, Optional[i
     if error:
         return error
 
+    time_value, error = _process_time(form.time.data)
+    if error:
+        return error
+
     amount, error = _process_amount(form.amount.data)
     if error:
         return error
@@ -532,15 +598,102 @@ def _process_expense_form_data(form: ExpenseForm) -> Union[Tuple[int, Optional[i
     if error:
         return error
 
-    return category_id, restaurant_id, date_value, amount, tags
+    # Combine date and time into a datetime object
+    if time_value:
+        # Use the provided time - interpret as user's local time
+        import pytz
+
+        from app.utils.timezone_utils import get_user_timezone
+
+        user_tz = get_user_timezone(user_timezone)
+        user_datetime = datetime.combine(date_value, time_value)
+        # Localize to user's timezone, then convert to UTC for storage
+        user_datetime_tz = user_tz.localize(user_datetime)
+        datetime_value = user_datetime_tz.astimezone(pytz.UTC).replace(tzinfo=None)  # Remove tzinfo for storage
+    else:
+        # Use noon to avoid timezone issues (as we did before)
+        datetime_value = datetime.combine(date_value, time(12, 0))
+
+    return category_id, restaurant_id, datetime_value, amount, tags
 
 
-def update_expense(expense: Expense, form: ExpenseForm) -> Tuple[Optional[Expense], Optional[str]]:
+def _handle_receipt_update(expense: Expense, receipt_file, delete_receipt: bool) -> Optional[str]:
+    """Handle receipt upload or deletion for an expense.
+
+    Args:
+        expense: The expense being updated
+        receipt_file: Optional uploaded receipt file
+        delete_receipt: Whether to delete the existing receipt
+
+    Returns:
+        Error message if failed, None if successful
+    """
+    if receipt_file and receipt_file.filename:
+        return _upload_new_receipt(expense, receipt_file)
+    elif delete_receipt and expense.receipt_image:
+        return _delete_existing_receipt(expense)
+    return None
+
+
+def _upload_new_receipt(expense: Expense, receipt_file) -> Optional[str]:
+    """Upload a new receipt for an expense."""
+    try:
+        from flask import current_app
+
+        from app.expenses.utils import save_receipt_to_storage
+
+        upload_folder = current_app.config.get("UPLOAD_FOLDER")
+        storage_path, error = save_receipt_to_storage(receipt_file, upload_folder)
+
+        if error:
+            return error
+
+        # Store the storage path directly (S3 key or local filename)
+        expense.receipt_image = storage_path
+        current_app.logger.info(f"Receipt updated: {storage_path}")
+        return None
+    except Exception as e:
+        current_app.logger.error(f"Failed to save receipt: {str(e)}")
+        return f"Failed to save receipt: {str(e)}"
+
+
+def _delete_existing_receipt(expense: Expense) -> Optional[str]:
+    """Delete an existing receipt from an expense."""
+    try:
+        from flask import current_app
+
+        from app.expenses.utils import delete_receipt_from_storage
+
+        # Check if there's actually a receipt to delete
+        if not expense.receipt_image:
+            current_app.logger.info("No receipt to delete")
+            return None
+
+        upload_folder = current_app.config.get("UPLOAD_FOLDER")
+        error = delete_receipt_from_storage(expense.receipt_image, upload_folder)
+
+        if error:
+            return error
+
+        expense.receipt_image = None
+        current_app.logger.info("Receipt deleted from expense")
+        return None
+
+    except Exception as e:
+        current_app.logger.error(f"Failed to delete receipt: {str(e)}")
+        return f"Failed to delete receipt: {str(e)}"
+
+
+def update_expense(
+    expense: Expense, form: ExpenseForm, receipt_file=None, delete_receipt=False
+) -> Tuple[Optional[Expense], Optional[str]]:
     """Update an existing expense from form data.
 
     Args:
         expense: The expense to update
         form: The validated expense form
+        receipt_file: Optional uploaded receipt file
+        delete_receipt: Whether to delete the existing receipt
 
     Returns:
         A tuple containing:
@@ -550,12 +703,23 @@ def update_expense(expense: Expense, form: ExpenseForm) -> Tuple[Optional[Expens
     try:
         current_app.logger.info("Updating expense with form data: %s", form.data)
 
+        # Get user timezone for proper time handling
+        from app.auth.models import User
+        from app.extensions import db
+
+        user = db.session.get(User, expense.user_id)
+        user_timezone = user.timezone if user and user.timezone else "UTC"
         # Process form data
-        expense_data = _process_expense_form_data(form)
+        expense_data = _process_expense_form_data(form, user_timezone)
         if isinstance(expense_data, str):  # Error message
             return None, expense_data
 
         category_id, restaurant_id, date_value, amount, tags = expense_data
+
+        # Handle receipt upload/deletion
+        receipt_error = _handle_receipt_update(expense, receipt_file, delete_receipt)
+        if receipt_error:
+            return None, receipt_error
 
         # Update expense fields
         expense.amount = float(amount)
@@ -633,22 +797,30 @@ def get_expense_by_id_for_user(expense_id: int, user_id: int) -> Optional[Expens
     return get_expense_by_id(expense_id, user_id)
 
 
-def get_expenses_for_user(user_id: int) -> List[Expense]:
+def get_expenses_for_user(
+    user_id: int, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None
+) -> List[Expense]:
     """
-    Get all expenses for a specific user.
+    Get all expenses for a specific user, optionally filtered by date range.
 
     Args:
         user_id: ID of the current user
+        start_date: Optional start date for filtering
+        end_date: Optional end date for filtering
 
     Returns:
         List of expenses belonging to the user
     """
-    return (
-        Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag))
-        .filter_by(user_id=user_id)
-        .order_by(Expense.date.desc())
-        .all()
+    query = Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag)).filter_by(
+        user_id=user_id
     )
+
+    if start_date:
+        query = query.filter(Expense.date >= start_date.date())
+    if end_date:
+        query = query.filter(Expense.date <= end_date.date())
+
+    return query.order_by(Expense.date.desc()).all()
 
 
 def create_expense_for_user(user_id: int, data: Dict[str, Any]) -> Expense:
@@ -800,7 +972,12 @@ def get_filter_options(user_id: int) -> Dict[str, Any]:
 
     return {
         "categories": [
-            {"name": str(cat[0]), "color": str(cat[1]), "icon": str(cat[2]) if cat[2] else None, "count": int(cat[3])}
+            {
+                "name": str(cat[0]),
+                "color": str(cat[1]),
+                "icon": str(cat[2]) if cat[2] else None,
+                "count": int(cat[3]),
+            }
             for cat in categories
         ],
         "years": year_options,
@@ -1133,7 +1310,10 @@ def _parse_expense_amount(amount_str: str) -> Tuple[Optional[Decimal], Optional[
 
         return amount, None
     except (ValueError, InvalidOperation):
-        return None, f"Invalid amount: {amount_str}. Supported formats: 24.77, $24.77, (24.77), ($24.77)"
+        return (
+            None,
+            f"Invalid amount: {amount_str}. Supported formats: 24.77, $24.77, (24.77), ($24.77)",
+        )
 
 
 def _find_category_by_name(category_name: str, user_id: int) -> Optional[Category]:
@@ -1203,7 +1383,9 @@ def _find_or_create_restaurant(
 
     # Strategy 1: Exact name + address match (if address provided)
     if restaurant_address:
-        existing = Restaurant.query.filter_by(user_id=user_id, name=restaurant_name, address=restaurant_address).first()
+        existing = Restaurant.query.filter_by(
+            user_id=user_id, name=restaurant_name, address_line_1=restaurant_address
+        ).first()
         if existing:
             return existing, None
 
@@ -1212,7 +1394,7 @@ def _find_or_create_restaurant(
             new_restaurant = Restaurant(
                 user_id=user_id,
                 name=restaurant_name,
-                address=restaurant_address,
+                address_line_1=restaurant_address,
                 city=None,  # Will be filled by user later if needed
             )
             db.session.add(new_restaurant)
@@ -1243,7 +1425,11 @@ def _find_or_create_restaurant(
 
 
 def _check_expense_duplicate(
-    user_id: int, restaurant_id: Optional[int], amount: Decimal, expense_date: date, meal_type: Optional[str]
+    user_id: int,
+    restaurant_id: Optional[int],
+    amount: Decimal,
+    expense_date: date,
+    meal_type: Optional[str],
 ) -> bool:
     """Check if an expense with the same details already exists.
 
@@ -1355,36 +1541,95 @@ def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tu
     success_count = 0
     errors = []
     info_messages = []
+    batch_size = 50  # Process in batches to avoid memory issues
 
     for i, row in enumerate(data, 1):
-        try:
-            expense, error = _create_expense_from_data(row, user_id)
-            if error:
-                if error.startswith("Duplicate expense:"):
-                    info_messages.append(f"Row {i}: {error}")
-                elif (
-                    "matches multiple existing restaurants" in error or "not found. Please provide an address" in error
-                ):
-                    # Restaurant ambiguity warnings should be treated as info messages
-                    info_messages.append(f"Row {i}: {error}")
-                else:
-                    errors.append(f"Row {i}: {error}")
-                continue
+        expense, error = _process_expense_row(row, user_id, i)
+        if error:
+            _handle_import_error(error, i, errors, info_messages)
+            continue
 
-            if expense:
-                db.session.add(expense)
-                success_count += 1
+        if expense:
+            db.session.add(expense)
+            success_count += 1
 
-        except Exception as e:
-            errors.append(f"Row {i}: Unexpected error - {str(e)}")
+            # Commit every batch_size records to avoid memory issues
+            if success_count % batch_size == 0:
+                commit_success = _commit_batch(success_count, batch_size, errors)
+                if not commit_success:
+                    return success_count, errors, info_messages
 
-    # Limit messages reported to avoid overwhelming output
-    if len(errors) > 10:
-        errors = errors[:10] + [f"... and {len(errors) - 10} more errors"]
-    if len(info_messages) > 10:
-        info_messages = info_messages[:10] + [f"... and {len(info_messages) - 10} more duplicates"]
-
+    # Don't limit messages - let the frontend handle display properly
     return success_count, errors, info_messages
+
+
+def _process_expense_row(row: Dict[str, Any], user_id: int, row_number: int) -> Tuple[Optional[Expense], Optional[str]]:
+    """Process a single expense row and return expense or error.
+
+    Args:
+        row: The expense data dictionary
+        user_id: The ID of the user importing the expenses
+        row_number: The row number for error reporting
+
+    Returns:
+        Tuple of (expense, error_message)
+    """
+    try:
+        return _create_expense_from_data(row, user_id)
+    except Exception as e:
+        return None, f"Row {row_number}: Unexpected error - {str(e)}"
+
+
+def _handle_import_error(error: str, row_number: int, errors: List[str], info_messages: List[str]) -> None:
+    """Handle different types of import errors.
+
+    Args:
+        error: The error message
+        row_number: The row number where the error occurred
+        errors: List to append actual errors to
+        info_messages: List to append informational messages to
+    """
+    if error.startswith("Duplicate expense:"):
+        info_messages.append(f"Row {row_number}: {error}")
+    elif _is_restaurant_warning(error):
+        # Restaurant ambiguity warnings should be treated as info messages
+        info_messages.append(f"Row {row_number}: {error}")
+    else:
+        errors.append(f"Row {row_number}: {error}")
+
+
+def _is_restaurant_warning(error: str) -> bool:
+    """Check if error is a restaurant-related warning that should be treated as info.
+
+    Args:
+        error: The error message to check
+
+    Returns:
+        True if this is a restaurant warning, False otherwise
+    """
+    return "matches multiple existing restaurants" in error or "not found. Please provide an address" in error
+
+
+def _commit_batch(success_count: int, batch_size: int, errors: List[str]) -> bool:
+    """Commit a batch of expenses and handle errors.
+
+    Args:
+        success_count: Current count of successful imports
+        batch_size: Size of the batch being committed
+        errors: List to append errors to
+
+    Returns:
+        True if commit was successful, False otherwise
+    """
+    try:
+        db.session.commit()
+        current_app.logger.info(f"Committed batch of {batch_size} expenses")
+        return True
+    except Exception as e:
+        current_app.logger.error(f"Error committing batch: {str(e)}")
+        db.session.rollback()
+        errors.append(f"Batch {success_count // batch_size}: Database error - {str(e)}")
+        return False
 
 
 def _count_warning_types(info_messages: List[str]) -> Tuple[int, int]:
@@ -1486,8 +1731,15 @@ def _generate_import_result(
     Returns:
         Tuple of (success, result_data)
     """
-    if success_count > 0:
-        db.session.commit()
+    # Only commit if we have successful imports and no errors during processing
+    # (Note: Individual batches may have already been committed during import)
+    if success_count > 0 and len(errors) == 0:
+        try:
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.error(f"Error committing final batch: {str(e)}")
+            db.session.rollback()
+            errors.append(f"Final commit failed: {str(e)}")
 
     # Build result data structure
     result_data = {
@@ -1624,7 +1876,7 @@ def update_tag(user_id: int, tag_id: int, name: str, color: str = "#6c757d", des
     tag.name = normalized_name
     tag.color = color
     tag.description = description
-    tag.updated_at = datetime.utcnow()
+    tag.updated_at = datetime.now(timezone.utc)
 
     db.session.commit()
 
@@ -1702,7 +1954,8 @@ def add_tags_to_expense(expense_id: int, user_id: int, tag_names: list[str]) -> 
     Returns:
         List of Tag objects that were added
     """
-    expense = Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag)).get(expense_id)
+    # Use SQLAlchemy 2.0 style to avoid LegacyAPIWarning for Query.get()
+    expense = db.session.get(Expense, expense_id)
     if not expense:
         raise ValueError("Expense not found")
 
@@ -1749,7 +2002,7 @@ def remove_tags_from_expense(expense_id: int, user_id: int, tag_names: list[str]
     Returns:
         List of Tag objects that were removed
     """
-    expense = Expense.query.get(expense_id)
+    expense = db.session.get(Expense, expense_id)
     if not expense:
         raise ValueError("Expense not found")
 
@@ -1794,7 +2047,7 @@ def get_expense_tags(expense_id: int, user_id: int) -> list[Tag]:
     Returns:
         List of Tag objects for the expense
     """
-    expense = Expense.query.get(expense_id)
+    expense = db.session.get(Expense, expense_id)
     if not expense:
         return []
 
@@ -1815,7 +2068,7 @@ def update_expense_tags(expense_id: int, user_id: int, tag_names: list[str]) -> 
     Returns:
         List of Tag objects that are now associated with the expense
     """
-    expense = Expense.query.get(expense_id)
+    expense = db.session.get(Expense, expense_id)
     if not expense:
         raise ValueError("Expense not found")
 
@@ -1854,7 +2107,7 @@ def delete_tag(user_id: int, tag_id: int) -> bool:
     Returns:
         True if tag was deleted, False if not found or unauthorized
     """
-    tag = Tag.query.get(tag_id)
+    tag = db.session.get(Tag, tag_id)
     if not tag or tag.user_id != user_id:
         return False
 

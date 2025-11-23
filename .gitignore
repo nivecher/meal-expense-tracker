@@ -7,11 +7,10 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-Python-3.13.0.tgz
-Python-3.13.0/
 
 # Build artifacts
 dist/
+bin/
 
 # Version files
 !.python-version  # Explicitly track Python version for development tools
@@ -52,6 +51,7 @@ env/
 .env.*.local
 !.env.example
 .flaskenv
+flask_session/
 
 # Docker
 docker-compose.override.yml
@@ -73,6 +73,8 @@ docker-compose.override.yml
 htmlcov/
 .pytest_cache/
 .tox/
+test-results/
+playwright-report/
 
 # Logs
 *.log
@@ -111,6 +113,13 @@ tfsec-results.*
 .tfsec/
 .tfsec.log
 
+# Security scanning
+bandit-report.json
+safety-report.json
+
+# Static uploads (receipts, user files)
+app/static/uploads/
+
 # Terraform
 .terraform/
 terraform.tfstate*
@@ -144,6 +153,7 @@ terraform/.terraform.tfstate.lock.info
 **/backend.hcl
 !terraform/backend.hcl
 **/backend.hcl.*
+!**/backend.hcl.template
 **/backend.tf
 !terraform/backend.tf
 **/backend.tf.*

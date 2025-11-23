@@ -223,18 +223,6 @@ class User(BaseModel, UserMixin):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
-    def to_token_dict(self) -> Dict[str, Any]:
-        """Return a dictionary suitable for JWT token generation.
-
-        Returns:
-            Dict containing minimal user data for token claims
-        """
-        return {
-            "user_id": self.id,
-            "username": self.username,
-            "is_admin": self.is_admin,
-        }
-
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username='{self.username}')>"
 

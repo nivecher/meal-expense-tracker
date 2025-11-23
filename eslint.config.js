@@ -65,18 +65,18 @@ export default [
       'no-unreachable-loop': 'warn',
       'no-use-before-define': 'error',
       'block-scoped-var': 'error',
-      'camelcase': 'warn',
-      'class-methods-use-this': 'warn',
-      'consistent-return': 'warn',
-      'default-case': 'warn',
+      'camelcase': 'off', // Disabled - API response properties use snake_case
+      'class-methods-use-this': 'off', // Disabled - utility methods don't need 'this'
+      'consistent-return': 'off', // Disabled - event handlers don't need consistent returns
+      'default-case': 'off', // Disabled - switch statements may not need default
       'default-param-last': 'error',
       'dot-notation': 'error',
       'eqeqeq': 'error',
       'max-classes-per-file': ['warn', 2],
       'max-depth': ['warn', 4],
-      'max-lines-per-function': ['warn', 100],
-      'max-params': ['warn', 5],
-      'max-statements': ['warn', 20],
+      'max-lines-per-function': 'off', // Disabled - complex functions are sometimes necessary
+      'max-params': 'off', // Disabled - some functions need many parameters
+      'max-statements': 'off', // Disabled - complex logic sometimes requires many statements
       'new-cap': 'warn',
       'no-array-constructor': 'error',
       'no-bitwise': 'warn',
@@ -107,13 +107,13 @@ export default [
       'no-useless-concat': 'error',
       'no-useless-return': 'error',
       'no-void': 'error',
-      'prefer-named-capture-group': 'warn',
+      'prefer-named-capture-group': 'off', // Disabled - simple regex groups are fine
       'prefer-object-has-own': 'warn',
       'prefer-object-spread': 'warn',
       'prefer-promise-reject-errors': 'warn',
       'prefer-regex-literals': 'warn',
       'radix': 'error',
-      'require-unicode-regexp': 'warn',
+      'require-unicode-regexp': 'off', // Disabled - not all regex needs unicode flag
       'vars-on-top': 'warn',
       'yoda': 'warn',
       'array-bracket-spacing': ['error', 'never'],

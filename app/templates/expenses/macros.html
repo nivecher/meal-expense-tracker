@@ -1,10 +1,12 @@
 {% macro expense_form(form, expense=None, is_edit=false) %}
     <form id="expenseForm"
           method="post"
+          enctype="multipart/form-data"
           novalidate
           action="{% if is_edit %}{{ url_for('expenses.edit_expense', expense_id=expense.id) }}{% else %}{{ url_for('expenses.add_expense', restaurant_id=request.view_args.get('restaurant_id') ) if request.view_args and request.view_args.get('restaurant_id') else url_for('expenses.add_expense') }}{% endif %}"
           data-ajax
-          data-validate>
+          data-validate
+          data-extension-safe="true">
         {% if form %}
             {{ form.hidden_tag() }}
         {% else %}
@@ -32,6 +34,23 @@
                        value="{{ default_date }}"
                        required>
                 {% if form.date.errors %}<div class="invalid-feedback">{{ form.date.errors[0] }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+                {{ form.time.label(class="form-label") }}
+                {% set default_time = form.time.data.strftime('%H:%M') if form.time.data else '' %}
+                <input type="time"
+                       id="{{ form.time.id }}"
+                       name="{{ form.time.name }}"
+                       class="form-control{{ ' is-invalid' if form.time.errors else '' }}"
+                       value="{{ default_time }}"
+                       placeholder="Optional time (e.g., 14:30)">
+                {% if form.time.errors %}<div class="invalid-feedback">{{ form.time.errors[0] }}</div>{% endif %}
+                <div class="form-text">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Optional time in 24-hour format. If not specified, defaults to noon in your timezone.
+                    </small>
+                </div>
             </div>
         </div>
         <div class="row mb-3">
@@ -104,6 +123,45 @@
             </div>
         </div>
 
+        <!-- Receipt Upload Section -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <label for="receipt_image" class="form-label">
+                    <i class="fas fa-receipt me-1"></i>Receipt Image (Optional)
+                </label>
+                <input type="file"
+                       id="receipt_image"
+                       name="receipt_image"
+                       class="form-control"
+                       accept="image/*"
+                       {% if expense and expense.receipt_image %}
+                           data-existing-receipt="{{ expense.receipt_image }}"
+                       {% endif %}>
+                <!-- Hidden field to track receipt deletion -->
+                <input type="hidden" id="delete_receipt" name="delete_receipt" value="false">
+                <div class="form-text">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Upload a photo of your receipt. Supported formats: JPG, PNG, GIF. Max size: 5MB.
+                        {% if expense and expense.receipt_image %}
+                            <br>
+                            <div class="d-flex gap-2">
+                                <a href="{{ get_receipt_url(expense.receipt_image) }}" target="_blank" class="text-primary">
+                                    <i class="fas fa-eye me-1"></i>View current receipt
+                                </a>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        onclick="deleteReceipt()"
+                                        title="Delete receipt">
+                                    <i class="fas fa-trash me-1"></i>Delete
+                                </button>
+                            </div>
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+
         <!-- Tags Section -->
         <div class="row mb-3">
             <div class="col-12">
@@ -115,6 +173,7 @@
                        placeholder="Type to add tags..."
                        {% if expense and expense.tags %}
                            value="{{ expense.tags|map(attribute='name')|join(', ') }}"
+                           data-existing-tags="{{ expense.tags|map(attribute='to_dict')|list|tojson }}"
                        {% endif %}>
                 <div class="form-text" id="tags-help">
                     <small class="text-muted">
@@ -140,6 +199,8 @@
     </form>
 {% endmacro %}
 {% macro expense_scripts() %}
+    <!-- Unified Error Handler already loaded in base template -->
+
     <!-- Tagify CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.17.9/dist/tagify.css">
     <!-- Pretty Tagify styling with rounded edges -->
@@ -162,4 +223,65 @@
 
     <!-- Tagify initialization script -->
     <script src="{{ url_for('static', filename='js/utils/tagify-init.js') }}"></script>
+
+    <!-- Receipt deletion functionality -->
+    <script>
+        function deleteReceipt() {
+            if (confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
+                // Set the hidden field to indicate deletion
+                const deleteField = document.getElementById('delete_receipt');
+                if (deleteField) {
+                    deleteField.value = 'true';
+                }
+
+                // Clear the file input
+                const fileInput = document.getElementById('receipt_image');
+                if (fileInput) {
+                    fileInput.value = '';
+                }
+
+                // Hide the receipt actions
+                const receiptActions = document.querySelector('.d-flex.gap-2');
+                if (receiptActions) {
+                    receiptActions.style.display = 'none';
+                }
+
+                // Show processing message
+                const formText = document.querySelector('.form-text');
+                if (formText) {
+                    const processingMsg = document.createElement('div');
+                    processingMsg.className = 'alert alert-info alert-dismissible fade show mt-2';
+                    processingMsg.innerHTML = `
+                        <i class="fas fa-spinner fa-spin me-1"></i>Deleting receipt...
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    formText.appendChild(processingMsg);
+                }
+
+                // Auto-submit the form to delete the receipt immediately
+                const form = document.querySelector('form');
+                if (form) {
+                    // Create a temporary submit button to trigger form submission
+                    const submitBtn = document.createElement('button');
+                    submitBtn.type = 'submit';
+                    submitBtn.style.display = 'none';
+                    form.appendChild(submitBtn);
+                    submitBtn.click();
+                    form.removeChild(submitBtn);
+                }
+
+                // Note: Toast will be shown by the backend after successful deletion
+            }
+        }
+
+        // Show success toast for receipt uploads
+        function showReceiptUploadSuccess() {
+            showSuccessToast('Receipt uploaded successfully!');
+        }
+
+        // Show error toast for receipt uploads
+        function showReceiptUploadError(message) {
+            showErrorToast(`Failed to upload receipt: ${message}`);
+        }
+    </script>
 {% endmacro %}

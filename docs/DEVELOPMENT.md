@@ -10,7 +10,7 @@ This document provides detailed instructions for setting up and working with the
 - Docker and Docker Compose
 - AWS CLI (for deployment)
 - AWS SAM CLI (for local Lambda testing)
-- Terraform 1.5+ (for infrastructure management)
+- Terraform 1.13.5+ (for infrastructure management)
 - **AWS CLI**: For AWS service interaction
 
 ### Local Development Setup
@@ -153,37 +153,37 @@ docker-compose -f docker-compose.yml logs -f
 
 ## Deployment
 
-### Build and Package (optional)
+### Deploy Lambda (Docker Container)
+
+The application is deployed as a Docker container image to AWS Lambda via ECR:
 
 ```bash
 
-## Build deployment package
-sam build
+## Build and deploy Lambda container image
+./scripts/redeploy-lambda.sh
 
-## Package for deployment
-sam package \
-  --output-template-file packaged.yaml \
-  --s3-bucket your-deployment-bucket
+## Or use the full deployment script with migrations
+./scripts/deploy_with_migrations.sh -e dev
 
 ```
 
-### Deploy to AWS (optional)
+This will:
+
+1. Build Docker container image using `Dockerfile.lambda`
+2. Push image to ECR repository
+3. Update Lambda function with new container image
+4. Sync static files to S3
+5. Invalidate CloudFront cache
+6. Run database migrations (if enabled)
+
+### Deploy Static Files to S3
+
+Static files (CSS, JS, images) are deployed separately to S3 and served via CloudFront:
 
 ```bash
 
-## Deploy to development environment
-sam deploy \
-  --template-file packaged.yaml \
-  --stack-name meal-expense-tracker-dev \
-  --capabilities CAPABILITY_IAM \
-  --region us-east-1
-
-## Deploy to production
-sam deploy \
-  --template-file packaged.yaml \
-  --stack-name meal-expense-tracker-prod \
-  --capabilities CAPABILITY_IAM \
-  --region us-east-1
+## Sync static files to S3
+./scripts/sync_static_to_s3.sh
 
 ```
 

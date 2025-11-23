@@ -10,7 +10,9 @@
         Back to Dashboard
     </a>
 </div>
-{% endblock page_actions %} {% block admin_content %}
+{% endblock page_actions %} {% block admin_content %} {% if error_message %}
+<div class="alert alert-danger" role="alert"> <strong>Error:</strong> {{ error_message }} </div>
+{% endif %}
 <!-- Filters -->
 <div class="row mb-4">
     <div class="col-12">

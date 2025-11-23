@@ -41,8 +41,7 @@ This document outlines the technology choices and architecture decisions for the
 - **Authentication & Security**:
 
   - Flask-Login for session-based authentication
-  - JWT for API token authentication
-  - Flexible session storage (DynamoDB for AWS, signed cookies for Lambda)
+  - Signed cookie sessions for all environments (no external storage required)
   - Flask-Limiter for rate limiting
   - CSRF protection (disabled in Lambda, enabled in development)
 
@@ -80,10 +79,11 @@ This document outlines the technology choices and architecture decisions for the
 
 ### AWS Lambda Integration
 
-- **Runtime**: Python 3.13
-- **WSGI Adapter**: AWS-wsgi
-- **Handler**: Lambda-compatible entry point
-- **Layers**: Custom runtime dependencies
+- **Runtime**: Python 3.13 (container image)
+- **Package Type**: Docker container image deployed via ECR
+- **WSGI Adapter**: aws-wsgi (included in container) <!-- markdownlint-disable-line MD044 -->
+- **Handler**: Lambda-compatible entry point (wsgi.lambda_handler)
+- **Dependencies**: Installed in container image (not via layers)
 - **Environment**: Configuration via Lambda environment variables
 - **Logging**: Structured JSON logging with CloudWatch
 
@@ -94,12 +94,13 @@ This document outlines the technology choices and architecture decisions for the
 - **Compute**: AWS Lambda
 - **API**: API Gateway HTTP API
 - **Storage**:
-  - S3 for Lambda deployment packages
-  - RDS PostgreSQL for data storage
+  - S3 for static file hosting and receipt storage
+  - ECR for Lambda container image registry
+  - External PostgreSQL (Neon/Supabase) for data storage
 - **Networking**:
-  - VPC with public/private subnets
-  - Security Groups for access control
-  - NAT Gateway for outbound internet access
+  - CloudFront CDN for request routing and static file delivery
+  - Simplified architecture - no VPC required (Lambda connects via HTTPS)
+  - Origin Access Control (OAC) for secure S3 access
 - **Secrets**: AWS Secrets Manager for credentials
 - **Monitoring**:
   - CloudWatch Logs
@@ -126,9 +127,11 @@ This document outlines the technology choices and architecture decisions for the
 
 1. **Deployment**
 
-- Build and package Flask application
-  - Upload deployment package to S3
-  - Update Lambda function
+- Build Docker container image for Lambda
+  - Push container image to ECR
+  - Update Lambda function with new image
+  - Sync static files to S3 bucket
+  - Invalidate CloudFront cache
   - Run database migrations
   - Update API Gateway configuration
   - Run integration tests

@@ -13,7 +13,7 @@ enable_xray_tracing    = false
 
 # Cost control
 enable_cost_alert     = true
-monthly_budget_amount = 200
+monthly_budget_amount = 20
 
 # Security
 allowed_ip_ranges = ["0.0.0.0/0"] # Restrict this in production

@@ -55,7 +55,7 @@ export class MapRestaurantSearch {
     this.getCurrentLocation();
   }
 
-  async loadGoogleMaps() {
+  async loadGoogleMaps() { // eslint-disable-line require-await
     if (window.google && window.google.maps) {
       return; // Already loaded
     }
@@ -70,7 +70,7 @@ export class MapRestaurantSearch {
     });
   }
 
-  async waitForGoogleMaps() {
+  async waitForGoogleMaps() { // eslint-disable-line require-await
     // Wait for Google Maps API to be fully loaded including marker library
     return new Promise((resolve) => {
       const checkGoogleMaps = () => {
@@ -226,6 +226,9 @@ export class MapRestaurantSearch {
           <div id="results-header" class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">
               <i class="fas fa-utensils me-2"></i>Search Results
+              <span id="location-indicator" class="badge bg-success ms-2 d-none">
+                <i class="fas fa-map-marker-alt me-1"></i>Location-based
+              </span>
             </h5>
             <span id="results-count" class="badge bg-primary fs-6">0 restaurants found</span>
           </div>
@@ -235,7 +238,8 @@ export class MapRestaurantSearch {
               <div class="text-center text-muted py-5">
                 <i class="fas fa-search fa-3x mb-3"></i>
                 <h6>Find restaurants in your area</h6>
-                <p class="mb-0">Click "Search" to discover nearby dining options, or enter specific criteria above</p>
+                <p class="mb-2">Click "Search" or "Use My Location" to discover nearby dining options</p>
+                <small class="text-muted">Leave the search box empty to find all restaurants in your area</small>
               </div>
             </div>
           </div>
@@ -255,6 +259,13 @@ export class MapRestaurantSearch {
   initMap() {
     const mapElement = this.container.querySelector('#restaurant-map');
 
+    // Debug: Log map configuration
+    console.log('Map initialization options:', this.options);
+    console.log('Google Maps Map ID:', this.options.googleMapsMapId);
+    console.log('Google Maps Map ID type:', typeof this.options.googleMapsMapId);
+    console.log('Google Maps Map ID length:', this.options.googleMapsMapId ? this.options.googleMapsMapId.length : 'N/A');
+    console.log('Google Maps Map ID truthy:', !!this.options.googleMapsMapId);
+
     // Default to San Francisco if no location available
     const defaultLocation = { lat: 37.7749, lng: -122.4194 };
 
@@ -269,8 +280,27 @@ export class MapRestaurantSearch {
     };
 
     if (this.options.googleMapsMapId) {
-      mapOptions.mapId = this.options.googleMapsMapId;
+      // Validate Map ID format
+      const mapId = this.options.googleMapsMapId.trim();
+      console.log('Map ID validation:', {
+        original: this.options.googleMapsMapId,
+        trimmed: mapId,
+        length: mapId.length,
+        type: typeof mapId,
+      });
+
+      if (mapId.length < 10) {
+        console.warn('Map ID appears to be too short, may not be valid:', mapId);
+      }
+      mapOptions.mapId = mapId;
+      console.log('Using Map ID:', mapId);
     } else {
+      console.warn('No Map ID provided, using default styles');
+      console.log('Map ID options:', {
+        googleMapsMapId: this.options.googleMapsMapId,
+        type: typeof this.options.googleMapsMapId,
+        truthy: !!this.options.googleMapsMapId,
+      });
       // Only apply inline styles when not using a cloud-based Map ID style
       mapOptions.styles = [
         {
@@ -281,6 +311,7 @@ export class MapRestaurantSearch {
       ];
     }
 
+    console.log('Final map options:', mapOptions);
     this.map = new google.maps.Map(mapElement, mapOptions);
 
     // Add click listener to map
@@ -337,10 +368,11 @@ export class MapRestaurantSearch {
       if (addButton) {
         e.stopPropagation(); // Prevent card selection
         const { placeId } = addButton.dataset;
-        if (placeId && placeId !== 'null' && placeId !== 'undefined') {
+        if (placeId && placeId !== 'null' && placeId !== 'undefined' && placeId.trim() !== '') {
           this.addToMyRestaurants(placeId);
         } else {
-          console.error('No valid place ID found on button. placeId:', placeId);
+          console.warn('Restaurant cannot be added: missing Google Place ID. This restaurant may need to be added manually.');
+          // Note: User-friendly message shown via console.warn above
         }
       }
     });
@@ -377,7 +409,7 @@ export class MapRestaurantSearch {
     useLocationBtn.disabled = true;
 
     statusDiv.classList.remove('d-none');
-    statusText.textContent = 'Getting your location...';
+    statusText.textContent = 'Requesting location permission...';
 
     try {
       const position = await this.getCurrentPosition();
@@ -386,14 +418,15 @@ export class MapRestaurantSearch {
         lng: position.coords.longitude,
       };
 
-      // Update map center (let fitMapToMarkers handle the zoom)
+      // Update map center and show user location
       this.map.setCenter(this.currentLocation);
+      this.addCurrentLocationMarker();
 
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-success');
-      statusText.innerHTML = '<i class="fas fa-check-circle me-2"></i>Location found! Searching for nearby restaurants...';
+      statusText.innerHTML = '<i class="fas fa-check-circle me-2"></i>Location found! Searching for restaurants in your area...';
 
-      // Perform search automatically
+      // Perform search automatically with location-based results
       await this.performSearch();
 
       // Hide status after 3 seconds
@@ -404,12 +437,35 @@ export class MapRestaurantSearch {
     } catch (error) {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
-      statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
 
-      // Hide status after 5 seconds
+      // Provide more specific error messages based on error type
+      let errorMessage = '<i class="fas fa-exclamation-triangle me-2"></i>';
+
+      if (error.message.includes('Geolocation is not supported')) {
+        errorMessage += 'Location services not available. You can still search by text or drag the map to your area.';
+      } else if (error.message.includes('User denied')) {
+        errorMessage += 'Location access denied. You can still search by text or drag the map to your area.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage += 'Location request timed out. Try again or search by text.';
+      } else {
+        errorMessage += 'Could not get your location. You can still search by text or drag the map to your area.';
+      }
+
+      statusText.innerHTML = errorMessage;
+
+      // Show help text about manual location setting
+      const helpText = document.createElement('div');
+      helpText.className = 'mt-2 small text-muted';
+      helpText.innerHTML = '<i class="fas fa-info-circle me-1"></i>Tip: You can drag the map to your area and search for better results.';
+      statusText.parentNode.appendChild(helpText);
+
+      // Hide status after 7 seconds for error messages
       setTimeout(() => {
         statusDiv.classList.add('d-none');
-      }, 5000);
+        if (helpText.parentNode) {
+          helpText.parentNode.removeChild(helpText);
+        }
+      }, 7000);
     } finally {
       // Reset button state
       useLocationBtn.innerHTML = originalText;
@@ -444,7 +500,7 @@ export class MapRestaurantSearch {
         statusDiv.classList.add('d-none');
       }, 3000);
 
-    } catch (error) {
+    } catch (_error) {
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-warning');
       statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
@@ -463,11 +519,31 @@ export class MapRestaurantSearch {
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000, // 5 minutes
-      });
+      navigator.geolocation.getCurrentPosition(
+        resolve,
+        (error) => {
+          // Provide more specific error messages for better user feedback
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              reject(new Error('User denied geolocation request'));
+              break;
+            case error.POSITION_UNAVAILABLE:
+              reject(new Error('Location information unavailable'));
+              break;
+            case error.TIMEOUT:
+              reject(new Error('Location request timed out'));
+              break;
+            default:
+              reject(new Error(`Geolocation error: ${error.message}`));
+              break;
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000, // Increased timeout for better success rate
+          maximumAge: 300000, // 5 minutes
+        },
+      );
     });
   }
 
@@ -491,6 +567,14 @@ export class MapRestaurantSearch {
       // If no query provided, search for restaurants in the area
       const searchQuery = query || 'restaurants';
 
+      // Update search input placeholder to show it's searching for restaurants
+      if (!query) {
+        searchInput.placeholder = 'Searching for restaurants in your area...';
+        setTimeout(() => {
+          searchInput.placeholder = 'Name, cuisine, location...';
+        }, 2000);
+      }
+
       // Always use current map center for search location
       const mapCenter = this.map.getCenter();
       const searchLocation = {
@@ -503,11 +587,11 @@ export class MapRestaurantSearch {
         query: searchQuery,
         lat: searchLocation.lat,
         lng: searchLocation.lng,
-        radius_miles: radius,
+        radiusMiles: radius,
         cuisine: filters.cuisine || '',
         minRating: filters.minRating || '',
         maxPriceLevel: filters.maxPriceLevel || '',
-        maxResults: filters.maxResults || 20,
+        maxResults: filters.maxResults || 10, // Reduced for cost savings
       };
 
       // Remove empty parameters
@@ -571,12 +655,85 @@ export class MapRestaurantSearch {
     return data.data;
   }
 
+  sortResultsByDistance(results) {
+    if (!this.currentLocation || !results || results.length === 0) {
+      return results;
+    }
+
+    // Calculate distance for each restaurant and sort by distance
+    const resultsWithDistance = results.map((restaurant) => {
+      const distance = this.calculateDistance(
+        this.currentLocation.lat,
+        this.currentLocation.lng,
+        restaurant.latitude || (restaurant.geometry && restaurant.geometry.location ? restaurant.geometry.location.lat : null),
+        restaurant.longitude || (restaurant.geometry && restaurant.geometry.location ? restaurant.geometry.location.lng : null),
+      );
+
+      return {
+        ...restaurant,
+        distance,
+        distanceText: this.formatDistance(distance),
+      };
+    }).filter((restaurant) => restaurant.distance !== null); // Filter out restaurants without valid coordinates
+
+    // Sort by distance (closest first)
+    return resultsWithDistance.sort((a, b) => a.distance - b.distance);
+  }
+
+  calculateDistance(lat1, lng1, lat2, lng2) {
+    if (!lat2 || !lng2) return null;
+
+    // Haversine formula to calculate distance between two points on Earth
+    const R = 3959; // Earth's radius in miles (use 6371 for kilometers)
+    const dLat = this.toRadians(lat2 - lat1);
+    const dLng = this.toRadians(lng2 - lng1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in miles
+  }
+
+  toRadians(degrees) {
+    return degrees * (Math.PI / 180);
+  }
+
+  formatDistance(distance) {
+    if (distance === null) return '';
+
+    if (this.locale.useMiles) {
+      if (distance < 0.1) {
+        return `${Math.round(distance * 5280)} ft`;
+      } else if (distance < 1) {
+        return `${(distance * 0.621371).toFixed(1)} mi`;
+      }
+      return `${distance.toFixed(1)} mi`;
+
+    }
+    if (distance < 0.1) {
+      return `${Math.round(distance * 1000)} m`;
+    }
+    return `${(distance * 1.60934).toFixed(1)} km`;
+
+  }
+
   displayResults(results) {
     const resultsContainer = this.container.querySelector('#search-results');
     const resultsCount = this.container.querySelector('#results-count');
+    const locationIndicator = this.container.querySelector('#location-indicator');
 
-    // Store current results for selection
-    this.currentResults = results;
+    // Sort results by distance from search location (closest first)
+    const sortedResults = this.sortResultsByDistance(results.results);
+
+    // Store current results for selection (use sorted results for consistent ordering)
+    this.currentResults = {
+      ...results,
+      results: sortedResults,
+    };
 
     // Clear existing markers
     this.clearMarkers();
@@ -592,18 +749,30 @@ export class MapRestaurantSearch {
         </div>
       `;
       resultsCount.textContent = '0 restaurants found';
+
+      // Hide location indicator if no results
+      locationIndicator.classList.add('d-none');
       return;
     }
 
     // Update results count
-    const count = results.results.length;
+    const count = sortedResults.length;
     resultsCount.textContent = `${count} restaurant${count !== 1 ? 's' : ''} found`;
 
-    // Create markers and result cards in grid layout
-    const resultsHtml = results.results.map((restaurant, index) => {
-      // Create marker
-      this.createMarker(restaurant, index);
+    // Show location indicator if we have location and search was location-based
+    if (this.currentLocation) {
+      locationIndicator.classList.remove('d-none');
+    } else {
+      locationIndicator.classList.add('d-none');
+    }
 
+    // Create markers and result cards in grid layout (using sorted results)
+    sortedResults.forEach((restaurant, index) => {
+      // Create marker for this restaurant at its sorted position
+      this.createMarker(restaurant, index);
+    });
+
+    const resultsHtml = sortedResults.map((restaurant, index) => {
       // Create result card in grid column
       return `
         <div class="col-lg-4 col-md-6 col-sm-12">
@@ -619,14 +788,27 @@ export class MapRestaurantSearch {
   }
 
   createMarker(restaurant, index) {
-    if (!restaurant.geometry || !restaurant.geometry.location) {
-      return;
+    // Handle both old and new Google Places API formats
+    let position = null;
+
+    if (restaurant.geometry && restaurant.geometry.location) {
+      // Old format: restaurant.geometry.location.lat/lng
+      position = {
+        lat: restaurant.geometry.location.lat,
+        lng: restaurant.geometry.location.lng,
+      };
+    } else if (restaurant.latitude && restaurant.longitude) {
+      // New format: restaurant.latitude/longitude
+      position = {
+        lat: restaurant.latitude,
+        lng: restaurant.longitude,
+      };
     }
 
-    const position = {
-      lat: restaurant.geometry.location.lat,
-      lng: restaurant.geometry.location.lng,
-    };
+    if (!position) {
+      console.warn('No location data found for restaurant:', restaurant.name);
+      return;
+    }
 
     // Use AdvancedMarkerElement with numbered content
     const marker = new google.maps.marker.AdvancedMarkerElement({
@@ -638,7 +820,7 @@ export class MapRestaurantSearch {
 
     // Add click listener
     marker.addListener('click', () => {
-      this.selectRestaurant(index, restaurant);
+      this.selectRestaurant(index);
     });
 
     this.markers.push(marker);
@@ -702,9 +884,24 @@ export class MapRestaurantSearch {
   }
 
   createResultCard(restaurant, index) {
-    const photoUrl = restaurant.photos && restaurant.photos.length > 0
-      ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=300&photoreference=${restaurant.photos[0].photo_reference}&key=${this.options.googleMapsApiKey}`
-      : null;
+    // Handle photos - use the URL if available, otherwise build it from photo_reference
+    let photoUrl = null;
+    console.log(`Restaurant ${restaurant.name} photos:`, restaurant.photos);
+
+    if (restaurant.photos && restaurant.photos.length > 0) {
+      const [firstPhoto] = restaurant.photos;
+      console.log(`First photo for ${restaurant.name}:`, firstPhoto);
+
+      if (firstPhoto.url) {
+        // New Places API format: photo has direct URL
+        photoUrl = firstPhoto.url;
+        console.log(`Using Places API photo URL for ${restaurant.name}:`, photoUrl);
+      } else {
+        console.log(`No photo URL available for ${restaurant.name}`);
+      }
+    } else {
+      console.log(`No photos found for ${restaurant.name}`);
+    }
 
     const rating = restaurant.rating || 0;
     const reviewCount = restaurant.user_ratings_total || 0;
@@ -739,9 +936,11 @@ export class MapRestaurantSearch {
         ` : ''}
 
         ${photoUrl ? `
-          <img src="${photoUrl}" class="card-img-top" alt="${restaurant.name}" style="height: 140px; object-fit: cover;" loading="lazy">
+          <img src="${photoUrl}" class="card-img-top" alt="${restaurant.name}" style="height: 140px; object-fit: cover;" loading="lazy"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'; console.error('Failed to load image:', this.src);"
+               onload="console.log('Image loaded successfully:', this.src);">
         ` : `
-          <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 140px;">
+          <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 140px; display: none;">
             <i class="fas fa-utensils fa-2x text-muted"></i>
           </div>
         `}
@@ -758,6 +957,11 @@ export class MapRestaurantSearch {
                   </span>
                 ` : ''}
               </h6>
+              ${restaurant.distanceText ? `
+                <div class="text-muted small">
+                  <i class="fas fa-map-marker-alt me-1"></i>${restaurant.distanceText} away
+                </div>
+              ` : ''}
             </div>
             ${rating > 0 ? `
               <div class="d-flex align-items-center text-end">
@@ -811,9 +1015,15 @@ export class MapRestaurantSearch {
 
           <!-- Add button -->
           <div class="mt-auto">
-            <button class="btn btn-primary btn-sm w-100" data-place-id="${restaurant.place_id}" data-action="add-restaurant">
-              <i class="fas fa-plus me-1"></i>Add to My Restaurants
-            </button>
+            ${(restaurant.google_place_id && restaurant.google_place_id.trim() !== '') || (restaurant.place_id && restaurant.place_id.trim() !== '') ? `
+              <button class="btn btn-primary btn-sm w-100" data-place-id="${restaurant.google_place_id || restaurant.place_id}" data-action="add-restaurant">
+                <i class="fas fa-plus me-1"></i>Add to My Restaurants
+              </button>
+            ` : `
+              <button class="btn btn-outline-secondary btn-sm w-100" disabled title="This restaurant cannot be added automatically. Missing Google Place ID.">
+                <i class="fas fa-exclamation-triangle me-1"></i>Cannot Add Automatically
+              </button>
+            `}
           </div>
         </div>
       </div>
@@ -821,23 +1031,50 @@ export class MapRestaurantSearch {
   }
 
   parseAddress(restaurant) {
+    console.log('Parsing address for:', restaurant.name);
+    console.log('Restaurant address data:', {
+      address: restaurant.address,
+      address_line_1: restaurant.address_line_1,
+      address_line_2: restaurant.address_line_2,
+      city: restaurant.city,
+      state: restaurant.state,
+      postal_code: restaurant.postal_code,
+      formatted_address: restaurant.formatted_address,
+      vicinity: restaurant.vicinity,
+    });
+
     // First, try to use structured address data if available (from details API)
-    if (restaurant.address && restaurant.city && restaurant.state) {
-      const street = restaurant.address;
+    if ((restaurant.address_line_1 || restaurant.address) && restaurant.city && restaurant.state) {
+      const street = restaurant.address_line_1 || restaurant.address;
       const cityState = restaurant.postal_code
         ? `${restaurant.city}, ${restaurant.state} ${restaurant.postal_code}`
         : `${restaurant.city}, ${restaurant.state}`;
 
+      console.log('Using structured address:', { street, cityStateZip: cityState });
       return {
         street,
         cityStateZip: cityState,
       };
     }
 
+    // Debug: Check if we have partial structured data
+    if (restaurant.city || restaurant.state || restaurant.postal_code) {
+      console.log('Partial structured data available:', {
+        address_line_1: restaurant.address_line_1,
+        address: restaurant.address,
+        city: restaurant.city,
+        state: restaurant.state,
+        postal_code: restaurant.postal_code,
+      });
+    }
+
     // Fallback to parsing formatted_address or vicinity from search results
     const formatted = restaurant.formatted_address || restaurant.vicinity || '';
 
+    console.log('Using formatted address fallback:', formatted);
+
     if (!formatted) {
+      console.log('No formatted address available');
       return { street: 'Address not available', cityStateZip: '' };
     }
 
@@ -848,7 +1085,7 @@ export class MapRestaurantSearch {
 
     if (states && states.length > 0) {
       // Found state abbreviation, try to parse around it
-      const state = states[0];
+      const [state] = states;
       const stateIndex = formatted.indexOf(state);
 
       // Extract everything after the state (should include city)
@@ -858,7 +1095,7 @@ export class MapRestaurantSearch {
       // Try to find city before state
       const parts = beforeState.split(',').map((p) => p.trim());
       if (parts.length > 0) {
-        const street = parts[0];
+        const [street] = parts;
         const city = parts.length > 1 ? parts[parts.length - 1] : '';
 
         return {
@@ -873,9 +1110,7 @@ export class MapRestaurantSearch {
 
     if (parts.length >= 4) {
       // Format: "Street, City, State ZIP, Country"
-      const street = parts[0];
-      const city = parts[1];
-      const stateZip = parts[2];
+      const [street, city, stateZip] = parts;
 
       return {
         street,
@@ -883,9 +1118,7 @@ export class MapRestaurantSearch {
       };
     } else if (parts.length === 3) {
       // Format: "Street, City, State ZIP" or "Street, City, Country"
-      const street = parts[0];
-      const city = parts[1];
-      const lastPart = parts[2];
+      const [street, city, lastPart] = parts;
 
       // Check if last part contains state abbreviation or full state name
       const stateRegex = /\b[A-Z]{2}\b|\b(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming)\b/i;
@@ -905,14 +1138,14 @@ export class MapRestaurantSearch {
 
     } else if (parts.length === 2) {
       // Format: "Street, City State" or "Street, City"
-      const street = parts[0];
-      const cityState = parts[1];
+      const [street] = parts;
+      const [, cityState] = parts;
 
       // Try to extract state from cityState if it's in format "City State ZIP"
       const stateMatch = cityState.match(/\b([A-Z]{2})\s+\d{5}(-\d{4})?$/);
       if (stateMatch) {
         const cityOnly = cityState.replace(/\s+[A-Z]{2}\s+\d{5}(-\d{4})?$/, '');
-        const stateZip = cityState.match(/\s+([A-Z]{2}\s+\d{5}(-\d{4})?)$/)[1];
+        const [, stateZip] = cityState.match(/\s+([A-Z]{2}\s+\d{5}(-\d{4})?)$/);
         return {
           street,
           cityStateZip: `${cityOnly}, ${stateZip}`,
@@ -935,10 +1168,13 @@ export class MapRestaurantSearch {
       };
     }
 
-    return {
+    const result = {
       street: formatted,
       cityStateZip: '',
     };
+
+    console.log('Final parsed address result:', result);
+    return result;
 
   }
 
@@ -972,7 +1208,7 @@ export class MapRestaurantSearch {
         // Extract just the hours part (after the day name and colon)
         const hoursMatch = todaysHours.match(/:\s*(.+)$/);
         if (hoursMatch) {
-          status.hoursText = hoursMatch[1];
+          [, status.hoursText] = hoursMatch;
         }
       }
     }
@@ -981,7 +1217,7 @@ export class MapRestaurantSearch {
   }
 
   selectRestaurant(index) {
-    // Get restaurant data from the current results
+    // Get restaurant data from the sorted results
     const restaurant = this.currentResults?.results?.[index];
     if (!restaurant) return;
 
@@ -991,15 +1227,18 @@ export class MapRestaurantSearch {
     // Highlight selected restaurant card
     const card = this.container.querySelector(`[data-index="${index}"]`);
     if (card) {
-      card.classList.add('border-primary', 'shadow-lg');
-      card.style.transform = 'scale(1.02)';
-      card.style.transition = 'all 0.2s ease';
+      // Use requestAnimationFrame to batch DOM writes
+      requestAnimationFrame(() => {
+        card.classList.add('border-primary', 'shadow-lg');
+        card.style.transform = 'scale(1.02)';
+        card.style.transition = 'all 0.2s ease';
 
-      // Scroll to selected card
-      card.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-        inline: 'nearest',
+        // Scroll to selected card
+        card.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'nearest',
+        });
       });
     }
 
@@ -1029,7 +1268,7 @@ export class MapRestaurantSearch {
       card.style.transform = 'scale(1)';
     });
 
-    // Reset all markers to red with numbers
+    // Reset all markers to red with numbers (use sorted results for numbering)
     this.markers.forEach((marker, index) => {
       if (marker.content) {
         // AdvancedMarkerElement
@@ -1189,7 +1428,7 @@ export class MapRestaurantSearch {
         position = marker.getPosition();
       } else if (marker.position) {
         // AdvancedMarkerElement
-        position = marker.position;
+        position = marker.position; // eslint-disable-line prefer-destructuring
       }
 
       if (position) {

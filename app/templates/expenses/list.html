@@ -15,31 +15,8 @@
 
 {% block scripts %}
 {{ super() }}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Apply colors to all tag badges on the page
-    const tagBadges = document.querySelectorAll('.tag-badge[data-tag-color]');
-    tagBadges.forEach(badge => {
-        const color = badge.getAttribute('data-tag-color');
-        if (color) {
-            // Use setProperty with !important to ensure styles are applied
-            badge.style.setProperty('background-color', color, 'important');
-            badge.style.setProperty('color', 'white', 'important');
-            badge.style.setProperty('border-radius', '20px', 'important');
-            badge.style.setProperty('padding', '4px 12px', 'important');
-            badge.style.setProperty('font-size', '0.8rem', 'important');
-            badge.style.setProperty('font-weight', '500', 'important');
-            badge.style.setProperty('box-shadow', '0 2px 4px rgba(0, 0, 0, 0.1)', 'important');
-            badge.style.setProperty('transition', 'all 0.2s ease', 'important');
-            badge.style.setProperty('border', 'none', 'important');
-            badge.style.setProperty('display', 'inline-flex', 'important');
-            badge.style.setProperty('align-items', 'center', 'important');
-            badge.style.setProperty('margin', '2px', 'important');
-            badge.style.setProperty('line-height', '1.2', 'important');
-        }
-    });
-});
-</script>
+    <!-- Tag badge styling -->
+    <script src="{{ url_for('static', filename='js/components/tag-badge-styler.js') }}"></script>
     <!-- Table sorting functionality -->
     <script src="{{ url_for('static', filename='js/components/table-sorting.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/pages/expense-list.js') }}"></script>
@@ -533,7 +510,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                             <i class="fas fa-times me-2"></i> Cancel
                         </button>
-                        <form id="delete-expense-form" method="post" action="">
+                        <form id="delete-expense-form" method="post" action="" data-delete-url="{{ url_for('expenses.list_expenses') }}" data-skip-ajax="true">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                             <button type="submit" class="btn btn-danger">
                                 <i class="fas fa-trash me-2"></i> Delete Expense

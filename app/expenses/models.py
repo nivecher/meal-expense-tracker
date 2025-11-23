@@ -340,7 +340,7 @@ class Expense(BaseModel):
             "party_size": self.party_size,
             "date": self.date.isoformat() if self.date else None,
             "formatted_amount": self.formatted_amount,
-            "price_per_person": float(self.price_per_person) if self.price_per_person is not None else None,
+            "price_per_person": (float(self.price_per_person) if self.price_per_person is not None else None),
             "formatted_price_per_person": self.formatted_price_per_person,
             "is_recent": self.is_recent,
             "receipt_image": self.receipt_image,
@@ -399,8 +399,10 @@ def validate_expense(mapper, connection, target):
             if target.date.tzinfo is None:
                 target.date = target.date.replace(tzinfo=timezone.utc)
         else:
-            # For date objects, convert to timezone-aware datetime
-            target.date = datetime.combine(target.date, datetime.min.time(), tzinfo=timezone.utc)
+            # For date objects, interpret as the user's intended date
+            # Convert to UTC at noon to avoid date shifting issues
+            # This preserves the user's intended date regardless of timezone
+            target.date = datetime.combine(target.date, datetime.min.time().replace(hour=12), tzinfo=timezone.utc)
 
 
 @event.listens_for(Tag, "before_insert")

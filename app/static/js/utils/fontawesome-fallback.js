@@ -3,7 +3,7 @@
  * Checks if Font Awesome loaded correctly and provides fallback if needed
  */
 
-function init_fontawesome_fallback() {
+function initFontawesomeFallback() {
   const testIcon = document.createElement('i');
   testIcon.className = 'fas fa-check';
   testIcon.style.display = 'none';
@@ -21,7 +21,7 @@ function init_fontawesome_fallback() {
 }
 
 // Auto-initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', init_fontawesome_fallback);
+document.addEventListener('DOMContentLoaded', initFontawesomeFallback);
 
 // Export for manual initialization if needed
-export { init_fontawesome_fallback };
+export { initFontawesomeFallback };

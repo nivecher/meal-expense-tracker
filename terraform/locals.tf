@@ -29,12 +29,20 @@ locals {
   # API domain name based on environment
   api_domain_name = var.environment == "prod" ? "${var.api_subdomain}.${var.base_domain}" : "${var.api_subdomain}.${var.environment}.${var.base_domain}"
 
-  # Standardized resource naming
-  resource_names = {
-    vpc         = local.name
-    rds         = local.name
-    lambda      = local.name
-    api_gateway = local.name
-    s3_bucket   = "${local.name}-${data.aws_caller_identity.current.account_id}-${var.aws_region}"
-  }
+  # API domain prefix for constructing API Gateway domain
+  api_domain_prefix = var.api_domain_prefix != null ? var.api_domain_prefix : "api"
+
+  # Set budget amount based on environment
+  budget_amount = var.environment == "prod" ? "20.0" : "5.0"
+
+  # Use provided monthly_budget_amount or default to environment-based amount
+  monthly_budget = coalesce(var.monthly_budget_amount, local.budget_amount)
+
+  # CORS origins for API Gateway
+  # These are the domains that browsers will send as the 'Origin' header
+  base_cors_origins = [
+    "https://${local.api_domain_name}", # Main application domain (via CloudFront)
+    "http://localhost:5000",            # Local development
+    "https://localhost:5000"            # Local development with HTTPS
+  ]
 }

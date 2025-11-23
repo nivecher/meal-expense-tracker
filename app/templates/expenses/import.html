@@ -237,16 +237,12 @@
                         {% if warnings %}
                         <div class="alert alert-warning">
                             <h5 class="alert-heading"><i class="fas fa-exclamation-circle me-2"></i>Import Warnings</h5>
-                            <p class="mb-3">The following items were skipped during import:</p>
-                            <div class="warning-list scrollable-container-sm">
+                            <p class="mb-3">{{ warnings|length }} items were skipped during import:</p>
+                            <div class="warning-list scrollable-container-md">
                                 <ul class="mb-0">
-                                    {% for warning in warnings[:10] %}
+                                    {% for warning in warnings %}
                                     <li class="mb-1"><small>{{ warning }}</small></li>
-                                    {% endfor %} {% if warnings|length > 10 %}
-                                    <li class="text-muted mt-2"
-                                        ><em>... and {{ warnings|length - 10 }} more warnings</em></li
-                                    >
-                                    {% endif %}
+                                    {% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -257,50 +253,16 @@
                         <div class="alert alert-danger">
                             <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Import Errors</h5>
                             <p class="mb-3"
-                                >The following errors occurred during import. Please fix these issues in your file and
-                                try again:</p
+                                >{{ errors|length }} errors occurred during import. Please fix these issues in your file
+                                and try again:</p
                             >
-                            {% if errors|length > 10 %}
-                            <div class="mb-3">
-                                <small class="text-muted"
-                                    >Showing first 10 errors of {{ errors|length }} total errors.</small
-                                >
-                            </div>
-                            {% endif %}
-                            <div class="error-list scrollable-container-md">
+                            <div class="error-list scrollable-container-lg">
                                 <ul class="mb-0">
-                                    {% for error in errors[:10] %}
+                                    {% for error in errors %}
                                     <li class="mb-1"><code>{{ error }}</code></li>
-                                    {% endfor %} {% if errors|length > 10 %}
-                                    <li class="text-muted mt-2"
-                                        ><em>... and {{ errors|length - 10 }} more errors</em></li
-                                    >
-                                    {% endif %}
+                                    {% endfor %}
                                 </ul>
                             </div>
-                            {% if errors|length > 10 %}
-                            <div class="mt-3">
-                                <button
-                                    class="btn btn-sm btn-outline-secondary"
-                                    type="button"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#allErrors"
-                                    aria-expanded="false">
-                                    <i class="fas fa-list me-1"></i> Show All {{ errors|length }} Errors
-                                </button>
-                            </div>
-                            <div class="collapse mt-3" id="allErrors">
-                                <div class="card card-body">
-                                    <div class="scrollable-container-lg">
-                                        <ul class="mb-0">
-                                            {% for error in errors %}
-                                            <li class="mb-1"><code>{{ error }}</code></li>
-                                            {% endfor %}
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endif %}
 
                             <!-- Common Error Help -->
                             <div class="mt-3 p-3 bg-light rounded">
@@ -355,52 +317,6 @@
     </div>
 </div>
 {% endblock content %} {% block scripts %} {{ super() }}
-<script>
-    // Form validation
-    document.addEventListener("DOMContentLoaded", function () {
-        const form = document.getElementById("import-form");
-        const fileInput = form.querySelector("#file");
-
-        // Reset any initial validation states
-        fileInput.classList.remove("is-invalid", "is-valid");
-
-        form.addEventListener("submit", function (event) {
-            // Clear any previous validation states
-            fileInput.classList.remove("is-invalid", "is-valid");
-
-            if (!fileInput.files.length) {
-                event.preventDefault();
-                event.stopPropagation();
-                fileInput.classList.add("is-invalid");
-                form.classList.add("was-validated");
-            } else {
-                // File is selected, allow form submission
-                fileInput.classList.add("is-valid");
-            }
-        });
-
-        fileInput.addEventListener("change", function () {
-            // Clear any validation classes when file selection changes
-            this.classList.remove("is-invalid", "is-valid");
-
-            if (this.files.length) {
-                // File selected, show positive feedback but don't persist it
-                this.classList.add("is-valid");
-
-                // Remove validation state after a short delay to prevent persistent green border
-                setTimeout(() => {
-                    if (!form.classList.contains("was-validated")) {
-                        this.classList.remove("is-valid");
-                    }
-                }, 1000);
-            }
-        });
-
-        // Clear validation states when form is reset or page loads
-        form.addEventListener("reset", function () {
-            fileInput.classList.remove("is-invalid", "is-valid");
-            form.classList.remove("was-validated");
-        });
-    });
-</script>
+<!-- Expense import form validation -->
+<script src="{{ url_for('static', filename='js/pages/expense-import.js') }}"></script>
 {% endblock scripts %}

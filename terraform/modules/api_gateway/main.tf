@@ -8,8 +8,11 @@ data "aws_route53_zone" "main" {
 
 # Look up the existing ACM certificate in us-east-1 if cert_domain is provided
 data "aws_acm_certificate" "main" {
-  domain   = var.cert_domain
-  statuses = ["ISSUED"]
+  domain      = var.cert_domain
+  statuses    = ["ISSUED"]
+  key_types   = ["RSA_2048"]
+  types       = ["AMAZON_ISSUED"]
+  most_recent = true # Use the most recently issued certificate
 
   # We need to use a provider configured for us-east-1 for ACM certificates used by API Gateway
   provider = aws.us-east-1
@@ -24,8 +27,13 @@ data "aws_acm_certificate" "main" {
 }
 
 # API Gateway Custom Domain (only if domain_name and certificate are provided)
+locals {
+  # Construct API domain name if not explicitly provided
+  effective_api_domain_name = var.api_domain_name != null ? var.api_domain_name : "${var.api_domain_prefix}.${var.domain_name}"
+}
+
 resource "aws_apigatewayv2_domain_name" "main" {
-  domain_name = var.api_domain_name
+  domain_name = local.effective_api_domain_name
 
   domain_name_configuration {
     certificate_arn = data.aws_acm_certificate.main.arn
@@ -42,18 +50,18 @@ resource "aws_apigatewayv2_domain_name" "main" {
   lifecycle {
     # Ensure we have a valid domain name configuration
     precondition {
-      condition     = can(regex("\\.", var.api_domain_name))
-      error_message = "The API domain name '${var.api_domain_name}' is not a valid domain name."
+      condition     = can(regex("\\.", local.effective_api_domain_name))
+      error_message = "The API domain name '${local.effective_api_domain_name}' is not a valid domain name."
     }
 
     # Ensure the domain name is within the certificate's scope
     precondition {
       condition = var.cert_domain == null || (var.cert_domain != null && (
-        var.api_domain_name == var.cert_domain ||
-        endswith(var.api_domain_name, ".${var.cert_domain}") ||
-        (startswith(var.cert_domain, "*") && endswith(var.api_domain_name, substr(var.cert_domain, 1, length(var.cert_domain) - 1)))
+        local.effective_api_domain_name == var.cert_domain ||
+        endswith(local.effective_api_domain_name, ".${var.cert_domain}") ||
+        (startswith(var.cert_domain, "*") && endswith(local.effective_api_domain_name, substr(var.cert_domain, 1, length(var.cert_domain) - 1)))
       ))
-      error_message = "The API domain name '${var.api_domain_name}' is not covered by the certificate domain '${var.cert_domain}'."
+      error_message = "The API domain name '${local.effective_api_domain_name}' is not covered by the certificate domain '${var.cert_domain}'."
     }
   }
 }
@@ -65,10 +73,13 @@ resource "aws_apigatewayv2_api_mapping" "main" {
   stage       = aws_apigatewayv2_stage.main.id # Point to the main stage
 }
 
-# Create Route53 record for the API Gateway custom domain (only if domain and certificate are configured)
+# Route53 record for API Gateway custom domain (needed for direct access to API)
+# Only create if not using CloudFront routing
 resource "aws_route53_record" "api" {
+  count = length(aws_apigatewayv2_domain_name.main) > 0 && var.create_route53_record ? 1 : 0
+
   zone_id = data.aws_route53_zone.main.zone_id
-  name    = trimsuffix(var.api_domain_name, ".${var.domain_name}")
+  name    = local.effective_api_domain_name
   type    = "A"
 
   alias {
@@ -78,22 +89,6 @@ resource "aws_route53_record" "api" {
   }
 
   allow_overwrite = true
-
-  lifecycle {
-    create_before_destroy = true
-
-    # Ensure the domain name is within the Route53 zone
-    precondition {
-      condition     = endswith(var.api_domain_name, ".${var.domain_name}") || var.api_domain_name == var.domain_name
-      error_message = "The API domain name '${var.api_domain_name}' is not within the Route53 zone '${var.domain_name}'."
-    }
-
-    # Ensure we have a valid target domain name
-    precondition {
-      condition     = length(aws_apigatewayv2_domain_name.main.domain_name_configuration) > 0 && aws_apigatewayv2_domain_name.main.domain_name_configuration[0].target_domain_name != ""
-      error_message = "The target domain name for the API Gateway custom domain is empty or invalid."
-    }
-  }
 }
 
 # API Gateway HTTP API (HTTP API is cheaper than REST API)

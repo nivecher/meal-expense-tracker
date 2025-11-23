@@ -5,14 +5,16 @@ This module contains the route handlers for the main blueprint.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import (
     Response,
+    abort,
     current_app,
     flash,
     redirect,
     render_template,
+    request,
     send_from_directory,
     url_for,
 )
@@ -24,6 +26,72 @@ from app.extensions import db
 from app.restaurants.models import Restaurant
 
 from . import bp
+
+# Constants for pagination
+PER_PAGE = 10  # Number of expenses per page
+SHOW_ALL = -1  # Special value to show all expenses
+
+
+def _get_page_size_from_cookie(cookie_name="expense_page_size", default_size=PER_PAGE):
+    """Get page size from cookie with validation and fallback."""
+    try:
+        cookie_value = request.cookies.get(cookie_name)
+        if cookie_value:
+            page_size = int(cookie_value)
+            # Validate page size is in allowed values
+            if page_size in [10, 25, 50, 100, SHOW_ALL]:
+                return page_size
+    except (ValueError, TypeError):
+        pass
+    return default_size
+
+
+@bp.app_template_global()
+def get_receipt_url(storage_path):
+    """Generate URL for accessing a receipt file."""
+    from app.expenses.utils import get_receipt_url
+
+    return get_receipt_url(storage_path)
+
+
+@bp.route("/uploads/<filename>")
+@login_required
+def serve_uploaded_file(filename):
+    """Serve uploaded receipt files.
+
+    Args:
+        filename: The name of the file to serve
+
+    Returns:
+        The requested file or 404 if not found
+    """
+    # Verify the user owns an expense with this receipt
+    from app.expenses.models import Expense
+
+    # Check both old format (uploads/filename) and new format (filename)
+    expense = Expense.query.filter(
+        (Expense.receipt_image == f"uploads/{filename}") | (Expense.receipt_image == filename),
+        Expense.user_id == current_user.id,
+    ).first()
+
+    if not expense:
+        abort(404)
+
+    upload_folder = current_app.config.get("UPLOAD_FOLDER")
+
+    # Determine MIME type based on file extension
+    mimetype = None
+    if filename.lower().endswith(".pdf"):
+        mimetype = "application/pdf"
+
+    return send_from_directory(upload_folder, filename, mimetype=mimetype)
+
+
+@bp.route("/expense-statistics")
+@login_required
+def expense_statistics():
+    """Redirect to expense statistics page."""
+    return redirect(url_for("reports.expense_statistics"))
 
 
 @bp.route("/favicon.ico")
@@ -47,9 +115,13 @@ def about():
     Returns:
         Rendered about page template with version data
     """
-    from app._version import __version__
+    from app._version import __build_timestamp__, __version__
 
-    return render_template("main/about.html", app_version=__version__)
+    return render_template(
+        "main/about.html",
+        app_version=__version__,
+        build_timestamp=__build_timestamp__,
+    )
 
 
 @bp.route("/help")
@@ -60,9 +132,9 @@ def help_page():
         Rendered help page template with all feature information
     """
     # Import all the constants for displaying options
+    from app.constants import MEAL_TYPES
     from app.constants.categories import get_default_categories
     from app.constants.cuisines import get_cuisine_color, get_cuisine_constants
-    from app.constants.meal_types import get_meal_type_constants
 
     # Get cuisine constants but override colors with centralized Bootstrap colors
     cuisines = get_cuisine_constants()
@@ -70,7 +142,10 @@ def help_page():
         cuisine["color"] = get_cuisine_color(cuisine["name"])
 
     return render_template(
-        "main/help.html", meal_types=get_meal_type_constants(), cuisines=cuisines, categories=get_default_categories()
+        "main/help.html",
+        meal_types=list(MEAL_TYPES.values()),
+        cuisines=cuisines,
+        categories=get_default_categories(),
     )
 
 
@@ -81,7 +156,7 @@ def terms():
     Returns:
         Rendered terms of service template with current datetime
     """
-    return render_template("main/terms.html", now=datetime.utcnow())
+    return render_template("main/terms.html", now=datetime.now(timezone.utc))
 
 
 @bp.route("/privacy")
@@ -91,7 +166,7 @@ def privacy():
     Returns:
         Rendered privacy policy template with current datetime
     """
-    return render_template("main/privacy.html", now=datetime.utcnow())
+    return render_template("main/privacy.html", now=datetime.now(timezone.utc))
 
 
 @bp.route("/contact", methods=["GET", "POST"])
@@ -114,10 +189,15 @@ def contact():
     return render_template("main/contact.html", form=form)
 
 
+@bp.route("/test")
+def test():
+    return "Test route works"
+
+
 @bp.route("/")
 @login_required
 def index():
-    """Display the main dashboard with expense and restaurant summaries."""
+    """Display the main dashboard with welcome message, stats, and recent activity."""
     user_id = current_user.id
 
     # Get expense statistics
@@ -137,16 +217,20 @@ def index():
         )
     ).first()
 
-    # Get recent expenses (last 5)
+    # Get recent expenses (top 5 most recent)
     recent_expenses = db.session.execute(
-        select(Expense, Restaurant.name.label("restaurant_name"), Restaurant.website.label("restaurant_website"))
-        .outerjoin(Restaurant, Expense.restaurant_id == Restaurant.id)
+        select(
+            Expense,
+            Restaurant.name.label("restaurant_name"),
+            Restaurant.website.label("restaurant_website"),
+        )
+        .join(Restaurant, Expense.restaurant_id == Restaurant.id, isouter=True)
         .where(Expense.user_id == user_id)
         .order_by(Expense.date.desc(), Expense.created_at.desc())
         .limit(5)
     ).all()
 
-    # Get top restaurants by spending
+    # Get top restaurants by expense count (top 5)
     top_restaurants = db.session.execute(
         select(
             Restaurant.id,
@@ -154,17 +238,14 @@ def index():
             Restaurant.website,
             Restaurant.cuisine,
             func.count(Expense.id).label("visit_count"),
-            func.sum(Expense.amount).label("total_spent"),
+            func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
         )
-        .join(Expense, Expense.restaurant_id == Restaurant.id)
-        .where(Restaurant.user_id == user_id, Expense.user_id == user_id)
+        .join(Expense, Restaurant.id == Expense.restaurant_id)
+        .where(Restaurant.user_id == user_id)
         .group_by(Restaurant.id, Restaurant.name, Restaurant.website, Restaurant.cuisine)
-        .order_by(func.sum(Expense.amount).desc())
+        .order_by(func.count(Expense.id).desc())
         .limit(5)
     ).all()
-
-    # Import cuisine color function for template use
-    from app.constants.cuisines import get_cuisine_color
 
     return render_template(
         "main/dashboard.html",
@@ -172,8 +253,20 @@ def index():
         restaurant_stats=restaurant_stats,
         recent_expenses=recent_expenses,
         top_restaurants=top_restaurants,
-        get_cuisine_color=get_cuisine_color,
     )
+
+
+@bp.route("/index.html")
+@login_required
+def index_html():
+    """Serve the main dashboard for index.html requests (browser default)."""
+    return index()
+
+
+@bp.route("/index")
+def index_redirect():
+    """Redirect to the main index page."""
+    return redirect(url_for("main.index"))
 
 
 @bp.route("/css/user-tags.css")
@@ -212,7 +305,7 @@ def user_tag_css():
     css_content = "\n".join(css_rules)
 
     # Add a comment with timestamp for cache busting
-    css_content = f"""/* User tag colors - Generated at {datetime.utcnow().isoformat()} */
+    css_content = f"""/* User tag colors - Generated at {datetime.now(timezone.utc).isoformat()} */
 {css_content}"""
 
     # Create ETag based on user ID, tag count, and last update time
@@ -228,7 +321,7 @@ def user_tag_css():
         headers={
             "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
             "ETag": etag,  # ETag for cache validation
-            "Last-Modified": max_updated_at.strftime("%a, %d %b %Y %H:%M:%S GMT") if max_updated_at else None,
+            "Last-Modified": (max_updated_at.strftime("%a, %d %b %Y %H:%M:%S GMT") if max_updated_at else None),
         },
     )
 

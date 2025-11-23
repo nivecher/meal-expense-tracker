@@ -71,7 +71,7 @@ async function handleStaticAsset(request) {
     }
 
     return networkResponse;
-  } catch (error) {
+  } catch {
     console.warn('Static asset request failed:', error);
 
     // Return cached version if available
@@ -97,7 +97,7 @@ async function handleNavigation(request) {
     }
 
     return networkResponse;
-  } catch (error) {
+  } catch {
     console.warn('Navigation request failed, trying cache:', error);
 
     // Try cache first
@@ -122,7 +122,7 @@ async function handleNavigation(request) {
 async function handleAPI(request) {
   try {
     return await fetch(request);
-  } catch (error) {
+  } catch {
     console.warn('API request failed:', error);
 
     // Return a meaningful offline response

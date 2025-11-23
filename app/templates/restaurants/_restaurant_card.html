@@ -16,8 +16,12 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
                 <h5 class="card-title mb-1">{{ restaurant.name }}</h5>
-                {% if restaurant.cuisine %} {% from 'macros/badge_helpers.html' import cuisine_badge %} {{
-                cuisine_badge(restaurant.cuisine, size='sm') }} {% endif %}
+                <div class="d-flex flex-column align-items-end gap-1">
+                    {% if restaurant.price_level is not none %} {% from 'macros/badge_helpers.html' import
+                    price_level_badge %} {{ price_level_badge(restaurant.price_level, size='sm') }} {% endif %} {% if
+                    restaurant.cuisine %} {% from 'macros/badge_helpers.html' import cuisine_badge %} {{
+                    cuisine_badge(restaurant.cuisine, size='sm') }} {% endif %}
+                </div>
             </div>
             <div class="restaurant-meta mb-2 d-flex align-items-start">
                 <i class="fas fa-map-marker-alt me-2 mt-1 flex-shrink-0"></i>

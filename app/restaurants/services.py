@@ -8,6 +8,7 @@ from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from werkzeug.datastructures import FileStorage
 
+from app.constants.cuisines import format_cuisine_type
 from app.expenses.models import Expense
 from app.extensions import db
 from app.restaurants.exceptions import (
@@ -15,11 +16,67 @@ from app.restaurants.exceptions import (
     DuplicateRestaurantError,
 )
 from app.restaurants.models import Restaurant
-from app.utils.cuisine_formatter import format_cuisine_type
-from app.utils.service_level_detector import (
-    ServiceLevelDetector,
-    detect_restaurant_service_level,
-)
+from app.utils.geo_utils import calculate_distance_km, validate_coordinates
+from app.utils.service_level_detector import ServiceLevel, ServiceLevelDetector
+
+
+def normalize_service_level_value(value: str) -> Optional[str]:
+    """
+    Normalize service level value to enum format.
+
+    Converts display names like 'Casual Dining' to enum values like 'casual_dining'.
+    Also handles already-normalized values and validates them.
+
+    Args:
+        value: Service level value (display name or enum value)
+
+    Returns:
+        Normalized enum value or None if invalid
+    """
+    if not value or not isinstance(value, str):
+        return None
+
+    value = value.strip()
+    if not value:
+        return None
+
+    # Mapping from display names to enum values
+    display_to_enum = {
+        "Fine Dining": ServiceLevel.FINE_DINING.value,
+        "Casual Dining": ServiceLevel.CASUAL_DINING.value,
+        "Fast Casual": ServiceLevel.FAST_CASUAL.value,
+        "Quick Service": ServiceLevel.QUICK_SERVICE.value,
+        "Unknown": ServiceLevel.UNKNOWN.value,
+        # Also handle some variations
+        "Fine": ServiceLevel.FINE_DINING.value,
+        "Casual": ServiceLevel.CASUAL_DINING.value,
+        "Fast": ServiceLevel.FAST_CASUAL.value,
+        "Quick": ServiceLevel.QUICK_SERVICE.value,
+    }
+
+    # Check if it's already an enum value (validate it)
+    valid_enum_values = {level.value for level in ServiceLevel}
+    if value in valid_enum_values:
+        return value
+
+    # Try exact match with display names (case-insensitive)
+    for display_name, enum_value in display_to_enum.items():
+        if value.lower() == display_name.lower():
+            return enum_value
+
+    # Try partial matches for flexibility
+    value_lower = value.lower()
+    if "fine" in value_lower or "upscale" in value_lower:
+        return ServiceLevel.FINE_DINING.value
+    elif "casual" in value_lower and "fast" not in value_lower:
+        return ServiceLevel.CASUAL_DINING.value
+    elif "fast" in value_lower or "counter" in value_lower:
+        return ServiceLevel.FAST_CASUAL.value
+    elif "quick" in value_lower or "takeout" in value_lower or "drive" in value_lower:
+        return ServiceLevel.QUICK_SERVICE.value
+
+    # Return None for invalid values (will be handled by validation)
+    return None
 
 
 def recalculate_restaurant_statistics(user_id: int) -> None:
@@ -145,16 +202,21 @@ def get_restaurants_with_stats(user_id: int, args: Dict[str, Any]) -> Tuple[list
     # Convert results to list of dictionaries with all required attributes
     restaurants = []
     for row in results:
-        restaurant = row[0].__dict__.copy()
+        restaurant_obj = row[0]
+        restaurant = restaurant_obj.__dict__.copy()
         # Remove SQLAlchemy instance state
         restaurant.pop("_sa_instance_state", None)
+        # Add the computed address property and individual address lines
+        restaurant["address"] = restaurant_obj.address
+        restaurant["address_line_1"] = restaurant_obj.address_line_1
+        restaurant["address_line_2"] = restaurant_obj.address_line_2
         # Add the aggregated fields
         restaurant.update(
             {
                 "visit_count": row.visit_count,
                 "total_spent": float(row.total_spent) if row.total_spent else 0.0,
                 "last_visit": row.last_visit,
-                "avg_price_per_person": float(row.avg_price_per_person) if row.avg_price_per_person else 0.0,
+                "avg_price_per_person": (float(row.avg_price_per_person) if row.avg_price_per_person else 0.0),
             }
         )
         restaurants.append(restaurant)
@@ -185,7 +247,8 @@ def _apply_search_filter(stmt, search_term: str):
     return stmt.where(
         or_(
             Restaurant.name.ilike(search_pattern),
-            Restaurant.address.ilike(search_pattern),
+            Restaurant.address_line_1.ilike(search_pattern),
+            Restaurant.address_line_2.ilike(search_pattern),
             Restaurant.city.ilike(search_pattern),
             Restaurant.state.ilike(search_pattern),
             Restaurant.notes.ilike(search_pattern),
@@ -266,7 +329,10 @@ def _get_sort_field(sort_by: str):
         "avg_price_per_person": func.coalesce(
             func.avg(
                 case(
-                    (Expense.party_size.isnot(None) & (Expense.party_size > 1), Expense.amount / Expense.party_size),
+                    (
+                        Expense.party_size.isnot(None) & (Expense.party_size > 1),
+                        Expense.amount / Expense.party_size,
+                    ),
                     else_=None,
                 )
             ),
@@ -476,6 +542,10 @@ def create_restaurant(user_id: int, form: Any) -> Tuple[Restaurant, bool]:
         return restaurant, True
     except IntegrityError as e:
         db.session.rollback()
+        # Reset session state to avoid PendingRollbackError
+        # This is necessary because after rollback, the session is in an invalid state
+        db.session.expunge_all()  # Remove all objects from session
+
         # Handle database constraint violations
         if "uix_restaurant_google_place_id_user" in str(e.orig):
             # Re-query to get the existing restaurant for the exception
@@ -563,8 +633,7 @@ def _validate_restaurant_row(row: dict) -> Tuple[bool, str]:
     """
     if not row.get("name", "").strip():
         return False, "Name is required"
-    if not row.get("city", "").strip():
-        return False, "City is required"
+    # City is optional - restaurants can exist without city information
     return True, ""
 
 
@@ -603,7 +672,10 @@ def _find_existing_restaurant(
     Checks for duplicates by:
     1. Google Place ID (if provided)
     2. Name + Address combination
-    3. Name + City combination (as fallback)
+    3. Name + City combination (as fallback) - case-insensitive
+
+    Note: This only checks committed database records. Uses expire_on_commit=False
+    to ensure we query the database directly, not cached session objects.
 
     Args:
         name: Restaurant name
@@ -617,19 +689,34 @@ def _find_existing_restaurant(
     """
     # Strategy 1: Match by Google Place ID (most reliable)
     if google_place_id:
-        existing = Restaurant.query.filter_by(user_id=user_id, google_place_id=google_place_id).first()
+        stmt = select(Restaurant).where(
+            Restaurant.user_id == user_id,
+            Restaurant.google_place_id == google_place_id,
+        )
+        existing = db.session.scalar(stmt)
         if existing:
             return existing
 
-    # Strategy 2: Match by name + address (if both provided)
+    # Strategy 2: Match by name + address (if both provided) - case-insensitive
     if name and address:
-        existing = Restaurant.query.filter_by(user_id=user_id, name=name, address=address).first()
+        stmt = select(Restaurant).where(
+            Restaurant.user_id == user_id,
+            func.lower(Restaurant.name) == func.lower(name),
+            func.lower(Restaurant.address_line_1) == func.lower(address),
+        )
+        existing = db.session.scalar(stmt)
         if existing:
             return existing
 
-    # Strategy 3: Match by name + city (existing constraint)
+    # Strategy 3: Match by name + city (existing constraint) - case-insensitive
+    # Only check this if city is provided and we haven't found a match yet
     if name and city:
-        existing = Restaurant.query.filter_by(user_id=user_id, name=name, city=city).first()
+        stmt = select(Restaurant).where(
+            Restaurant.user_id == user_id,
+            func.lower(Restaurant.name) == func.lower(name),
+            func.lower(Restaurant.city) == func.lower(city),
+        )
+        existing = db.session.scalar(stmt)
         if existing:
             return existing
 
@@ -664,12 +751,15 @@ def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Optiona
             # Skip duplicate - return success but no restaurant to add
             return True, f"Skipped duplicate restaurant: {name}", None
 
-        # Create new restaurant
+        # Create new restaurant with normalized service level
+        service_level_raw = row.get("service_level", "").strip() or None
+        service_level_normalized = normalize_service_level_value(service_level_raw) if service_level_raw else None
+
         restaurant = Restaurant(
             user_id=user_id,
             name=name,
             city=city,
-            address=address,
+            address_line_1=address,
             state=row.get("state", "").strip() or None,
             postal_code=row.get("postal_code", "").strip() or None,
             country=row.get("country", "").strip() or None,
@@ -677,8 +767,12 @@ def _process_restaurant_row(row: dict, user_id: int) -> Tuple[bool, str, Optiona
             email=row.get("email", "").strip() or None,
             website=row.get("website", "").strip() or None,
             cuisine=row.get("cuisine", "").strip() or None,
-            service_level=row.get("service_level", "").strip() or None,
+            service_level=service_level_normalized,
             rating=safe_import_float(row.get("rating")),
+            price_level=safe_import_int(row.get("price_level")),
+            primary_type=row.get("primary_type", "").strip() or None,
+            latitude=safe_import_float(row.get("latitude")),
+            longitude=safe_import_float(row.get("longitude")),
             is_chain=safe_import_bool(row.get("is_chain")),
             google_place_id=google_place_id,
             notes=row.get("notes", "").strip() or None,
@@ -711,6 +805,111 @@ def _process_csv_file(file: FileStorage) -> Tuple[bool, str, Optional[csv.DictRe
         return False, f"Error reading CSV file: {str(e)}", None
 
 
+def _handle_integrity_error(e: IntegrityError, row: dict, line_num: int) -> Tuple[str, bool]:
+    """Handle IntegrityError and return error message and whether it was a duplicate.
+
+    Args:
+        e: The IntegrityError exception
+        row: The CSV row data
+        line_num: Line number in CSV file
+
+    Returns:
+        Tuple of (error_message, is_duplicate)
+    """
+    error_str = str(e.orig)
+    if "uix_restaurant_name_city_user" in error_str:
+        name = row.get("name", "").strip()
+        city = row.get("city", "").strip() or "Unknown"
+        return f"Line {line_num}: Duplicate restaurant '{name}' in '{city}' already exists", True
+    if "uix_restaurant_google_place_id_user" in error_str:
+        google_place_id = row.get("google_place_id", "").strip() or "Unknown"
+        return f"Line {line_num}: Duplicate Google Place ID '{google_place_id}' already exists", True
+    return f"Line {line_num}: Database constraint violation - {str(e)}", False
+
+
+def _add_restaurant_with_savepoint(
+    restaurant: Restaurant, savepoint: Any, batch_size: int, success_count: int
+) -> Tuple[bool, Optional[IntegrityError]]:
+    """Add a restaurant using a savepoint for error isolation.
+
+    Args:
+        restaurant: Restaurant to add
+        savepoint: SQLAlchemy savepoint
+        batch_size: Batch size for commits
+        success_count: Current success count
+
+    Returns:
+        Tuple of (success, IntegrityError_or_None)
+    """
+    try:
+        db.session.add(restaurant)
+        db.session.flush()  # Flush to catch errors early
+        savepoint.commit()  # Commit the savepoint
+
+        # Commit main transaction in batches
+        if (success_count + 1) % batch_size == 0:
+            db.session.commit()
+
+        return True, None
+    except IntegrityError as e:
+        savepoint.rollback()
+        db.session.expunge(restaurant)  # Remove the failed restaurant
+        return False, e
+
+
+def _process_import_row(
+    row: dict, user_id: int, line_num: int, savepoint: Any, batch_size: int, success_count: int
+) -> Tuple[int, int, List[str]]:
+    """Process a single row from the CSV import.
+
+    Args:
+        row: CSV row data
+        user_id: User ID
+        line_num: Line number in CSV
+        savepoint: SQLAlchemy savepoint
+        batch_size: Batch size for commits
+        success_count: Current success count
+
+    Returns:
+        Tuple of (success_delta, skipped_delta, errors)
+    """
+    success_delta = 0
+    skipped_delta = 0
+    errors = []
+
+    try:
+        success, message, restaurant = _process_restaurant_row(row, user_id)
+
+        if success:
+            if restaurant:
+                add_success, error = _add_restaurant_with_savepoint(restaurant, savepoint, batch_size, success_count)
+                if add_success:
+                    success_delta = 1
+                else:
+                    if error:
+                        error_msg, is_duplicate = _handle_integrity_error(error, row, line_num)
+                        errors.append(error_msg)
+                        if is_duplicate:
+                            skipped_delta = 1
+            else:
+                savepoint.commit()  # Commit empty savepoint
+                skipped_delta = 1
+        else:
+            savepoint.rollback()
+            errors.append(f"Line {line_num}: {message}")
+    except IntegrityError as e:
+        savepoint.rollback()
+        error_msg, is_duplicate = _handle_integrity_error(e, row, line_num)
+        errors.append(error_msg)
+        if is_duplicate:
+            skipped_delta = 1
+    except Exception as e:
+        savepoint.rollback()
+        errors.append(f"Line {line_num}: Unexpected error - {str(e)}")
+
+    return success_delta, skipped_delta, errors
+
+
 def _import_restaurants_from_reader(csv_reader: csv.DictReader, user_id: int) -> Tuple[int, int, List[str]]:
     """Import restaurants from a CSV reader with smart duplicate detection.
 
@@ -724,21 +923,26 @@ def _import_restaurants_from_reader(csv_reader: csv.DictReader, user_id: int) ->
     success_count = 0
     skipped_count = 0
     errors = []
+    batch_size = 50  # Commit in batches to avoid losing progress on errors
 
-    for i, row in enumerate(csv_reader, 2):  # Start from line 2 (1-based + header)
-        success, message, restaurant = _process_restaurant_row(row, user_id)
+    # Use no_autoflush to prevent premature flushes that could cause IntegrityError
+    with db.session.no_autoflush:
+        for i, row in enumerate(csv_reader, 2):  # Start from line 2 (1-based + header)
+            savepoint = db.session.begin_nested()
+            success_delta, skipped_delta, row_errors = _process_import_row(
+                row, user_id, i, savepoint, batch_size, success_count
+            )
+            success_count += success_delta
+            skipped_count += skipped_delta
+            errors.extend(row_errors)
 
-        if success:
-            if restaurant:
-                # New restaurant to add
-                db.session.add(restaurant)
-                success_count += 1
-            else:
-                # Duplicate skipped
-                skipped_count += 1
-        else:
-            # Error processing row
-            errors.append(f"Line {i}: {message}")
+    # Commit any remaining uncommitted restaurants
+    if success_count > 0 and success_count % batch_size != 0:
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            errors.append(f"Error committing final batch: {str(e)}")
 
     return success_count, skipped_count, errors
 
@@ -753,9 +957,10 @@ def _generate_import_result(success_count: int, skipped_count: int, errors: List
 
     Returns:
         Tuple of (success, result_data)
+
+    Note:
+        Commits are handled in _import_restaurants_from_reader, so no commit needed here.
     """
-    if success_count > 0:
-        db.session.commit()
 
     # Build result data with separate components
     result_data = {
@@ -821,7 +1026,13 @@ def import_restaurants_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, 
         return _generate_import_result(success_count, skipped_count, errors)
 
     except Exception as e:
-        db.session.rollback()
+        # Ensure session is properly rolled back and reset
+        try:
+            db.session.rollback()
+            db.session.expunge_all()  # Reset session state after rollback
+        except Exception:
+            # If rollback fails, create a new session
+            db.session.close()
         error_msg = f"Error processing CSV file: {str(e)}"
         return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
 
@@ -859,6 +1070,10 @@ def export_restaurants_for_user(user_id: int) -> List[Dict[str, Any]]:
             "service_level": r.service_level or "",
             "website": r.website or "",
             "rating": safe_float(r.rating) if r.rating is not None else "",
+            "price_level": r.price_level if r.price_level is not None else "",
+            "primary_type": r.primary_type or "",
+            "latitude": safe_float(r.latitude) if r.latitude is not None else "",
+            "longitude": safe_float(r.longitude) if r.longitude is not None else "",
             "is_chain": bool(r.is_chain) if r.is_chain is not None else "",
             "google_place_id": r.google_place_id or "",
             "notes": r.notes or "",
@@ -899,8 +1114,9 @@ def create_restaurant_for_user(user_id: int, data: Dict[str, Any]) -> Restaurant
         name=data.get("name"),
         type=data.get("type"),
         description=data.get("description"),
-        address=data.get("address"),
-        address2=data.get("address2"),
+        located_within=data.get("located_within"),
+        address_line_1=data.get("address_line_1"),
+        address_line_2=data.get("address_line_2"),
         city=data.get("city"),
         state=data.get("state"),
         postal_code=data.get("postal_code"),
@@ -912,6 +1128,10 @@ def create_restaurant_for_user(user_id: int, data: Dict[str, Any]) -> Restaurant
         cuisine=data.get("cuisine"),
         service_level=data.get("service_level"),
         rating=data.get("rating"),
+        price_level=data.get("price_level"),
+        primary_type=data.get("primary_type"),
+        latitude=data.get("latitude"),
+        longitude=data.get("longitude"),
         is_chain=data.get("is_chain", False),
         notes=data.get("notes"),
     )
@@ -938,8 +1158,9 @@ def update_restaurant_for_user(restaurant: Restaurant, data: Dict[str, Any]) -> 
         "name",
         "type",
         "description",
-        "address",
-        "address2",
+        "located_within",
+        "address_line_1",
+        "address_line_2",
         "city",
         "state",
         "postal_code",
@@ -951,6 +1172,10 @@ def update_restaurant_for_user(restaurant: Restaurant, data: Dict[str, Any]) -> 
         "cuisine",
         "service_level",
         "rating",
+        "price_level",
+        "primary_type",
+        "latitude",
+        "longitude",
         "is_chain",
         "notes",
     ]
@@ -1002,7 +1227,10 @@ def delete_restaurant_by_id(restaurant_id: int, user_id: int) -> Tuple[bool, str
             if expense_count == 1:
                 return True, "Restaurant and 1 associated expense deleted successfully."
             else:
-                return True, f"Restaurant and {expense_count} associated expenses deleted successfully."
+                return (
+                    True,
+                    f"Restaurant and {expense_count} associated expenses deleted successfully.",
+                )
         else:
             # No expenses, just delete the restaurant
             db.session.delete(restaurant)
@@ -1051,7 +1279,7 @@ def calculate_expense_stats(restaurant_id: int, user_id: int) -> Dict[str, Any]:
 
 def detect_service_level_from_google_data(google_data: Dict[str, Any]) -> Tuple[str, float]:
     """
-    Centralized function to detect service level from Google Places data.
+    Centralized function to detect service level from Google Places data using GooglePlacesService.
 
     Args:
         google_data: Dictionary containing Google Places API response data
@@ -1060,27 +1288,22 @@ def detect_service_level_from_google_data(google_data: Dict[str, Any]) -> Tuple[
         Tuple of (service_level, confidence_score)
     """
     try:
-        google_places_data = {
-            "price_level": google_data.get("price_level"),
-            "types": google_data.get("types", []),
-            "rating": google_data.get("rating"),
-            "user_ratings_total": google_data.get("user_ratings_total"),
-        }
+        from app.services.google_places_service import get_google_places_service
 
-        detected_level, confidence = detect_restaurant_service_level(google_places_data)
-        return detected_level.value, confidence
+        places_service = get_google_places_service()
+        return places_service.detect_service_level_from_data(google_data)
     except Exception:
         return "unknown", 0.0
 
 
 def validate_restaurant_service_level(
-    restaurant: Restaurant, google_service_level: str, confidence: float
+    current_data: dict, google_service_level: str, confidence: float
 ) -> Tuple[bool, str, Optional[str]]:
     """
     Validate restaurant service level against Google data.
 
     Args:
-        restaurant: Restaurant instance to validate
+        current_data: Current form data dictionary to validate
         google_service_level: Service level detected from Google
         confidence: Confidence score of the detection
 
@@ -1090,13 +1313,14 @@ def validate_restaurant_service_level(
     if google_service_level == "unknown" or confidence <= 0.3:
         return False, "", None
 
-    if restaurant.service_level and restaurant.service_level != google_service_level:
+    current_service_level = current_data.get("service_level")
+    if current_service_level and current_service_level != google_service_level:
         return (
             True,
-            f"Service Level: '{restaurant.service_level}' vs Google: '{google_service_level}' (confidence: {confidence:.2f})",
+            f"Service Level: '{current_service_level}' vs Google: '{google_service_level}' (confidence: {confidence:.2f})",
             google_service_level,
         )
-    elif not restaurant.service_level:
+    elif not current_service_level:
         return (
             True,
             f"Service Level: Not set vs Google: '{google_service_level}' (confidence: {confidence:.2f})",
@@ -1139,3 +1363,90 @@ def get_service_level_display_info(service_level: str) -> Dict[str, str]:
             "display_name": "Unknown",
             "description": "Service level could not be determined",
         }
+
+
+def search_restaurants_by_location(
+    user_id: int, latitude: float, longitude: float, radius_km: float = 10.0, limit: int = 50
+) -> List[Dict[str, Any]]:
+    """
+    Search for restaurants within a specified radius of a location.
+
+    Args:
+        user_id: ID of the user whose restaurants to search
+        latitude: Center latitude for search
+        longitude: Center longitude for search
+        radius_km: Search radius in kilometers (default: 10km)
+        limit: Maximum number of results to return (default: 50)
+
+    Returns:
+        List of restaurant dictionaries with distance information
+    """
+    if not validate_coordinates(latitude, longitude):
+        raise ValueError("Invalid coordinates provided")
+
+    if radius_km <= 0:
+        raise ValueError("Radius must be positive")
+
+    if limit <= 0:
+        raise ValueError("Limit must be positive")
+
+    # Get all restaurants for the user that have coordinates
+    restaurants = db.session.scalars(
+        select(Restaurant).where(
+            Restaurant.user_id == user_id,
+            Restaurant.latitude.isnot(None),
+            Restaurant.longitude.isnot(None),
+        )
+    ).all()
+
+    results = []
+
+    for restaurant in restaurants:
+        # Calculate distance
+        distance = calculate_distance_km(latitude, longitude, restaurant.latitude, restaurant.longitude)
+
+        # Check if within radius
+        if distance <= radius_km:
+            restaurant_dict = {
+                "id": restaurant.id,
+                "name": restaurant.name,
+                "address": restaurant.address,
+                "city": restaurant.city,
+                "state": restaurant.state,
+                "cuisine": restaurant.cuisine,
+                "service_level": restaurant.service_level,
+                "rating": restaurant.rating,
+                "price_level": restaurant.price_level,
+                "latitude": restaurant.latitude,
+                "longitude": restaurant.longitude,
+                "distance_km": round(distance, 2),
+                "distance_miles": round(distance * 0.621371, 2),
+            }
+            results.append(restaurant_dict)
+
+    # Sort by distance (closest first)
+    results.sort(key=lambda x: x["distance_km"])
+
+    # Apply limit
+    return results[:limit]
+
+
+def get_restaurants_with_coordinates(user_id: int) -> List[Restaurant]:
+    """
+    Get all restaurants for a user that have coordinates stored.
+
+    Args:
+        user_id: ID of the user
+
+    Returns:
+        List of restaurants with coordinates
+    """
+    return db.session.scalars(
+        select(Restaurant)
+        .where(
+            Restaurant.user_id == user_id,
+            Restaurant.latitude.isnot(None),
+            Restaurant.longitude.isnot(None),
+        )
+        .order_by(Restaurant.name)
+    ).all()

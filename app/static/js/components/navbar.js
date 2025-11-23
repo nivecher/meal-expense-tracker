@@ -94,26 +94,29 @@ class ResponsiveNavbarManager {
   }
 
   positionDropdown(dropdown, toggle) {
-    const rect = toggle.getBoundingClientRect();
-    const dropdownRect = dropdown.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
+    // Use requestAnimationFrame to batch DOM reads and writes
+    requestAnimationFrame(() => {
+      const rect = toggle.getBoundingClientRect();
+      const dropdownRect = dropdown.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
 
-    // Check if dropdown would overflow on the right
-    if (rect.left + dropdownRect.width > viewportWidth - 20) {
-      dropdown.style.left = 'auto';
-      dropdown.style.right = '0';
-    } else {
-      dropdown.style.left = '0';
-      dropdown.style.right = 'auto';
-    }
+      // Check if dropdown would overflow on the right
+      if (rect.left + dropdownRect.width > viewportWidth - 20) {
+        dropdown.style.left = 'auto';
+        dropdown.style.right = '0';
+      } else {
+        dropdown.style.left = '0';
+        dropdown.style.right = 'auto';
+      }
+    });
   }
 
   setupResizeObserver() {
     const resizeObserver = new ResizeObserver((entries) => {
       const { width } = entries[0].contentRect;
       const wasMobile = this.isMobile;
-      const wasTablet = this.isTablet;
-      const wasSmallMobile = this.isSmallMobile;
+      // const wasTablet = this.isTablet; // Unused for now
+      // const wasSmallMobile = this.isSmallMobile; // Unused for now
 
       this.isMobile = width < this.breakpoints.mobile;
       this.isTablet = width < this.breakpoints.tablet;

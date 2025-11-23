@@ -70,7 +70,19 @@ def get_or_create_app() -> Flask:
             # Initialize migration manager
             from app.utils.migration_manager import init_migration_manager
 
-            init_migration_manager(_APP_INSTANCE)
+            migration_manager = init_migration_manager(_APP_INSTANCE)
+
+            # Run auto-migration if enabled (force refresh)
+            try:
+                auto_migration_result = migration_manager.auto_migrate()
+                if auto_migration_result.get("success"):
+                    logger.info(f"Auto-migration completed: {auto_migration_result.get('message', 'Success')}")
+                else:
+                    logger.warning(f"Auto-migration failed: {auto_migration_result.get('message', 'Unknown error')}")
+            except Exception as e:
+                logger.error(f"Auto-migration error: {e}")
+                # Don't fail the entire Lambda initialization for migration issues
+                logger.info("Continuing Lambda initialization despite migration error")
 
         except Exception as e:
             logger.exception("Failed to create Flask application")
@@ -99,6 +111,17 @@ def _convert_apigw_v2_to_v1(event: Dict[str, Any]) -> Dict[str, Any]:
     if cookies:
         cookie_header = "; ".join(cookies)
         headers["Cookie"] = cookie_header
+
+    # Fix Host header for CloudFront routing - replace API Gateway domain with CloudFront domain
+    # This ensures Flask generates correct redirect URLs
+    host_header = headers.get("host") or headers.get("Host", "")
+    if host_header and ("execute-api" in host_header or "amazonaws.com" in host_header):
+        # Get the configured server name (CloudFront domain) from environment
+        server_name = os.getenv("SERVER_NAME")
+        if server_name:
+            headers["Host"] = server_name
+            headers["host"] = server_name
+            logger.info(f"Replaced Host header from {host_header} to {server_name} for URL generation")
 
     # Convert v2.0 event to v1.0 format
     v1_event = {
@@ -139,8 +162,8 @@ def _convert_apigw_v2_to_v1(event: Dict[str, Any]) -> Dict[str, Any]:
 def _validate_session_config(app: Flask) -> None:
     """Validate session configuration for Lambda deployment.
 
-    Ensures that DynamoDB session configuration is properly set up
-    for the Lambda environment.
+    Ensures that session configuration is properly set up
+    for the Lambda environment using signed cookie sessions.
 
     Args:
         app: Flask application instance
@@ -150,54 +173,10 @@ def _validate_session_config(app: Flask) -> None:
     """
     session_type = app.config.get("SESSION_TYPE")
 
-    if session_type == "dynamodb":
-        table_name = os.environ.get("SESSION_DYNAMODB_TABLE")
-        # Use SESSION_DYNAMODB_REGION with fallback to built-in AWS_REGION
-        aws_region = os.environ.get("SESSION_DYNAMODB_REGION") or os.environ.get("AWS_REGION")
-
-        required_configs = {
-            "SESSION_DYNAMODB_TABLE": table_name,
-            "SESSION_DYNAMODB_REGION/AWS_REGION": aws_region,
-        }
-
-        missing_configs = [key for key, value in required_configs.items() if not value]
-
-        if missing_configs:
-            error_msg = f"Missing required session environment variables for Lambda: {', '.join(missing_configs)}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
-
-        # Log session configuration for debugging
-        logger.info("Lambda session configuration validated:")
-        logger.info("  Type: %s", session_type)
-        logger.info("  Table: %s", table_name)
-        logger.info("  Region: %s", aws_region)
-
-        # Test DynamoDB table existence in Lambda environment with retry logic
-        try:
-            import boto3
-            from botocore.config import Config
-
-            # Configure boto3 with retry logic
-            boto_config = Config(region_name=aws_region, retries={"max_attempts": 3, "mode": "adaptive"})
-
-            dynamodb = boto3.resource("dynamodb", config=boto_config)
-            table = dynamodb.Table(table_name)
-            table.load()  # This will fail if table doesn't exist
-            logger.info("DynamoDB session table verified: %s", table_name)
-        except Exception as e:
-            logger.error("DynamoDB session table validation failed: %s", str(e))
-            logger.error("Ensure the DynamoDB table exists before Lambda deployment")
-            # This is critical - raise the error to prevent Flask-Session from trying to create table
-            raise RuntimeError(f"DynamoDB session table '{table_name}' is not accessible")
-
-    elif session_type == "filesystem":
-        logger.warning("Using filesystem sessions in Lambda - this may cause issues with session persistence")
-    elif session_type is None:
+    if session_type is None:
         logger.info("Using Flask's default signed cookie sessions (ideal for Lambda)")
-
     else:
-        logger.info("Session configuration validated for type: %s", session_type)
+        logger.warning(f"Unexpected session type in Lambda: {session_type}. Using signed cookie sessions instead.")
 
 
 def handle_migration(app: Flask) -> Dict[str, Any]:
@@ -364,7 +343,7 @@ def _enhance_security_headers(headers: Dict[str, str]) -> None:
             "https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net "
             "https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' "
             "https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
-            "img-src 'self' data: https: blob:; connect-src 'self' https://maps.googleapis.com "
+            "img-src 'self' data: https: blob: https://places.googleapis.com https://maps.googleapis.com; connect-src 'self' https://maps.googleapis.com "
             "https://places.googleapis.com https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';"
         )
 
@@ -524,11 +503,15 @@ def _process_awsgi_response(response: Dict[str, Any], event: Dict[str, Any] = No
 
 def _run_auto_migration() -> None:
     """Run auto-migration on first request if enabled."""
+    logger.info("_run_auto_migration called")
+
     if not hasattr(lambda_handler, "_migration_checked"):
+        logger.info("Migration not yet checked, running initialization...")
         try:
             from lambda_init import initialize_lambda
 
             # Initialize Lambda with migrations
+            logger.info("Calling initialize_lambda...")
             init_result = initialize_lambda()
             if init_result.get("success"):
                 logger.info(f"Lambda initialization: {init_result['message']}")
@@ -536,10 +519,14 @@ def _run_auto_migration() -> None:
                 logger.warning(f"Lambda initialization failed: {init_result.get('message', 'Unknown error')}")
 
         except Exception as e:
-            logger.warning(f"Lambda initialization error (non-critical): {e}")
+            logger.error(f"Lambda initialization error: {e}")
+            logger.exception("Full traceback:")
 
         # Mark as checked to avoid running on every request
         lambda_handler._migration_checked = True
+        logger.info("Migration check completed")
+    else:
+        logger.info("Migration already checked, skipping")
 
 
 def _extract_cookies_from_headers(headers: Dict[str, str]) -> list[str]:
@@ -558,11 +545,26 @@ def _handle_http_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handle HTTP API events."""
     app = get_or_create_app()
 
+    # Extract and log request details
+    http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
+    path = event.get("path") or event.get("rawPath") or event.get("requestContext", {}).get("http", {}).get("path")
+    logger.info(f"Processing request: {http_method} {path}")
+
     try:
         # Handle CORS preflight requests for OPTIONS method
-        http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
         if http_method == "OPTIONS":
             return _handle_cors_preflight()
+
+        # Fix Host header for URL generation before processing
+        headers = event.get("headers", {})
+        host_header = headers.get("host") or headers.get("Host", "")
+        if host_header and ("execute-api" in host_header or "amazonaws.com" in host_header):
+            server_name = os.getenv("SERVER_NAME")
+            if server_name:
+                headers["Host"] = server_name
+                headers["host"] = server_name
+                event["headers"] = headers
+                logger.info(f"Fixed Host header from {host_header} to {server_name} for URL generation")
 
         # Convert API Gateway v2.0 format to v1.0 format for awsgi compatibility
         # Note: With payload_format_version = "2.0", this conversion is always needed
@@ -634,6 +636,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         dict: Response in appropriate API Gateway format
     """
+    print(
+        f"*** LAMBDA_HANDLER START: routeKey: {event.get('routeKey', 'MISSING')} rawPath: {event.get('rawPath', 'MISSING')} ***"
+    )
+    logger.error(
+        f"*** LAMBDA_HANDLER START: routeKey: {event.get('routeKey', 'MISSING')} rawPath: {event.get('rawPath', 'MISSING')} ***"
+    )
     _ = context  # Mark as unused
 
     # Handle direct invocation for database operations
@@ -646,6 +654,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     # Handle health check requests
     if event.get("path") == "/health" or event.get("rawPath") == "/health":
+        logger.info("Health check request detected")
+        # Run auto-migration on health check (first request)
+        logger.info("About to call _run_auto_migration")
+        _run_auto_migration()
+        logger.info("Finished calling _run_auto_migration")
         return _handle_health_check()
 
     # Auto-migrate on first request (if enabled)

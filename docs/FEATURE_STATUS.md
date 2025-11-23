@@ -24,7 +24,7 @@ This document serves as the single source of truth for the implementation status
 | User Profile Management   | ✅     | Complete               | `app/auth/routes.py:164`  | 100%       |
 | Admin User Management     | ✅     | Complete               | `app/admin/routes.py`     | 100%       |
 | Role-based Access Control | ✅     | Complete               | `app/utils/decorators.py` | 100%       |
-| JWT Authentication        | ❌     | **Not Implemented**    | `app/auth/api.py`         | 0%         |
+| JWT Authentication        | ❌     | **Deprecated/Removed** | N/A                       | 0%         |
 | Session Management        | ✅     | Complete               | `app/extensions.py`       | 100%       |
 | API Authentication        | 🚧     | Session-based JSON API | `app/auth/api.py`         | 80%        |
 
@@ -196,11 +196,10 @@ This document serves as the single source of truth for the implementation status
 
 ### High-Priority Missing Features
 
-1. **JWT Authentication** - Proper API authentication (currently session-based)
-2. **Receipt Image Upload** - Critical for expense tracking (model exists, no UI)
-3. **Visual Analytics Dashboard** - Important for user insights
-4. **Budget Tracking** - Core financial management feature
-5. **PDF Export** - Professional reporting capability
+1. **Receipt Image Upload** - Critical for expense tracking (model exists, no UI)
+2. **Visual Analytics Dashboard** - Important for user insights
+3. **Budget Tracking** - Core financial management feature
+4. **PDF Export** - Professional reporting capability
 
 ### Medium-Priority Missing Features
 
@@ -231,7 +230,6 @@ This document serves as the single source of truth for the implementation status
 
 ### Areas Needing Attention
 
-- **JWT Authentication**: Infrastructure exists but tokens are never created or used
 - **Reporting System**: Currently only has basic templates, needs full implementation
 - **Image Upload**: Receipt photos would significantly enhance the user experience (model fields exist)
 - **Analytics**: Visual charts and trend analysis would provide valuable insights
@@ -239,7 +237,6 @@ This document serves as the single source of truth for the implementation status
 
 ### Technical Debt
 
-- JWT infrastructure is set up but never used (conflicts with CSRF)
 - Some features marked as "Planned/Documented Only" need implementation
 - Reporting templates exist but lack backend logic
 - Analytics dashboard needs data visualization components

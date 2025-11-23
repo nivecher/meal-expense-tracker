@@ -3,65 +3,73 @@
 /* Following TIGER principles: Safety, Performance, Developer Experience */
 
 .tag-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    border: none;
-    color: white;
-    transition: all 0.2s ease;
-    margin: 2px;
-    box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
-    line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: none;
+  color: #fff;
+  transition: all 0.2s ease;
+  margin: 2px;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  line-height: 1.2;
 }
 
 .tag-badge i {
-    margin-right: 0.25rem;
-    font-size: 0.7rem;
+  margin-right: 0.25rem;
+  font-size: 0.7rem;
 }
 
 /* Compact version for table rows */
 
 .tag-badge.compact {
-    padding: 3px 8px;
-    font-size: 0.7rem;
-    margin: 1px;
-    border-radius: 15px;
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  margin: 1px;
+  border-radius: 15px;
 }
 
 .tag-badge.compact i {
-    margin-right: 0.125rem;
-    font-size: 0.6rem;
+  margin-right: 0.125rem;
+  font-size: 0.6rem;
 }
 
 /* Hover effects */
 
 .tag-badge:hover {
-    transform: scale(1.05);
-    text-decoration: none;
-    color: white;
-    opacity: 0.9;
+  transform: scale(1.05);
+  text-decoration: none;
+  color: #fff;
+  opacity: 0.9;
 }
 
 /* Default fallback styling when no color class is provided */
 
 .tag-badge:not([class*="tag-"]) {
-    background-color: #6c757d;
-    color: white;
-    border: none;
+  background-color: #6c757d;
+  color: #fff;
+  border: none;
+}
+
+/* Apply colors from data-tag-color attribute - JavaScript will set the background-color directly */
+
+.tag-badge[data-tag-color] {
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%) !important;
 }
 
 /* Tag container for multiple tags */
 
 .expense-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
 }
 
 .expense-tags .tag-badge {
-    margin: 0;
+  margin: 0;
 }

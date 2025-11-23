@@ -7,7 +7,7 @@ export function initExpenseDetail() {
   // Initialize Bootstrap tooltips
   if (typeof bootstrap !== 'undefined') {
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    const tooltipList = tooltipTriggerList.map((tooltipTriggerEl) => {
+    tooltipTriggerList.map((tooltipTriggerEl) => {
       return new bootstrap.Tooltip(tooltipTriggerEl);
     });
   }

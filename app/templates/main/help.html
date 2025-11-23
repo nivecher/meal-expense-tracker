@@ -150,6 +150,27 @@
                 </div>
             </div>
 
+            <!-- Essentials Tier Notice -->
+            <div class="alert alert-warning border-warning">
+                <h6 class="alert-heading mb-2">
+                    <i class="fas fa-info-circle me-2"></i>Google Places API Essentials Tier
+                </h6>
+                <p class="mb-1">
+                    This application uses Google Places API Essentials tier to control costs. Some advanced features are not available:
+                </p>
+                <ul class="mb-0 small">
+                    <li><strong>No restaurant photos</strong> - Photo display is disabled</li>
+                    <li><strong>No detailed reviews</strong> - Only basic ratings are shown</li>
+                    <li><strong>Limited amenities</strong> - Only basic service options (takeout, delivery, etc.)</li>
+                    <li><strong>No advanced features</strong> - Payment options, parking info, and other Pro+ features are not available</li>
+                </ul>
+            </div>
+
+            <div class="help-card bg-light">
+                <h5><i class="fas fa-star me-2"></i>Key Features</h5>
+                </div>
+            </div>
+
             <!-- Quick Navigation -->
             <div class="help-card bg-light">
                 <h5><i class="fas fa-compass me-2"></i>Quick Navigation</h5>
@@ -298,6 +319,16 @@
                                             ><strong>Tags:</strong> Add custom labels for better organization</li
                                         >
                                         <li class="mb-2"><strong>Notes:</strong> Add any additional details</li>
+                                        <li class="mb-2"
+                                            ><strong>Receipt:</strong> Upload a photo or PDF of your receipt (optional)
+                                            <div class="alert alert-success mt-2 mb-0 p-2">
+                                                <small
+                                                    ><i class="fas fa-file-pdf me-1"></i
+                                                    ><strong>Supported Formats:</strong> JPG, PNG, GIF, PDF. Max size: 5MB.
+                                                    Receipts are securely stored and can be viewed or deleted at any time.</small
+                                                >
+                                            </div>
+                                        </li>
                                     </ul>
 
                                     <h6><i class="fas fa-filter me-2"></i>Filtering & Sorting</h6>
@@ -371,7 +402,7 @@
                                             Places</li
                                         >
                                         <li class="mb-2"
-                                            ><i class="fas fa-star me-1"></i>Ratings and reviews integration</li
+                                            ><i class="fas fa-star me-1"></i>Basic ratings from Google Places</li
                                         >
                                     </ul>
 
@@ -390,6 +421,25 @@
                                             ><strong>Track:</strong> See visit history and spending totals</li
                                         >
                                     </ul>
+
+                                    <h6><i class="fas fa-check-circle me-2"></i>Google Places Validation</h6>
+                                    <div class="alert alert-info">
+                                        <strong>Data Validation:</strong> Compare your restaurant information with
+                                        Google Places data to ensure accuracy. Validate and fix mismatches in:
+                                        <ul class="mb-0 mt-2">
+                                            <li
+                                                ><strong>Name & Address:</strong> Ensure correct location
+                                                information</li
+                                            >
+                                            <li
+                                                ><strong>Type:</strong> Verify business type (restaurant, cafe, bar,
+                                                etc.)</li
+                                            >
+                                            <li><strong>Cuisine:</strong> Confirm cuisine classification</li>
+                                            <li><strong>Phone & Website:</strong> Keep contact information current</li>
+                                            <li><strong>Price Level:</strong> Validate pricing tier information</li>
+                                        </ul>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
                                     <h6><i class="fas fa-chart-line me-2"></i>Restaurant Analytics</h6>
@@ -473,6 +523,117 @@
                                         <span>{{ cuisine.name }}</span>
                                     </span>
                                     {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- Restaurant Types -->
+                            <div class="help-section">
+                                <h5><i class="fas fa-utensils me-2"></i>Restaurant Types (29 Available)</h5>
+                                <p class="text-muted"
+                                    >Categorize restaurants by their primary business type for better organization:</p
+                                >
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled">
+                                            <li class="mb-2"
+                                                ><strong>🍽️ Restaurant:</strong> General dining establishments</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>☕ Cafe:</strong> Coffee shops and casual cafes</li
+                                            >
+                                            <li class="mb-2"><strong>🍺 Bar:</strong> Bars and pubs serving alcohol</li>
+                                            <li class="mb-2"><strong>🥖 Bakery:</strong> Bakeries and pastry shops</li>
+                                            <li class="mb-2"
+                                                ><strong>🍰 Dessert Shop:</strong> Specialty dessert and sweet shops</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🍨 Ice Cream Shop:</strong> Ice cream and frozen dessert
+                                                shops</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🥪 Deli:</strong> Delicatessens and sandwich shops</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🏪 Food Court:</strong> Mall food courts and food halls</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🥡 Takeaway:</strong> Takeout and pickup-only
+                                                establishments</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🚚 Delivery Service:</strong> Food delivery services</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🍔 Fast Food Restaurant:</strong> Quick-service fast food
+                                                chains</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🥩 Fine Dining Restaurant:</strong> Upscale dining
+                                                establishments</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🥩 Steak House:</strong> Steak and grill restaurants</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🦞 Seafood Restaurant:</strong> Seafood and fish
+                                                restaurants</li
+                                            >
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <ul class="list-unstyled">
+                                            <li class="mb-2"
+                                                ><strong>🍕 Pizza Restaurant:</strong> Pizza-focused restaurants</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🍣 Sushi Restaurant:</strong> Sushi and Japanese
+                                                restaurants</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🥞 Breakfast Restaurant:</strong> Breakfast and brunch
+                                                spots</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>☕ Coffee Shop:</strong> Specialty coffee shops</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🥖 Sandwich Shop:</strong> Sandwich and sub shops</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🍩 Donut Shop:</strong> Donut and pastry shops</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🥤 Juice Shop:</strong> Juice and smoothie bars</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🍷 Wine Bar:</strong> Wine bars and wine-focused venues</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🍻 Pub:</strong> Traditional pubs and taverns</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>☕ Tea House:</strong> Tea houses and tea rooms</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🏪 Convenience Store:</strong> Convenience stores and corner shops</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>🛒 Grocery Store:</strong> Grocery stores and supermarkets</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>⛽ Gas Station:</strong> Gas stations with food service</li
+                                            >
+                                            <li class="mb-2"
+                                                ><strong>❓ Other:</strong> Other food service establishments</li
+                                            >
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="alert alert-primary mt-3">
+                                    <strong>Auto-detection:</strong> Restaurant types are automatically detected from
+                                    Google Places data when searching for restaurants. Non-restaurant food establishments
+                                    (like convenience stores) are automatically categorized as "Other" to maintain focus on
+                                    dining experiences. You can also manually select the appropriate type when adding restaurants.
                                 </div>
                             </div>
 
@@ -585,6 +746,73 @@
                     </div>
                 </div>
 
+                <!-- Future Features Section -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button
+                            class="accordion-button collapsed"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapseFutureFeatures">
+                            <i class="fas fa-rocket me-2"></i>Future Features
+                        </button>
+                    </h2>
+                    <div id="collapseFutureFeatures" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                        <div class="accordion-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-camera me-2"></i>Advanced Receipt Features</h6>
+                                    <div class="alert alert-info">
+                                        <strong>Coming Soon:</strong> Enhanced receipt processing capabilities.
+                                        <ul class="mb-0 mt-2">
+                                            <li>Automatic receipt verification</li>
+                                            <li>OCR text extraction for automatic expense entry</li>
+                                            <li>Receipt data parsing (amount, date, restaurant)</li>
+                                        </ul>
+                                        <div class="mt-2">
+                                            <small><i class="fas fa-check-circle me-1"></i><strong>Available Now:</strong> Upload receipts in JPG, PNG, GIF, and PDF formats.</small>
+                                        </div>
+                                    </div>
+
+                                    <h6><i class="fas fa-chart-line me-2"></i>Enhanced Analytics</h6>
+                                    <div class="alert alert-info">
+                                        <strong>In Development:</strong> Advanced reporting and analytics features.
+                                        <ul class="mb-0 mt-2">
+                                            <li>Interactive charts and graphs</li>
+                                            <li>Budget tracking and alerts</li>
+                                            <li>PDF report generation</li>
+                                            <li>Trend analysis over time</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-mobile-alt me-2"></i>Mobile App</h6>
+                                    <div class="alert alert-info">
+                                        <strong>Planned:</strong> Native mobile applications for iOS and Android.
+                                        <ul class="mb-0 mt-2">
+                                            <li>Offline expense entry</li>
+                                            <li>Camera integration for receipts</li>
+                                            <li>Push notifications</li>
+                                            <li>Touch-optimized interface</li>
+                                        </ul>
+                                    </div>
+
+                                    <h6><i class="fas fa-sync me-2"></i>Auto-Save & Sync</h6>
+                                    <div class="alert alert-info">
+                                        <strong>In Progress:</strong> Enhanced data management features.
+                                        <ul class="mb-0 mt-2">
+                                            <li>Auto-save draft expenses</li>
+                                            <li>Real-time data synchronization</li>
+                                            <li>Automatic data backup</li>
+                                            <li>Conflict resolution</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- FAQ Section -->
                 <div class="accordion-item">
                     <h2 class="accordion-header">
@@ -671,65 +899,7 @@
     </div>
 </div>
 
-<script>
-    // Auto-expand sections based on URL hash
-    document.addEventListener("DOMContentLoaded", function () {
-        if (window.location.hash) {
-            const targetId = window.location.hash.substring(1);
-            const targetElement = document.getElementById(targetId);
-            if (targetElement && targetElement.classList.contains("accordion-item")) {
-                const collapseElement = targetElement.querySelector(".accordion-collapse");
-                if (collapseElement) {
-                    const bsCollapse = new bootstrap.Collapse(collapseElement, { show: true });
-                }
-            }
-        }
-    });
-
-    // Enhanced navigation for accordion sections
-    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-        anchor.addEventListener("click", function (e) {
-            e.preventDefault();
-            const targetId = this.getAttribute("href").substring(1);
-            const targetElement = document.getElementById(targetId);
-
-            if (targetElement && targetElement.classList.contains("accordion-item")) {
-                // Find the collapse element within this accordion item
-                const collapseElement = targetElement.querySelector(".accordion-collapse");
-                if (collapseElement) {
-                    // Check if the section is already open
-                    if (collapseElement.classList.contains("show")) {
-                        // Already open, just scroll to it
-                        targetElement.scrollIntoView({
-                            behavior: "smooth",
-                            block: "start",
-                        });
-                    } else {
-                        // Open the accordion section using Bootstrap's Collapse API
-                        const bsCollapse = new bootstrap.Collapse(collapseElement, { show: true });
-
-                        // Wait for the collapse animation to complete, then scroll
-                        collapseElement.addEventListener(
-                            "shown.bs.collapse",
-                            function () {
-                                targetElement.scrollIntoView({
-                                    behavior: "smooth",
-                                    block: "start",
-                                });
-                            },
-                            { once: true }
-                        );
-                    }
-                }
-            } else if (targetElement) {
-                // Regular smooth scrolling for non-accordion targets
-                targetElement.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                });
-            }
-        });
-    });
-</script>
+<!-- Help page functionality -->
+<script src="{{ url_for('static', filename='js/pages/help.js') }}"></script>
 
 {% endblock content %}

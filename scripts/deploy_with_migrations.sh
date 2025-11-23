@@ -174,21 +174,21 @@ build_docker_image() {
 package_lambda() {
   log_info "Packaging Lambda deployment..."
 
-  # Create dist directory
-  mkdir -p "dist/x86_64"
+  # Create dist directory with architecture-first structure
+  mkdir -p "dist/x86_64/app"
 
   # Create deployment package
   docker run --rm \
-    -v "$(pwd)/dist/x86_64:/output" \
+    -v "$(pwd)/dist/x86_64/app:/output" \
     "meal-expense-tracker:$ENVIRONMENT" \
     sh -c "cp -r /var/task/* /output/ && chmod -R 755 /output"
 
   # Create ZIP file
-  cd "dist/x86_64"
-  zip -r "../app-x86_64.zip" . -x "*.pyc" "__pycache__/*" "*.git*" "*.DS_Store"
+  cd "dist/x86_64/app"
+  zip -r "app-x86_64.zip" . -x "*.pyc" "__pycache__/*" "*.git*" "*.DS_Store"
   cd "$PROJECT_ROOT"
 
-  log_success "Lambda package created: dist/app-x86_64.zip"
+  log_success "Lambda package created: dist/x86_64/app/app-x86_64.zip"
 }
 
 # Deploy with Terraform
@@ -303,6 +303,23 @@ cleanup() {
   rm -f terraform/terraform.tfplan
 }
 
+# Sync static files to S3 for CloudFront
+sync_static_files() {
+  log_info "Syncing static files to S3 for CloudFront..."
+
+  if [ ! -f "${PROJECT_ROOT}/scripts/sync_static_to_s3.sh" ]; then
+    log_warning "Static file sync script not found, skipping..."
+    return 0
+  fi
+
+  # Run the sync script
+  if bash "${PROJECT_ROOT}/scripts/sync_static_to_s3.sh"; then
+    log_success "Static files synced to S3"
+  else
+    log_warning "Static file sync failed, but continuing deployment..."
+  fi
+}
+
 # Main deployment function
 main() {
   log_info "Starting deployment process..."
@@ -315,6 +332,7 @@ main() {
   build_docker_image
   package_lambda
   deploy_terraform
+  sync_static_files  # Sync static files to S3 for CloudFront
   wait_for_lambda
   test_lambda
   check_migration_status

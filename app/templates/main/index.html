@@ -248,7 +248,7 @@
                                 <strong>Total</strong>
                             </td>
                             <td colspan="2" class="amount-right">
-                                <strong>${{ "%.2f"|format(total_amount) }}</strong>
+                                <strong>${{ "%.2f"|format(expense_stats.total_spent) }}</strong>
                             </td>
                         </tr>
                     </tfoot>
@@ -277,6 +277,7 @@
                     action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}"
                     method="post"
                     class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <button type="submit" class="btn btn-danger">Delete</button>
                 </form>
             </div>
@@ -284,39 +285,6 @@
     </div>
 </div>
 {% endfor %} {% endblock content %} {% block scripts %} {{ super() }}
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        var filterHeader = document.querySelector('.card-header[data-bs-toggle="collapse"]');
-        if (filterHeader) {
-            filterHeader.addEventListener("click", function () {
-                var icon = this.querySelector("i.fas.fa-chevron-down, i.fas.fa-chevron-up");
-                if (icon) {
-                    icon.classList.toggle("fa-chevron-down");
-                    icon.classList.toggle("fa-chevron-up");
-                }
-            });
-        }
-
-        // Enhance category dropdown with colors and icons
-        var categorySelect = document.getElementById("category");
-        if (categorySelect) {
-            // Style the options with their colors
-            categorySelect.addEventListener("change", function () {
-                var selectedOption = this.options[this.selectedIndex];
-                if (selectedOption && selectedOption.dataset.color) {
-                    this.style.backgroundColor = selectedOption.dataset.color + "20";
-                    this.style.borderColor = selectedOption.dataset.color + "40";
-                    this.style.color = selectedOption.dataset.color;
-                } else {
-                    this.style.backgroundColor = "";
-                    this.style.borderColor = "";
-                    this.style.color = "";
-                }
-            });
-
-            // Trigger change event on page load to set initial color
-            categorySelect.dispatchEvent(new Event("change"));
-        }
-    });
-</script>
+<!-- Dashboard functionality -->
+<script src="{{ url_for('static', filename='js/pages/dashboard.js') }}"></script>
 {% endblock scripts %}

@@ -28,6 +28,10 @@ Resources:
                 'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubOrg}/${RepositoryName}:*'
               StringEquals:
                 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com'
+          - Effect: Allow
+            Principal:
+              AWS: 'arn:aws:sts::562427544284:assumed-role/AWSReservedSSO_AdministratorAccess_c93d252d500730e3/mtd37'
+            Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
         - arn:aws:iam::aws:policy/AWSLambda_FullAccess
@@ -43,9 +47,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  # IAM permissions for task execution role
                   - iam:PassRole
-                  # EC2 permissions for VPC setup
                   - ec2:CreateVpc
                   - ec2:CreateSubnet
                   - ec2:CreateRouteTable
@@ -59,7 +61,6 @@ Resources:
                   - ec2:DeleteTags
                   - ec2:Describe*
                   - ec2:Get*
-                  # KMS permissions
                   - kms:CreateKey
                   - kms:CreateAlias
                   - kms:DeleteAlias
@@ -67,7 +68,20 @@ Resources:
                   - kms:EnableKeyRotation
                   - kms:Get*
                   - kms:List*
-                  # ACM permissions
+                  - kms:Decrypt
+                  - kms:GenerateDataKey
+                  - ssm:GetParameter
+                  - ssm:DescribeParameters
+                  - ssm:ListTagsForResource
+                  - ssm:GetParameters
+                  - sns:GetTopicAttributes
+                  - sns:ListTagsForResource
+                  - sns:Publish
+                  - route53:ListHostedZones
+                  - route53:GetHostedZone
+                  - route53:ListResourceRecordSets
+                  - route53:ListTagsForResource
+                  - logs:ListTagsForResource
                   - acm:RequestCertificate
                   - acm:DeleteCertificate
                   - acm:DeleteCertificateAuthority
@@ -75,6 +89,32 @@ Resources:
                   - acm:Get*
                   - acm:ImportCertificate
                   - acm:List*
+                  # CloudFront permissions
+                  - cloudfront:GetDistribution
+                  - cloudfront:GetOriginAccessControl
+                  - cloudfront:ListTagsForResource
+                  # S3 permissions
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:PutObject
+                  - s3:GetBucketLocation
+                  - s3:GetBucketTagging
+                  - s3:PutBucketTagging
+                  - s3:GetBucketVersioning
+                  - s3:GetBucketAcl
+                  - s3:GetLifecycleConfiguration
+                  - s3:PutLifecycleConfiguration
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:GetBucketPublicAccessBlock
+                  - s3:GetEncryptionConfiguration
+                  - s3:PutEncryptionConfiguration
+                  - s3:PutBucketVersioning
+                  - s3:PutBucketLogging
+                  - s3:GetBucketLogging
+                  - s3:PutBucketCORS
+                  - s3:GetBucketCORS
+                  - s3:GetBucketPolicy
+                  - s3:PutBucketPolicy
                 Resource: '*'
 
 Outputs:

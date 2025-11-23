@@ -17,3 +17,18 @@ def inject_user_context():
         "current_user": current_user,
         "user": current_user,  # Alternative name for compatibility
     }
+
+
+def inject_cuisine_data():
+    """Inject cuisine data into all templates.
+
+    This provides centralized cuisine configuration to both templates
+    and JavaScript without API calls.
+    """
+    from app.constants import CUISINES, MEAL_TYPES, get_cuisine_names
+
+    return {
+        "cuisines": CUISINES,
+        "cuisine_names": get_cuisine_names(),
+        "meal_types": MEAL_TYPES,
+    }

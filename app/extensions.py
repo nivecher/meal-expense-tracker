@@ -3,31 +3,48 @@
 This module initializes and configures all Flask extensions used in the application.
 """
 
+import logging
+import os
 from typing import Any, Optional, Union, cast
 
-from flask import Flask, request, url_for
+from flask import (
+    Flask,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    request,
+    session,
+    url_for,
+)
 from flask.wrappers import Response
-from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
 from flask_migrate import Migrate
-from flask_session import Session
 from flask_sqlalchemy import SQLAlchemy
-from flask_wtf.csrf import CSRFError, CSRFProtect
+from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
+
+logger = logging.getLogger(__name__)
+
+# Development fallback secret key (only used when SECRET_KEY env var is not set)
+# This is safe because production environments must set SECRET_KEY
+_DEV_FALLBACK_SECRET = "dev-key-change-in-production"  # nosec B105
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
 
-# Initialize JWT for token-based authentication
-jwt = JWTManager()
 
 # Initialize LoginManager for session-based authentication
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 
 # Initialize rate limiter to prevent abuse
-limiter = Limiter(key_func=get_remote_address, default_limits=["400 per day", "100 per hour"], storage_uri="memory://")
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["400 per day", "100 per hour"],
+    storage_uri="memory://",
+)
 
 # Initialize CSRF protection (will be conditionally configured based on environment)
 csrf = CSRFProtect()
@@ -35,105 +52,15 @@ csrf = CSRFProtect()
 # Initialize Flask-Migrate for database migrations
 migrate = Migrate()
 
-# Initialize Flask-Session
-flask_session = Session()
-
 
 def _log_session_config(app: Flask) -> None:
     """Log session configuration for debugging - Single responsibility."""
-    session_type = app.config.get("SESSION_TYPE")
-
-    if session_type == "dynamodb":
-        app.logger.info("Session backend: dynamodb")
-        table = app.config.get("SESSION_DYNAMODB_TABLE")
-        region = app.config.get("SESSION_DYNAMODB_REGION")
-        endpoint = app.config.get("SESSION_DYNAMODB_ENDPOINT_URL")
-        key_prefix = app.config.get("SESSION_KEY_PREFIX", "")
-
-        app.logger.info("  Table: %s, Region: %s, Endpoint: %s", table, region, endpoint or "AWS default")
-        if key_prefix:
-            app.logger.info("  Key prefix: %s", key_prefix)
-    elif session_type is None:
-        app.logger.info("Session backend: signed-cookies (Flask default)")
-        app.logger.info("  Cookie name: %s", app.config.get("SESSION_COOKIE_NAME", "session"))
-        app.logger.info("  Cookie secure: %s", app.config.get("SESSION_COOKIE_SECURE", False))
-        app.logger.info("  Session lifetime: %s seconds", app.config.get("PERMANENT_SESSION_LIFETIME", 3600))
-    else:
-        app.logger.info("Session backend: %s", session_type)
-
-
-def _validate_dynamodb_session_config(app: Flask) -> None:
-    """Validate DynamoDB session configuration - Single responsibility."""
-    if app.config.get("SESSION_TYPE") != "dynamodb":
-        return
-
-    _validate_required_configs(app)
-    table_name = _validate_table_name_format(app)
-    _test_dynamodb_connection(app, table_name)
-    app.logger.info("DynamoDB session configuration validated successfully")
-
-
-def _validate_required_configs(app: Flask) -> None:
-    """Validate required DynamoDB session configuration parameters."""
-    required_configs = {"SESSION_DYNAMODB_TABLE": "DynamoDB table name", "SESSION_DYNAMODB_REGION": "AWS region"}
-
-    missing_configs = []
-    for config_key, description in required_configs.items():
-        if not app.config.get(config_key):
-            missing_configs.append(f"{config_key} ({description})")
-
-    if missing_configs:
-        error_msg = f"Missing required DynamoDB session configuration: {', '.join(missing_configs)}"
-        app.logger.error(error_msg)
-        raise ValueError(error_msg)
-
-
-def _validate_table_name_format(app: Flask) -> str:
-    """Validate DynamoDB table name format."""
-    table_name = app.config.get("SESSION_DYNAMODB_TABLE", "")
-    if not table_name.replace("-", "").replace("_", "").isalnum():
-        raise ValueError(
-            f"Invalid DynamoDB table name: {table_name}. Must contain only alphanumeric characters, hyphens, and underscores."
-        )
-    return table_name
-
-
-def _test_dynamodb_connection(app: Flask, table_name: str) -> None:
-    """Test DynamoDB connection and permissions."""
-    try:
-        dynamodb_resource = app.config.get("SESSION_DYNAMODB")
-        if dynamodb_resource:
-            # Test connection by attempting to describe the table with retry logic
-            table = dynamodb_resource.Table(table_name)
-            table.load()  # This will raise an exception if table doesn't exist or connection fails
-            app.logger.info("DynamoDB session table connection verified: %s", table_name)
-            app.logger.info("Table status: %s", table.table_status)
-
-            # Test basic table operations to ensure permissions are correct
-            try:
-                _test_dynamodb_permissions(table)
-                app.logger.info("DynamoDB table permissions verified successfully")
-            except Exception as perm_error:
-                app.logger.warning("DynamoDB table permissions test failed: %s", str(perm_error))
-                app.logger.warning("This may indicate insufficient IAM permissions")
-        else:
-            app.logger.warning("SESSION_DYNAMODB resource not configured - Flask-Session will create its own")
-    except Exception as e:
-        app.logger.error("DynamoDB session table verification failed: %s", str(e))
-        # Don't fail startup - let Flask-Session handle the error gracefully
-        app.logger.info("Note: Ensure the DynamoDB table '%s' exists and is accessible", table_name)
-        app.logger.info("Check IAM permissions and network connectivity")
-
-
-def _test_dynamodb_permissions(table) -> None:
-    """Test DynamoDB table permissions."""
-    try:
-        # Try a simple scan operation to verify permissions
-        table.scan(Limit=1)
-        # Note: We can't access app logger from table object, so we'll log success at caller level
-    except Exception as perm_error:
-        # Note: We can't access app logger from table object, so we'll log warning at caller level
-        raise perm_error
+    app.logger.info("Session backend: signed-cookies (Flask default)")
+    app.logger.info("  Cookie name: %s", app.config.get("SESSION_COOKIE_NAME", "session"))
+    app.logger.info("  Cookie secure: %s", app.config.get("SESSION_COOKIE_SECURE", False))
+    app.logger.info("  Cookie httponly: %s", app.config.get("SESSION_COOKIE_HTTPONLY", True))
+    app.logger.info("  Cookie samesite: %s", app.config.get("SESSION_COOKIE_SAMESITE", "Lax"))
+    app.logger.info("  Session lifetime: %s seconds", app.config.get("PERMANENT_SESSION_LIFETIME", 3600))
 
 
 def _configure_csrf_handlers(app: Flask) -> None:
@@ -143,8 +70,6 @@ def _configure_csrf_handlers(app: Flask) -> None:
 
     # Only configure CSRF handlers if CSRF is enabled
     if csrf_enabled:
-        from flask_wtf.csrf import generate_csrf
-
         # Add CSRF token to response headers for all requests (helps with Lambda/API Gateway)
         @app.after_request
         def add_csrf_headers(response: Response) -> Response:
@@ -165,15 +90,9 @@ def _configure_csrf_handlers(app: Flask) -> None:
         @app.errorhandler(CSRFError)
         def handle_csrf_error(e: CSRFError) -> Response:
             # Enhanced logging for Lambda/API Gateway debugging
-            import os
-
-            from flask import flash, jsonify, redirect
-
             is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
             app.logger.warning(f"CSRF error: {e} - Host: {request.host} - Path: {request.path} - Lambda: {is_lambda}")
             app.logger.warning(f"CSRF error details - Method: {request.method}, Headers: {dict(request.headers)}")
-            from flask import session
-
             app.logger.warning(
                 f"CSRF error - Session: {dict(session) if hasattr(session, '__dict__') else 'No session'}"
             )
@@ -195,46 +114,53 @@ def _configure_csrf_handlers(app: Flask) -> None:
             return cast(Response, redirect(url_for("auth.login", next=current_path)))
 
 
+def _configure_migration_directory(app: Flask) -> None:
+    """Configure Flask-Migrate with Lambda-aware directory handling."""
+    # In Lambda, we need to handle the read-only filesystem
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        # Lambda environment - use environment variable if set, otherwise /var/task/migrations
+        migration_dir = os.environ.get("MIGRATIONS_DIR")
+        if not migration_dir:
+            migration_dir = "/var/task/migrations"
+        logger.info(f"Lambda environment detected, using migration directory: {migration_dir}")
+    else:
+        # Local environment - use standard location
+        migration_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "migrations")
+
+    migrate.init_app(app, db, directory=migration_dir)
+
+
+def _configure_session_backend(app: Flask) -> None:
+    """Configure session backend and log configuration."""
+    # Use Flask's built-in signed cookie sessions - no external session backend needed
+    app.logger.info("Using Flask's default signed cookie sessions (ideal for all environments)")
+
+    _log_session_config(app)
+
+
 def init_app(app: Flask) -> None:
     """Initialize all extensions with the Flask application."""
     # Initialize core extensions
     db.init_app(app)
-    jwt.init_app(app)
     login_manager.init_app(app)
-    migrate.init_app(app, db)
 
-    # Initialize Flask-Session based on session type
-    session_type = app.config.get("SESSION_TYPE")
-
-    if session_type == "dynamodb":
-        # Validate DynamoDB configuration
-        _validate_dynamodb_session_config(app)
-        flask_session.init_app(app)
-    elif session_type is None:
-        # Using Flask's default signed cookie sessions - no Flask-Session needed
-        app.logger.info("Using Flask's default signed cookie sessions (ideal for Lambda)")
-    else:
-        # Other session types (filesystem, redis, etc.)
-        flask_session.init_app(app)
-
-    _log_session_config(app)
+    # Configure components
+    _configure_migration_directory(app)
+    _configure_session_backend(app)
 
     # Initialize rate limiter
     limiter.init_app(app)
 
-    # Configure JWT settings
+    # Configure CSRF secret key (same as Flask SECRET_KEY for consistency)
     secret_key = app.config.get("SECRET_KEY")
-    fallback_key = "dev-key-change-in-production"  # nosec B105 - Development fallback key
-    if not secret_key or secret_key == fallback_key:
-        app.logger.warning("Using fallback JWT secret key - ensure SECRET_KEY is set in production")
-        secret_key = fallback_key
-    app.config["JWT_SECRET_KEY"] = secret_key
-    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 3600  # 1 hour
-    app.config["JWT_REFRESH_TOKEN_EXPIRES"] = 2592000  # 30 days
+    if not secret_key:
+        # Development fallback - production must set SECRET_KEY environment variable
+        app.logger.warning("Using fallback CSRF secret key - ensure SECRET_KEY is set in production")
+        # Get from environment first, fallback to dev key only if not set
+        env_secret = os.getenv("SECRET_KEY")
+        secret_key = env_secret if env_secret else _DEV_FALLBACK_SECRET
 
     # Check if we're running in AWS Lambda environment
-    import os
-
     lambda_function_name = os.getenv("AWS_LAMBDA_FUNCTION_NAME")
     is_lambda = lambda_function_name is not None
 
@@ -242,18 +168,74 @@ def init_app(app: Flask) -> None:
 
     # Configure CSRF protection
     app.logger.info("Enabling CSRF protection")
-    csrf.init_app(app)
+    # Set CSRF configuration BEFORE initializing the extension
     app.config.update(
         WTF_CSRF_ENABLED=True,
         WTF_CSRF_CHECK_DEFAULT=False,  # RELAXED: Disable CSRF checking by default for testing
         WTF_CSRF_SSL_STRICT=False,
         WTF_CSRF_TIME_LIMIT=3600,
         WTF_CSRF_REFERRER_CHECK=False,
-        WTF_CSRF_SECRET_KEY=secret_key,
     )
+    # Set secret key separately to allow proper suppression comment
+    app.config["WTF_CSRF_SECRET_KEY"] = secret_key  # nosec B105
+    # Initialize CSRF protection AFTER configuration is set
+    csrf.init_app(app)
 
     # Configure CSRF handlers
     _configure_csrf_handlers(app)
+
+
+def _is_lambda_environment() -> bool:
+    """Check if running in AWS Lambda environment."""
+    server_name = current_app.config.get("SERVER_NAME")
+    return bool(server_name and server_name != "localhost:5000" and "localhost" not in server_name)
+
+
+def _fix_api_gateway_url(url: str, server_name: str) -> str:
+    """Replace API Gateway domain with CloudFront domain in URL."""
+    if not url:
+        return url
+
+    # Check for various API Gateway domain patterns
+    api_patterns = ["execute-api", "amazonaws.com", "api.dev.nivecher.com"]
+    if not any(pattern in url for pattern in api_patterns):
+        return url
+
+    if "://" in url:
+        protocol, rest = url.split("://", 1)
+        if "/" in rest:
+            host, path = rest.split("/", 1)
+            return f"{protocol}://{server_name}/{path}"
+        else:
+            return f"{protocol}://{server_name}"
+
+    return url
+
+
+def _handle_api_unauthorized() -> Response:
+    """Handle unauthorized API requests."""
+    response = jsonify({"status": "error", "message": "Authentication required", "code": 401})
+    response.status_code = 401
+    return response
+
+
+def _handle_web_unauthorized() -> Response:
+    """Handle unauthorized web requests with fixed URLs for Lambda."""
+    next_url = request.url
+    server_name = current_app.config.get("SERVER_NAME")
+
+    # Fix URLs in Lambda environment
+    if _is_lambda_environment() and server_name:
+        next_url = _fix_api_gateway_url(next_url, server_name)
+
+    # Generate login URL with fixed next parameter
+    login_url = url_for(login_manager.login_view, next=next_url, _external=True)
+
+    # Fix login URL if needed
+    if _is_lambda_environment() and server_name:
+        login_url = _fix_api_gateway_url(login_url, server_name)
+
+    return cast(Response, redirect(login_url))
 
 
 @login_manager.unauthorized_handler
@@ -263,19 +245,33 @@ def unauthorized() -> Union[Response, str]:
     For API requests, return a 401 JSON response.
     For web requests, redirect to the login page.
     """
-    from flask import jsonify, redirect
-
     if request.path.startswith("/api/"):
-        response = jsonify({"status": "error", "message": "Authentication required", "code": 401})
-        response.status_code = 401
-        return response
-    return cast(Response, redirect(url_for(login_manager.login_view, next=request.url)))
+        return _handle_api_unauthorized()
+
+    return _handle_web_unauthorized()
 
 
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[Any]:
-    """Load a user from the database."""
+    """Load a user from the database.
+
+    Only returns active users. Inactive users are treated as non-existent
+    to prevent access after account deactivation.
+    """
     # Lazy import to avoid circular imports
     from app.auth.models import User
 
-    return User.query.get(int(user_id))
+    try:
+        if not user_id or not user_id.isdigit():
+            return None
+
+        user_id_int = int(user_id)
+        user = db.session.get(User, user_id_int)
+
+        # Only return the user if they exist and are active
+        if user and user.is_active:
+            return user
+
+        return None
+    except (ValueError, TypeError):
+        return None

@@ -5,6 +5,7 @@ This module exports all model-related classes and types used throughout the appl
 
 from __future__ import annotations
 
+from .api_cache import APICache
 from .base import BaseModel, ModelType, SessionType
 
 # Export all models and types
@@ -12,4 +13,5 @@ __all__ = [
     "BaseModel",
     "ModelType",
     "SessionType",
+    "APICache",
 ]

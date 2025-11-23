@@ -1,7 +1,37 @@
-# # Pin packages to stable versions
-# click==8.1.7
-# Flask==3.1.1
-# Werkzeug==3.1.3
-# itsdangerous==2.2.0
-# Jinja2==3.1.4
-# MarkupSafe==2.1.52
+# Pin packages to stable versions for reproducible builds
+# Core Flask ecosystem
+click==8.1.7
+Flask==3.1.1
+Werkzeug==3.1.3
+itsdangerous==2.2.0
+# Jinja2 - let Flask determine compatible version (allows automatic security updates)
+# MarkupSafe - let Flask determine compatible version
+
+# Development tools - pinned to match requirements/dev.in
+black==24.10.0
+flake8==7.3.0
+isort==5.13.2
+mypy==1.13.0
+pylint==3.3.1
+pytest==8.4.2
+pytest-cov==4.0.0
+pytest-xdist==3.8.0
+coverage==7.6.9
+bandit==1.8.6
+# safety - let pip resolve compatible version due to packaging conflicts
+
+# Documentation tools
+sphinx==7.4.7
+sphinx-rtd-theme==2.0.0
+
+# Type stubs - pinned to latest stable
+types-Flask==1.1.6
+types-requests==2.32.0.20241016
+types-python-dateutil==2.9.0.20241003
+types-pytz==2024.2.0.20241003
+
+# Node.js tools (managed via package.json)
+# prettier==3.3.3
+# eslint==9.34.0
+# stylelint==16.24.0
+# @playwright/test>=1.56.1 (security: allows patch updates for vulnerabilities)

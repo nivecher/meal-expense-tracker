@@ -58,10 +58,16 @@ class Restaurant(BaseModel):
     # Basic Information
     name: Mapped[str] = db.Column(db.String(100), nullable=False, comment="Name of the restaurant")
     type: Mapped[Optional[str]] = db.Column(db.String(50), comment="Type of cuisine or restaurant style")
+    located_within: Mapped[Optional[str]] = db.Column(
+        db.String(100), comment="Location within (e.g., mall, airport, hotel)"
+    )
     description: Mapped[Optional[str]] = db.Column(db.Text, comment="Detailed description of the restaurant")
 
     # Location Information
-    address: Mapped[Optional[str]] = db.Column(db.String(200), comment="Street address")
+    address_line_1: Mapped[Optional[str]] = db.Column(db.String(200), comment="Primary street address")
+    address_line_2: Mapped[Optional[str]] = db.Column(
+        db.String(200), comment="Secondary address (apartment/suite/unit)"
+    )
     city: Mapped[Optional[str]] = db.Column(db.String(100), comment="City")
     state: Mapped[Optional[str]] = db.Column(db.String(100), comment="State/Province")
     postal_code: Mapped[Optional[str]] = db.Column(db.String(20), comment="ZIP/Postal code")
@@ -69,7 +75,7 @@ class Restaurant(BaseModel):
 
     # Contact Information
     phone: Mapped[Optional[str]] = db.Column(db.String(20), comment="Contact phone number")
-    website: Mapped[Optional[str]] = db.Column(db.String(200), comment="Restaurant website URL")
+    website: Mapped[Optional[str]] = db.Column(db.String(500), comment="Restaurant website URL")
     email: Mapped[Optional[str]] = db.Column(db.String(100), comment="Contact email")
     google_place_id: Mapped[Optional[str]] = db.Column(
         db.String(255), index=True, comment="Google Place ID for the restaurant"
@@ -78,7 +84,9 @@ class Restaurant(BaseModel):
     # Business Details - User Customizable
     cuisine: Mapped[Optional[str]] = db.Column(db.String(100), index=True, comment="Type of cuisine")
     service_level: Mapped[Optional[str]] = db.Column(
-        db.String(50), index=True, comment="Service level (fine_dining, casual_dining, fast_casual, quick_service)"
+        db.String(50),
+        index=True,
+        comment="Service level (fine_dining, casual_dining, fast_casual, quick_service)",
     )
     is_chain: Mapped[bool] = db.Column(
         db.Boolean,
@@ -87,6 +95,16 @@ class Restaurant(BaseModel):
         comment="Whether it's a chain restaurant",
     )
     rating: Mapped[Optional[float]] = db.Column(db.Float, comment="User's personal rating (1.0-5.0)")
+    price_level: Mapped[Optional[int]] = db.Column(
+        db.Integer,
+        comment="Price level from Google Places (0=Free, 1=$1-10, 2=$11-30, 3=$31-60, 4=$61+)",
+    )
+    primary_type: Mapped[Optional[str]] = db.Column(
+        db.String(100),
+        comment="Primary business type from Google Places API (e.g., restaurant, cafe, bar)",
+    )
+    latitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Restaurant latitude coordinate")
+    longitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Restaurant longitude coordinate")
     notes: Mapped[Optional[str]] = db.Column(db.Text, comment="Additional notes")
 
     # Foreign Keys
@@ -119,24 +137,55 @@ class Restaurant(BaseModel):
         return f"{self.name} - {self.city}"
 
     @property
+    def address(self) -> Optional[str]:
+        """Return the combined address lines (address_line_1 + address_line_2).
+
+        Returns:
+            Optional[str]: Combined address lines or None if no address components
+        """
+        parts: List[str] = []
+        if self.address_line_1:
+            parts.append(self.address_line_1)
+        if self.address_line_2:
+            parts.append(self.address_line_2)
+        return ", ".join(parts) if parts else None
+
+    @property
     def full_address(self) -> Optional[str]:
-        """Return the restaurant's full address as a formatted string.
+        """Return the restaurant's full address as a formatted string using US Standard format.
 
         Returns:
             Optional[str]: Formatted address string or None if no address components
         """
         parts: List[str] = []
-        if self.address:
-            parts.append(self.address)
+
+        # Combine address lines with space (US Standard)
+        address_lines = []
+        if self.address_line_1:
+            address_lines.append(self.address_line_1)
+        if self.address_line_2:
+            address_lines.append(self.address_line_2)
+        if address_lines:
+            parts.append(" ".join(address_lines))
+
+        # Combine city and state with comma (US Standard)
+        city_state = []
         if self.city:
-            parts.append(self.city)
+            city_state.append(self.city)
         if self.state:
-            parts.append(self.state)
+            city_state.append(self.state)
+        if city_state:
+            parts.append(", ".join(city_state))
+
+        # Add postal code
         if self.postal_code:
             parts.append(self.postal_code)
-        if self.country:
+
+        # Only add country if it's not United States (avoid redundancy for US addresses)
+        if self.country and self.country.lower() not in ["united states", "usa", "us"]:
             parts.append(self.country)
-        return ", ".join(parts) if parts else None
+
+        return " ".join(parts) if parts else None
 
     @property
     def google_search(self) -> Optional[str]:
@@ -206,14 +255,14 @@ class Restaurant(BaseModel):
             search_parts.append(self.name)
 
         # Add address details in order of specificity
-        if self.address:
-            search_parts.append(self.address)
+        if self.address_line_1:
+            search_parts.append(self.address_line_1)
         elif self.city:
             # If no street address, at least include city
             search_parts.append(self.city)
 
         # Add city if not already included in address
-        if self.city and self.address and self.city.lower() not in self.address.lower():
+        if self.city and self.address_line_1 and self.city.lower() not in self.address_line_1.lower():
             search_parts.append(self.city)
 
         # Add state for better disambiguation
@@ -230,45 +279,6 @@ class Restaurant(BaseModel):
             return quote_plus(search_query)
 
         return None
-
-    def _update_address_components(self, address_components: list[dict]) -> None:
-        """Update address-related fields from Google Places address components.
-
-        Args:
-            address_components: List of address component dictionaries from Google Places
-        """
-        for component in address_components:
-            types = component.get("types", [])
-            component_type_handlers = {
-                "street_number": lambda c: self._update_street_address(c, "long_name", prepend=True),
-                "route": lambda c: self._update_street_address(c, "long_name"),
-                "locality": lambda c: setattr(self, "city", c.get("long_name", self.city)),
-                "administrative_area_level_1": lambda c: setattr(self, "state", c.get("short_name", self.state)),
-                "postal_code": lambda c: setattr(self, "postal_code", c.get("long_name", self.postal_code)),
-                "country": lambda c: setattr(self, "country", c.get("long_name", self.country)),
-            }
-
-            for address_type, handler in component_type_handlers.items():
-                if address_type in types:
-                    handler(component)
-                    break
-
-    def _update_street_address(self, component: dict, name_attr: str, prepend: bool = False) -> None:
-        """Update the street address component.
-
-        Args:
-            component: Address component dictionary
-            name_attr: Attribute name to get from component ('short_name' or 'long_name')
-            prepend: Whether to prepend (True) or append (False) the component to existing address
-        """
-        value = component.get(name_attr, "")
-        if not value:
-            return
-
-        if prepend:
-            self.address = f"{value} {self.address or ''}".strip()
-        else:
-            self.address = f"{self.address or ''} {value}".strip()
 
     def _update_contact_info(self, place_data: dict) -> None:
         """Update contact information from Google Places data.
@@ -336,13 +346,26 @@ class Restaurant(BaseModel):
             self.google_place_id = place_data.get("place_id", self.google_place_id)
             self.name = place_data.get("name", self.name)
 
-            # Update address components if available
-            if "address_components" in place_data:
-                self._update_address_components(place_data["address_components"])
+            # Update address components using centralized service
+            if "addressComponents" in place_data:
+                from app.services.google_places_service import get_google_places_service
+
+                places_service = get_google_places_service()
+
+                # Parse address components using centralized service
+                address_data = places_service.parse_address_components(place_data["addressComponents"])
+
+                # Update address fields with standardized field names
+                self.address_line_1 = address_data.get("address_line_1", self.address_line_1)
+                self.address_line_2 = address_data.get("address_line_2", self.address_line_2)
+                self.city = address_data.get("city", self.city)
+                self.state = address_data.get("state", self.state)
+                self.postal_code = address_data.get("postal_code", self.postal_code)
+                self.country = address_data.get("country", self.country)
 
             # Update from formatted address if available and no address was set
-            if "formatted_address" in place_data and not self.address:
-                self.address = place_data["formatted_address"]
+            if "formatted_address" in place_data and not self.address_line_1:
+                self.address_line_1 = place_data["formatted_address"]
 
             # Update contact information
             self._update_contact_info(place_data)
@@ -363,20 +386,141 @@ class Restaurant(BaseModel):
         Args:
             place_data: Raw Google Places API response data
         """
-        # Business status
-        if "business_status" in place_data:
-            self.business_status = place_data["business_status"]
-
+        # Note: business_status is time-sensitive and not stored permanently
         # Note: rating is now user's personal rating, not from Google Places
-        # Google's rating/price_level would be looked up dynamically via lookup service
 
-        # Website (as fallback if not set in _update_contact_info)
+        self._update_price_level(place_data)
+        self._update_primary_type(place_data)
+        self._update_coordinates(place_data)
+        self._update_website_fallback(place_data)
+        self._update_service_level_and_cuisine(place_data)
+        self._store_raw_place_data(place_data)
+
+    def _update_price_level(self, place_data: dict) -> None:
+        """Update price level from Google Places data.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
+        if "price_level" in place_data:
+            self.price_level = place_data["price_level"]
+        elif "priceLevel" in place_data:
+            self.price_level = self._convert_price_level(place_data["priceLevel"])
+
+    def _convert_price_level(self, price_level: Any) -> int:
+        """Convert price level to integer format using centralized service.
+
+        Args:
+            price_level: Price level value from Google Places API
+
+        Returns:
+            int: Converted price level (0-4)
+        """
+        from app.services.google_places_service import get_google_places_service
+
+        places_service = get_google_places_service()
+        converted = places_service.convert_price_level_to_int(price_level)
+        return converted if converted is not None else 0
+
+    def _update_primary_type(self, place_data: dict) -> None:
+        """Update primary type from Google Places data.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
+        if "primary_type" in place_data:
+            self.primary_type = place_data["primary_type"]
+        elif "primaryType" in place_data:
+            self.primary_type = place_data["primaryType"]
+
+    def _update_coordinates(self, place_data: dict) -> None:
+        """Update coordinates from Google Places data.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
+        # Try legacy API geometry format first
+        if "geometry" in place_data and place_data["geometry"]:
+            self._update_coordinates_from_geometry(place_data["geometry"])
+        # Try new API location format
+        elif "location" in place_data and place_data["location"]:
+            self._update_coordinates_from_location(place_data["location"])
+
+    def _update_coordinates_from_geometry(self, geometry: dict) -> None:
+        """Update coordinates from legacy API geometry format.
+
+        Args:
+            geometry: Geometry data from Google Places API
+        """
+        if "location" in geometry:
+            location = geometry["location"]
+            if "lat" in location:
+                self.latitude = location["lat"]
+            if "lng" in location:
+                self.longitude = location["lng"]
+
+    def _update_coordinates_from_location(self, location: dict) -> None:
+        """Update coordinates from new API location format.
+
+        Args:
+            location: Location data from Google Places API
+        """
+        if "latitude" in location:
+            self.latitude = location["latitude"]
+        if "longitude" in location:
+            self.longitude = location["longitude"]
+
+    def _update_website_fallback(self, place_data: dict) -> None:
+        """Update website as fallback if not already set.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
         if not self.website and "website" in place_data:
             self.website = place_data["website"]
 
-        # Store raw place data for reference
+    def _store_raw_place_data(self, place_data: dict) -> None:
+        """Store raw place data for reference.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
         if hasattr(self, "place_data"):
             self.place_data = place_data
+
+    def _update_service_level_and_cuisine(self, place_data: dict) -> None:
+        """Update service level and cuisine from Google Places data.
+
+        Args:
+            place_data: Raw Google Places API response data
+        """
+        try:
+            from flask import current_app
+
+            from app.services.google_places_service import get_google_places_service
+
+            # Get types from place data
+            types = place_data.get("types", [])
+            if not types:
+                current_app.logger.info("No types found in place data, skipping classification")
+                return
+
+            # Use centralized service for restaurant type analysis
+            places_service = get_google_places_service()
+            cuisine, service_level = places_service.analyze_restaurant_types(place_data)
+
+            # Update the restaurant fields if we detected values
+            if cuisine:
+                self.cuisine = cuisine
+                current_app.logger.info(f"Updated cuisine to: {cuisine}")
+
+            if service_level:
+                self.service_level = service_level
+                current_app.logger.info(f"Updated service level to: {service_level}")
+
+        except Exception as e:
+            current_app.logger.error(f"Error updating service level and cuisine: {str(e)}")
+            # Don't raise - this is not critical enough to fail the entire update
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a dictionary representation of the restaurant.
@@ -388,8 +532,10 @@ class Restaurant(BaseModel):
             "id": self.id,
             "name": self.name,
             "type": self.type,
+            "located_within": self.located_within,
             "description": self.description,
-            "address": self.address,
+            "address_line_1": self.address_line_1,
+            "address_line_2": self.address_line_2,
             "city": self.city,
             "state": self.state,
             "postal_code": self.postal_code,
@@ -398,8 +544,10 @@ class Restaurant(BaseModel):
             "website": self.website,
             "email": self.email,
             "cuisine": self.cuisine,
+            "service_level": self.service_level,
             "is_chain": self.is_chain,
             "rating": self.rating,
+            "price_level": self.price_level,
             "notes": self.notes,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),

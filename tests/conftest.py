@@ -80,7 +80,7 @@ def app() -> Generator[Flask, None, None]:
     init_utils_filters(app)
 
     # Set up test client class with CSRF handling
-    class TestClient(FlaskClient):
+    class CustomTestClient(FlaskClient):
         def open(self, *args, **kwargs):
             # Add CSRF token to all requests
             if kwargs.get("method") in ("POST", "PUT", "PATCH", "DELETE"):
@@ -91,7 +91,7 @@ def app() -> Generator[Flask, None, None]:
                         kwargs["data"] = f"{kwargs['data']}&csrf_token=dummy_csrf_token"
             return super().open(*args, **kwargs)
 
-    app.test_client_class = TestClient
+    app.test_client_class = CustomTestClient
 
     # Push application context
     ctx = app.app_context()
@@ -407,7 +407,7 @@ def test_restaurant(session: Session, test_user: User) -> Restaurant:
     # Create the restaurant with all required fields
     restaurant = Restaurant(
         name=f"Test Restaurant {uuid.uuid4().hex[:8]}",
-        address="123 Test St",
+        address_line_1="123 Test St",
         city="Test City",
         state="TS",
         postal_code="12345",

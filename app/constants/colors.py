@@ -19,16 +19,52 @@ class ColorData(TypedDict):
 
 # Bootstrap 5 compatible color palette
 BOOTSTRAP_COLORS: Dict[str, ColorData] = {
-    "orange": {"hex": "#fd7e14", "name": "Orange", "description": "Bootstrap orange - warm, energetic"},
-    "green": {"hex": "#198754", "name": "Green", "description": "Bootstrap success green - fresh, positive"},
-    "cyan": {"hex": "#0dcaf0", "name": "Cyan", "description": "Bootstrap info cyan - cool, refreshing"},
-    "red": {"hex": "#dc3545", "name": "Red", "description": "Bootstrap danger red - attention, urgency"},
-    "purple": {"hex": "#6f42c1", "name": "Purple", "description": "Bootstrap purple - creative, premium"},
-    "blue": {"hex": "#0d6efd", "name": "Blue", "description": "Bootstrap primary blue - trustworthy, professional"},
-    "gray": {"hex": "#6c757d", "name": "Gray", "description": "Bootstrap secondary gray - neutral, balanced"},
-    "yellow": {"hex": "#ffc107", "name": "Yellow", "description": "Bootstrap warning yellow - caution, attention"},
+    "orange": {
+        "hex": "#fd7e14",
+        "name": "Orange",
+        "description": "Bootstrap orange - warm, energetic",
+    },
+    "green": {
+        "hex": "#198754",
+        "name": "Green",
+        "description": "Bootstrap success green - fresh, positive",
+    },
+    "cyan": {
+        "hex": "#0dcaf0",
+        "name": "Cyan",
+        "description": "Bootstrap info cyan - cool, refreshing",
+    },
+    "red": {
+        "hex": "#dc3545",
+        "name": "Red",
+        "description": "Bootstrap danger red - attention, urgency",
+    },
+    "purple": {
+        "hex": "#6f42c1",
+        "name": "Purple",
+        "description": "Bootstrap purple - creative, premium",
+    },
+    "blue": {
+        "hex": "#0d6efd",
+        "name": "Blue",
+        "description": "Bootstrap primary blue - trustworthy, professional",
+    },
+    "gray": {
+        "hex": "#6c757d",
+        "name": "Gray",
+        "description": "Bootstrap secondary gray - neutral, balanced",
+    },
+    "yellow": {
+        "hex": "#ffc107",
+        "name": "Yellow",
+        "description": "Bootstrap warning yellow - caution, attention",
+    },
     "teal": {"hex": "#20c997", "name": "Teal", "description": "Bootstrap teal - calm, natural"},
-    "indigo": {"hex": "#6610f2", "name": "Indigo", "description": "Bootstrap indigo - deep, sophisticated"},
+    "indigo": {
+        "hex": "#6610f2",
+        "name": "Indigo",
+        "description": "Bootstrap indigo - deep, sophisticated",
+    },
 }
 
 

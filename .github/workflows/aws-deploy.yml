@@ -1,0 +1,32 @@
+name: AWS Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: 
+          aws-region: us-east-1
+
+      - name: Deploy with Terraform
+        run: |
+          cd terraform/environments/dev
+          terraform init
+          terraform validate
+          terraform plan
+          # Uncomment to apply changes
+          # terraform apply -auto-approve

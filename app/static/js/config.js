@@ -24,7 +24,7 @@ function loadConfig() {
         app: { ...defaults.app, ...(userConfig.app || {}) },
       };
     }
-  } catch (error) {
+  } catch {
     console.error('Config load error:', error);
   }
   return defaults;
@@ -35,6 +35,15 @@ const config = loadConfig();
 // Make colors globally available for backward compatibility
 if (config.colors) {
   window.MEAL_TRACKER_COLORS = config.colors;
+}
+
+// Make cuisines and meal types globally available
+if (config.cuisines) {
+  window.MEAL_TRACKER_CUISINES = config.cuisines;
+}
+
+if (config.mealTypes) {
+  window.MEAL_TRACKER_MEAL_TYPES = config.mealTypes;
 }
 
 export default config;

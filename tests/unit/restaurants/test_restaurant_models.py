@@ -12,7 +12,7 @@ def test_create_restaurant(session, test_user):
         user_id=test_user.id,
         name="Test Restaurant",
         city="Test City",
-        address="123 Test St",
+        address_line_1="123 Test St",  # Use address_line_1 instead of address
         phone="123-456-7890",
         website="http://test.com",
         cuisine="American",
@@ -132,5 +132,5 @@ def test_restaurant_serialization(test_restaurant):
 def test_restaurant_expenses_relationship(test_restaurant, test_expense):
     """Test the expenses relationship."""
     assert test_expense in test_restaurant.expenses
-    assert test_restaurant in test_expense.restaurant.expenses
+    assert test_expense.restaurant == test_restaurant
     assert test_restaurant.expenses[0].id == test_expense.id

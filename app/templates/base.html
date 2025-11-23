@@ -8,6 +8,10 @@
         <meta name="keywords" content="meal expense tracker, food expenses, budget tracking, expense management" />
         <meta name="author" content="Meal Expense Tracker" />
         <meta name="csrf-token" content="{{ csrf_token() }}" />
+
+        <!-- Unified Error Handler - MUST LOAD FIRST -->
+        <script src="{{ url_for('static', filename='js/utils/unified-error-handler.js') }}"></script>
+
         <!-- Bootstrap Icons -->
         <title> {% block title %} Meal Expense Tracker {% endblock title %} </title>
         <!-- Favicon -->
@@ -43,6 +47,7 @@
         <link href="{{ url_for('static', filename='css/forms.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/utilities.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/loading.css') }}" rel="stylesheet" />
+        <link href="{{ url_for('static', filename='css/select2-fixes.css') }}" rel="stylesheet" />
         <!-- Google Places CSS removed - not needed for direct API calls -->
         {% if config.DEBUG %}
         <script type="module" src="{{ url_for('static', filename='js/utils/debug.js') }}"></script>
@@ -106,21 +111,27 @@
                     "red": "#dc3545",
                     "purple": "#6f42c1",
                     "blue": "#0d6efd"
-                }
+                },
+                "cuisines": {{ cuisine_names|tojson }},
+                "mealTypes": {{ meal_types|tojson }}
             }'>
         </div>
+        <!-- Unified Error Handler already loaded above -->
+
         <!-- Core Application Scripts -->
         <script type="module" src="{{ url_for('static', filename='js/main.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/config.js') }}" defer></script>
         <!-- Load other utility modules -->
+        <script type="module" src="{{ url_for('static', filename='js/utils/error-handler.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/utils/logger.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/utils/module-loader.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/utils/select2-init.js') }}" defer></script>
         {% if config.DEBUG %}
         <script type="module" src="{{ url_for('static', filename='js/utils/debug.js') }}" defer></script>
+        <script type="module" src="{{ url_for('static', filename='js/utils/console-test.js') }}" defer></script>
         <!-- Console warning filter for development -->
         <script src="{{ url_for('static', filename='js/utils/console-filter.js') }}"></script>
-        {% endif %} itting
+        {% endif %}
         <!-- Page-specific scripts -->
         {% block scripts %} {% endblock scripts %} {% block extra_js %} {% endblock extra_js %}
 
@@ -144,5 +155,34 @@
 
         <!-- Robust favicon handling -->
         <script type="module" src="{{ url_for('static', filename='js/utils/robust-favicon-handler.js') }}"></script>
+
+        <!-- Flash to Toast Converter -->
+        <script type="module">
+            import { toast } from "/static/js/utils/notifications.js";
+
+            document.addEventListener("DOMContentLoaded", function () {
+                // Convert flash messages to toasts only if they exist and no JavaScript toasts are expected
+                const flashMessages = document.querySelectorAll(".flash-messages .alert");
+                flashMessages.forEach(function (alert) {
+                    // Only convert if this is a page load (not an AJAX response)
+                    if (!alert.closest("[data-ajax-response]")) {
+                        const message = alert.querySelector(".alert-message")?.innerHTML || alert.textContent.trim();
+                        const category = alert.classList.contains("alert-success")
+                            ? "success"
+                            : alert.classList.contains("alert-danger")
+                              ? "error"
+                              : alert.classList.contains("alert-warning")
+                                ? "warning"
+                                : "info";
+
+                        // Show toast
+                        toast[category](message);
+
+                        // Hide the original flash message
+                        alert.style.display = "none";
+                    }
+                });
+            });
+        </script>
     </body>
 </html>

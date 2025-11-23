@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from flask import jsonify
 from sqlalchemy import text
 
-from app._version import __version__
 from app.extensions import db
 
 from . import bp  # Import the blueprint from __init__.py
@@ -29,6 +28,13 @@ def check():
     except Exception as e:
         logger.error(f"Database connection error: {str(e)}")
         db_status = f"error: {str(e)}"
+
+    # Get version with fallback if import fails
+    try:
+        from app._version import __version__
+    except ImportError:
+        logger.warning("Could not import version information")
+        __version__ = "unknown"
 
     return jsonify(
         {

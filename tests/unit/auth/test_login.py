@@ -113,9 +113,14 @@ def test_login_required_redirect(client, app):
         # 2. A 401 Unauthorized (API flow)
         if response.status_code == 302:
             # Web flow - should redirect to login page with next parameter
-            assert response.location.startswith(login_url)
-            # The next parameter might be URL-encoded / or a full URL
-            assert "next=%2F" in response.location or "next=http://localhost/" in response.location
+            # Handle both relative and absolute URLs
+            assert login_url in response.location or response.location.startswith(login_url)
+            # The next parameter might be URL-encoded /, unencoded /, or a full URL
+            assert (
+                "next=%2F" in response.location
+                or "next=/" in response.location
+                or "next=http://localhost/" in response.location
+            )
 
             # Follow the redirect to the login page
             response = client.get(response.location, follow_redirects=True)

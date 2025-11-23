@@ -2,17 +2,18 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths-ignore:
       - 'docs/**'
       - '**.md'
+      - '.gitignore'
   pull_request:
-    branches: [main]
+    branches: [main, develop]
     types: [opened, synchronize, reopened]
 
 env:
   PYTHON_VERSION: '3.13'
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   PYTHONPATH: ${{ github.workspace }}
   FLASK_ENV: test
   TESTING: 'true'
@@ -30,10 +31,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
@@ -44,41 +45,29 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           python -m pip install --upgrade pip
-
-      - name: Install Python dependencies
-        run: |
-          source venv/bin/activate
           pip install -r requirements-dev.txt
 
       - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Node dependencies
         run: |
-          if [ -f package-lock.json ]; then 
-            npm ci
-          else 
-            npm install
+          if [ -f package.json ]; then
+            if [ -f package-lock.json ]; then 
+              npm ci
+            else 
+              npm install
+            fi
+          else
+            echo "No package.json found, skipping npm dependencies"
           fi
 
-      - name: Python linting
+      - name: Run linting
         run: |
           source venv/bin/activate
-          make lint-python
-
-      - name: JavaScript linting
-        run: |
-          npm run lint:js
-
-      - name: CSS linting
-        run: |
-          make lint-css
-
-      - name: HTML template linting
-        run: |
-          make lint-html
+          make lint
 
   # Comprehensive test job
   test:
@@ -91,10 +80,10 @@ jobs:
         test-type: ['unit', 'integration']
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
@@ -105,10 +94,6 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           python -m pip install --upgrade pip
-
-      - name: Install dependencies
-        run: |
-          source venv/bin/activate
           pip install -r requirements-dev.txt
 
       - name: Run ${{ matrix.test-type }} tests
@@ -127,22 +112,112 @@ jobs:
   terraform:
     name: Terraform Validation
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          terraform_version: 1.13.5
           
       - name: Terraform format check
-        run: terraform -chdir=terraform fmt -check -recursive
-        
-      - name: Terraform validation
         run: |
-          terraform -chdir=terraform init -backend=false
-          terraform -chdir=terraform validate
+          if [ -d "terraform" ]; then
+            terraform -chdir=terraform fmt -check -recursive
+          else
+            echo "No terraform directory found, skipping format check"
+          fi
+        
+      - name: Terraform validation (basic)
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
+          TF_IN_AUTOMATION: 1
+        run: |
+          if [ -d "terraform" ]; then
+            cd terraform
+            # Basic validation without backend (doesn't require AWS credentials)
+            terraform init -backend=false
+            terraform validate
+          else
+            echo "No terraform directory found, skipping validation"
+          fi
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: GitHubActions-TerraformValidation-${{ github.run_id }}
+          role-duration-seconds: 3600
+
+      - name: Generate backend.hcl files from templates
+        env:
+          AWS_REGION: us-east-1
+        run: |
+          if [ -d "terraform" ]; then
+            # Get AWS account ID
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
+            echo "Using AWS Region: $AWS_REGION"
+            
+            # Generate backend.hcl files for each environment from templates
+            for ENV in dev staging prod; do
+              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
+              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
+              
+              if [ -f "$TEMPLATE_FILE" ]; then
+                echo "Generating $OUTPUT_FILE from template..."
+                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
+                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
+                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
+                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+                echo "✅ Generated $OUTPUT_FILE"
+              else
+                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
+              fi
+            done
+          else
+            echo "No terraform directory found, skipping backend.hcl generation"
+          fi
+
+      - name: Terraform validation (with backend)
+        env:
+          TF_ENV: dev
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
+          TF_IN_AUTOMATION: 1
+        run: |
+          if [ -d "terraform" ]; then
+            cd terraform
+            terraform init -reconfigure -backend-config=environments/${TF_ENV}/backend.hcl
+            terraform validate
+          else
+            echo "No terraform directory found, skipping validation"
+          fi
+
+      - name: Terraform Plan
+        env:
+          TF_ENV: dev
+          TF_PARALLELISM: 30
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
+          TF_IN_AUTOMATION: 1
+        run: |
+          if [ -d "terraform" ]; then
+            cd terraform
+            # Initialize with backend configuration
+            terraform init -reconfigure -backend-config=environments/${TF_ENV}/backend.hcl
+            terraform plan \
+              -var-file=environments/${TF_ENV}/terraform.tfvars \
+              -var="environment=${TF_ENV}" \
+              -input=false \
+              -lock=true \
+              -parallelism=${TF_PARALLELISM}
+          else
+            echo "No terraform directory found, skipping plan"
+          fi
 
   # Security scanning
   security:
@@ -151,10 +226,10 @@ jobs:
     needs: lint
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
@@ -165,23 +240,12 @@ jobs:
           python -m venv venv
           source venv/bin/activate
           python -m pip install --upgrade pip
-
-      - name: Install dependencies
-        run: |
-          source venv/bin/activate
           pip install -r requirements-dev.txt
 
-      - name: Security scan with bandit
+      - name: Run security checks
         run: |
           source venv/bin/activate
-          bandit -r app/ -f json -o bandit-report.json || true
-          bandit -r app/
-
-      - name: Safety check
-        run: |
-          source venv/bin/activate
-          safety check --json --output safety-report.json || true
-          safety check
+          make security-check
 
   # Final status check - all jobs must pass
   ci-success:

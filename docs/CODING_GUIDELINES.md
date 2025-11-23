@@ -86,7 +86,7 @@
 
 - **AWS Serverless**: Lambda + API Gateway (primary deployment)
 - **Database**: RDS PostgreSQL (production), SQLite (development)
-- **Storage**: S3 for deployment packages and assets
+- **Storage**: S3 for static file hosting and receipt storage, ECR for Lambda container images
 - **Infrastructure as Code**: Terraform with comprehensive CI/CD
 - **Development**: Docker Compose for local services
 - **CI/CD**: GitHub Actions with security scanning and testing

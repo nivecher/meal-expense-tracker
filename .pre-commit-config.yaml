@@ -1,7 +1,7 @@
 repos:
   # 1. File validation
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
         types: [yaml]
@@ -13,7 +13,7 @@ repos:
 
   # 2. Formatting
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
@@ -21,24 +21,24 @@ repos:
 
   # 3. Security checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: detect-private-key
       - id: check-added-large-files
 
   # 4. Debug checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: debug-statements
 
   # Python formatting
   - repo: https://github.com/psf/black
-    rev: 25.1.0
+    rev: 24.10.0
     hooks:
       - id: black
         language_version: python3
-        args: ['--line-length=120', '--target-version=py312']
+        args: ['--line-length=120', '--target-version=py313']
 
   # Python linting
   - repo: https://github.com/pycqa/flake8
@@ -58,7 +58,7 @@ repos:
 
   # Sort imports
   - repo: https://github.com/pycqa/isort
-    rev: 6.0.1
+    rev: 5.13.2
     hooks:
       - id: isort
         args: ['--profile', 'black', '--filter-files']
@@ -85,9 +85,9 @@ repos:
   #       args: [--config-file=setup.cfg]
   #       files: \.py$
 
-  # Markdown linting
+  # Markdown linting (pinned to v0.38.0 for Node.js 18 compatibility)
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.45.0
+    rev: v0.38.0
     hooks:
       - id: markdownlint
         args:
@@ -95,7 +95,7 @@ repos:
 
   # Prettier (optional for Markdown/JSON/YAML)
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
+    rev: v3.1.0
     hooks:
       - id: prettier
         additional_dependencies:

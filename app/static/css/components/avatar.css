@@ -8,6 +8,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: 0.75rem; /* Add spacing between avatar and text */
 }
 
 /* Avatar Size Variants */
@@ -57,7 +58,7 @@
 
 .avatar-container .avatar-initials {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  color: #fff;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -160,7 +161,7 @@
 }
 
 .avatar-loading::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 2px;
   border-radius: 50%;
@@ -181,7 +182,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: #fff;
   font-weight: 600;
   font-size: 0.875rem;
   border-radius: 50%;
@@ -195,9 +196,7 @@
 }
 
 /* Responsive Design */
-
 @media (width <= 768px) {
-
   /* Hide username on small screens for compact display */
 
   .avatar-container .avatar-username {
@@ -226,7 +225,6 @@
 }
 
 @media (width <= 576px) {
-
   /* Further reduce sizes on very small screens */
 
   .avatar-container.avatar-md {
@@ -243,15 +241,25 @@
 }
 
 /* Animations */
-
 @keyframes avatar-pulse {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @keyframes avatar-shimmer {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
 }
 
 /* Hover Effects */

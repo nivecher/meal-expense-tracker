@@ -11,6 +11,8 @@ import os
 import time
 from typing import Any, Dict, Optional
 
+from sqlalchemy import text
+
 from app import create_app
 from app.utils.migration_manager import migration_manager
 
@@ -34,9 +36,19 @@ _INITIALIZATION_STATE = {
 def _validate_environment() -> Dict[str, Any]:
     """Validate required environment variables and configuration."""
     required_vars = [
-        "DATABASE_URL",
         "SECRET_KEY",
     ]
+
+    # Either DATABASE_URL or DATABASE_SECRET_NAME must be present
+    database_config = os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_SECRET_NAME")
+    if not database_config:
+        validation_result = {
+            "valid": False,
+            "missing_required": ["DATABASE_URL or DATABASE_SECRET_NAME"],
+            "missing_optional": [],
+            "warnings": [],
+        }
+        return validation_result
 
     optional_vars = [
         "AUTO_MIGRATE",
@@ -75,14 +87,22 @@ def _test_database_connection(app) -> Dict[str, Any]:
     """Test database connectivity and basic operations."""
     try:
         with app.app_context():
-            from app.extensions import db
+            # Ensure real database credentials are resolved
+            from app.database import _ensure_real_database_uri, get_session
+
+            _ensure_real_database_uri()
+
+            # Get session
+            session = get_session()
 
             # Test basic connection
-            db.session.execute("SELECT 1")
-            db.session.commit()
+            session.execute(text("SELECT 1"))
+            session.commit()
 
             # Test if we can access the database
             from sqlalchemy import inspect
+
+            from app.extensions import db
 
             inspector = inspect(db.engine)
             tables = inspector.get_table_names()

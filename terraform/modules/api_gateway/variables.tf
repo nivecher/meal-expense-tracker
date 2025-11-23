@@ -14,6 +14,18 @@ variable "logs_kms_key_arn" {
   type        = string
 }
 
+variable "create_route53_record" {
+  description = "Whether to create a Route53 record for the API Gateway custom domain"
+  type        = bool
+  default     = true
+}
+
+variable "api_domain_prefix" {
+  description = "Prefix for API Gateway domain (e.g., 'api' for api.meals.dev.nivecher.com)"
+  type        = string
+  default     = "api"
+}
+
 variable "tags" {
   description = "A map of tags to add to all resources"
   type        = map(string)
@@ -40,10 +52,11 @@ variable "domain_name" {
 variable "api_domain_name" {
   description = <<-EOT
     The full domain name for the API (e.g., 'api.example.com').
+    If not provided, will be constructed as '{api_domain_prefix}.{domain_name}'.
     This is used to:
     1. Create the API Gateway custom domain
     2. Set up the domain name configuration
-    3. Create the Route53 record
+    3. Create the Route53 record (if enabled)
   EOT
   type        = string
   default     = null

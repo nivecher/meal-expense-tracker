@@ -21,12 +21,19 @@ def test_update_profile(client, test_user):
 
     response = client.post(
         url_for("auth.profile"),
-        data={"username": "newusername", "email": "newemail@example.com"},
+        data={
+            "first_name": "NewFirstName",
+            "last_name": "NewLastName",
+            "display_name": "NewDisplayName",
+            "bio": "New bio text",
+            "phone": "123-456-7890",
+            "timezone": "America/New_York",
+        },
         follow_redirects=True,
     )
     assert response.status_code == 200
-    # Check that the new username appears in the response
-    assert b"newusername" in response.data
+    # Check that the new display name appears in the response
+    assert b"NewDisplayName" in response.data
 
 
 def test_change_password(client, test_user):

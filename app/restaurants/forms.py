@@ -17,10 +17,19 @@ from wtforms.validators import (
     ValidationError,
 )
 
+from app.constants.cuisines import get_cuisine_names
+
 
 def validate_service_level(form, field):
     """Validate service level field."""
-    if field.data and field.data not in ["", "fine_dining", "casual_dining", "fast_casual", "quick_service", "unknown"]:
+    if field.data and field.data not in [
+        "",
+        "fine_dining",
+        "casual_dining",
+        "fast_casual",
+        "quick_service",
+        "unknown",
+    ]:
         raise ValidationError("Invalid service level selected.")
 
 
@@ -30,19 +39,41 @@ class RestaurantForm(FlaskForm):
     type = SelectField(
         "Type",
         choices=[
+            # Core Restaurant Types (most common)
             ("restaurant", "Restaurant"),
             ("cafe", "Cafe"),
             ("bar", "Bar"),
             ("bakery", "Bakery"),
+            ("fast_food_restaurant", "Fast Food"),
+            ("pizza_restaurant", "Pizza Restaurant"),
+            ("coffee_shop", "Coffee Shop"),
+            ("ice_cream_shop", "Ice Cream Shop"),
+            ("deli", "Deli"),
+            # Specialty Dining
+            ("steak_house", "Steak House"),
+            ("seafood_restaurant", "Seafood Restaurant"),
+            ("sushi_restaurant", "Sushi Restaurant"),
+            ("breakfast_restaurant", "Breakfast Restaurant"),
+            ("dessert_shop", "Dessert Shop"),
+            ("food_court", "Food Court"),
+            # Quick Service & Delivery
+            ("meal_takeaway", "Takeaway"),
+            ("meal_delivery", "Delivery"),
+            ("sandwich_shop", "Sandwich Shop"),
+            # Non-Restaurant Food Establishments
+            ("convenience_store", "Convenience Store"),
+            ("grocery_store", "Grocery Store"),
+            # Other (catch-all for unmapped types)
             ("other", "Other"),
         ],
         validators=[DataRequired()],
     )
+    located_within = StringField("Location Within", validators=[Optional(), Length(max=100)])
     description = TextAreaField("Description", validators=[Optional(), Length(max=500)])
 
     # Contact Information
-    address = StringField("Address Line 1", validators=[Optional(), Length(max=255)])
-    address2 = StringField("Address Line 2", validators=[Optional(), Length(max=255)])
+    address_line_1 = StringField("Address Line 1", validators=[Optional(), Length(max=255)])
+    address_line_2 = StringField("Address Line 2", validators=[Optional(), Length(max=255)])
     city = StringField("City", validators=[Optional(), Length(max=100)])
     state = StringField("State/Province", validators=[Optional(), Length(max=100)])
     postal_code = StringField("Postal Code", validators=[Optional(), Length(max=20)])
@@ -55,7 +86,11 @@ class RestaurantForm(FlaskForm):
     google_place_id = StringField("Google Place ID", validators=[Optional(), Length(max=255)])
 
     # Additional Information
-    cuisine = StringField("Cuisine", validators=[Optional(), Length(max=100)])
+    cuisine = SelectField(
+        "Cuisine",
+        choices=[("", "Select Cuisine (Optional)")] + [(name, name) for name in get_cuisine_names()],
+        validators=[Optional()],
+    )
     service_level = SelectField(
         "Service Level",
         choices=[
@@ -75,7 +110,29 @@ class RestaurantForm(FlaskForm):
     rating = FloatField(
         "Your Rating",
         validators=[Optional(), NumberRange(min=1.0, max=5.0)],
-        render_kw={"step": "0.5", "min": "1.0", "max": "5.0", "placeholder": "Your personal rating (1.0 - 5.0)"},
+        render_kw={
+            "step": "0.5",
+            "min": "1.0",
+            "max": "5.0",
+            "placeholder": "Your personal rating (1.0 - 5.0)",
+        },
+    )
+    price_level = SelectField(
+        "Price Level",
+        choices=[
+            ("", "Auto-detect (Google)"),
+            (0, "Free"),
+            (1, "$ Budget ($1-10)"),
+            (2, "$$ Moderate ($11-30)"),
+            (3, "$$$ Expensive ($31-60)"),
+            (4, "$$$$ Very Expensive ($61+)"),
+        ],
+        validators=[Optional()],
+        coerce=lambda x: int(x) if x and x != "" else None,
+        render_kw={
+            "data-bs-toggle": "tooltip",
+            "title": "Price level will be auto-detected from Google Places data if available",
+        },
     )
     is_chain = BooleanField("Part of a chain", false_values=(False, "false", 0, "0"), default=False)
     notes = TextAreaField("Notes", validators=[Optional()])

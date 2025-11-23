@@ -5,7 +5,7 @@ This module provides environment-specific configuration settings for the applica
 
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 class Config:
@@ -15,7 +15,8 @@ class Config:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-key-change-in-production")
 
     # Flask settings
-    DEBUG: bool = False
+    DEBUG: bool = os.getenv("FLASK_DEBUG", "0").lower() == "1"
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     TESTING: bool = False
 
     # Database settings
@@ -35,16 +36,27 @@ class Config:
     # Google Maps API
     GOOGLE_MAPS_API_KEY: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
     GOOGLE_MAPS_MAP_ID: str = os.getenv("GOOGLE_MAPS_MAP_ID", "")
+    GOOGLE_API_REFERRER_DOMAIN: str = os.getenv("GOOGLE_API_REFERRER_DOMAIN", "localhost:5000")
 
     # Application settings
-    APP_NAME: str = os.getenv("APP_NAME", "Meal Expense Tracker")
+    APP_NAME: str = os.getenv("APP_NAME", "meal-expense-tracker")
+    SERVER_NAME: str = os.getenv("SERVER_NAME", "localhost:5000")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "dev")
 
-    # Email configuration (AWS SES only)
-    MAIL_ENABLED: bool = os.getenv("MAIL_ENABLED", "false").lower() == "true"
-    MAIL_DEFAULT_SENDER: str = os.getenv("MAIL_DEFAULT_SENDER", "noreply@nivecher.com")
+    # File upload settings
+    UPLOAD_FOLDER: str = os.path.join(os.path.dirname(__file__), "app", "static", "uploads")
+    MAX_CONTENT_LENGTH: int = 5 * 1024 * 1024  # 5MB max file size
 
-    # AWS SES configuration (uses IAM roles by default)
-    AWS_SES_REGION: str = os.getenv("AWS_SES_REGION", "us-east-1")
+    # S3 settings for receipt storage
+    # If S3_RECEIPTS_BUCKET is set, S3 is enabled; otherwise use local storage
+    S3_RECEIPTS_BUCKET: Optional[str] = os.getenv("S3_RECEIPTS_BUCKET")
+    S3_REGION: str = os.getenv("S3_REGION", "us-east-1")
+    S3_RECEIPTS_PREFIX: str = os.getenv("S3_RECEIPTS_PREFIX", "receipts/")
+    S3_URL_EXPIRY: int = int(os.getenv("S3_URL_EXPIRY", "3600"))  # 1 hour default
+
+    # Notification configuration (AWS SNS)
+    NOTIFICATIONS_ENABLED: bool = os.getenv("NOTIFICATIONS_ENABLED", "true").lower() == "true"
+    SNS_TOPIC_ARN: str = ""  # Will be set in __init__
 
     def __init__(self) -> None:
         """Initialize configuration."""
@@ -57,6 +69,9 @@ class Config:
         # Configure session
         self._configure_session()
 
+        # Configure SNS topic ARN
+        self._configure_sns_topic_arn()
+
     def _get_database_uri(self) -> str:
         """Get the appropriate database URI for the current environment."""
         # Handle Heroku-style database URLs
@@ -66,28 +81,29 @@ class Config:
                 uri = uri.replace("postgres://", "postgresql://", 1)
             return uri
 
+        # In Lambda environment without DATABASE_URL, fetch from Secrets Manager
+        if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+            try:
+                from app.database import _get_lambda_database_uri
+
+                return _get_lambda_database_uri()
+            except Exception:
+                # If we can't import or fetch, return placeholder - will be resolved later
+                return "postgresql+pg8000://"
+
         # Default to SQLite in development
+        # Skip creating directories in Lambda (read-only filesystem)
+        if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+            return "sqlite:///:memory:"
+
         instance_path = Path(__file__).parent / "instance"
         instance_path.mkdir(exist_ok=True)
         return f'sqlite:///{instance_path}/app-{os.getenv("FLASK_ENV")}.db'
 
     def _configure_session(self) -> None:
         """Configure session settings based on environment."""
-        # Use DynamoDB for all environments if SESSION_TYPE is explicitly set to dynamodb
-        # or if running in production
-        session_type = os.getenv("SESSION_TYPE", "").lower()
-        flask_env = os.getenv("FLASK_ENV", "development")
-        is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
-
-        # For now, use signed cookies in Lambda to avoid table creation issues
-        # TODO: Fix DynamoDB session configuration to work with existing tables
-        if is_lambda:
-            # For Lambda environments, use signed cookies to avoid permission issues
-            self._setup_signed_cookie_session()
-        elif session_type == "dynamodb" or flask_env == "production":
-            self._setup_dynamodb_session()
-        else:
-            self._setup_filesystem_session()
+        # Use Flask's built-in signed cookie sessions for all environments
+        self._setup_signed_cookie_session()
 
         # Configure secure cookie settings based on HTTPS availability
         self._configure_cookie_security()
@@ -120,83 +136,38 @@ class Config:
             f"Cookie security: SECURE={self.SESSION_COOKIE_SECURE}, HTTPONLY={self.SESSION_COOKIE_HTTPONLY}, SAMESITE={self.SESSION_COOKIE_SAMESITE}"
         )
 
-    def _setup_dynamodb_session(self) -> None:
-        """Setup DynamoDB session configuration with validation."""
-        self.SESSION_TYPE = "dynamodb"
+    def _configure_sns_topic_arn(self) -> None:
+        """Configure SNS topic ARN for notifications."""
+        # Try to get from environment first (set by Terraform)
+        env_arn = os.getenv("SNS_TOPIC_ARN")
+        if env_arn and env_arn != "arn:aws:sns:::notifications":  # Check for placeholder
+            self.SNS_TOPIC_ARN = env_arn
+            return
 
-        # Session table configuration with validation
-        table_name = os.getenv("SESSION_DYNAMODB_TABLE", "flask_sessions")
-        if not table_name or len(table_name.strip()) == 0:
-            raise ValueError("SESSION_DYNAMODB_TABLE cannot be empty when using DynamoDB sessions")
-        self.SESSION_DYNAMODB_TABLE = table_name.strip()
-
-        # AWS region configuration - use SESSION_DYNAMODB_REGION with fallback to built-in AWS_REGION
-        region = os.getenv("SESSION_DYNAMODB_REGION") or os.getenv("AWS_REGION", "us-east-1")
-        if not region or len(region.strip()) == 0:
-            raise ValueError("SESSION_DYNAMODB_REGION or AWS_REGION must be specified for DynamoDB sessions")
-        self.SESSION_DYNAMODB_REGION = region.strip()
-
-        # Explicitly configure DynamoDB to use AWS (not localhost)
-        # This prevents Flask-Session from defaulting to localhost:8000
-        import boto3
-        from botocore.config import Config
-
-        # Create DynamoDB resource with explicit AWS configuration and enhanced retry logic
-        boto_config = Config(
-            region_name=region.strip(),
-            retries={"max_attempts": 5, "mode": "adaptive", "total_max_attempts": 10},
-            connect_timeout=10,
-            read_timeout=30,
-        )
-
-        # Optional endpoint for testing/LocalStack only
-        endpoint_url = os.getenv("SESSION_DYNAMODB_ENDPOINT")
-        if endpoint_url:
-            endpoint_url = endpoint_url.strip()
-            if endpoint_url:
-                self.SESSION_DYNAMODB_ENDPOINT_URL = endpoint_url
-                # For LocalStack/testing, create resource with custom endpoint
-                self.SESSION_DYNAMODB = boto3.resource(
-                    "dynamodb", endpoint_url=endpoint_url, region_name=region.strip(), config=boto_config
-                )
-            else:
-                # Production: use default AWS endpoints
-                self.SESSION_DYNAMODB = boto3.resource("dynamodb", region_name=region.strip(), config=boto_config)
-        else:
-            # Production: use default AWS endpoints (no localhost fallback)
-            self.SESSION_DYNAMODB = boto3.resource("dynamodb", region_name=region.strip(), config=boto_config)
-
-        # Security settings
-        self.SESSION_USE_SIGNER = True
-        self.SESSION_PERMANENT = True
-
-        # Session timeout configuration (in seconds)
-        session_timeout = os.getenv("SESSION_TIMEOUT", "3600")  # Default 1 hour
+        # If not in environment, try to construct it
         try:
-            self.SESSION_TIMEOUT = int(session_timeout)
-        except ValueError:
-            self.SESSION_TIMEOUT = 3600  # Fallback to 1 hour
+            import boto3
 
-        # Key prefix for session isolation (optional)
-        if key_prefix := os.getenv("SESSION_KEY_PREFIX"):
-            self.SESSION_KEY_PREFIX = key_prefix.strip()
+            # Get current AWS region and account
+            region = os.getenv("AWS_REGION", "us-east-1")
+            # Try to get account ID from STS
+            sts_client = boto3.client("sts", region_name=region)
+            account_id = sts_client.get_caller_identity()["Account"]
 
-        # Cookie settings will be configured by _configure_cookie_security()
-        # This ensures consistent behavior across all session types
+            # Construct SNS topic ARN
+            app_name = os.getenv("APP_NAME", "meal-expense-tracker").replace("_", "-")
+            environment = os.getenv("ENVIRONMENT", "dev")
 
-        # DynamoDB-specific settings
-        # Disable automatic table creation - table should exist from Terraform
-        self.SESSION_DYNAMODB_AUTO_CREATE = False
-        self.SESSION_DYNAMODB_AUTO_DELETE = False
-
-        # Optional custom hash function (default is hashlib.sha1)
-        # self.SESSION_DYNAMODB_HASH_FUNCTION = "sha256"  # Uncomment for SHA-256
+            self.SNS_TOPIC_ARN = f"arn:aws:sns:{region}:{account_id}:{app_name}-{environment}-notifications"
+        except Exception:
+            # If we can't construct it, leave as empty string
+            self.SNS_TOPIC_ARN = ""
 
     def _setup_signed_cookie_session(self) -> None:
-        """Setup signed cookie session configuration for Lambda environments.
+        """Setup signed cookie session configuration for all environments.
 
         Uses Flask's default session interface with signed cookies.
-        This is ideal for serverless environments as it requires no external storage.
+        This is ideal for all environments as it requires no external storage.
         """
         # Use Flask's default signed cookie sessions
         self.SESSION_TYPE = None  # This uses Flask's default SecureCookieSessionInterface
@@ -210,37 +181,21 @@ class Config:
         # Enable session signing
         self.SESSION_USE_SIGNER = True
 
-        # Additional security for serverless
+        # Additional security settings
         self.SESSION_COOKIE_NAME = "session"
-        # Set explicit domain for API Gateway compatibility
-        environment = os.getenv("ENVIRONMENT", "dev")
-        if environment == "dev":
-            # For development, don't set domain to allow subdomain flexibility
-            self.SESSION_COOKIE_DOMAIN = None
-        else:
-            # For production, set explicit domain
-            self.SESSION_COOKIE_DOMAIN = None
         self.SESSION_COOKIE_PATH = "/"
-
-    def _setup_filesystem_session(self) -> None:
-        """Setup filesystem session configuration."""
-        import tempfile
-
-        self.SESSION_TYPE = "filesystem"
-        self.SESSION_FILE_DIR = tempfile.mkdtemp(prefix="flask_session_")
-        self.SESSION_FILE_THRESHOLD = 100
 
 
 class DevelopmentConfig(Config):
     """Development configuration."""
 
-    DEBUG: bool = True
+    # DEBUG: bool = True
     # Cookie security is now automatically configured based on HTTPS availability
     # SESSION_COOKIE_SECURE will be False for HTTP development, True for HTTPS
     # SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE are always enabled for security
 
 
-class TestingConfig(Config):
+class UnitTestConfig(Config):  # noqa: D101
     """Testing configuration."""
 
     TESTING: bool = True
@@ -263,7 +218,7 @@ def get_config() -> Config:
 
     configs = {
         "development": DevelopmentConfig,
-        "testing": TestingConfig,
+        "testing": UnitTestConfig,
         "production": ProductionConfig,
     }
 

@@ -14,7 +14,7 @@ async function loadModule(moduleName) {
     const module = await import(`/static/js/pages/${moduleName}.js`);
     loadedModules.add(moduleName);
     module.init?.();
-  } catch (error) {
+  } catch {
     console.error(`Failed to load module ${moduleName}:`, error);
   }
 }

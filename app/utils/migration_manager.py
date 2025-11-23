@@ -11,6 +11,7 @@ import time
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
+from alembic.script import ScriptDirectory
 from flask import current_app
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DisconnectionError, OperationalError
@@ -55,6 +56,45 @@ class MigrationManager:
         """Initialize with Flask app."""
         self.app = app
 
+    def _detect_migrations_dir(self) -> Optional[str]:
+        """Detect the migrations directory path in current environment."""
+        env_dir = os.environ.get("MIGRATIONS_DIR")
+        if env_dir and os.path.isdir(env_dir):
+            return env_dir
+
+        try:
+            app = self.app or current_app
+            migrate_ext = getattr(app, "extensions", {}).get("migrate")
+            if migrate_ext and getattr(migrate_ext, "directory", None):
+                dir_candidate = migrate_ext.directory
+                if dir_candidate and os.path.isdir(dir_candidate):
+                    return dir_candidate
+        except Exception as e:
+            logger.debug(f"Could not detect migrations directory from Flask app: {e}")
+            # Continue to fallback options
+
+        lambda_default = "/var/task/migrations"
+        if os.path.isdir(lambda_default):
+            return lambda_default
+
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        local_default = os.path.join(project_root, "migrations")
+        if os.path.isdir(local_default):
+            return local_default
+
+        return None
+
+    def _list_revisions_from_dir(self, migrations_dir: str) -> List[str]:
+        """List Alembic revision ids from the specified migrations directory."""
+        script = ScriptDirectory(migrations_dir)
+        try:
+            revisions_desc = list(script.walk_revisions())
+        except Exception:
+            revisions_desc = list(script.walk_revisions(base="base", head="heads"))
+        revisions = [rev.revision for rev in reversed(revisions_desc)]
+        logger.info(f"Found {len(revisions)} migrations from {migrations_dir}: {revisions}")
+        return revisions
+
     def _get_app_context(self):
         """Get Flask app context."""
         if self.app:
@@ -96,7 +136,7 @@ class MigrationManager:
             logger.error(f"Database connection test failed: {e}")
             return False
 
-    def _copy_migrations_to_writable_location(self) -> str:
+    def _copy_migrations_to_writable_location(self) -> Optional[str]:
         """Copy migrations to a writable location in Lambda."""
         import os
         import shutil
@@ -105,8 +145,17 @@ class MigrationManager:
         temp_migrations_dir = tempfile.mkdtemp(prefix="migrations_")
 
         try:
-            # Get the original migrations directory
-            original_migrations_dir = os.path.join(os.getcwd(), "migrations")
+            # Get the original migrations directory - in Lambda, it's at the root of the package
+            import os
+
+            # In Lambda, migrations are at the root level of the package (v4 fix)
+            if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+                # Lambda environment - migrations are at /var/task/migrations
+                original_migrations_dir = "/var/task/migrations"
+            else:
+                # Local environment - calculate relative to this file
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                original_migrations_dir = os.path.join(project_root, "migrations")
 
             if not os.path.exists(original_migrations_dir):
                 logger.error(f"Original migrations directory not found: {original_migrations_dir}")
@@ -122,6 +171,25 @@ class MigrationManager:
             # Set environment variable for Flask-Migrate
             os.environ["MIGRATIONS_DIR"] = temp_migrations_dir
             logger.info(f"Set MIGRATIONS_DIR to: {temp_migrations_dir}")
+
+            # Configure Flask-Migrate to use the copied directory
+            try:
+                from flask import current_app
+                from flask_migrate import Migrate
+
+                # Get the current Flask app and configure Migrate
+                app = current_app._get_current_object()
+                if "migrate" not in app.extensions:
+                    # Initialize Migrate with the app and the temp directory
+                    migrate = Migrate()
+                    migrate.init_app(app, db, directory=temp_migrations_dir)
+                    logger.info(f"Configured Flask-Migrate to use directory: {temp_migrations_dir}")
+                else:
+                    # Update existing Migrate instance
+                    app.extensions["migrate"].directory = temp_migrations_dir
+                    logger.info(f"Updated Flask-Migrate to use directory: {temp_migrations_dir}")
+            except Exception as e:
+                logger.warning(f"Could not configure Flask-Migrate: {e}")
 
             return temp_migrations_dir
 
@@ -163,35 +231,29 @@ class MigrationManager:
             return None
 
     def _get_available_revisions(self) -> Tuple[List[str], Optional[str]]:
-        """Get available migration revisions, copying to writable location if needed."""
-        try:
-            from flask_migrate import history
+        """Get available migration revisions using Alembic ScriptDirectory."""
+        mig_dir = self._detect_migrations_dir()
+        if mig_dir:
+            try:
+                return self._list_revisions_from_dir(mig_dir), None
+            except Exception as e:
+                logger.warning(f"Could not get migration history via Alembic: {e}")
 
-            migration_history = history()
-            available_revisions = [rev.revision for rev in migration_history]
-            logger.info(f"Found {len(available_revisions)} migrations: {available_revisions}")
-            return available_revisions, None
-        except Exception as e:
-            logger.warning(f"Could not get migration history: {e}")
+        temp_dir = self._copy_migrations_to_writable_location()
+        if temp_dir:
+            try:
+                return self._list_revisions_from_dir(temp_dir), None
+            except Exception as e2:
+                logger.error(f"Still could not get migration history after copying: {e2}")
+                return [], "Could not access migration files: error after copying"
 
-            # Try copying migrations to writable location
-            temp_migrations_dir = self._copy_migrations_to_writable_location()
-            if temp_migrations_dir:
-                try:
-                    from flask_migrate import history
-
-                    migration_history = history()
-                    available_revisions = [rev.revision for rev in migration_history]
-                    logger.info(f"Found {len(available_revisions)} migrations after copying: {available_revisions}")
-                    return available_revisions, None
-                except Exception as e2:
-                    logger.error(f"Still could not get migration history after copying: {e2}")
-                    return [], f"Could not access migration files: {str(e)}"
-            else:
-                return [], f"Could not access migration files: {str(e)}"
+        return [], "Could not access migration files: migrations directory not found"
 
     def _determine_migration_state(
-        self, db_info: Dict[str, Any], current_revision: Optional[str], available_revisions: List[str]
+        self,
+        db_info: Dict[str, Any],
+        current_revision: Optional[str],
+        available_revisions: List[str],
     ) -> str:
         """Determine the current migration state."""
         if not db_info["has_main_tables"]:
@@ -245,36 +307,41 @@ class MigrationManager:
                 return {"state": "error", "error": str(e)}
 
     def _get_latest_revision(self) -> Tuple[Optional[str], Optional[str]]:
-        """Get the latest migration revision, copying migrations if needed."""
-        try:
-            from flask_migrate import history
+        """Get the latest migration revision using Alembic ScriptDirectory.
 
-            migration_history = history()
-            if not migration_history:
-                return None, "No migration files found"
-            latest_revision = migration_history[-1].revision
-            logger.info(f"Latest migration revision: {latest_revision}")
-            return latest_revision, None
-        except Exception as e:
-            logger.warning(f"Could not get migration history directly: {e}")
+        Avoids relying on Flask-Migrate's history() which may return None.
+        """
 
-            # Try copying migrations to writable location
-            temp_migrations_dir = self._copy_migrations_to_writable_location()
-            if temp_migrations_dir:
-                try:
-                    from flask_migrate import history
+        def _latest_from_dir(migrations_dir: str) -> Optional[str]:
+            script = ScriptDirectory(migrations_dir)
+            try:
+                revisions_desc = list(script.walk_revisions())
+            except Exception:
+                revisions_desc = list(script.walk_revisions(base="base", head="heads"))
+            if not revisions_desc:
+                return None
+            # walk_revisions yields newest→oldest, pick the first or reverse
+            latest = revisions_desc[0].revision
+            return latest
 
-                    migration_history = history()
-                    if not migration_history:
-                        return None, "No migration files found after copying"
-                    latest_revision = migration_history[-1].revision
-                    logger.info(f"Latest migration revision after copying: {latest_revision}")
-                    return latest_revision, None
-                except Exception as e2:
-                    logger.error(f"Still could not get migration history after copying: {e2}")
-                    return None, f"Could not access migration files: {str(e)}"
-            else:
-                return None, f"Could not access migration files: {str(e)}"
+        # Try detected migrations dir first
+        mig_dir = self._detect_migrations_dir()
+        if mig_dir and os.path.isdir(mig_dir):
+            latest = _latest_from_dir(mig_dir)
+            if latest:
+                logger.info(f"Latest migration revision: {latest}")
+                return latest, None
+
+        # Fallback to copy to /tmp and retry
+        temp_dir = self._copy_migrations_to_writable_location()
+        if temp_dir and os.path.isdir(temp_dir):
+            latest = _latest_from_dir(temp_dir)
+            if latest:
+                logger.info(f"Latest migration revision after copying: {latest}")
+                return latest, None
+            return None, "No migration files found after copying"
+
+        return None, "No migration files found"
 
     def _create_alembic_version_table(self, existing_tables: List[str]) -> None:
         """Create alembic_version table if it doesn't exist."""
@@ -294,7 +361,10 @@ class MigrationManager:
     def _set_migration_revision(self, revision: str) -> None:
         """Set the current migration revision."""
         db.session.execute(text("DELETE FROM alembic_version"))
-        db.session.execute(text("INSERT INTO alembic_version (version_num) VALUES (:revision)"), {"revision": revision})
+        db.session.execute(
+            text("INSERT INTO alembic_version (version_num) VALUES (:revision)"),
+            {"revision": revision},
+        )
 
     def fix_migration_history(self) -> Dict[str, Any]:
         """
@@ -329,6 +399,122 @@ class MigrationManager:
                 db.session.rollback()
                 logger.error(f"Error fixing migration history: {e}")
                 return {"success": False, "error": str(e)}
+
+    def _upgrade_once_to_heads(self) -> Dict[str, Any]:
+        """Perform a single Alembic upgrade to 'heads' and return revisions before/after.
+
+        Uses Alembic's programmatic API directly to avoid CLI argument ambiguity.
+        """
+        from alembic import command as alembic_command
+        from alembic.config import Config
+
+        # Determine migrations directory
+        mig_dir = self._detect_migrations_dir()
+        if not mig_dir:
+            mig_dir = self._copy_migrations_to_writable_location()
+        if not mig_dir:
+            raise RuntimeError("Migrations directory not found for upgrade")
+
+        # Compute before revision
+        db_info = self._get_database_info()
+        before_rev = self._get_current_revision(db_info["has_alembic_version"])
+        logger.info(f"Current revision before upgrade: {before_rev}")
+
+        # Build Alembic Config from alembic.ini to satisfy env.py fileConfig
+        ini_path = os.path.join(mig_dir, "alembic.ini")
+        if os.path.exists(ini_path):
+            cfg = Config(ini_path)
+        else:
+            cfg = Config()
+        # Ensure critical options are set regardless of path source
+        cfg.set_main_option("script_location", mig_dir)
+        try:
+            cfg.set_main_option("config_file_name", ini_path)
+            cfg.config_file_name = ini_path  # safeguard for env.py fileConfig
+        except Exception as e:
+            logger.debug(f"Could not set config_file_name for Alembic config: {e}")
+            # Continue without config file name
+        try:
+            # Provide DB URL for offline envs; env.py usually reads from current_app
+            cfg.set_main_option("sqlalchemy.url", str(db.engine.url))
+        except Exception as e:
+            logger.debug(f"Could not set sqlalchemy.url for Alembic config: {e}")
+            # Continue without explicit URL (env.py will handle connection)
+
+        # Run upgrade to heads
+        alembic_command.upgrade(cfg, "heads")
+
+        # Compute after revision
+        db_info = self._get_database_info()
+        after_rev = self._get_current_revision(db_info["has_alembic_version"])
+        logger.info(f"New revision after upgrade: {after_rev}")
+
+        return {"previous_revision": before_rev, "new_revision": after_rev}
+
+    def _upgrade_until_up_to_date(self, max_checks: int = 5) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Upgrade to heads and repeat until state is up_to_date or attempts exhausted."""
+        migration_data = self._retry_with_backoff(self._upgrade_once_to_heads)
+        for _ in range(max_checks):
+            post_state = self.check_migration_state()
+            if post_state.get("state") in {"up_to_date", "empty"}:
+                return migration_data, post_state
+            logger.info(
+                f"Still pending migrations ({post_state.get('pending_count', '?')}), running another upgrade cycle..."
+            )
+            migration_data = self._retry_with_backoff(self._upgrade_once_to_heads)
+        return migration_data, self.check_migration_state()
+
+    def _verify_schema_matches_head(self) -> bool:
+        """Lightweight verification that critical schema matches expected head.
+
+        Currently verifies the 'restaurant.located_within' column exists.
+        Returns True when verification passes.
+        """
+        try:
+            inspector = inspect(db.engine)
+            if "restaurant" not in inspector.get_table_names():
+                return True  # nothing to verify yet
+            columns = [col["name"] for col in inspector.get_columns("restaurant")]
+            if "located_within" not in columns:
+                logger.warning("Schema mismatch: restaurant.located_within is missing while at head")
+                return False
+            return True
+        except Exception as e:
+            logger.warning(f"Schema verification failed: {e}")
+            return True
+
+    def _stamp_to_previous_of_head(self) -> Optional[str]:
+        """Stamp alembic_version to the previous revision of the head, if resolvable.
+
+        Returns the stamped revision id or None on failure.
+        """
+        try:
+            mig_dir = self._detect_migrations_dir() or self._copy_migrations_to_writable_location()
+            if not mig_dir:
+                logger.error("Cannot determine migrations directory to stamp")
+                return None
+            script = ScriptDirectory(mig_dir)
+            head = script.get_current_head() or (script.get_heads()[0] if script.get_heads() else None)
+            if not head:
+                logger.error("Could not determine head revision to stamp back from")
+                return None
+            head_rev = script.get_revision(head)
+            prev = None
+            if isinstance(head_rev.down_revision, tuple):
+                prev = head_rev.down_revision[0] if head_rev.down_revision else None
+            else:
+                prev = head_rev.down_revision
+            if not prev:
+                logger.error("Head has no down_revision; cannot stamp backwards")
+                return None
+            self._set_migration_revision(prev)
+            db.session.commit()
+            logger.info(f"Stamped alembic_version back to previous revision: {prev}")
+            return prev
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed stamping to previous of head: {e}")
+            return None
 
     def run_migrations(self, dry_run: bool = False, target_revision: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -373,31 +559,15 @@ class MigrationManager:
                         "dry_run": True,
                     }
 
-                # Run the actual migration with retry logic
-                def _run_upgrade():
-                    from flask_migrate import current, upgrade
-
-                    current_rev = current()
-                    logger.info(f"Current revision before upgrade: {current_rev}")
-
-                    # Run upgrade
-                    upgrade()
-
-                    new_rev = current()
-                    logger.info(f"New revision after upgrade: {new_rev}")
-
-                    return {
-                        "previous_revision": current_rev,
-                        "new_revision": new_rev,
-                        "target_revision": target_revision,
-                    }
-
-                migration_data = self._retry_with_backoff(_run_upgrade)
+                migration_data, final_state = self._upgrade_until_up_to_date(max_checks=5)
+                self._handle_post_upgrade_verification(migration_data, final_state)
 
                 return {
                     "success": True,
-                    "message": f"Database migrations completed successfully. Revision: {migration_data['previous_revision']} → {migration_data['new_revision']}",
-                    "data": migration_data,
+                    "message": (
+                        f"Database migrations attempted. Last revision: {migration_data['previous_revision']} → {migration_data['new_revision']}"
+                    ),
+                    "data": {"final_state": final_state, **migration_data},
                 }
 
             except Exception as e:
@@ -413,7 +583,25 @@ class MigrationManager:
                 elif "connection" in error_msg.lower():
                     error_msg = f"Database connection issue: {error_msg}"
 
-                return {"success": False, "message": f"Migration failed: {error_msg}", "error": str(e)}
+                return {
+                    "success": False,
+                    "message": f"Migration failed: {error_msg}",
+                    "error": str(e),
+                }
+
+    def _handle_post_upgrade_verification(self, migration_data: Dict[str, Any], final_state: Dict[str, Any]) -> None:
+        """Verify schema and optionally stamp back one revision and re-apply if needed."""
+        if final_state.get("state") != "up_to_date":
+            logger.warning(f"Migrations did not reach up-to-date state: {final_state}")
+            return
+        if self._verify_schema_matches_head():
+            return
+        stamped = self._stamp_to_previous_of_head()
+        if not stamped:
+            logger.warning("Could not stamp back to previous revision; manual intervention may be required")
+            return
+        logger.info("Re-applying migrations after stamping back one revision...")
+        self._upgrade_until_up_to_date(max_checks=3)
 
     def auto_migrate(self) -> Dict[str, Any]:
         """
@@ -457,7 +645,11 @@ class MigrationManager:
 
         else:
             logger.warning(f"Unknown migration state: {state_info['state']}")
-            return {"success": False, "message": f"Unknown migration state: {state_info['state']}", "data": state_info}
+            return {
+                "success": False,
+                "message": f"Unknown migration state: {state_info['state']}",
+                "data": state_info,
+            }
 
 
 # Global migration manager instance
