@@ -154,6 +154,36 @@ jobs:
           role-session-name: GitHubActions-TerraformValidation-${{ github.run_id }}
           role-duration-seconds: 3600
 
+      - name: Generate backend.hcl files from templates
+        env:
+          AWS_REGION: us-east-1
+        run: |
+          if [ -d "terraform" ]; then
+            # Get AWS account ID
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
+            echo "Using AWS Region: $AWS_REGION"
+            
+            # Generate backend.hcl files for each environment from templates
+            for ENV in dev staging prod; do
+              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
+              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
+              
+              if [ -f "$TEMPLATE_FILE" ]; then
+                echo "Generating $OUTPUT_FILE from template..."
+                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
+                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
+                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
+                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+                echo "✅ Generated $OUTPUT_FILE"
+              else
+                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
+              fi
+            done
+          else
+            echo "No terraform directory found, skipping backend.hcl generation"
+          fi
+
       - name: Terraform validation (with backend)
         env:
           TF_ENV: dev
@@ -172,10 +202,13 @@ jobs:
         env:
           TF_ENV: dev
           TF_PARALLELISM: 30
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
           TF_IN_AUTOMATION: 1
         run: |
           if [ -d "terraform" ]; then
             cd terraform
+            # Initialize with backend configuration
+            terraform init -reconfigure -backend-config=environments/${TF_ENV}/backend.hcl
             terraform plan \
               -var-file=environments/${TF_ENV}/terraform.tfvars \
               -var="environment=${TF_ENV}" \

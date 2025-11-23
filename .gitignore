@@ -153,6 +153,7 @@ terraform/.terraform.tfstate.lock.info
 **/backend.hcl
 !terraform/backend.hcl
 **/backend.hcl.*
+!**/backend.hcl.template
 **/backend.tf
 !terraform/backend.tf
 **/backend.tf.*

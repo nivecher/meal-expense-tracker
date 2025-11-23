@@ -1,0 +1,7 @@
+# Backend configuration for staging environment
+bucket         = "meal-expense-tracker-tfstate-${AWS_ACCOUNT_ID}"
+key            = "staging/terraform.tfstate"
+region         = "${AWS_REGION}"
+dynamodb_table = "meal-expense-tracker-tflock"
+use_lockfile   = true
+encrypt        = true
