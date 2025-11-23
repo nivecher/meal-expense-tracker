@@ -1,9 +1,8 @@
 import logging
-import os
-from typing import Optional, Union
+from typing import Optional
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, request
 from flask_cors import CORS
 
 from config import get_config

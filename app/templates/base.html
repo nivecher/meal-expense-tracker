@@ -158,24 +158,28 @@
 
         <!-- Flash to Toast Converter -->
         <script type="module">
-            import { toast } from '/static/js/utils/notifications.js';
+            import { toast } from "/static/js/utils/notifications.js";
 
-            document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener("DOMContentLoaded", function () {
                 // Convert flash messages to toasts only if they exist and no JavaScript toasts are expected
-                const flashMessages = document.querySelectorAll('.flash-messages .alert');
-                flashMessages.forEach(function(alert) {
+                const flashMessages = document.querySelectorAll(".flash-messages .alert");
+                flashMessages.forEach(function (alert) {
                     // Only convert if this is a page load (not an AJAX response)
-                    if (!alert.closest('[data-ajax-response]')) {
-                        const message = alert.querySelector('.alert-message')?.innerHTML || alert.textContent.trim();
-                        const category = alert.classList.contains('alert-success') ? 'success' :
-                                       alert.classList.contains('alert-danger') ? 'error' :
-                                       alert.classList.contains('alert-warning') ? 'warning' : 'info';
+                    if (!alert.closest("[data-ajax-response]")) {
+                        const message = alert.querySelector(".alert-message")?.innerHTML || alert.textContent.trim();
+                        const category = alert.classList.contains("alert-success")
+                            ? "success"
+                            : alert.classList.contains("alert-danger")
+                              ? "error"
+                              : alert.classList.contains("alert-warning")
+                                ? "warning"
+                                : "info";
 
                         // Show toast
                         toast[category](message);
 
                         // Hide the original flash message
-                        alert.style.display = 'none';
+                        alert.style.display = "none";
                     }
                 });
             });

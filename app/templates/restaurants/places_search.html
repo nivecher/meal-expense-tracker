@@ -13,9 +13,11 @@ url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Fin
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h1 class="h4 mb-0"> <i class="fas fa-map-marked-alt text-primary me-2"></i>Find Restaurants </h1>
                 <div class="d-flex gap-2">
-                    <button id="clear-location-btn" class="btn btn-outline-warning btn-sm"
-                            data-bs-toggle="tooltip"
-                            title="Clear saved location data and reset location permissions">
+                    <button
+                        id="clear-location-btn"
+                        class="btn btn-outline-warning btn-sm"
+                        data-bs-toggle="tooltip"
+                        title="Clear saved location data and reset location permissions">
                         <i class="fas fa-location-slash me-1"></i> Clear Location
                     </button>
                     <a href="{{ url_for('restaurants.list_restaurants') }}" class="btn btn-outline-secondary">
@@ -90,18 +92,18 @@ url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Fin
             };
 
             // Initialize clear location button
-            const clearLocationBtn = document.getElementById('clear-location-btn');
+            const clearLocationBtn = document.getElementById("clear-location-btn");
             if (clearLocationBtn) {
-                clearLocationBtn.addEventListener('click', function() {
+                clearLocationBtn.addEventListener("click", function () {
                     // Check if location data exists first
                     const locationData = window.LocationUtils.checkLocationData();
 
                     if (!locationData.hasLocationData) {
                         // Show info message if no location data exists
-                        if (typeof showToast === 'function') {
-                            showToast('No location data found to clear', 'info');
+                        if (typeof showToast === "function") {
+                            showToast("No location data found to clear", "info");
                         } else {
-                            alert('No location data found to clear');
+                            alert("No location data found to clear");
                         }
                         return;
                     }
@@ -114,18 +116,18 @@ url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Fin
 
                         if (result.success) {
                             // Show success message and reload after delay
-                            if (typeof showToast === 'function') {
-                                showToast('Location data cleared successfully! Reloading page...', 'success');
+                            if (typeof showToast === "function") {
+                                showToast("Location data cleared successfully! Reloading page...", "success");
                             }
 
                             setTimeout(() => {
                                 window.location.reload();
                             }, 2000);
                         } else {
-                            if (typeof showToast === 'function') {
-                                showToast('Failed to clear location data: ' + result.error, 'error');
+                            if (typeof showToast === "function") {
+                                showToast("Failed to clear location data: " + result.error, "error");
                             } else {
-                                alert('Failed to clear location data: ' + result.error);
+                                alert("Failed to clear location data: " + result.error);
                             }
                         }
                     }

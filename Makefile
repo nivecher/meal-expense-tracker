@@ -156,7 +156,7 @@ help:  ## Show this help message
 
 	@echo "\n\033[1mRequirements & Security:\033[0m"
 	@echo "  \033[1mmake requirements\033[0m     Generate requirements files from .in files"
-	@echo "  \033[1mmake security-scan\033[0m     Run security analysis (vulnerabilities + bandit)"
+	@echo "  \033[1mmake security-check\033[0m   Run security checks (vulnerabilities + bandit)"
 	@echo "  \033[1mmake security-vulns\033[0m    Check for known vulnerabilities"
 	@echo "  \033[1mmake security-bandit\033[0m   Run Bandit security linter"
 	@echo "  \033[1mmake deps-check\033[0m        Check for outdated dependencies"
@@ -200,7 +200,7 @@ setup:
 	@echo "  \033[1msource venv/bin/activate\033[0m  # Activate virtual environment"
 	@echo "  \033[1mmake run\033[0m                 # Start the application"
 	@echo "  \033[1mmake test\033[0m                # Run tests"
-	@echo "  \033[1mmake security-scan\033[0m       # Check security"
+	@echo "  \033[1mmake security-check\033[0m       # Check security"
 
 ## Run the application locally
 .PHONY: run
@@ -346,10 +346,14 @@ check-pip-tools:
 		$(PIP) install pip-tools; \
 	fi
 
-## Run comprehensive security analysis
+## Run security checks (vulnerabilities + bandit)
+.PHONY: security-check
+security-check: security-vulns security-bandit
+	@echo "\n\033[1;32m✅ Security checks completed\033[0m"
+
+## Run comprehensive security analysis (alias for security-check)
 .PHONY: security-scan
-security-scan: security-vulns security-bandit
-	@echo "\n\033[1;32m✅ Security scan completed\033[0m"
+security-scan: security-check
 
 ## Check for known vulnerabilities
 .PHONY: security-vulns

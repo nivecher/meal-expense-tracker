@@ -6,7 +6,6 @@ This module contains the route handlers for the main blueprint.
 
 import os
 from datetime import datetime, timezone
-from math import ceil
 
 from flask import (
     Response,
@@ -22,7 +21,6 @@ from flask import (
 from flask_login import current_user, login_required
 from sqlalchemy import func, select
 
-from app.expenses import services as expense_services
 from app.expenses.models import Expense, Tag
 from app.extensions import db
 from app.restaurants.models import Restaurant
@@ -117,9 +115,13 @@ def about():
     Returns:
         Rendered about page template with version data
     """
-    from app._version import __version__
+    from app._version import __build_timestamp__, __version__
 
-    return render_template("main/about.html", app_version=__version__)
+    return render_template(
+        "main/about.html",
+        app_version=__version__,
+        build_timestamp=__build_timestamp__,
+    )
 
 
 @bp.route("/help")

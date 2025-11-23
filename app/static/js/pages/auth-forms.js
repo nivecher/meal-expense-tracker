@@ -84,6 +84,7 @@ async function handleErrorResponse(response, form) {
 function detectBrowserTimezone() {
   try {
     if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+      // eslint-disable-next-line new-cap
       const options = Intl.DateTimeFormat().resolvedOptions();
       if (options && options.timeZone && typeof options.timeZone === 'string') {
         return options.timeZone;
@@ -151,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Also set timezone right before form submission as backup
     registerForm.addEventListener(
       'submit',
-      (event) => {
+      (_event) => {
         const tzInput = document.getElementById('timezone');
         if (tzInput) {
           const tz = detectBrowserTimezone();
@@ -165,7 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
       true, // Use capture phase to ensure it runs before form submits
     );
   } else {
-    console.warn('⚠️ Registration form not found');
+    // Registration form not found - expected on login page
+    console.debug('Registration form not found (expected on non-registration pages)');
   }
 
   // Simple form submission handler for auth forms

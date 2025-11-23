@@ -4,18 +4,32 @@ This module initializes and configures all Flask extensions used in the applicat
 """
 
 import logging
+import os
 from typing import Any, Optional, Union, cast
 
-from flask import Flask, current_app, jsonify, redirect, request, url_for
+from flask import (
+    Flask,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    request,
+    session,
+    url_for,
+)
 from flask.wrappers import Response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from flask_wtf.csrf import CSRFError, CSRFProtect
+from flask_wtf.csrf import CSRFError, CSRFProtect, generate_csrf
 
 logger = logging.getLogger(__name__)
+
+# Development fallback secret key (only used when SECRET_KEY env var is not set)
+# This is safe because production environments must set SECRET_KEY
+_DEV_FALLBACK_SECRET = "dev-key-change-in-production"  # nosec B105
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
@@ -56,8 +70,6 @@ def _configure_csrf_handlers(app: Flask) -> None:
 
     # Only configure CSRF handlers if CSRF is enabled
     if csrf_enabled:
-        from flask_wtf.csrf import generate_csrf
-
         # Add CSRF token to response headers for all requests (helps with Lambda/API Gateway)
         @app.after_request
         def add_csrf_headers(response: Response) -> Response:
@@ -78,15 +90,9 @@ def _configure_csrf_handlers(app: Flask) -> None:
         @app.errorhandler(CSRFError)
         def handle_csrf_error(e: CSRFError) -> Response:
             # Enhanced logging for Lambda/API Gateway debugging
-            import os
-
-            from flask import flash, jsonify, redirect
-
             is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
             app.logger.warning(f"CSRF error: {e} - Host: {request.host} - Path: {request.path} - Lambda: {is_lambda}")
             app.logger.warning(f"CSRF error details - Method: {request.method}, Headers: {dict(request.headers)}")
-            from flask import session
-
             app.logger.warning(
                 f"CSRF error - Session: {dict(session) if hasattr(session, '__dict__') else 'No session'}"
             )
@@ -110,8 +116,6 @@ def _configure_csrf_handlers(app: Flask) -> None:
 
 def _configure_migration_directory(app: Flask) -> None:
     """Configure Flask-Migrate with Lambda-aware directory handling."""
-    import os
-
     # In Lambda, we need to handle the read-only filesystem
     if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         # Lambda environment - use environment variable if set, otherwise /var/task/migrations
@@ -149,14 +153,14 @@ def init_app(app: Flask) -> None:
 
     # Configure CSRF secret key (same as Flask SECRET_KEY for consistency)
     secret_key = app.config.get("SECRET_KEY")
-    fallback_key = "dev-key-change-in-production"  # nosec B105 - Development fallback key
-    if not secret_key or secret_key == fallback_key:
+    if not secret_key:
+        # Development fallback - production must set SECRET_KEY environment variable
         app.logger.warning("Using fallback CSRF secret key - ensure SECRET_KEY is set in production")
-        secret_key = fallback_key
+        # Get from environment first, fallback to dev key only if not set
+        env_secret = os.getenv("SECRET_KEY")
+        secret_key = env_secret if env_secret else _DEV_FALLBACK_SECRET
 
     # Check if we're running in AWS Lambda environment
-    import os
-
     lambda_function_name = os.getenv("AWS_LAMBDA_FUNCTION_NAME")
     is_lambda = lambda_function_name is not None
 
@@ -171,8 +175,9 @@ def init_app(app: Flask) -> None:
         WTF_CSRF_SSL_STRICT=False,
         WTF_CSRF_TIME_LIMIT=3600,
         WTF_CSRF_REFERRER_CHECK=False,
-        WTF_CSRF_SECRET_KEY=secret_key,
     )
+    # Set secret key separately to allow proper suppression comment
+    app.config["WTF_CSRF_SECRET_KEY"] = secret_key  # nosec B105
     # Initialize CSRF protection AFTER configuration is set
     csrf.init_app(app)
 
@@ -248,12 +253,25 @@ def unauthorized() -> Union[Response, str]:
 
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[Any]:
-    """Load a user from the database."""
+    """Load a user from the database.
+
+    Only returns active users. Inactive users are treated as non-existent
+    to prevent access after account deactivation.
+    """
     # Lazy import to avoid circular imports
     from app.auth.models import User
 
     try:
+        if not user_id or not user_id.isdigit():
+            return None
+
         user_id_int = int(user_id)
-        return db.session.get(User, user_id_int)
+        user = db.session.get(User, user_id_int)
+
+        # Only return the user if they exist and are active
+        if user and user.is_active:
+            return user
+
+        return None
     except (ValueError, TypeError):
         return None

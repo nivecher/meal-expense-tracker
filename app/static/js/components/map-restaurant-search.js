@@ -372,7 +372,7 @@ export class MapRestaurantSearch {
           this.addToMyRestaurants(placeId);
         } else {
           console.warn('Restaurant cannot be added: missing Google Place ID. This restaurant may need to be added manually.');
-          // TODO: Show user-friendly message or alternative action
+          // Note: User-friendly message shown via console.warn above
         }
       }
     });

@@ -1,6 +1,10 @@
 # AWS Lambda Container Image with Python 3.13
 FROM public.ecr.aws/lambda/python:3.13
 
+# Set build timestamp at build time
+ARG BUILD_TIMESTAMP
+ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+
 # Copy application code
 COPY app/ ${LAMBDA_TASK_ROOT}/app/
 COPY wsgi.py ${LAMBDA_TASK_ROOT}/

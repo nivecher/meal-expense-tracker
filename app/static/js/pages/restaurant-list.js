@@ -50,6 +50,17 @@ function initViewToggle() {
   });
 }
 
+// Helper function to clean up modal backdrop
+function cleanupModalBackdrop() {
+  const backdrops = document.querySelectorAll('.modal-backdrop');
+  backdrops.forEach((backdrop) => {
+    backdrop.remove();
+  });
+  document.body.classList.remove('modal-open');
+  document.body.style.overflow = '';
+  document.body.style.paddingRight = '';
+}
+
 // Delete restaurant functionality - optimized with event delegation
 function initDeleteRestaurant() {
   // Use event delegation for better performance
@@ -79,7 +90,8 @@ function initDeleteRestaurant() {
     }
 
     // Show the modal
-    const modal = new bootstrap.Modal(document.getElementById('deleteRestaurantModal'));
+    const modalElement = document.getElementById('deleteRestaurantModal');
+    const modal = new bootstrap.Modal(modalElement);
     modal.show();
 
     // Handle form submission
@@ -100,13 +112,26 @@ function initDeleteRestaurant() {
           .then((response) => {
             if (response.ok) {
               toast.success('Restaurant deleted successfully.');
-              // Remove the row from the table
-              const row = document.querySelector(`[data-restaurant-id="${restaurantId}"]`);
-              if (row) {
-                row.remove();
-              }
-              // Close the modal
+              // Remove restaurant from both card view and table view
+              const elementsWithId = document.querySelectorAll(`[data-restaurant-id="${restaurantId}"]`);
+              elementsWithId.forEach((element) => {
+                // For card view: find the parent .col div and remove it
+                const cardContainer = element.closest('.col');
+                if (cardContainer) {
+                  cardContainer.remove();
+                }
+                // For table view: find the parent tr and remove it
+                const tableRow = element.closest('tr');
+                if (tableRow) {
+                  tableRow.remove();
+                }
+              });
+              // Close the modal and clean up backdrop
               modal.hide();
+              // Wait for modal to fully close, then remove any leftover backdrop
+              if (modalElement) {
+                modalElement.addEventListener('hidden.bs.modal', cleanupModalBackdrop, { once: true });
+              }
             } else {
               return response.json().then((data) => {
                 if (data.error) {
@@ -120,6 +145,8 @@ function initDeleteRestaurant() {
           .catch((error) => {
             console.error('Error:', error);
             toast.error('An error occurred while deleting the restaurant.');
+            // Clean up backdrop on error as well
+            cleanupModalBackdrop();
           });
       };
     }

@@ -8,6 +8,12 @@
     "keyframes-name-pattern": null,
     "declaration-block-no-duplicate-custom-properties": null,
     "declaration-property-value-keyword-no-deprecated": null,
-    "media-feature-name-value-no-unknown": null
+    "media-feature-name-value-no-unknown": null,
+    "selector-type-no-unknown": [
+      true,
+      {
+        "ignoreTypes": ["tags", "tag"]
+      }
+    ]
   }
 }

@@ -466,7 +466,7 @@ class RestaurantAutocomplete {
         console.log('DEBUG: Mapping failed, returning test suggestions');
         return [
           { placeId: 'test1', title: 'Test Pizza Place', description: '123 Main St', distance: null, distanceMiles: null },
-          { placeId: 'test2', title: 'Test Cafe', description: '456 Oak Ave', distance: null, distanceMiles: null }
+          { placeId: 'test2', title: 'Test Cafe', description: '456 Oak Ave', distance: null, distanceMiles: null },
         ];
       }
 
@@ -719,7 +719,7 @@ class RestaurantAutocomplete {
       return {};
     }
 
-    const parts = formattedAddress.split(',').map(part => part.trim());
+    const parts = formattedAddress.split(',').map((part) => part.trim());
 
     let address_line_1 = '';
     let city = '';
@@ -735,21 +735,17 @@ class RestaurantAutocomplete {
       const postalStatePart = parts[parts.length - 2];
       const postalStateMatch = postalStatePart.match(/^(.+?)\s+(\d{5}(?:-\d{4})?)$/);
       if (postalStateMatch) {
-        state = postalStateMatch[1];
-        postal_code = postalStateMatch[2];
+        [, state, postal_code] = postalStateMatch;
       } else {
         // Fallback: assume state and postal are together
         const statePostalMatch = postalStatePart.match(/^(.+?)\s+(\w{2})\s+(\d{5}(?:-\d{4})?)$/);
         if (statePostalMatch) {
-          city = statePostalMatch[1];
-          state = statePostalMatch[2];
-          postal_code = statePostalMatch[3];
+          [, city, state, postal_code] = statePostalMatch;
         } else {
           // Even simpler fallback
           const words = postalStatePart.split(' ');
           if (words.length >= 2) {
-            state = words[words.length - 2];
-            postal_code = words[words.length - 1];
+            [state, postal_code] = [words[words.length - 2], words[words.length - 1]];
             city = words.slice(0, -2).join(' ');
           }
         }
@@ -773,7 +769,7 @@ class RestaurantAutocomplete {
       city,
       state,
       postal_code,
-      country
+      country,
     };
   }
 

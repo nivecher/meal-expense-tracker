@@ -1,4 +1,5 @@
-{% extends "admin/base.html" %} {% from 'macros/avatar_helpers.html' import user_avatar_simple %} {% block page_actions %}
+{% extends "admin/base.html" %} {% from 'macros/avatar_helpers.html' import user_avatar_simple %} {% block page_actions
+%}
 <div class="btn-group" role="group">
     <a href="{{ url_for('admin.create_user') }}" class="btn btn-success">
         <i class="fas fa-user-plus me-1"></i>
@@ -9,11 +10,8 @@
         Back to Dashboard
     </a>
 </div>
-{% endblock page_actions %} {% block admin_content %}
-{% if error_message %}
-<div class="alert alert-danger" role="alert">
-    <strong>Error:</strong> {{ error_message }}
-</div>
+{% endblock page_actions %} {% block admin_content %} {% if error_message %}
+<div class="alert alert-danger" role="alert"> <strong>Error:</strong> {{ error_message }} </div>
 {% endif %}
 <!-- Filters -->
 <div class="row mb-4">
@@ -37,10 +35,10 @@
                     <div class="col-md-2">
                         <label for="per_page" class="form-label">Per Page</label>
                         <select class="form-select" id="per_page" name="per_page">
-                            <option value="10" {% if users.per_page == 10 %}selected{% endif %}>10</option>
-                            <option value="20" {% if users.per_page == 20 %}selected{% endif %}>20</option>
-                            <option value="50" {% if users.per_page == 50 %}selected{% endif %}>50</option>
-                            <option value="100" {% if users.per_page == 100 %}selected{% endif %}>100</option>
+                            <option value="10" {% if users.per_page="" ="10" %}selected{% endif %}>10</option>
+                            <option value="20" {% if users.per_page="" ="20" %}selected{% endif %}>20</option>
+                            <option value="50" {% if users.per_page="" ="50" %}selected{% endif %}>50</option>
+                            <option value="100" {% if users.per_page="" ="100" %}selected{% endif %}>100</option>
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -50,7 +48,12 @@
                                 type="checkbox"
                                 id="admin_only"
                                 name="admin_only"
-                                {% if admin_only %}checked{% endif %} />
+                                {%
+                                if
+                                admin_only
+                                %}checked{%
+                                endif
+                                %} />
                             <label class="form-check-label" for="admin_only"> Admin Only </label>
                         </div>
                     </div>
@@ -61,7 +64,12 @@
                                 type="checkbox"
                                 id="active_only"
                                 name="active_only"
-                                {% if active_only %}checked{% endif %} />
+                                {%
+                                if
+                                active_only
+                                %}checked{%
+                                endif
+                                %} />
                             <label class="form-check-label" for="active_only"> Active Only </label>
                         </div>
                     </div>

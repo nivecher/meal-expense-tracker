@@ -9,6 +9,8 @@
                 <div class="card-body">
                     <form id="register-form" method="post" novalidate>
                         {{ form.hidden_tag() }}
+                        <!-- Hidden timezone field - populated by JavaScript -->
+                        <input type="hidden" id="timezone" name="timezone" value="UTC" />
                         <div class="mb-3">
                             {{ form.username.label(class="form-label") }} {{ form.username(class="form-control",
                             autocomplete="username") }} {% for error in form.username.errors %}<span class="text-danger"

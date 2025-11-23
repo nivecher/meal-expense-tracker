@@ -58,7 +58,7 @@
                         <select class="form-select" id="meal_type" name="meal_type">
                             <option value="">All Meals</option>
                             {% for mt in meal_types %}
-                            <option value="{{ mt }}" {% if meal_type == mt %}selected{% endif %}>{{ mt }}</option>
+                            <option value="{{ mt }}" {% if meal_type="" ="mt" %}selected{% endif %}>{{ mt }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -69,7 +69,13 @@
                             {% for cat in categories %}
                             <option
                                 value="{{ cat.name }}"
-                                {% if category == cat.name %}selected{% endif %}
+                                {%
+                                if
+                                category=""
+                                ="cat.name"
+                                %}selected{%
+                                endif
+                                %}
                                 data-color="{{ cat.color }}"
                                 data-icon="{{ cat.icon }}"
                                 >{{ cat.name }} ({{ cat.count }})</option

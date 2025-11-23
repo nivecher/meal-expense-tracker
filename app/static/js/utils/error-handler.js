@@ -221,10 +221,10 @@ class ErrorHandler {
     // Show user-friendly error message
     // Error toast shown by server response
 
-    // Temporarily disable console logging to prevent infinite loop
-    // TODO: Fix the console interception issue properly
+    // Console logging disabled to prevent infinite loop
     // The error handler should not intercept its own console calls
-    if (false && this.options.logLevel === 'debug') {
+    // Debug logging can be enabled by setting logLevel to 'debug' in options
+    if (this.options.logLevel === 'debug') {
       this.originalConsole.group('🚨 Application Error');
       this.originalConsole.error('Type:', errorInfo.type);
       this.originalConsole.error('Message:', errorInfo.message);

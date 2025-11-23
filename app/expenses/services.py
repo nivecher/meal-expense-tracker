@@ -432,7 +432,7 @@ def _process_tags(form: ExpenseForm) -> Tuple[Optional[list[str]], Optional[str]
     try:
         # Get tags from form data (sent as JSON string from JavaScript)
         tags_data = form.tags.data if hasattr(form, "tags") and form.tags.data else None
-        current_app.logger.info(f"Processing tags - raw data: {tags_data}")
+        current_app.logger.info(f"Processing tags - raw data: {tags_data}, type: {type(tags_data)}")
 
         if not tags_data:
             current_app.logger.info("No tags data found")
@@ -440,9 +440,12 @@ def _process_tags(form: ExpenseForm) -> Tuple[Optional[list[str]], Optional[str]
 
         # Parse JSON if it's a string
         if isinstance(tags_data, str):
+            # Try to parse as JSON first
             tags_list, error = _parse_tags_json(tags_data)
             if error:
-                return None, error
+                # If JSON parsing fails, treat as a single tag name (fallback for plain text)
+                current_app.logger.info(f"Tags data is not JSON, treating as single tag: {tags_data}")
+                tags_list = [tags_data.strip()] if tags_data.strip() else []
         else:
             tags_list = tags_data
 

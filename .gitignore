@@ -7,8 +7,6 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-Python-3.13.0.tgz
-Python-3.13.0/
 
 # Build artifacts
 dist/

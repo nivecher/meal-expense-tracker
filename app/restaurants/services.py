@@ -672,7 +672,10 @@ def _find_existing_restaurant(
     Checks for duplicates by:
     1. Google Place ID (if provided)
     2. Name + Address combination
-    3. Name + City combination (as fallback)
+    3. Name + City combination (as fallback) - case-insensitive
+
+    Note: This only checks committed database records. Uses expire_on_commit=False
+    to ensure we query the database directly, not cached session objects.
 
     Args:
         name: Restaurant name
@@ -686,19 +689,34 @@ def _find_existing_restaurant(
     """
     # Strategy 1: Match by Google Place ID (most reliable)
     if google_place_id:
-        existing = Restaurant.query.filter_by(user_id=user_id, google_place_id=google_place_id).first()
+        stmt = select(Restaurant).where(
+            Restaurant.user_id == user_id,
+            Restaurant.google_place_id == google_place_id,
+        )
+        existing = db.session.scalar(stmt)
         if existing:
             return existing
 
-    # Strategy 2: Match by name + address (if both provided)
+    # Strategy 2: Match by name + address (if both provided) - case-insensitive
     if name and address:
-        existing = Restaurant.query.filter_by(user_id=user_id, name=name, address=address).first()
+        stmt = select(Restaurant).where(
+            Restaurant.user_id == user_id,
+            func.lower(Restaurant.name) == func.lower(name),
+            func.lower(Restaurant.address_line_1) == func.lower(address),
+        )
+        existing = db.session.scalar(stmt)
         if existing:
             return existing
 
-    # Strategy 3: Match by name + city (existing constraint)
+    # Strategy 3: Match by name + city (existing constraint) - case-insensitive
+    # Only check this if city is provided and we haven't found a match yet
     if name and city:
-        existing = Restaurant.query.filter_by(user_id=user_id, name=name, city=city).first()
+        stmt = select(Restaurant).where(
+            Restaurant.user_id == user_id,
+            func.lower(Restaurant.name) == func.lower(name),
+            func.lower(Restaurant.city) == func.lower(city),
+        )
+        existing = db.session.scalar(stmt)
         if existing:
             return existing
 
@@ -787,6 +805,111 @@ def _process_csv_file(file: FileStorage) -> Tuple[bool, str, Optional[csv.DictRe
         return False, f"Error reading CSV file: {str(e)}", None
 
 
+def _handle_integrity_error(e: IntegrityError, row: dict, line_num: int) -> Tuple[str, bool]:
+    """Handle IntegrityError and return error message and whether it was a duplicate.
+
+    Args:
+        e: The IntegrityError exception
+        row: The CSV row data
+        line_num: Line number in CSV file
+
+    Returns:
+        Tuple of (error_message, is_duplicate)
+    """
+    error_str = str(e.orig)
+    if "uix_restaurant_name_city_user" in error_str:
+        name = row.get("name", "").strip()
+        city = row.get("city", "").strip() or "Unknown"
+        return f"Line {line_num}: Duplicate restaurant '{name}' in '{city}' already exists", True
+    if "uix_restaurant_google_place_id_user" in error_str:
+        google_place_id = row.get("google_place_id", "").strip() or "Unknown"
+        return f"Line {line_num}: Duplicate Google Place ID '{google_place_id}' already exists", True
+    return f"Line {line_num}: Database constraint violation - {str(e)}", False
+
+
+def _add_restaurant_with_savepoint(
+    restaurant: Restaurant, savepoint: Any, batch_size: int, success_count: int
+) -> Tuple[bool, Optional[IntegrityError]]:
+    """Add a restaurant using a savepoint for error isolation.
+
+    Args:
+        restaurant: Restaurant to add
+        savepoint: SQLAlchemy savepoint
+        batch_size: Batch size for commits
+        success_count: Current success count
+
+    Returns:
+        Tuple of (success, IntegrityError_or_None)
+    """
+    try:
+        db.session.add(restaurant)
+        db.session.flush()  # Flush to catch errors early
+        savepoint.commit()  # Commit the savepoint
+
+        # Commit main transaction in batches
+        if (success_count + 1) % batch_size == 0:
+            db.session.commit()
+
+        return True, None
+    except IntegrityError as e:
+        savepoint.rollback()
+        db.session.expunge(restaurant)  # Remove the failed restaurant
+        return False, e
+
+
+def _process_import_row(
+    row: dict, user_id: int, line_num: int, savepoint: Any, batch_size: int, success_count: int
+) -> Tuple[int, int, List[str]]:
+    """Process a single row from the CSV import.
+
+    Args:
+        row: CSV row data
+        user_id: User ID
+        line_num: Line number in CSV
+        savepoint: SQLAlchemy savepoint
+        batch_size: Batch size for commits
+        success_count: Current success count
+
+    Returns:
+        Tuple of (success_delta, skipped_delta, errors)
+    """
+    success_delta = 0
+    skipped_delta = 0
+    errors = []
+
+    try:
+        success, message, restaurant = _process_restaurant_row(row, user_id)
+
+        if success:
+            if restaurant:
+                add_success, error = _add_restaurant_with_savepoint(restaurant, savepoint, batch_size, success_count)
+                if add_success:
+                    success_delta = 1
+                else:
+                    if error:
+                        error_msg, is_duplicate = _handle_integrity_error(error, row, line_num)
+                        errors.append(error_msg)
+                        if is_duplicate:
+                            skipped_delta = 1
+            else:
+                savepoint.commit()  # Commit empty savepoint
+                skipped_delta = 1
+        else:
+            savepoint.rollback()
+            errors.append(f"Line {line_num}: {message}")
+    except IntegrityError as e:
+        savepoint.rollback()
+        error_msg, is_duplicate = _handle_integrity_error(e, row, line_num)
+        errors.append(error_msg)
+        if is_duplicate:
+            skipped_delta = 1
+    except Exception as e:
+        savepoint.rollback()
+        errors.append(f"Line {line_num}: Unexpected error - {str(e)}")
+
+    return success_delta, skipped_delta, errors
+
+
 def _import_restaurants_from_reader(csv_reader: csv.DictReader, user_id: int) -> Tuple[int, int, List[str]]:
     """Import restaurants from a CSV reader with smart duplicate detection.
 
@@ -800,21 +923,26 @@ def _import_restaurants_from_reader(csv_reader: csv.DictReader, user_id: int) ->
     success_count = 0
     skipped_count = 0
     errors = []
+    batch_size = 50  # Commit in batches to avoid losing progress on errors
 
-    for i, row in enumerate(csv_reader, 2):  # Start from line 2 (1-based + header)
-        success, message, restaurant = _process_restaurant_row(row, user_id)
+    # Use no_autoflush to prevent premature flushes that could cause IntegrityError
+    with db.session.no_autoflush:
+        for i, row in enumerate(csv_reader, 2):  # Start from line 2 (1-based + header)
+            savepoint = db.session.begin_nested()
+            success_delta, skipped_delta, row_errors = _process_import_row(
+                row, user_id, i, savepoint, batch_size, success_count
+            )
+            success_count += success_delta
+            skipped_count += skipped_delta
+            errors.extend(row_errors)
 
-        if success:
-            if restaurant:
-                # New restaurant to add
-                db.session.add(restaurant)
-                success_count += 1
-            else:
-                # Duplicate skipped
-                skipped_count += 1
-        else:
-            # Error processing row
-            errors.append(f"Line {i}: {message}")
+    # Commit any remaining uncommitted restaurants
+    if success_count > 0 and success_count % batch_size != 0:
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            errors.append(f"Error committing final batch: {str(e)}")
 
     return success_count, skipped_count, errors
 
@@ -829,9 +957,10 @@ def _generate_import_result(success_count: int, skipped_count: int, errors: List
 
     Returns:
         Tuple of (success, result_data)
+
+    Note:
+        Commits are handled in _import_restaurants_from_reader, so no commit needed here.
     """
-    if success_count > 0:
-        db.session.commit()
 
     # Build result data with separate components
     result_data = {
@@ -897,7 +1026,13 @@ def import_restaurants_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, 
         return _generate_import_result(success_count, skipped_count, errors)
 
     except Exception as e:
-        db.session.rollback()
+        # Ensure session is properly rolled back and reset
+        try:
+            db.session.rollback()
+            db.session.expunge_all()  # Reset session state after rollback
+        except Exception:
+            # If rollback fails, create a new session
+            db.session.close()
         error_msg = f"Error processing CSV file: {str(e)}"
         return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
 

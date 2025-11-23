@@ -8,13 +8,19 @@ resource "aws_s3_bucket" "static" {
   tags = var.tags
 }
 
+# Public access block configuration for CloudFront with OAC
+# The bucket is secured via:
+# 1. Origin Access Control (OAC) - only CloudFront can access the bucket
+# 2. Bucket policy restricts access to CloudFront service only
+# 3. All public access is blocked - access only through CloudFront
+# OAC works with private buckets as long as the bucket policy allows CloudFront access
 resource "aws_s3_bucket_public_access_block" "static" {
   bucket = aws_s3_bucket.static.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 # Origin Access Control for S3

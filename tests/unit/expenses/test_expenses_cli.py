@@ -6,6 +6,7 @@ import pytest
 from click.testing import CliRunner
 from flask import Flask
 
+from app.auth.models import User
 from app.expenses.cli import (
     _get_target_users,
     _process_users,
@@ -43,25 +44,27 @@ class TestExpensesCLI:
         return CliRunner()
 
     @pytest.fixture
-    def mock_user(self):
+    def mock_user(self, app):
         """Create mock user."""
-        user = Mock()
-        user.id = 1
-        user.username = "testuser"
-        return user
+        with app.app_context():
+            user = Mock(spec=User)
+            user.id = 1
+            user.username = "testuser"
+            return user
 
     @pytest.fixture
-    def mock_category(self):
+    def mock_category(self, app):
         """Create mock category."""
-        category = Mock(spec=Category)
-        category.id = 1
-        category.name = "Food"
-        category.description = "Food and dining expenses"
-        category.color = "#FF5733"
-        category.icon = "🍽️"
-        category.is_default = True
-        category.user_id = 1
-        return category
+        with app.app_context():
+            category = Mock(spec=Category)
+            category.id = 1
+            category.name = "Food"
+            category.description = "Food and dining expenses"
+            category.color = "#FF5733"
+            category.icon = "🍽️"
+            category.is_default = True
+            category.user_id = 1
+            return category
 
     def test_category_cli_group(self):
         """Test category CLI group creation."""
@@ -73,45 +76,51 @@ class TestExpensesCLI:
         register_commands(app)
         assert "category" in [cmd.name for cmd in app.cli.commands.values()]
 
-    def test_sort_categories_by_default_order(self, mock_category):
+    def test_sort_categories_by_default_order(self, app, mock_category):
         """Test sorting categories by default order."""
-        # Create additional mock categories
-        cat1 = Mock(spec=Category)
-        cat1.name = "Food"
-        cat2 = Mock(spec=Category)
-        cat2.name = "Transportation"
-        cat3 = Mock(spec=Category)
-        cat3.name = "Custom Category"
+        with app.app_context():
+            # Create additional mock categories
+            cat1 = Mock(spec=Category)
+            cat1.name = "Food"
+            cat2 = Mock(spec=Category)
+            cat2.name = "Transportation"
+            cat3 = Mock(spec=Category)
+            cat3.name = "Custom Category"
 
-        categories = [cat3, cat1, cat2]  # Out of order
+            categories = [cat3, cat1, cat2]  # Out of order
 
-        with patch("app.expenses.cli.get_default_categories") as mock_get_default:
-            mock_get_default.return_value = [{"name": "Food"}, {"name": "Transportation"}, {"name": "Entertainment"}]
+            with patch("app.expenses.cli.get_default_categories") as mock_get_default:
+                mock_get_default.return_value = [
+                    {"name": "Food"},
+                    {"name": "Transportation"},
+                    {"name": "Entertainment"},
+                ]
 
-            result = _sort_categories_by_default_order(categories)
+                result = _sort_categories_by_default_order(categories)
 
-            # Should be sorted with default categories first, then custom
-            assert result[0].name == "Food"
-            assert result[1].name == "Transportation"
-            assert result[2].name == "Custom Category"
+                # Should be sorted with default categories first, then custom
+                assert result[0].name == "Food"
+                assert result[1].name == "Transportation"
+                assert result[2].name == "Custom Category"
 
-    def test_sort_categories_by_default_order_custom_only(self, mock_category):
+    def test_sort_categories_by_default_order_custom_only(self, app, mock_category):
         """Test sorting categories with only custom categories."""
-        cat1 = Mock(spec=Category)
-        cat1.name = "Custom Category B"
-        cat2 = Mock(spec=Category)
-        cat2.name = "Custom Category A"
+        with app.app_context():
+            cat1 = Mock(spec=Category)
+            cat1.name = "Custom Category B"
+            cat2 = Mock(spec=Category)
+            cat2.name = "Custom Category A"
 
-        categories = [cat1, cat2]
+            categories = [cat1, cat2]
 
-        with patch("app.expenses.cli.get_default_categories") as mock_get_default:
-            mock_get_default.return_value = [{"name": "Food"}]
+            with patch("app.expenses.cli.get_default_categories") as mock_get_default:
+                mock_get_default.return_value = [{"name": "Food"}]
 
-            result = _sort_categories_by_default_order(categories)
+                result = _sort_categories_by_default_order(categories)
 
-            # Should be sorted alphabetically
-            assert result[0].name == "Custom Category A"
-            assert result[1].name == "Custom Category B"
+                # Should be sorted alphabetically
+                assert result[0].name == "Custom Category A"
+                assert result[1].name == "Custom Category B"
 
     def test_get_target_users_by_user_id(self, mock_user):
         """Test getting target users by user ID."""
@@ -191,25 +200,11 @@ class TestExpensesCLI:
                         result = _process_users([mock_user], False, False)
                         assert result == (1, 0)  # 1 created, 0 deleted
 
-    def test_process_users_with_existing_categories(self, mock_user, mock_category):
+    def test_process_users_with_existing_categories(self, app, mock_user, mock_category):
         """Test processing users with existing categories."""
-        with patch("app.expenses.cli.get_default_categories") as mock_get_default:
-            with patch("app.expenses.cli.Category") as mock_category_class:
-                mock_get_default.return_value = [
-                    {"name": "Food", "description": "Food expenses", "color": "#FF5733", "icon": "🍽️"}
-                ]
-                mock_query = Mock()
-                mock_query.filter_by.return_value.all.return_value = [mock_category]
-                mock_category_class.query = mock_query
-
-                result = _process_users([mock_user], False, False)
-                assert result == (0, 0)  # 0 created, 0 deleted
-
-    def test_process_users_force_mode(self, mock_user, mock_category):
-        """Test processing users in force mode."""
-        with patch("app.expenses.cli.get_default_categories") as mock_get_default:
-            with patch("app.expenses.cli.Category") as mock_category_class:
-                with patch("app.expenses.cli.db") as mock_db:
+        with app.app_context():
+            with patch("app.expenses.cli.get_default_categories") as mock_get_default:
+                with patch("app.expenses.cli.Category") as mock_category_class:
                     mock_get_default.return_value = [
                         {"name": "Food", "description": "Food expenses", "color": "#FF5733", "icon": "🍽️"}
                     ]
@@ -217,24 +212,41 @@ class TestExpensesCLI:
                     mock_query.filter_by.return_value.all.return_value = [mock_category]
                     mock_category_class.query = mock_query
 
-                    result = _process_users([mock_user], True, False)
-                    assert result == (1, 1)  # 1 created, 1 deleted
-                    mock_db.session.delete.assert_called_once()
-                    mock_db.session.flush.assert_called_once()
+                    result = _process_users([mock_user], False, False)
+                    assert result == (0, 0)  # 0 created, 0 deleted
 
-    def test_process_users_dry_run(self, mock_user):
+    def test_process_users_force_mode(self, app, mock_user, mock_category):
+        """Test processing users in force mode."""
+        with app.app_context():
+            with patch("app.expenses.cli.get_default_categories") as mock_get_default:
+                with patch("app.expenses.cli.Category") as mock_category_class:
+                    with patch("app.expenses.cli.db") as mock_db:
+                        mock_get_default.return_value = [
+                            {"name": "Food", "description": "Food expenses", "color": "#FF5733", "icon": "🍽️"}
+                        ]
+                        mock_query = Mock()
+                        mock_query.filter_by.return_value.all.return_value = [mock_category]
+                        mock_category_class.query = mock_query
+
+                        result = _process_users([mock_user], True, False)
+                        assert result == (1, 1)  # 1 created, 1 deleted
+                        mock_db.session.delete.assert_called_once()
+                        mock_db.session.flush.assert_called_once()
+
+    def test_process_users_dry_run(self, app, mock_user):
         """Test processing users in dry run mode."""
-        with patch("app.expenses.cli.get_default_categories") as mock_get_default:
-            with patch("app.expenses.cli.Category") as mock_category_class:
-                mock_get_default.return_value = [
-                    {"name": "Food", "description": "Food expenses", "color": "#FF5733", "icon": "🍽️"}
-                ]
-                mock_query = Mock()
-                mock_query.filter_by.return_value.all.return_value = []
-                mock_category_class.query = mock_query
+        with app.app_context():
+            with patch("app.expenses.cli.get_default_categories") as mock_get_default:
+                with patch("app.expenses.cli.Category") as mock_category_class:
+                    mock_get_default.return_value = [
+                        {"name": "Food", "description": "Food expenses", "color": "#FF5733", "icon": "🍽️"}
+                    ]
+                    mock_query = Mock()
+                    mock_query.filter_by.return_value.all.return_value = []
+                    mock_category_class.query = mock_query
 
-                result = _process_users([mock_user], False, True)
-                assert result == (1, 0)  # 1 created, 0 deleted
+                    result = _process_users([mock_user], False, True)
+                    assert result == (1, 0)  # 1 created, 0 deleted
 
     def test_show_results_success(self):
         """Test showing results successfully."""

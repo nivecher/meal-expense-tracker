@@ -69,11 +69,14 @@ def version_info() -> Response:
     """Get application version information.
 
     Returns:
-        JSON response with version from git tags
+        JSON response with version from git tags and build timestamp
     """
-    from app._version import __version__
+    from app._version import __build_timestamp__, __version__
 
-    version_data = {"version": __version__}
+    version_data = {
+        "version": __version__,
+        "build_timestamp": __build_timestamp__,
+    }
     return _create_api_response(data=version_data, message="Version information retrieved successfully")
 
 

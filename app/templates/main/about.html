@@ -36,6 +36,13 @@
                                 <div class="card-body">
                                     <h5 class="card-title">Version</h5>
                                     <p class="card-text">{{ app_version }}</p>
+                                    {% if build_timestamp and build_timestamp != "Not set" %}
+                                    <hr class="my-2" />
+                                    <h6 class="card-subtitle mb-1 text-muted small">Build Date</h6>
+                                    <p class="card-text small mb-0">
+                                        <i class="fas fa-clock me-1"></i>{{ build_timestamp }}
+                                    </p>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>

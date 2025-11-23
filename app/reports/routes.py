@@ -2,12 +2,12 @@
 
 from datetime import datetime, timedelta
 
-from flask import jsonify, render_template, request
+from flask import render_template, request
 from flask_login import current_user, login_required
-from sqlalchemy import extract, func
+from sqlalchemy import func
 
 from app.expenses import services as expense_services
-from app.expenses.models import Category, Expense
+from app.expenses.models import Expense
 from app.extensions import db
 from app.reports import bp
 from app.restaurants import services as restaurant_services

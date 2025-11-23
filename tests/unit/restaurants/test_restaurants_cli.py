@@ -50,35 +50,37 @@ class TestRestaurantCLI:
         return CliRunner()
 
     @pytest.fixture
-    def mock_user(self):
+    def mock_user(self, app):
         """Create mock user."""
-        user = Mock(spec=User)
-        user.id = 1
-        user.username = "testuser"
-        return user
+        with app.app_context():
+            user = Mock(spec=User)
+            user.id = 1
+            user.username = "testuser"
+            return user
 
     @pytest.fixture
-    def mock_restaurant(self):
+    def mock_restaurant(self, app):
         """Create mock restaurant."""
-        restaurant = Mock(spec=Restaurant)
-        restaurant.id = 1
-        restaurant.name = "Test Restaurant"
-        restaurant.cuisine = "Italian"
-        restaurant.address_line_1 = "123 Main St"
-        restaurant.address_line_2 = None  # Explicitly set to None
-        restaurant.city = "Test City"
-        restaurant.state = "TS"
-        restaurant.postal_code = "12345"
-        restaurant.country = None  # Explicitly set to None
-        restaurant.phone = "555-1234"
-        restaurant.google_place_id = "test_place_id"
-        restaurant.rating = 4.5
-        restaurant.service_level = "casual_dining"
-        restaurant.expenses = []
-        restaurant.user = Mock()
-        restaurant.user.username = "testuser"
-        restaurant.full_address = "123 Main St, Test City, TS 12345"
-        return restaurant
+        with app.app_context():
+            restaurant = Mock(spec=Restaurant)
+            restaurant.id = 1
+            restaurant.name = "Test Restaurant"
+            restaurant.cuisine = "Italian"
+            restaurant.address_line_1 = "123 Main St"
+            restaurant.address_line_2 = None  # Explicitly set to None
+            restaurant.city = "Test City"
+            restaurant.state = "TS"
+            restaurant.postal_code = "12345"
+            restaurant.country = None  # Explicitly set to None
+            restaurant.phone = "555-1234"
+            restaurant.google_place_id = "test_place_id"
+            restaurant.rating = 4.5
+            restaurant.service_level = "casual_dining"
+            restaurant.expenses = []
+            restaurant.user = Mock()
+            restaurant.user.username = "testuser"
+            restaurant.full_address = "123 Main St, Test City, TS 12345"
+            return restaurant
 
     def test_restaurant_cli_group(self):
         """Test restaurant CLI group creation."""

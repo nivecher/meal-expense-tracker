@@ -56,12 +56,7 @@ fi
 
 # Run linting (mirrors ci.yml lint job)
 echo -e "\n${BLUE}🔍 Lint & Format Check${NC}"
-run_step "Python linting" "source venv/bin/activate && make lint-python"
-if [ -f package.json ]; then
-    run_step "JavaScript linting" "npm run lint:js"
-fi
-run_step "CSS linting" "source venv/bin/activate && make lint-css"
-run_step "HTML template linting" "source venv/bin/activate && make lint-html"
+run_step "Linting" "source venv/bin/activate && make lint"
 
 # Run tests (mirrors ci.yml test job)
 echo -e "\n${BLUE}🧪 Test Suite${NC}"
@@ -75,8 +70,7 @@ run_step "Terraform validation" "terraform -chdir=terraform init -backend=false 
 
 # Security scanning (mirrors ci.yml security job)
 echo -e "\n${BLUE}🔒 Security Scan${NC}"
-run_step "Bandit security scan" "bandit -r app/ -f json -o bandit-report.json || true; bandit -r app/"
-run_step "Safety check" "safety check --json --output safety-report.json || true; safety check"
+run_step "Security checks" "source venv/bin/activate && make security-check"
 
 echo -e "\n${GREEN}🎉 Local CI completed successfully!${NC}"
 echo -e "${BLUE}All CI jobs passed: lint, test, terraform, security${NC}"

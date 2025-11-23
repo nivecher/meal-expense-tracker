@@ -6,102 +6,6 @@
  */
 
 /**
- * Clear all location-related data from the browser
- * @param {Object} options - Configuration options
- * @param {boolean} options.clearCookies - Clear location cookies (default: true)
- * @param {boolean} options.clearLocalStorage - Clear location localStorage (default: true)
- * @param {boolean} options.showNotification - Show success notification (default: true)
- */
-function clearLocationData(options = {}) {
-  const config = {
-    clearCookies: true,
-    clearLocalStorage: true,
-    showNotification: true,
-    ...options,
-  };
-
-  let clearedItems = [];
-
-  try {
-    // Clear location-related cookies
-    if (config.clearCookies) {
-      const locationCookies = [
-        'userLocation',
-        'lastKnownLocation',
-        'locationPermission',
-        'mapCenter',
-        'mapZoom',
-        'searchLocation',
-        'preferredLocation',
-      ];
-
-      locationCookies.forEach(cookieName => {
-        if (getCookie(cookieName)) {
-          deleteCookie(cookieName);
-          clearedItems.push(`Cookie: ${cookieName}`);
-        }
-      });
-    }
-
-    // Clear location-related localStorage
-    if (config.clearLocalStorage) {
-      const locationKeys = [
-        'userLocation',
-        'lastKnownLocation',
-        'locationPermission',
-        'mapState',
-        'searchHistory',
-        'locationPreferences',
-      ];
-
-      locationKeys.forEach(key => {
-        if (localStorage.getItem(key)) {
-          localStorage.removeItem(key);
-          clearedItems.push(`LocalStorage: ${key}`);
-        }
-      });
-    }
-
-    // Clear sessionStorage location data
-    const sessionKeys = [
-      'currentLocation',
-      'tempLocation',
-      'searchLocation',
-    ];
-
-    sessionKeys.forEach(key => {
-      if (sessionStorage.getItem(key)) {
-        sessionStorage.removeItem(key);
-        clearedItems.push(`SessionStorage: ${key}`);
-      }
-    });
-
-    // Reset any location-related components
-    resetLocationComponents();
-
-    // Show notification if requested
-    if (config.showNotification && clearedItems.length > 0) {
-      showLocationClearNotification(clearedItems);
-    }
-
-    console.log('Location data cleared:', clearedItems);
-    return {
-      success: true,
-      clearedItems,
-      message: `Cleared ${clearedItems.length} location data items`,
-    };
-
-  } catch (error) {
-    console.error('Error clearing location data:', error);
-    return {
-      success: false,
-      error: error.message,
-      clearedItems,
-    };
-  }
-}
-
-/**
  * Get a cookie value by name
  * @param {string} name - Cookie name
  * @returns {string|null} Cookie value or null if not found
@@ -139,7 +43,7 @@ function deleteCookie(name, path = '/', domain = '') {
 function resetLocationComponents() {
   // Reset restaurant autocomplete location
   const autocompleteElements = document.querySelectorAll('[data-restaurant-autocomplete]');
-  autocompleteElements.forEach(element => {
+  autocompleteElements.forEach((element) => {
     if (element.restaurantAutocomplete && element.restaurantAutocomplete.userLocation) {
       element.restaurantAutocomplete.userLocation = null;
       element.restaurantAutocomplete.locationError = null;
@@ -149,7 +53,7 @@ function resetLocationComponents() {
 
   // Reset map components
   const mapElements = document.querySelectorAll('[data-map-search]');
-  mapElements.forEach(element => {
+  mapElements.forEach((element) => {
     if (element.mapSearch && element.mapSearch.currentLocation) {
       element.mapSearch.currentLocation = null;
       element.mapSearch.currentLocationMarker = null;
@@ -159,9 +63,9 @@ function resetLocationComponents() {
 
   // Trigger location permission reset (user will need to allow again)
   if ('permissions' in navigator) {
-    navigator.permissions.query({ name: 'geolocation' }).then(permission => {
+    navigator.permissions.query({ name: 'geolocation' }).then((permission) => {
       console.log('Current geolocation permission:', permission.state);
-    }).catch(error => {
+    }).catch((error) => {
       console.log('Cannot query geolocation permission:', error);
     });
   }
@@ -205,6 +109,102 @@ function showLocationClearNotification(clearedItems) {
         notification.parentNode.removeChild(notification);
       }
     }, 5000);
+  }
+}
+
+/**
+ * Clear all location-related data from the browser
+ * @param {Object} options - Configuration options
+ * @param {boolean} options.clearCookies - Clear location cookies (default: true)
+ * @param {boolean} options.clearLocalStorage - Clear location localStorage (default: true)
+ * @param {boolean} options.showNotification - Show success notification (default: true)
+ */
+function clearLocationData(options = {}) {
+  const config = {
+    clearCookies: true,
+    clearLocalStorage: true,
+    showNotification: true,
+    ...options,
+  };
+
+  const clearedItems = [];
+
+  try {
+    // Clear location-related cookies
+    if (config.clearCookies) {
+      const locationCookies = [
+        'userLocation',
+        'lastKnownLocation',
+        'locationPermission',
+        'mapCenter',
+        'mapZoom',
+        'searchLocation',
+        'preferredLocation',
+      ];
+
+      locationCookies.forEach((cookieName) => {
+        if (getCookie(cookieName)) {
+          deleteCookie(cookieName);
+          clearedItems.push(`Cookie: ${cookieName}`);
+        }
+      });
+    }
+
+    // Clear location-related localStorage
+    if (config.clearLocalStorage) {
+      const locationKeys = [
+        'userLocation',
+        'lastKnownLocation',
+        'locationPermission',
+        'mapState',
+        'searchHistory',
+        'locationPreferences',
+      ];
+
+      locationKeys.forEach((key) => {
+        if (localStorage.getItem(key)) {
+          localStorage.removeItem(key);
+          clearedItems.push(`LocalStorage: ${key}`);
+        }
+      });
+    }
+
+    // Clear sessionStorage location data
+    const sessionKeys = [
+      'currentLocation',
+      'tempLocation',
+      'searchLocation',
+    ];
+
+    sessionKeys.forEach((key) => {
+      if (sessionStorage.getItem(key)) {
+        sessionStorage.removeItem(key);
+        clearedItems.push(`SessionStorage: ${key}`);
+      }
+    });
+
+    // Reset any location-related components
+    resetLocationComponents();
+
+    // Show notification if requested
+    if (config.showNotification && clearedItems.length > 0) {
+      showLocationClearNotification(clearedItems);
+    }
+
+    console.log('Location data cleared:', clearedItems);
+    return {
+      success: true,
+      clearedItems,
+      message: `Cleared ${clearedItems.length} location data items`,
+    };
+
+  } catch (error) {
+    console.error('Error clearing location data:', error);
+    return {
+      success: false,
+      error: error.message,
+      clearedItems,
+    };
   }
 }
 
@@ -257,10 +257,10 @@ function checkLocationData() {
     'locationPreferences',
   ];
 
-  const existingCookies = locationCookies.filter(name => getCookie(name));
-  const existingLocalStorage = locationLocalStorage.filter(key => localStorage.getItem(key));
+  const existingCookies = locationCookies.filter((name) => getCookie(name));
+  const existingLocalStorage = locationLocalStorage.filter((key) => localStorage.getItem(key));
   const existingSessionStorage = ['currentLocation', 'tempLocation', 'searchLocation']
-    .filter(key => sessionStorage.getItem(key));
+    .filter((key) => sessionStorage.getItem(key));
 
   return {
     cookies: existingCookies,

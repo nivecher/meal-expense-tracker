@@ -40,8 +40,10 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'requirements*.txt'
 
-      - name: Install Python dependencies
+      - name: Create virtual environment
         run: |
+          python -m venv venv
+          source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
@@ -62,34 +64,10 @@ jobs:
             echo "No package.json found, skipping npm dependencies"
           fi
 
-      - name: Python linting
+      - name: Run linting
         run: |
-          if command -v flake8 >/dev/null 2>&1; then
-            python -m flake8 app tests
-          else
-            echo "flake8 not found, skipping flake8 check"
-          fi
-          if command -v black >/dev/null 2>&1; then
-            python -m black --check app tests
-          else
-            echo "black not found, skipping black check"
-          fi
-
-      - name: JavaScript linting
-        run: |
-          if [ -f package.json ]; then
-            npm run lint:js
-          else
-            echo "No package.json found, skipping JavaScript linting"
-          fi
-
-      - name: CSS linting
-        run: |
-          echo "CSS linting would go here"
-
-      - name: HTML template linting
-        run: |
-          echo "HTML template linting would go here"
+          source venv/bin/activate
+          make lint
 
   # Comprehensive test job
   test:
@@ -111,18 +89,17 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'requirements*.txt'
 
-      - name: Install dependencies
+      - name: Create virtual environment
         run: |
+          python -m venv venv
+          source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
       - name: Run ${{ matrix.test-type }} tests
         run: |
-          if command -v pytest >/dev/null 2>&1; then
-            python -m pytest tests/${{ matrix.test-type }}/ -v --cov=app --cov-report=term-missing
-          else
-            echo "pytest not found, skipping ${{ matrix.test-type }} tests"
-          fi
+          source venv/bin/activate
+          make test-${{ matrix.test-type }}
 
       - name: Upload coverage to Codecov
         if: matrix.test-type == 'unit'
@@ -196,28 +173,17 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'requirements*.txt'
 
-      - name: Install dependencies
+      - name: Create virtual environment
         run: |
+          python -m venv venv
+          source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Security scan with bandit
+      - name: Run security checks
         run: |
-          if command -v bandit >/dev/null 2>&1; then
-            bandit -r app/ -f json -o bandit-report.json || true
-            bandit -r app/
-          else
-            echo "bandit not found, skipping security scan"
-          fi
-
-      - name: Safety check
-        run: |
-          if command -v safety >/dev/null 2>&1; then
-            safety scan --output json --save-as safety-report.json || true
-            safety scan
-          else
-            echo "safety not found, skipping safety check"
-          fi
+          source venv/bin/activate
+          make security-check
 
   # Final status check - all jobs must pass
   ci-success:

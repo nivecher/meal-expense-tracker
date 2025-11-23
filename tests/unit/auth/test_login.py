@@ -115,8 +115,12 @@ def test_login_required_redirect(client, app):
             # Web flow - should redirect to login page with next parameter
             # Handle both relative and absolute URLs
             assert login_url in response.location or response.location.startswith(login_url)
-            # The next parameter might be URL-encoded / or a full URL
-            assert "next=%2F" in response.location or "next=http://localhost/" in response.location
+            # The next parameter might be URL-encoded /, unencoded /, or a full URL
+            assert (
+                "next=%2F" in response.location
+                or "next=/" in response.location
+                or "next=http://localhost/" in response.location
+            )
 
             # Follow the redirect to the login page
             response = client.get(response.location, follow_redirects=True)

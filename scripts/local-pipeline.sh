@@ -57,7 +57,7 @@ fi
 if [ "$SKIP_TESTS" = "false" ]; then
     echo -e "\n${BLUE}🔒 Enhanced Security Scan${NC}"
     run_step "Bandit security scan" "bandit -r app/"
-    run_step "Safety check" "safety check"
+    run_step "Safety check" "safety scan"
 else
     echo -e "\n${YELLOW}⚠️  Skipping security scan as requested${NC}"
 fi
