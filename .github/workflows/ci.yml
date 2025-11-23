@@ -124,14 +124,6 @@ jobs:
         with:
           terraform_version: 1.13.5
           
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
-          role-session-name: GitHubActions-TerraformValidation-${{ github.run_id }}
-          role-duration-seconds: 3600
-          
       - name: Terraform format check
         run: |
           if [ -d "terraform" ]; then
@@ -140,19 +132,56 @@ jobs:
             echo "No terraform directory found, skipping format check"
           fi
         
-      - name: Terraform validation
+      - name: Terraform validation (basic)
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
+          TF_IN_AUTOMATION: 1
         run: |
           if [ -d "terraform" ]; then
-            terraform -chdir=terraform init
-            terraform -chdir=terraform validate
+            cd terraform
+            # Basic validation without backend (doesn't require AWS credentials)
+            terraform init -backend=false
+            terraform validate
+          else
+            echo "No terraform directory found, skipping validation"
+          fi
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: GitHubActions-TerraformValidation-${{ github.run_id }}
+          role-duration-seconds: 3600
+
+      - name: Terraform validation (with backend)
+        env:
+          TF_ENV: dev
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
+          TF_IN_AUTOMATION: 1
+        run: |
+          if [ -d "terraform" ]; then
+            cd terraform
+            terraform init -reconfigure -backend-config=environments/${TF_ENV}/backend.hcl
+            terraform validate
           else
             echo "No terraform directory found, skipping validation"
           fi
 
       - name: Terraform Plan
+        env:
+          TF_ENV: dev
+          TF_PARALLELISM: 30
+          TF_IN_AUTOMATION: 1
         run: |
           if [ -d "terraform" ]; then
-            terraform -chdir=terraform plan -var-file=environments/dev/terraform.tfvars
+            cd terraform
+            terraform plan \
+              -var-file=environments/${TF_ENV}/terraform.tfvars \
+              -var="environment=${TF_ENV}" \
+              -input=false \
+              -lock=true \
+              -parallelism=${TF_PARALLELISM}
           else
             echo "No terraform directory found, skipping plan"
           fi

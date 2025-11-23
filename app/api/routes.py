@@ -65,19 +65,30 @@ def health_check() -> Response:
 
 # Version Information
 @bp.route("/version")
-def version_info() -> Response:
+def version_info() -> Tuple[Response, int]:
     """Get application version information.
 
     Returns:
         JSON response with version from git tags and build timestamp
     """
-    from app._version import __build_timestamp__, __version__
+    try:
+        from app._version import __build_timestamp__, __version__
 
-    version_data = {
-        "version": __version__,
-        "build_timestamp": __build_timestamp__,
-    }
-    return _create_api_response(data=version_data, message="Version information retrieved successfully")
+        version_data = {
+            "version": __version__,
+            "build_timestamp": __build_timestamp__,
+        }
+        return _create_api_response(data=version_data, message="Version information retrieved successfully")
+    except ImportError as e:
+        current_app.logger.warning(f"Could not import version information: {e}")
+        version_data = {
+            "version": "unknown",
+            "build_timestamp": "Not set",
+        }
+        return _create_api_response(data=version_data, message="Version information retrieved successfully")
+    except Exception as e:
+        current_app.logger.error(f"Error retrieving version information: {e}")
+        return _handle_service_error(e, "retrieve version information")
 
 
 # Cuisine Data
