@@ -148,7 +148,6 @@ core_dependencies = [
     'gunicorn',
     'marshmallow',
     'msgspec',
-    'pytz',
     'requests',
     'us',
     'werkzeug',

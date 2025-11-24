@@ -487,14 +487,13 @@ def create_expense(user_id: int, form: ExpenseForm, receipt_file=None) -> Tuple[
         - Error message on failure, None on success
     """
     try:
-        # Get user timezone for proper time handling
-        from app.auth.models import User
-        from app.extensions import db
+        # Get browser timezone for proper time handling
+        from app.utils.timezone_utils import get_browser_timezone, normalize_timezone
 
-        user = db.session.get(User, user_id)
-        user_timezone = user.timezone if user and user.timezone else "UTC"
+        browser_timezone_raw = get_browser_timezone() or "UTC"
+        browser_timezone = normalize_timezone(browser_timezone_raw) or "UTC"
         # Process form data
-        expense_data = _process_expense_form_data(form, user_timezone)
+        expense_data = _process_expense_form_data(form, browser_timezone)
         if isinstance(expense_data, str):  # Error message
             return None, expense_data
 
@@ -521,14 +520,17 @@ def create_expense(user_id: int, form: ExpenseForm, receipt_file=None) -> Tuple[
                 return None, f"Failed to save receipt: {str(e)}"
 
         # Create and save the expense
-        # Use current datetime in user's timezone if no datetime provided
+        # Use current datetime in browser's timezone if no datetime provided
         if not datetime_value:
-            from app.auth.models import User
-            from app.utils.timezone_utils import get_current_time_in_user_timezone
+            from app.utils.timezone_utils import (
+                get_browser_timezone,
+                get_current_time_in_browser_timezone,
+                normalize_timezone,
+            )
 
-            user = db.session.get(User, user_id)
-            user_timezone = user.timezone if user and user.timezone else "UTC"
-            datetime_value = get_current_time_in_user_timezone(user_timezone)
+            browser_timezone_raw = get_browser_timezone() or "UTC"
+            browser_timezone = normalize_timezone(browser_timezone_raw) or "UTC"
+            datetime_value = get_current_time_in_browser_timezone(browser_timezone)
 
         expense = Expense(
             user_id=user_id,
@@ -564,16 +566,21 @@ def create_expense(user_id: int, form: ExpenseForm, receipt_file=None) -> Tuple[
 
 
 def _process_expense_form_data(
-    form: ExpenseForm, user_timezone: str = "UTC"
+    form: ExpenseForm, browser_timezone: str = "UTC"
 ) -> Union[Tuple[int, Optional[int], datetime, Decimal, list[str]], str]:
     """Process all form data for expense creation/update.
 
     Args:
         form: The expense form
+        browser_timezone: Browser timezone string (will be normalized if deprecated)
 
     Returns:
         Either a tuple of processed data or an error message string
     """
+    from app.utils.timezone_utils import normalize_timezone
+
+    # Normalize deprecated timezone names (e.g., US/Central -> America/Chicago)
+    browser_timezone = normalize_timezone(browser_timezone) or "UTC"
     category_id, error = _process_category_id(form)
     if error:
         return error
@@ -600,16 +607,18 @@ def _process_expense_form_data(
 
     # Combine date and time into a datetime object
     if time_value:
-        # Use the provided time - interpret as user's local time
-        import pytz
+        # Use the provided time - interpret as browser's local time
+        from zoneinfo import ZoneInfo
 
-        from app.utils.timezone_utils import get_user_timezone
+        from app.utils.timezone_utils import get_timezone
 
-        user_tz = get_user_timezone(user_timezone)
-        user_datetime = datetime.combine(date_value, time_value)
-        # Localize to user's timezone, then convert to UTC for storage
-        user_datetime_tz = user_tz.localize(user_datetime)
-        datetime_value = user_datetime_tz.astimezone(pytz.UTC).replace(tzinfo=None)  # Remove tzinfo for storage
+        browser_tz = get_timezone(browser_timezone)
+        browser_datetime = datetime.combine(date_value, time_value)
+        # Localize to browser's timezone, then convert to UTC for storage
+        browser_datetime_tz = browser_datetime.replace(tzinfo=browser_tz)
+        datetime_value = browser_datetime_tz.astimezone(ZoneInfo("UTC")).replace(
+            tzinfo=None
+        )  # Remove tzinfo for storage
     else:
         # Use noon to avoid timezone issues (as we did before)
         datetime_value = datetime.combine(date_value, time(12, 0))
@@ -707,10 +716,13 @@ def update_expense(
         from app.auth.models import User
         from app.extensions import db
 
-        user = db.session.get(User, expense.user_id)
-        user_timezone = user.timezone if user and user.timezone else "UTC"
+        # Get browser timezone for proper time handling
+        from app.utils.timezone_utils import get_browser_timezone, normalize_timezone
+
+        browser_timezone_raw = get_browser_timezone() or "UTC"
+        browser_timezone = normalize_timezone(browser_timezone_raw) or "UTC"
         # Process form data
-        expense_data = _process_expense_form_data(form, user_timezone)
+        expense_data = _process_expense_form_data(form, browser_timezone)
         if isinstance(expense_data, str):  # Error message
             return None, expense_data
 
@@ -1884,15 +1896,37 @@ def update_tag(user_id: int, tag_id: int, name: str, color: str = "#6c757d", des
 
 
 def get_user_tags(user_id: int) -> list[Tag]:
-    """Get all tags for a user.
+    """Get all tags for a user with accurate expense counts.
 
     Args:
         user_id: ID of the user
 
     Returns:
-        List of Tag objects for the user
+        List of Tag objects for the user with expense_count populated
     """
-    return Tag.query.filter_by(user_id=user_id).order_by(Tag.name).all()
+    tags = Tag.query.filter_by(user_id=user_id).order_by(Tag.name).all()
+
+    # Optimize: Get all expense counts in a single query instead of N+1 queries
+    if tags:
+        tag_ids = [tag.id for tag in tags]
+
+        # Count expenses per tag, joining with Expense to ensure expenses exist
+        counts = (
+            db.session.query(ExpenseTag.tag_id, func.count(ExpenseTag.id).label("count"))
+            .join(Expense, ExpenseTag.expense_id == Expense.id)
+            .filter(ExpenseTag.tag_id.in_(tag_ids))
+            .group_by(ExpenseTag.tag_id)
+            .all()
+        )
+
+        # Create a dictionary mapping tag_id to count
+        count_dict = {tag_id: count for tag_id, count in counts}
+
+        # Set expense_count on each tag object
+        for tag in tags:
+            tag._expense_count = count_dict.get(tag.id, 0)
+
+    return tags
 
 
 def search_tags(user_id: int, query: str, limit: int = 10) -> list[Tag]:

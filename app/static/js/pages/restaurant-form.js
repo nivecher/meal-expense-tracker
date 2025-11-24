@@ -361,7 +361,8 @@ function openWebsite() {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = `https://${url}`;
     }
-    window.open(url, '_blank', 'noopener,noreferrer');
+    // Navigate in the same window for SPA behavior
+    window.location.href = url;
   }
 }
 

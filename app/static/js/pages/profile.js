@@ -15,7 +15,7 @@ function initializeTagManager() {
     } else {
       console.warn('TagManager not available globally');
     }
-  } catch {
+  } catch (error) {
     console.error('Failed to initialize tag manager:', error);
   }
 }

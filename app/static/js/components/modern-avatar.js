@@ -70,7 +70,10 @@ class ModernAvatarManager {
 
     avatarElements.forEach((element, index) => {
       // Skip if already processed
-      if (element.dataset.avatarProcessed) return;
+      if (element.dataset.avatarProcessed === 'true') return;
+
+      // Skip if manually updated by avatar picker
+      if (element.dataset.avatarManuallyUpdated === 'true') return;
 
       this.processAvatar(element, index);
       element.dataset.avatarProcessed = 'true';
@@ -78,6 +81,11 @@ class ModernAvatarManager {
   }
 
   processAvatar(element, index = 0) {
+    // Skip if manually updated by avatar picker
+    if (element.dataset.avatarManuallyUpdated === 'true') {
+      return;
+    }
+
     const avatarId = `avatar-${Date.now()}-${index}`;
     const avatarData = this.extractAvatarData(element);
 
@@ -92,12 +100,17 @@ class ModernAvatarManager {
     const existingInitials = container.querySelector('.avatar-initials');
 
     if (existingInitials) {
-      // There's already an initials div, just show it and hide the image
-      existingInitials.style.display = 'flex';
-      element.style.display = 'none';
-      element.classList.remove('avatar-loading');
-      element.classList.add('avatar-loaded');
-      return;
+      // Only show initials if image source is empty or invalid
+      const src = element.src || element.dataset.src || '';
+      if (!src || src.trim() === '' || src === 'about:blank' || src === 'data:,') {
+        // No valid source, show initials
+        existingInitials.style.display = 'flex';
+        element.style.display = 'none';
+        element.classList.remove('avatar-loading');
+        element.classList.add('avatar-loaded');
+        return;
+      }
+      // If there's a valid source, let it load normally
     }
 
     // Try to load the image only if there's a valid source

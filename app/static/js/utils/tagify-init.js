@@ -76,7 +76,8 @@ function fixTagifyElementsForExtensions() {
 // Initialize Tagify for expense forms
 document.addEventListener('DOMContentLoaded', () => {
   const tagsInput = document.getElementById('tagsInput');
-  if (tagsInput) {
+  // Prevent double initialization
+  if (tagsInput && !tagsInput.tagify) {
     // Get existing tags from input value and data attribute
     const existingTagsValue = tagsInput.value;
     const existingTagsData = tagsInput.getAttribute('data-existing-tags');
@@ -92,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
           title: tag.description || tag.name,
           description: tag.description || '',
         }));
-      } catch {
+      } catch (error) {
         console.warn('Failed to parse existing tags data:', error);
         // Fallback to simple name parsing
         existingTags = existingTagsValue ? existingTagsValue.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [];
@@ -121,6 +122,20 @@ document.addEventListener('DOMContentLoaded', () => {
           const tagColor = tagData.color || '#6c757d'; // Default gray if no color
           const tagDescription = tagData.description || tagData.title || '';
 
+          // Calculate text color based on background brightness
+          const hexToRgb = (hex) => {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+              r: parseInt(result[1], 16),
+              g: parseInt(result[2], 16),
+              b: parseInt(result[3], 16),
+            } : null;
+          };
+
+          const rgb = hexToRgb(tagColor);
+          const brightness = rgb ? (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 : 128;
+          const textColor = brightness > 128 ? '#000' : '#fff';
+
           return `
                         <tag title="${tagDescription}"
                              contenteditable='false'
@@ -130,10 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
                              data-tagify-tag="true"
                              data-tag-id="${tagId}"
                              data-tag-color="${tagColor}"
-                             data-tag-description="${tagDescription}">
+                             data-tag-description="${tagDescription}"
+                             style="--tag-color: ${tagColor}; background-color: ${tagColor} !important; background: ${tagColor} !important; background-image: none !important; color: ${textColor} !important;">
                         <x title='' class='tagify__tag__removeBtn' role='button' aria-label='remove tag'></x>
                         <div>
-                            <span class='tagify__tag-text'>${tagData.value}</span>
+                            <span class='tagify__tag-text' style="color: ${textColor} !important;">${tagData.value}</span>
                         </div>
                     </tag>
                     `;
@@ -155,30 +171,11 @@ document.addEventListener('DOMContentLoaded', () => {
           }));
 
           // Add existing tags to Tagify after whitelist is loaded
-          if (existingTags.length > 0) {
+          // Only add if Tagify doesn't already have tags (prevent duplicates)
+          if (existingTags.length > 0 && tagify.value.length === 0) {
             // If we have full tag data (from data-existing-tags), use it directly
             if (existingTags[0] && existingTags[0].id) {
               tagify.addTags(existingTags);
-              // Apply colors immediately for existing tags
-              setTimeout(() => {
-                const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
-                tagElements.forEach((tagEl) => {
-                  const tagColor = tagEl.getAttribute('data-tag-color');
-                  if (tagColor) {
-                    // Set CSS custom property for maximum override
-                    tagEl.style.setProperty('--tag-color', tagColor, 'important');
-                    tagEl.style.setProperty('background-color', tagColor, 'important');
-                    tagEl.style.setProperty('background-image', 'none', 'important');
-                    tagEl.style.setProperty('background', tagColor, 'important');
-
-                    // Also apply to text element
-                    const textElement = tagEl.querySelector('.tagify__tag-text');
-                    if (textElement) {
-                      textElement.style.setProperty('color', '#fff', 'important');
-                    }
-                  }
-                });
-              }, 50);
             } else {
               // Fallback: try to match with whitelist
               existingTags.forEach((tagName) => {
@@ -196,54 +193,65 @@ document.addEventListener('DOMContentLoaded', () => {
       })
       .catch((error) => console.error('Failed to load tags:', error));
 
-    // Apply colors when tags are added or updated
-    tagify.on('add', (_e) => {
-      setTimeout(() => {
-        const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
-        tagElements.forEach((tagEl) => {
-          const tagColor = tagEl.getAttribute('data-tag-color');
-          if (tagColor) {
-            // Set CSS custom property for maximum override
-            tagEl.style.setProperty('--tag-color', tagColor, 'important');
-            tagEl.style.setProperty('background-color', tagColor, 'important');
-            tagEl.style.setProperty('background-image', 'none', 'important');
-            tagEl.style.setProperty('background', tagColor, 'important');
-
-            // Also apply to text element
-            const textElement = tagEl.querySelector('.tagify__tag-text');
-            if (textElement) {
-              textElement.style.setProperty('color', '#fff', 'important');
-            }
-          }
-        });
-      }, 10);
-    });
-
-    // Also apply colors when tags are updated
-    tagify.on('change', (_e) => {
-      setTimeout(() => {
-        const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
-        tagElements.forEach((tagEl) => {
-          const tagColor = tagEl.getAttribute('data-tag-color');
-          if (tagColor) {
-            // Set CSS custom property for maximum override
-            tagEl.style.setProperty('--tag-color', tagColor, 'important');
-            tagEl.style.setProperty('background-color', tagColor, 'important');
-            tagEl.style.setProperty('background-image', 'none', 'important');
-            tagEl.style.setProperty('background', tagColor, 'important');
-
-            // Also apply to text element
-            const textElement = tagEl.querySelector('.tagify__tag-text');
-            if (textElement) {
-              textElement.style.setProperty('color', '#fff', 'important');
-            }
-          }
-        });
-      }, 10);
-    });
+    // CSS variable is already set in template, so no need to re-apply
+    // Tagify will handle tag rendering with the styles from the template
 
     // Make globally available
     window.tagifyInstance = tagify;
+
+    // Watch for Tagify tags being added/updated and ensure styles are applied
+    const tagStyleObserver = new MutationObserver(() => {
+      const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
+      tagElements.forEach((tagEl) => {
+        const tagColor = tagEl.getAttribute('data-tag-color');
+        if (tagColor) {
+          // Force apply background color with maximum specificity
+          tagEl.style.setProperty('background-color', tagColor, 'important');
+          tagEl.style.setProperty('background', tagColor, 'important');
+          tagEl.style.setProperty('background-image', 'none', 'important');
+          // Ensure text color is set based on brightness
+          const textSpan = tagEl.querySelector('.tagify__tag-text');
+          if (textSpan && !textSpan.style.color) {
+            const hexToRgb = (hex) => {
+              const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+              return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16),
+              } : null;
+            };
+            const rgb = hexToRgb(tagColor);
+            const brightness = rgb ? (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 : 128;
+            const textColor = brightness > 128 ? '#000' : '#fff';
+            textSpan.style.setProperty('color', textColor, 'important');
+          }
+        }
+      });
+    });
+
+    // Observe the Tagify container for changes
+    const tagifyContainer = tagsInput.closest('.tagify') || tagsInput.parentElement;
+    if (tagifyContainer) {
+      tagStyleObserver.observe(tagifyContainer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-tag-color', 'class'],
+      });
+    }
+
+    // Apply styles immediately to any existing tags
+    setTimeout(() => {
+      const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
+      tagElements.forEach((tagEl) => {
+        const tagColor = tagEl.getAttribute('data-tag-color');
+        if (tagColor) {
+          tagEl.style.setProperty('background-color', tagColor, 'important');
+          tagEl.style.setProperty('background', tagColor, 'important');
+          tagEl.style.setProperty('background-image', 'none', 'important');
+        }
+      });
+    }, 50);
 
     // Fix Tagify elements for browser extensions
     setTimeout(() => {

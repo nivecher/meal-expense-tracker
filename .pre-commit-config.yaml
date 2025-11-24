@@ -81,7 +81,6 @@ repos:
   #         - types-requests
   #         - types-python-dateutil
   #         - types-pyyaml
-  #         - types-pytz
   #       args: [--config-file=setup.cfg]
   #       files: \.py$
 

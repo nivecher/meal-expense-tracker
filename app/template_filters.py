@@ -16,6 +16,7 @@ from app.utils.timezone_utils import (
     format_current_time_for_user,
     format_date_for_user,
     format_datetime_for_user,
+    format_datetime_with_timezone_abbr,
     get_timezone_display_name,
     time_ago_for_user,
 )
@@ -28,20 +29,10 @@ def time_ago(value: datetime) -> str:
         value: The datetime object to format
 
     Returns:
-        str: A human-readable relative time string in user's timezone
+        str: A human-readable relative time string in browser's timezone
     """
-    # Get user timezone from Flask context
-    user_timezone = None
-    try:
-        from flask_login import current_user
-
-        if current_user and current_user.is_authenticated:
-            user_timezone = current_user.timezone
-    except Exception:  # nosec B110 - Intentional fallback when Flask-Login context unavailable
-        # Fall back to UTC if user context not available (e.g., CLI context)
-        pass
-
-    return time_ago_for_user(value, user_timezone)
+    # Browser timezone will be retrieved from request by time_ago_for_user
+    return time_ago_for_user(value, None)
 
 
 def meal_type_color(meal_type: str) -> str:
@@ -247,74 +238,44 @@ def service_level_css_class_filter(service_level: str) -> str:
 
 
 def format_datetime_user_tz(value: datetime, format_str: str = "%B %d, %Y at %I:%M %p") -> str:
-    """Format a datetime for display in user's timezone.
+    """Format a datetime for display in browser's timezone.
 
     Args:
         value: The datetime object to format
         format_str: Python strftime format string
 
     Returns:
-        str: Formatted datetime string in user's timezone
+        str: Formatted datetime string in browser's timezone
     """
-    # Get user timezone from Flask context
-    user_timezone = None
-    try:
-        from flask_login import current_user
-
-        if current_user and current_user.is_authenticated:
-            user_timezone = current_user.timezone
-    except Exception:  # nosec B110 - Intentional fallback when Flask-Login context unavailable
-        # Fall back to UTC if user context not available (e.g., CLI context)
-        pass
-
-    return format_datetime_for_user(value, user_timezone, format_str)
+    # Browser timezone will be retrieved from request by format_datetime_for_user
+    return format_datetime_for_user(value, None, format_str)
 
 
 def format_date_user_tz(value: datetime, format_str: str = "%B %d, %Y") -> str:
-    """Format a date for display in user's timezone.
+    """Format a date for display in browser's timezone.
 
     Args:
         value: The datetime object to format
         format_str: Python strftime format string
 
     Returns:
-        str: Formatted date string in user's timezone
+        str: Formatted date string in browser's timezone
     """
-    # Get user timezone from Flask context
-    user_timezone = None
-    try:
-        from flask_login import current_user
-
-        if current_user and current_user.is_authenticated:
-            user_timezone = current_user.timezone
-    except Exception:  # nosec B110 - Intentional fallback when Flask-Login context unavailable
-        # Fall back to UTC if user context not available (e.g., CLI context)
-        pass
-
-    return format_date_for_user(value, user_timezone, format_str)
+    # Browser timezone will be retrieved from request by format_date_for_user
+    return format_date_for_user(value, None, format_str)
 
 
 def current_time_user_tz(format_str: str = "%B %d, %Y at %I:%M:%S %p %Z") -> str:
-    """Get current time formatted for user's timezone.
+    """Get current time formatted for browser's timezone.
 
     Args:
         format_str: Python strftime format string
 
     Returns:
-        str: Formatted current time string in user's timezone
+        str: Formatted current time string in browser's timezone
     """
-    # Get user timezone from Flask context
-    user_timezone = None
-    try:
-        from flask_login import current_user
-
-        if current_user and current_user.is_authenticated:
-            user_timezone = current_user.timezone
-    except Exception:  # nosec B110 - Intentional fallback when Flask-Login context unavailable
-        # Fall back to UTC if user context not available (e.g., CLI context)
-        pass
-
-    return format_current_time_for_user(user_timezone, format_str)
+    # Browser timezone will be retrieved from request by format_current_time_for_user
+    return format_current_time_for_user(None, format_str)
 
 
 def timezone_display_name(timezone_str: str) -> str:
@@ -353,6 +314,20 @@ def init_app(app: Flask) -> None:
     app.add_template_filter(time_ago, name="time_ago")
     app.add_template_filter(format_datetime_user_tz, name="format_datetime_user_tz")
     app.add_template_filter(format_date_user_tz, name="format_date_user_tz")
+
+    def format_time_with_tz(value: datetime) -> str:
+        """Format time with timezone abbreviation in RFC format."""
+        return format_datetime_with_timezone_abbr(value, None, "%I:%M %p")
+
+    app.add_template_filter(format_time_with_tz, name="format_time_with_tz")
+
+    def tags_to_dict(tags) -> list:
+        """Convert a list of tag objects to a list of dictionaries."""
+        if not tags:
+            return []
+        return [tag.to_dict() if hasattr(tag, "to_dict") else {"id": tag.id, "name": tag.name} for tag in tags]
+
+    app.add_template_filter(tags_to_dict, name="tags_to_dict")
     app.add_template_filter(timezone_display_name, name="timezone_display_name")
 
     # Existing filters

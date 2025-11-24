@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, available_timezones
 
-import pytz
 from flask import (
     current_app,
     flash,
@@ -126,16 +126,20 @@ def change_password():
 
 def _handle_timezone_update():
     """Handle timezone-only update via AJAX."""
+    from app.utils.timezone_utils import normalize_timezone
+
     new_timezone = request.form.get("timezone", "UTC").strip()
 
-    # Validate timezone
-    if new_timezone not in pytz.all_timezones:
-        new_timezone = "UTC"
+    # Normalize and validate timezone (handles deprecated names like US/Central)
+    normalized_tz = normalize_timezone(new_timezone)
+    if not normalized_tz:
+        normalized_tz = "UTC"
+        current_app.logger.warning(f"Invalid timezone '{new_timezone}', defaulted to UTC")
 
-    current_user.timezone = new_timezone
+    current_user.timezone = normalized_tz
     db.session.commit()
 
-    current_app.logger.info(f"Timezone updated for user {current_user.id}: {new_timezone}")
+    current_app.logger.info(f"Timezone updated for user {current_user.id}: {normalized_tz} (from {new_timezone})")
     return jsonify({"success": True, "message": "Timezone updated successfully"})
 
 
@@ -163,10 +167,19 @@ def _handle_regular_profile_update():
         flash("Avatar URL is too long (max 255 characters)", "error")
         return redirect(url_for("auth.profile"))
 
-    # Validate timezone
-    if current_user.timezone not in pytz.all_timezones:
-        current_user.timezone = "UTC"
-        flash("Invalid timezone, defaulted to UTC", "warning")
+    # Validate and normalize timezone
+    from app.utils.timezone_utils import normalize_timezone
+
+    if current_user.timezone:
+        normalized_tz = normalize_timezone(current_user.timezone)
+        if not normalized_tz:
+            current_user.timezone = "UTC"
+            flash("Invalid timezone, defaulted to UTC", "warning")
+        elif normalized_tz != current_user.timezone:
+            # Update to normalized version if it was a deprecated name
+            original_tz = current_user.timezone
+            current_user.timezone = normalized_tz
+            current_app.logger.info(f"Normalized timezone from {original_tz} to {normalized_tz}")
 
     db.session.commit()
     flash("Profile updated successfully!", "success")
@@ -194,13 +207,13 @@ def profile():
             current_app.logger.error(f"Profile update failed for user {current_user.id}: {e}")
             return redirect(url_for("auth.profile"))
 
-    # Get common timezones for the dropdown
-    common_timezones = [
+    # Get common timezones for the dropdown (using IANA timezone names)
+    common_timezones_raw = [
         "UTC",
-        "US/Eastern",
-        "US/Central",
-        "US/Mountain",
-        "US/Pacific",
+        "America/New_York",
+        "America/Chicago",
+        "America/Denver",
+        "America/Los_Angeles",
         "Europe/London",
         "Europe/Paris",
         "Europe/Berlin",
@@ -209,25 +222,41 @@ def profile():
         "Australia/Sydney",
     ]
 
-    # Get current time in user's timezone for the sanity check
     from app.utils.timezone_utils import (
         format_current_time_for_user,
         get_timezone_display_name,
+        normalize_timezone,
     )
 
-    # Use the user's timezone, fall back to UTC if None/empty
-    user_timezone = current_user.timezone if current_user.timezone else "UTC"
-    current_time_user_tz = format_current_time_for_user(user_timezone, "%B %d, %Y at %I:%M:%S %p")
+    # Get user's saved timezone, normalize if needed
+    user_timezone = current_user.timezone or "UTC"
+    user_timezone = normalize_timezone(user_timezone) or "UTC"
+
+    # Update database if timezone was normalized (e.g., US/Central -> America/Chicago)
+    if current_user.timezone != user_timezone:
+        current_user.timezone = user_timezone
+        db.session.commit()
+
+    # Show current time in user's timezone
+    from zoneinfo import ZoneInfo
+
+    current_time_display = format_current_time_for_user(user_timezone, "%B %d, %Y at %I:%M:%S %p")
     timezone_display = get_timezone_display_name(user_timezone)
+
+    # Create timezone lists with display names
+    common_timezones = [(tz, get_timezone_display_name(tz)) for tz in common_timezones_raw]
+    all_timezones_raw = sorted(available_timezones())
+    all_timezones = [(tz, get_timezone_display_name(tz)) for tz in all_timezones_raw]
 
     return render_template(
         "auth/profile.html",
         title="Profile",
         now=datetime.now(timezone.utc),
-        current_time_user_tz=current_time_user_tz,
+        current_time_user_tz=current_time_display,
         timezone_display=timezone_display,
         common_timezones=common_timezones,
-        all_timezones=sorted(pytz.all_timezones),
+        all_timezones=all_timezones,
+        user_timezone=user_timezone,
     )
 
 
@@ -285,7 +314,9 @@ def detect_timezone():
                 break
 
         # Validate the timezone
-        if detected_timezone not in pytz.all_timezones:
+        try:
+            ZoneInfo(detected_timezone)
+        except Exception:
             detected_timezone = "UTC"
 
         return jsonify(

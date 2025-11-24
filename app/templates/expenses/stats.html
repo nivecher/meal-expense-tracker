@@ -75,27 +75,27 @@ head_extra %} {{ super() }}
         <h1 class="h3 mb-0">Expense Statistics</h1>
         <div class="time-period-selector">
             <a
-                href="{{ url_for('expenses.stats', days=7) }}"
+                href="{{ url_for('reports.expense_statistics', days=7) }}"
                 class="time-period-btn {% if days == 7 %}active{% endif %}"
                 >7 Days</a
             >
             <a
-                href="{{ url_for('expenses.stats', days=30) }}"
+                href="{{ url_for('reports.expense_statistics', days=30) }}"
                 class="time-period-btn {% if days == 30 %}active{% endif %}"
                 >30 Days</a
             >
             <a
-                href="{{ url_for('expenses.stats', days=90) }}"
+                href="{{ url_for('reports.expense_statistics', days=90) }}"
                 class="time-period-btn {% if days == 90 %}active{% endif %}"
                 >90 Days</a
             >
             <a
-                href="{{ url_for('expenses.stats', days=180) }}"
+                href="{{ url_for('reports.expense_statistics', days=180) }}"
                 class="time-period-btn {% if days == 180 %}active{% endif %}"
                 >6 Months</a
             >
             <a
-                href="{{ url_for('expenses.stats', days=365) }}"
+                href="{{ url_for('reports.expense_statistics', days=365) }}"
                 class="time-period-btn {% if days == 365 %}active{% endif %}"
                 >1 Year</a
             >
@@ -224,18 +224,7 @@ head_extra %} {{ super() }}
 </div>
 {% endblock content %} {% block scripts %} {{ super() }}
 <script type="application/json" id="chart-data">
-    {
-        "labels": {
-            {
-                chart_data.labels | tojson | safe
-            }
-        },
-        "data": {
-            {
-                chart_data.data | tojson | safe
-            }
-        }
-    }
+{{ chart_data | tojson | safe }}
 </script>
 <!-- Expense stats chart functionality -->
 <script src="{{ url_for('static', filename='js/pages/expense-stats.js') }}"></script>

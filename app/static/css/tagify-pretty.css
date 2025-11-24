@@ -1,10 +1,25 @@
 /**
  * Pretty Tagify Styling with Rounded Edges and User Colors
+ *
+ * IMPORTANT: This file must load AFTER Tagify's default CSS to override it.
+ * Load order: 1) Tagify CDN CSS, 2) This file (tagify-pretty.css)
  */
 
-/* Pretty rounded tags */
+/* Aggressive override for ALL Tagify tags with data-tag-color - must override Tagify defaults */
+.tagify__tag[data-tag-color] {
+  background-image: none !important;
+  background-size: auto !important;
+  background-position: initial !important;
+  background-repeat: no-repeat !important;
+  background-attachment: scroll !important;
+  background-origin: padding-box !important;
+  background-clip: border-box !important;
+}
 
-.tagify-tag-pretty {
+/* Pretty rounded tags - base styling for all pretty tags */
+
+.tagify-tag-pretty,
+.tagify__tag.tagify-tag-pretty {
   border-radius: 20px !important;
   padding: 4px 12px !important;
   font-size: 0.8rem !important;
@@ -12,6 +27,8 @@
   box-shadow: 0 2px 4px rgb(0 0 0 / 10%) !important;
   transition: all 0.2s ease !important;
   line-height: 1.2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }
 
 /* Pretty rounded remove button */
@@ -52,80 +69,22 @@
   color: inherit !important;
 }
 
-/* Apply colors from data-tag-color attribute - JavaScript will set the background-color directly */
-
-.tagify__tag[data-tag-color] {
-  color: #fff !important;
-  border: none !important;
+/* Ensure pretty styling is preserved for tags with colors - maximum specificity to override Tagify defaults */
+.tagify__tag.tagify-tag-pretty[data-tag-color],
+.tagify__tag.tagify-tag-pretty[data-tag-color].tagify__tag--editable,
+.tagify__tag.tagify-tag-pretty[data-tag-color].tagify__tag--selected,
+.tagify__tag.tagify-tag-pretty[data-tag-color].tagify__tag--editable.tagify__tag--selected {
+  /* Preserve all pretty styling from .tagify-tag-pretty */
+  border-radius: 20px !important;
+  padding: 4px 12px !important;
+  font-size: 0.8rem !important;
+  font-weight: 500 !important;
   box-shadow: 0 2px 4px rgb(0 0 0 / 10%) !important;
-  background-image: none !important;
-}
-
-.tagify__tag[data-tag-color] .tagify__tag-text {
-  color: #fff !important;
-}
-
-/* Override any conflicting styles for tag colors with higher specificity */
-
-.tagify__tag.tagify-tag-pretty[data-tag-color] {
-  color: #fff !important;
-  border: none !important;
-  background-image: none !important;
-}
-
-.tagify__tag.tagify-tag-pretty[data-tag-color] .tagify__tag-text {
-  color: #fff !important;
-}
-
-/* Override default Tagify background colors with maximum specificity */
-
-.tagify__tag[data-tag-color].tagify__tag--editable {
-  background-image: none !important;
-}
-
-.tagify__tag[data-tag-color].tagify__tag--editable .tagify__tag-text {
-  color: #fff !important;
-}
-
-/* Ensure background colors from JavaScript take precedence */
-
-.tagify__tag[data-tag-color].tagify-tag-pretty.tagify__tag--editable {
-  background-image: none !important;
-}
-
-/* NUCLEAR OPTION: Override ALL possible Tagify background styles with maximum specificity */
-
-.tagify__tag[data-tag-color] {
-  background: var(--tag-color) !important;
-  background-color: var(--tag-color) !important;
-  background-image: none !important;
-  background-size: auto !important;
-  background-position: initial !important;
-  background-repeat: no-repeat !important;
-}
-
-/* Even more specific override for all possible Tagify states */
-
-.tagify__tag[data-tag-color].tagify__tag--editable,
-.tagify__tag[data-tag-color].tagify__tag--editable.tagify__tag--selected,
-.tagify__tag[data-tag-color].tagify__tag--editable.tagify__tag--editable.tagify__tag--selected {
-  background: var(--tag-color) !important;
-  background-color: var(--tag-color) !important;
-  background-image: none !important;
-}
-
-/* Override any gradient backgrounds */
-
-.tagify__tag[data-tag-color]::before,
-.tagify__tag[data-tag-color]::after {
-  display: none !important;
-}
-
-/* FINAL NUCLEAR OPTION: Override everything with maximum specificity */
-
-.tagify__tag[data-tag-color] {
-  background: var(--tag-color) !important;
-  background-color: var(--tag-color) !important;
+  transition: all 0.2s ease !important;
+  line-height: 1.2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  /* Completely disable Tagify's default background styles */
   background-image: none !important;
   background-size: auto !important;
   background-position: initial !important;
@@ -133,28 +92,33 @@
   background-attachment: scroll !important;
   background-origin: padding-box !important;
   background-clip: border-box !important;
+  border: none !important;
+  /* Don't override color or background-color - they're set in template inline style */
 }
 
-/* Override any possible Tagify state */
-
+/* Override for all Tagify states - disable gradients only */
 .tagify__tag[data-tag-color].tagify__tag--editable,
 .tagify__tag[data-tag-color].tagify__tag--selected,
-.tagify__tag[data-tag-color].tagify__tag--editable.tagify__tag--selected,
-.tagify__tag[data-tag-color].tagify__tag--editable.tagify__tag--editable.tagify__tag--selected {
-  background: var(--tag-color) !important;
-  background-color: var(--tag-color) !important;
+.tagify__tag[data-tag-color].tagify__tag--editable.tagify__tag--selected {
   background-image: none !important;
+  border: none !important;
+  /* Don't override color - it's set in template */
 }
 
-/* Override any pseudo-elements */
+/* Text color is set in template based on brightness - don't override */
+.tagify__tag[data-tag-color] .tagify__tag-text,
+.tagify__tag.tagify-tag-pretty[data-tag-color] .tagify__tag-text {
+  /* Color is set inline in template - preserve it, don't override */
+}
 
+/* Completely disable Tagify's gradient pseudo-elements */
 .tagify__tag[data-tag-color]::before,
-.tagify__tag[data-tag-color]::after,
-.tagify__tag[data-tag-color]::first-line,
-.tagify__tag[data-tag-color]::first-letter {
-  background: var(--tag-color) !important;
-  background-color: var(--tag-color) !important;
+.tagify__tag[data-tag-color]::after {
+  display: none !important;
+  content: none !important;
+  background: none !important;
   background-image: none !important;
+  background-color: transparent !important;
 }
 
 /* Pretty tag badges for modal display */

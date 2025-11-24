@@ -12,6 +12,11 @@
     <!-- Embedded styles removed - now using external CSS file -->
 {% endblock head_extra %}
 
+{% block scripts %}
+    <!-- Tag Manager for modal functionality - load after modal HTML is in DOM -->
+    <script src="{{ url_for('static', filename='js/components/tag-manager.js') }}"></script>
+{% endblock scripts %}
+
 {% block content %}
 <div class="profile-container">
     <!-- Profile Header -->
@@ -169,17 +174,18 @@
                 <div class="timezone-container">
                     <select id="timezone" name="timezone" class="form-control">
                         <optgroup label="Common Timezones">
-                            {% for tz in common_timezones %}
-                            <option value="{{ tz }}"{% if current_user.timezone == tz %} selected{% endif %}>
-                                {{ tz.replace('_', ' ') }}
+                            {% for tz_id, tz_display in common_timezones %}
+                            <option value="{{ tz_id }}"{% if user_timezone == tz_id %} selected{% endif %}>
+                                {{ tz_display }}
                             </option>
                             {% endfor %}
                         </optgroup>
                         <optgroup label="All Timezones">
-                            {% for tz in all_timezones %}
-                            {% if tz not in common_timezones %}
-                            <option value="{{ tz }}"{% if current_user.timezone == tz %} selected{% endif %}>
-                                {{ tz.replace('_', ' ') }}
+                            {% for tz_id, tz_display in all_timezones %}
+                            {% set tz_in_common = common_timezones | selectattr('0', 'equalto', tz_id) | list %}
+                            {% if not tz_in_common %}
+                            <option value="{{ tz_id }}"{% if user_timezone == tz_id %} selected{% endif %}>
+                                {{ tz_display }}
                             </option>
                             {% endif %}
                             {% endfor %}
@@ -248,5 +254,6 @@
 {% include 'components/tag_editor_modal.html' %}
 
     <!-- Profile page functionality -->
+    <!-- Note: tag-manager.js is loaded in head_extra, so it's available here -->
     <script type="module" src="{{ url_for('static', filename='js/pages/profile.js') }}"></script>
 {% endblock content %}

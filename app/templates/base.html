@@ -119,6 +119,8 @@
         <!-- Unified Error Handler already loaded above -->
 
         <!-- Core Application Scripts -->
+        <script type="module" src="{{ url_for('static', filename='js/utils/timezone-handler.js') }}" defer></script>
+        <script type="module" src="{{ url_for('static', filename='js/utils/date-formatter.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/main.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/config.js') }}" defer></script>
         <!-- Load other utility modules -->

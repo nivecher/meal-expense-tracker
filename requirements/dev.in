@@ -2,7 +2,6 @@
 
 # Core Python type stubs
 types-python-dateutil>=2.8.0           # Type stubs for python-dateutil (date/time parsing and arithmetic)
-types-pytz>=2024.1.0                   # Type stubs for pytz (timezone support)
 types-PyYAML>=6.0.12                   # Type stubs for PyYAML (YAML parsing and serialization)
 types-jsonschema>=4.24.0               # Type stubs for jsonschema (JSON Schema validation)
 types-setuptools>=80.0.0               # Type stubs for setuptools (Python packaging utilities)
@@ -30,7 +29,6 @@ types-Flask-SQLAlchemy>=2.5.9,<3.0.0   # Type stubs for Flask-SQLAlchemy (ORM in
 types-Werkzeug>=1.0.0,<2.0.0           # Type stubs for Werkzeug (WSGI utilities, used by Flask)
 types-requests>=2.31.0,<3.0.0          # Type stubs for requests (HTTP client)
 types-python-dateutil>=2.8.0,<3.0.0    # Type stubs for python-dateutil (date/time parsing and arithmetic)
-types-pytz>=2024.1.0,<2026.0.0         # Type stubs for pytz (timezone support)
 # types-Flask-Login not available for Python 3.13 yet
 types-Jinja2>=2.11.0,<3.0.0            # Type stubs for Jinja2 (templating engine)
 types-MarkupSafe>=1.1.0,<2.0.0         # Type stubs for MarkupSafe (string escaping for Jinja2)
