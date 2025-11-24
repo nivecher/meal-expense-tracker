@@ -380,8 +380,6 @@ python-dotenv==1.1.1
     # via
     #   -r requirements/base.in
     #   webdriver-manager
-pytz==2024.2
-    # via -r requirements/base.in
 pyupgrade==3.21.2
     # via -r requirements/dev.in
 pyyaml==6.0.3
@@ -549,10 +547,6 @@ types-markupsafe==1.1.10
 types-psycopg2==2.9.21.20250718
     # via -r requirements/dev.in
 types-python-dateutil==2.9.0.20241003
-    # via
-    #   -c constraints.txt
-    #   -r requirements/dev.in
-types-pytz==2024.2.0.20241003
     # via
     #   -c constraints.txt
     #   -r requirements/dev.in

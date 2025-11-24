@@ -91,7 +91,10 @@ def serve_uploaded_file(filename):
 @login_required
 def expense_statistics():
     """Redirect to expense statistics page."""
-    return redirect(url_for("reports.expense_statistics"))
+    from flask import request
+
+    # Preserve query parameters in redirect
+    return redirect(url_for("reports.expense_statistics", **request.args.to_dict()))
 
 
 @bp.route("/favicon.ico")

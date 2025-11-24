@@ -54,8 +54,6 @@
             {% set maps_url = restaurant|google_maps_url %} {% if maps_url %}
             <a
                 href="{{ maps_url }}"
-                target="_blank"
-                rel="noopener noreferrer"
                 class="btn btn-sm btn-outline-secondary ms-2"
                 data-bs-toggle="tooltip"
                 title="View on Google Maps">

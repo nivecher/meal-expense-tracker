@@ -176,7 +176,7 @@ class TestAuthRoutes:
             assert user.display_name == "Johnny"
             assert user.bio == "Test bio"
             assert user.phone == "123-456-7890"
-            assert user.timezone == "US/Eastern"
+            assert user.timezone == "America/New_York"  # Normalized from US/Eastern
             assert user.avatar_url == "https://example.com/avatar.jpg"
 
     def test_profile_update_validation_errors(self, client, auth, test_user):
@@ -280,10 +280,10 @@ class TestAuthRoutes:
         assert data["success"] is True
         assert data["message"] == "Timezone updated successfully"
 
-        # Verify timezone was updated
+        # Verify timezone was updated (normalized from US/Pacific to America/Los_Angeles)
         with app.app_context():
             user = db.session.get(User, test_user.id)
-            assert user.timezone == "US/Pacific"
+            assert user.timezone == "America/Los_Angeles"
 
     def test_profile_update_exception_handling(self, client, auth, test_user):
         """Test profile update exception handling."""

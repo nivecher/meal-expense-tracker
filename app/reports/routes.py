@@ -16,10 +16,32 @@ from app.restaurants import services as restaurant_services
 @bp.route("/")
 @login_required
 def index():
-    """Show the reports dashboard."""
-    expenses = expense_services.get_expenses_for_user(current_user.id)
+    """Show the reports dashboard with statistics."""
+    # Get date range from query parameters with validation
+    try:
+        days = int(request.args.get("days", 30))
+        # Validate days is within reasonable range
+        if days < 1 or days > 3650:  # Max 10 years
+            days = 30
+    except (ValueError, TypeError):
+        days = 30
+
+    start_date = datetime.now() - timedelta(days=days)
+
+    # Get expenses and restaurants
+    expenses = expense_services.get_expenses_for_user(current_user.id, start_date=start_date)
     restaurants = restaurant_services.get_restaurants_for_user(current_user.id)
-    return render_template("reports/index.html", expenses=expenses, restaurants=restaurants)
+
+    # Calculate dashboard statistics
+    dashboard_stats = _calculate_dashboard_stats(expenses, restaurants, days)
+
+    return render_template(
+        "reports/index.html",
+        expenses=expenses,
+        restaurants=restaurants,
+        dashboard_stats=dashboard_stats,
+        days=days,
+    )
 
 
 @bp.route("/expenses")
@@ -104,17 +126,49 @@ def analytics():
 @login_required
 def expense_statistics():
     """Show expense statistics page."""
-    # Get date range
-    days = int(request.args.get("days", 30))
+    # Get date range with validation
+    try:
+        days = int(request.args.get("days", 30))
+        # Validate days is within reasonable range
+        if days < 1 or days > 3650:  # Max 10 years
+            days = 30
+    except (ValueError, TypeError):
+        days = 30
+
     start_date = datetime.now() - timedelta(days=days)
 
     # Get expenses
     expenses = expense_services.get_expenses_for_user(current_user.id, start_date=start_date)
 
-    # Calculate comprehensive statistics
-    stats_data = _calculate_comprehensive_stats(expenses, days)
+    # Calculate statistics for template
+    total_spent = sum(expense.amount for expense in expenses) if expenses else 0.0
+    total_spending = total_spent  # Alias for template
 
-    return render_template("expenses/stats.html", stats_data=stats_data, days=days)
+    # Category spending as list of tuples (name, amount)
+    category_stats = _calculate_category_stats(expenses)
+    category_spending = [
+        (name, data["total"])
+        for name, data in sorted(category_stats.items(), key=lambda x: x[1]["total"], reverse=True)
+    ]
+
+    # Top expenses (sorted by amount, limit to 10)
+    top_expenses = sorted(expenses, key=lambda x: x.amount, reverse=True)[:10] if expenses else []
+
+    # Chart data for monthly trends
+    monthly_data = _calculate_monthly_data(expenses)
+    chart_labels = sorted(monthly_data.keys())
+    chart_data_values = [monthly_data[month] for month in chart_labels]
+    chart_data = {"labels": chart_labels, "data": chart_data_values}
+
+    return render_template(
+        "expenses/stats.html",
+        days=days,
+        total_spent=total_spent,
+        total_spending=total_spending,
+        category_spending=category_spending,
+        top_expenses=top_expenses,
+        chart_data=chart_data,
+    )
 
 
 def _calculate_analytics_data(expenses, days):
@@ -281,3 +335,56 @@ def _format_stats_list(stats_dict):
 def _format_monthly_data(monthly_data):
     """Format monthly data into sorted list."""
     return [{"month": month, "total": float(total)} for month, total in sorted(monthly_data.items())]
+
+
+def _calculate_dashboard_stats(expenses, restaurants, days):
+    """Calculate dashboard statistics.
+
+    Args:
+        expenses: List of expense objects
+        restaurants: List of restaurant objects
+        days: Number of days in the date range
+
+    Returns:
+        Dictionary with dashboard statistics
+    """
+    total_expenses = len(expenses)
+    total_restaurants = len(restaurants)
+
+    # Calculate expense totals
+    total_spent = sum(expense.amount for expense in expenses) if expenses else 0.0
+    avg_per_expense = total_spent / total_expenses if total_expenses > 0 else 0.0
+    avg_per_day = total_spent / days if days > 0 else 0.0
+
+    # Top categories
+    category_totals = {}
+    for expense in expenses:
+        category_name = expense.category.name if expense.category else "Uncategorized"
+        if category_name not in category_totals:
+            category_totals[category_name] = 0
+        category_totals[category_name] += expense.amount
+
+    top_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # Top restaurants by expense count
+    restaurant_counts = {}
+    for expense in expenses:
+        if expense.restaurant:
+            restaurant_name = expense.restaurant.name
+            if restaurant_name not in restaurant_counts:
+                restaurant_counts[restaurant_name] = 0
+            restaurant_counts[restaurant_name] += 1
+
+    top_restaurants = sorted(restaurant_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    return {
+        "summary": {
+            "total_expenses": total_expenses,
+            "total_restaurants": total_restaurants,
+            "total_spent": float(total_spent),
+            "avg_per_expense": float(avg_per_expense),
+            "avg_per_day": float(avg_per_day),
+        },
+        "top_categories": [{"name": name, "total": float(total)} for name, total in top_categories],
+        "top_restaurants": [{"name": name, "count": count} for name, count in top_restaurants],
+    }

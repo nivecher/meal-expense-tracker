@@ -175,7 +175,7 @@ jobs:
           pip install semgrep detect-secrets
 
       - name: Run Semgrep
-        run: semgrep --config=p/ci --error-on-findings .
+        run: semgrep --config=p/ci --error .
 
       - name: Run Grype vulnerability scan
         run: |

@@ -375,7 +375,6 @@
                                                     <span class="me-2">{{ expense.restaurant.city }}, {{ expense.restaurant.state }}</span>
                                                     {% if expense.restaurant.get_google_maps_url() %}
                                                         <a href="{{ expense.restaurant.get_google_maps_url() }}"
-                                                           target="_blank"
                                                            class="text-decoration-none text-primary"
                                                            data-bs-toggle="tooltip"
                                                            title="View on Google Maps">
@@ -394,7 +393,12 @@
                                         <!-- Date (full format) -->
                                         <div class="text-muted small mt-1">
                                             <i class="far fa-calendar-alt me-1"></i>
-                                            {{ expense.date|format_datetime_user_tz('%B %d, %Y') }}
+                                            {{ expense.date|format_date_user_tz('%B %d, %Y') }}
+                                        </div>
+                                        <!-- Time with timezone -->
+                                        <div class="text-muted small mb-0">
+                                            <i class="fas fa-clock me-1"></i>
+                                            {{ expense.date|format_time_with_tz }}
                                         </div>
                                     </div>
                                     <div class="col-4">

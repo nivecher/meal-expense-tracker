@@ -78,12 +78,35 @@ def _credentials_invalid(user: Optional[User], password: str) -> bool:
 def api_login() -> Tuple[Dict[str, Any], int]:
     """Handle user login via API.
 
+    This endpoint authenticates users using session-based authentication.
+    On success, a session is created and the user is logged in.
+
     Request JSON:
         username (str): The user's username
         password (str): The user's password
 
     Returns:
-        JSON response with status and message
+        JSON response with status, message, and user info on success
+
+    Example:
+        POST /auth/login
+        Request: {"username": "user", "password": "password123"}
+        Response (success): {
+            "status": "success",
+            "message": "Logged in successfully.",
+            "user": {"id": 1, "username": "user", "email": "user@example.com"}
+        }
+        Response (error): {
+            "status": "error",
+            "message": "Invalid username or password."
+        }
+
+    Status Codes:
+        200: Login successful
+        400: Invalid request data
+        401: Invalid credentials
+        429: Rate limit exceeded
+        500: Server error
     """
     try:
         _ensure_ratelimit_exception_is_test_friendly()
@@ -146,11 +169,15 @@ def api_login() -> Tuple[Dict[str, Any], int]:
 
 @bp.route("/auth/logout", methods=["POST"])
 @limiter.limit("10 per minute")  # Rate limiting for logout as well
-def api_logout():
+def api_logout() -> Tuple[Dict[str, Any], int]:
     """Handle user logout via API.
 
     Returns:
         JSON response with status and message
+
+    Example:
+        POST /auth/logout
+        Response: {"status": "success", "message": "Logged out successfully."}
     """
     if not current_user.is_authenticated:
         return (
@@ -162,10 +189,62 @@ def api_logout():
         username = current_user.username
         logout_user()
         current_app.logger.info(f"User {username} logged out successfully")
-        return jsonify({"status": "success", "message": "Logged out successfully."})
+        return jsonify({"status": "success", "message": "Logged out successfully."}), 200
     except Exception as e:
         current_app.logger.error(f"Logout error: {str(e)}")
         return (
             jsonify({"status": "error", "message": "An error occurred during logout."}),
             500,
         )
+
+
+@bp.route("/auth/status", methods=["GET"])
+def api_auth_status() -> Tuple[Dict[str, Any], int]:
+    """Check authentication status via API.
+
+    Returns:
+        JSON response with authentication status and user info if authenticated
+
+    Example:
+        GET /auth/status
+        Response (authenticated): {
+            "status": "success",
+            "authenticated": true,
+            "user": {"id": 1, "username": "user", "email": "user@example.com"}
+        }
+        Response (not authenticated): {
+            "status": "success",
+            "authenticated": false
+        }
+    """
+    if current_user.is_authenticated:
+        return (
+            jsonify(
+                {
+                    "status": "success",
+                    "authenticated": True,
+                    "user": {
+                        "id": current_user.id,
+                        "username": current_user.username,
+                        "email": current_user.email,
+                    },
+                }
+            ),
+            200,
+        )
+
+    return jsonify({"status": "success", "authenticated": False}), 200
+
+
+@bp.route("/auth/health", methods=["GET"])
+def api_auth_health() -> Tuple[Dict[str, Any], int]:
+    """Health check endpoint for authentication API.
+
+    Returns:
+        JSON response indicating API health status
+
+    Example:
+        GET /auth/health
+        Response: {"status": "ok", "service": "auth-api"}
+    """
+    return jsonify({"status": "ok", "service": "auth-api"}), 200

@@ -8,6 +8,7 @@ class TagManager {
     this.modal = null;
     this.form = null;
     this.isInitialized = false;
+    this.listenersSetup = false;
   }
 
   /**
@@ -34,13 +35,38 @@ class TagManager {
      * Initialize the tag manager
      */
   init() {
-    if (this.isInitialized) return;
+    if (this.isInitialized) {
+      // Re-check modal and form elements in case DOM changed
+      this.modal = document.getElementById('tagEditorModal');
+      this.form = document.getElementById('tagEditorForm');
+      if (this.modal && this.form) {
+        return;
+      }
+    }
 
     this.modal = document.getElementById('tagEditorModal');
     this.form = document.getElementById('tagEditorForm');
 
     if (!this.modal || !this.form) {
-      console.warn('Tag manager modal not found in DOM');
+      console.warn('Tag manager modal not found in DOM. Will retry when modal is opened.');
+      // Set up a listener for when modal might be added to DOM
+      const checkModal = () => {
+        this.modal = document.getElementById('tagEditorModal');
+        this.form = document.getElementById('tagEditorForm');
+        if (this.modal && this.form && !this.isInitialized) {
+          this.setupEventListeners();
+          this.isInitialized = true;
+        }
+      };
+      // Check periodically for a short time
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        checkModal();
+        if (this.isInitialized || attempts > 10) {
+          clearInterval(interval);
+        }
+      }, 100);
       return;
     }
 
@@ -52,6 +78,11 @@ class TagManager {
      * Setup event listeners for the tag manager
      */
   setupEventListeners() {
+    // Prevent duplicate event listeners
+    if (this.listenersSetup) {
+      return;
+    }
+
     const tagNameInput = document.getElementById('tagName');
     const tagColorInput = document.getElementById('tagColor');
     const saveBtn = document.getElementById('saveTagBtn');
@@ -93,6 +124,12 @@ class TagManager {
       resetBtn.addEventListener('click', () => this.resetForm());
     }
 
+    // Refresh tags button
+    const refreshBtn = document.getElementById('refreshTagsBtn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => this.loadAllTags());
+    }
+
     // Prevent form submission
     if (this.form) {
       this.form.addEventListener('submit', (e) => {
@@ -103,6 +140,17 @@ class TagManager {
 
     // Reset modal when hidden and restore focus
     this.modal.addEventListener('hidden.bs.modal', () => {
+      // Clean up any leftover modal backdrops
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      backdrops.forEach((backdrop) => {
+        backdrop.remove();
+      });
+
+      // Remove modal-open class from body if present
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+
       // Reset form to clear any unsaved changes
       this.resetForm();
 
@@ -112,14 +160,14 @@ class TagManager {
       // Refresh Tagify instance to show updated tags
       this.refreshTagifyInstance();
 
-      // Restore focus to the tags input field after a delay
-      // This prevents the aria-hidden focus issue
+      // Restore focus to the tags input field
+      // Bootstrap handles focus restoration, but we need to target the Tagify input
       setTimeout(() => {
-        const tagsInput = document.getElementById('tagsInput');
-        if (tagsInput) {
-          tagsInput.focus();
+        const tagifyInput = document.querySelector('.tagify__input');
+        if (tagifyInput) {
+          tagifyInput.focus();
         }
-      }, 200);
+      }, 100);
     });
 
     // Handle modal before it's hidden to manage focus properly
@@ -133,16 +181,29 @@ class TagManager {
 
     // Load all tags when modal is shown
     this.modal.addEventListener('shown.bs.modal', () => {
-      this.loadAllTags();
       // Ensure modal is properly accessible when shown
       this.modal.setAttribute('aria-hidden', 'false');
+      // Load tags after a small delay to ensure modal is fully rendered
+      setTimeout(() => {
+        this.loadAllTags();
+      }, 100);
     });
 
     // Handle modal when it's about to be shown
     this.modal.addEventListener('show.bs.modal', () => {
       // Ensure modal is accessible when being shown
       this.modal.setAttribute('aria-hidden', 'false');
+      // Ensure initialization is complete
+      if (!this.isInitialized) {
+        this.setupEventListeners();
+        this.isInitialized = true;
+      }
+      // Pre-load tags when modal starts opening
+      this.loadAllTags();
     });
+
+    // Mark listeners as setup
+    this.listenersSetup = true;
   }
 
   /**
@@ -157,6 +218,10 @@ class TagManager {
 
     tagPreview.textContent = tagName;
     tagPreview.style.backgroundColor = tagColor;
+    // Ensure preview uses tag-badge-pretty class for consistency
+    if (!tagPreview.classList.contains('tag-badge-pretty')) {
+      tagPreview.classList.add('tag-badge-pretty');
+    }
 
     // Adjust text color based on background brightness
     const rgb = this.hexToRgb(tagColor);
@@ -183,56 +248,148 @@ class TagManager {
 
     try {
       const loadingDiv = document.createElement('div');
-      loadingDiv.className = 'text-muted small';
-      loadingDiv.textContent = 'Loading tags...';
+      loadingDiv.className = 'text-muted small text-center py-3';
+      loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Loading tags...';
       container.replaceChildren(loadingDiv);
 
       const response = await fetch('/expenses/tags');
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('Failed to fetch tags:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('Tags API response:', data);
       if (data.success && Array.isArray(data.tags)) {
         const { tags } = data;
 
         if (tags.length === 0) {
           const noTagsDiv = document.createElement('div');
-          noTagsDiv.className = 'text-muted small';
-          noTagsDiv.textContent = 'No tags created yet. Create your first tag above!';
+          noTagsDiv.className = 'text-muted text-center py-4';
+          noTagsDiv.innerHTML = '<i class="fas fa-tags fa-2x mb-2 d-block"></i><div>No tags created yet. Create your first tag above!</div>';
           container.replaceChildren(noTagsDiv);
           return;
         }
 
+        // Create a list container for better organization
         container.replaceChildren();
-        tags.forEach((tag) => {
-          const tagElement = document.createElement('span');
-          tagElement.className = 'tag-badge tag-editable tag-badge-pretty';
-          tagElement.setAttribute('data-tag-id', tag.id);
-          tagElement.setAttribute('data-tag-name', tag.name);
-          tagElement.setAttribute('data-tag-color', tag.color);
-          tagElement.setAttribute('data-tag-description', tag.description || '');
-          tagElement.style.backgroundColor = tag.color;
-          tagElement.style.cursor = 'pointer';
-          tagElement.textContent = tag.name;
+        const tagList = document.createElement('div');
+        tagList.className = 'tag-list-container';
+        tagList.style.maxHeight = '400px';
+        tagList.style.overflowY = 'auto';
 
-          // Add tooltip if description exists
-          if (tag.description && tag.description.trim()) {
-            tagElement.setAttribute('data-bs-toggle', 'tooltip');
-            tagElement.setAttribute('data-bs-placement', 'top');
-            tagElement.setAttribute('title', tag.description);
+        tags.forEach((tag) => {
+          const tagItem = document.createElement('div');
+          tagItem.className = 'tag-list-item d-flex align-items-center justify-content-between p-2 mb-2 border rounded';
+          tagItem.style.cursor = 'pointer';
+          tagItem.style.transition = 'background-color 0.15s ease-in-out';
+          tagItem.setAttribute('data-tag-id', tag.id);
+
+          // Hover effect
+          tagItem.addEventListener('mouseenter', () => {
+            tagItem.style.backgroundColor = '#f8f9fa';
+          });
+          tagItem.addEventListener('mouseleave', () => {
+            tagItem.style.backgroundColor = '';
+          });
+
+          // Left side: Tag badge and info - align with preview section
+          const tagInfo = document.createElement('div');
+          tagInfo.className = 'd-flex align-items-start flex-grow-1';
+          tagInfo.style.gap = '1rem';
+
+          // Tag badge container with fixed width for consistent alignment
+          const tagBadgeContainer = document.createElement('div');
+          tagBadgeContainer.className = 'tag-badge-container';
+          tagBadgeContainer.style.flexShrink = '0';
+          tagBadgeContainer.style.width = '90px';
+
+          // Tag badge - match preview styling exactly (compact and centered)
+          const tagBadge = document.createElement('span');
+          tagBadge.className = 'tag-badge tag-badge-pretty tag-editable';
+          tagBadge.style.backgroundColor = tag.color;
+          tagBadge.style.cursor = 'pointer';
+          tagBadge.style.display = 'inline-flex';
+          tagBadge.style.alignItems = 'center';
+          tagBadge.style.justifyContent = 'center';
+          tagBadge.style.textAlign = 'center';
+          tagBadge.textContent = tag.name;
+
+          // Adjust text color based on background brightness
+          const rgb = this.hexToRgb(tag.color);
+          if (rgb) {
+            const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+            tagBadge.style.color = brightness > 128 ? '#000' : '#fff';
           }
 
-          // Add click handler to edit tag
-          tagElement.addEventListener('click', () => {
+          tagBadgeContainer.appendChild(tagBadge);
+          tagInfo.appendChild(tagBadgeContainer);
+
+          // Tag details - consistent spacing for name, description, expense totals
+          const tagDetails = document.createElement('div');
+          tagDetails.className = 'd-flex flex-column flex-grow-1';
+          tagDetails.style.gap = '0.25rem';
+
+          // Tag name (if different from badge display)
+          const tagNameText = document.createElement('div');
+          tagNameText.className = 'fw-semibold';
+          tagNameText.textContent = tag.name;
+          tagDetails.appendChild(tagNameText);
+
+          // Description (if provided)
+          if (tag.description && tag.description.trim()) {
+            const tagDescription = document.createElement('div');
+            tagDescription.className = 'text-muted small';
+            tagDescription.textContent = tag.description;
+            tagDetails.appendChild(tagDescription);
+          }
+
+          // Expense count (always show if available)
+          if (tag.expense_count !== undefined && tag.expense_count !== null) {
+            const tagExpenseCount = document.createElement('div');
+            tagExpenseCount.className = 'text-muted small d-flex align-items-center';
+
+            // Create icon element
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-receipt me-1';
+
+            // Create text node with expense count
+            const expenseText = tag.expense_count === 1 ? 'expense' : 'expenses';
+            const countText = document.createTextNode(`${tag.expense_count} ${expenseText}`);
+
+            tagExpenseCount.appendChild(icon);
+            tagExpenseCount.appendChild(countText);
+            tagDetails.appendChild(tagExpenseCount);
+          }
+
+          tagInfo.appendChild(tagDetails);
+          tagItem.appendChild(tagInfo);
+
+          // Right side: Edit button
+          const editButton = document.createElement('button');
+          editButton.className = 'btn btn-sm btn-outline-primary';
+          editButton.innerHTML = '<i class="fas fa-edit me-1"></i>Edit';
+          editButton.type = 'button';
+          editButton.addEventListener('click', (e) => {
+            e.stopPropagation();
             this.editTag(tag.id, tag.name, tag.color, tag.description || '');
           });
 
-          container.appendChild(tagElement);
+          tagItem.appendChild(editButton);
+
+          // Click handler for entire item
+          tagItem.addEventListener('click', (e) => {
+            // Don't trigger if clicking the edit button
+            if (!e.target.closest('button')) {
+              this.editTag(tag.id, tag.name, tag.color, tag.description || '');
+            }
+          });
+
+          tagList.appendChild(tagItem);
         });
 
-        // Initialize tooltips for the new elements
-        this.initializeTooltips();
+        container.appendChild(tagList);
 
         // Restore form state if we were editing a tag
         if (currentFormData && currentTagId) {
@@ -249,12 +406,17 @@ class TagManager {
             this.updateTagPreview();
           }
         }
+      } else {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'text-danger small';
+        errorDiv.textContent = data.message || 'Failed to load tags.';
+        container.replaceChildren(errorDiv);
       }
-    } catch {
+    } catch (error) {
       console.error('Error loading all tags:', error);
       const errorDiv = document.createElement('div');
       errorDiv.className = 'text-danger small';
-      errorDiv.textContent = 'Error loading tags.';
+      errorDiv.textContent = 'Error loading tags. Please try again.';
       container.replaceChildren(errorDiv);
     }
   }
@@ -357,7 +519,7 @@ class TagManager {
       } else {
         alert(`Error: ${result.message}`);
       }
-    } catch {
+    } catch (error) {
       console.error('Error saving tag:', error);
       alert('Error saving tag. Please try again.');
     }
@@ -408,7 +570,7 @@ class TagManager {
       } else {
         alert(`Error: ${result.message}`);
       }
-    } catch {
+    } catch (error) {
       console.error('Error deleting tag:', error);
       alert('Error deleting tag. Please try again.');
     }
@@ -451,7 +613,7 @@ class TagManager {
           }));
         }
       }
-    } catch {
+    } catch (error) {
       console.error('Error updating Tagify whitelist:', error);
     }
   }
@@ -466,17 +628,18 @@ class TagManager {
       // Update the whitelist with latest tags
       await this.updateTagifyWhitelist();
 
-      // Re-apply colors to existing tags
+      // Re-apply colors to existing tags - only set CSS variable
       setTimeout(() => {
         const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
         tagElements.forEach((tagEl) => {
           const tagColor = tagEl.getAttribute('data-tag-color');
           if (tagColor) {
-            tagEl.style.setProperty('background-color', tagColor, 'important');
+            // Only set CSS variable - CSS handles the rest
+            tagEl.style.setProperty('--tag-color', tagColor);
           }
         });
       }, 100);
-    } catch {
+    } catch (error) {
       console.error('Error refreshing Tagify instance:', error);
     }
   }

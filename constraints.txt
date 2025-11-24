@@ -28,7 +28,6 @@ sphinx-rtd-theme==2.0.0
 types-Flask==1.1.6
 types-requests==2.32.0.20241016
 types-python-dateutil==2.9.0.20241003
-types-pytz==2024.2.0.20241003
 
 # Node.js tools (managed via package.json)
 # prettier==3.3.3

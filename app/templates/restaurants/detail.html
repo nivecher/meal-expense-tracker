@@ -245,7 +245,7 @@ Restaurant Details - Meal Expense Tracker
                                                     <i class="fas fa-times me-1"></i>Clear Place ID
                                                 </button>
                                                 {% endif %}
-                                                <a href="{{ maps_url }}" target="_blank" rel="noopener noreferrer"
+                                                <a href="{{ maps_url }}"
                                                     class="btn btn-sm btn-primary flex-fill">
                                                     <i class="fas fa-map-marked-alt me-1"></i>View on Google Maps
                                                 </a>
@@ -281,8 +281,8 @@ Restaurant Details - Meal Expense Tracker
                                         <div class="list-group-item px-0 py-2 border-0">
                                             <div class="d-flex align-items-center">
                                                 <i class="fas fa-globe text-muted me-3"></i>
-                                                <a href="{{ restaurant.website }}" target="_blank"
-                                                    rel="noopener noreferrer" class="text-decoration-none text-break">
+                                                <a href="{{ restaurant.website }}"
+                                                    class="text-decoration-none text-break">
                                                     {{ restaurant.website|truncate(40) }}
                                                 </a>
                                             </div>

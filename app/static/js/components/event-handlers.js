@@ -93,19 +93,11 @@ export class EventHandlers {
 
   /**
    * Setup link-related event handlers
-   * Handles external links, navigation, and smooth scrolling
+   * Handles navigation and smooth scrolling
+   * Note: External links with explicit target="_blank" will still open in new tabs
+   * but we don't automatically add target="_blank" to preserve SPA behavior
    */
   setupLinkHandlers() {
-    // External link handling
-    document.addEventListener('click', (event) => {
-      const link = event.target.closest('a[href^="http"]');
-      if (link && !link.target) {
-        // Open external links in new tab
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-      }
-    });
-
     // Smooth scrolling for anchor links
     document.addEventListener('click', (event) => {
       const link = event.target.closest('a[href^="#"]');

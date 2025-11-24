@@ -4,6 +4,7 @@ Expense Tracker{% endblock title %} {% block styles %} {{ super() }}
 <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/tags.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/tagify-pretty.css') }}" rel="stylesheet" />
+<link href="{{ url_for('static', filename='css/pages/expense-detail.css') }}" rel="stylesheet" />
 {% endblock styles %} {% block scripts %} {{ super() }}
 <!-- Tag badge styling -->
 <script src="{{ url_for('static', filename='js/components/tag-badge-styler.js') }}"></script>
@@ -17,7 +18,7 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
 
 <div class="container py-4">
     <!-- Compact Header Banner -->
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 expense-detail-header">
         <div class="card-body p-3">
             <div class="row align-items-center">
                 <div class="col-lg-8">
@@ -63,7 +64,6 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                                 <span class="me-2">{{ expense.restaurant.city }}, {{ expense.restaurant.state }}</span>
                                 <a
                                     href="{{ expense.restaurant.get_google_maps_url() }}"
-                                    target="_blank"
                                     class="text-decoration-none text-primary small">
                                     <i class="fab fa-google me-1"></i>View on Maps
                                 </a>
@@ -71,7 +71,6 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                                 <span class="me-2">{{ expense.restaurant.address|truncate(30, '...') }}</span>
                                 <a
                                     href="{{ expense.restaurant.get_google_maps_url() }}"
-                                    target="_blank"
                                     class="text-decoration-none text-primary small">
                                     <i class="fab fa-google me-1"></i>View on Maps
                                 </a>
@@ -85,6 +84,30 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                 </div>
                 <div class="col-lg-4">
                     <div class="d-flex flex-column align-items-lg-end">
+                        <!-- Action Buttons -->
+                        <div class="mb-3 w-100">
+                            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                                <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i>Back to List
+                                </a>
+                                <a
+                                    href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
+                                    class="btn btn-primary">
+                                    <i class="fas fa-edit me-1"></i>Edit Expense
+                                </a>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-danger"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#deleteExpenseModal"
+                                    data-expense-id="{{ expense.id }}"
+                                    data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
+                                    data-expense-amount="{{ '%.2f'|format(expense.amount) }}"
+                                    data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}">
+                                    <i class="fas fa-trash me-1"></i>Delete Expense
+                                </button>
+                            </div>
+                        </div>
                         <!-- Amount in top right -->
                         <div class="mb-1">
                             <div class="display-5 fw-bold text-success">${{ "%.2f"|format(expense.amount) }}</div>
@@ -99,7 +122,9 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                         </div>
                         <!-- Date -->
                         <div class="text-muted small">
-                            <i class="fas fa-calendar me-1"></i>{{ expense.date|format_date_user_tz("%B %d, %Y") }}
+                            <i class="fas fa-calendar me-1"></i>{{ expense.date|format_date_user_tz("%B %d, %Y") }} {%
+                            if timezone_display %} <br /><i class="fas fa-clock me-1"></i>{{
+                            expense.date|format_time_with_tz }} {% endif %}
                         </div>
                     </div>
                 </div>
@@ -236,14 +261,15 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                             <label class="form-label text-muted small">Created</label>
                             <div class="text-muted">
                                 <i class="fas fa-calendar-plus me-1"></i>{{
-                                expense.created_at|format_datetime_user_tz("%B %d, %Y %I:%M %p") }}
+                                expense.created_at|format_datetime_user_tz("%B %d, %Y %I:%M %p") }} ({{ timezone_abbr
+                                }})
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label text-muted small">Last Updated</label>
                             <div class="text-muted">
                                 <i class="fas fa-edit me-1"></i>{{ expense.updated_at|format_datetime_user_tz("%B %d, %Y
-                                %I:%M %p") }}
+                                %I:%M %p") }} ({{ timezone_abbr }})
                             </div>
                         </div>
 
@@ -253,7 +279,6 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                             <div>
                                 <a
                                     href="{{ get_receipt_url(expense.receipt_image) }}"
-                                    target="_blank"
                                     class="btn btn-outline-primary btn-sm">
                                     <i class="fas fa-receipt me-1"></i>View Receipt
                                 </a>
@@ -265,38 +290,8 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
             </div>
         </div>
 
-        <!-- Right Column - Actions & Restaurant Info -->
+        <!-- Right Column - Restaurant Info -->
         <div class="col-12 col-lg-5">
-            <!-- Action Buttons Card -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"> <i class="fas fa-bolt text-primary me-2"></i>Actions </h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-arrow-left me-1"></i>Back to List
-                        </a>
-                        <a
-                            href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
-                            class="btn btn-outline-primary">
-                            <i class="fas fa-edit me-1"></i>Edit Expense
-                        </a>
-                        <button
-                            type="button"
-                            class="btn btn-outline-danger"
-                            data-bs-toggle="modal"
-                            data-bs-target="#deleteExpenseModal"
-                            data-expense-id="{{ expense.id }}"
-                            data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
-                            data-expense-amount="{{ '%.2f'|format(expense.amount) }}"
-                            data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}">
-                            <i class="fas fa-trash me-1"></i>Delete Expense
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             <!-- Restaurant Information Card -->
             {% if expense.restaurant %}
             <div class="card shadow-sm mb-4">
@@ -353,7 +348,6 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                         {% if expense.restaurant.get_google_maps_url() %}
                         <a
                             href="{{ expense.restaurant.get_google_maps_url() }}"
-                            target="_blank"
                             class="text-decoration-none text-primary small">
                             <i class="fab fa-google me-1"></i>View on Google Maps
                         </a>

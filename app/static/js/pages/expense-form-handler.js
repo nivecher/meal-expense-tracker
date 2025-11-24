@@ -3,6 +3,32 @@
  */
 
 /**
+ * Get browser timezone - uses shared utility if available, otherwise detects it.
+ * @returns {string} IANA timezone string (e.g., 'America/New_York') or 'UTC' as fallback
+ */
+async function getBrowserTimezone() {
+  try {
+    // Try to import from shared utility
+    const { detectBrowserTimezone } = await import('../utils/timezone-handler.js');
+    return detectBrowserTimezone();
+  } catch {
+    // Fallback to inline detection if import fails
+    try {
+      if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
+        // eslint-disable-next-line new-cap
+        const options = Intl.DateTimeFormat().resolvedOptions();
+        if (options && options.timeZone && typeof options.timeZone === 'string') {
+          return options.timeZone;
+        }
+      }
+    } catch (error) {
+      console.warn('Timezone detection failed:', error);
+    }
+    return 'UTC';
+  }
+}
+
+/**
  * Display form validation errors
  * @param {HTMLFormElement} form - The form element
  * @param {Object} errors - Object containing error messages
@@ -161,7 +187,7 @@ function setLoadingState(submitButton) {
   }
 }
 
-function prepareFormDataForSubmission(form, formData) {
+async function prepareFormDataForSubmission(form, formData) {
   console.log('Submitting form data:', Object.fromEntries(formData.entries()));
 
   const csrfToken = document.querySelector('input[name="csrf_token"]')?.value;
@@ -169,6 +195,15 @@ function prepareFormDataForSubmission(form, formData) {
   // Add CSRF token if not already in form
   if (csrfToken && !formData.has('csrf_token')) {
     formData.append('csrf_token', csrfToken);
+  }
+
+  // Add browser timezone if not already in form
+  const browserTimezone = await getBrowserTimezone();
+  if (!formData.has('browser_timezone')) {
+    formData.append('browser_timezone', browserTimezone);
+  } else {
+    // Update existing timezone field with current browser timezone
+    formData.set('browser_timezone', browserTimezone);
   }
 
   return formData;
@@ -266,7 +301,7 @@ async function processFormSubmission(formElements, formData) {
   try {
     setLoadingState(submitButton);
 
-    const preparedData = prepareFormDataForSubmission(form, formData);
+    const preparedData = await prepareFormDataForSubmission(form, formData);
     logSubmissionDetails(form, preparedData);
 
     const response = await submitFormToServer(form, preparedData);
@@ -351,15 +386,32 @@ function setupCategoryRestaurantHandling(form) {
 /**
  * Initialize the expense form
  */
-function initializeExpenseForm() {
+async function initializeExpenseForm() {
   const form = document.getElementById('expenseForm');
   if (!form) return;
+
+  // Set browser timezone in hidden field
+  const timezoneInput = document.getElementById('browser_timezone');
+  if (timezoneInput) {
+    try {
+      const detectedTimezone = await getBrowserTimezone();
+      timezoneInput.value = detectedTimezone;
+      console.log('Browser timezone detected:', detectedTimezone);
+    } catch (error) {
+      console.warn('Failed to detect timezone:', error);
+      timezoneInput.value = 'UTC';
+    }
+  }
 
   // Set up form submission handler
   form.addEventListener('submit', handleFormSubmit);
 
   // Set up category and restaurant type handling
   setupCategoryRestaurantHandling(form);
+
+  // Initialize auto-save draft functionality
+  const { initAutoSave } = await import('../utils/auto-save.js');
+  initAutoSave(form);
 
   // Check if we're editing an existing expense
   const restaurantSelect = form.querySelector('select[name="restaurant_id"]');

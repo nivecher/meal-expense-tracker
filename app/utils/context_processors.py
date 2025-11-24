@@ -6,6 +6,8 @@ to all templates globally.
 
 from flask_login import current_user
 
+from app.utils.timezone_utils import get_browser_timezone
+
 
 def inject_user_context():
     """Inject current user context into all templates.
@@ -16,6 +18,7 @@ def inject_user_context():
     return {
         "current_user": current_user,
         "user": current_user,  # Alternative name for compatibility
+        "browser_timezone": get_browser_timezone(),  # Browser timezone for display
     }
 
 

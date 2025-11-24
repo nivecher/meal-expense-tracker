@@ -316,8 +316,7 @@ python-dotenv==1.1.1
     # via
     #   -r requirements/base.in
     #   webdriver-manager
-pytz==2024.2
-    # via -r requirements/base.in
+
 pyupgrade==3.20.0
     # via -r requirements/dev.in
 pyyaml==6.0.3

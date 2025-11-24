@@ -38,7 +38,7 @@ endblock title %} {% block content %}
                     <div id="alert-container">
                         <!-- Flash messages now handled by base template -->
                     </div>
-                    {{ expense_form(form=form, expense=expense, is_edit=is_edit) }}
+                    {{ expense_form(form=form, expense=expense, is_edit=is_edit, timezone_display=timezone_display) }}
                 </div>
             </div>
         </div>

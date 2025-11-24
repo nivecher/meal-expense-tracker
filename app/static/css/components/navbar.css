@@ -261,6 +261,12 @@
   margin: var(--spacing-sm) var(--spacing-lg);
 }
 
+/* User Info Section in Dropdown */
+.dropdown-menu .user-info {
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: block;
+}
+
 /* User Dropdown Section */
 
 .navbar-nav-user {

@@ -22,21 +22,14 @@ const pageModules = {
 
 // Apply tag colors from data attributes
 function applyTagColors() {
-  const tagBadges = document.querySelectorAll('.tag-badge[data-tag-color], .tagify__tag[data-tag-color]');
+  // Only handle tag-badge elements, not tagify__tag (those are handled in tagify-init.js)
+  const tagBadges = document.querySelectorAll('.tag-badge[data-tag-color]:not(.tagify__tag)');
   tagBadges.forEach((badge) => {
     const color = badge.getAttribute('data-tag-color');
     if (color) {
-      // Set CSS custom property for maximum override
-      badge.style.setProperty('--tag-color', color, 'important');
-      badge.style.setProperty('background-color', color, 'important');
-      badge.style.setProperty('background-image', 'none', 'important');
-      badge.style.setProperty('background', color, 'important');
-
-      // Also apply to any nested elements
-      const textElement = badge.querySelector('.tagify__tag-text');
-      if (textElement) {
-        textElement.style.setProperty('color', '#fff', 'important');
-      }
+      // Only set CSS variable - CSS handles the rest
+      badge.style.setProperty('--tag-color', color);
+      badge.style.setProperty('background-color', color);
     }
   });
 }
@@ -48,40 +41,24 @@ function initTagColorWatcher() {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            // Check if the added node is a tag badge
-            if (node.classList && (node.classList.contains('tag-badge') || node.classList.contains('tagify__tag')) && node.hasAttribute('data-tag-color')) {
+            // Check if the added node is a tag badge (not Tagify tags - those are handled in tagify-init.js)
+            if (node.classList && node.classList.contains('tag-badge') && !node.classList.contains('tagify__tag') && node.hasAttribute('data-tag-color')) {
               const color = node.getAttribute('data-tag-color');
               if (color) {
-                // Set CSS custom property for maximum override
-                node.style.setProperty('--tag-color', color, 'important');
-                node.style.setProperty('background-color', color, 'important');
-                node.style.setProperty('background-image', 'none', 'important');
-                node.style.setProperty('background', color, 'important');
-
-                // Also apply to text element
-                const textElement = node.querySelector('.tagify__tag-text');
-                if (textElement) {
-                  textElement.style.setProperty('color', '#fff', 'important');
-                }
+                // Only set CSS variable for tag badges - CSS handles the rest
+                node.style.setProperty('--tag-color', color);
+                node.style.setProperty('background-color', color);
               }
             }
-            // Check for tag badges within the added node
-            const tagBadges = node.querySelectorAll && node.querySelectorAll('.tag-badge[data-tag-color], .tagify__tag[data-tag-color]');
+            // Check for tag badges within the added node (exclude tagify__tag)
+            const tagBadges = node.querySelectorAll && node.querySelectorAll('.tag-badge[data-tag-color]:not(.tagify__tag)');
             if (tagBadges) {
               tagBadges.forEach((badge) => {
                 const color = badge.getAttribute('data-tag-color');
                 if (color) {
-                  // Set CSS custom property for maximum override
-                  badge.style.setProperty('--tag-color', color, 'important');
-                  badge.style.setProperty('background-color', color, 'important');
-                  badge.style.setProperty('background-image', 'none', 'important');
-                  badge.style.setProperty('background', color, 'important');
-
-                  // Also apply to text element
-                  const textElement = badge.querySelector('.tagify__tag-text');
-                  if (textElement) {
-                    textElement.style.setProperty('color', '#fff', 'important');
-                  }
+                  // Only set CSS variable - CSS handles the rest
+                  badge.style.setProperty('--tag-color', color);
+                  badge.style.setProperty('background-color', color);
                 }
               });
             }
@@ -123,23 +100,14 @@ async function refreshTagifyInstance() {
       }
     }
 
-    // Re-apply colors to existing tags
+    // Re-apply colors to existing tags - only set CSS variable
     setTimeout(() => {
       const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
       tagElements.forEach((tagEl) => {
         const tagColor = tagEl.getAttribute('data-tag-color');
         if (tagColor) {
-          // Set CSS custom property for maximum override
-          tagEl.style.setProperty('--tag-color', tagColor, 'important');
-          tagEl.style.setProperty('background-color', tagColor, 'important');
-          tagEl.style.setProperty('background-image', 'none', 'important');
-          tagEl.style.setProperty('background', tagColor, 'important');
-
-          // Also apply to text element
-          const textElement = tagEl.querySelector('.tagify__tag-text');
-          if (textElement) {
-            textElement.style.setProperty('color', '#fff', 'important');
-          }
+          // Only set CSS variable - CSS handles the rest
+          tagEl.style.setProperty('--tag-color', tagColor);
         }
       });
     }, 100);

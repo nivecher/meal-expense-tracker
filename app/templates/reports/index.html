@@ -1,13 +1,164 @@
 {% extends "reports/base.html" %} {% block page_title %} Reports Dashboard {% endblock page_title %} {% block
 reports_content %}
-<div class="card">
+<!-- Date Range Filter -->
+<div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title">Welcome to Reports</h5>
-        <p class="card-text">Here's a summary of your data:</p>
-        <ul>
-            <li>Total Expenses: {{ expenses|length }}</li>
-            <li>Total Restaurants: {{ restaurants|length }}</li>
-        </ul>
+        <form
+            method="GET"
+            action="{{ url_for('reports.index') }}"
+            id="dashboard-date-filter"
+            class="d-flex align-items-center gap-3">
+            <label for="days" class="form-label mb-0">Date Range:</label>
+            <select name="days" id="days" class="form-select" style="width: auto">
+                <option value="7" {% if days="" ="7" %}selected{% endif %}>Last 7 days</option>
+                <option value="30" {% if days="" ="30" %}selected{% endif %}>Last 30 days</option>
+                <option value="90" {% if days="" ="90" %}selected{% endif %}>Last 90 days</option>
+                <option value="365" {% if days="" ="365" %}selected{% endif %}>Last year</option>
+            </select>
+        </form>
     </div>
 </div>
-{% endblock reports_content %}
+
+<!-- Summary Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total Expenses</h6>
+                <h3 class="card-title text-primary">{{ dashboard_stats.summary.total_expenses }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Total Spent</h6>
+                <h3 class="card-title text-success">${{ "%.2f"|format(dashboard_stats.summary.total_spent) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Avg per Expense</h6>
+                <h3 class="card-title text-info">${{ "%.2f"|format(dashboard_stats.summary.avg_per_expense) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Avg per Day</h6>
+                <h3 class="card-title text-warning">${{ "%.2f"|format(dashboard_stats.summary.avg_per_day) }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Categories -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Top Categories</h5>
+            </div>
+            <div class="card-body">
+                {% if dashboard_stats.top_categories %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for category in dashboard_stats.top_categories %}
+                        <tr>
+                            <td>{{ category.name }}</td>
+                            <td class="text-end">${{ "%.2f"|format(category.total) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted mb-0">No category data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Restaurants -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Top Restaurants</h5>
+            </div>
+            <div class="card-body">
+                {% if dashboard_stats.top_restaurants %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Restaurant</th>
+                            <th class="text-end">Visits</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for restaurant in dashboard_stats.top_restaurants %}
+                        <tr>
+                            <td>{{ restaurant.name }}</td>
+                            <td class="text-end">{{ restaurant.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted mb-0">No restaurant data available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Links -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Quick Links</h5>
+    </div>
+    <div class="card-body">
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('reports.expense_report') }}" class="btn btn-outline-primary">Expense Report</a>
+            <a href="{{ url_for('reports.restaurant_report') }}" class="btn btn-outline-primary">Restaurant Report</a>
+            <a href="{{ url_for('reports.analytics') }}" class="btn btn-outline-primary">Analytics</a>
+            <a href="{{ url_for('reports.expense_statistics') }}" class="btn btn-outline-primary">Expense Statistics</a>
+        </div>
+    </div>
+</div>
+{% endblock reports_content %} {% block scripts %} {{ super() }}
+<script>
+    (function () {
+        "use strict";
+
+        function initDashboardDateFilter() {
+            const daysSelect = document.getElementById("days");
+            const dateFilterForm = document.getElementById("dashboard-date-filter");
+
+            if (daysSelect && dateFilterForm) {
+                daysSelect.addEventListener("change", function () {
+                    // Use native form submission to avoid jQuery interference
+                    const form = dateFilterForm;
+                    const formData = new FormData(form);
+                    const params = new URLSearchParams(formData);
+                    const url = form.action + (params.toString() ? "?" + params.toString() : "");
+                    window.location.href = url;
+                });
+            }
+        }
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", initDashboardDateFilter);
+        } else {
+            initDashboardDateFilter();
+        }
+    })();
+</script>
+{% endblock scripts %}

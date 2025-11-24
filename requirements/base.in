@@ -5,7 +5,7 @@ python-dotenv==1.1.1,<2.0.0        # Load environment variables from .env files 
 Flask-WTF>=1.2.2,<2.0.0            # WTForms integration for Flask, provides secure form handling and CSRF protection
 email-validator>=2.1.0,<3.0.0      # Validates email addresses for user registration and profile updates
 click==8.1.7                       # Command-line interface creation, used for Flask CLI commands (pinned to avoid yanked version)
-pytz>=2023.3,<2025.0.0             # Timezone support for user profiles and date handling
+# pytz removed - using zoneinfo (Python 3.9+ standard library) instead
 
 # Security
 Flask-Login>=0.6.3,<0.7.0          # User session management and authentication for Flask

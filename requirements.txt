@@ -117,8 +117,6 @@ python-dateutil==2.9.0.post0
     #   pg8000
 python-dotenv==1.1.1
     # via -r requirements/base.in
-pytz==2024.2
-    # via -r requirements/base.in
 requests==2.32.5
     # via
     #   -r requirements/base.in

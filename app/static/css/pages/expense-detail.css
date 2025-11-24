@@ -1,0 +1,58 @@
+/**
+ * Expense Detail Page Styles
+ * Styles for the expense details page with improved action button layout
+ */
+
+/**
+ * Header Action Buttons
+ * Ensure buttons are properly spaced and accessible
+ */
+
+.expense-detail-header .btn {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+/**
+ * Responsive adjustments for header actions
+ */
+
+@media (width <= 991.98px) {
+  .expense-detail-header .d-flex.flex-wrap {
+    justify-content: flex-start;
+  }
+
+  .expense-detail-header .btn {
+    flex: 1 1 auto;
+    min-width: 120px;
+  }
+}
+
+@media (width <= 767.98px) {
+  .expense-detail-header .d-flex.flex-wrap {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .expense-detail-header .btn {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  /* Adjust header layout on mobile */
+  .expense-detail-header .col-lg-4 {
+    margin-top: 1rem;
+  }
+
+  .expense-detail-header .align-items-lg-end {
+    align-items: flex-start !important;
+  }
+}
+
+@media (width <= 575.98px) {
+  /* Ensure buttons are touch-friendly on small screens */
+  .expense-detail-header .btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+}

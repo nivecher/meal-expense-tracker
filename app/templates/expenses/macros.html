@@ -1,4 +1,4 @@
-{% macro expense_form(form, expense=None, is_edit=false) %}
+{% macro expense_form(form, expense=None, is_edit=false, timezone_display=None) %}
     <form id="expenseForm"
           method="post"
           enctype="multipart/form-data"
@@ -12,6 +12,8 @@
         {% else %}
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         {% endif %}
+        <!-- Hidden timezone field - populated by JavaScript -->
+        <input type="hidden" id="browser_timezone" name="browser_timezone" value="UTC">
         <div id="formErrors" class="alert alert-danger d-none"></div>
         <div class="row mb-3">
             <div class="col-md-6">
@@ -21,7 +23,7 @@
                 ) }}
                 {% if form.restaurant_id.errors %}<div class="invalid-feedback">{{ form.restaurant_id.errors[0] }}</div>{% endif %}
                 <div class="form-text">
-                    <a href="{{ url_for('restaurants.add_restaurant') }}" target="_blank">Add a new restaurant</a>
+                    <a href="{{ url_for('restaurants.add_restaurant') }}">Add a new restaurant</a>
                 </div>
             </div>
             <div class="col-md-6">
@@ -36,7 +38,15 @@
                 {% if form.date.errors %}<div class="invalid-feedback">{{ form.date.errors[0] }}</div>{% endif %}
             </div>
             <div class="col-md-6">
-                {{ form.time.label(class="form-label") }}
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    {{ form.time.label(class="form-label mb-0") }}
+                    {% if timezone_display %}
+                    <small class="text-muted">
+                        <i class="fas fa-clock me-1"></i>
+                        <strong>{{ timezone_display }}</strong>
+                    </small>
+                    {% endif %}
+                </div>
                 {% set default_time = form.time.data.strftime('%H:%M') if form.time.data else '' %}
                 <input type="time"
                        id="{{ form.time.id }}"
@@ -48,7 +58,7 @@
                 <div class="form-text">
                     <small class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
-                        Optional time in 24-hour format. If not specified, defaults to noon in your timezone.
+                        Optional time in 24-hour format. If not specified, defaults to noon in your browser's timezone.
                     </small>
                 </div>
             </div>
@@ -146,7 +156,7 @@
                         {% if expense and expense.receipt_image %}
                             <br>
                             <div class="d-flex gap-2">
-                                <a href="{{ get_receipt_url(expense.receipt_image) }}" target="_blank" class="text-primary">
+                                <a href="{{ get_receipt_url(expense.receipt_image) }}" class="text-primary">
                                     <i class="fas fa-eye me-1"></i>View current receipt
                                 </a>
                                 <button type="button"
@@ -173,7 +183,7 @@
                        placeholder="Type to add tags..."
                        {% if expense and expense.tags %}
                            value="{{ expense.tags|map(attribute='name')|join(', ') }}"
-                           data-existing-tags="{{ expense.tags|map(attribute='to_dict')|list|tojson }}"
+                           data-existing-tags="{{ expense.tags|tags_to_dict|tojson }}"
                        {% endif %}>
                 <div class="form-text" id="tags-help">
                     <small class="text-muted">

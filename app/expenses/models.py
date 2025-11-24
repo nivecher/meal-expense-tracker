@@ -72,16 +72,24 @@ class Tag(BaseModel):
 
     @property
     def expense_count(self) -> int:
-        """Get the number of expenses using this tag."""
+        """Get the number of expenses using this tag.
+
+        Only counts expenses that actually exist (joins with Expense table).
+        """
         if hasattr(self, "_expense_count"):
             return self._expense_count
         try:
-            # Use a direct query to avoid relationship loading issues
+            # Use a direct query with join to ensure we only count tags on existing expenses
             from sqlalchemy import func
 
             from app import db
 
-            count = db.session.query(func.count(ExpenseTag.id)).filter(ExpenseTag.tag_id == self.id).scalar()
+            count = (
+                db.session.query(func.count(ExpenseTag.id))
+                .join(Expense, ExpenseTag.expense_id == Expense.id)
+                .filter(ExpenseTag.tag_id == self.id)
+                .scalar()
+            )
             return count or 0
         except Exception:
             return 0

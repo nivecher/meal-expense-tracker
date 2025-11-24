@@ -40,6 +40,10 @@ from app.extensions import db
 from app.restaurants.models import Restaurant
 from app.utils.decorators import db_transaction
 from app.utils.messages import FlashMessages
+from app.utils.timezone_utils import (
+    get_browser_timezone_info,
+    get_timezone_abbreviation,
+)
 
 # Constants
 PER_PAGE = 10  # Number of expenses per page
@@ -142,20 +146,20 @@ def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
     except (ValueError, TypeError):
         normalized_restaurant_id = None
 
-    # Set default date to current date in user's timezone
-    from app.utils.timezone_utils import get_current_time_in_user_timezone
+    # Set default date to current date in browser's timezone
+    from app.utils.timezone_utils import get_current_time_in_browser_timezone
 
-    user_timezone = current_user.timezone if current_user.timezone else "UTC"
-    current_datetime_user_tz = get_current_time_in_user_timezone(user_timezone)
-    current_date_user_tz = current_datetime_user_tz.date()
-    current_time_user_tz = current_datetime_user_tz.time()
+    browser_timezone, _ = get_browser_timezone_info()
+    current_datetime_browser_tz = get_current_time_in_browser_timezone(browser_timezone)
+    current_date_browser_tz = current_datetime_browser_tz.date()
+    current_time_browser_tz = current_datetime_browser_tz.time()
 
     form = ExpenseForm(
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant")] + restaurants,
         restaurant_id=normalized_restaurant_id,
-        date=current_date_user_tz,
-        time=current_time_user_tz,
+        date=current_date_browser_tz,
+        time=current_time_browser_tz,
     )
     return form, is_ajax
 
@@ -210,7 +214,19 @@ def _handle_creation_error(
         return jsonify(response), status_code
 
     flash(str(error), "error")
-    return render_template("expenses/form.html", form=form, is_edit=False), status_code
+    # Get browser timezone for display
+    browser_timezone, timezone_display = get_browser_timezone_info()
+
+    return (
+        render_template(
+            "expenses/form.html",
+            form=form,
+            is_edit=False,
+            browser_timezone=browser_timezone,
+            timezone_display=timezone_display,
+        ),
+        status_code,
+    )
 
 
 def _handle_creation_success(expense: Expense, is_ajax: bool) -> ResponseReturnValue:
@@ -282,7 +298,16 @@ def add_expense() -> ResponseReturnValue:
                     ),
                     400,
                 )
-            return render_template("expenses/form.html", form=form, is_edit=False)
+            # Get browser timezone for display
+            browser_timezone, timezone_display = get_browser_timezone_info()
+
+            return render_template(
+                "expenses/form.html",
+                form=form,
+                is_edit=False,
+                browser_timezone=browser_timezone,
+                timezone_display=timezone_display,
+            )
 
         # Process valid form submission
         return _handle_expense_creation(form, is_ajax)
@@ -295,12 +320,17 @@ def add_expense() -> ResponseReturnValue:
     if form.restaurant_id.data:
         restaurant = Restaurant.query.filter_by(id=form.restaurant_id.data, user_id=current_user.id).first()
 
+    # Get browser timezone for display
+    browser_timezone, timezone_display = get_browser_timezone_info()
+
     return render_template(
         "expenses/form.html",
         title="Add Expense",
         form=form,
         is_edit=False,
         restaurant=restaurant,
+        browser_timezone=browser_timezone,
+        timezone_display=timezone_display,
     )
 
 
@@ -442,18 +472,18 @@ def _handle_expense_not_found() -> ResponseReturnValue:
 
 def _init_expense_form(categories: list[tuple[int, str, str, str]], restaurants: list[tuple[str, str]]) -> ExpenseForm:
     """Initialize an expense form with the given choices."""
-    # Set default date to current date in user's timezone
-    from app.utils.timezone_utils import get_current_time_in_user_timezone
+    # Set default date to current date in browser's timezone
+    from app.utils.timezone_utils import get_current_time_in_browser_timezone
 
-    user_timezone = current_user.timezone if current_user.timezone else "UTC"
-    current_datetime_user_tz = get_current_time_in_user_timezone(user_timezone)
-    current_date_user_tz = current_datetime_user_tz.date()
-    current_time_user_tz = current_datetime_user_tz.time()
+    browser_timezone, _ = get_browser_timezone_info()
+    current_datetime_browser_tz = get_current_time_in_browser_timezone(browser_timezone)
+    current_date_browser_tz = current_datetime_browser_tz.date()
+    current_time_browser_tz = current_datetime_browser_tz.time()
     return ExpenseForm(
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant")] + restaurants,
-        date=current_date_user_tz,
-        time=current_time_user_tz,
+        date=current_date_browser_tz,
+        time=current_time_browser_tz,
     )
 
 
@@ -468,12 +498,12 @@ def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
         form.meal_type.data = expense.meal_type
     # Set the date and time from the expense
     if expense.date:
-        from app.utils.timezone_utils import convert_to_user_timezone
+        from app.utils.timezone_utils import convert_to_browser_timezone
 
-        user_timezone = current_user.timezone if current_user.timezone else "UTC"
-        expense_datetime_user_tz = convert_to_user_timezone(expense.date, user_timezone)
-        form.date.data = expense_datetime_user_tz.date()
-        form.time.data = expense_datetime_user_tz.time()
+        browser_timezone, _ = get_browser_timezone_info()
+        expense_datetime_browser_tz = convert_to_browser_timezone(expense.date, browser_timezone)
+        form.date.data = expense_datetime_browser_tz.date()
+        form.time.data = expense_datetime_browser_tz.time()
 
 
 def _handle_expense_update(
@@ -519,7 +549,19 @@ def _handle_update_error(error: str, is_ajax: bool) -> ResponseReturnValue:
     if is_ajax:
         return {"success": False, "message": error, "errors": {"_error": [error]}}, 400
     flash(error, "error")
-    return render_template("expenses/form.html", form=ExpenseForm(), is_edit=True), 400
+    # Get browser timezone for display
+    browser_timezone, timezone_display = get_browser_timezone_info()
+
+    return (
+        render_template(
+            "expenses/form.html",
+            form=ExpenseForm(),
+            is_edit=True,
+            browser_timezone=browser_timezone,
+            timezone_display=timezone_display,
+        ),
+        400,
+    )
 
 
 def _handle_update_success(expense_id: int, is_ajax: bool, receipt_deleted: bool = False) -> ResponseReturnValue:
@@ -545,7 +587,20 @@ def _handle_validation_errors(form: ExpenseForm, expense: Expense, is_ajax: bool
     """Handle form validation errors."""
     if is_ajax and form.errors:
         return {"success": False, "errors": form.errors}, 400
-    return render_template("expenses/form.html", form=form, expense=expense, is_edit=True), 400
+    # Get browser timezone for display
+    browser_timezone, timezone_display = get_browser_timezone_info()
+
+    return (
+        render_template(
+            "expenses/form.html",
+            form=form,
+            expense=expense,
+            is_edit=True,
+            browser_timezone=browser_timezone,
+            timezone_display=timezone_display,
+        ),
+        400,
+    )
 
 
 def _render_expense_form(
@@ -566,12 +621,17 @@ def _render_expense_form(
     # Transform categories for template (include color and icon info)
     categories_for_template = [{"id": c[0], "name": c[1], "color": c[2], "icon": c[3]} for c in categories]
 
+    # Get browser timezone for display
+    browser_timezone, timezone_display = get_browser_timezone_info()
+
     return render_template(
         "expenses/form.html",
         form=form,
         expense=expense if is_edit else None,
         is_edit=is_edit,
         categories=categories_for_template,
+        browser_timezone=browser_timezone,
+        timezone_display=timezone_display,
         debug=current_app.debug,
     )
 
@@ -626,6 +686,9 @@ def list_expenses() -> str:
     except Exception as e:
         current_app.logger.error(f"Error getting filter options: {str(e)}")
 
+    # Get browser timezone for display
+    _, timezone_display = get_browser_timezone_info()
+
     return render_template(
         "expenses/list.html",
         expenses=paginated_expenses,
@@ -640,6 +703,7 @@ def list_expenses() -> str:
         category=filters["category"],
         start_date=filters["start_date"],
         end_date=filters["end_date"],
+        timezone_display=timezone_display,
         **filter_options,
     )
 
@@ -660,7 +724,17 @@ def expense_details(expense_id: int) -> ResponseReturnValue:
         flash("Expense not found.", "error")
         return redirect(url_for("expenses.list_expenses"))
 
-    return render_template("expenses/details.html", expense=expense)
+    # Get browser timezone for display
+    browser_timezone, timezone_display = get_browser_timezone_info()
+    timezone_abbr = get_timezone_abbreviation(browser_timezone)
+
+    return render_template(
+        "expenses/details.html",
+        expense=expense,
+        browser_timezone=browser_timezone,
+        timezone_display=timezone_display,
+        timezone_abbr=timezone_abbr,
+    )
 
 
 @bp.route("/<int:expense_id>/delete", methods=["POST"])
