@@ -9,118 +9,6 @@ const DRAFT_INDICATOR_ID = 'draft-indicator';
 const SAVE_DEBOUNCE_MS = 1000;
 
 /**
- * Get draft storage key for a specific form
- * @param {HTMLFormElement} form - The form element
- * @returns {string} Storage key
- */
-function getDraftKey(form) {
-  const formId = form.id || 'expenseForm';
-  const formAction = form.action || window.location.pathname;
-  return `${DRAFT_STORAGE_KEY}_${formId}_${formAction}`;
-}
-
-/**
- * Save form data to localStorage
- * @param {HTMLFormElement} form - The form to save
- */
-function saveDraft(form) {
-  try {
-    const formData = new FormData(form);
-    const draftData = {};
-
-    // Convert FormData to plain object
-    for (const [key, value] of formData.entries()) {
-      if (draftData[key]) {
-        // Handle multiple values (e.g., checkboxes)
-        if (Array.isArray(draftData[key])) {
-          draftData[key].push(value);
-        } else {
-          draftData[key] = [draftData[key], value];
-        }
-      } else {
-        draftData[key] = value;
-      }
-    }
-
-    const storageKey = getDraftKey(form);
-    localStorage.setItem(storageKey, JSON.stringify(draftData));
-    showDraftIndicator('Draft saved', 'success');
-  } catch (error) {
-    console.warn('Failed to save draft:', error);
-  }
-}
-
-/**
- * Restore form data from localStorage
- * @param {HTMLFormElement} form - The form to restore
- * @returns {boolean} True if draft was restored
- */
-function restoreDraft(form) {
-  try {
-    const storageKey = getDraftKey(form);
-    const draftJson = localStorage.getItem(storageKey);
-
-    if (!draftJson) {
-      return false;
-    }
-
-    const draftData = JSON.parse(draftJson);
-
-    // Restore form fields
-    for (const [key, value] of Object.entries(draftData)) {
-      const field = form.querySelector(`[name="${key}"]`);
-
-      if (!field) {
-        continue;
-      }
-
-      if (field.type === 'checkbox' || field.type === 'radio') {
-        if (Array.isArray(value)) {
-          value.forEach((val) => {
-            const option = form.querySelector(`[name="${key}"][value="${val}"]`);
-            if (option) {
-              option.checked = true;
-            }
-          });
-        } else {
-          const option = form.querySelector(`[name="${key}"][value="${value}"]`);
-          if (option) {
-            option.checked = true;
-          }
-        }
-      } else if (field.tagName === 'SELECT') {
-        field.value = Array.isArray(value) ? value[0] : value;
-      } else {
-        field.value = Array.isArray(value) ? value.join(', ') : value;
-      }
-
-      // Trigger change event for fields that need it
-      field.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    showDraftIndicator('Draft restored', 'info');
-    return true;
-  } catch (error) {
-    console.warn('Failed to restore draft:', error);
-    return false;
-  }
-}
-
-/**
- * Clear draft from localStorage
- * @param {HTMLFormElement} form - The form to clear draft for
- */
-function clearDraft(form) {
-  try {
-    const storageKey = getDraftKey(form);
-    localStorage.removeItem(storageKey);
-    hideDraftIndicator();
-  } catch (error) {
-    console.warn('Failed to clear draft:', error);
-  }
-}
-
-/**
  * Show draft status indicator
  * @param {string} message - Message to display
  * @param {string} type - Indicator type (success, info, warning)
@@ -175,6 +63,159 @@ function hideDraftIndicator() {
 }
 
 /**
+ * Get draft storage key for a specific form
+ * @param {HTMLFormElement} form - The form element
+ * @returns {string} Storage key
+ */
+function getDraftKey(form) {
+  const formId = form.id || 'expenseForm';
+  const formAction = form.action || window.location.pathname;
+  return `${DRAFT_STORAGE_KEY}_${formId}_${formAction}`;
+}
+
+/**
+ * Restore a single form field value
+ * @param {HTMLFormElement} form - The form element
+ * @param {string} key - Field name
+ * @param {*} value - Field value
+ */
+function restoreFieldValue(form, key, value) {
+  const field = form.querySelector(`[name="${key}"]`);
+
+  if (!field) {
+    return;
+  }
+
+  if (field.type === 'checkbox' || field.type === 'radio') {
+    if (Array.isArray(value)) {
+      value.forEach((val) => {
+        const option = form.querySelector(`[name="${key}"][value="${val}"]`);
+        if (option) {
+          option.checked = true;
+        }
+      });
+    } else {
+      const option = form.querySelector(`[name="${key}"][value="${value}"]`);
+      if (option) {
+        option.checked = true;
+      }
+    }
+  } else if (field.tagName === 'SELECT') {
+    field.value = Array.isArray(value) ? value[0] : value;
+  } else {
+    field.value = Array.isArray(value) ? value.join(', ') : value;
+  }
+
+  // Trigger change event for fields that need it
+  field.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * Restore form data from localStorage
+ * @param {HTMLFormElement} form - The form to restore
+ * @returns {boolean} True if draft was restored
+ */
+function restoreDraft(form) {
+  try {
+    const storageKey = getDraftKey(form);
+    const draftJson = localStorage.getItem(storageKey);
+
+    if (!draftJson) {
+      return false;
+    }
+
+    const draftData = JSON.parse(draftJson);
+
+    // Restore form fields
+    for (const [key, value] of Object.entries(draftData)) {
+      const field = form.querySelector(`[name="${key}"]`);
+
+      if (field) {
+        restoreFieldValue(form, key, value);
+      }
+    }
+
+    showDraftIndicator('Draft restored', 'info');
+    return true;
+  } catch (error) {
+    console.warn('Failed to restore draft:', error);
+    return false;
+  }
+}
+
+/**
+ * Show restore draft button
+ * @param {HTMLFormElement} form - The form element
+ */
+function showRestoreButton(form) {
+  // Check if button already exists
+  if (document.getElementById('restore-draft-btn')) {
+    return;
+  }
+
+  const button = document.createElement('button');
+  button.id = 'restore-draft-btn';
+  button.type = 'button';
+  button.className = 'btn btn-outline-info btn-sm mb-3';
+  button.innerHTML = '<i class="fas fa-undo me-1"></i> Restore Draft';
+
+  button.addEventListener('click', () => {
+    if (confirm('Restore your saved draft? This will replace current form values.')) {
+      restoreDraft(form);
+      button.remove();
+    }
+  });
+
+  // Insert before form
+  form.parentNode.insertBefore(button, form);
+}
+
+/**
+ * Save form data to localStorage
+ * @param {HTMLFormElement} form - The form to save
+ */
+function saveDraft(form) {
+  try {
+    const formData = new FormData(form);
+    const draftData = {};
+
+    // Convert FormData to plain object
+    for (const [key, value] of formData.entries()) {
+      if (draftData[key]) {
+        // Handle multiple values (e.g., checkboxes)
+        if (Array.isArray(draftData[key])) {
+          draftData[key].push(value);
+        } else {
+          draftData[key] = [draftData[key], value];
+        }
+      } else {
+        draftData[key] = value;
+      }
+    }
+
+    const storageKey = getDraftKey(form);
+    localStorage.setItem(storageKey, JSON.stringify(draftData));
+    showDraftIndicator('Draft saved', 'success');
+  } catch (error) {
+    console.warn('Failed to save draft:', error);
+  }
+}
+
+/**
+ * Clear draft from localStorage
+ * @param {HTMLFormElement} form - The form to clear draft for
+ */
+function clearDraft(form) {
+  try {
+    const storageKey = getDraftKey(form);
+    localStorage.removeItem(storageKey);
+    hideDraftIndicator();
+  } catch (error) {
+    console.warn('Failed to clear draft:', error);
+  }
+}
+
+/**
  * Check if draft exists for a form
  * @param {HTMLFormElement} form - The form to check
  * @returns {boolean} True if draft exists
@@ -224,33 +265,6 @@ function initAutoSave(form) {
     // Try to restore immediately if no user interaction needed
     restoreDraft(form);
   }
-}
-
-/**
- * Show restore draft button
- * @param {HTMLFormElement} form - The form element
- */
-function showRestoreButton(form) {
-  // Check if button already exists
-  if (document.getElementById('restore-draft-btn')) {
-    return;
-  }
-
-  const button = document.createElement('button');
-  button.id = 'restore-draft-btn';
-  button.type = 'button';
-  button.className = 'btn btn-outline-info btn-sm mb-3';
-  button.innerHTML = '<i class="fas fa-undo me-1"></i> Restore Draft';
-
-  button.addEventListener('click', () => {
-    if (confirm('Restore your saved draft? This will replace current form values.')) {
-      restoreDraft(form);
-      button.remove();
-    }
-  });
-
-  // Insert before form
-  form.parentNode.insertBefore(button, form);
 }
 
 // Export functions

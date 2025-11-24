@@ -72,7 +72,7 @@ function initializeTimezoneDetector() {
     return;
   }
 
-  detectButton.addEventListener('click', async () => {
+  detectButton.addEventListener('click', async() => {
     // Disable button during detection
     detectButton.disabled = true;
     detectButton.textContent = 'Detecting...';

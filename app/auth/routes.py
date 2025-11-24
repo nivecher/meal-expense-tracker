@@ -238,7 +238,6 @@ def profile():
         db.session.commit()
 
     # Show current time in user's timezone
-    from zoneinfo import ZoneInfo
 
     current_time_display = format_current_time_for_user(user_timezone, "%B %d, %Y at %I:%M:%S %p")
     timezone_display = get_timezone_display_name(user_timezone)

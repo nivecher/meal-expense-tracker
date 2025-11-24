@@ -713,7 +713,6 @@ def update_expense(
         current_app.logger.info("Updating expense with form data: %s", form.data)
 
         # Get user timezone for proper time handling
-        from app.auth.models import User
         from app.extensions import db
 
         # Get browser timezone for proper time handling

@@ -92,7 +92,7 @@ repos:
         args:
           - --config=.markdownlint.json
 
-  # Prettier (optional for Markdown/JSON/YAML)
+  # Prettier for Markdown/JSON/YAML (auto-formats on commit)
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.1.0
     hooks:
@@ -100,3 +100,38 @@ repos:
         additional_dependencies:
           - prettier@3.3.3
         files: \.(md|json|ya?ml)$
+
+  # HTML linting with prettier (matches make lint-html)
+  # Uses npm script to ensure consistency with make lint
+  - repo: local
+    hooks:
+      - id: prettier-html
+        name: prettier-html
+        entry: sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then OUTPUT=$(npm run lint-html 2>&1); EXIT_CODE=$?; echo "$OUTPUT" | grep -v "unchanged" || true; exit $EXIT_CODE; else echo Skipping prettier-html; exit 0; fi'
+        language: system
+        types: [html]
+        files: ^app/templates/.*\.html$
+        require_serial: true
+
+  # CSS linting with stylelint (matches make lint-css)
+  # Uses npm script to ensure consistency with make lint
+  - repo: local
+    hooks:
+      - id: stylelint
+        name: stylelint
+        entry: sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then npm run lint:css; else echo Skipping stylelint; exit 0; fi'
+        language: system
+        types: [css]
+        files: ^app/static/css/.*\.css$
+        require_serial: true
+
+  # JavaScript linting with eslint (matches make lint-js)
+  # Uses npm script to ensure consistency with make lint
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then npm run lint:js; else echo Skipping eslint; exit 0; fi'
+        language: system
+        files: ^app/static/js/.*\.js$
+        require_serial: true

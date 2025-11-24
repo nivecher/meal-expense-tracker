@@ -84,6 +84,7 @@
   line-height: 1.2 !important;
   display: inline-flex !important;
   align-items: center !important;
+
   /* Completely disable Tagify's default background styles */
   background-image: none !important;
   background-size: auto !important;
@@ -93,6 +94,7 @@
   background-origin: padding-box !important;
   background-clip: border-box !important;
   border: none !important;
+
   /* Don't override color or background-color - they're set in template inline style */
 }
 
@@ -102,6 +104,7 @@
 .tagify__tag[data-tag-color].tagify__tag--editable.tagify__tag--selected {
   background-image: none !important;
   border: none !important;
+
   /* Don't override color - it's set in template */
 }
 

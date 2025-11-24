@@ -122,10 +122,9 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                         </div>
                         <!-- Date -->
                         <div class="text-muted small">
-                            <i class="fas fa-calendar me-1"></i>{{ expense.date|format_date_user_tz("%B %d, %Y") }}
-                            {% if timezone_display %}
-                            <br><i class="fas fa-clock me-1"></i>{{ expense.date|format_time_with_tz }}
-                            {% endif %}
+                            <i class="fas fa-calendar me-1"></i>{{ expense.date|format_date_user_tz("%B %d, %Y") }} {%
+                            if timezone_display %} <br /><i class="fas fa-clock me-1"></i>{{
+                            expense.date|format_time_with_tz }} {% endif %}
                         </div>
                     </div>
                 </div>
@@ -262,7 +261,8 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                             <label class="form-label text-muted small">Created</label>
                             <div class="text-muted">
                                 <i class="fas fa-calendar-plus me-1"></i>{{
-                                expense.created_at|format_datetime_user_tz("%B %d, %Y %I:%M %p") }} ({{ timezone_abbr }})
+                                expense.created_at|format_datetime_user_tz("%B %d, %Y %I:%M %p") }} ({{ timezone_abbr
+                                }})
                             </div>
                         </div>
                         <div class="col-12 col-md-6">

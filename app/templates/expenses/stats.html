@@ -224,7 +224,7 @@ head_extra %} {{ super() }}
 </div>
 {% endblock content %} {% block scripts %} {{ super() }}
 <script type="application/json" id="chart-data">
-{{ chart_data | tojson | safe }}
+    {{ chart_data | tojson | safe }}
 </script>
 <!-- Expense stats chart functionality -->
 <script src="{{ url_for('static', filename='js/pages/expense-stats.js') }}"></script>

@@ -6,6 +6,48 @@
  */
 
 /**
+ * Format a date with a custom format string (Python strftime-like).
+ * @param {Date} date - JavaScript Date object
+ * @param {string} format - Format string with % placeholders
+ * @returns {string} Formatted date string
+ */
+function formatCustomDate(date, format) {
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  let result = format;
+  const month = date.getMonth();
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
+  const dayOfWeek = date.getDay();
+
+  // Replace format codes
+  result = result.replace(/%Y/g, String(year));
+  result = result.replace(/%y/g, String(year).slice(-2));
+  result = result.replace(/%m/g, String(month + 1).padStart(2, '0'));
+  result = result.replace(/%B/g, monthNames[month]);
+  result = result.replace(/%b/g, monthNamesShort[month]);
+  result = result.replace(/%d/g, String(day).padStart(2, '0'));
+  result = result.replace(/%A/g, dayNames[dayOfWeek]);
+  result = result.replace(/%a/g, dayNamesShort[dayOfWeek]);
+  result = result.replace(/%H/g, String(hours).padStart(2, '0'));
+  result = result.replace(/%I/g, String(hours % 12 || 12).padStart(2, '0'));
+  result = result.replace(/%M/g, String(minutes).padStart(2, '0'));
+  result = result.replace(/%S/g, String(seconds).padStart(2, '0'));
+  result = result.replace(/%p/g, hours >= 12 ? 'PM' : 'AM');
+
+  return result;
+}
+
+/**
  * Format a UTC ISO 8601 datetime string to the browser's local timezone.
  * @param {string} isoString - UTC ISO 8601 datetime string (e.g., '2024-01-15T14:30:00Z')
  * @param {Object} options - Intl.DateTimeFormat options
@@ -25,7 +67,7 @@ function formatDateTime(isoString, options = {}) {
     const defaultOptions = {
       dateStyle: 'medium',
       timeStyle: 'short',
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
 
     const formatOptions = { ...defaultOptions, ...options };
@@ -71,48 +113,6 @@ function formatDate(isoString, format = 'medium') {
     console.warn('Date formatting failed:', error);
     return 'Invalid date';
   }
-}
-
-/**
- * Format a date with a custom format string (Python strftime-like).
- * @param {Date} date - JavaScript Date object
- * @param {string} format - Format string with % placeholders
- * @returns {string} Formatted date string
- */
-function formatCustomDate(date, format) {
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const dayNamesShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  let result = format;
-  const month = date.getMonth();
-  const day = date.getDate();
-  const year = date.getFullYear();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const seconds = date.getSeconds();
-  const dayOfWeek = date.getDay();
-
-  // Replace format codes
-  result = result.replace(/%Y/g, String(year));
-  result = result.replace(/%y/g, String(year).slice(-2));
-  result = result.replace(/%m/g, String(month + 1).padStart(2, '0'));
-  result = result.replace(/%B/g, monthNames[month]);
-  result = result.replace(/%b/g, monthNamesShort[month]);
-  result = result.replace(/%d/g, String(day).padStart(2, '0'));
-  result = result.replace(/%A/g, dayNames[dayOfWeek]);
-  result = result.replace(/%a/g, dayNamesShort[dayOfWeek]);
-  result = result.replace(/%H/g, String(hours).padStart(2, '0'));
-  result = result.replace(/%I/g, String(hours % 12 || 12).padStart(2, '0'));
-  result = result.replace(/%M/g, String(minutes).padStart(2, '0'));
-  result = result.replace(/%S/g, String(seconds).padStart(2, '0'));
-  result = result.replace(/%p/g, hours >= 12 ? 'PM' : 'AM');
-
-  return result;
 }
 
 /**

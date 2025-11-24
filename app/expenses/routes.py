@@ -41,11 +41,8 @@ from app.restaurants.models import Restaurant
 from app.utils.decorators import db_transaction
 from app.utils.messages import FlashMessages
 from app.utils.timezone_utils import (
-    get_browser_timezone,
     get_browser_timezone_info,
     get_timezone_abbreviation,
-    get_timezone_display_name,
-    normalize_timezone,
 )
 
 # Constants
