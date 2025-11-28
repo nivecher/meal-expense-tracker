@@ -41,13 +41,13 @@ blinker==1.9.0
     # via flask
 boto3==1.40.26
     # via -r requirements/base.in
-boto3-stubs==1.41.3
+boto3-stubs==1.41.5
     # via -r requirements/dev.in
 botocore==1.40.76
     # via
     #   boto3
     #   s3transfer
-botocore-stubs==1.41.3
+botocore-stubs==1.41.5
     # via
     #   -r requirements/dev.in
     #   boto3-stubs
@@ -225,7 +225,7 @@ mypy==1.13.0
     #   -r requirements/dev.in
 mypy-boto3-cloudformation==1.41.2
     # via -r requirements/dev.in
-mypy-boto3-ec2==1.41.2
+mypy-boto3-ec2==1.41.4
     # via -r requirements/dev.in
 mypy-boto3-lambda==1.41.2
     # via -r requirements/dev.in
@@ -289,7 +289,7 @@ pure-eval==0.2.3
     # via stack-data
 pycparser==2.23
     # via cffi
-pydantic==2.12.4
+pydantic==2.12.5
     # via
     #   safety
     #   safety-schemas
@@ -466,8 +466,6 @@ types-flask-cors==6.0.0.20250809
     # via -r requirements/dev.in
 types-flask-migrate==4.1.0.20250112
     # via -r requirements/dev.in
-types-flask-sqlalchemy==2.5.9.4
-    # via -r requirements/dev.in
 types-html5lib==1.1.11.20250708
     # via
     #   -r requirements/dev.in
@@ -500,10 +498,6 @@ types-setuptools==80.9.0.20250822
     # via -r requirements/dev.in
 types-simplejson==3.20.0.20250822
     # via -r requirements/dev.in
-types-sqlalchemy==1.4.53.38
-    # via
-    #   -r requirements/dev.in
-    #   types-flask-sqlalchemy
 types-toml==0.10.8.20240310
     # via -r requirements/dev.in
 types-urllib3==1.26.25.14
