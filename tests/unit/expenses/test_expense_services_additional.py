@@ -25,7 +25,7 @@ class MockForm:
 class TestExpenseServicesAdditional:
     """Additional tests for expense services."""
 
-    def test_prepare_expense_form(self, app):
+    def test_prepare_expense_form(self, app) -> None:
         """Test preparing expense form with data."""
         with app.app_context():
             result = prepare_expense_form(user_id=1)
@@ -41,7 +41,7 @@ class TestExpenseServicesAdditional:
             assert hasattr(form, "amount")
             assert hasattr(form, "notes")
 
-    def test_process_date_valid(self, app):
+    def test_process_date_valid(self, app) -> None:
         """Test processing valid date."""
         with app.app_context():
             test_date = date(2024, 2, 20)
@@ -51,7 +51,7 @@ class TestExpenseServicesAdditional:
             assert processed_date == test_date
             assert error is None
 
-    def test_process_date_string(self, app):
+    def test_process_date_string(self, app) -> None:
         """Test processing date string."""
         with app.app_context():
             date_str = "2024-02-20"
@@ -61,7 +61,7 @@ class TestExpenseServicesAdditional:
             assert processed_date == date(2024, 2, 20)
             assert error is None
 
-    def test_process_date_invalid(self, app):
+    def test_process_date_invalid(self, app) -> None:
         """Test processing invalid date."""
         with app.app_context():
             invalid_date = "not-a-date"
@@ -71,7 +71,7 @@ class TestExpenseServicesAdditional:
             assert processed_date is None
             assert error is not None
 
-    def test_process_date_future(self, app):
+    def test_process_date_future(self, app) -> None:
         """Test processing future date."""
         with app.app_context():
             future_date = date(2030, 1, 1)
@@ -82,7 +82,7 @@ class TestExpenseServicesAdditional:
             assert processed_date == future_date
             assert error is None
 
-    def test_process_amount_valid(self, app):
+    def test_process_amount_valid(self, app) -> None:
         """Test processing valid amount."""
         with app.app_context():
             amount = Decimal("25.50")
@@ -92,7 +92,7 @@ class TestExpenseServicesAdditional:
             assert processed_amount == amount
             assert error is None
 
-    def test_process_amount_string(self, app):
+    def test_process_amount_string(self, app) -> None:
         """Test processing amount string."""
         with app.app_context():
             amount_str = "25.50"
@@ -102,7 +102,7 @@ class TestExpenseServicesAdditional:
             assert processed_amount == Decimal("25.50")
             assert error is None
 
-    def test_process_amount_invalid(self, app):
+    def test_process_amount_invalid(self, app) -> None:
         """Test processing invalid amount."""
         with app.app_context():
             invalid_amount = "not-a-number"
@@ -112,7 +112,7 @@ class TestExpenseServicesAdditional:
             assert processed_amount is None
             assert error is not None
 
-    def test_process_amount_negative(self, app):
+    def test_process_amount_negative(self, app) -> None:
         """Test processing negative amount."""
         with app.app_context():
             negative_amount = Decimal("-10.00")
@@ -123,7 +123,7 @@ class TestExpenseServicesAdditional:
             assert processed_amount == Decimal("10.00")
             assert error is None
 
-    def test_process_amount_zero(self, app):
+    def test_process_amount_zero(self, app) -> None:
         """Test processing zero amount."""
         with app.app_context():
             zero_amount = Decimal("0.00")
@@ -133,7 +133,7 @@ class TestExpenseServicesAdditional:
             assert processed_amount == Decimal("0.00")
             assert error is None
 
-    def test_parse_tags_json_valid(self, app):
+    def test_parse_tags_json_valid(self, app) -> None:
         """Test parsing valid JSON tags."""
         with app.app_context():
             tags_json = '["business", "lunch", "client"]'
@@ -143,7 +143,7 @@ class TestExpenseServicesAdditional:
             assert tags == ["business", "lunch", "client"]
             assert error is None
 
-    def test_parse_tags_json_empty(self, app):
+    def test_parse_tags_json_empty(self, app) -> None:
         """Test parsing empty JSON tags."""
         with app.app_context():
             tags_json = "[]"
@@ -153,7 +153,7 @@ class TestExpenseServicesAdditional:
             assert tags == []
             assert error is None
 
-    def test_parse_tags_json_invalid(self, app):
+    def test_parse_tags_json_invalid(self, app) -> None:
         """Test parsing invalid JSON tags."""
         with app.app_context():
             tags_json = '{"invalid": "json"}'
@@ -165,7 +165,7 @@ class TestExpenseServicesAdditional:
             # The service doesn't return an error for valid JSON, even if it's not a list
             assert error is None
 
-    def test_validate_tags_list_valid(self):
+    def test_validate_tags_list_valid(self) -> None:
         """Test validating valid tags list."""
         tags_list = ["business", "lunch", "client"]
 
@@ -174,7 +174,7 @@ class TestExpenseServicesAdditional:
         assert validated_tags == ["business", "lunch", "client"]
         assert error is None
 
-    def test_validate_tags_list_not_list(self):
+    def test_validate_tags_list_not_list(self) -> None:
         """Test validating non-list tags."""
         tags_not_list = "business,lunch,client"
 
@@ -183,7 +183,7 @@ class TestExpenseServicesAdditional:
         assert validated_tags is None
         assert error is not None
 
-    def test_validate_tags_list_invalid_items(self):
+    def test_validate_tags_list_invalid_items(self) -> None:
         """Test validating tags list with invalid items."""
         tags_with_invalid = ["business", 123, "client"]
 
@@ -193,7 +193,7 @@ class TestExpenseServicesAdditional:
         assert error is not None
         assert "Invalid tag format" in error
 
-    def test_validate_tags_list_empty_strings(self):
+    def test_validate_tags_list_empty_strings(self) -> None:
         """Test validating tags list with empty strings."""
         tags_with_empty = ["business", "", "client"]
 
@@ -203,7 +203,7 @@ class TestExpenseServicesAdditional:
         assert validated_tags == ["business", "client"]
         assert error is None
 
-    def test_validate_tags_list_too_long(self):
+    def test_validate_tags_list_too_long(self) -> None:
         """Test validating tags list that's too long."""
         long_tags = ["tag" + str(i) for i in range(11)]  # 11 tags
 
@@ -213,7 +213,7 @@ class TestExpenseServicesAdditional:
         assert validated_tags == long_tags
         assert error is None
 
-    def test_sort_categories_by_default_order(self):
+    def test_sort_categories_by_default_order(self) -> None:
         """Test sorting categories by default order."""
         # Mock categories with different names
         category1 = Mock()

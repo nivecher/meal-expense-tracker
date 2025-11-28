@@ -1,7 +1,7 @@
 """Tests for reports routes module."""
 
-import pytest
 from flask import Flask
+import pytest
 
 from app.reports.routes import analytics, expense_report, index, restaurant_report
 
@@ -18,37 +18,37 @@ class TestReportsRoutes:
         app.config["SECRET_KEY"] = "test_secret_key"
         return app
 
-    def test_index_route_decorator_presence(self):
+    def test_index_route_decorator_presence(self) -> None:
         """Test that index route has the @login_required decorator."""
         assert hasattr(index, "__wrapped__")
 
-    def test_expense_report_route_decorator_presence(self):
+    def test_expense_report_route_decorator_presence(self) -> None:
         """Test that expense_report route has the @login_required decorator."""
         assert hasattr(expense_report, "__wrapped__")
 
-    def test_restaurant_report_route_decorator_presence(self):
+    def test_restaurant_report_route_decorator_presence(self) -> None:
         """Test that restaurant_report route has the @login_required decorator."""
         assert hasattr(restaurant_report, "__wrapped__")
 
-    def test_analytics_route_decorator_presence(self):
+    def test_analytics_route_decorator_presence(self) -> None:
         """Test that analytics route has the @login_required decorator."""
         assert hasattr(analytics, "__wrapped__")
 
-    def test_routes_import_correctly(self):
+    def test_routes_import_correctly(self) -> None:
         """Test that all routes can be imported correctly."""
         assert index is not None
         assert expense_report is not None
         assert restaurant_report is not None
         assert analytics is not None
 
-    def test_routes_are_callable(self):
+    def test_routes_are_callable(self) -> None:
         """Test that all routes are callable functions."""
         assert callable(index)
         assert callable(expense_report)
         assert callable(restaurant_report)
         assert callable(analytics)
 
-    def test_routes_module_structure(self):
+    def test_routes_module_structure(self) -> None:
         """Test that the routes module has expected structure."""
         from app.reports import routes
 
@@ -57,7 +57,7 @@ class TestReportsRoutes:
         assert hasattr(routes, "restaurant_report")
         assert hasattr(routes, "analytics")
 
-    def test_routes_blueprint_registration(self):
+    def test_routes_blueprint_registration(self) -> None:
         """Test that routes are properly registered with blueprint."""
         from app.reports import bp
 
@@ -65,7 +65,7 @@ class TestReportsRoutes:
         assert hasattr(bp, "name")
         assert bp.name == "reports"
 
-    def test_route_functions_have_docstrings(self):
+    def test_route_functions_have_docstrings(self) -> None:
         """Test that route functions have proper documentation."""
         assert index.__doc__ is not None
         assert "Show the reports dashboard" in index.__doc__

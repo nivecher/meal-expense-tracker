@@ -5,6 +5,39 @@
  * This replaces the inline JavaScript in the base_auth.html template.
  */
 
+/**
+ * Validate redirect URL to prevent open redirect vulnerabilities
+ * Only allows relative URLs or same-origin absolute URLs
+ * @param {string} url - URL to validate
+ * @returns {string|null} - Validated URL or null if invalid
+ */
+function validateRedirectUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+
+  // Allow relative URLs (starting with /)
+  if (url.startsWith('/')) {
+    // Ensure it doesn't contain protocol or host
+    if (!url.includes('://') && !url.includes('//')) {
+      return url;
+    }
+    return null;
+  }
+
+  // Allow same-origin absolute URLs only
+  try {
+    const urlObj = new URL(url, window.location.origin);
+    if (urlObj.origin === window.location.origin) {
+      return urlObj.pathname + urlObj.search + urlObj.hash;
+    }
+  } catch {
+    // Invalid URL
+  }
+
+  return null;
+}
+
 // Helper function to display validation errors
 function displayValidationErrors(form, errors) {
   // Clear existing errors
@@ -73,6 +106,39 @@ async function handleErrorResponse(response, form) {
 
   console.error('Form submission failed:', response.status, response.statusText);
   // Don't reload to preserve error info for debugging
+}
+
+/**
+ * Handle redirect from response data
+ * @param {string} redirectUrl - URL to redirect to
+ * @returns {boolean} - True if redirect was handled, false otherwise
+ */
+function handleRedirect(redirectUrl) {
+  const validatedUrl = validateRedirectUrl(redirectUrl);
+  if (validatedUrl) {
+    window.location.href = validatedUrl;
+    return true;
+  }
+  // Default to home page if redirect URL is invalid
+  window.location.href = '/';
+  return true;
+}
+
+/**
+ * Handle successful JSON response
+ * @param {Object} data - Response data
+ * @returns {boolean} - True if response was handled, false otherwise
+ */
+function handleJsonResponse(data) {
+  if (data.redirect) {
+    handleRedirect(data.redirect);
+    return true;
+  }
+  if (data.success) {
+    window.location.reload();
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -215,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (response.ok) {
           // Check if it's a redirect (successful login/registration)
           if (response.redirected || response.url !== window.location.href) {
-            window.location.href = response.url;
+            handleRedirect(response.url);
             return;
           }
 
@@ -223,12 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const contentType = response.headers.get('content-type');
           if (contentType && contentType.includes('application/json')) {
             const data = await response.json();
-            if (data.redirect) {
-              window.location.href = data.redirect;
-              return;
-            }
-            if (data.success) {
-              window.location.reload();
+            if (handleJsonResponse(data)) {
               return;
             }
           }
@@ -238,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           await handleErrorResponse(response, form);
         }
-      } catch {
+      } catch (error) {
         console.error('Form submission error:', error);
         alert('An error occurred. Please try again.');
       } finally {

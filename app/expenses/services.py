@@ -1,16 +1,17 @@
 """Service functions for the expenses blueprint."""
 
 import csv
+from datetime import UTC, date, datetime, time, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 import io
 import json
-from datetime import date, datetime, time, timedelta, timezone
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 from flask import Request, current_app
 from flask_wtf import FlaskForm
 from sqlalchemy import extract, func, or_, select
 from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import Select
 from werkzeug.datastructures import FileStorage
 
 from app.constants.categories import get_default_categories
@@ -24,7 +25,7 @@ from app.restaurants.models import Restaurant
 # =============================================================================
 
 
-def get_expense_filters(request: Request) -> Dict[str, Any]:
+def get_expense_filters(request: Request) -> dict[str, Any]:
     """Extract and validate filter parameters from the request.
 
     Args:
@@ -46,7 +47,7 @@ def get_expense_filters(request: Request) -> Dict[str, Any]:
     }
 
 
-def get_user_expenses(user_id: int, filters: Dict[str, Any]) -> Tuple[List[Expense], float]:
+def get_user_expenses(user_id: int, filters: dict[str, Any]) -> tuple[list[Expense], float, float | None]:
     """Get expenses for a user with the given filters.
 
     Args:
@@ -71,28 +72,30 @@ def get_user_expenses(user_id: int, filters: Dict[str, Any]) -> Tuple[List[Expen
 
     # Execute query
     result = db.session.execute(stmt)
-    expenses = result.scalars().unique().all()
+    expenses_list = list(result.scalars().unique().all())
 
     # Calculate total
-    total_amount = sum(expense.amount for expense in expenses) if expenses else 0.0
+    total_amount = float(sum(expense.amount for expense in expenses_list)) if expenses_list else 0.0
 
     # Calculate average price per person
     # Include all expenses where party_size is set (including single person)
     # This matches what's displayed in the table
-    price_per_person_values = []
-    for expense in expenses:
+    price_per_person_values: list[float] = []
+    for expense in expenses_list:
         if expense.party_size is not None and expense.party_size > 0:
             # Include all expenses with party size set (single or multi-person)
-            price_per_person_values.append(float(expense.price_per_person))
+            price_per_person = expense.price_per_person
+            if price_per_person is not None:
+                price_per_person_values.append(float(price_per_person))
 
     avg_price_per_person = (
         sum(price_per_person_values) / len(price_per_person_values) if price_per_person_values else None
     )
 
-    return expenses, total_amount, avg_price_per_person
+    return expenses_list, total_amount, avg_price_per_person
 
 
-def apply_filters(stmt, filters: Dict[str, Any]):
+def apply_filters(stmt: Select, filters: dict[str, Any]) -> Select:
     """Apply filters to the query with comprehensive search across text fields.
 
     Args:
@@ -110,15 +113,15 @@ def apply_filters(stmt, filters: Dict[str, Any]):
         search_term = f"%{filters['search']}%"
         stmt = stmt.where(
             or_(
-                # Restaurant fields
-                Restaurant.name.ilike(search_term),
-                Restaurant.address_line_1.ilike(search_term),
-                Restaurant.address_line_2.ilike(search_term),
+                # Restaurant fields (handle NULL values from outer join)
+                func.coalesce(Restaurant.name, "").ilike(search_term),
+                func.coalesce(Restaurant.address_line_1, "").ilike(search_term),
+                func.coalesce(Restaurant.address_line_2, "").ilike(search_term),
                 # Expense fields
-                Expense.notes.ilike(search_term),
-                Expense.meal_type.ilike(search_term),
-                # Category fields
-                Category.name.ilike(search_term),
+                func.coalesce(Expense.notes, "").ilike(search_term),
+                func.coalesce(Expense.meal_type, "").ilike(search_term),
+                # Category fields (handle NULL values from outer join)
+                func.coalesce(Category.name, "").ilike(search_term),
             )
         )
 
@@ -133,7 +136,7 @@ def apply_filters(stmt, filters: Dict[str, Any]):
     # Apply date range filters with proper error handling
     if filters["start_date"]:
         try:
-            start_date = datetime.strptime(filters["start_date"], "%Y-%m-%d").date()
+            start_date: date = datetime.strptime(filters["start_date"], "%Y-%m-%d").date()
             stmt = stmt.where(Expense.date >= start_date)
         except (ValueError, TypeError):
             # Log the error but don't fail the query
@@ -141,7 +144,7 @@ def apply_filters(stmt, filters: Dict[str, Any]):
 
     if filters["end_date"]:
         try:
-            end_date = datetime.strptime(filters["end_date"], "%Y-%m-%d").date()
+            end_date: date = datetime.strptime(filters["end_date"], "%Y-%m-%d").date()
             stmt = stmt.where(Expense.date <= end_date)
         except (ValueError, TypeError):
             # Log the error but don't fail the query
@@ -150,7 +153,7 @@ def apply_filters(stmt, filters: Dict[str, Any]):
     return stmt
 
 
-def apply_sorting(stmt, sort_by: str, sort_order: str):
+def apply_sorting(stmt: Select, sort_by: str, sort_order: str) -> Select:
     """Apply sorting to the query.
 
     Args:
@@ -162,15 +165,17 @@ def apply_sorting(stmt, sort_by: str, sort_order: str):
         The modified select statement with sorting applied
     """
     is_desc = sort_order.lower() == "desc"
-    sort_fields = []
+    sort_fields: list[Any] = []
 
     if sort_by == "date":
         # Primary sort by date, secondary sort by created_at for recently entered expenses
-        primary_field = Expense.date.desc() if is_desc else Expense.date.asc()
-        secondary_field = Expense.created_at.desc() if is_desc else Expense.created_at.asc()
+        date_col = Expense.date
+        created_at_col = Expense.created_at
+        primary_field = date_col.desc() if is_desc else date_col.asc()
+        secondary_field = created_at_col.desc() if is_desc else created_at_col.asc()
         sort_fields = [primary_field, secondary_field]
     elif sort_by == "amount":
-        sort_field = Expense.amount.desc() if is_desc else Expense.amount.asc()
+        sort_field: Any = Expense.amount.desc() if is_desc else Expense.amount.asc()
         sort_fields = [sort_field]
     elif sort_by == "meal_type":
         sort_field = Expense.meal_type.desc() if is_desc else Expense.meal_type.asc()
@@ -194,7 +199,7 @@ def apply_sorting(stmt, sort_by: str, sort_order: str):
     return stmt
 
 
-def get_main_filter_options(user_id: int) -> Dict[str, List[str]]:
+def get_main_filter_options(user_id: int) -> dict[str, list[str]]:
     """Get filter options (meal types and categories) for the current user.
 
     This provides simple filter options for main dashboard filtering.
@@ -239,7 +244,7 @@ def _sort_categories_by_default_order(categories: list[Category]) -> list[Catego
     name_to_order = {name: i for i, name in enumerate(default_names)}
 
     # Sort categories: default categories first (in original order), then others
-    def sort_key(cat):
+    def sort_key(cat: Category) -> tuple[int, int | str]:
         if cat.name in name_to_order:
             return (0, name_to_order[cat.name])  # Default categories first
         else:
@@ -249,8 +254,8 @@ def _sort_categories_by_default_order(categories: list[Category]) -> list[Catego
 
 
 def prepare_expense_form(
-    user_id: int, form: Optional[FlaskForm] = None
-) -> Tuple[ExpenseForm, List[Category], List["Restaurant"]]:
+    user_id: int, form: FlaskForm | None = None
+) -> tuple[ExpenseForm, list[Category], list["Restaurant"]]:
     """Prepare the expense form with categories and restaurants.
 
     Args:
@@ -268,19 +273,19 @@ def prepare_expense_form(
     else:
         form = cast(ExpenseForm, form)
 
-    categories: List[Category] = Category.query.order_by(Category.name).all()
-    restaurants: List[Restaurant] = Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()
+    categories: list[Category] = Category.query.order_by(Category.name).all()
+    restaurants: list[Restaurant] = Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()
 
     form.category_id.choices = [(None, "Select a category (optional)")] + [(c.id, c.name) for c in categories]
     form.restaurant_id.choices = [(None, "Select a restaurant")] + [(r.id, r.name) for r in restaurants]
 
     if not form.date.data:
-        form.date.data = datetime.now(timezone.utc).date()
+        form.date.data = datetime.now(UTC).date()
 
     return form, categories, restaurants
 
 
-def _process_category_id(form: ExpenseForm) -> Tuple[Optional[int], Optional[str]]:
+def _process_category_id(form: ExpenseForm) -> tuple[int | None, str | None]:
     """Process and validate category_id from form data."""
     category_id = form.category_id.data if form.category_id.data else None
     if isinstance(category_id, str):
@@ -292,7 +297,7 @@ def _process_category_id(form: ExpenseForm) -> Tuple[Optional[int], Optional[str
     return category_id, None
 
 
-def _process_restaurant_id(form: ExpenseForm) -> Tuple[Optional[int], Optional[str]]:
+def _process_restaurant_id(form: ExpenseForm) -> tuple[int | None, str | None]:
     """Process and validate restaurant_id from form data."""
     restaurant_id = form.restaurant_id.data if form.restaurant_id.data else None
     if isinstance(restaurant_id, str):
@@ -304,7 +309,7 @@ def _process_restaurant_id(form: ExpenseForm) -> Tuple[Optional[int], Optional[s
     return restaurant_id, None
 
 
-def _process_date(date_value: Any) -> Tuple[Optional[date], Optional[str]]:
+def _process_date(date_value: Any) -> tuple[date | None, str | None]:
     """Process and validate date from form data."""
     if not date_value:
         return None, "Date is required"
@@ -323,7 +328,7 @@ def _process_date(date_value: Any) -> Tuple[Optional[date], Optional[str]]:
         return None, "Invalid date format. Please use YYYY-MM-DD format."
 
 
-def _process_time(time_value: Any) -> Tuple[Optional[time], Optional[str]]:
+def _process_time(time_value: Any) -> tuple[time | None, str | None]:
     """Process and validate time from form data."""
     if not time_value:
         return None, None  # Time is optional
@@ -342,7 +347,7 @@ def _process_time(time_value: Any) -> Tuple[Optional[time], Optional[str]]:
         return None, "Invalid time format. Please use HH:MM format."
 
 
-def _process_amount(amount_value: Any) -> Tuple[Optional[Decimal], Optional[str]]:
+def _process_amount(amount_value: Any) -> tuple[Decimal | None, str | None]:
     """Process and validate amount from form data with smart amount support."""
     try:
         amount_str = str(amount_value).strip()
@@ -372,7 +377,7 @@ def _process_amount(amount_value: Any) -> Tuple[Optional[Decimal], Optional[str]
         return None, f"Invalid amount: {amount_value}"
 
 
-def _parse_tags_json(tags_data: str) -> Tuple[Optional[list], Optional[str]]:
+def _parse_tags_json(tags_data: str) -> tuple[list | None, str | None]:
     """Parse JSON tags data.
 
     Args:
@@ -391,7 +396,7 @@ def _parse_tags_json(tags_data: str) -> Tuple[Optional[list], Optional[str]]:
         return None, "Invalid tags format"
 
 
-def _validate_tags_list(tags_list: Any) -> Tuple[Optional[list[str]], Optional[str]]:
+def _validate_tags_list(tags_list: Any) -> tuple[list[str] | None, str | None]:
     """Validate and clean tags list.
 
     Args:
@@ -420,7 +425,7 @@ def _validate_tags_list(tags_list: Any) -> Tuple[Optional[list[str]], Optional[s
     return processed_tags, None
 
 
-def _process_tags(form: ExpenseForm) -> Tuple[Optional[list[str]], Optional[str]]:
+def _process_tags(form: ExpenseForm) -> tuple[list[str] | None, str | None]:
     """Process and validate tags from form data.
 
     Args:
@@ -447,7 +452,7 @@ def _process_tags(form: ExpenseForm) -> Tuple[Optional[list[str]], Optional[str]
                 current_app.logger.info(f"Tags data is not JSON, treating as single tag: {tags_data}")
                 tags_list = [tags_data.strip()] if tags_data.strip() else []
         else:
-            tags_list = tags_data
+            tags_list = tags_data  # type: ignore[unreachable]
 
         # Validate and clean tags
         result = _validate_tags_list(tags_list)
@@ -473,7 +478,9 @@ def _add_tags_to_expense(expense_id: int, user_id: int, tags: list[str]) -> None
         current_app.logger.warning(f"Failed to add tags to expense {expense_id}: {str(e)}")
 
 
-def create_expense(user_id: int, form: ExpenseForm, receipt_file=None) -> Tuple[Optional[Expense], Optional[str]]:
+def create_expense(
+    user_id: int, form: ExpenseForm, receipt_file: FileStorage | None = None
+) -> tuple[Expense | None, str | None]:
     """Create a new expense from form data.
 
     Args:
@@ -508,6 +515,8 @@ def create_expense(user_id: int, form: ExpenseForm, receipt_file=None) -> Tuple[
                 from app.expenses.utils import save_receipt_to_storage
 
                 upload_folder = current_app.config.get("UPLOAD_FOLDER")
+                if not isinstance(upload_folder, str):
+                    return None, "UPLOAD_FOLDER configuration is not set"
                 storage_path, error = save_receipt_to_storage(receipt_file, upload_folder)
 
                 if error:
@@ -565,9 +574,35 @@ def create_expense(user_id: int, form: ExpenseForm, receipt_file=None) -> Tuple[
         return None, f"An error occurred while creating the expense: {str(e)}"
 
 
+def _combine_date_time_with_timezone(date_value: date, time_value: time | None, browser_timezone: str) -> datetime:
+    """Combine date and time into a datetime object, handling timezone conversion.
+
+    Args:
+        date_value: The date value (required)
+        time_value: The time value (optional)
+        browser_timezone: Browser timezone string (already normalized)
+
+    Returns:
+        Datetime object in UTC (without tzinfo for storage)
+    """
+    if time_value:
+        # Use the provided time - interpret as browser's local time
+        from zoneinfo import ZoneInfo
+
+        from app.utils.timezone_utils import get_timezone
+
+        browser_tz = get_timezone(browser_timezone)
+        browser_datetime = datetime.combine(date_value, time_value)
+        # Localize to browser's timezone, then convert to UTC for storage
+        browser_datetime_tz = browser_datetime.replace(tzinfo=browser_tz)
+        return browser_datetime_tz.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    # Use noon to avoid timezone issues (as we did before)
+    return datetime.combine(date_value, time(12, 0))
+
+
 def _process_expense_form_data(
     form: ExpenseForm, browser_timezone: str = "UTC"
-) -> Union[Tuple[int, Optional[int], datetime, Decimal, list[str]], str]:
+) -> tuple[int | None, int | None, datetime, Decimal, list[str]] | str:
     """Process all form data for expense creation/update.
 
     Args:
@@ -592,6 +627,8 @@ def _process_expense_form_data(
     date_value, error = _process_date(form.date.data)
     if error:
         return error
+    if date_value is None:
+        return "Date is required"
 
     time_value, error = _process_time(form.time.data)
     if error:
@@ -600,33 +637,22 @@ def _process_expense_form_data(
     amount, error = _process_amount(form.amount.data)
     if error:
         return error
+    if amount is None:
+        return "Amount is required"
 
     tags, error = _process_tags(form)
     if error:
         return error
+    if tags is None:
+        return "Tags processing error"
 
     # Combine date and time into a datetime object
-    if time_value:
-        # Use the provided time - interpret as browser's local time
-        from zoneinfo import ZoneInfo
-
-        from app.utils.timezone_utils import get_timezone
-
-        browser_tz = get_timezone(browser_timezone)
-        browser_datetime = datetime.combine(date_value, time_value)
-        # Localize to browser's timezone, then convert to UTC for storage
-        browser_datetime_tz = browser_datetime.replace(tzinfo=browser_tz)
-        datetime_value = browser_datetime_tz.astimezone(ZoneInfo("UTC")).replace(
-            tzinfo=None
-        )  # Remove tzinfo for storage
-    else:
-        # Use noon to avoid timezone issues (as we did before)
-        datetime_value = datetime.combine(date_value, time(12, 0))
+    datetime_value = _combine_date_time_with_timezone(date_value, time_value, browser_timezone)
 
     return category_id, restaurant_id, datetime_value, amount, tags
 
 
-def _handle_receipt_update(expense: Expense, receipt_file, delete_receipt: bool) -> Optional[str]:
+def _handle_receipt_update(expense: Expense, receipt_file: FileStorage | None, delete_receipt: bool) -> str | None:
     """Handle receipt upload or deletion for an expense.
 
     Args:
@@ -644,7 +670,7 @@ def _handle_receipt_update(expense: Expense, receipt_file, delete_receipt: bool)
     return None
 
 
-def _upload_new_receipt(expense: Expense, receipt_file) -> Optional[str]:
+def _upload_new_receipt(expense: Expense, receipt_file: FileStorage) -> str | None:
     """Upload a new receipt for an expense."""
     try:
         from flask import current_app
@@ -652,6 +678,8 @@ def _upload_new_receipt(expense: Expense, receipt_file) -> Optional[str]:
         from app.expenses.utils import save_receipt_to_storage
 
         upload_folder = current_app.config.get("UPLOAD_FOLDER")
+        if not isinstance(upload_folder, str):
+            return "UPLOAD_FOLDER configuration is not set"
         storage_path, error = save_receipt_to_storage(receipt_file, upload_folder)
 
         if error:
@@ -666,7 +694,7 @@ def _upload_new_receipt(expense: Expense, receipt_file) -> Optional[str]:
         return f"Failed to save receipt: {str(e)}"
 
 
-def _delete_existing_receipt(expense: Expense) -> Optional[str]:
+def _delete_existing_receipt(expense: Expense) -> str | None:
     """Delete an existing receipt from an expense."""
     try:
         from flask import current_app
@@ -679,6 +707,8 @@ def _delete_existing_receipt(expense: Expense) -> Optional[str]:
             return None
 
         upload_folder = current_app.config.get("UPLOAD_FOLDER")
+        if not isinstance(upload_folder, str):
+            return "UPLOAD_FOLDER configuration is not set"
         error = delete_receipt_from_storage(expense.receipt_image, upload_folder)
 
         if error:
@@ -694,8 +724,8 @@ def _delete_existing_receipt(expense: Expense) -> Optional[str]:
 
 
 def update_expense(
-    expense: Expense, form: ExpenseForm, receipt_file=None, delete_receipt=False
-) -> Tuple[Optional[Expense], Optional[str]]:
+    expense: Expense, form: ExpenseForm, receipt_file: FileStorage | None = None, delete_receipt: bool = False
+) -> tuple[Expense | None, str | None]:
     """Update an existing expense from form data.
 
     Args:
@@ -733,7 +763,7 @@ def update_expense(
             return None, receipt_error
 
         # Update expense fields
-        expense.amount = float(amount)
+        expense.amount = Decimal(str(amount))
         expense.date = date_value
         expense.notes = form.notes.data.strip() if form.notes.data else None
         expense.category_id = category_id
@@ -778,7 +808,7 @@ def delete_expense(expense: Expense) -> None:
     recalculate_restaurant_statistics(user_id)
 
 
-def get_expense_by_id(expense_id: int, user_id: int) -> Optional[Expense]:
+def get_expense_by_id(expense_id: int, user_id: int) -> Expense | None:
     """Get an expense by ID, ensuring it belongs to the user.
 
     Args:
@@ -788,14 +818,15 @@ def get_expense_by_id(expense_id: int, user_id: int) -> Optional[Expense]:
     Returns:
         The expense if found and belongs to the user, None otherwise
     """
-    return (
+    result = (
         Expense.query.options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag))
         .filter_by(id=expense_id, user_id=user_id)
         .first()
     )
+    return cast(Expense | None, result)
 
 
-def get_expense_by_id_for_user(expense_id: int, user_id: int) -> Optional[Expense]:
+def get_expense_by_id_for_user(expense_id: int, user_id: int) -> Expense | None:
     """Get an expense by ID for a specific user.
 
     Args:
@@ -809,8 +840,8 @@ def get_expense_by_id_for_user(expense_id: int, user_id: int) -> Optional[Expens
 
 
 def get_expenses_for_user(
-    user_id: int, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None
-) -> List[Expense]:
+    user_id: int, start_date: datetime | None = None, end_date: datetime | None = None
+) -> list[Expense]:
     """
     Get all expenses for a specific user, optionally filtered by date range.
 
@@ -831,10 +862,11 @@ def get_expenses_for_user(
     if end_date:
         query = query.filter(Expense.date <= end_date.date())
 
-    return query.order_by(Expense.date.desc()).all()
+    result = query.order_by(Expense.date.desc()).all()
+    return cast(list[Expense], result)
 
 
-def create_expense_for_user(user_id: int, data: Dict[str, Any]) -> Expense:
+def create_expense_for_user(user_id: int, data: dict[str, Any]) -> Expense:
     """
     Create a new expense for a user from API data.
 
@@ -861,7 +893,7 @@ def create_expense_for_user(user_id: int, data: Dict[str, Any]) -> Expense:
     return expense
 
 
-def update_expense_for_user(expense: Expense, data: Dict[str, Any]) -> Expense:
+def update_expense_for_user(expense: Expense, data: dict[str, Any]) -> Expense:
     """
     Update an existing expense for a user from API data.
 
@@ -913,7 +945,7 @@ def delete_expense_for_user(expense: Expense) -> None:
     recalculate_restaurant_statistics(user_id)
 
 
-def get_filter_options(user_id: int) -> Dict[str, Any]:
+def get_filter_options(user_id: int) -> dict[str, Any]:
     """
     Get filter options for the expenses list.
 
@@ -940,8 +972,8 @@ def get_filter_options(user_id: int) -> Dict[str, Any]:
     default_names = [cat["name"] for cat in default_categories]
     name_to_order = {name: i for i, name in enumerate(default_names)}
 
-    def sort_key(cat_tuple):
-        cat_name = cat_tuple[0]  # name is still the first element
+    def sort_key(cat_row: Any) -> tuple[int, Any]:
+        cat_name = cat_row[0]  # name is still the first element
         if cat_name in name_to_order:
             return (0, name_to_order[cat_name])  # Default categories first
         else:
@@ -965,7 +997,7 @@ def get_filter_options(user_id: int) -> Dict[str, Any]:
     year_options = sorted({int(part.year) for part in date_parts if part is not None and part.year is not None})
 
     # Create month options with formatted display
-    month_options: List[Tuple[str, str]] = []
+    month_options: list[tuple[str, str]] = []
     for part in date_parts:
         if part is not None and part.year is not None and part.month is not None:
             month_str = f"{int(part.month):02d}/{int(part.year)}"
@@ -996,7 +1028,7 @@ def get_filter_options(user_id: int) -> Dict[str, Any]:
     }
 
 
-def export_expenses_for_user(user_id: int) -> List[Dict[str, Any]]:
+def export_expenses_for_user(user_id: int) -> list[dict[str, Any]]:
     """Get all expenses for a user in a format suitable for export.
 
     Args:
@@ -1007,7 +1039,7 @@ def export_expenses_for_user(user_id: int) -> List[Dict[str, Any]]:
     """
     expenses = db.session.scalars(select(Expense).where(Expense.user_id == user_id).order_by(Expense.date.desc())).all()
 
-    def safe_float(value):
+    def safe_float(value: Any) -> float | None:
         """Safely convert value to float."""
         try:
             return float(value) if value is not None else None
@@ -1050,7 +1082,7 @@ def _validate_import_file(file: FileStorage) -> bool:
     return True
 
 
-def _normalize_field_names(data_row: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_field_names(data_row: dict[str, Any]) -> dict[str, Any]:
     """Normalize field names to match expected format.
 
     Maps various common field names to the standard field names used by the system.
@@ -1118,7 +1150,7 @@ def _normalize_field_names(data_row: Dict[str, Any]) -> Dict[str, Any]:
     return normalized_row
 
 
-def _parse_import_file(file: FileStorage) -> Optional[List[Dict[str, Any]]]:
+def _parse_import_file(file: FileStorage) -> list[dict[str, Any]] | None:
     """Parse the uploaded file and return normalized data.
 
     Args:
@@ -1128,7 +1160,7 @@ def _parse_import_file(file: FileStorage) -> Optional[List[Dict[str, Any]]]:
         List of normalized expense data dictionaries or None if error
     """
     try:
-        if file.filename.lower().endswith(".json"):
+        if file.filename and file.filename.lower().endswith(".json"):
             # Reset file pointer to beginning
             file.seek(0)
             data = json.load(file)
@@ -1157,7 +1189,7 @@ def _parse_import_file(file: FileStorage) -> Optional[List[Dict[str, Any]]]:
         return None
 
 
-def _process_csv_file(file: FileStorage) -> Tuple[bool, Optional[str], Optional[csv.DictReader]]:
+def _process_csv_file(file: FileStorage) -> tuple[bool, str | None, csv.DictReader | None]:
     """Process the CSV file and return a reader.
 
     Args:
@@ -1175,32 +1207,52 @@ def _process_csv_file(file: FileStorage) -> Tuple[bool, Optional[str], Optional[
         return False, f"Error processing CSV file: {str(e)}", None
 
 
-def _parse_excel_serial_date(date_str: str) -> Tuple[Optional[date], bool]:
+def _parse_excel_serial_date(date_value: str | int | float | None) -> tuple[date | None, bool]:
     """Parse Excel serial date format.
 
+    Excel stores dates as sequential serial numbers starting from January 1, 1900 (day 1).
+    Example: 45985 = 2025-11-24
+
     Args:
-        date_str: The date string to parse
+        date_value: The date value to parse (string, int, or float)
 
     Returns:
         Tuple of (parsed_date, is_excel_date)
     """
+    if date_value is None:
+        return None, False
+
     try:
-        serial_number = float(date_str)
-        if serial_number.is_integer() and 1 <= serial_number <= 2958465:  # Valid Excel date range
+        # Handle both string and numeric types
+        if isinstance(date_value, (int, float)):
+            serial_number = float(date_value)
+        else:
+            # Convert string to float, handling empty strings
+            date_str = str(date_value).strip()
+            if not date_str:
+                return None, False
+            serial_number = float(date_str)
+
+        # Excel date range: 1 to 2958465 (represents dates from 1900-01-01 to 9999-12-31)
+        # Only accept integers or floats that represent integers (e.g., 45985.0)
+        if 1 <= serial_number <= 2958465 and serial_number.is_integer():
             # Excel uses 1900-01-01 as day 1, but incorrectly treats 1900 as a leap year
-            excel_epoch = datetime(1899, 12, 30)  # Day 0 in Excel
+            # We use 1899-12-30 as epoch (day 0) to account for this
+            excel_epoch = datetime(1899, 12, 30)
             try:
                 parsed_date = excel_epoch + timedelta(days=int(serial_number))
                 return parsed_date.date(), True
-            except (ValueError, OverflowError):
+            except (ValueError, OverflowError) as e:
+                current_app.logger.warning(f"Error converting Excel date {serial_number}: {e}")
                 pass
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, AttributeError):
+        # Not a numeric value, so not an Excel serial date
         pass
 
     return None, False
 
 
-def _parse_standard_date_formats(date_str: str) -> Tuple[Optional[date], Optional[str]]:
+def _parse_standard_date_formats(date_str: str) -> tuple[date | None, str | None]:
     """Parse standard date formats (ISO, US, European).
 
     Args:
@@ -1237,37 +1289,47 @@ def _parse_standard_date_formats(date_str: str) -> Tuple[Optional[date], Optiona
     )
 
 
-def _parse_expense_date(date_str: str) -> Tuple[Optional[date], Optional[str]]:
-    """Parse expense date from string with support for multiple formats.
+def _parse_expense_date(date_value: str | int | float | None) -> tuple[date | None, str | None]:
+    """Parse expense date from string or numeric value with support for multiple formats.
 
     Supported formats:
     - ISO format: YYYY-MM-DD
     - US format: M/D/YYYY, MM/DD/YYYY
     - Alternative US: M-D-YYYY, MM-DD-YYYY
-    - Excel serial dates: numeric values (1-based from 1900-01-01)
+    - Excel serial dates: numeric values (e.g., 45985 = 2025-11-24)
 
     Args:
-        date_str: The date string to parse
+        date_value: The date value to parse (string, int, float, or None)
 
     Returns:
         Tuple of (parsed_date, error_message)
     """
-    if not date_str:
+    if date_value is None:
         return None, "Date is required"
 
-    # Strip whitespace
-    date_str = str(date_str).strip()
+    # Handle numeric types directly for Excel dates
+    if isinstance(date_value, (int, float)):
+        excel_date, is_excel = _parse_excel_serial_date(date_value)
+        if is_excel:
+            return excel_date, None
+        # If numeric but not a valid Excel date, convert to string for standard parsing
+        date_str = str(date_value).strip()
+    else:
+        # Handle string types
+        date_str = str(date_value).strip()
+        if not date_str:
+            return None, "Date is required"
 
-    # Try Excel serial date first
-    excel_date, is_excel = _parse_excel_serial_date(date_str)
-    if is_excel:
-        return excel_date, None
+        # Try Excel serial date first (in case it's a string like "45985")
+        excel_date, is_excel = _parse_excel_serial_date(date_str)
+        if is_excel:
+            return excel_date, None
 
     # Try standard date formats
     return _parse_standard_date_formats(date_str)
 
 
-def _parse_expense_amount(amount_str: str) -> Tuple[Optional[Decimal], Optional[str]]:
+def _parse_expense_amount(amount_str: str) -> tuple[Decimal | None, str | None]:
     """Parse expense amount from string with support for multiple formats.
 
     Supported formats:
@@ -1327,7 +1389,7 @@ def _parse_expense_amount(amount_str: str) -> Tuple[Optional[Decimal], Optional[
         )
 
 
-def _find_category_by_name(category_name: str, user_id: int) -> Optional[Category]:
+def _find_category_by_name(category_name: str, user_id: int) -> Category | None:
     """Find category by name for a user with support for hierarchical categories.
 
     Args:
@@ -1343,7 +1405,7 @@ def _find_category_by_name(category_name: str, user_id: int) -> Optional[Categor
     # First try exact match
     category = Category.query.filter_by(user_id=user_id, name=category_name).first()
     if category:
-        return category
+        return cast(Category | None, category)
 
     # Handle hierarchical category format (e.g., "Dining & Drinks:Fast Food")
     if ":" in category_name:
@@ -1351,23 +1413,23 @@ def _find_category_by_name(category_name: str, user_id: int) -> Optional[Categor
         subcategory_name = category_name.split(":", 1)[1].strip()
         category = Category.query.filter_by(user_id=user_id, name=subcategory_name).first()
         if category:
-            return category
+            return cast(Category | None, category)
 
         # Try the part before the colon (parent category)
         parent_category_name = category_name.split(":", 1)[0].strip()
         category = Category.query.filter_by(user_id=user_id, name=parent_category_name).first()
         if category:
-            return category
+            return cast(Category | None, category)
 
     # Try case-insensitive search as fallback
     category = Category.query.filter(Category.user_id == user_id, Category.name.ilike(f"%{category_name}%")).first()
 
-    return category
+    return cast(Category | None, category)
 
 
 def _find_or_create_restaurant(
     restaurant_name: str, restaurant_address: str, user_id: int
-) -> Tuple[Optional[Restaurant], Optional[str]]:
+) -> tuple[Restaurant | None, str | None]:
     """Find existing restaurant or create new one if not found, with ambiguity checking.
 
     Prevents duplicate creation by:
@@ -1390,12 +1452,12 @@ def _find_or_create_restaurant(
 
     # Clean inputs
     restaurant_name = restaurant_name.strip()
-    restaurant_address = restaurant_address.strip() if restaurant_address else None
+    restaurant_address_cleaned: str | None = restaurant_address.strip() if restaurant_address else None
 
     # Strategy 1: Exact name + address match (if address provided)
-    if restaurant_address:
+    if restaurant_address_cleaned:
         existing = Restaurant.query.filter_by(
-            user_id=user_id, name=restaurant_name, address_line_1=restaurant_address
+            user_id=user_id, name=restaurant_name, address_line_1=restaurant_address_cleaned
         ).first()
         if existing:
             return existing, None
@@ -1405,7 +1467,7 @@ def _find_or_create_restaurant(
             new_restaurant = Restaurant(
                 user_id=user_id,
                 name=restaurant_name,
-                address_line_1=restaurant_address,
+                address_line_1=restaurant_address_cleaned,
                 city=None,  # Will be filled by user later if needed
             )
             db.session.add(new_restaurant)
@@ -1437,10 +1499,10 @@ def _find_or_create_restaurant(
 
 def _check_expense_duplicate(
     user_id: int,
-    restaurant_id: Optional[int],
+    restaurant_id: int | None,
     amount: Decimal,
     expense_date: date,
-    meal_type: Optional[str],
+    meal_type: str | None,
 ) -> bool:
     """Check if an expense with the same details already exists.
 
@@ -1463,7 +1525,7 @@ def _check_expense_duplicate(
     return existing is not None
 
 
-def _find_restaurant_by_name(restaurant_name: str, user_id: int) -> Optional[Restaurant]:
+def _find_restaurant_by_name(restaurant_name: str, user_id: int) -> Restaurant | None:
     """Find restaurant by name for a user.
 
     Args:
@@ -1475,10 +1537,11 @@ def _find_restaurant_by_name(restaurant_name: str, user_id: int) -> Optional[Res
     """
     if not restaurant_name:
         return None
-    return Restaurant.query.filter_by(user_id=user_id, name=restaurant_name).first()
+    result = Restaurant.query.filter_by(user_id=user_id, name=restaurant_name).first()
+    return cast(Restaurant | None, result)
 
 
-def _create_expense_from_data(data: Dict[str, Any], user_id: int) -> Tuple[Optional[Expense], Optional[str]]:
+def _create_expense_from_data(data: dict[str, Any], user_id: int) -> tuple[Expense | None, str | None]:
     """Create an expense from import data with smart restaurant handling and duplicate detection.
 
     Args:
@@ -1489,8 +1552,11 @@ def _create_expense_from_data(data: Dict[str, Any], user_id: int) -> Tuple[Optio
         Tuple of (expense, error_message)
     """
     try:
-        # Parse date
-        expense_date, date_error = _parse_expense_date(data.get("date", "").strip())
+        # Parse date - handle both string and numeric values (Excel dates)
+        date_value = data.get("date")
+        if date_value is not None and isinstance(date_value, str):
+            date_value = date_value.strip()
+        expense_date, date_error = _parse_expense_date(date_value)
         if date_error:
             return None, date_error
 
@@ -1515,12 +1581,15 @@ def _create_expense_from_data(data: Dict[str, Any], user_id: int) -> Tuple[Optio
         meal_type = data.get("meal_type", "").strip() or None
 
         # Check for duplicate expense
-        if _check_expense_duplicate(user_id, restaurant.id if restaurant else None, amount, expense_date, meal_type):
-            restaurant_name_display = restaurant.name if restaurant else "Unknown"
-            return (
-                None,
-                f"Duplicate expense: ${amount} at {restaurant_name_display} on {expense_date} for {meal_type or 'unspecified meal'}",
-            )
+        if amount is not None and expense_date is not None:
+            if _check_expense_duplicate(
+                user_id, restaurant.id if restaurant else None, amount, expense_date, meal_type
+            ):
+                restaurant_name_display = restaurant.name if restaurant else "Unknown"
+                return (
+                    None,
+                    f"Duplicate expense: ${amount} at {restaurant_name_display} on {expense_date} for {meal_type or 'unspecified meal'}",
+                )
 
         # Create expense
         expense = Expense(
@@ -1539,7 +1608,7 @@ def _create_expense_from_data(data: Dict[str, Any], user_id: int) -> Tuple[Optio
         return None, f"Error creating expense: {str(e)}"
 
 
-def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tuple[int, List[str], List[str]]:
+def _import_expenses_from_reader(data: list[dict[str, Any]], user_id: int) -> tuple[int, list[str], list[str]]:
     """Import expenses from parsed data.
 
     Args:
@@ -1550,8 +1619,8 @@ def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tu
         Tuple of (success_count, errors, info_messages)
     """
     success_count = 0
-    errors = []
-    info_messages = []
+    errors: list[str] = []
+    info_messages: list[str] = []
     batch_size = 50  # Process in batches to avoid memory issues
 
     for i, row in enumerate(data, 1):
@@ -1574,7 +1643,7 @@ def _import_expenses_from_reader(data: List[Dict[str, Any]], user_id: int) -> Tu
     return success_count, errors, info_messages
 
 
-def _process_expense_row(row: Dict[str, Any], user_id: int, row_number: int) -> Tuple[Optional[Expense], Optional[str]]:
+def _process_expense_row(row: dict[str, Any], user_id: int, row_number: int) -> tuple[Expense | None, str | None]:
     """Process a single expense row and return expense or error.
 
     Args:
@@ -1591,7 +1660,7 @@ def _process_expense_row(row: Dict[str, Any], user_id: int, row_number: int) -> 
         return None, f"Row {row_number}: Unexpected error - {str(e)}"
 
 
-def _handle_import_error(error: str, row_number: int, errors: List[str], info_messages: List[str]) -> None:
+def _handle_import_error(error: str, row_number: int, errors: list[str], info_messages: list[str]) -> None:
     """Handle different types of import errors.
 
     Args:
@@ -1621,7 +1690,7 @@ def _is_restaurant_warning(error: str) -> bool:
     return "matches multiple existing restaurants" in error or "not found. Please provide an address" in error
 
 
-def _commit_batch(success_count: int, batch_size: int, errors: List[str]) -> bool:
+def _commit_batch(success_count: int, batch_size: int, errors: list[str]) -> bool:
     """Commit a batch of expenses and handle errors.
 
     Args:
@@ -1643,7 +1712,7 @@ def _commit_batch(success_count: int, batch_size: int, errors: List[str]) -> boo
         return False
 
 
-def _count_warning_types(info_messages: List[str]) -> Tuple[int, int]:
+def _count_warning_types(info_messages: list[str]) -> tuple[int, int]:
     """Count different types of warning messages.
 
     Args:
@@ -1657,7 +1726,7 @@ def _count_warning_types(info_messages: List[str]) -> Tuple[int, int]:
     return duplicate_count, restaurant_warning_count
 
 
-def _build_warning_message(info_messages: List[str]) -> str:
+def _build_warning_message(info_messages: list[str]) -> str:
     """Build warning message text from info messages.
 
     Args:
@@ -1681,7 +1750,7 @@ def _build_warning_message(info_messages: List[str]) -> str:
     return ""
 
 
-def _build_import_message(success_count: int, info_messages: List[str], errors: List[str]) -> str:
+def _build_import_message(success_count: int, info_messages: list[str], errors: list[str]) -> str:
     """Build the main import result message.
 
     Args:
@@ -1710,7 +1779,7 @@ def _build_import_message(success_count: int, info_messages: List[str], errors: 
         return "No expenses processed."
 
 
-def _prepare_error_details(errors: List[str]) -> List[str]:
+def _prepare_error_details(errors: list[str]) -> list[str]:
     """Prepare error details with appropriate limits.
 
     Args:
@@ -1730,8 +1799,8 @@ def _prepare_error_details(errors: List[str]) -> List[str]:
 
 
 def _generate_import_result(
-    success_count: int, errors: List[str], info_messages: List[str]
-) -> Tuple[bool, Dict[str, Any]]:
+    success_count: int, errors: list[str], info_messages: list[str]
+) -> tuple[bool, dict[str, Any]]:
     """Generate the result of the import operation.
 
     Args:
@@ -1773,7 +1842,7 @@ def _generate_import_result(
     return is_success, result_data
 
 
-def import_expenses_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, Dict[str, Any]]:
+def import_expenses_from_csv(file: FileStorage, user_id: int) -> tuple[bool, dict[str, Any]]:
     """Import expenses from a CSV file.
 
     Args:
@@ -1808,7 +1877,7 @@ def import_expenses_from_csv(file: FileStorage, user_id: int) -> Tuple[bool, Dic
 
 
 # Tag Services
-def create_tag(user_id: int, name: str, color: str = "#6c757d", description: str = None) -> Tag:
+def create_tag(user_id: int, name: str, color: str = "#6c757d", description: str | None = None) -> Tag:
     """Create a new tag for a user.
 
     Args:
@@ -1847,7 +1916,9 @@ def create_tag(user_id: int, name: str, color: str = "#6c757d", description: str
     return tag
 
 
-def update_tag(user_id: int, tag_id: int, name: str, color: str = "#6c757d", description: str = None) -> Optional[Tag]:
+def update_tag(
+    user_id: int, tag_id: int, name: str, color: str = "#6c757d", description: str | None = None
+) -> Tag | None:
     """Update an existing tag for a user.
 
     Args:
@@ -1887,11 +1958,11 @@ def update_tag(user_id: int, tag_id: int, name: str, color: str = "#6c757d", des
     tag.name = normalized_name
     tag.color = color
     tag.description = description
-    tag.updated_at = datetime.now(timezone.utc)
+    tag.updated_at = datetime.now(UTC)
 
     db.session.commit()
 
-    return tag
+    return cast(Tag, tag)
 
 
 def get_user_tags(user_id: int) -> list[Tag]:
@@ -1925,7 +1996,7 @@ def get_user_tags(user_id: int) -> list[Tag]:
         for tag in tags:
             tag._expense_count = count_dict.get(tag.id, 0)
 
-    return tags
+    return cast(list[Tag], tags)
 
 
 def search_tags(user_id: int, query: str, limit: int = 10) -> list[Tag]:
@@ -1943,7 +2014,8 @@ def search_tags(user_id: int, query: str, limit: int = 10) -> list[Tag]:
         return []
 
     search_term = f"%{query.strip().lower()}%"
-    return Tag.query.filter(Tag.user_id == user_id, Tag.name.ilike(search_term)).limit(limit).all()
+    result = Tag.query.filter(Tag.user_id == user_id, Tag.name.ilike(search_term)).limit(limit).all()
+    return cast(list[Tag], result)
 
 
 def get_or_create_tag(user_id: int, name: str, color: str = "#6c757d") -> Tag:
@@ -1973,7 +2045,7 @@ def get_or_create_tag(user_id: int, name: str, color: str = "#6c757d") -> Tag:
         db.session.add(tag)
         db.session.commit()
 
-    return tag
+    return cast(Tag, tag)
 
 
 def add_tags_to_expense(expense_id: int, user_id: int, tag_names: list[str]) -> list[Tag]:
@@ -2087,7 +2159,8 @@ def get_expense_tags(expense_id: int, user_id: int) -> list[Tag]:
     if expense.user_id != user_id:
         return []
 
-    return expense.tags
+    # Type checker limitation: doesn't recognize SQLAlchemy relationship return type
+    return list(expense.tags)
 
 
 def update_expense_tags(expense_id: int, user_id: int, tag_names: list[str]) -> list[Tag]:

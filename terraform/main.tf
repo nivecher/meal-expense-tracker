@@ -101,21 +101,18 @@ module "ecr" {
 }
 
 # Database: Using Supabase (external PostgreSQL)
-# No Aurora or RDS Proxy needed - Lambda connects via HTTPS over internet
+# Lambda connects via HTTPS over internet
 # This eliminates $95/month in infrastructure costs!
 
-# IAM Module (simplified for Supabase - no database secret needed)
+# IAM Module (using Supabase - no RDS needed)
 module "iam" {
   source = "./modules/iam"
 
-  app_name               = var.app_name
-  environment            = var.environment
-  region                 = var.aws_region
-  account_id             = data.aws_caller_identity.current.account_id
-  db_secret_arn          = "" # No Aurora secrets needed - using Supabase
-  db_instance_identifier = "" # No Aurora instance
-  db_username            = "" # No Aurora username
-  tags                   = local.tags
+  app_name    = var.app_name
+  environment = var.environment
+  region      = var.aws_region
+  account_id  = data.aws_caller_identity.current.account_id
+  tags        = local.tags
 }
 
 # Lambda function configuration (must come before API Gateway)
@@ -136,15 +133,8 @@ module "lambda" {
 
   kms_key_arn = aws_kms_key.main.arn
 
-  # Database configuration - Using Supabase
-  db_protocol                 = "postgresql"
-  db_secret_arn               = ""
-  db_security_group_id        = ""
-  rds_proxy_security_group_id = ""
-  db_username                 = ""
-  db_host                     = ""
-  db_port                     = ""
-  db_name                     = ""
+  # Note: Database configuration handled via Supabase secrets in Secrets Manager
+  # Lambda reads connection details from: meal-expense-tracker/${var.environment}/supabase-connection
 
   api_gateway_domain_name   = "" # Will be set after API Gateway is created
   api_gateway_execution_arn = "" # Will be set after API Gateway is created
@@ -312,6 +302,10 @@ module "cloudfront" {
   acm_certificate_arn       = data.aws_acm_certificate.main.arn
   domain_aliases            = [local.api_domain_name]
   route53_zone_id           = data.aws_route53_zone.main.zone_id
+
+  providers = {
+    aws.us-east-1 = aws.us-east-1
+  }
 
   tags = local.tags
 

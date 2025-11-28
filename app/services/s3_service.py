@@ -1,9 +1,9 @@
 """S3 service for handling receipt file operations."""
 
-import os
-import uuid
 from datetime import datetime
+import os
 from typing import Optional, Tuple
+import uuid
 
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
@@ -14,12 +14,12 @@ from werkzeug.datastructures import FileStorage
 class S3Service:
     """Service for S3 file operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize S3 service with configuration."""
-        self.bucket_name = current_app.config.get("S3_RECEIPTS_BUCKET")
-        self.region = current_app.config.get("S3_REGION", "us-east-1")
-        self.prefix = current_app.config.get("S3_RECEIPTS_PREFIX", "receipts/")
-        self.url_expiry = current_app.config.get("S3_URL_EXPIRY", 3600)
+        self.bucket_name: str | None = current_app.config.get("S3_RECEIPTS_BUCKET")
+        self.region: str = current_app.config.get("S3_REGION", "us-east-1")
+        self.prefix: str = current_app.config.get("S3_RECEIPTS_PREFIX", "receipts/")
+        self.url_expiry: int = current_app.config.get("S3_URL_EXPIRY", 3600)
 
         # Initialize S3 client
         try:
@@ -34,6 +34,8 @@ class S3Service:
 
     def _verify_bucket_access(self) -> None:
         """Verify that we can access the S3 bucket."""
+        if not self.bucket_name:
+            raise ValueError("S3 bucket name is not configured")
         try:
             self.s3_client.head_bucket(Bucket=self.bucket_name)
             current_app.logger.info(f"S3 bucket access verified: {self.bucket_name}")
@@ -60,7 +62,7 @@ class S3Service:
 
         return f"{timestamp}_{unique_id}_{original_filename}"
 
-    def upload_receipt(self, file_storage: FileStorage) -> Tuple[Optional[str], Optional[str]]:
+    def upload_receipt(self, file_storage: FileStorage) -> tuple[str | None, str | None]:
         """Upload a receipt file to S3.
 
         Args:
@@ -71,13 +73,16 @@ class S3Service:
         """
         try:
             # Generate unique filename
-            filename = self._generate_unique_filename(file_storage.filename)
+            original_filename = file_storage.filename or "unknown_file"
+            filename = self._generate_unique_filename(original_filename)
             s3_key = f"{self.prefix}{filename}"
 
             # Upload file to S3
+            if not self.bucket_name:
+                return None, "S3 bucket name is not configured"
             file_storage.seek(0)  # Reset file pointer
             self.s3_client.upload_fileobj(
-                file_storage,
+                file_storage,  # type: ignore[arg-type]
                 self.bucket_name,
                 s3_key,
                 ExtraArgs={
@@ -101,7 +106,7 @@ class S3Service:
             current_app.logger.error(error_msg)
             return None, error_msg
 
-    def delete_receipt(self, s3_key: str) -> Optional[str]:
+    def delete_receipt(self, s3_key: str) -> str | None:
         """Delete a receipt file from S3.
 
         Args:
@@ -111,6 +116,8 @@ class S3Service:
             Error message if failed, None if successful
         """
         try:
+            if not self.bucket_name:
+                return "S3 bucket name is not configured"
             self.s3_client.delete_object(Bucket=self.bucket_name, Key=s3_key)
             current_app.logger.info(f"Receipt deleted from S3: {s3_key}")
             return None
@@ -124,7 +131,7 @@ class S3Service:
             current_app.logger.error(error_msg)
             return error_msg
 
-    def generate_presigned_url(self, s3_key: str) -> Optional[str]:
+    def generate_presigned_url(self, s3_key: str) -> str | None:
         """Generate a presigned URL for accessing a receipt.
 
         Args:
@@ -148,7 +155,7 @@ class S3Service:
             return None
 
 
-def get_s3_service() -> Optional[S3Service]:
+def get_s3_service() -> S3Service | None:
     """Get S3 service instance if S3 is enabled."""
     if current_app.config.get("S3_RECEIPTS_BUCKET"):
         try:

@@ -4,10 +4,10 @@ This module handles all authentication-related API endpoints including login and
 """
 
 from types import SimpleNamespace
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, cast
 
-import flask_limiter as _flask_limiter  # type: ignore
 from flask import current_app, jsonify, request
+import flask_limiter as _flask_limiter
 from flask_limiter import RateLimitExceeded
 from flask_login import current_user, login_user, logout_user
 from werkzeug.security import check_password_hash
@@ -29,26 +29,27 @@ def _ensure_ratelimit_exception_is_test_friendly() -> None:
     except TypeError:
         pass
 
-    _orig_rle_init = _flask_limiter.RateLimitExceeded.__init__  # type: ignore[attr-defined]
+    _orig_rle_init = _flask_limiter.RateLimitExceeded.__init__
 
-    def _rle_init_with_default(self, limit=None, *args, **kwargs):  # type: ignore[no-redef]
+    def _rle_init_with_default(self: Any, limit: Any = None, *args: Any, **kwargs: Any) -> None:
         if limit is None:
             limit = SimpleNamespace(error_message="Rate limit exceeded")
         return _orig_rle_init(self, limit, *args, **kwargs)
 
-    _flask_limiter.RateLimitExceeded.__init__ = _rle_init_with_default  # type: ignore[assignment]
+    # Monkey-patch for test compatibility - type checker doesn't allow method assignment
+    _flask_limiter.RateLimitExceeded.__init__ = _rle_init_with_default  # type: ignore[method-assign]
 
 
 def _trigger_rate_limit_check() -> None:
     """Trigger limiter evaluation in tests where decorators may not execute."""
     try:
-        limiter.limit("test-per-call")(lambda f: f)(None)  # type: ignore[arg-type]
+        limiter.limit("test-per-call")(lambda f: f)(None)
     except RateLimitExceeded:
         # Re-raise to be handled by outer layer uniformly
         raise
 
 
-def _parse_login_data() -> Tuple[Optional[Dict[str, Any]], Optional[Tuple[Any, int]]]:
+def _parse_login_data() -> tuple[dict[str, Any] | None, tuple[Any, int] | None]:
     data = request.get_json(silent=True)
     if not data or "username" not in data or "password" not in data:
         return None, (
@@ -58,16 +59,26 @@ def _parse_login_data() -> Tuple[Optional[Dict[str, Any]], Optional[Tuple[Any, i
     return data, None
 
 
-def _find_user_by_username(username: str) -> Optional[User]:
-    return User.query.filter_by(username=username).first()
+def _find_user_by_username(username: str) -> User | None:
+    result = User.query.filter_by(username=username).first()
+    return cast(User | None, result)
 
 
-def _credentials_invalid(user: Optional[User], password: str) -> bool:
-    if not user or not getattr(user, "password_hash", None):
+def _credentials_invalid(user: User | None, password: str) -> bool:
+    # Type checker limitation: doesn't narrow Optional[User] properly
+    if user is None:
         return True
-    if hasattr(user, "is_active") and user.is_active is False:
+    # At this point, user is guaranteed to be non-None after early return above
+    if not getattr(user, "password_hash", None):
         return True
-    if not check_password_hash(user.password_hash, password):
+    # Type checker limitation: doesn't narrow Mapped[bool] properly
+    if not user.is_active:
+        return True
+    # We already checked password_hash exists above, so it's safe here
+    password_hash = user.password_hash
+    if password_hash is None:
+        return True
+    if not check_password_hash(password_hash, password):
         return True
     return False
 
@@ -75,7 +86,7 @@ def _credentials_invalid(user: Optional[User], password: str) -> bool:
 @bp.route("/auth/login", methods=["POST"])
 @limiter.limit("5 per minute")  # Rate limiting to prevent brute force
 @limiter.limit("100 per day")  # Daily limit per IP
-def api_login() -> Tuple[Dict[str, Any], int]:
+def api_login() -> tuple[dict[str, Any], int]:
     """Handle user login via API.
 
     This endpoint authenticates users using session-based authentication.
@@ -138,14 +149,22 @@ def api_login() -> Tuple[Dict[str, Any], int]:
             return jsonify({"status": "error", "message": "Invalid username or password."}), 401
 
         # At this point, user is valid and password verified
-        login_user(user, remember=True)  # type: ignore[arg-type]
+        # Type checker limitation: doesn't understand that _credentials_invalid ensures user is not None
+        # Explicit check for type narrowing (replaces assert that would be stripped in -O mode)
+        if user is None:
+            current_app.logger.error("User validation passed but user is None")
+            return jsonify({"status": "error", "message": "An error occurred during login."}), 500
+        login_user(user, remember=True)
         current_app.logger.info(f"User {user.username} logged in successfully")
-        return jsonify(
-            {
-                "status": "success",
-                "message": "Logged in successfully.",
-                "user": {"id": user.id, "username": user.username, "email": user.email},
-            }
+        return (
+            jsonify(
+                {
+                    "status": "success",
+                    "message": "Logged in successfully.",
+                    "user": {"id": user.id, "username": user.username, "email": user.email},
+                }
+            ),
+            200,
         )
 
     except RateLimitExceeded:
@@ -169,7 +188,7 @@ def api_login() -> Tuple[Dict[str, Any], int]:
 
 @bp.route("/auth/logout", methods=["POST"])
 @limiter.limit("10 per minute")  # Rate limiting for logout as well
-def api_logout() -> Tuple[Dict[str, Any], int]:
+def api_logout() -> tuple[dict[str, Any], int]:
     """Handle user logout via API.
 
     Returns:
@@ -199,7 +218,7 @@ def api_logout() -> Tuple[Dict[str, Any], int]:
 
 
 @bp.route("/auth/status", methods=["GET"])
-def api_auth_status() -> Tuple[Dict[str, Any], int]:
+def api_auth_status() -> tuple[dict[str, Any], int]:
     """Check authentication status via API.
 
     Returns:
@@ -237,7 +256,7 @@ def api_auth_status() -> Tuple[Dict[str, Any], int]:
 
 
 @bp.route("/auth/health", methods=["GET"])
-def api_auth_health() -> Tuple[Dict[str, Any], int]:
+def api_auth_health() -> tuple[dict[str, Any], int]:
     """Health check endpoint for authentication API.
 
     Returns:

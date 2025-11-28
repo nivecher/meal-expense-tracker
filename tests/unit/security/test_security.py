@@ -12,7 +12,7 @@ import pytest
 from app.security import generate_password, get_secret_dict
 
 
-def test_generate_password():
+def test_generate_password() -> None:
     """Test secure password generation with various lengths and validations."""
     # Test default length (16)
     password = generate_password()
@@ -44,7 +44,7 @@ def test_generate_password():
     assert password != password2
 
 
-def test_generate_password_failure():
+def test_generate_password_failure() -> None:
     """Test password generation failure cases."""
     # Test with invalid max_attempts
     with pytest.raises(RuntimeError):
@@ -52,7 +52,7 @@ def test_generate_password_failure():
 
 
 @patch("boto3.client")
-def test_get_secret_dict_valid(mock_boto):
+def test_get_secret_dict_valid(mock_boto) -> None:
     """Test get_secret_dict with valid secret data."""
     # Setup mock
     mock_client = MagicMock()
@@ -85,7 +85,7 @@ def test_get_secret_dict_valid(mock_boto):
 
 
 @patch("boto3.client")
-def test_get_secret_dict_missing_fields(mock_boto):
+def test_get_secret_dict_missing_fields(mock_boto) -> None:
     """Test get_secret_dict with missing required fields."""
     # Setup mock
     mock_client = MagicMock()
@@ -110,7 +110,7 @@ def test_get_secret_dict_missing_fields(mock_boto):
 
 
 @patch("boto3.client")
-def test_get_secret_dict_invalid_port(mock_boto):
+def test_get_secret_dict_invalid_port(mock_boto) -> None:
     """Test get_secret_dict with invalid port number."""
     # Setup mock
     mock_client = MagicMock()

@@ -4,12 +4,12 @@ This script updates version information in project files with proper security me
 """
 
 import logging
+from pathlib import Path
 import re
 import shlex
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 from typing import List, Optional, Tuple
 
 import toml
@@ -26,7 +26,7 @@ VERSION_PATTERN = r"^v\d+\.\d+\.\d+$"
 MAX_TAG_LENGTH = 50
 
 
-def _run_git_command(args: List[str], cwd: Optional[str] = None) -> Tuple[bool, str]:
+def _run_git_command(args: list[str], cwd: str | None = None) -> tuple[bool, str]:
     """Safely run a git command with proper error handling.
 
     Args:
@@ -86,7 +86,7 @@ def validate_version(version: str) -> bool:
     return bool(re.match(VERSION_PATTERN, version))
 
 
-def get_latest_git_tag() -> Optional[str]:
+def get_latest_git_tag() -> str | None:
     """Get the latest git tag with proper validation.
 
     Returns:
@@ -153,7 +153,7 @@ def update_pyproject_version(version: str) -> bool:
     return True
 
 
-def get_current_version() -> Optional[str]:
+def get_current_version() -> str | None:
     """Get current version from _version.py with validation.
 
     Returns:
@@ -165,7 +165,7 @@ def get_current_version() -> Optional[str]:
             logger.debug("Version file not found: %s", version_path)
             return None
 
-        with open(version_path, "r", encoding="utf-8") as f:
+        with open(version_path, encoding="utf-8") as f:
             content = f.read()
             match = re.search(r'__version__ = "(.*?)"', content)
             if match:
@@ -174,7 +174,7 @@ def get_current_version() -> Optional[str]:
                 if validate_version(f"v{version}"):
                     return version
                 logger.warning("Invalid version format in _version.py: %s", version)
-    except (IOError, PermissionError) as exc:
+    except (OSError, PermissionError) as exc:
         logger.error("Error reading version file: %s", exc)
     except Exception:
         logger.exception("Unexpected error getting current version")

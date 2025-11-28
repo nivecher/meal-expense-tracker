@@ -4,9 +4,9 @@ This module provides timezone-aware date and time formatting utilities
 that use browser timezone for date/time entry and display.
 """
 
-import urllib.parse
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional, Union
+import urllib.parse
 from zoneinfo import ZoneInfo
 
 from flask import current_app, request
@@ -25,7 +25,7 @@ DEPRECATED_TIMEZONE_MAP = {
 }
 
 
-def normalize_timezone(timezone_str: Optional[str]) -> Optional[str]:
+def normalize_timezone(timezone_str: str | None) -> str | None:
     """Normalize timezone string to IANA timezone name.
 
     Converts deprecated timezone names (like US/Central) to modern IANA names
@@ -58,14 +58,14 @@ def normalize_timezone(timezone_str: Optional[str]) -> Optional[str]:
         return None
 
 
-def _get_timezone_from_form() -> Optional[str]:
+def _get_timezone_from_form() -> str | None:
     """Get timezone from form data."""
     if hasattr(request, "form"):
         return request.form.get("browser_timezone")
     return None
 
 
-def _get_timezone_from_json() -> Optional[str]:
+def _get_timezone_from_json() -> str | None:
     """Get timezone from JSON data."""
     if not (hasattr(request, "content_type") and request.content_type):
         return None
@@ -73,27 +73,28 @@ def _get_timezone_from_json() -> Optional[str]:
         return None
     try:
         if hasattr(request, "json") and request.json:
-            return request.json.get("browser_timezone")
+            timezone = request.json.get("browser_timezone")
+            return str(timezone) if timezone else None
     except Exception:  # nosec B110 - Intentional: gracefully handle malformed JSON
         pass
     return None
 
 
-def _get_timezone_from_cookie() -> Optional[str]:
+def _get_timezone_from_cookie() -> str | None:
     """Get timezone from cookie."""
     if hasattr(request, "cookies"):
         return request.cookies.get("browser_timezone")
     return None
 
 
-def _get_timezone_from_header() -> Optional[str]:
+def _get_timezone_from_header() -> str | None:
     """Get timezone from header."""
     if hasattr(request, "headers"):
         return request.headers.get("X-Browser-Timezone")
     return None
 
 
-def get_browser_timezone() -> Optional[str]:
+def get_browser_timezone() -> str | None:
     """Get browser timezone from request.
 
     Checks form data, JSON, cookies, and headers for browser timezone.
@@ -146,7 +147,7 @@ def get_browser_timezone_info() -> tuple[str, str]:
     return browser_timezone, timezone_display
 
 
-def get_timezone(timezone_str: Optional[str] = None) -> ZoneInfo:
+def get_timezone(timezone_str: str | None = None) -> ZoneInfo:
     """Get a ZoneInfo timezone object from timezone string.
 
     If timezone_str is not provided, attempts to get browser timezone from request.
@@ -179,7 +180,7 @@ def get_timezone(timezone_str: Optional[str] = None) -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
-def get_user_timezone(user_timezone: Optional[str] = None) -> ZoneInfo:
+def get_user_timezone(user_timezone: str | None = None) -> ZoneInfo:
     """Get a ZoneInfo timezone object from user timezone string.
 
     DEPRECATED: Use get_timezone() instead, which uses browser timezone.
@@ -193,7 +194,7 @@ def get_user_timezone(user_timezone: Optional[str] = None) -> ZoneInfo:
     return get_timezone(user_timezone)
 
 
-def convert_to_browser_timezone(dt: datetime, browser_timezone: Optional[str] = None) -> datetime:
+def convert_to_browser_timezone(dt: datetime, browser_timezone: str | None = None) -> datetime:
     """Convert a datetime to the browser's timezone.
 
     Args:
@@ -213,7 +214,7 @@ def convert_to_browser_timezone(dt: datetime, browser_timezone: Optional[str] = 
 
     # Ensure datetime is timezone-aware
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
 
     # Get browser timezone
     browser_tz = get_timezone(browser_timezone)
@@ -222,7 +223,7 @@ def convert_to_browser_timezone(dt: datetime, browser_timezone: Optional[str] = 
     return dt.astimezone(browser_tz)
 
 
-def convert_to_user_timezone(dt: datetime, user_timezone: Optional[str] = None) -> datetime:
+def convert_to_user_timezone(dt: datetime, user_timezone: str | None = None) -> datetime:
     """Convert a datetime to the user's timezone.
 
     DEPRECATED: Use convert_to_browser_timezone() instead.
@@ -243,7 +244,7 @@ def convert_to_user_timezone(dt: datetime, user_timezone: Optional[str] = None) 
 
 
 def format_datetime_for_user(
-    dt: datetime, user_timezone: Optional[str] = None, format_str: str = "%B %d, %Y at %I:%M %p"
+    dt: datetime, user_timezone: str | None = None, format_str: str = "%B %d, %Y at %I:%M %p"
 ) -> str:
     """Format a datetime for display in browser's timezone.
 
@@ -275,7 +276,7 @@ def format_datetime_for_user(
 
 
 def format_datetime_with_timezone_abbr(
-    dt: datetime, user_timezone: Optional[str] = None, format_str: str = "%I:%M %p"
+    dt: datetime, user_timezone: str | None = None, format_str: str = "%I:%M %p"
 ) -> str:
     """Format a datetime with timezone abbreviation in RFC format.
 
@@ -325,9 +326,7 @@ def format_datetime_with_timezone_abbr(
         return "Invalid date"
 
 
-def format_date_for_user(
-    dt: Union[datetime, str], user_timezone: Optional[str] = None, format_str: str = "%B %d, %Y"
-) -> str:
+def format_date_for_user(dt: datetime | str, user_timezone: str | None = None, format_str: str = "%B %d, %Y") -> str:
     """Format a date for display in browser's timezone.
 
     Args:
@@ -345,9 +344,10 @@ def format_date_for_user(
         # Handle date strings
         if isinstance(dt, str):
             # Try to parse common date formats
+            dt_str = dt
             for fmt in ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"]:
                 try:
-                    dt = datetime.strptime(dt, fmt)
+                    dt = datetime.strptime(dt_str, fmt)
                     break
                 except ValueError:
                     continue
@@ -364,7 +364,7 @@ def format_date_for_user(
         return "Invalid date"
 
 
-def get_current_time_in_browser_timezone(browser_timezone: Optional[str] = None) -> datetime:
+def get_current_time_in_browser_timezone(browser_timezone: str | None = None) -> datetime:
     """Get current time in browser's timezone.
 
     Args:
@@ -373,11 +373,11 @@ def get_current_time_in_browser_timezone(browser_timezone: Optional[str] = None)
     Returns:
         datetime: Current time in browser's timezone
     """
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     return convert_to_browser_timezone(now_utc, browser_timezone)
 
 
-def get_current_time_in_user_timezone(user_timezone: Optional[str] = None) -> datetime:
+def get_current_time_in_user_timezone(user_timezone: str | None = None) -> datetime:
     """Get current time in user's timezone.
 
     DEPRECATED: Use get_current_time_in_browser_timezone() instead.
@@ -392,7 +392,7 @@ def get_current_time_in_user_timezone(user_timezone: Optional[str] = None) -> da
 
 
 def format_current_time_for_user(
-    user_timezone: Optional[str] = None, format_str: str = "%B %d, %Y at %I:%M:%S %p %Z"
+    user_timezone: str | None = None, format_str: str = "%B %d, %Y at %I:%M:%S %p %Z"
 ) -> str:
     """Format current time for display in browser's timezone.
 
@@ -407,7 +407,7 @@ def format_current_time_for_user(
     return current_time.strftime(format_str)
 
 
-def time_ago_for_user(dt: datetime, user_timezone: Optional[str] = None) -> str:
+def time_ago_for_user(dt: datetime, user_timezone: str | None = None) -> str:
     """Calculate time ago relative to browser's timezone.
 
     Args:

@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Dict, Type, TypeAlias, TypeVar, cast
 
 from flask_sqlalchemy.model import DefaultMeta
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import Session as _Session
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import Mapped, Session as _Session, mapped_column
 from sqlalchemy.sql import func
-from typing_extensions import TypeAlias
 
 from ..extensions import db as _db
 
@@ -72,14 +69,14 @@ class BaseModel(Model):  # type: ignore
         name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", cls.__name__)
         return re.sub("([a-z0-9])([A-Z])", r"\1_\2", name).lower()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert model to dictionary.
 
         Returns:
             Dict[str, Any]: Dictionary representation of the model
         """
-        result: Dict[str, Any] = {}
-        for column in self.__table__.columns:  # type: ignore
+        result: dict[str, Any] = {}
+        for column in self.__table__.columns:
             value = getattr(self, column.name)
             # Handle datetime serialization
             if hasattr(value, "isoformat"):
@@ -88,7 +85,7 @@ class BaseModel(Model):  # type: ignore
         return result
 
     @classmethod
-    def from_dict(cls: Type[ModelType], data: Dict[str, Any], **kwargs: Any) -> ModelType:
+    def from_dict(cls: type[ModelType], data: dict[str, Any], **kwargs: Any) -> ModelType:
         """Create model instance from dictionary.
 
         Args:
@@ -99,7 +96,7 @@ class BaseModel(Model):  # type: ignore
             ModelType: An instance of the model
         """
         # Get the table columns
-        columns = {c.name for c in cls.__table__.columns}  # type: ignore
+        columns = {c.name for c in cls.__table__.columns}
 
         # Filter data to only include valid columns
         filtered_data = {k: v for k, v in data.items() if k in columns}

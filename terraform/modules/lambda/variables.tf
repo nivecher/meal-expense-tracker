@@ -152,50 +152,6 @@ variable "subnet_ids" {
   default     = []
 }
 
-# Database Configuration
-variable "db_secret_arn" {
-  description = "ARN of the Secrets Manager secret containing the database credentials"
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = can(regex("^arn:aws:secretsmanager:", var.db_secret_arn)) || var.db_secret_arn == ""
-    error_message = "The db_secret_arn must be a valid AWS Secrets Manager ARN or an empty string."
-  }
-}
-
-variable "db_username" {
-  description = "Database username for direct connection in non-prod environments."
-  type        = string
-  default     = null
-}
-
-variable "db_password" {
-  description = "Database password for direct connection in non-prod environments."
-  type        = string
-  default     = null
-}
-
-variable "db_security_group_id" {
-  description = "The security group ID of the RDS instance that the Lambda function needs to access"
-  type        = string
-
-  validation {
-    condition     = can(regex("^sg-", var.db_security_group_id)) || var.db_security_group_id == ""
-    error_message = "The db_security_group_id must be a valid security group ID starting with 'sg-' or an empty string."
-  }
-}
-
-variable "rds_proxy_security_group_id" {
-  description = "The security group ID of the RDS Proxy that the Lambda function needs to access"
-  type        = string
-
-  validation {
-    condition     = can(regex("^sg-", var.rds_proxy_security_group_id)) || var.rds_proxy_security_group_id == ""
-    error_message = "The rds_proxy_security_group_id must be a valid security group ID starting with 'sg-' or an empty string."
-  }
-}
-
 variable "app_secret_key_arn" {
   description = "The ARN of the SSM parameter containing the application secret key"
   type        = string
@@ -205,30 +161,6 @@ variable "notification_topic_arn" {
   description = "ARN of the SNS topic for notifications"
   type        = string
   default     = ""
-}
-
-variable "db_protocol" {
-  description = "Database protocol for direct connection in non-prod environments."
-  type        = string
-  default     = "postgresql"
-}
-
-variable "db_host" {
-  description = "Database host for direct connection in non-prod environments."
-  type        = string
-  default     = null
-}
-
-variable "db_port" {
-  description = "Database port for direct connection in non-prod environments."
-  type        = string
-  default     = null
-}
-
-variable "db_name" {
-  description = "Database name for direct connection in non-prod environments."
-  type        = string
-  default     = null
 }
 
 variable "api_gateway_domain_name" {

@@ -92,7 +92,7 @@ class TestExpenseServices:
             db.session.commit()
             return expense, expense.id
 
-    def test_create_expense_for_user(self, app, user, restaurant, category):
+    def test_create_expense_for_user(self, app, user, restaurant, category) -> None:
         """Test creating an expense for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -114,7 +114,7 @@ class TestExpenseServices:
             assert expense.category_id == category_id
             assert expense.user_id == user_id
 
-    def test_get_expenses_for_user(self, app, user, expense):
+    def test_get_expenses_for_user(self, app, user, expense) -> None:
         """Test getting expenses for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         expense_obj, expense_id = expense  # Unpack expense and expense_id
@@ -125,7 +125,7 @@ class TestExpenseServices:
             assert expenses[0].amount == Decimal("25.50")
             assert expenses[0].notes == "Test expense"
 
-    def test_get_expense_by_id_for_user(self, app, user, expense):
+    def test_get_expense_by_id_for_user(self, app, user, expense) -> None:
         """Test getting a specific expense by ID for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         expense_obj, expense_id = expense  # Unpack expense and expense_id
@@ -136,7 +136,7 @@ class TestExpenseServices:
             assert found_expense.amount == Decimal("25.50")
             assert found_expense.notes == "Test expense"
 
-    def test_get_expense_by_id_for_user_not_found(self, app, user):
+    def test_get_expense_by_id_for_user_not_found(self, app, user) -> None:
         """Test getting a non-existent expense."""
         user_obj, user_id = user  # Unpack user and user_id
         # No expense fixture needed for this test
@@ -145,7 +145,7 @@ class TestExpenseServices:
 
             assert found_expense is None
 
-    def test_update_expense_for_user(self, app, user, expense):
+    def test_update_expense_for_user(self, app, user, expense) -> None:
         """Test updating an expense for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         expense_obj, expense_id = expense  # Unpack expense and expense_id
@@ -157,7 +157,7 @@ class TestExpenseServices:
             assert updated_expense.amount == Decimal("35.00")
             assert updated_expense.notes == "Updated expense"
 
-    def test_delete_expense_for_user(self, app, user, expense):
+    def test_delete_expense_for_user(self, app, user, expense) -> None:
         """Test deleting an expense for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         expense_obj, expense_id = expense  # Unpack expense and expense_id
@@ -168,7 +168,7 @@ class TestExpenseServices:
             deleted_expense = get_expense_by_id_for_user(expense_id, user_id)
             assert deleted_expense is None
 
-    def test_get_expense_filters(self, app):
+    def test_get_expense_filters(self, app) -> None:
         """Test getting expense filters from request."""
         # No expense fixture needed for this test
         with app.app_context():
@@ -185,7 +185,7 @@ class TestExpenseServices:
                 assert filters["sort_by"] == "date"
                 assert filters["sort_order"] == "desc"
 
-    def test_get_user_expenses_with_filters(self, app, user, expense):
+    def test_get_user_expenses_with_filters(self, app, user, expense) -> None:
         """Test getting user expenses with filters."""
         user_obj, user_id = user  # Unpack user and user_id
         expense_obj, expense_id = expense  # Unpack expense and expense_id
@@ -206,7 +206,7 @@ class TestExpenseServices:
             assert expenses[0].notes == "Test expense"
             assert total == 25.50
 
-    def test_get_user_expenses_with_search_filter(self, app, user, expense):
+    def test_get_user_expenses_with_search_filter(self, app, user, expense) -> None:
         """Test getting user expenses with search filter."""
         user_obj, user_id = user  # Unpack user and user_id
         expense_obj, expense_id = expense  # Unpack expense and expense_id
@@ -232,7 +232,7 @@ class TestExpenseServices:
             assert expenses[0].notes == "Test expense"
             assert total == 25.50
 
-    def test_export_expenses_to_csv(self, app, user, expense):
+    def test_export_expenses_to_csv(self, app, user, expense) -> None:
         """Test exporting expenses for CSV generation."""
         user_obj, user_id = user  # Unpack user and user_id
         expense_obj, expense_id = expense  # Unpack expense and expense_id
@@ -247,7 +247,7 @@ class TestExpenseServices:
             assert expense_data["amount"] == 25.50
             assert expense_data["notes"] == "Test expense"
 
-    def test_import_expenses_from_csv(self, app, user, restaurant, category):
+    def test_import_expenses_from_csv(self, app, user, restaurant, category) -> None:
         """Test importing expenses from CSV."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -276,7 +276,7 @@ class TestExpenseServices:
             assert expenses[0].amount == Decimal("30.00")
             assert expenses[0].notes == "Imported expense"
 
-    def test_import_expenses_from_csv_with_errors(self, app, user):
+    def test_import_expenses_from_csv_with_errors(self, app, user) -> None:
         """Test importing expenses from CSV with validation errors."""
         user_obj, user_id = user  # Unpack user and user_id
         # No expense fixture needed for this test
@@ -297,7 +297,7 @@ class TestExpenseServices:
             assert result["error_count"] == 1
             assert len(result["errors"]) > 0
 
-    def test_expense_services_error_handling(self, app, user):
+    def test_expense_services_error_handling(self, app, user) -> None:
         """Test error handling in expense services."""
         user_obj, user_id = user  # Unpack user and user_id
         # No expense fixture needed for this test
@@ -310,7 +310,7 @@ class TestExpenseServices:
             expense = get_expense_by_id_for_user(999, user_id)
             assert expense is None
 
-    def test_expense_services_edge_cases(self, app, user):
+    def test_expense_services_edge_cases(self, app, user) -> None:
         """Test edge cases in expense services."""
         user_obj, user_id = user  # Unpack user and user_id
         # No expense fixture needed for this test
@@ -324,7 +324,7 @@ class TestExpenseServices:
             assert isinstance(expenses_data, list)
             assert len(expenses_data) == 0
 
-    def test_expense_amount_validation(self, app, user, restaurant, category):
+    def test_expense_amount_validation(self, app, user, restaurant, category) -> None:
         """Test expense amount validation."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -348,7 +348,7 @@ class TestExpenseServices:
             expense = create_expense_for_user(user_id, data)
             assert expense.amount == Decimal("0.00")
 
-    def test_expense_date_handling(self, app, user, restaurant, category):
+    def test_expense_date_handling(self, app, user, restaurant, category) -> None:
         """Test expense date handling."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -369,7 +369,7 @@ class TestExpenseServices:
             expense = create_expense_for_user(user_id, data)
             assert expense.date.date() == test_date
 
-    def test_expense_restaurant_association(self, app, user, restaurant, category):
+    def test_expense_restaurant_association(self, app, user, restaurant, category) -> None:
         """Test expense restaurant association."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -388,9 +388,10 @@ class TestExpenseServices:
 
             # Verify restaurant association
             assert expense.restaurant_id == restaurant_id
+            assert expense.restaurant is not None
             assert expense.restaurant.name == "Test Restaurant"
 
-    def test_expense_category_association(self, app, user, restaurant, category):
+    def test_expense_category_association(self, app, user, restaurant, category) -> None:
         """Test expense category association."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -409,9 +410,10 @@ class TestExpenseServices:
 
             # Verify category association
             assert expense.category_id == category_id
+            assert expense.category is not None
             assert expense.category.name == "Test Category"
 
-    def test_expense_user_isolation(self, app, user, restaurant, category):
+    def test_expense_user_isolation(self, app, user, restaurant, category) -> None:
         """Test that expenses are isolated by user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id

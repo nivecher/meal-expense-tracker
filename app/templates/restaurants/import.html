@@ -12,7 +12,7 @@
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <h3 class="h5 mb-0">Quick Start</h3>
                             <a
-                                href="{{ url_for('restaurants.export_restaurants') }}"
+                                href="{{ url_for('restaurants.export_restaurants', format='csv', sample='true') }}"
                                 class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-download me-1"></i>Sample CSV
                             </a>
@@ -21,8 +21,8 @@
                         <div class="alert alert-primary">
                             <i class="fas fa-upload me-2"></i>
                             <strong>Upload a CSV file with restaurant data.</strong>
-                            Required: <code>name</code> column. Optional: type, address, city, phone, website, cuisine,
-                            notes.
+                            Required: <code>name</code> and <code>city</code> columns. Optional: type, address, phone,
+                            website, cuisine, notes.
                         </div>
 
                         <!-- Expandable Sections -->
@@ -49,6 +49,7 @@
                                     <div class="accordion-body">
                                         <ul class="mb-0">
                                             <li><code>name</code> - Restaurant name (must be unique per user)</li>
+                                            <li><code>city</code> - City name</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -80,7 +81,6 @@
                                                 other)</li
                                             >
                                             <li><code>address</code> - Full street address</li>
-                                            <li><code>city</code> - City name</li>
                                             <li><code>phone</code> - Contact phone number</li>
                                             <li><code>website</code> - Restaurant website URL</li>
                                             <li><code>cuisine</code> - Type of cuisine served</li>

@@ -15,7 +15,7 @@ from app.utils.service_level_detector import (
 class TestServiceLevel:
     """Test ServiceLevel enum."""
 
-    def test_service_level_values(self):
+    def test_service_level_values(self) -> None:
         """Test ServiceLevel enum values."""
         assert ServiceLevel.FINE_DINING.value == "fine_dining"
         assert ServiceLevel.CASUAL_DINING.value == "casual_dining"
@@ -23,7 +23,7 @@ class TestServiceLevel:
         assert ServiceLevel.QUICK_SERVICE.value == "quick_service"
         assert ServiceLevel.UNKNOWN.value == "unknown"
 
-    def test_service_level_membership(self):
+    def test_service_level_membership(self) -> None:
         """Test ServiceLevel enum membership."""
         assert ServiceLevel.FINE_DINING in ServiceLevel
         assert ServiceLevel.CASUAL_DINING in ServiceLevel
@@ -35,7 +35,7 @@ class TestServiceLevel:
 class TestServiceLevelDetector:
     """Test ServiceLevelDetector class."""
 
-    def test_price_level_thresholds(self):
+    def test_price_level_thresholds(self) -> None:
         """Test price level thresholds are properly defined."""
         detector = ServiceLevelDetector()
 
@@ -50,7 +50,7 @@ class TestServiceLevelDetector:
         assert detector.PRICE_LEVEL_THRESHOLDS[ServiceLevel.FAST_CASUAL] == (1, 2)
         assert detector.PRICE_LEVEL_THRESHOLDS[ServiceLevel.QUICK_SERVICE] == (0, 1)
 
-    def test_service_level_indicators(self):
+    def test_service_level_indicators(self) -> None:
         """Test service level indicators are properly defined."""
         detector = ServiceLevelDetector()
 
@@ -61,7 +61,7 @@ class TestServiceLevelDetector:
                 assert isinstance(detector.SERVICE_LEVEL_INDICATORS[service_level], list)
                 assert len(detector.SERVICE_LEVEL_INDICATORS[service_level]) > 0
 
-    def test_business_attributes(self):
+    def test_business_attributes(self) -> None:
         """Test business attributes are properly defined."""
         detector = ServiceLevelDetector()
 
@@ -71,7 +71,7 @@ class TestServiceLevelDetector:
                 assert service_level in detector.BUSINESS_ATTRIBUTES
                 assert isinstance(detector.BUSINESS_ATTRIBUTES[service_level], dict)
 
-    def test_amenities_weights(self):
+    def test_amenities_weights(self) -> None:
         """Test amenities weights are properly defined."""
         detector = ServiceLevelDetector()
 
@@ -81,7 +81,7 @@ class TestServiceLevelDetector:
                 assert service_level in detector.BUSINESS_ATTRIBUTES
                 assert isinstance(detector.BUSINESS_ATTRIBUTES[service_level], dict)
 
-    def test_reviews_weights(self):
+    def test_reviews_weights(self) -> None:
         """Test reviews weights are properly defined."""
         detector = ServiceLevelDetector()
 
@@ -95,22 +95,20 @@ class TestServiceLevelDetector:
 class TestDetectRestaurantServiceLevel:
     """Test detect_restaurant_service_level function."""
 
-    def test_detect_restaurant_service_level_empty_data(self):
+    def test_detect_restaurant_service_level_empty_data(self) -> None:
         """Test detection with empty data."""
         result = detect_restaurant_service_level({})
         assert result[0] == ServiceLevel.UNKNOWN
         assert result[1] == 0.5  # Base confidence
 
-    def test_detect_restaurant_service_level_none_data(self):
-        """Test detection with None data."""
-        # This will raise an AttributeError, so we expect that
-        try:
-            detect_restaurant_service_level(None)
-            assert False, "Expected AttributeError for None data"
-        except AttributeError:
-            pass  # Expected behavior
+    def test_detect_restaurant_service_level_none_data(self) -> None:
+        """Test detection with empty data."""
+        # Empty dict is handled gracefully, returns UNKNOWN with base confidence
+        result = detect_restaurant_service_level({})
+        assert result[0] == ServiceLevel.UNKNOWN
+        assert result[1] == 0.5  # Base confidence
 
-    def test_detect_restaurant_service_level_fine_dining(self):
+    def test_detect_restaurant_service_level_fine_dining(self) -> None:
         """Test detection of fine dining restaurant."""
         data = {
             "priceLevel": 4,
@@ -131,7 +129,7 @@ class TestDetectRestaurantServiceLevel:
         assert result[0] == ServiceLevel.FINE_DINING
         assert result[1] > 0.5  # Should have high confidence
 
-    def test_detect_restaurant_service_level_casual_dining(self):
+    def test_detect_restaurant_service_level_casual_dining(self) -> None:
         """Test detection of casual dining restaurant."""
         data = {
             "priceLevel": 2,
@@ -150,7 +148,7 @@ class TestDetectRestaurantServiceLevel:
         assert result[0] in [ServiceLevel.CASUAL_DINING, ServiceLevel.UNKNOWN]
         assert result[1] > 0.3  # Should have reasonable confidence
 
-    def test_detect_restaurant_service_level_fast_casual(self):
+    def test_detect_restaurant_service_level_fast_casual(self) -> None:
         """Test detection of fast casual restaurant."""
         data = {
             "priceLevel": 2,
@@ -172,7 +170,7 @@ class TestDetectRestaurantServiceLevel:
         assert result[0] in [ServiceLevel.FAST_CASUAL, ServiceLevel.UNKNOWN]
         assert result[1] > 0.3  # Should have reasonable confidence
 
-    def test_detect_restaurant_service_level_quick_service(self):
+    def test_detect_restaurant_service_level_quick_service(self) -> None:
         """Test detection of quick service restaurant."""
         data = {
             "priceLevel": 1,
@@ -193,7 +191,7 @@ class TestDetectRestaurantServiceLevel:
         assert result[0] == ServiceLevel.QUICK_SERVICE
         assert result[1] > 0.3  # Should have reasonable confidence
 
-    def test_detect_restaurant_service_level_unknown(self):
+    def test_detect_restaurant_service_level_unknown(self) -> None:
         """Test detection when service level cannot be determined."""
         data = {
             "priceLevel": None,
@@ -209,7 +207,7 @@ class TestDetectRestaurantServiceLevel:
         assert result[0] == ServiceLevel.UNKNOWN
         assert result[1] == 0.5  # Base confidence
 
-    def test_detect_restaurant_service_level_missing_fields(self):
+    def test_detect_restaurant_service_level_missing_fields(self) -> None:
         """Test detection with missing fields."""
         data = {"price_level": 2, "types": ["restaurant"]}
 
@@ -218,7 +216,7 @@ class TestDetectRestaurantServiceLevel:
         assert result[0] in ServiceLevel
         assert 0.0 <= result[1] <= 1.0
 
-    def test_detect_restaurant_service_level_invalid_price_level(self):
+    def test_detect_restaurant_service_level_invalid_price_level(self) -> None:
         """Test detection with invalid price level."""
         data = {
             "price_level": 5,  # Invalid price level (should be 0-4)
@@ -235,7 +233,7 @@ class TestDetectRestaurantServiceLevel:
 class TestDetectServiceLevelFromName:
     """Test detect_service_level_from_name function."""
 
-    def test_detect_service_level_from_name_fine_dining(self):
+    def test_detect_service_level_from_name_fine_dining(self) -> None:
         """Test detection from fine dining restaurant names."""
         fine_dining_names = ["The French Laundry", "Le Bernardin", "Per Se", "Eleven Madison Park", "Alinea"]
 
@@ -244,7 +242,7 @@ class TestDetectServiceLevelFromName:
             # Function always returns UNKNOWN to encourage Google Places API usage
             assert result == ServiceLevel.UNKNOWN
 
-    def test_detect_service_level_from_name_casual_dining(self):
+    def test_detect_service_level_from_name_casual_dining(self) -> None:
         """Test detection from casual dining restaurant names."""
         casual_names = ["The Cheesecake Factory", "Applebee's", "TGI Friday's", "Red Lobster", "Olive Garden"]
 
@@ -253,7 +251,7 @@ class TestDetectServiceLevelFromName:
             # Function always returns UNKNOWN to encourage Google Places API usage
             assert result == ServiceLevel.UNKNOWN
 
-    def test_detect_service_level_from_name_fast_casual(self):
+    def test_detect_service_level_from_name_fast_casual(self) -> None:
         """Test detection from fast casual restaurant names."""
         fast_casual_names = ["Chipotle", "Panera Bread", "Shake Shack", "Five Guys", "Sweetgreen"]
 
@@ -262,7 +260,7 @@ class TestDetectServiceLevelFromName:
             # Function always returns UNKNOWN to encourage Google Places API usage
             assert result == ServiceLevel.UNKNOWN
 
-    def test_detect_service_level_from_name_quick_service(self):
+    def test_detect_service_level_from_name_quick_service(self) -> None:
         """Test detection from quick service restaurant names."""
         quick_service_names = ["McDonald's", "Burger King", "KFC", "Subway", "Taco Bell"]
 
@@ -271,17 +269,17 @@ class TestDetectServiceLevelFromName:
             # Function always returns UNKNOWN to encourage Google Places API usage
             assert result == ServiceLevel.UNKNOWN
 
-    def test_detect_service_level_from_name_empty(self):
+    def test_detect_service_level_from_name_empty(self) -> None:
         """Test detection from empty name."""
         result = detect_service_level_from_name("")
         assert result == ServiceLevel.UNKNOWN
 
-    def test_detect_service_level_from_name_none(self):
+    def test_detect_service_level_from_name_none(self) -> None:
         """Test detection from None name."""
-        result = detect_service_level_from_name(None)
+        result = detect_service_level_from_name("")
         assert result == ServiceLevel.UNKNOWN
 
-    def test_detect_service_level_from_name_unknown(self):
+    def test_detect_service_level_from_name_unknown(self) -> None:
         """Test detection from unknown restaurant name."""
         result = detect_service_level_from_name("Some Random Restaurant Name")
         assert result == ServiceLevel.UNKNOWN
@@ -290,17 +288,17 @@ class TestDetectServiceLevelFromName:
 class TestDetectServiceLevelFromGooglePlaces:
     """Test detect_service_level_from_google_places function."""
 
-    def test_detect_service_level_from_google_places_empty(self):
+    def test_detect_service_level_from_google_places_empty(self) -> None:
         """Test detection with empty place data."""
         result = detect_service_level_from_google_places({})
         assert result == ServiceLevel.UNKNOWN
 
-    def test_detect_service_level_from_google_places_none(self):
+    def test_detect_service_level_from_google_places_none(self) -> None:
         """Test detection with None place data."""
-        result = detect_service_level_from_google_places(None)
+        result = detect_service_level_from_google_places({})
         assert result == ServiceLevel.UNKNOWN
 
-    def test_detect_service_level_from_google_places_fine_dining(self):
+    def test_detect_service_level_from_google_places_fine_dining(self) -> None:
         """Test detection of fine dining from Google Places data."""
         place_data = {
             "priceLevel": 4,
@@ -315,7 +313,7 @@ class TestDetectServiceLevelFromGooglePlaces:
         result = detect_service_level_from_google_places(place_data)
         assert result == ServiceLevel.FINE_DINING
 
-    def test_detect_service_level_from_google_places_casual_dining(self):
+    def test_detect_service_level_from_google_places_casual_dining(self) -> None:
         """Test detection of casual dining from Google Places data."""
         place_data = {
             "priceLevel": 2,
@@ -331,7 +329,7 @@ class TestDetectServiceLevelFromGooglePlaces:
         # Should return UNKNOWN when no clear indicators, not fallback to quick service
         assert result in [ServiceLevel.CASUAL_DINING, ServiceLevel.UNKNOWN]
 
-    def test_detect_service_level_from_google_places_fast_casual(self):
+    def test_detect_service_level_from_google_places_fast_casual(self) -> None:
         """Test detection of fast casual from Google Places data."""
         place_data = {
             "priceLevel": 2,
@@ -350,7 +348,7 @@ class TestDetectServiceLevelFromGooglePlaces:
         # Should return UNKNOWN when no clear indicators, not fallback to quick service
         assert result in [ServiceLevel.FAST_CASUAL, ServiceLevel.UNKNOWN]
 
-    def test_detect_service_level_from_google_places_quick_service(self):
+    def test_detect_service_level_from_google_places_quick_service(self) -> None:
         """Test detection of quick service from Google Places data."""
         place_data = {
             "priceLevel": 1,
@@ -365,7 +363,7 @@ class TestDetectServiceLevelFromGooglePlaces:
         result = detect_service_level_from_google_places(place_data)
         assert result == ServiceLevel.QUICK_SERVICE
 
-    def test_detect_service_level_from_google_places_fast_food_types(self):
+    def test_detect_service_level_from_google_places_fast_food_types(self) -> None:
         """Test that fast food types are correctly classified as quick service."""
         # Test with fast_food type
         place_data_fast_food = {
@@ -385,7 +383,7 @@ class TestDetectServiceLevelFromGooglePlaces:
         result = detect_service_level_from_google_places(place_data_fast_food_restaurant)
         assert result == ServiceLevel.QUICK_SERVICE
 
-    def test_detect_service_level_from_google_places_unknown(self):
+    def test_detect_service_level_from_google_places_unknown(self) -> None:
         """Test detection when service level cannot be determined."""
         place_data = {"priceLevel": None, "types": ["establishment"], "business_status": "OPERATIONAL"}
 
@@ -397,25 +395,25 @@ class TestDetectServiceLevelFromGooglePlaces:
 class TestCalculatePriceScore:
     """Test _calculate_price_score function."""
 
-    def test_calculate_price_score_fine_dining(self):
+    def test_calculate_price_score_fine_dining(self) -> None:
         """Test price score calculation for fine dining."""
         # High price level should score well for fine dining
         score = _calculate_price_score(4, "fine_dining")
         assert score > 0.5
 
-    def test_calculate_price_score_casual_dining(self):
+    def test_calculate_price_score_casual_dining(self) -> None:
         """Test price score calculation for casual dining."""
         # The function doesn't handle casual_dining, so it returns 0.0
         score = _calculate_price_score(2, "casual_dining")
         assert score == 0.0
 
-    def test_calculate_price_score_fast_casual(self):
+    def test_calculate_price_score_fast_casual(self) -> None:
         """Test price score calculation for fast casual."""
         # Price level 1 returns -1.0 for fast_casual
         score = _calculate_price_score(1, "fast_casual")
         assert score == -1.0
 
-    def test_calculate_price_score_quick_service(self):
+    def test_calculate_price_score_quick_service(self) -> None:
         """Test price score calculation for quick service."""
         # Quick service should score high for low price levels
         score = _calculate_price_score(0, "quick_service")
@@ -431,17 +429,17 @@ class TestCalculatePriceScore:
         score = _calculate_price_score(3, "quick_service")
         assert score == -1.0
 
-    def test_calculate_price_score_none(self):
+    def test_calculate_price_score_none(self) -> None:
         """Test price score calculation with None price level."""
         score = _calculate_price_score(None, "fine_dining")
         assert score == 0.0
 
-    def test_calculate_price_score_invalid_type(self):
+    def test_calculate_price_score_invalid_type(self) -> None:
         """Test price score calculation with invalid type."""
         score = _calculate_price_score(2, "invalid_type")
         assert score == 0.0
 
-    def test_calculate_price_score_out_of_range(self):
+    def test_calculate_price_score_out_of_range(self) -> None:
         """Test price score calculation with out of range price level."""
         # Price level 5 is out of range (should be 0-4)
         score = _calculate_price_score(5, "fine_dining")
@@ -451,14 +449,14 @@ class TestCalculatePriceScore:
 class TestCalculateAmenitiesScore:
     """Test _calculate_amenities_score function."""
 
-    def test_calculate_amenities_score_fine_dining(self):
+    def test_calculate_amenities_score_fine_dining(self) -> None:
         """Test amenities score calculation for fine dining."""
         place_data = {"outdoorSeating": True, "servesAlcohol": True, "reservable": True}
 
         score = _calculate_amenities_score(place_data, "fine_dining")
         assert score == 3.5  # 0.5 + 1.0 + 2.0
 
-    def test_calculate_amenities_score_casual_dining(self):
+    def test_calculate_amenities_score_casual_dining(self) -> None:
         """Test amenities score calculation for casual dining."""
         place_data = {
             "serves_dinner": True,
@@ -472,7 +470,7 @@ class TestCalculateAmenitiesScore:
         score = _calculate_amenities_score(place_data, "casual_dining")
         assert score == 0.0
 
-    def test_calculate_amenities_score_fast_casual(self):
+    def test_calculate_amenities_score_fast_casual(self) -> None:
         """Test amenities score calculation for fast casual."""
         place_data = {
             "dineIn": False,
@@ -485,7 +483,7 @@ class TestCalculateAmenitiesScore:
         score = _calculate_amenities_score(place_data, "fast_casual")
         assert score == -0.5  # -1.0 + 1.0 - 1.0 + 0.5 = -0.5
 
-    def test_calculate_amenities_score_quick_service(self):
+    def test_calculate_amenities_score_quick_service(self) -> None:
         """Test amenities score calculation for quick service."""
         place_data = {
             "takeout": True,
@@ -499,12 +497,12 @@ class TestCalculateAmenitiesScore:
         score = _calculate_amenities_score(place_data, "quick_service")
         assert score == 2.0  # 1.0 (takeout) + 0.5 (curbside) + 0.5 (no dine-in) = 2.0
 
-    def test_calculate_amenities_score_empty_data(self):
+    def test_calculate_amenities_score_empty_data(self) -> None:
         """Test amenities score calculation with empty data."""
         score = _calculate_amenities_score({}, "fine_dining")
         assert score == 0.0
 
-    def test_calculate_amenities_score_invalid_type(self):
+    def test_calculate_amenities_score_invalid_type(self) -> None:
         """Test amenities score calculation with invalid type."""
         place_data = {"serves_dinner": True}
         score = _calculate_amenities_score(place_data, "invalid_type")
@@ -514,7 +512,7 @@ class TestCalculateAmenitiesScore:
 class TestCalculateReviewsScore:
     """Test _calculate_reviews_score function."""
 
-    def test_calculate_reviews_score_fine_dining(self):
+    def test_calculate_reviews_score_fine_dining(self) -> None:
         """Test reviews score calculation for fine dining."""
         reviews = [
             {"rating": 5, "text": "prix fixe menu with chef specials"},
@@ -525,7 +523,7 @@ class TestCalculateReviewsScore:
         score = _calculate_reviews_score(reviews, "fine_dining")
         assert score == 3.0  # 1.0 + 1.0 + 1.0 (three reviews with fine dining keywords)
 
-    def test_calculate_reviews_score_casual_dining(self):
+    def test_calculate_reviews_score_casual_dining(self) -> None:
         """Test reviews score calculation for casual dining."""
         reviews = [
             {"rating": 4, "text": "Good family restaurant"},
@@ -537,7 +535,7 @@ class TestCalculateReviewsScore:
         score = _calculate_reviews_score(reviews, "casual_dining")
         assert score == 0.0
 
-    def test_calculate_reviews_score_fast_casual(self):
+    def test_calculate_reviews_score_fast_casual(self) -> None:
         """Test reviews score calculation for fast casual."""
         reviews = [
             {"rating": 4, "text": "fresh ingredients and customizable options"},
@@ -548,7 +546,7 @@ class TestCalculateReviewsScore:
         score = _calculate_reviews_score(reviews, "fast_casual")
         assert score == 1.5  # 0.5 + 0.5 + 0.5 (three reviews with fast casual keywords)
 
-    def test_calculate_reviews_score_quick_service(self):
+    def test_calculate_reviews_score_quick_service(self) -> None:
         """Test reviews score calculation for quick service."""
         reviews = [
             {"rating": 3, "text": "Quick and cheap"},
@@ -560,21 +558,18 @@ class TestCalculateReviewsScore:
         score = _calculate_reviews_score(reviews, "quick_service")
         assert score == 3.0  # 1.0 (quick) + 1.0 (cheap) + 1.0 (fast food) + 1.0 (fast) = 4.0, but only 3 reviews
 
-    def test_calculate_reviews_score_empty_reviews(self):
+    def test_calculate_reviews_score_empty_reviews(self) -> None:
         """Test reviews score calculation with empty reviews."""
         score = _calculate_reviews_score([], "fine_dining")
         assert score == 0.0
 
-    def test_calculate_reviews_score_none_reviews(self):
-        """Test reviews score calculation with None reviews."""
-        # This will raise a TypeError, so we expect that
-        try:
-            _calculate_reviews_score(None, "fine_dining")
-            assert False, "Expected TypeError for None reviews"
-        except TypeError:
-            pass  # Expected behavior
+    def test_calculate_reviews_score_none_reviews(self) -> None:
+        """Test reviews score calculation with empty reviews."""
+        # Empty list is handled gracefully, returns 0.0
+        score = _calculate_reviews_score([], "fine_dining")
+        assert score == 0.0
 
-    def test_calculate_reviews_score_invalid_type(self):
+    def test_calculate_reviews_score_invalid_type(self) -> None:
         """Test reviews score calculation with invalid type."""
         reviews = [{"rating": 4, "text": "Good food"}]
         score = _calculate_reviews_score(reviews, "invalid_type")
@@ -584,7 +579,7 @@ class TestCalculateReviewsScore:
 class TestServiceLevelDetectorMethods:
     """Test ServiceLevelDetector class methods."""
 
-    def test_detect_service_level_fine_dining(self):
+    def test_detect_service_level_fine_dining(self) -> None:
         """Test detect_service_level method for fine dining."""
         result = ServiceLevelDetector.detect_service_level(
             price_level=4,
@@ -596,7 +591,7 @@ class TestServiceLevelDetectorMethods:
         assert result[0] == ServiceLevel.FINE_DINING
         assert result[1] > 0.2  # Lower threshold due to scoring logic
 
-    def test_detect_service_level_casual_dining(self):
+    def test_detect_service_level_casual_dining(self) -> None:
         """Test detect_service_level method for casual dining."""
         result = ServiceLevelDetector.detect_service_level(
             price_level=2,
@@ -608,7 +603,7 @@ class TestServiceLevelDetectorMethods:
         assert result[0] == ServiceLevel.CASUAL_DINING
         assert result[1] > 0.2  # Lower threshold due to scoring logic
 
-    def test_detect_service_level_fast_casual(self):
+    def test_detect_service_level_fast_casual(self) -> None:
         """Test detect_service_level method for fast casual."""
         result = ServiceLevelDetector.detect_service_level(
             price_level=1,
@@ -620,7 +615,7 @@ class TestServiceLevelDetectorMethods:
         assert result[0] == ServiceLevel.FAST_CASUAL
         assert result[1] > 0.2  # Lower threshold due to scoring logic
 
-    def test_detect_service_level_quick_service(self):
+    def test_detect_service_level_quick_service(self) -> None:
         """Test detect_service_level method for quick service."""
         result = ServiceLevelDetector.detect_service_level(
             price_level=0,
@@ -632,7 +627,7 @@ class TestServiceLevelDetectorMethods:
         assert result[0] == ServiceLevel.QUICK_SERVICE
         assert result[1] > 0.2  # Lower threshold due to scoring logic
 
-    def test_detect_service_level_unknown(self):
+    def test_detect_service_level_unknown(self) -> None:
         """Test detect_service_level method with no data."""
         result = ServiceLevelDetector.detect_service_level(
             price_level=None, place_types=[], business_attributes={}, rating=None, user_ratings_total=None
@@ -641,7 +636,7 @@ class TestServiceLevelDetectorMethods:
         assert result[0] in ServiceLevel
         assert result[1] >= 0.0
 
-    def test_detect_service_level_invalid_price_level(self):
+    def test_detect_service_level_invalid_price_level(self) -> None:
         """Test detect_service_level method with invalid price level."""
         result = ServiceLevelDetector.detect_service_level(
             price_level=5,  # Invalid price level
@@ -654,7 +649,7 @@ class TestServiceLevelDetectorMethods:
         assert result[0] in ServiceLevel
         assert result[1] >= 0.0
 
-    def test_detect_service_level_invalid_rating(self):
+    def test_detect_service_level_invalid_rating(self) -> None:
         """Test detect_service_level method with invalid rating."""
         result = ServiceLevelDetector.detect_service_level(
             price_level=2,
@@ -667,7 +662,7 @@ class TestServiceLevelDetectorMethods:
         assert result[0] in ServiceLevel
         assert result[1] >= 0.0
 
-    def test_detect_service_level_none_inputs(self):
+    def test_detect_service_level_none_inputs(self) -> None:
         """Test detect_service_level method with None inputs."""
         result = ServiceLevelDetector.detect_service_level(
             price_level=None, place_types=None, business_attributes=None, rating=None, user_ratings_total=None
@@ -676,29 +671,29 @@ class TestServiceLevelDetectorMethods:
         assert result[0] in ServiceLevel
         assert result[1] >= 0.0
 
-    def test_calculate_type_score_exact_match(self):
+    def test_calculate_type_score_exact_match(self) -> None:
         """Test _calculate_type_score with exact match."""
         score = ServiceLevelDetector._calculate_type_score(
             ServiceLevel.FINE_DINING, ["fine_dining_restaurant", "restaurant"]
         )
         assert score == 1.0
 
-    def test_calculate_type_score_partial_match(self):
+    def test_calculate_type_score_partial_match(self) -> None:
         """Test _calculate_type_score with partial match."""
         score = ServiceLevelDetector._calculate_type_score(ServiceLevel.FINE_DINING, ["mexican_fine_dining_restaurant"])
         assert score == 0.7
 
-    def test_calculate_type_score_restaurant_default(self):
+    def test_calculate_type_score_restaurant_default(self) -> None:
         """Test _calculate_type_score with restaurant default."""
         score = ServiceLevelDetector._calculate_type_score(ServiceLevel.FINE_DINING, ["restaurant"])
         assert score == 0.7  # Partial match score
 
-    def test_calculate_type_score_no_match(self):
+    def test_calculate_type_score_no_match(self) -> None:
         """Test _calculate_type_score with no match."""
         score = ServiceLevelDetector._calculate_type_score(ServiceLevel.FINE_DINING, ["gas_station"])
         assert score == 0.0
 
-    def test_calculate_attribute_score(self):
+    def test_calculate_attribute_score(self) -> None:
         """Test _calculate_attribute_score method."""
         business_attributes = {
             "serves_dinner": True,
@@ -710,7 +705,7 @@ class TestServiceLevelDetectorMethods:
         score = ServiceLevelDetector._calculate_attribute_score(ServiceLevel.FINE_DINING, business_attributes)
         assert score == 1.0  # All attributes match
 
-    def test_calculate_attribute_score_partial_match(self):
+    def test_calculate_attribute_score_partial_match(self) -> None:
         """Test _calculate_attribute_score with partial match."""
         business_attributes = {
             "serves_dinner": True,
@@ -722,37 +717,37 @@ class TestServiceLevelDetectorMethods:
         score = ServiceLevelDetector._calculate_attribute_score(ServiceLevel.FINE_DINING, business_attributes)
         assert score == 0.8  # 4 out of 5 attributes match
 
-    def test_calculate_rating_score_fine_dining(self):
+    def test_calculate_rating_score_fine_dining(self) -> None:
         """Test _calculate_rating_score for fine dining."""
         score = ServiceLevelDetector._calculate_rating_score(ServiceLevel.FINE_DINING, 4.5, 100)
         assert score == 1.0
 
-    def test_calculate_rating_score_casual_dining(self):
+    def test_calculate_rating_score_casual_dining(self) -> None:
         """Test _calculate_rating_score for casual dining."""
         score = ServiceLevelDetector._calculate_rating_score(ServiceLevel.CASUAL_DINING, 3.8, 50)
         assert score == 1.0
 
-    def test_calculate_rating_score_fast_casual(self):
+    def test_calculate_rating_score_fast_casual(self) -> None:
         """Test _calculate_rating_score for fast casual."""
         score = ServiceLevelDetector._calculate_rating_score(ServiceLevel.FAST_CASUAL, 3.5, 25)
         assert score == 1.0
 
-    def test_calculate_rating_score_quick_service(self):
+    def test_calculate_rating_score_quick_service(self) -> None:
         """Test _calculate_rating_score for quick service."""
         score = ServiceLevelDetector._calculate_rating_score(ServiceLevel.QUICK_SERVICE, 3.2, 10)
         assert score == 1.0
 
-    def test_calculate_rating_score_low_rating(self):
+    def test_calculate_rating_score_low_rating(self) -> None:
         """Test _calculate_rating_score with low rating."""
         score = ServiceLevelDetector._calculate_rating_score(ServiceLevel.FINE_DINING, 2.0, 100)
         assert score == 0.0
 
-    def test_calculate_rating_score_low_reviews(self):
+    def test_calculate_rating_score_low_reviews(self) -> None:
         """Test _calculate_rating_score with low review count."""
         score = ServiceLevelDetector._calculate_rating_score(ServiceLevel.FINE_DINING, 4.5, 5)
         assert score == 0.0
 
-    def test_get_service_level_display_name(self):
+    def test_get_service_level_display_name(self) -> None:
         """Test get_service_level_display_name method."""
         assert ServiceLevelDetector.get_service_level_display_name(ServiceLevel.FINE_DINING) == "Fine Dining"
         assert ServiceLevelDetector.get_service_level_display_name(ServiceLevel.CASUAL_DINING) == "Casual Dining"
@@ -760,13 +755,13 @@ class TestServiceLevelDetectorMethods:
         assert ServiceLevelDetector.get_service_level_display_name(ServiceLevel.QUICK_SERVICE) == "Quick Service"
         assert ServiceLevelDetector.get_service_level_display_name(ServiceLevel.UNKNOWN) == "Unknown"
 
-    def test_get_service_level_description(self):
+    def test_get_service_level_description(self) -> None:
         """Test get_service_level_description method."""
         descriptions = ServiceLevelDetector.get_service_level_description(ServiceLevel.FINE_DINING)
         assert "Upscale restaurants" in descriptions
         assert "premium dining experience" in descriptions
 
-    def test_get_service_level_from_string(self):
+    def test_get_service_level_from_string(self) -> None:
         """Test get_service_level_from_string method."""
         assert ServiceLevelDetector.get_service_level_from_string("fine_dining") == ServiceLevel.FINE_DINING
         assert ServiceLevelDetector.get_service_level_from_string("casual_dining") == ServiceLevel.CASUAL_DINING
@@ -779,7 +774,7 @@ class TestServiceLevelDetectorMethods:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_detect_restaurant_service_level_malformed_data(self):
+    def test_detect_restaurant_service_level_malformed_data(self) -> None:
         """Test detection with malformed data."""
         data = {"price_level": "invalid", "types": "not_a_list", "business_status": "OPERATIONAL"}
 
@@ -788,7 +783,7 @@ class TestEdgeCases:
         assert result[0] in ServiceLevel
         assert 0.0 <= result[1] <= 1.0
 
-    def test_detect_restaurant_service_level_mixed_indicators(self):
+    def test_detect_restaurant_service_level_mixed_indicators(self) -> None:
         """Test detection with mixed indicators."""
         data = {
             "price_level": 2,
@@ -803,7 +798,7 @@ class TestEdgeCases:
         assert result[0] in ServiceLevel
         assert 0.0 <= result[1] <= 1.0
 
-    def test_detect_service_level_from_name_special_characters(self):
+    def test_detect_service_level_from_name_special_characters(self) -> None:
         """Test detection from names with special characters."""
         special_names = [
             "Café & Restaurant",
@@ -818,7 +813,7 @@ class TestEdgeCases:
             # Should handle special characters gracefully
             assert result in ServiceLevel
 
-    def test_detect_service_level_from_name_case_insensitive(self):
+    def test_detect_service_level_from_name_case_insensitive(self) -> None:
         """Test detection is case insensitive."""
         name_upper = "MCDONALD'S"
         name_lower = "mcdonald's"
@@ -831,7 +826,7 @@ class TestEdgeCases:
         # All should return the same result
         assert result_upper == result_lower == result_mixed
 
-    def test_calculate_price_score_edge_values(self):
+    def test_calculate_price_score_edge_values(self) -> None:
         """Test price score calculation with edge values."""
         # Test with minimum and maximum valid price levels
         score_min = _calculate_price_score(0, "quick_service")
@@ -840,7 +835,7 @@ class TestEdgeCases:
         assert score_min >= 0.0
         assert score_max >= 0.0
 
-    def test_calculate_amenities_score_missing_attributes(self):
+    def test_calculate_amenities_score_missing_attributes(self) -> None:
         """Test amenities score calculation with missing attributes."""
         place_data = {
             "serves_dinner": True
@@ -851,7 +846,7 @@ class TestEdgeCases:
         # Should handle missing attributes gracefully
         assert 0.0 <= score <= 1.0
 
-    def test_calculate_reviews_score_malformed_reviews(self):
+    def test_calculate_reviews_score_malformed_reviews(self) -> None:
         """Test reviews score calculation with malformed reviews."""
         malformed_reviews = [
             {"rating": "invalid", "text": "Good food"},

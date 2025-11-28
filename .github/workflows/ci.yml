@@ -64,10 +64,24 @@ jobs:
             echo "No package.json found, skipping npm dependencies"
           fi
 
+      - name: Install markdownlint-cli
+        run: |
+          npm install -g markdownlint-cli@0.38.0
+
       - name: Run linting
         run: |
           source venv/bin/activate
           make lint
+
+      - name: Run markdown linting
+        run: |
+          source venv/bin/activate
+          make lint-markdown
+
+      - name: Run YAML/JSON/TOML validation
+        run: |
+          source venv/bin/activate
+          make lint-yaml lint-json lint-toml
 
   # Comprehensive test job
   test:

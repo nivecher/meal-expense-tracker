@@ -20,11 +20,12 @@ terraform/
 ├── terraform.tfvars     # Variable values (not versioned)
 ├── package_lambda.sh    # Script to package Lambda function
 └── modules/             # Reusable modules
-├── network/         # VPC, subnets, routing
 ├── iam/             # IAM roles and policies
-├── rds/             # Database resources
 ├── lambda/          # Lambda function
-└── api_gateway/     # API Gateway
+├── api_gateway/     # API Gateway
+├── cloudfront/      # CloudFront distribution
+├── s3/              # S3 buckets
+└── ecr/             # ECR repository
 ```
 
 ## Prerequisites
@@ -86,8 +87,9 @@ After applying the configuration, Terraform will output the following:
 
 - API Gateway endpoint URL
 - Lambda function name and ARN
-- RDS endpoint and credentials (stored in AWS Secrets Manager)
-- VPC and subnet information
+- CloudFront distribution URL
+- S3 bucket names (receipts and static files)
+- Database connection string (stored in AWS Secrets Manager for Supabase)
 
 ## Cleaning Up
 
@@ -101,6 +103,7 @@ terraform destroy
 
 ## Notes
 
-- The Lambda function code is expected to be in the `lambda/` directory
-- Database credentials are stored in AWS Secrets Manager
+- The Lambda function uses container images stored in ECR
+- Database connection string is stored in AWS Secrets Manager (Supabase external PostgreSQL)
 - All resources are tagged with the application name and environment
+- Lambda is deployed without VPC for cost efficiency (connects to Supabase via HTTPS)

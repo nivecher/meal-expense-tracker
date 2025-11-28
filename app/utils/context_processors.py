@@ -4,12 +4,14 @@ This module provides context processors that make data available
 to all templates globally.
 """
 
+from typing import Dict
+
 from flask_login import current_user
 
 from app.utils.timezone_utils import get_browser_timezone
 
 
-def inject_user_context():
+def inject_user_context() -> dict[str, object]:
     """Inject current user context into all templates.
 
     This makes the current user available in template filters
@@ -22,7 +24,7 @@ def inject_user_context():
     }
 
 
-def inject_cuisine_data():
+def inject_cuisine_data() -> dict[str, object]:
     """Inject cuisine data into all templates.
 
     This provides centralized cuisine configuration to both templates

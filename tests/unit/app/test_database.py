@@ -3,8 +3,8 @@
 import os
 from unittest.mock import Mock, patch
 
-import pytest
 from flask import Flask
+import pytest
 
 from app.database import (
     _get_database_uri,
@@ -28,45 +28,45 @@ class TestDatabaseModule:
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         return app
 
-    def test_is_lambda_environment_aws_execution_env(self):
+    def test_is_lambda_environment_aws_execution_env(self) -> None:
         """Test Lambda environment detection with AWS_EXECUTION_ENV."""
         with patch.dict(os.environ, {"AWS_EXECUTION_ENV": "AWS_Lambda_python3.9"}):
             assert _is_lambda_environment() is True
 
-    def test_is_lambda_environment_aws_lambda_function_name(self):
+    def test_is_lambda_environment_aws_lambda_function_name(self) -> None:
         """Test Lambda environment detection with AWS_LAMBDA_FUNCTION_NAME."""
         with patch.dict(os.environ, {"AWS_LAMBDA_FUNCTION_NAME": "my-function"}):
             assert _is_lambda_environment() is True
 
-    def test_is_lambda_environment_not_lambda(self):
+    def test_is_lambda_environment_not_lambda(self) -> None:
         """Test Lambda environment detection when not in Lambda."""
         with patch.dict(os.environ, {}, clear=True):
             assert _is_lambda_environment() is False
 
-    def test_is_lambda_environment_empty_aws_execution_env(self):
+    def test_is_lambda_environment_empty_aws_execution_env(self) -> None:
         """Test Lambda environment detection with empty AWS_EXECUTION_ENV."""
         with patch.dict(os.environ, {"AWS_EXECUTION_ENV": ""}):
             assert _is_lambda_environment() is False
 
-    def test_get_database_uri_from_env_postgres(self):
+    def test_get_database_uri_from_env_postgres(self) -> None:
         """Test getting database URI from environment variable with postgres://."""
         with patch.dict(os.environ, {"DATABASE_URL": "postgres://user:pass@host:5432/db"}):
             uri = _get_database_uri()
             assert uri == "postgresql+pg8000://user:pass@host:5432/db"
 
-    def test_get_database_uri_from_env_postgresql(self):
+    def test_get_database_uri_from_env_postgresql(self) -> None:
         """Test getting database URI from environment variable with postgresql://."""
         with patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@host:5432/db"}):
             uri = _get_database_uri()
             assert uri == "postgresql+pg8000://user:pass@host:5432/db"
 
-    def test_get_database_uri_from_env_mysql(self):
+    def test_get_database_uri_from_env_mysql(self) -> None:
         """Test getting database URI from environment variable with mysql://."""
         with patch.dict(os.environ, {"DATABASE_URL": "mysql://user:pass@host:3306/db"}):
             uri = _get_database_uri()
             assert uri == "mysql://user:pass@host:3306/db"
 
-    def test_get_database_uri_lambda_environment_no_url(self):
+    def test_get_database_uri_lambda_environment_no_url(self) -> None:
         """Test getting database URI in Lambda environment without DATABASE_URL."""
         with patch.dict(os.environ, {"AWS_LAMBDA_FUNCTION_NAME": "my-function"}, clear=True):
             with patch("app.database._get_database_uri_from_secrets_manager") as mock_secrets:
@@ -76,7 +76,7 @@ class TestDatabaseModule:
                 ):
                     _get_database_uri()
 
-    def test_get_database_uri_from_app_config(self, app):
+    def test_get_database_uri_from_app_config(self, app) -> None:
         """Test getting database URI from app config."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///test.db"
 
@@ -84,7 +84,7 @@ class TestDatabaseModule:
             uri = _get_database_uri(app)
             assert uri == "sqlite:///test.db"
 
-    def test_get_database_uri_from_app_config_runtime_error(self, app):
+    def test_get_database_uri_from_app_config_runtime_error(self, app) -> None:
         """Test getting database URI when app context is not available."""
         with patch.dict(os.environ, {}, clear=True):
             # Test without app context - should fall back to SQLite
@@ -92,7 +92,7 @@ class TestDatabaseModule:
             assert uri.startswith("sqlite:///")
             assert "app-development.db" in uri
 
-    def test_get_database_uri_sqlite_development(self):
+    def test_get_database_uri_sqlite_development(self) -> None:
         """Test getting database URI for SQLite development database."""
         with patch.dict(os.environ, {}, clear=True):
             with patch("app.database.os.path.exists") as mock_exists:
@@ -105,7 +105,7 @@ class TestDatabaseModule:
                     assert "check_same_thread=False" in uri
                     assert "timeout=30" in uri
 
-    def test_get_database_uri_sqlite_development_no_instance_dir(self):
+    def test_get_database_uri_sqlite_development_no_instance_dir(self) -> None:
         """Test getting database URI when instance directory doesn't exist."""
         with patch.dict(os.environ, {}, clear=True):
             with patch("app.database.os.path.exists") as mock_exists:
@@ -115,7 +115,7 @@ class TestDatabaseModule:
                     uri = _get_database_uri()
                     assert uri == "sqlite:///:memory:"
 
-    def test_get_database_uri_with_flask_env(self):
+    def test_get_database_uri_with_flask_env(self) -> None:
         """Test getting database URI with different FLASK_ENV values."""
         with patch.dict(os.environ, {"FLASK_ENV": "production"}, clear=True):
             with patch("app.database.os.path.exists") as mock_exists:
@@ -125,7 +125,7 @@ class TestDatabaseModule:
                     uri = _get_database_uri()
                     assert "app-production.db" in uri
 
-    def test_init_database_already_initialized(self, app):
+    def test_init_database_already_initialized(self, app) -> None:
         """Test initializing database when already initialized."""
         app.extensions["sqlalchemy"] = Mock()
 
@@ -133,7 +133,7 @@ class TestDatabaseModule:
             init_database(app)
             mock_init_app.assert_not_called()
 
-    def test_init_database_success(self, app):
+    def test_init_database_success(self, app) -> None:
         """Test successful database initialization."""
         with patch("app.database.db.init_app") as mock_init_app:
             with patch("app.database.db.create_all") as mock_create_all:
@@ -144,7 +144,7 @@ class TestDatabaseModule:
                     mock_create_all.assert_called_once()
                     mock_logger.info.assert_called_once()
 
-    def test_init_database_with_connection_pooling(self, app):
+    def test_init_database_with_connection_pooling(self, app) -> None:
         """Test database initialization with connection pooling for non-SQLite databases."""
         with patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@host:5432/db"}):
             with patch("app.database.db.init_app"):
@@ -158,7 +158,7 @@ class TestDatabaseModule:
                     assert engine_options["pool_size"] == 5
                     assert engine_options["max_overflow"] == 10
 
-    def test_init_database_sqlite_no_pooling(self, app):
+    def test_init_database_sqlite_no_pooling(self, app) -> None:
         """Test database initialization without connection pooling for SQLite."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
 
@@ -168,7 +168,7 @@ class TestDatabaseModule:
 
                 assert "SQLALCHEMY_ENGINE_OPTIONS" not in app.config
 
-    def test_init_database_exception(self, app):
+    def test_init_database_exception(self, app) -> None:
         """Test database initialization with exception."""
         with patch("app.database.db.init_app", side_effect=Exception("Database error")):
             with patch("app.database.logger") as mock_logger:
@@ -176,21 +176,21 @@ class TestDatabaseModule:
                     init_database(app)
                 mock_logger.error.assert_called_once()
 
-    def test_create_tables(self, app):
+    def test_create_tables(self, app) -> None:
         """Test creating database tables."""
         with app.app_context():
             with patch("app.database.db.create_all") as mock_create_all:
                 create_tables()
                 mock_create_all.assert_called_once()
 
-    def test_drop_tables(self, app):
+    def test_drop_tables(self, app) -> None:
         """Test dropping database tables."""
         with app.app_context():
             with patch("app.database.db.drop_all") as mock_drop_all:
                 drop_tables()
                 mock_drop_all.assert_called_once()
 
-    def test_get_session_success(self, app):
+    def test_get_session_success(self, app) -> None:
         """Test getting database session successfully."""
         with app.app_context():
             with patch("app.database.db") as mock_db:
@@ -200,7 +200,7 @@ class TestDatabaseModule:
                 session = get_session()
                 assert session == mock_session
 
-    def test_get_session_not_initialized(self, app):
+    def test_get_session_not_initialized(self, app) -> None:
         """Test getting database session when not initialized."""
         with app.app_context():
             with patch("app.database.db") as mock_db:
@@ -209,7 +209,7 @@ class TestDatabaseModule:
                 with pytest.raises(RuntimeError, match="Database session factory not initialized"):
                     get_session()
 
-    def test_get_session_no_session_attribute(self, app):
+    def test_get_session_no_session_attribute(self, app) -> None:
         """Test getting database session when session attribute doesn't exist."""
         with app.app_context():
             with patch("app.database.db") as mock_db:
@@ -218,7 +218,7 @@ class TestDatabaseModule:
                 with pytest.raises(RuntimeError, match="Database session factory not initialized"):
                     get_session()
 
-    def test_get_engine_success(self, app):
+    def test_get_engine_success(self, app) -> None:
         """Test getting database engine successfully."""
         with app.app_context():
             with patch("app.database.db") as mock_db:
@@ -228,7 +228,7 @@ class TestDatabaseModule:
                 engine = get_engine()
                 assert engine == mock_engine
 
-    def test_get_engine_not_initialized(self, app):
+    def test_get_engine_not_initialized(self, app) -> None:
         """Test getting database engine when not initialized."""
         with app.app_context():
             with patch("app.database.db") as mock_db:
@@ -237,7 +237,7 @@ class TestDatabaseModule:
                 with pytest.raises(RuntimeError, match="Database engine not initialized"):
                     get_engine()
 
-    def test_get_engine_no_engine_attribute(self, app):
+    def test_get_engine_no_engine_attribute(self, app) -> None:
         """Test getting database engine when engine attribute doesn't exist."""
         with app.app_context():
             with patch("app.database.db") as mock_db:
@@ -246,7 +246,7 @@ class TestDatabaseModule:
                 with pytest.raises(RuntimeError, match="Database engine not initialized"):
                     get_engine()
 
-    def test_database_uri_postgres_conversion_edge_cases(self):
+    def test_database_uri_postgres_conversion_edge_cases(self) -> None:
         """Test postgres:// to postgresql+pg8000:// conversion edge cases."""
         test_cases = [
             ("postgres://user:pass@host:5432/db", "postgresql+pg8000://user:pass@host:5432/db"),
@@ -263,7 +263,7 @@ class TestDatabaseModule:
                 result = _get_database_uri()
                 assert result == expected_uri
 
-    def test_database_uri_environment_variable_priority(self, app):
+    def test_database_uri_environment_variable_priority(self, app) -> None:
         """Test that DATABASE_URL environment variable takes priority over app config."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
 
@@ -271,7 +271,7 @@ class TestDatabaseModule:
             uri = _get_database_uri(app)
             assert uri == "postgresql+pg8000://env:pass@host:5432/envdb"
 
-    def test_database_uri_app_config_fallback(self, app):
+    def test_database_uri_app_config_fallback(self, app) -> None:
         """Test that app config is used when no environment variable is set."""
         app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
 
@@ -279,7 +279,7 @@ class TestDatabaseModule:
             uri = _get_database_uri(app)
             assert uri == "sqlite:///app.db"
 
-    def test_database_uri_sqlite_path_construction(self):
+    def test_database_uri_sqlite_path_construction(self) -> None:
         """Test SQLite path construction for development database."""
         with patch.dict(os.environ, {}, clear=True):
             with patch("app.database.os.path.exists") as mock_exists:
@@ -295,7 +295,7 @@ class TestDatabaseModule:
                             assert "check_same_thread=False" in uri
                             assert "timeout=30" in uri
 
-    def test_init_database_configuration_values(self, app):
+    def test_init_database_configuration_values(self, app) -> None:
         """Test that init_database sets correct configuration values."""
         with patch("app.database.db.init_app"):
             with patch("app.database.db.create_all"):
@@ -304,7 +304,7 @@ class TestDatabaseModule:
                 assert app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] is False
                 assert "SQLALCHEMY_DATABASE_URI" in app.config
 
-    def test_init_database_logging(self, app):
+    def test_init_database_logging(self, app) -> None:
         """Test that init_database logs appropriate messages."""
         with patch("app.database.db.init_app"):
             with patch("app.database.db.create_all"):
@@ -316,7 +316,7 @@ class TestDatabaseModule:
                     log_message = mock_logger.info.call_args[0][0]
                     assert "Database initialized successfully" in log_message
 
-    def test_init_database_exception_logging(self, app):
+    def test_init_database_exception_logging(self, app) -> None:
         """Test that init_database logs exceptions properly."""
         with patch("app.database.db.init_app", side_effect=Exception("Connection failed")):
             with patch("app.database.logger") as mock_logger:

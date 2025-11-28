@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from sqlalchemy import UniqueConstraint, event
-from sqlalchemy.orm import Mapped, relationship
+from sqlalchemy import ForeignKey, UniqueConstraint, event
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
 from app.models.base import BaseModel
@@ -30,39 +30,39 @@ class Tag(BaseModel):
         - Tags follow Jira-style naming conventions
     """
 
-    __tablename__ = "tag"
+    __tablename__ = "tag"  # type: ignore[assignment]
     __table_args__ = (
         UniqueConstraint("name", "user_id", name="uix_tag_name_user"),
         {"comment": "Custom tags for organizing expenses"},
     )
 
     # Tag details
-    name: Mapped[str] = db.Column(
+    name: Mapped[str] = mapped_column(
         db.String(50),
         nullable=False,
         index=True,
         comment="Name of the tag (unique per user, Jira-style)",
     )
-    color: Mapped[str] = db.Column(
+    color: Mapped[str] = mapped_column(
         db.String(20),
         default="#6c757d",
         nullable=False,
         comment="Hex color code for the tag badge (e.g., #6c757d)",
     )
-    description: Mapped[Optional[str]] = db.Column(db.Text, nullable=True, comment="Description of the tag")
+    description: Mapped[str | None] = mapped_column(db.Text, nullable=True, comment="Description of the tag")
 
     # Foreign key
-    user_id: Mapped[int] = db.Column(
+    user_id: Mapped[int] = mapped_column(
         db.Integer,
-        db.ForeignKey("user.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="Reference to the user who owns this tag",
     )
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="tags", lazy="select")
-    expense_tags: Mapped[list["ExpenseTag"]] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="tags", lazy="select")
+    expense_tags: Mapped[list[ExpenseTag]] = relationship(
         "ExpenseTag",
         back_populates="tag",
         cascade="all, delete-orphan",
@@ -77,24 +77,25 @@ class Tag(BaseModel):
         Only counts expenses that actually exist (joins with Expense table).
         """
         if hasattr(self, "_expense_count"):
-            return self._expense_count
+            count = getattr(self, "_expense_count", 0)
+            return int(count) if count else 0
         try:
             # Use a direct query with join to ensure we only count tags on existing expenses
-            from sqlalchemy import func
+            from sqlalchemy import func, select
 
-            from app import db
+            from app.extensions import db
 
-            count = (
-                db.session.query(func.count(ExpenseTag.id))
+            stmt = (
+                select(func.count(ExpenseTag.id))
                 .join(Expense, ExpenseTag.expense_id == Expense.id)
-                .filter(ExpenseTag.tag_id == self.id)
-                .scalar()
+                .where(ExpenseTag.tag_id == self.id)
             )
-            return count or 0
+            result = db.session.scalar(stmt)
+            return int(result) if result else 0
         except Exception:
             return 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the tag.
 
         Returns:
@@ -111,7 +112,7 @@ class Tag(BaseModel):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
-        # Include user info if loaded
+        # Include user info if loaded (check if relationship is loaded)
         if hasattr(self, "user") and self.user is not None:
             result["user"] = {"id": self.user.id, "username": self.user.username}
 
@@ -135,46 +136,46 @@ class ExpenseTag(BaseModel):
         - Soft-deleted when either expense or tag is deleted
     """
 
-    __tablename__ = "expense_tag"
+    __tablename__ = "expense_tag"  # type: ignore[assignment]
     __table_args__ = (
         UniqueConstraint("expense_id", "tag_id", name="uix_expense_tag"),
         {"comment": "Association table for expense-tag relationships"},
     )
 
     # Foreign keys
-    expense_id: Mapped[int] = db.Column(
+    expense_id: Mapped[int] = mapped_column(
         db.Integer,
-        db.ForeignKey("expense.id", ondelete="CASCADE"),
+        ForeignKey("expense.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="Reference to the expense",
     )
-    tag_id: Mapped[int] = db.Column(
+    tag_id: Mapped[int] = mapped_column(
         db.Integer,
-        db.ForeignKey("tag.id", ondelete="CASCADE"),
+        ForeignKey("tag.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="Reference to the tag",
     )
-    added_by: Mapped[int] = db.Column(
+    added_by: Mapped[int] = mapped_column(
         db.Integer,
-        db.ForeignKey("user.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         comment="User who added this tag to the expense",
     )
 
     # Relationships
-    expense: Mapped["Expense"] = relationship("Expense", back_populates="expense_tags", lazy="select")
-    tag: Mapped["Tag"] = relationship("Tag", back_populates="expense_tags", lazy="select")
-    user: Mapped["User"] = relationship("User", lazy="select")
+    expense: Mapped[Expense] = relationship("Expense", back_populates="expense_tags", lazy="select")
+    tag: Mapped[Tag] = relationship("Tag", back_populates="expense_tags", lazy="select")
+    user: Mapped[User] = relationship("User", lazy="select")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the expense tag.
 
         Returns:
             Dict containing the expense tag data
         """
-        result = {
+        result: dict[str, Any] = {
             "id": self.id,
             "expense_id": self.expense_id,
             "tag_id": self.tag_id,
@@ -182,11 +183,16 @@ class ExpenseTag(BaseModel):
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
-        # Include related objects if loaded
-        if hasattr(self, "tag") and self.tag is not None:
-            result["tag"] = self.tag.to_dict()
-        if hasattr(self, "user") and self.user is not None:
-            result["user"] = {"id": self.user.id, "username": self.user.username}
+        # Include related objects if loaded (check if relationships are loaded)
+        # Note: tag and user are always defined but may not be loaded (lazy loading)
+        tag_obj = getattr(self, "tag", None)
+        if tag_obj is not None:
+            tag_dict = tag_obj.to_dict()
+            result["tag"] = tag_dict
+        user_obj = getattr(self, "user", None)
+        if user_obj is not None:
+            user_dict: dict[str, Any] = {"id": user_obj.id, "username": user_obj.username}
+            result["user"] = user_dict
 
         return result
 
@@ -215,47 +221,47 @@ class Expense(BaseModel):
         - Party size is used to calculate price per person metrics
     """
 
-    __tablename__ = "expense"
+    __tablename__ = "expense"  # type: ignore[assignment]
     __table_args__ = {"comment": "Track meal expenses with details about where and when they occurred"}
 
     # Columns
-    amount: Mapped[Decimal] = db.Column(
+    amount: Mapped[Decimal] = mapped_column(
         db.Numeric(10, 2, asdecimal=True),
         nullable=False,
         comment="Amount of the expense (stored with 2 decimal places)",
         default=Decimal("0.00"),
     )
-    notes: Mapped[Optional[str]] = db.Column(db.Text, nullable=True, comment="Additional notes about the expense")
-    meal_type: Mapped[Optional[str]] = db.Column(
+    notes: Mapped[str | None] = mapped_column(db.Text, nullable=True, comment="Additional notes about the expense")
+    meal_type: Mapped[str | None] = mapped_column(
         db.String(50),
         nullable=True,
         index=True,
         comment="Type of meal (e.g., breakfast, lunch, dinner)",
     )
-    order_type: Mapped[Optional[str]] = db.Column(
+    order_type: Mapped[str | None] = mapped_column(
         db.String(50),
         nullable=True,
         index=True,
         comment="Type of order (e.g., dine_in, takeout, delivery)",
     )
-    party_size: Mapped[Optional[int]] = db.Column(
+    party_size: Mapped[int | None] = mapped_column(
         db.Integer,
         nullable=True,
         comment="Number of people in the party (1-50)",
     )
-    date: Mapped[datetime] = db.Column(
+    date: Mapped[datetime] = mapped_column(
         db.DateTime(timezone=True),
         nullable=False,
         index=True,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         comment="Date and time when the expense occurred",
     )
 
     # Receipt information
-    receipt_image: Mapped[Optional[str]] = db.Column(
+    receipt_image: Mapped[str | None] = mapped_column(
         db.String(255), nullable=True, comment="Path to the receipt image file"
     )
-    receipt_verified: Mapped[bool] = db.Column(
+    receipt_verified: Mapped[bool] = mapped_column(
         db.Boolean,
         default=False,
         nullable=False,
@@ -263,33 +269,33 @@ class Expense(BaseModel):
     )
 
     # Foreign keys with proper cascading
-    user_id: Mapped[int] = db.Column(
+    user_id: Mapped[int] = mapped_column(
         db.Integer,
-        db.ForeignKey("user.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="Reference to the user who made this expense",
     )
-    restaurant_id: Mapped[Optional[int]] = db.Column(
+    restaurant_id: Mapped[int | None] = mapped_column(
         db.Integer,
-        db.ForeignKey("restaurant.id", ondelete="SET NULL"),
+        ForeignKey("restaurant.id", ondelete="SET NULL"),
         index=True,
         comment="Reference to the restaurant where the expense occurred",
     )
-    category_id: Mapped[Optional[int]] = db.Column(
+    category_id: Mapped[int | None] = mapped_column(
         db.Integer,
-        db.ForeignKey("category.id", ondelete="SET NULL"),
+        ForeignKey("category.id", ondelete="SET NULL"),
         index=True,
         comment="Reference to the expense category",
     )
 
     # Relationships with explicit join conditions and loading strategies
-    user: Mapped["User"] = relationship("User", back_populates="expenses", lazy="select")
-    restaurant: Mapped[Optional["Restaurant"]] = relationship("Restaurant", back_populates="expenses", lazy="select")
-    category: Mapped[Optional["Category"]] = relationship("Category", back_populates="expenses", lazy="select")
+    user: Mapped[User] = relationship("User", back_populates="expenses", lazy="select")
+    restaurant: Mapped[Restaurant | None] = relationship("Restaurant", back_populates="expenses", lazy="select")
+    category: Mapped[Category | None] = relationship("Category", back_populates="expenses", lazy="select")
 
     # Tags relationship
-    expense_tags: Mapped[list["ExpenseTag"]] = relationship(
+    expense_tags: Mapped[list[ExpenseTag]] = relationship(
         "ExpenseTag",
         back_populates="expense",
         cascade="all, delete-orphan",
@@ -298,39 +304,40 @@ class Expense(BaseModel):
     )
 
     @property
-    def tags(self) -> list["Tag"]:
+    def tags(self) -> list[Tag]:
         """Get all tags associated with this expense."""
-        return [et.tag for et in self.expense_tags if et.tag is not None]
+        expense_tags_list = getattr(self, "expense_tags", [])
+        return [et.tag for et in expense_tags_list if et.tag is not None]
 
     @property
     def formatted_amount(self) -> str:
         """Return the amount formatted as a currency string."""
-        if self.amount is None:
-            return "$0.00"
         return f"${self.amount:.2f}"
 
     @property
     def is_recent(self) -> bool:
         """Check if the expense is from the last 7 days."""
-        if not self.date:
-            return False
-        return (datetime.now(timezone.utc) - self.date).days <= 7
+        return bool((datetime.now(UTC) - self.date).days <= 7)
 
     @property
-    def price_per_person(self) -> Optional[Decimal]:
+    def price_per_person(self) -> Decimal | None:
         """Calculate the price per person for this expense."""
-        if self.amount is None or self.party_size is None or self.party_size <= 0:
+        party_size = self.party_size
+        if party_size is None:
             return None
-        return (self.amount / self.party_size).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        # Type narrowing: after None check, party_size is int
+        if party_size <= 0:
+            return None
+        return (self.amount / party_size).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @property
-    def formatted_price_per_person(self) -> Optional[str]:
+    def formatted_price_per_person(self) -> str | None:
         """Return the price per person formatted as a currency string."""
         if self.price_per_person is None:
             return None
         return f"${self.price_per_person:.2f}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the expense.
 
         Returns:
@@ -339,7 +346,7 @@ class Expense(BaseModel):
         """
         amount_decimal = Decimal(str(self.amount)) if self.amount is not None else Decimal("0.00")
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "id": self.id,
             "amount": float(amount_decimal.quantize(Decimal("0.00"), rounding=ROUND_HALF_UP)),
             "notes": self.notes,
@@ -361,15 +368,20 @@ class Expense(BaseModel):
         }
 
         # Include related objects if they're loaded
-        if hasattr(self, "restaurant") and self.restaurant is not None:
-            result["restaurant"] = self.restaurant.to_dict()
-        if hasattr(self, "category") and self.category is not None:
-            result["category"] = self.category.to_dict()
-        if hasattr(self, "user") and self.user is not None:
+        # Note: restaurant and category are always defined but may not be loaded (lazy loading)
+        restaurant_obj = getattr(self, "restaurant", None)
+        if restaurant_obj is not None:
+            result["restaurant"] = restaurant_obj.to_dict()
+        category_obj = getattr(self, "category", None)
+        if category_obj is not None:
+            result["category"] = category_obj.to_dict()
+        # Note: user is always defined but may not be loaded (lazy loading)
+        user_obj = getattr(self, "user", None)
+        if user_obj is not None:
             result["user"] = {
-                "id": self.user.id,
-                "username": self.user.username,
-                "email": self.user.email,
+                "id": user_obj.id,
+                "username": user_obj.username,
+                "email": user_obj.email,
             }
 
         # Include tags
@@ -383,56 +395,67 @@ class Expense(BaseModel):
 
 @event.listens_for(Expense, "before_insert")
 @event.listens_for(Expense, "before_update")
-def validate_expense(mapper, connection, target):
+def validate_expense(mapper: object, connection: object, target: Expense) -> None:
     """Validate expense data before insert/update."""
     # Ensure amount is properly converted to Decimal and rounded to 2 decimal places
-    if target.amount is not None:
-        if not isinstance(target.amount, Decimal):
-            # Convert to string first to avoid floating point precision issues
-            target.amount = Decimal(str(target.amount))
-        target.amount = target.amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    # Note: amount is typed as Mapped[Decimal] but may be other types at runtime (e.g., float, str)
+    amount_value: Any = target.amount
+    if not isinstance(amount_value, Decimal):
+        # Convert to string first to avoid floating point precision issues
+        amount_value = Decimal(str(amount_value))
+    target.amount = amount_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     # Clean string fields
-    if target.notes:
+    if target.notes is not None:
         target.notes = target.notes.strip()
-    if target.meal_type:
+    if target.meal_type is not None:
         target.meal_type = target.meal_type.strip().lower()
 
     # Ensure date is timezone-aware
+    # Note: Type checker sees timezone=True in column definition, but runtime may receive naive datetimes
     if target.date:
-        from datetime import datetime, timezone
-
-        if isinstance(target.date, datetime):
+        date_value: Any = target.date
+        if isinstance(date_value, datetime):
             # For datetime objects, ensure they're timezone-aware
-            if target.date.tzinfo is None:
-                target.date = target.date.replace(tzinfo=timezone.utc)
+            if date_value.tzinfo is None:
+                target.date = date_value.replace(tzinfo=UTC)
         else:
             # For date objects, interpret as the user's intended date
             # Convert to UTC at noon to avoid date shifting issues
             # This preserves the user's intended date regardless of timezone
-            target.date = datetime.combine(target.date, datetime.min.time().replace(hour=12), tzinfo=timezone.utc)
+            from datetime import date as date_type
+
+            if isinstance(date_value, date_type):
+                target.date = datetime.combine(date_value, datetime.min.time().replace(hour=12), tzinfo=UTC)
 
 
 @event.listens_for(Tag, "before_insert")
 @event.listens_for(Tag, "before_update")
-def validate_tag(mapper, connection, target):
+def validate_tag(mapper: object, connection: object, target: Tag) -> None:
     """Validate tag data before insert/update."""
     # Clean string fields
-    if target.name:
-        # Convert to lowercase and replace spaces with hyphens for Jira-style naming
-        target.name = target.name.strip().lower().replace(" ", "-")
-        # Remove any non-alphanumeric characters except hyphens
-        target.name = "".join(c for c in target.name if c.isalnum() or c == "-")
-        # Ensure it starts with a letter or number
-        if target.name and not target.name[0].isalnum():
-            target.name = target.name[1:]
-    if target.description:
-        target.description = target.description.strip()
-    if target.color:
-        # Ensure color is lowercase and starts with #
-        target.color = target.color.lower().lstrip("#")
-        if not target.color.startswith("#"):
-            target.color = f"#{target.color}"
+    # Note: name is non-nullable, so no None check needed
+    name_val: str = target.name
+    # Convert to lowercase and replace spaces with hyphens for Jira-style naming
+    name_val = name_val.strip().lower().replace(" ", "-")
+    # Remove any non-alphanumeric characters except hyphens
+    name_val = "".join(c for c in name_val if c.isalnum() or c == "-")
+    # Ensure it starts with a letter or number
+    if name_val and not name_val[0].isalnum():
+        name_val = name_val[1:]
+    target.name = name_val
+    # Clean description if present
+    description_val = target.description
+    if description_val is not None:
+        stripped = description_val.strip()
+        target.description = stripped if stripped else None
+    # Clean and format color (color is non-nullable)
+    color_val = target.color
+    if color_val is not None:
+        color_val = color_val.lower().lstrip("#")
+        if not color_val.startswith("#"):
+            color_val = f"#{color_val}"
+        target.color = color_val
 
 
 class Category(BaseModel):
@@ -452,30 +475,30 @@ class Category(BaseModel):
         - Default categories are pre-created for new users
     """
 
-    __tablename__ = "category"
+    __tablename__ = "category"  # type: ignore[assignment]
     __table_args__ = (
         UniqueConstraint("name", "user_id", name="uix_category_name_user"),
         {"comment": "Categories for organizing expenses"},
     )
 
     # Category details
-    name: Mapped[str] = db.Column(
+    name: Mapped[str] = mapped_column(
         db.String(100),
         nullable=False,
         index=True,
         comment="Name of the category (unique per user)",
     )
-    description: Mapped[Optional[str]] = db.Column(db.Text, nullable=True, comment="Description of the category")
-    color: Mapped[str] = db.Column(
+    description: Mapped[str | None] = mapped_column(db.Text, nullable=True, comment="Description of the category")
+    color: Mapped[str] = mapped_column(
         db.String(20),
         default="#6c757d",
         nullable=False,
         comment="Hex color code for the category (e.g., #6c757d)",
     )
-    icon: Mapped[Optional[str]] = db.Column(
+    icon: Mapped[str | None] = mapped_column(
         db.String(50), nullable=True, comment="Icon identifier from the icon library"
     )
-    is_default: Mapped[bool] = db.Column(
+    is_default: Mapped[bool] = mapped_column(
         db.Boolean,
         default=False,
         nullable=False,
@@ -483,17 +506,17 @@ class Category(BaseModel):
     )
 
     # Foreign key
-    user_id: Mapped[int] = db.Column(
+    user_id: Mapped[int] = mapped_column(
         db.Integer,
-        db.ForeignKey("user.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="Reference to the user who owns this category",
     )
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="categories", lazy="joined", innerjoin=True)
-    expenses: Mapped[list["Expense"]] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="categories", lazy="joined", innerjoin=True)
+    expenses: Mapped[list[Expense]] = relationship(
         "Expense",
         back_populates="category",
         cascade="all, delete-orphan",
@@ -505,18 +528,20 @@ class Category(BaseModel):
     def expense_count(self) -> int:
         """Get the number of expenses in this category."""
         if hasattr(self, "_expense_count"):
-            return self._expense_count
+            count = getattr(self, "_expense_count", 0)
+            return int(count) if count else 0
         if hasattr(self, "expenses") and hasattr(self.expenses, "count"):
-            return self.expenses.count()
+            count = self.expenses.count()  # type: ignore[call-arg]
+            return int(count) if count else 0
         return 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the category.
 
         Returns:
             Dict containing the category data with related counts
         """
-        result = {
+        result: dict[str, Any] = {
             "id": self.id,
             "name": self.name,
             "description": self.description,
@@ -530,8 +555,9 @@ class Category(BaseModel):
         }
 
         # Include user info if loaded
-        if hasattr(self, "user") and self.user is not None:
-            result["user"] = {"id": self.user.id, "username": self.user.username}
+        user = getattr(self, "user", None)
+        if user is not None:
+            result["user"] = {"id": user.id, "username": user.username}
 
         return result
 
@@ -541,17 +567,26 @@ class Category(BaseModel):
 
 @event.listens_for(Category, "before_insert")
 @event.listens_for(Category, "before_update")
-def validate_category(mapper, connection, target):
+def validate_category(mapper: object, connection: object, target: Category) -> None:
     """Validate category data before insert/update."""
     # Clean string fields
-    if target.name:
-        target.name = target.name.strip()
-    if target.description:
-        target.description = target.description.strip()
-    if target.color:
-        # Ensure color is lowercase and starts with #
-        target.color = target.color.lower().lstrip("#")
-        if not target.color.startswith("#"):
-            target.color = f"#{target.color}"
-    if target.icon:
-        target.icon = target.icon.strip()
+    # Note: name is non-nullable, so no None check needed
+    name_val: str = target.name
+    target.name = name_val.strip()
+    # Clean description if present
+    description_val = target.description
+    if description_val is not None:
+        stripped = description_val.strip()
+        target.description = stripped if stripped else None
+    # Clean and format color (color is non-nullable)
+    color_val = target.color
+    if color_val is not None:
+        color_val = color_val.lower().lstrip("#")
+        if not color_val.startswith("#"):
+            color_val = f"#{color_val}"
+        target.color = color_val
+    # Clean icon if present
+    icon_val = target.icon
+    if icon_val is not None:
+        stripped_icon = icon_val.strip()
+        target.icon = stripped_icon if stripped_icon else None

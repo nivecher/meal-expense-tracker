@@ -2,9 +2,9 @@
 
 from unittest.mock import Mock, patch
 
-import pytest
 from click.testing import CliRunner
 from flask import Flask
+import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.auth.cli import (
@@ -87,17 +87,17 @@ class TestAuthCLI:
         user.categories.count.return_value = 2
         return user
 
-    def test_user_cli_group(self):
+    def test_user_cli_group(self) -> None:
         """Test user CLI group creation."""
         assert user_cli.name == "user"
         assert user_cli.help == "User management commands."
 
-    def test_register_commands(self, app):
+    def test_register_commands(self, app) -> None:
         """Test command registration."""
         register_commands(app)
         assert "user" in [cmd.name for cmd in app.cli.commands.values()]
 
-    def test_reset_admin_password_success(self, runner, app, mock_user):
+    def test_reset_admin_password_success(self, runner, app, mock_user) -> None:
         """Test successful admin password reset."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:
@@ -111,7 +111,7 @@ class TestAuthCLI:
                 mock_user.set_password.assert_called_once_with("newpass123")
                 mock_db.session.commit.assert_called_once()
 
-    def test_reset_admin_password_user_not_found(self, runner, app):
+    def test_reset_admin_password_user_not_found(self, runner, app) -> None:
         """Test admin password reset when user not found."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:
@@ -123,7 +123,7 @@ class TestAuthCLI:
                 assert result.exit_code == 0
                 assert "No admin user found" in result.output
 
-    def test_reset_admin_password_exception(self, runner, app, mock_user):
+    def test_reset_admin_password_exception(self, runner, app, mock_user) -> None:
         """Test admin password reset with exception."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:
@@ -137,13 +137,13 @@ class TestAuthCLI:
                 assert "Error updating password" in result.output
                 mock_db.session.rollback.assert_called_once()
 
-    def test_count_user_objects(self, mock_user):
+    def test_count_user_objects(self, mock_user) -> None:
         """Test counting user related objects."""
         result = _count_user_objects(mock_user)
 
         assert result == {"expenses": 5, "restaurants": 3, "categories": 2}
 
-    def test_list_users_success(self, runner, app, mock_user):
+    def test_list_users_success(self, runner, app, mock_user) -> None:
         """Test successful user listing."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:
@@ -154,7 +154,7 @@ class TestAuthCLI:
                 assert "testuser" in result.output
                 assert "test@example.com" in result.output
 
-    def test_list_users_admin_only(self, runner, app, mock_user):
+    def test_list_users_admin_only(self, runner, app, mock_user) -> None:
         """Test user listing with admin only filter."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:
@@ -164,7 +164,7 @@ class TestAuthCLI:
                 assert result.exit_code == 0
                 assert "admin only" in result.output
 
-    def test_list_users_with_objects(self, runner, app, mock_user):
+    def test_list_users_with_objects(self, runner, app, mock_user) -> None:
         """Test user listing with object counts."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:
@@ -176,7 +176,7 @@ class TestAuthCLI:
                 assert "Restaurants" in result.output
                 assert "Categories" in result.output
 
-    def test_list_users_no_users(self, runner, app):
+    def test_list_users_no_users(self, runner, app) -> None:
         """Test user listing when no users found."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:
@@ -186,7 +186,7 @@ class TestAuthCLI:
                 assert result.exit_code == 0
                 assert "No users found" in result.output
 
-    def test_create_user_success(self, runner, app):
+    def test_create_user_success(self, runner, app) -> None:
         """Test successful user creation."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:
@@ -212,7 +212,7 @@ class TestAuthCLI:
                     mock_db.session.add.assert_called_once()
                     mock_db.session.commit.assert_called_once()
 
-    def test_create_user_invalid_email(self, runner, app):
+    def test_create_user_invalid_email(self, runner, app) -> None:
         """Test user creation with invalid email."""
         result = runner.invoke(
             create_user, ["--username", "newuser", "--email", "invalid-email", "--password", "password123"]
@@ -220,7 +220,7 @@ class TestAuthCLI:
         assert result.exit_code == 0
         assert "Invalid email format" in result.output
 
-    def test_create_user_short_password(self, runner, app):
+    def test_create_user_short_password(self, runner, app) -> None:
         """Test user creation with short password."""
         result = runner.invoke(
             create_user, ["--username", "newuser", "--email", "newuser@example.com", "--password", "123"]
@@ -228,7 +228,7 @@ class TestAuthCLI:
         assert result.exit_code == 0
         assert "Password must be at least 8 characters" in result.output
 
-    def test_create_user_existing_user(self, runner, app):
+    def test_create_user_existing_user(self, runner, app) -> None:
         """Test user creation when user already exists."""
         with app.app_context():
             with patch("app.auth.models.User") as mock_user_class:
@@ -244,7 +244,7 @@ class TestAuthCLI:
                 assert result.exit_code == 0
                 assert "already exists" in result.output
 
-    def test_create_user_integrity_error(self, runner, app):
+    def test_create_user_integrity_error(self, runner, app) -> None:
         """Test user creation with integrity error."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:
@@ -262,7 +262,7 @@ class TestAuthCLI:
                     assert "Error creating user" in result.output
                     mock_db.session.rollback.assert_called_once()
 
-    def test_find_user_by_identifier_id(self, app, mock_user):
+    def test_find_user_by_identifier_id(self, app, mock_user) -> None:
         """Test finding user by ID."""
         with app.app_context():
             with patch("app.extensions.db") as mock_db:
@@ -272,7 +272,7 @@ class TestAuthCLI:
                 assert result == mock_user
                 mock_db.session.get.assert_called_once()
 
-    def test_find_user_by_identifier_username(self, app, mock_user):
+    def test_find_user_by_identifier_username(self, app, mock_user) -> None:
         """Test finding user by username."""
         with app.app_context():
             with patch("app.auth.models.User") as mock_user_class:
@@ -283,7 +283,7 @@ class TestAuthCLI:
                 result = _find_user_by_identifier("testuser")
                 assert result == mock_user
 
-    def test_find_user_by_identifier_email(self, app, mock_user):
+    def test_find_user_by_identifier_email(self, app, mock_user) -> None:
         """Test finding user by email."""
         with app.app_context():
             with patch("app.auth.models.User") as mock_user_class:
@@ -294,7 +294,7 @@ class TestAuthCLI:
                 result = _find_user_by_identifier("test@example.com")
                 assert result == mock_user
 
-    def test_find_user_by_identifier_not_found(self, app):
+    def test_find_user_by_identifier_not_found(self, app) -> None:
         """Test finding user when not found."""
         with app.app_context():
             with patch("app.auth.models.User") as mock_user_class:
@@ -305,7 +305,7 @@ class TestAuthCLI:
                 result = _find_user_by_identifier("nonexistent")
                 assert result is None
 
-    def test_update_user_username_success(self, app, mock_user):
+    def test_update_user_username_success(self, app, mock_user) -> None:
         """Test successful username update."""
         with app.app_context():
             with patch("app.auth.models.User") as mock_user_class:
@@ -320,7 +320,7 @@ class TestAuthCLI:
                 assert mock_user.username == "newusername"
                 assert "username to 'newusername'" in changes
 
-    def test_update_user_username_same(self, mock_user):
+    def test_update_user_username_same(self, mock_user) -> None:
         """Test username update with same username."""
         changes = []
         result = _update_user_username(mock_user, "testuser", changes)
@@ -328,7 +328,7 @@ class TestAuthCLI:
         assert result is True
         assert changes == []
 
-    def test_update_user_username_taken(self, app, mock_user):
+    def test_update_user_username_taken(self, app, mock_user) -> None:
         """Test username update with taken username."""
         with app.app_context():
             with patch("app.auth.models.User") as mock_user_class:
@@ -342,7 +342,7 @@ class TestAuthCLI:
                 assert result is False
                 assert changes == []
 
-    def test_update_user_email_success(self, app, mock_user):
+    def test_update_user_email_success(self, app, mock_user) -> None:
         """Test successful email update."""
         with app.app_context():
             with patch("app.auth.models.User") as mock_user_class:
@@ -357,7 +357,7 @@ class TestAuthCLI:
                 assert mock_user.email == "newemail@example.com"
                 assert "email to 'newemail@example.com'" in changes
 
-    def test_update_user_email_same(self, mock_user):
+    def test_update_user_email_same(self, mock_user) -> None:
         """Test email update with same email."""
         changes = []
         result = _update_user_email(mock_user, "test@example.com", changes)
@@ -365,7 +365,7 @@ class TestAuthCLI:
         assert result is True
         assert changes == []
 
-    def test_update_user_email_invalid(self, mock_user):
+    def test_update_user_email_invalid(self, mock_user) -> None:
         """Test email update with invalid email."""
         changes = []
         result = _update_user_email(mock_user, "invalid-email", changes)
@@ -373,7 +373,7 @@ class TestAuthCLI:
         assert result is False
         assert changes == []
 
-    def test_update_user_email_taken(self, app, mock_user):
+    def test_update_user_email_taken(self, app, mock_user) -> None:
         """Test email update with taken email."""
         with app.app_context():
             with patch("app.auth.models.User") as mock_user_class:
@@ -387,7 +387,7 @@ class TestAuthCLI:
                 assert result is False
                 assert changes == []
 
-    def test_update_user_password_success(self, mock_user):
+    def test_update_user_password_success(self, mock_user) -> None:
         """Test successful password update."""
         with patch("app.auth.cli.click") as mock_click:
             mock_click.prompt.return_value = "newpassword123"
@@ -400,7 +400,7 @@ class TestAuthCLI:
             mock_user.set_password.assert_called_once_with("newpassword123")
             assert "password" in changes
 
-    def test_update_user_password_short(self, mock_user):
+    def test_update_user_password_short(self, mock_user) -> None:
         """Test password update with short password."""
         with patch("app.auth.cli.click") as mock_click:
             mock_click.prompt.return_value = "123"
@@ -411,7 +411,7 @@ class TestAuthCLI:
             assert result is False
             assert changes == []
 
-    def test_update_user_password_cancelled(self, mock_user):
+    def test_update_user_password_cancelled(self, mock_user) -> None:
         """Test password update when cancelled."""
         with patch("app.auth.cli.click") as mock_click:
             mock_click.prompt.return_value = "newpassword123"
@@ -423,7 +423,7 @@ class TestAuthCLI:
             assert result is False
             assert changes == []
 
-    def test_update_user_admin_status_changed(self, mock_user):
+    def test_update_user_admin_status_changed(self, mock_user) -> None:
         """Test admin status update when changed."""
         changes = []
         result = _update_user_admin_status(mock_user, False, changes)
@@ -432,7 +432,7 @@ class TestAuthCLI:
         assert mock_user.is_admin is False
         assert "admin privileges revoked" in changes
 
-    def test_update_user_admin_status_unchanged(self, mock_user):
+    def test_update_user_admin_status_unchanged(self, mock_user) -> None:
         """Test admin status update when unchanged."""
         changes = []
         result = _update_user_admin_status(mock_user, True, changes)
@@ -440,7 +440,7 @@ class TestAuthCLI:
         assert result is True
         assert changes == []
 
-    def test_update_user_active_status_changed(self, mock_user):
+    def test_update_user_active_status_changed(self, mock_user) -> None:
         """Test active status update when changed."""
         changes = []
         result = _update_user_active_status(mock_user, False, changes)
@@ -449,7 +449,7 @@ class TestAuthCLI:
         assert mock_user.is_active is False
         assert "account deactivated" in changes
 
-    def test_update_user_active_status_unchanged(self, mock_user):
+    def test_update_user_active_status_unchanged(self, mock_user) -> None:
         """Test active status update when unchanged."""
         changes = []
         result = _update_user_active_status(mock_user, True, changes)
@@ -457,12 +457,12 @@ class TestAuthCLI:
         assert result is True
         assert changes == []
 
-    def test_confirm_and_apply_changes_no_changes(self, mock_user):
+    def test_confirm_and_apply_changes_no_changes(self, mock_user) -> None:
         """Test confirm and apply changes with no changes."""
         result = _confirm_and_apply_changes(mock_user, [])
         assert result is False
 
-    def test_confirm_and_apply_changes_success(self, mock_user):
+    def test_confirm_and_apply_changes_success(self, mock_user) -> None:
         """Test successful confirm and apply changes."""
         with patch("app.auth.cli.db") as mock_db:
             with patch("app.auth.cli.click") as mock_click:
@@ -474,7 +474,7 @@ class TestAuthCLI:
                 assert result is True
                 mock_db.session.commit.assert_called_once()
 
-    def test_confirm_and_apply_changes_cancelled(self, mock_user):
+    def test_confirm_and_apply_changes_cancelled(self, mock_user) -> None:
         """Test confirm and apply changes when cancelled."""
         with patch("app.auth.cli.click") as mock_click:
             mock_click.confirm.return_value = False
@@ -484,7 +484,7 @@ class TestAuthCLI:
 
             assert result is False
 
-    def test_confirm_and_apply_changes_integrity_error(self, mock_user):
+    def test_confirm_and_apply_changes_integrity_error(self, mock_user) -> None:
         """Test confirm and apply changes with integrity error."""
         with patch("app.auth.cli.db") as mock_db:
             with patch("app.auth.cli.click") as mock_click:
@@ -497,7 +497,7 @@ class TestAuthCLI:
                 assert result is False
                 mock_db.session.rollback.assert_called_once()
 
-    def test_update_user_success(self, runner, app, mock_user):
+    def test_update_user_success(self, runner, app, mock_user) -> None:
         """Test successful user update."""
         with app.app_context():
             with patch("app.auth.cli._find_user_by_identifier") as mock_find:
@@ -511,7 +511,7 @@ class TestAuthCLI:
                         assert result.exit_code == 0
                         mock_update_username.assert_called_once()
 
-    def test_update_user_not_found(self, runner, app):
+    def test_update_user_not_found(self, runner, app) -> None:
         """Test user update when user not found."""
         with app.app_context():
             with patch("app.auth.cli._find_user_by_identifier") as mock_find:
@@ -521,7 +521,7 @@ class TestAuthCLI:
                 assert result.exit_code == 0
                 assert "No user found" in result.output
 
-    def test_update_user_no_changes(self, runner, app, mock_user):
+    def test_update_user_no_changes(self, runner, app, mock_user) -> None:
         """Test user update with no changes specified."""
         with app.app_context():
             with patch("app.auth.cli._find_user_by_identifier") as mock_find:
@@ -531,7 +531,7 @@ class TestAuthCLI:
                 assert result.exit_code == 0
                 assert "No changes specified" in result.output
 
-    def test_display_user_info(self, mock_user, capsys):
+    def test_display_user_info(self, mock_user, capsys) -> None:
         """Test displaying user information."""
         _display_user_info(mock_user)
         captured = capsys.readouterr()
@@ -540,7 +540,7 @@ class TestAuthCLI:
         assert "Admin: Yes" in captured.out
         assert "Active: Yes" in captured.out
 
-    def test_check_related_data_no_data(self, mock_user):
+    def test_check_related_data_no_data(self, mock_user) -> None:
         """Test checking related data when no data exists."""
         mock_user.expenses.count.return_value = 0
         mock_user.restaurants.count.return_value = 0
@@ -549,7 +549,7 @@ class TestAuthCLI:
         result = _check_related_data(mock_user, False, False)
         assert result is True
 
-    def test_check_related_data_with_data_cascade(self, mock_user):
+    def test_check_related_data_with_data_cascade(self, mock_user) -> None:
         """Test checking related data with cascade enabled."""
         with patch("app.auth.cli.click") as mock_click:
             mock_click.confirm.return_value = True
@@ -557,17 +557,17 @@ class TestAuthCLI:
             result = _check_related_data(mock_user, False, False)
             assert result is True
 
-    def test_check_related_data_with_data_no_cascade(self, mock_user):
+    def test_check_related_data_with_data_no_cascade(self, mock_user) -> None:
         """Test checking related data with no cascade."""
         result = _check_related_data(mock_user, True, False)
         assert result is False
 
-    def test_check_related_data_with_data_force(self, mock_user):
+    def test_check_related_data_with_data_force(self, mock_user) -> None:
         """Test checking related data with force flag."""
         result = _check_related_data(mock_user, False, True)
         assert result is True
 
-    def test_confirm_deletion_success(self, mock_user):
+    def test_confirm_deletion_success(self, mock_user) -> None:
         """Test successful deletion confirmation."""
         with patch("app.auth.cli.click") as mock_click:
             mock_click.confirm.return_value = True
@@ -575,7 +575,7 @@ class TestAuthCLI:
             result = _confirm_deletion(mock_user, False)
             assert result is True
 
-    def test_confirm_deletion_cancelled(self, mock_user):
+    def test_confirm_deletion_cancelled(self, mock_user) -> None:
         """Test deletion confirmation when cancelled."""
         with patch("app.auth.cli.click") as mock_click:
             mock_click.confirm.return_value = False
@@ -583,12 +583,12 @@ class TestAuthCLI:
             result = _confirm_deletion(mock_user, False)
             assert result is False
 
-    def test_confirm_deletion_force(self, mock_user):
+    def test_confirm_deletion_force(self, mock_user) -> None:
         """Test deletion confirmation with force flag."""
         result = _confirm_deletion(mock_user, True)
         assert result is True
 
-    def test_execute_user_deletion_success(self, mock_user):
+    def test_execute_user_deletion_success(self, mock_user) -> None:
         """Test successful user deletion."""
         with patch("app.auth.cli.db") as mock_db:
             _execute_user_deletion(mock_user)
@@ -596,16 +596,18 @@ class TestAuthCLI:
             mock_db.session.delete.assert_called_once_with(mock_user)
             mock_db.session.commit.assert_called_once()
 
-    def test_execute_user_deletion_integrity_error(self, mock_user):
+    def test_execute_user_deletion_integrity_error(self, mock_user) -> None:
         """Test user deletion with integrity error."""
+        from sqlalchemy.exc import IntegrityError as SQLIntegrityError
+
         with patch("app.auth.cli.db") as mock_db:
-            mock_db.session.commit.side_effect = IntegrityError("Constraint violation", None, None)
+            mock_db.session.commit.side_effect = SQLIntegrityError("Constraint violation", None, Exception("orig"))
 
             _execute_user_deletion(mock_user)
 
             mock_db.session.rollback.assert_called_once()
 
-    def test_execute_user_deletion_exception(self, mock_user):
+    def test_execute_user_deletion_exception(self, mock_user) -> None:
         """Test user deletion with exception."""
         with patch("app.auth.cli.db") as mock_db:
             mock_db.session.commit.side_effect = Exception("Database error")
@@ -614,7 +616,7 @@ class TestAuthCLI:
 
             mock_db.session.rollback.assert_called_once()
 
-    def test_delete_user_success(self, runner, app, mock_user):
+    def test_delete_user_success(self, runner, app, mock_user) -> None:
         """Test successful user deletion."""
         with app.app_context():
             with patch("app.auth.cli._find_user_by_identifier") as mock_find:
@@ -629,7 +631,7 @@ class TestAuthCLI:
                             assert result.exit_code == 0
                             mock_execute.assert_called_once()
 
-    def test_delete_user_not_found(self, runner, app):
+    def test_delete_user_not_found(self, runner, app) -> None:
         """Test user deletion when user not found."""
         with app.app_context():
             with patch("app.auth.cli._find_user_by_identifier") as mock_find:
@@ -639,7 +641,7 @@ class TestAuthCLI:
                 assert result.exit_code == 0
                 assert "No user found" in result.output
 
-    def test_delete_user_no_cascade_with_data(self, runner, app, mock_user):
+    def test_delete_user_no_cascade_with_data(self, runner, app, mock_user) -> None:
         """Test user deletion with no cascade when user has data."""
         with app.app_context():
             with patch("app.auth.cli._find_user_by_identifier") as mock_find:
@@ -650,7 +652,7 @@ class TestAuthCLI:
                     result = runner.invoke(delete_user, ["testuser", "--no-cascade"])
                     assert result.exit_code == 0
 
-    def test_delete_user_cancelled(self, runner, app, mock_user):
+    def test_delete_user_cancelled(self, runner, app, mock_user) -> None:
         """Test user deletion when cancelled."""
         with app.app_context():
             with patch("app.auth.cli._find_user_by_identifier") as mock_find:
@@ -663,7 +665,7 @@ class TestAuthCLI:
                         result = runner.invoke(delete_user, ["testuser"])
                         assert result.exit_code == 0
 
-    def test_create_user_inactive(self, runner, app):
+    def test_create_user_inactive(self, runner, app) -> None:
         """Test creating inactive user."""
         with app.app_context():
             with patch("app.auth.cli.db"):
@@ -687,7 +689,7 @@ class TestAuthCLI:
                     assert result.exit_code == 0
                     assert "Active: No" in result.output
 
-    def test_update_user_multiple_changes(self, runner, app, mock_user):
+    def test_update_user_multiple_changes(self, runner, app, mock_user) -> None:
         """Test user update with multiple changes."""
         with app.app_context():
             with patch("app.auth.cli._find_user_by_identifier") as mock_find:
@@ -706,7 +708,7 @@ class TestAuthCLI:
                             mock_update_username.assert_called_once()
                             mock_update_email.assert_called_once()
 
-    def test_list_users_table_formatting(self, runner, app, mock_user):
+    def test_list_users_table_formatting(self, runner, app, mock_user) -> None:
         """Test user listing table formatting."""
         with app.app_context():
             with patch("app.auth.cli.db") as mock_db:

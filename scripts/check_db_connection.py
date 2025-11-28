@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
 
-def main():
+def main() -> int:
     # Database configuration - using the same settings as the app
     db_url = "sqlite:////home/mtd37/.meal_expense_tracker/meal_expenses.db"
 

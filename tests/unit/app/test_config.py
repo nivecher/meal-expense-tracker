@@ -18,7 +18,7 @@ class TestConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # SQLAlchemy 2.0 engine options
-    SQLALCHEMY_ENGINE_OPTIONS: Dict[str, Any] = {
+    SQLALCHEMY_ENGINE_OPTIONS: dict[str, Any] = {
         "connect_args": {"check_same_thread": False},
         "pool_pre_ping": True,
         "pool_recycle": 300,
@@ -26,7 +26,7 @@ class TestConfig:
     }
 
     # Session configuration
-    SQLALCHEMY_SESSION_OPTIONS: Dict[str, Any] = {
+    SQLALCHEMY_SESSION_OPTIONS: dict[str, Any] = {
         "expire_on_commit": False,
         "autoflush": False,
     }

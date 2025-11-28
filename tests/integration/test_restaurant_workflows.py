@@ -104,7 +104,7 @@ class TestRestaurantWorkflows:
             ],
         }
 
-    def test_restaurant_creation_workflow(self, logged_in_client, user, mock_google_places_data):
+    def test_restaurant_creation_workflow(self, logged_in_client, user, mock_google_places_data) -> None:
         """Test complete restaurant creation workflow."""
         # Test that the route exists and is accessible
         response = logged_in_client.get("/restaurants/add")
@@ -124,7 +124,7 @@ class TestRestaurantWorkflows:
         # Should return 200 (form with validation errors) or 302 (success)
         assert response.status_code in [200, 302]
 
-    def test_google_places_search_workflow(self, logged_in_client, user, mock_google_places_data):
+    def test_google_places_search_workflow(self, logged_in_client, user, mock_google_places_data) -> None:
         """Test Google Places search and restaurant creation workflow."""
         # Test that the Google Places search route is accessible
         response = logged_in_client.get(
@@ -134,7 +134,7 @@ class TestRestaurantWorkflows:
         # Should return 200 (success) or 500 (error due to missing API key in test environment)
         assert response.status_code in [200, 500]
 
-    def test_restaurant_import_export_workflow(self, logged_in_client, user):
+    def test_restaurant_import_export_workflow(self, logged_in_client, user) -> None:
         """Test restaurant CSV import and export workflow."""
         # Test that the export route is accessible (will redirect since no restaurants exist)
         response = logged_in_client.get("/restaurants/export?format=csv")
@@ -143,7 +143,7 @@ class TestRestaurantWorkflows:
         assert response.status_code == 302
         assert "/restaurants/" in response.location
 
-    def test_restaurant_filtering_and_pagination_workflow(self, logged_in_client, user):
+    def test_restaurant_filtering_and_pagination_workflow(self, logged_in_client, user) -> None:
         """Test restaurant filtering and pagination workflow."""
         with patch("app.restaurants.routes.services.get_restaurants_for_user") as mock_get_restaurants:
             # Mock restaurant data
@@ -163,7 +163,7 @@ class TestRestaurantWorkflows:
             # Should render the restaurant list template
             assert b"restaurants" in response.data.lower()
 
-    def test_restaurant_edit_workflow(self, logged_in_client, user):
+    def test_restaurant_edit_workflow(self, logged_in_client, user) -> None:
         """Test restaurant editing workflow."""
         # Test that the edit route is accessible (will return 404 since restaurant doesn't exist)
         response = logged_in_client.get("/restaurants/1/edit")
@@ -171,7 +171,7 @@ class TestRestaurantWorkflows:
         # Should return 404 (restaurant not found) rather than 500 (server error)
         assert response.status_code == 404
 
-    def test_restaurant_deletion_workflow(self, logged_in_client, user):
+    def test_restaurant_deletion_workflow(self, logged_in_client, user) -> None:
         """Test restaurant deletion workflow."""
         with patch("app.restaurants.routes.services.get_restaurant_for_user") as mock_get:
             with patch("app.restaurants.routes.services.delete_restaurant_by_id") as mock_delete:
@@ -191,7 +191,7 @@ class TestRestaurantWorkflows:
                 # Verify delete was called
                 mock_delete.assert_called_once()
 
-    def test_restaurant_search_by_location_workflow(self, logged_in_client, user):
+    def test_restaurant_search_by_location_workflow(self, logged_in_client, user) -> None:
         """Test restaurant search by location workflow."""
         # Test location-based search with correct parameters
         response = logged_in_client.get(
@@ -205,7 +205,7 @@ class TestRestaurantWorkflows:
         assert data["success"] is True
         assert "results" in data
 
-    def test_restaurant_duplicate_detection_workflow(self, logged_in_client, user):
+    def test_restaurant_duplicate_detection_workflow(self, logged_in_client, user) -> None:
         """Test restaurant duplicate detection workflow."""
         # Test that the duplicate detection route is accessible
         response = logged_in_client.post(
@@ -217,7 +217,7 @@ class TestRestaurantWorkflows:
         data = json.loads(response.data)
         assert "exists" in data
 
-    def test_restaurant_form_validation_workflow(self, logged_in_client, user):
+    def test_restaurant_form_validation_workflow(self, logged_in_client, user) -> None:
         """Test restaurant form validation workflow."""
         # Test with invalid data
         response = logged_in_client.post(
@@ -234,7 +234,7 @@ class TestRestaurantWorkflows:
         assert response.status_code == 200  # Form re-rendered with errors
         assert b"error" in response.data.lower() or b"invalid" in response.data.lower()
 
-    def test_restaurant_ajax_creation_workflow(self, logged_in_client, user):
+    def test_restaurant_ajax_creation_workflow(self, logged_in_client, user) -> None:
         """Test AJAX restaurant creation workflow."""
         with patch("app.restaurants.routes.services.create_restaurant") as mock_create:
             # Mock successful restaurant creation
@@ -261,7 +261,7 @@ class TestRestaurantWorkflows:
             assert data["success"] is True
             assert data["restaurant_id"] == 1
 
-    def test_restaurant_error_handling_workflow(self, logged_in_client, user):
+    def test_restaurant_error_handling_workflow(self, logged_in_client, user) -> None:
         """Test restaurant error handling workflow."""
         with patch("app.restaurants.routes.services.create_restaurant") as mock_create:
             # Mock service exception

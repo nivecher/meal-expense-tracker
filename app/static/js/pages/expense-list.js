@@ -8,7 +8,9 @@ import { initializeRobustFaviconHandling } from '../utils/robust-favicon-handler
 function setCookie(name, value, days) {
   const expires = new Date();
   expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+  // Add Secure flag for HTTPS sessions to prevent man-in-the-middle attacks
+  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/${secureFlag}`;
 }
 
 // Initialize Bootstrap tooltips

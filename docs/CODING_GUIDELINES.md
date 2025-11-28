@@ -256,8 +256,7 @@ app/
 ### Python
 
 - Black for code formatting
-- isort for import sorting
-- flake8 for linting
+- Ruff for linting, import sorting, and unused code removal (replaces flake8, isort, autoflake)
 - mypy for type checking
 - bandit for security scanning
 

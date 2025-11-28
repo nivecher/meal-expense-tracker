@@ -212,6 +212,13 @@ self.addEventListener('fetch', (event) => {
 // ===== MESSAGE HANDLING =====
 
 self.addEventListener('message', (event) => {
+  // Validate message origin to prevent unauthorized messages
+  // Only accept messages from same origin
+  if (event.origin !== self.location.origin) {
+    console.warn('Service worker received message from unauthorized origin:', event.origin);
+    return;
+  }
+
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }

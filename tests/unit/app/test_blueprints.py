@@ -1,7 +1,7 @@
 """Tests for blueprint registration and initialization."""
 
 
-def test_blueprint_registration(app):
+def test_blueprint_registration(app) -> None:
     """Test that all blueprints are properly registered."""
     blueprints = app.blueprints
 
@@ -32,7 +32,7 @@ def test_blueprint_registration(app):
     assert "main.about" in url_rules, "Main about route not found"
 
 
-def test_blueprint_initialization(app):
+def test_blueprint_initialization(app) -> None:
     """Test that blueprints are properly initialized with the app."""
     with app.app_context():
         assert app.config["TESTING"] is True, "App not in testing mode"

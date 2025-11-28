@@ -1,12 +1,12 @@
 """Tests for restaurant details view and functionality."""
 
-import pytest
 from flask import url_for
+import pytest
 
 from app.restaurants.models import Restaurant
 
 
-def test_restaurant_details_view(client, auth, test_user, test_restaurant):
+def test_restaurant_details_view(client, auth, test_user, test_restaurant) -> None:
     """Test viewing restaurant details."""
     # Login as test user
     auth.login(username=test_user.username, password="testpass")
@@ -22,7 +22,7 @@ def test_restaurant_details_view(client, auth, test_user, test_restaurant):
     assert b"Edit" in response.data
 
 
-def test_edit_restaurant(client, auth, test_user, test_restaurant, session):
+def test_edit_restaurant(client, auth, test_user, test_restaurant, session) -> None:
     """Test editing a restaurant's details."""
     auth.login(username=test_user.username, password="testpass")
 
@@ -62,7 +62,7 @@ def test_edit_restaurant(client, auth, test_user, test_restaurant, session):
     assert updated_restaurant.address_line_1 == "123 Updated St"
 
 
-def test_restaurant_not_found(client, auth, test_user):
+def test_restaurant_not_found(client, auth, test_user) -> None:
     """Test accessing a non-existent restaurant."""
     auth.login(username=test_user.username, password="testpass")
 
@@ -72,7 +72,7 @@ def test_restaurant_not_found(client, auth, test_user):
     assert response.status_code == 404
 
 
-def test_unauthorized_access(client, auth, test_restaurant, test_user2):
+def test_unauthorized_access(client, auth, test_restaurant, test_user2) -> None:
     """Test that users can't access other users' restaurants."""
     # Login as a different user
     auth.login(username=test_user2.username, password="testpass2")
@@ -108,7 +108,7 @@ def test_unauthorized_access(client, auth, test_restaurant, test_user2):
         ("rating", "-1"),
     ],
 )
-def test_edit_restaurant_validation(client, auth, test_user, test_restaurant, field, value):
+def test_edit_restaurant_validation(client, auth, test_user, test_restaurant, field, value) -> None:
     """Test form validation for restaurant editing."""
     auth.login(username=test_user.username, password="testpass")
 
@@ -156,7 +156,7 @@ def test_edit_restaurant_validation(client, auth, test_user, test_restaurant, fi
         pass
 
 
-def test_restaurant_expenses_display(client, auth, test_user, test_restaurant, test_expense):
+def test_restaurant_expenses_display(client, auth, test_user, test_restaurant, test_expense) -> None:
     """Test that expenses are displayed on the restaurant details page."""
     auth.login(username=test_user.username, password="testpass")
 

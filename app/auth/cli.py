@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import click
+from flask import Flask
 from flask.cli import with_appcontext
 from sqlalchemy import select
 
@@ -11,11 +12,11 @@ from app.extensions import db
 
 
 @click.group("user")
-def user_cli():
+def user_cli() -> None:
     """User management commands."""
 
 
-def register_commands(app):
+def register_commands(app: Flask) -> None:
     """Register CLI commands with the application."""
     # Register the user command group
     app.cli.add_command(user_cli)
@@ -64,7 +65,7 @@ def reset_admin_password(email: str, password: str) -> None:
         db.session.rollback()
 
 
-def _count_user_objects(user) -> dict[str, int]:
+def _count_user_objects(user: User) -> dict[str, int]:
     """Count related objects for a user.
 
     Args:
@@ -73,10 +74,11 @@ def _count_user_objects(user) -> dict[str, int]:
     Returns:
         dict: Counts of related objects by type
     """
+    # Type checker limitation: doesn't recognize dynamic relationships (lazy="dynamic") return Query objects
     return {
-        "expenses": user.expenses.count(),
-        "restaurants": user.restaurants.count(),
-        "categories": user.categories.count(),
+        "expenses": user.expenses.count(),  # type: ignore[call-arg]
+        "restaurants": user.restaurants.count(),  # type: ignore[call-arg]
+        "categories": user.categories.count(),  # type: ignore[call-arg]
     }
 
 
@@ -101,7 +103,7 @@ def list_users(admin_only: bool, objects: bool) -> None:
     """
     query = select(User)
     if admin_only:
-        query = query.where(User.is_admin.is_(True))
+        query = query.where(User.is_admin == True)  # noqa: E712
 
     users = db.session.scalars(query.order_by(User.email)).all()
 
@@ -249,13 +251,15 @@ def _find_user_by_identifier(identifier: str) -> User | None:
     Returns:
         User object if found, None otherwise
     """
+    from typing import cast
+
     from app.auth.models import User
 
     if identifier.isdigit():
         from app.extensions import db
 
-        return db.session.get(User, int(identifier))
-    return User.query.filter((User.username == identifier) | (User.email == identifier)).first()
+        return cast(User | None, db.session.get(User, int(identifier)))
+    return cast(User | None, User.query.filter((User.username == identifier) | (User.email == identifier)).first())
 
 
 def _update_user_username(user: User, new_username: str, changes: list[str]) -> bool:
@@ -450,7 +454,7 @@ def update_user(
     if not user:
         click.echo(f"Error: No user found with identifier: {user_identifier}", err=True)
         return
-    changes = []
+    changes: list[str] = []
 
     click.echo(f"Updating user: {user.username} " f"(ID: {user.id}, Email: {user.email})")
 

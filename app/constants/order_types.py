@@ -37,7 +37,7 @@ ORDER_TYPE_COLORS = {
 # All icons below are Font Awesome 5+ (free) icon names
 # See: https://fontawesome.com/icons?d=gallery&s=solid
 
-ORDER_TYPE_CONSTANTS: List[OrderTypeData] = [
+ORDER_TYPE_CONSTANTS: list[OrderTypeData] = [
     {
         "name": "dine_in",
         "color": ORDER_TYPE_COLORS["dine_in"],
@@ -77,7 +77,7 @@ ORDER_TYPE_CONSTANTS: List[OrderTypeData] = [
 ]
 
 
-def get_order_type_constants() -> List[OrderTypeData]:
+def get_order_type_constants() -> list[OrderTypeData]:
     """Get all order type constants.
 
     Returns:
@@ -90,7 +90,7 @@ def get_order_type_constants() -> List[OrderTypeData]:
     return ORDER_TYPE_CONSTANTS.copy()
 
 
-def get_order_type_names() -> List[str]:
+def get_order_type_names() -> list[str]:
     """Get list of all order type names.
 
     Returns:
@@ -103,7 +103,7 @@ def get_order_type_names() -> List[str]:
     return [order_type["name"] for order_type in ORDER_TYPE_CONSTANTS]
 
 
-def get_order_type_data(order_type_name: str) -> Optional[OrderTypeData]:
+def get_order_type_data(order_type_name: str) -> OrderTypeData | None:
     """Get order type data by name.
 
     Args:
@@ -194,7 +194,7 @@ def get_order_type_css_class(order_type_name: str) -> str:
     return "order-type-default"
 
 
-def create_order_type_map() -> Dict[str, OrderTypeData]:
+def create_order_type_map() -> dict[str, OrderTypeData]:
     """Create a dictionary mapping order type names to data for fast lookup.
 
     Returns:

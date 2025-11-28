@@ -3,7 +3,7 @@
 Single source of truth for restaurant types based on Google Places API types.
 """
 
-from typing import Dict
+from typing import Dict, List, Optional
 
 # Google Places API supported restaurant types (single point of truth)
 # Keys are Google Places API types, values are user-friendly display names
@@ -43,7 +43,7 @@ GOOGLE_RESTAURANT_TYPE_MAPPING = {
 }
 
 # User-friendly restaurant type display data (derived from Google mapping)
-RESTAURANT_TYPES: Dict[str, Dict[str, str]] = {}
+RESTAURANT_TYPES: dict[str, dict[str, str]] = {}
 
 # Color scheme for consistent UI display
 _RESTAURANT_TYPE_COLORS = {
@@ -97,17 +97,17 @@ for google_type, display_name in GOOGLE_RESTAURANT_TYPE_MAPPING.items():
 
 
 # Helper functions
-def get_restaurant_type_constants():
+def get_restaurant_type_constants() -> list[dict[str, str]]:
     """Get list of all restaurant type data."""
     return [{"name": k, **v} for k, v in RESTAURANT_TYPES.items()]
 
 
-def get_restaurant_type_names():
+def get_restaurant_type_names() -> list[str]:
     """Get list of all restaurant type names."""
     return list(RESTAURANT_TYPES.keys())
 
 
-def get_restaurant_type_data(type_name):
+def get_restaurant_type_data(type_name: str) -> dict[str, str] | None:
     """Get restaurant type data by name."""
     if not type_name or not isinstance(type_name, str):
         return None
@@ -126,30 +126,30 @@ def get_restaurant_type_data(type_name):
     return None
 
 
-def get_restaurant_type_color(type_name):
+def get_restaurant_type_color(type_name: str) -> str:
     """Get color for a restaurant type."""
     data = get_restaurant_type_data(type_name)
     return data["color"] if data else "#6c757d"
 
 
-def get_restaurant_type_icon(type_name):
+def get_restaurant_type_icon(type_name: str) -> str:
     """Get icon for a restaurant type."""
     data = get_restaurant_type_data(type_name)
     return data["icon"] if data else "question-circle"
 
 
-def validate_restaurant_type_name(type_name):
+def validate_restaurant_type_name(type_name: str) -> bool:
     """Check if restaurant type exists."""
     return get_restaurant_type_data(type_name) is not None
 
 
-def get_google_type_for_restaurant_type(type_name):
+def get_google_type_for_restaurant_type(type_name: str) -> str | None:
     """Get Google Places API type for a restaurant type name."""
     data = get_restaurant_type_data(type_name)
     return data["google_type"] if data else None
 
 
-def get_restaurant_type_for_google_type(google_type):
+def get_restaurant_type_for_google_type(google_type: str) -> str | None:
     """Get user-friendly restaurant type name for Google Places API type."""
     if not google_type or not isinstance(google_type, str):
         return None
@@ -162,7 +162,7 @@ def get_restaurant_type_for_google_type(google_type):
     return None
 
 
-def format_restaurant_type(type_name, max_length=100):
+def format_restaurant_type(type_name: str, max_length: int = 100) -> str:
     """Format restaurant type with proper capitalization and length limits."""
     if not type_name:
         return ""
@@ -177,7 +177,7 @@ def format_restaurant_type(type_name, max_length=100):
     return formatted
 
 
-def get_food_establishment_types():
+def get_food_establishment_types() -> list[str]:
     """Get list of Google Places types that are primarily food establishments."""
     food_types = []
     for google_type, display_name in GOOGLE_RESTAURANT_TYPE_MAPPING.items():
@@ -186,19 +186,19 @@ def get_food_establishment_types():
     return food_types
 
 
-def get_non_restaurant_types():
+def get_non_restaurant_types() -> list[str]:
     """Get list of Google Places types that are not restaurants but may sell food."""
     return ["convenience_store", "grocery_store", "supermarket", "gas_station"]
 
 
-def is_food_establishment(primary_type):
+def is_food_establishment(primary_type: str) -> bool:
     """Check if a Google Places primary type represents a food establishment."""
     if not primary_type:
         return False
     return primary_type in get_food_establishment_types()
 
 
-def map_google_primary_type_to_display_type(primary_type):
+def map_google_primary_type_to_display_type(primary_type: str) -> str:
     """Map Google Places primary type to display type, defaulting to 'Other' for non-restaurant types."""
     if not primary_type:
         return "Other"

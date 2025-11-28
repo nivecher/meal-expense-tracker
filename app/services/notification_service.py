@@ -14,7 +14,8 @@ def is_notifications_enabled() -> bool:
     Returns:
         True if notifications are enabled and configured, False otherwise
     """
-    return current_app.config.get("NOTIFICATIONS_ENABLED", False)
+    result = current_app.config.get("NOTIFICATIONS_ENABLED", False)
+    return bool(result)
 
 
 def _send_via_sns(topic_arn: str, subject: str, message: str) -> bool:
@@ -53,7 +54,7 @@ def _send_via_sns(topic_arn: str, subject: str, message: str) -> bool:
         return False
 
 
-def send_notification(subject: str, message: str, topic_arn: Optional[str] = None) -> bool:
+def send_notification(subject: str, message: str, topic_arn: str | None = None) -> bool:
     """Send a notification via SNS.
 
     Args:

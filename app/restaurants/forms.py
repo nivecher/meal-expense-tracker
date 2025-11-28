@@ -1,3 +1,5 @@
+from typing import Any
+
 from flask_wtf import FlaskForm
 from wtforms import (
     BooleanField,
@@ -20,9 +22,10 @@ from wtforms.validators import (
 from app.constants.cuisines import get_cuisine_names
 
 
-def validate_service_level(form, field):
+def validate_service_level(form: Any, field: Any) -> None:
     """Validate service level field."""
-    if field.data and field.data not in [
+    field_data = getattr(field, "data", None)
+    if field_data and field_data not in [
         "",
         "fine_dining",
         "casual_dining",

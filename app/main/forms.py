@@ -55,7 +55,7 @@ class ContactForm(FlaskForm):
 
     submit = SubmitField("Send Message")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, **kwargs: object) -> None:
         """Initialize the form."""
         super().__init__(*args, **kwargs)
         # Set the submit button class

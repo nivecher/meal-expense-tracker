@@ -91,7 +91,7 @@ def dining_category(app, test_user):
 # Test functions
 
 
-def test_authentication(client, auth, test_user):
+def test_authentication(client, auth, test_user) -> None:
     """Test user authentication flow."""
     # Login using the auth fixture
     client = auth.login("testuser_1", "testpass")
@@ -105,7 +105,7 @@ def test_authentication(client, auth, test_user):
     assert profile_response.status_code == 200, "Failed to access profile page"
 
 
-def test_expense_restaurant_association(client, app, auth, test_user, dining_category):
+def test_expense_restaurant_association(client, app, auth, test_user, dining_category) -> None:
     """Test that expense is properly associated with restaurant and user."""
     # Login
     client = auth.login("testuser_1", "testpass")
@@ -127,7 +127,7 @@ def test_expense_restaurant_association(client, app, auth, test_user, dining_cat
     assert expense.category_id == category_id, "Expense not associated with category"
 
 
-def test_invalid_expense_creation(client, app, auth, test_user, dining_category):
+def test_invalid_expense_creation(client, app, auth, test_user, dining_category) -> None:
     """Test expense creation with invalid data."""
     # Login
     client = auth.login("testuser_1", "testpass")
@@ -146,7 +146,7 @@ def test_invalid_expense_creation(client, app, auth, test_user, dining_category)
     assert b"error" in response.data.lower(), "Expected error message not found"
 
 
-def test_expense_editing_with_restaurant(client, app, auth, test_user):
+def test_expense_editing_with_restaurant(client, app, auth, test_user) -> None:
     """Test editing an expense and verifying restaurant association."""
     # Login the test user
     auth.login("testuser_1", "testpass")
@@ -211,7 +211,7 @@ def test_expense_editing_with_restaurant(client, app, auth, test_user):
         assert expense.restaurant_id == 1
 
 
-def test_expense_deletion_with_restaurant(client, app, auth, test_user):
+def test_expense_deletion_with_restaurant(client, app, auth, test_user) -> None:
     """Test deleting an expense and verifying restaurant data remains."""
     # Login the test user
     auth.login("testuser_1", "testpass")
@@ -267,7 +267,7 @@ def test_expense_deletion_with_restaurant(client, app, auth, test_user):
         assert restaurant.name == "Test Restaurant"
 
 
-def test_expense_export(client, app, auth, test_user):
+def test_expense_export(client, app, auth, test_user) -> None:
     """Test exporting expenses to CSV."""
     # Login the test user
     auth.login("testuser_1", "testpass")

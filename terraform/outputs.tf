@@ -48,7 +48,6 @@ output "lambda_function_arn" {
 # Lambda layer output removed - no longer using layers
 
 # Database Outputs (Supabase - external PostgreSQL)
-# No Aurora outputs needed - using Supabase
 output "database_type" {
   description = "Type of database being used"
   value       = "Supabase (external PostgreSQL)"

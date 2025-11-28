@@ -22,8 +22,10 @@ tests/
 │   │   └── test_expenses.py       # Expense model/route tests
 │   ├── restaurants/               # Restaurant functionality tests
 │   │   ├── test_restaurant_models.py    # Restaurant model tests
-│   │   ├── test_restaurant_routes.py    # Restaurant route tests
-│   │   └── test_restaurant_services.py  # Restaurant service tests
+│   │   ├── test_restaurant_routes.py    # Restaurant route endpoint tests
+│   │   ├── test_restaurants_routes.py   # Restaurant route internal function tests
+│   │   ├── test_restaurant_routes_additional.py  # Additional restaurant route tests
+│   │   └── test_restaurants_services.py # Restaurant service tests
 │   ├── categories/                # Category functionality tests
 │   │   └── test_categories.py     # Category API tests
 │   ├── profile/                   # Profile functionality tests

@@ -26,7 +26,7 @@ class TestDatabaseConnection(unittest.TestCase):
         self.app_context.pop()
 
     @patch("boto3.client")
-    def test_db_connection_in_lambda(self, mock_boto):
+    def test_db_connection_in_lambda(self, mock_boto) -> None:
         """Test database connection in Lambda environment."""
         # Mock the Secrets Manager response
         mock_secret = {"SecretString": '{"db_password": "testpassword"}'}

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import click
-from flask import current_app
+from flask import Flask, current_app
 from flask.cli import with_appcontext
 
 from app.auth.models import User
@@ -13,11 +15,11 @@ from app.extensions import db
 
 
 @click.group("category")
-def category_cli():
+def category_cli() -> None:
     """Category management commands."""
 
 
-def register_commands(app):
+def register_commands(app: Flask) -> None:
     """Register CLI commands with the application."""
     # Register the category command group
     app.cli.add_command(category_cli)
@@ -36,11 +38,12 @@ def _sort_categories_by_default_order(categories: list[Category]) -> list[Catego
     name_to_order = {name: i for i, name in enumerate(default_names)}
 
     # Sort categories: default categories first (in original order), then others
-    def sort_key(cat):
-        if cat.name in name_to_order:
-            return (0, name_to_order[cat.name])  # Default categories first
+    def sort_key(cat: Category) -> tuple[int, int | str]:
+        category_name = cat.name or ""
+        if category_name in name_to_order:
+            return (0, name_to_order[category_name])  # Default categories first
         else:
-            return (1, cat.name)  # Custom categories after, alphabetically
+            return (1, category_name)  # Custom categories after, alphabetically
 
     return sorted(categories, key=sort_key)
 
@@ -62,11 +65,13 @@ def _get_target_users(user_id: int | None, username: str | None, all_users: bool
             return []
         return [user]
     elif all_users:
-        users = User.query.all()
+        from app.extensions import db
+
+        users = db.session.scalars(db.select(User)).all()
         if not users:
             click.echo("❌ Error: No users found in database")
             return []
-        return users
+        return cast(list[User], users)
     return []
 
 

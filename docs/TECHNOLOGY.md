@@ -46,7 +46,7 @@ This document outlines the technology choices and architecture decisions for the
   - CSRF protection (disabled in Lambda, enabled in development)
 
 - **Testing**: Pytest with comprehensive test fixtures
-- **Code Quality**: Black, isort, Flake8, Mypy, pre-commit hooks
+- **Code Quality**: Black, Ruff (replaces Flake8/isort/autoflake), Mypy, pre-commit hooks
 
 ### Frontend
 
@@ -178,9 +178,8 @@ This document outlines the technology choices and architecture decisions for the
 
 - **Python**:
 
-  - [Flake8](https://flake8.pycqa.org/) - Style and complexity linting
+  - [Ruff](https://docs.astral.sh/ruff/) - Fast Python linter (replaces Flake8, isort, autoflake)
   - [Black](https://black.readthedocs.io/) - Code formatting (120 char line length)
-  - [isort](https://pycqa.github.io/isort/) - Import sorting
   - [Mypy](https://mypy.readthedocs.io/) - Static type checking
   - [Bandit](https://bandit.readthedocs.io/) - Security vulnerability scanning
 

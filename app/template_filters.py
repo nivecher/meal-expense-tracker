@@ -56,10 +56,11 @@ def meal_type_icon(meal_type: str) -> str:
     Returns:
         Font Awesome icon name or default utensils if not found
     """
-    return get_meal_type_icon(meal_type)
+    result = get_meal_type_icon(meal_type)
+    return str(result)
 
 
-def restaurant_cuisine(restaurant) -> str:
+def restaurant_cuisine(restaurant: object) -> str:
     """Get the cuisine for a restaurant.
 
     Args:
@@ -69,7 +70,8 @@ def restaurant_cuisine(restaurant) -> str:
         The cuisine name or dash if not available
     """
     if restaurant and hasattr(restaurant, "cuisine") and restaurant.cuisine:
-        return restaurant.cuisine
+        cuisine = getattr(restaurant, "cuisine", None)
+        return str(cuisine) if cuisine else "-"
     return "-"
 
 
@@ -82,7 +84,8 @@ def cuisine_icon(cuisine_name: str) -> str:
     Returns:
         Font Awesome icon name
     """
-    return get_cuisine_icon(cuisine_name)
+    result = get_cuisine_icon(cuisine_name)
+    return str(result)
 
 
 def cuisine_color(cuisine_name: str) -> str:
@@ -94,7 +97,8 @@ def cuisine_color(cuisine_name: str) -> str:
     Returns:
         Hex color code
     """
-    return get_cuisine_color(cuisine_name)
+    result = get_cuisine_color(cuisine_name)
+    return str(result)
 
 
 def cuisine_css_class_filter(cuisine_name: str) -> str:
@@ -321,11 +325,19 @@ def init_app(app: Flask) -> None:
 
     app.add_template_filter(format_time_with_tz, name="format_time_with_tz")
 
-    def tags_to_dict(tags) -> list:
+    def tags_to_dict(tags: object) -> list:
         """Convert a list of tag objects to a list of dictionaries."""
         if not tags:
             return []
-        return [tag.to_dict() if hasattr(tag, "to_dict") else {"id": tag.id, "name": tag.name} for tag in tags]
+        if not isinstance(tags, list):
+            return []
+        result = []
+        for tag in tags:
+            if hasattr(tag, "to_dict"):
+                result.append(tag.to_dict())
+            elif hasattr(tag, "id") and hasattr(tag, "name"):
+                result.append({"id": tag.id, "name": tag.name})
+        return result
 
     app.add_template_filter(tags_to_dict, name="tags_to_dict")
     app.add_template_filter(timezone_display_name, name="timezone_display_name")

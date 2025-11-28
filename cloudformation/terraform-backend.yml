@@ -110,6 +110,11 @@ Resources:
               NoncurrentDays: 90
             AbortIncompleteMultipartUpload:
               DaysAfterInitiation: 7
+      LoggingConfiguration: !If
+        - IsProd
+        - DestinationBucketName: !Ref AccessLogsBucket
+          LogFilePrefix: 'tfstate-access-logs/'
+        - !Ref 'AWS::NoValue'
 
   # Access Logs Bucket for S3 (using the same KMS key)
   # No separate KMS key needed as we're using the main backend key
@@ -139,6 +144,37 @@ Resources:
               NoncurrentDays: 90
             AbortIncompleteMultipartUpload:
               DaysAfterInitiation: 7
+
+  AccessLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: IsProd
+    DependsOn: AccessLogsBucket
+    Properties:
+      Bucket: !Ref AccessLogsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowS3LogDelivery
+            Effect: Allow
+            Principal:
+              Service: logging.s3.amazonaws.com
+            Action:
+              - s3:PutObject
+            Resource: !Sub 'arn:aws:s3:::${AccessLogsBucket}/*'
+            Condition:
+              StringEquals:
+                's3:x-amz-acl': bucket-owner-full-control
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
+          - Sid: AllowS3LogDeliveryAcl
+            Effect: Allow
+            Principal:
+              Service: logging.s3.amazonaws.com
+            Action:
+              - s3:GetBucketAcl
+            Resource: !GetAtt AccessLogsBucket.Arn
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
 
   TerraformStateBucketPolicy:
     Type: AWS::S3::BucketPolicy

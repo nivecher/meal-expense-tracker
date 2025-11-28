@@ -1,10 +1,14 @@
 """Tests for CSRF protection in API routes."""
 
+from flask.testing import FlaskClient
+
+from app.auth.models import User
+
 
 class TestCSRFProtection:
     """Test CSRF protection for API routes."""
 
-    def test_api_get_request_no_csrf_required(self, client, test_user):
+    def test_api_get_request_no_csrf_required(self, client: FlaskClient, test_user: User) -> None:
         """Test that GET requests to API don't require CSRF tokens."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
@@ -13,7 +17,7 @@ class TestCSRFProtection:
         response = client.get("/api/v1/health")
         assert response.status_code == 200
 
-    def test_api_post_request_without_csrf_fails(self, client, test_user):
+    def test_api_post_request_without_csrf_fails(self, client: FlaskClient, test_user: User) -> None:
         """Test that POST requests to API without CSRF token fail."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
@@ -27,7 +31,7 @@ class TestCSRFProtection:
         # In testing mode, CSRF is disabled, so this should return 400 (validation error) instead of 403
         assert response.status_code == 400
 
-    def test_api_post_request_with_csrf_succeeds(self, client, test_user):
+    def test_api_post_request_with_csrf_succeeds(self, client: FlaskClient, test_user: User) -> None:
         """Test that POST requests to API with CSRF token succeed."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
@@ -42,7 +46,7 @@ class TestCSRFProtection:
         # This should return 400 due to missing required fields, not 201
         assert response.status_code == 400
 
-    def test_api_put_request_with_csrf_succeeds(self, client, test_user, test_expense):
+    def test_api_put_request_with_csrf_succeeds(self, client: FlaskClient, test_user: User, test_expense) -> None:
         """Test that PUT requests to API with CSRF token succeed."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
@@ -57,7 +61,7 @@ class TestCSRFProtection:
         # This should return 400 due to missing required fields, not 200
         assert response.status_code == 400
 
-    def test_api_delete_request_with_csrf_succeeds(self, client, test_user, test_expense):
+    def test_api_delete_request_with_csrf_succeeds(self, client: FlaskClient, test_user: User, test_expense) -> None:
         """Test that DELETE requests to API with CSRF token succeed."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
@@ -70,7 +74,7 @@ class TestCSRFProtection:
         response = client.delete(f"/api/v1/expenses/{test_expense.id}", headers={"X-CSRFToken": csrf_token})
         assert response.status_code == 204
 
-    def test_api_request_with_invalid_csrf_fails(self, client, test_user):
+    def test_api_request_with_invalid_csrf_fails(self, client: FlaskClient, test_user: User) -> None:
         """Test that API requests with invalid CSRF token fail."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True
@@ -84,7 +88,7 @@ class TestCSRFProtection:
         # In testing mode, CSRF is disabled, so this should return 400 (validation error) instead of 403
         assert response.status_code == 400
 
-    def test_csrf_token_in_response_headers(self, client, test_user):
+    def test_csrf_token_in_response_headers(self, client: FlaskClient, test_user: User) -> None:
         """Test that CSRF tokens are included in API response headers."""
         with client.session_transaction() as sess:
             sess["_fresh"] = True

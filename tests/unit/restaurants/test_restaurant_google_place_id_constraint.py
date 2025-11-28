@@ -15,7 +15,7 @@ from app.restaurants.services import create_restaurant, validate_restaurant_uniq
 class TestGooglePlaceIdConstraint:
     """Test suite for Google Place ID uniqueness constraint."""
 
-    def test_unique_google_place_id_per_user_database_constraint(self, session, test_user, test_user2):
+    def test_unique_google_place_id_per_user_database_constraint(self, session, test_user, test_user2) -> None:
         """Test database-level unique constraint for google_place_id per user."""
         google_place_id = "ChIJ_test_place_id_123"
 
@@ -48,7 +48,7 @@ class TestGooglePlaceIdConstraint:
 
         session.rollback()
 
-    def test_null_google_place_id_allowed_multiple_times(self, session, test_user):
+    def test_null_google_place_id_allowed_multiple_times(self, session, test_user) -> None:
         """Test that multiple restaurants can have NULL google_place_id."""
         # Create multiple restaurants without Google Place ID
         restaurant1 = Restaurant(user_id=test_user.id, name="Restaurant 1", city="City 1", google_place_id=None)
@@ -61,7 +61,7 @@ class TestGooglePlaceIdConstraint:
         assert restaurant1.google_place_id is None
         assert restaurant2.google_place_id is None
 
-    def test_validate_restaurant_uniqueness_google_place_id_duplicate(self, session, test_user):
+    def test_validate_restaurant_uniqueness_google_place_id_duplicate(self, session, test_user) -> None:
         """Test validation function catches Google Place ID duplicates."""
         google_place_id = "ChIJ_test_validation_123"
 
@@ -85,7 +85,7 @@ class TestGooglePlaceIdConstraint:
         assert "Existing Restaurant" in error.message
         assert "Test City" in error.message
 
-    def test_validate_restaurant_uniqueness_name_city_duplicate(self, session, test_user):
+    def test_validate_restaurant_uniqueness_name_city_duplicate(self, session, test_user) -> None:
         """Test validation function catches name/city duplicates."""
         # Create existing restaurant
         existing = Restaurant(user_id=test_user.id, name="Test Restaurant", city="Test City", google_place_id=None)
@@ -103,7 +103,7 @@ class TestGooglePlaceIdConstraint:
         assert error.city == "Test City"
         assert error.existing_restaurant.id == existing.id
 
-    def test_validate_restaurant_uniqueness_exclude_id(self, session, test_user):
+    def test_validate_restaurant_uniqueness_exclude_id(self, session, test_user) -> None:
         """Test validation excludes specific restaurant ID (for updates)."""
         google_place_id = "ChIJ_test_exclude_123"
 
@@ -123,7 +123,7 @@ class TestGooglePlaceIdConstraint:
             exclude_id=existing.id,
         )  # Should not raise
 
-    def test_create_restaurant_with_duplicate_google_place_id(self, session, test_user):
+    def test_create_restaurant_with_duplicate_google_place_id(self, session, test_user) -> None:
         """Test create_restaurant function with duplicate Google Place ID."""
         google_place_id = "ChIJ_test_create_duplicate_123"
 
@@ -172,7 +172,7 @@ class TestGooglePlaceIdConstraint:
         assert error.google_place_id == google_place_id
         assert error.existing_restaurant.id == existing.id
 
-    def test_duplicate_google_place_id_error_to_dict(self, session, test_user):
+    def test_duplicate_google_place_id_error_to_dict(self, session, test_user) -> None:
         """Test DuplicateGooglePlaceIdError to_dict method."""
         google_place_id = "ChIJ_test_to_dict_123"
 
@@ -195,7 +195,7 @@ class TestGooglePlaceIdConstraint:
         assert error_dict["existing_restaurant"]["city"] == "Test City"
         assert error_dict["existing_restaurant"]["full_name"] == "Test Restaurant - Test City"
 
-    def test_different_users_can_have_same_google_place_id(self, session, test_user, test_user2):
+    def test_different_users_can_have_same_google_place_id(self, session, test_user, test_user2) -> None:
         """Test that different users can have restaurants with same Google Place ID."""
         google_place_id = "ChIJ_test_different_users_123"
 
@@ -268,7 +268,7 @@ class TestGooglePlaceIdConstraint:
         assert restaurant1.user_id == test_user.id
         assert restaurant2.user_id == test_user2.id
 
-    def test_validate_restaurant_uniqueness_google_place_id_priority(self, session, test_user):
+    def test_validate_restaurant_uniqueness_google_place_id_priority(self, session, test_user) -> None:
         """Test that Google Place ID validation takes priority over name/city."""
         google_place_id = "ChIJ_test_priority_123"
 

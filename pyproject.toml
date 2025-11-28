@@ -33,10 +33,104 @@ include = "\\.pyi?$"
 profile = "black"
 multi_line_output = 3
 
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+exclude = [
+    ".git",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    "node_modules",
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+    "*.egg-info",
+    "migrations",
+]
 
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+extend-select = ["PTH"]  # Path validation rules
+ignore = [
+    # Basic pycodestyle errors (matching .flake8 behavior)
+    "E203",  # Whitespace before ':' (conflicts with Black)
+    "E266",  # Too many leading '#' for block comment
+    "E501",  # Line too long (handled by Black)
+    "E402",  # Module level import not at top of file (false positives)
+    "E712",  # Comparison to True should be 'if cond is True:' or 'if cond:'
+    "E721",  # Do not compare types, use 'isinstance()'
+    "E722",  # Do not use bare 'except'
+    "E741",  # Ambiguous variable name 'l' (allow for common math variables)
+    "E742",  # Ambiguous class definition
+    "E743",  # Ambiguous function definition
+    # Note: W503, W504 not supported in Ruff (automatically handled with Black compatibility)
+    "W292",  # No newline at end of file (handled by pre-commit)
+    # pyflakes
+    "F401",  # Module imported but unused (allow for __init__.py and type checking)
+    "F403",  # 'from module import *' used; unable to detect undefined names
+    "F405",  # Name may be undefined, or defined from star imports
+    "F811",  # Redefinition of unused name
+    # flake8-bugbear
+    "B011",  # Do not call assert False since python -O removes these calls
+    "B014",  # Do not call assert False since python -O removes these calls
+    "B019",  # Use of functools.lru_cache or functools.cache on methods
+    "B007",  # unused-loop-control-variable (can be ignored if variable is intentionally unused)
+    "B905",  # zip-without-explicit-strict (can be ignored if different lengths are intentional)
+    "B904",  # raise-without-from-inside-except (good practice, but can be fixed incrementally)
+    # comprehensions
+    "C416",  # unnecessary-comprehension (can be ignored, sometimes more readable)
+    # pyupgrade - some rules may need manual review
+    "UP035",  # deprecated-import (may need manual review for compatibility)
+    "UP047",  # non-pep695-generic-function (Python 3.13 feature, may not be needed)
+    "UP040",  # non-pep695-type-alias (Python 3.13 feature, may not be needed)
+    "UP007",  # non-pep604-annotation-union (can be fixed later, not critical)
+    # Path rules - ignoring for now (suggestions to use pathlib, not critical)
+    # Can be enabled later when refactoring to use pathlib
+    "PTH100",  # os-path-abspath (use Path.resolve() instead)
+    "PTH101",  # os-chmod (use Path.chmod() instead)
+    "PTH110",  # os-path-exists (use Path.exists() instead)
+    "PTH118",  # os-path-join (use Path / operator instead)
+    "PTH120",  # os-path-dirname (use Path.parent instead)
+    "PTH112",  # os-path-isdir (use Path.is_dir() instead)
+    "PTH103",  # os-makedirs (use Path.mkdir() instead)
+    "PTH107",  # os-remove (use Path.unlink() instead)
+    "PTH122",  # os-path-splitext (use Path.suffix instead)
+    "PTH123",  # builtin-open (use Path.open() instead)
+]
 
-# djlint config moved to .djlintrc for better maintainability
-# See .djlintrc for the actual configuration
+[tool.ruff.lint.per-file-ignores]
+# Map current per-file-ignores from .flake8
+"__init__.py" = ["F401"]
+"scripts/*.py" = ["T201", "PTH110", "PTH118", "PTH120"]  # Allow os.path in scripts
+"tests/*.py" = [
+    "E501",  # Allow long lines in test files
+    "E402",  # Allow relative imports in test files
+    "ARG001", "ARG002", "ARG003",  # Allow unused arguments in test files
+    "F841",  # Allow unused variables in test files (useful for fixtures)
+    "F403", "F405",  # Allow star imports in test files
+    "PTH110", "PTH118", "PTH120", "PTH112", "PTH103", "PTH107", "PTH122",  # Allow os.path in tests
+    "B017",  # Allow assert Exception in tests
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.isort]
+# Match isort configuration - Ruff's isort is Black-compatible by default
+known-first-party = ["app"]
+combine-as-imports = true
+split-on-trailing-comma = true
+force-sort-within-sections = true
 
 [tool.mypy]
 python_version = "3.13"
@@ -45,21 +139,26 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 check_untyped_defs = true
-disallow_untyped_decorators = true
+disallow_untyped_decorators = false
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
+plugins = ["sqlalchemy.ext.mypy.plugin"]
 
 [[tool.mypy.overrides]]
 module = [
     "flask.*",
-    "flask_*",
-    "sqlalchemy.*",
-    "pytest",
-    "pytest_*",
+    "pytest.*",
     "awsgi.*"
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "flask_wtf.*",
+    "flask_login.*",
 ]
 ignore_missing_imports = true
 
@@ -71,6 +170,8 @@ module = [
     "wsgi.py"
 ]
 ignore_errors = true
+disallow_untyped_defs = false
+check_untyped_defs = false
 
 ## Bandit config consolidated to .bandit and pre-commit
 

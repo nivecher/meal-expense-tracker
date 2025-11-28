@@ -8,7 +8,7 @@ from app.restaurants.models import Restaurant
 class RestaurantValidationError(Exception):
     """Base exception for restaurant validation errors."""
 
-    def __init__(self, message: str, field: Optional[str] = None):
+    def __init__(self, message: str, field: str | None = None):
         self.message = message
         self.field = field
         super().__init__(self.message)
@@ -22,11 +22,16 @@ class DuplicateGooglePlaceIdError(RestaurantValidationError):
         self.existing_restaurant = existing_restaurant
 
         # Create message that clearly identifies the real conflict (Google Place ID)
-        location_str = (
-            f"{existing_restaurant.city}, {existing_restaurant.state}"
-            if existing_restaurant.city and existing_restaurant.state
-            else existing_restaurant.city or "unknown location"
-        )
+        city = existing_restaurant.city
+        state = existing_restaurant.state
+        # Type narrowing: check separately to help type checker understand Optional[str]
+        if city is not None:
+            if state is not None:
+                location_str = f"{city}, {state}"
+            else:
+                location_str = city
+        else:
+            location_str = "unknown location"
         # Keep user-facing text clean: emphasize name and location, omit Google ID
         message = f"A restaurant already exists: '{existing_restaurant.name}' — {location_str}"
 
@@ -51,17 +56,22 @@ class DuplicateGooglePlaceIdError(RestaurantValidationError):
 class DuplicateRestaurantError(RestaurantValidationError):
     """Raised when attempting to create a restaurant that already exists by name/city."""
 
-    def __init__(self, name: str, city: Optional[str], existing_restaurant: Restaurant):
+    def __init__(self, name: str, city: str | None, existing_restaurant: Restaurant):
         self.name = name
         self.city = city
         self.existing_restaurant = existing_restaurant
 
         # Create user-friendly message with restaurant name and location
-        location_str = (
-            f"{existing_restaurant.city}, {existing_restaurant.state}"
-            if existing_restaurant.city and existing_restaurant.state
-            else existing_restaurant.city or "unknown location"
-        )
+        city = existing_restaurant.city
+        state = existing_restaurant.state
+        # Type narrowing: check separately to help type checker understand Optional[str]
+        if city is not None:
+            if state is not None:
+                location_str = f"{city}, {state}"
+            else:
+                location_str = city
+        else:
+            location_str = "unknown location"
         message = f"A restaurant named '{name}' in {location_str} already exists"
 
         super().__init__(message, field="name")
@@ -86,7 +96,7 @@ class DuplicateRestaurantError(RestaurantValidationError):
 class RestaurantNotFoundError(Exception):
     """Raised when a requested restaurant is not found."""
 
-    def __init__(self, restaurant_id: Optional[int] = None, google_place_id: Optional[str] = None):
+    def __init__(self, restaurant_id: int | None = None, google_place_id: str | None = None):
         self.restaurant_id = restaurant_id
         self.google_place_id = google_place_id
 

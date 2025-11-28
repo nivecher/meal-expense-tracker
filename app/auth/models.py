@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union, cast
 
-from flask.typing import ResponseReturnValue
+from flask import Response
 from flask_login import UserMixin
-from sqlalchemy import Connection, event
-from sqlalchemy.orm import Mapped, Mapper, relationship
+
+# Type alias for Flask route return values
+ResponseReturnValue = Union[str, Response, tuple]
+from sqlalchemy import event
+from sqlalchemy.orm import Mapped, Mapper, mapped_column, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import LoginManager, db
 from app.models.base import BaseModel
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine import Connection
+
     from app.expenses.models import Category, Expense, Tag
     from app.restaurants.models import Restaurant
 
@@ -27,36 +32,36 @@ class User(BaseModel, UserMixin):
         is_admin: Whether the user has admin privileges
     """
 
-    __tablename__ = "user"
+    __tablename__ = "user"  # type: ignore[assignment]
 
     # Override the default id to match the existing schema
-    id: Mapped[int] = db.Column(db.Integer, primary_key=True, comment="Primary key for the user")
+    id: Mapped[int] = mapped_column(db.Integer, primary_key=True, comment="Primary key for the user")
 
     # User authentication information
-    username: Mapped[str] = db.Column(
+    username: Mapped[str] = mapped_column(
         db.String(64),
         unique=True,
         nullable=False,
         index=True,
         comment="Unique username",
     )
-    email: Mapped[str] = db.Column(
+    email: Mapped[str] = mapped_column(
         db.String(120),
         unique=True,
         nullable=False,
         index=True,
         comment="User's email address",
     )
-    password_hash: Mapped[Optional[str]] = db.Column(db.String(256), nullable=True, comment="Hashed password")
+    password_hash: Mapped[str | None] = mapped_column(db.String(256), nullable=True, comment="Hashed password")
 
     # User status flags
-    is_active: Mapped[bool] = db.Column(
+    is_active: Mapped[bool] = mapped_column(
         db.Boolean,
         default=True,
         nullable=False,
         comment="Whether the user account is active",
     )
-    is_admin: Mapped[bool] = db.Column(
+    is_admin: Mapped[bool] = mapped_column(
         db.Boolean,
         default=False,
         nullable=False,
@@ -64,37 +69,37 @@ class User(BaseModel, UserMixin):
     )
 
     # Profile fields
-    first_name: Mapped[Optional[str]] = db.Column(
+    first_name: Mapped[str | None] = mapped_column(
         db.String(64),
         nullable=True,
         comment="User's first name",
     )
-    last_name: Mapped[Optional[str]] = db.Column(
+    last_name: Mapped[str | None] = mapped_column(
         db.String(64),
         nullable=True,
         comment="User's last name",
     )
-    display_name: Mapped[Optional[str]] = db.Column(
+    display_name: Mapped[str | None] = mapped_column(
         db.String(128),
         nullable=True,
         comment="User's preferred display name",
     )
-    bio: Mapped[Optional[str]] = db.Column(
+    bio: Mapped[str | None] = mapped_column(
         db.Text,
         nullable=True,
         comment="User's bio or description",
     )
-    avatar_url: Mapped[Optional[str]] = db.Column(
+    avatar_url: Mapped[str | None] = mapped_column(
         db.String(255),
         nullable=True,
         comment="URL to user's avatar image",
     )
-    phone: Mapped[Optional[str]] = db.Column(
+    phone: Mapped[str | None] = mapped_column(
         db.String(20),
         nullable=True,
         comment="User's phone number",
     )
-    timezone: Mapped[Optional[str]] = db.Column(
+    timezone: Mapped[str | None] = mapped_column(
         db.String(50),
         nullable=True,
         default="UTC",
@@ -102,28 +107,28 @@ class User(BaseModel, UserMixin):
     )
 
     # Relationships
-    expenses: Mapped[List["Expense"]] = relationship(
+    expenses: Mapped[list[Expense]] = relationship(
         "Expense",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="dynamic",
         passive_deletes=True,
     )
-    restaurants: Mapped[List["Restaurant"]] = relationship(
+    restaurants: Mapped[list[Restaurant]] = relationship(
         "Restaurant",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="dynamic",
         passive_deletes=True,
     )
-    categories: Mapped[List["Category"]] = relationship(
+    categories: Mapped[list[Category]] = relationship(
         "Category",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="dynamic",
         passive_deletes=True,
     )
-    tags: Mapped[List["Tag"]] = relationship(
+    tags: Mapped[list[Tag]] = relationship(
         "Tag",
         back_populates="user",
         cascade="all, delete-orphan",
@@ -157,10 +162,13 @@ class User(BaseModel, UserMixin):
         Note:
             Returns False if the user has no password set
         """
-        if not password or not self.password_hash:
+        if not password:
             return False
-
-        return check_password_hash(self.password_hash, password)
+        password_hash = self.password_hash
+        if password_hash is None:
+            return False
+        # After None check, password_hash is guaranteed to be str
+        return bool(check_password_hash(password_hash, password))
 
     def get_id(self) -> str:
         """Return the user ID as a string for Flask-Login."""
@@ -172,14 +180,22 @@ class User(BaseModel, UserMixin):
         Returns:
             The display name if set, otherwise the full name, otherwise the username
         """
+        # Check display_name first (explicit None check for type narrowing)
         if self.display_name:
             return self.display_name
 
-        if self.first_name and self.last_name:
-            return f"{self.first_name} {self.last_name}"
-        elif self.first_name:
-            return self.first_name
+        # Check for full name
+        first_name = self.first_name
+        last_name = self.last_name
+        if first_name is not None:
+            if last_name is not None:
+                return f"{first_name} {last_name}"
 
+        # Check for first name only
+        if first_name is not None:
+            return first_name
+
+        # Fallback to username (always available, non-optional)
         return self.username
 
     def get_initials(self) -> str:
@@ -188,10 +204,12 @@ class User(BaseModel, UserMixin):
         Returns:
             Two-character initials based on name or username
         """
-        if self.first_name and self.last_name:
-            return f"{self.first_name[0]}{self.last_name[0]}".upper()
-        elif self.first_name:
-            return self.first_name[:2].upper()
+        first_name = self.first_name
+        last_name = self.last_name
+        if first_name is not None:
+            if last_name is not None:
+                return f"{first_name[0]}{last_name[0]}".upper()
+            return first_name[:2].upper()
         elif self.display_name:
             parts = self.display_name.split()
             if len(parts) >= 2:
@@ -200,7 +218,7 @@ class User(BaseModel, UserMixin):
 
         return self.username[:2].upper()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the user.
 
         Returns:
@@ -231,13 +249,11 @@ class User(BaseModel, UserMixin):
 @event.listens_for(User, "before_update")
 def validate_user(mapper: Mapper, connection: Connection, target: User) -> None:
     """Validate user data before insert/update."""
-    # Ensure username is lowercase
-    if target.username:
-        target.username = target.username.lower().strip()
+    # Ensure username is lowercase (required field, always present)
+    target.username = target.username.lower().strip()
 
-    # Ensure email is lowercase
-    if target.email:
-        target.email = target.email.lower().strip()
+    # Ensure email is lowercase (required field, always present)
+    target.email = target.email.lower().strip()
 
 
 def init_login_manager(login_manager: LoginManager) -> None:
@@ -251,7 +267,7 @@ def init_login_manager(login_manager: LoginManager) -> None:
     """
 
     @login_manager.user_loader
-    def load_user(user_id: str) -> Optional[User]:
+    def load_user(user_id: str) -> User | None:
         """Load a user by ID.
 
         Args:
@@ -266,10 +282,13 @@ def init_login_manager(login_manager: LoginManager) -> None:
         if not user_id or not user_id.isdigit():
             return None
 
-        user = db.session.get(User, int(user_id))
+        # Type checker limitation: doesn't recognize SQLAlchemy session.get return type
+        user = cast(User | None, db.session.get(User, int(user_id)))
 
         # Only return the user if they exist and are active
-        if user and user.is_active:
+        # Type checker limitation: doesn't narrow Optional[User] properly
+        # After None check, user is guaranteed to be non-None within this block
+        if user is not None and user.is_active:
             return user
 
         return None
@@ -286,7 +305,9 @@ def init_login_manager(login_manager: LoginManager) -> None:
 
         # Check if the request accepts HTML
         if "text/html" in request.accept_mimetypes:
-            return redirect(url_for("auth.login", next=request.url))
+            from typing import cast
+
+            return cast(ResponseReturnValue, redirect(url_for("auth.login", next=request.url)))
 
         # Default to JSON response for API requests
         return jsonify({"error": "You must be logged in to access this resource"}), 401

@@ -5,6 +5,29 @@
  * Features Google Maps integration with restaurant markers and detailed result cards.
  */
 
+// Import security utilities for XSS prevention
+let escapeHtml;
+if (typeof window !== 'undefined' && window.SecurityUtils) {
+  ({ escapeHtml } = window.SecurityUtils);
+} else {
+  // Fallback escapeHtml implementation
+  escapeHtml = function(text) {
+    if (text === null || text === undefined) {
+      return '';
+    }
+    const textString = String(text);
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;',
+    };
+    return textString.replace(/[&<>"'/]/g, (char) => map[char]);
+  };
+}
+
 export class MapRestaurantSearch {
   constructor(container, options = {}) {
     this.container = container;
@@ -917,6 +940,41 @@ export class MapRestaurantSearch {
     const phone = restaurant.formatted_phone_number;
     const { website } = restaurant;
 
+    // Escape all user-controlled data to prevent XSS
+    const escapedName = escapeHtml(restaurant.name || '');
+    const escapedDistanceText = restaurant.distanceText ? escapeHtml(restaurant.distanceText) : '';
+    const escapedStreet = escapeHtml(address.street || '');
+    const escapedCityStateZip = address.cityStateZip ? escapeHtml(address.cityStateZip) : '';
+    const escapedPhone = phone ? escapeHtml(phone) : '';
+    const escapedOpeningStatusText = openingStatus.text ? escapeHtml(openingStatus.text) : '';
+
+    // Validate and sanitize URLs
+    let safePhotoUrl = '';
+    if (photoUrl) {
+      try {
+        const photoUrlObj = new URL(photoUrl);
+        // Only allow https URLs for photos
+        if (photoUrlObj.protocol === 'https:') {
+          safePhotoUrl = photoUrlObj.href;
+        }
+      } catch {
+        // Invalid URL, skip photo
+      }
+    }
+
+    let safeWebsiteUrl = '';
+    if (website) {
+      try {
+        const websiteUrlObj = new URL(website);
+        // Only allow http/https URLs for websites
+        if (websiteUrlObj.protocol === 'http:' || websiteUrlObj.protocol === 'https:') {
+          safeWebsiteUrl = websiteUrlObj.href;
+        }
+      } catch {
+        // Invalid URL, skip website link
+      }
+    }
+
     return `
       <div class="card h-100 restaurant-card" data-index="${index}" style="cursor: pointer; position: relative;">
         <!-- Numbered badge to correlate with map markers -->
@@ -930,13 +988,13 @@ export class MapRestaurantSearch {
         ${openingStatus.badge ? `
           <div class="position-absolute top-0 end-0 m-2">
             <span class="badge ${openingStatus.class} small">
-              ${openingStatus.text}
+              ${escapedOpeningStatusText}
             </span>
           </div>
         ` : ''}
 
-        ${photoUrl ? `
-          <img src="${photoUrl}" class="card-img-top" alt="${restaurant.name}" style="height: 140px; object-fit: cover;" loading="lazy"
+        ${safePhotoUrl ? `
+          <img src="${safePhotoUrl}" class="card-img-top" alt="${escapedName}" style="height: 140px; object-fit: cover;" loading="lazy"
                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'; console.error('Failed to load image:', this.src);"
                onload="console.log('Image loaded successfully:', this.src);">
         ` : `
@@ -950,16 +1008,16 @@ export class MapRestaurantSearch {
           <div class="d-flex justify-content-between align-items-start mb-2">
             <div class="flex-grow-1">
               <h6 class="card-title mb-1 d-flex align-items-center gap-2">
-                ${restaurant.name}
+                ${escapedName}
                 ${priceLevel > 0 ? `
                   <span class="price-level text-success fw-bold small">
                     ${'$'.repeat(priceLevel)}
                   </span>
                 ` : ''}
               </h6>
-              ${restaurant.distanceText ? `
+              ${escapedDistanceText ? `
                 <div class="text-muted small">
-                  <i class="fas fa-map-marker-alt me-1"></i>${restaurant.distanceText} away
+                  <i class="fas fa-map-marker-alt me-1"></i>${escapedDistanceText} away
                 </div>
               ` : ''}
             </div>
@@ -977,25 +1035,25 @@ export class MapRestaurantSearch {
             <div class="d-flex align-items-start text-muted small">
               <i class="fas fa-map-marker-alt me-2 text-secondary mt-1" style="opacity:0.7;"></i>
               <div class="flex-grow-1">
-                <div>${address.street}</div>
-                ${address.cityStateZip ? `<div>${address.cityStateZip}</div>` : ''}
+                <div>${escapedStreet}</div>
+                ${escapedCityStateZip ? `<div>${escapedCityStateZip}</div>` : ''}
               </div>
             </div>
           </div>
 
           <!-- Contact Information -->
-          ${phone || website ? `
+          ${escapedPhone || safeWebsiteUrl ? `
             <div class="mb-3">
-              ${phone ? `
+              ${escapedPhone ? `
                 <div class="d-flex align-items-center text-muted small mb-1">
                   <i class="fas fa-phone me-2 text-secondary" style="opacity:0.7;"></i>
-                  <a href="tel:${phone}" class="text-decoration-none text-muted">${phone}</a>
+                  <a href="tel:${escapedPhone}" class="text-decoration-none text-muted">${escapedPhone}</a>
                 </div>
               ` : ''}
-              ${website ? `
+              ${safeWebsiteUrl ? `
                 <div class="d-flex align-items-center text-muted small">
                   <i class="fas fa-globe me-2 text-secondary" style="opacity:0.7;"></i>
-                  <a href="${website}" target="_blank" rel="noopener" class="text-decoration-none text-muted">
+                  <a href="${safeWebsiteUrl}" target="_blank" rel="noopener" class="text-decoration-none text-muted">
                     Website <i class="fas fa-external-link-alt ms-1" style="font-size: 10px;"></i>
                   </a>
                 </div>
@@ -1462,10 +1520,12 @@ export class MapRestaurantSearch {
 
   showError(message) {
     const resultsContainer = this.container.querySelector('#search-results');
+    // Escape message to prevent XSS
+    const escapedMessage = escapeHtml(message || 'An error occurred');
     resultsContainer.innerHTML = `
       <div class="alert alert-danger">
         <i class="fas fa-exclamation-triangle me-2"></i>
-        ${message}
+        ${escapedMessage}
       </div>
     `;
   }

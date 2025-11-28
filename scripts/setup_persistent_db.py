@@ -2,15 +2,15 @@
 """Set up a persistent SQLite database for the application."""
 
 import os
-import sys
 from pathlib import Path
+import sys
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
-def setup_persistent_db():
+def setup_persistent_db() -> int:
     """Set up a persistent SQLite database."""
     try:
         # Get the home directory
@@ -42,7 +42,8 @@ def setup_persistent_db():
         print(f"Database file permissions: {oct(db_path.stat().st_mode)[-3:]}")
 
         # Test the connection
-        from app import create_app, db
+        from app import create_app
+        from app.extensions import db
 
         app = create_app()
 

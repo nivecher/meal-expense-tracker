@@ -150,26 +150,6 @@
                 </div>
             </div>
 
-            <!-- Essentials Tier Notice -->
-            <div class="alert alert-warning border-warning">
-                <h6 class="alert-heading mb-2">
-                    <i class="fas fa-info-circle me-2"></i>Google Places API Essentials Tier
-                </h6>
-                <p class="mb-1">
-                    This application uses Google Places API Essentials tier to control costs. Some advanced features are
-                    not available:
-                </p>
-                <ul class="mb-0 small">
-                    <li><strong>No restaurant photos</strong> - Photo display is disabled</li>
-                    <li><strong>No detailed reviews</strong> - Only basic ratings are shown</li>
-                    <li><strong>Limited amenities</strong> - Only basic service options (takeout, delivery, etc.)</li>
-                    <li
-                        ><strong>No advanced features</strong> - Payment options, parking info, and other Pro+ features
-                        are not available</li
-                    >
-                </ul>
-            </div>
-
             <div class="help-card bg-light">
                 <h5><i class="fas fa-star me-2"></i>Key Features</h5>
             </div>
@@ -323,13 +303,13 @@
                                         >
                                         <li class="mb-2"><strong>Notes:</strong> Add any additional details</li>
                                         <li class="mb-2"
-                                            ><strong>Receipt:</strong> Upload a photo or PDF of your receipt (optional)
+                                            ><strong>Receipt:</strong> Upload a photo of your receipt (optional)
                                             <div class="alert alert-success mt-2 mb-0 p-2">
                                                 <small
-                                                    ><i class="fas fa-file-pdf me-1"></i
-                                                    ><strong>Supported Formats:</strong> JPG, PNG, GIF, PDF. Max size:
-                                                    5MB. Receipts are securely stored and can be viewed or deleted at
-                                                    any time.</small
+                                                    ><i class="fas fa-image me-1"></i
+                                                    ><strong>Supported Formats:</strong> JPG, PNG, GIF. Max size: 5MB.
+                                                    Receipts are securely stored and can be viewed or deleted at any
+                                                    time.</small
                                                 >
                                             </div>
                                         </li>
@@ -354,8 +334,8 @@
                                         spreadsheet software.
                                     </div>
                                     <div class="alert alert-success">
-                                        <strong>CSV Import:</strong> Bulk import expenses from spreadsheets or other
-                                        expense tracking apps.
+                                        <strong>CSV/JSON Import:</strong> Bulk import expenses from spreadsheets or
+                                        other expense tracking apps. Supports both CSV and JSON file formats.
                                     </div>
 
                                     <h6><i class="fas fa-keyboard me-2"></i>Keyboard Shortcuts</h6>
@@ -370,6 +350,13 @@
                                     <div class="d-flex justify-content-between mb-2">
                                         <span>Export to CSV</span>
                                         <kbd class="shortcut-key">Ctrl + E</kbd>
+                                    </div>
+
+                                    <h6><i class="fas fa-save me-2 mt-3"></i>Auto-Save Draft</h6>
+                                    <div class="alert alert-info">
+                                        <strong>Available Now:</strong> Your expense form automatically saves drafts as
+                                        you type. If you navigate away and return, you can restore your draft to
+                                        continue where you left off.
                                     </div>
                                 </div>
                             </div>
@@ -409,6 +396,27 @@
                                             ><i class="fas fa-star me-1"></i>Basic ratings from Google Places</li
                                         >
                                     </ul>
+                                    <div class="alert alert-warning mt-3">
+                                        <h6 class="alert-heading mb-2">
+                                            <i class="fas fa-info-circle me-2"></i>Google Places API Essentials Tier
+                                        </h6>
+                                        <p class="mb-1 small">
+                                            This application uses Google Places API Essentials tier to control costs.
+                                            Some advanced features are not available:
+                                        </p>
+                                        <ul class="mb-0 small">
+                                            <li><strong>No restaurant photos</strong> - Photo display is disabled</li>
+                                            <li><strong>No detailed reviews</strong> - Only basic ratings are shown</li>
+                                            <li
+                                                ><strong>Limited amenities</strong> - Only basic service options
+                                                (takeout, delivery, etc.)</li
+                                            >
+                                            <li
+                                                ><strong>No advanced features</strong> - Payment options, parking info,
+                                                and other Pro+ features are not available</li
+                                            >
+                                        </ul>
+                                    </div>
 
                                     <h6><i class="fas fa-edit me-2"></i>Managing Restaurants</h6>
                                     <ul class="list-unstyled">
@@ -462,8 +470,8 @@
                                         sharing.
                                     </div>
                                     <div class="alert alert-success">
-                                        <strong>CSV Import:</strong> Bulk import restaurants from spreadsheets with
-                                        flexible column mapping and validation.
+                                        <strong>CSV/JSON Import:</strong> Bulk import restaurants from spreadsheets with
+                                        flexible column mapping and validation. Supports both CSV and JSON file formats.
                                     </div>
 
                                     <h6><i class="fas fa-palette me-2"></i>Cuisine Color Coding</h6>
@@ -737,9 +745,22 @@
                                         <h6 class="text-primary">Analytics & Insights</h6>
                                         <ul class="list-unstyled">
                                             <li><i class="fas fa-check text-success me-2"></i>Spending dashboard</li>
-                                            <li><i class="fas fa-check text-success me-2"></i>Visual charts</li>
-                                            <li><i class="fas fa-check text-success me-2"></i>Trend analysis</li>
-                                            <li><i class="fas fa-check text-success me-2"></i>Top restaurants</li>
+                                            <li
+                                                ><i class="fas fa-check text-success me-2"></i>Visual charts and
+                                                graphs</li
+                                            >
+                                            <li
+                                                ><i class="fas fa-check text-success me-2"></i>Category and meal type
+                                                breakdowns</li
+                                            >
+                                            <li
+                                                ><i class="fas fa-check text-success me-2"></i>Monthly trend
+                                                analysis</li
+                                            >
+                                            <li
+                                                ><i class="fas fa-check text-success me-2"></i>Top restaurants and
+                                                categories</li
+                                            >
                                         </ul>
                                     </div>
                                 </div>
@@ -785,12 +806,17 @@
 
                                     <h6><i class="fas fa-chart-line me-2"></i>Enhanced Analytics</h6>
                                     <div class="alert alert-info">
-                                        <strong>In Development:</strong> Advanced reporting and analytics features.
+                                        <strong>Available Now:</strong> Analytics dashboard with interactive charts,
+                                        category breakdowns, and trend analysis.
                                         <ul class="mb-0 mt-2">
-                                            <li>Interactive charts and graphs</li>
+                                            <li>✅ Interactive charts and graphs</li>
+                                            <li>✅ Monthly trend analysis</li>
+                                            <li>✅ Category and meal type breakdowns</li>
+                                        </ul>
+                                        <strong class="mt-2 d-block">Coming Soon:</strong>
+                                        <ul class="mb-0 mt-2">
                                             <li>Budget tracking and alerts</li>
                                             <li>PDF report generation</li>
-                                            <li>Trend analysis over time</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -806,11 +832,14 @@
                                         </ul>
                                     </div>
 
-                                    <h6><i class="fas fa-sync me-2"></i>Auto-Save & Sync</h6>
+                                    <h6><i class="fas fa-sync me-2"></i>Data Management</h6>
                                     <div class="alert alert-info">
-                                        <strong>In Progress:</strong> Enhanced data management features.
+                                        <strong>Available Now:</strong> Auto-save draft expenses as you type.
                                         <ul class="mb-0 mt-2">
-                                            <li>Auto-save draft expenses</li>
+                                            <li>✅ Auto-save draft expenses</li>
+                                        </ul>
+                                        <strong class="mt-2 d-block">Coming Soon:</strong>
+                                        <ul class="mb-0 mt-2">
                                             <li>Real-time data synchronization</li>
                                             <li>Automatic data backup</li>
                                             <li>Conflict resolution</li>
@@ -839,8 +868,9 @@
                                 <div class="col-md-6">
                                     <h6>Q: How do I import expenses from another app?</h6>
                                     <p
-                                        >Use the CSV import feature. Export your data from the other app, then format it
-                                        to match our CSV template and import.</p
+                                        >Use the CSV or JSON import feature. Export your data from the other app, then
+                                        format it to match our template and import. Both CSV and JSON formats are
+                                        supported.</p
                                     >
 
                                     <h6>Q: Can I edit or delete expenses?</h6>

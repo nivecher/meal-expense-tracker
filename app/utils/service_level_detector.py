@@ -10,7 +10,7 @@ Following TIGER principles: Safety, Performance, Developer Experience
 """
 
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class ServiceLevel(Enum):
@@ -123,12 +123,12 @@ class ServiceLevelDetector:
     @classmethod
     def detect_service_level(
         cls,
-        price_level: Optional[int],
-        place_types: Optional[List[str]] = None,
-        business_attributes: Optional[Dict[str, bool]] = None,
-        rating: Optional[float] = None,
-        user_ratings_total: Optional[int] = None,
-    ) -> Tuple[ServiceLevel, float]:
+        price_level: int | None,
+        place_types: list[str] | None = None,
+        business_attributes: dict[str, bool] | None = None,
+        rating: float | None = None,
+        user_ratings_total: int | None = None,
+    ) -> tuple[ServiceLevel, float]:
         """
         Detect restaurant service level from Google Places API data.
 
@@ -192,11 +192,11 @@ class ServiceLevelDetector:
     def _calculate_service_level_score(
         cls,
         service_level: ServiceLevel,
-        price_level: Optional[int],
-        place_types: List[str],
-        business_attributes: Dict[str, bool],
-        rating: Optional[float],
-        user_ratings_total: Optional[int],
+        price_level: int | None,
+        place_types: list[str],
+        business_attributes: dict[str, bool],
+        rating: float | None,
+        user_ratings_total: int | None,
     ) -> float:
         """
         Calculate confidence score for a specific service level.
@@ -247,7 +247,7 @@ class ServiceLevelDetector:
         return score / factors
 
     @classmethod
-    def _calculate_type_score(cls, service_level: ServiceLevel, place_types: List[str]) -> float:
+    def _calculate_type_score(cls, service_level: ServiceLevel, place_types: list[str]) -> float:
         """Calculate score based on place types."""
         indicators = cls.SERVICE_LEVEL_INDICATORS[service_level]
 
@@ -269,7 +269,7 @@ class ServiceLevelDetector:
         return 0.0
 
     @classmethod
-    def _calculate_attribute_score(cls, service_level: ServiceLevel, business_attributes: Dict[str, bool]) -> float:
+    def _calculate_attribute_score(cls, service_level: ServiceLevel, business_attributes: dict[str, bool]) -> float:
         """Calculate score based on business attributes."""
         expected_attrs = cls.BUSINESS_ATTRIBUTES[service_level]
         matches = 0
@@ -346,7 +346,7 @@ class ServiceLevelDetector:
             return ServiceLevel.UNKNOWN
 
 
-def detect_restaurant_service_level(google_places_data: Dict[str, any]) -> Tuple[ServiceLevel, float]:
+def detect_restaurant_service_level(google_places_data: dict[str, Any]) -> tuple[ServiceLevel, float]:
     """
     Detect service level from Google Places API response using business model characteristics.
 
@@ -479,7 +479,7 @@ def detect_service_level_from_google_places(place_data: dict) -> ServiceLevel:
         return ServiceLevel.UNKNOWN
 
 
-def _calculate_price_score(price_level: Optional[int], score_type: str) -> float:
+def _calculate_price_score(price_level: int | None, score_type: str) -> float:
     """Calculate score based on price level."""
     if price_level is None:
         return 0.0
@@ -497,7 +497,7 @@ def _calculate_price_score(price_level: Optional[int], score_type: str) -> float
 def _calculate_amenities_score(place_data: dict, score_type: str) -> float:
     """Calculate score based on amenities and service options."""
     # Define amenity scoring rules for each service type
-    amenity_rules = {
+    amenity_rules: dict[str, list[tuple]] = {
         "fine_dining": [("outdoorSeating", 0.5), ("servesAlcohol", 1.0), ("reservable", 2.0)],
         "fast_casual": [("outdoorSeating", 1.0), ("servesAlcohol", 0.5)],
         "quick_service": [
@@ -510,7 +510,7 @@ def _calculate_amenities_score(place_data: dict, score_type: str) -> float:
     }
 
     score = 0.0
-    rules = amenity_rules.get(score_type, [])
+    rules: list[tuple] = amenity_rules.get(score_type, [])
 
     for rule in rules:
         if len(rule) == 3:  # Special case with expected value

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import math
+from typing import Optional
 
 import click
-from flask import current_app
+from flask import Flask, current_app
 from flask.cli import with_appcontext
 
 from app.auth.models import User
@@ -14,11 +15,11 @@ from app.restaurants.models import Restaurant
 
 
 @click.group("restaurant")
-def restaurant_cli():
+def restaurant_cli() -> None:
     """Restaurant management commands."""
 
 
-def register_commands(app):
+def register_commands(app: Flask) -> None:
     """Register CLI commands with the application."""
     # Register the restaurant command group
     app.cli.add_command(restaurant_cli)
@@ -54,7 +55,11 @@ def _find_google_place_match(restaurant: Restaurant) -> tuple[str | None, list[d
     """Find Google Place ID match for a restaurant based on name and address."""
     # Build search query from restaurant data
     name = restaurant.name
-    address = restaurant.full_address
+    # name is required (not nullable), but check for empty string
+    if not name:
+        return None, []
+
+    address = restaurant.full_address or ""
 
     # Search for matches
     places = _search_google_places_by_name_and_address(name, address)
@@ -72,7 +77,7 @@ def _find_google_place_match(restaurant: Restaurant) -> tuple[str | None, list[d
         )
 
         # Check if names match (case-insensitive)
-        if place_name.lower() == name.lower():
+        if place_name and place_name.lower() == name.lower():
             exact_matches.append(place)
 
     # If only one exact match, return it
@@ -121,8 +126,11 @@ def _find_closest_match(restaurant: Restaurant, matches: list[dict]) -> dict | N
     restaurant_city = restaurant.city
     restaurant_state = restaurant.state
 
-    if not restaurant_city or not restaurant_state:
-        # If no city/state info, return first match
+    if not restaurant_city:
+        # If no city info, return first match (matches is non-empty due to check above)
+        return matches[0]
+    if not restaurant_state:
+        # If no state info, return first match (matches is non-empty due to check above)
         return matches[0]
 
     # Score matches based on address similarity
@@ -191,7 +199,8 @@ def _update_service_levels_for_restaurants(restaurants: list[Restaurant], dry_ru
 
     for restaurant in restaurants:
         click.echo(f"\n🍽️  {restaurant.name} (ID: {restaurant.id})")
-        click.echo(f"   User: {restaurant.user.username}")
+        if restaurant.user:
+            click.echo(f"   User: {restaurant.user.username}")
         click.echo(f"   Current Service Level: {restaurant.service_level or 'Not set'}")
 
         # Note: Google Places data not available without Google Place ID
@@ -224,6 +233,9 @@ def _suggest_service_level_from_restaurant_data(restaurant: Restaurant) -> str |
     """Suggest service level using centralized detection logic."""
     from app.utils.service_level_detector import detect_service_level_from_name
 
+    if not restaurant.name:
+        return None
+
     detected_level = detect_service_level_from_name(restaurant.name)
     return detected_level.value
 
@@ -249,7 +261,9 @@ def _get_target_users(user_id: int | None, username: str | None, all_users: bool
         if not users:
             click.echo("❌ Error: No users found in database")
             return []
-        return users
+        from typing import cast
+
+        return cast(list[User], users)
     return []
 
 
@@ -276,7 +290,12 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                     }
                 raise
 
-            place_data = places_service.get_place_details(restaurant.google_place_id)
+            # Use CLI validation field mask (includes all tiers for full validation)
+            from app.services.google_places_service import FIELD_MASKS
+
+            place_data = places_service.get_place_details(
+                restaurant.google_place_id, field_mask=FIELD_MASKS["cli_validation"]
+            )
 
             if not place_data:
                 return {
@@ -287,17 +306,22 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
             # Extract restaurant data using the service
             google_data = places_service.extract_restaurant_data(place_data)
 
+            # PRO TIER: Extract website and price_level for validation
+            # ENTERPRISE TIER: Extract rating
+            google_website = google_data.get("website")
+            google_price_level = google_data.get("price_level")
+
             return {
                 "valid": True,
-                "google_name": google_data.get("name"),
-                "google_address": google_data.get("formatted_address"),
-                "google_rating": google_data.get("rating"),
-                "google_status": google_data.get("business_status", "OPERATIONAL"),
-                "types": google_data.get("types", []),
-                "primary_type": google_data.get("primary_type"),
-                "google_phone": google_data.get("phone_number"),
-                "google_website": google_data.get("website"),
-                "google_price_level": google_data.get("price_level"),
+                "google_name": google_data.get("name"),  # PRO TIER: displayName
+                "google_address": google_data.get("formatted_address"),  # ESSENTIALS TIER
+                "google_rating": google_data.get("rating"),  # ENTERPRISE TIER
+                "google_status": google_data.get("business_status", "OPERATIONAL"),  # PRO TIER
+                "types": google_data.get("types", []),  # PRO TIER
+                "primary_type": google_data.get("primary_type"),  # PRO TIER
+                "google_phone": google_data.get("phone_number"),  # ENTERPRISE TIER: nationalPhoneNumber
+                "google_website": google_website,  # PRO TIER: websiteUri
+                "google_price_level": google_price_level,  # PRO TIER: priceLevel (may be deprecated)
                 "google_address_line_1": google_data.get("address_line_1"),
                 "google_address_line_2": google_data.get("address_line_2"),
                 "google_city": google_data.get("city"),
@@ -329,7 +353,9 @@ def _get_user_restaurants(user: User, with_google_id: bool) -> list[Restaurant]:
     query = Restaurant.query.filter_by(user_id=user.id)
     if with_google_id:
         query = query.filter(Restaurant.google_place_id.isnot(None))
-    return query.order_by(Restaurant.name).all()
+    from typing import cast
+
+    return cast(list[Restaurant], query.order_by(Restaurant.name).all())
 
 
 def _format_restaurant_detailed(restaurant: Restaurant) -> None:
@@ -359,7 +385,7 @@ def _display_restaurant_basic_info(restaurant: Restaurant) -> None:
 def _display_restaurant_address_info(restaurant: Restaurant) -> None:
     """Display restaurant address information."""
     # Display address information
-    address_parts = []
+    address_parts: list[str] = []
     if restaurant.address_line_1:
         address_parts.append(restaurant.address_line_1)
     if restaurant.address_line_2:
@@ -369,7 +395,7 @@ def _display_restaurant_address_info(restaurant: Restaurant) -> None:
 
     # Display location information
     if restaurant.city:
-        location_parts = [restaurant.city]
+        location_parts: list[str] = [restaurant.city]
         if restaurant.state:
             location_parts.append(restaurant.state)
         if restaurant.postal_code:
@@ -522,8 +548,8 @@ def _get_restaurants_to_validate(
 
 def _check_restaurant_mismatches(restaurant: Restaurant, validation_result: dict) -> tuple[list[str], dict[str, str]]:
     """Check for mismatches between restaurant data and Google data."""
-    mismatches = []
-    fixes_to_apply = {}
+    mismatches: list[str] = []
+    fixes_to_apply: dict[str, str] = {}
 
     # Check name mismatch
     _check_name_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
@@ -534,17 +560,17 @@ def _check_restaurant_mismatches(restaurant: Restaurant, validation_result: dict
     # Check service level mismatch
     _check_service_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
 
-    # Check price level mismatch
+    # PRO TIER: Check price level mismatch
     _check_price_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+    # PRO TIER: Check website mismatch
+    _check_website_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
 
     # Check cuisine mismatch
     _check_cuisine_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
 
     # Check phone mismatch
     _check_phone_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
-
-    # Check website mismatch
-    _check_website_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
 
     # Check type mismatch
     _check_type_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
@@ -557,8 +583,14 @@ def _check_name_mismatch(
 ) -> None:
     """Check for name mismatches."""
     google_name = validation_result.get("google_name")
-    if google_name and google_name.lower() != restaurant.name.lower():
-        mismatches.append(f"Name: '{restaurant.name}' vs Google: '{google_name}'")
+    restaurant_name = restaurant.name
+    # restaurant_name is required (not nullable), so we only need to check google_name
+    if not google_name or not isinstance(google_name, str):
+        return
+
+    # Type narrowing: google_name is now known to be str
+    if google_name.lower() != restaurant_name.lower():
+        mismatches.append(f"Name: '{restaurant_name}' vs Google: '{google_name}'")
         fixes_to_apply["name"] = google_name
 
 
@@ -603,12 +635,16 @@ def _check_state_mismatch(current_data: dict, validation_result: dict, mismatche
         return
 
     # Check direct string matches first
-    if _states_match_directly(current_state, google_state, google_state_long, google_state_short):
-        return
+    if current_state and google_state:
+        if _states_match_directly(current_state, google_state or "", google_state_long or "", google_state_short or ""):
+            return
 
     # Try US library matching as fallback
-    if _states_match_with_us_library(current_state, google_state, google_state_long, google_state_short):
-        return
+    if current_state and google_state:
+        if _states_match_with_us_library(
+            current_state, google_state or "", google_state_long or "", google_state_short or ""
+        ):
+            return
 
     # No matches found - report mismatch
     # Use long version for display if available, otherwise fall back to regular state
@@ -637,7 +673,7 @@ def _states_match_with_us_library(
     current_state: str, google_state: str, google_state_long: str, google_state_short: str
 ) -> bool:
     """Check if states match using US library normalization."""
-    import us
+    import us  # type: ignore[import-untyped]
 
     current_state_obj = us.states.lookup(current_state)
     if not current_state_obj:
@@ -660,7 +696,25 @@ def _check_service_level_mismatch(
     google_service_level_data = validation_result.get("google_service_level")
 
     if google_service_level_data:
-        google_service_level, confidence = google_service_level_data
+        # Handle both tuple (level, confidence) and dict formats
+        if isinstance(google_service_level_data, tuple):
+            google_service_level = google_service_level_data[0]
+            confidence_value = google_service_level_data[1] if len(google_service_level_data) > 1 else None
+        elif isinstance(google_service_level_data, dict):
+            google_service_level = google_service_level_data.get("level")
+            confidence_value = google_service_level_data.get("confidence")
+        else:
+            return  # Invalid format, skip
+
+        # Convert confidence to float if it's not already
+        if confidence_value is not None:
+            try:
+                confidence = float(confidence_value)
+            except (ValueError, TypeError):
+                confidence = 0.0
+        else:
+            confidence = 0.0
+
         from app.restaurants.services import validate_restaurant_service_level
 
         # Create current_data from restaurant for validation
@@ -682,38 +736,39 @@ def _check_price_level_mismatch(
     restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
 ) -> None:
     """Check for price level mismatches."""
-    google_price_level_raw = validation_result.get("google_price_level")
+    google_price_level = validation_result.get("google_price_level")
 
-    if google_price_level_raw is not None:
-        # Convert Google price level to integer for comparison
+    if google_price_level is not None:
         from app.services.google_places_service import get_google_places_service
 
         places_service = get_google_places_service()
-        google_price_level = places_service.convert_price_level_to_int(google_price_level_raw)
+        google_price_level_int = places_service.convert_price_level_to_int(google_price_level)
+
         restaurant_price_level = restaurant.price_level
 
         # Check for mismatch (including None vs non-None)
-        if restaurant_price_level != google_price_level:
+        if restaurant_price_level != google_price_level_int:
             restaurant_display = _format_price_level_display(restaurant_price_level)
-            google_display = _format_price_level_display(google_price_level)
-
+            google_display = _format_price_level_display(google_price_level_int)
             mismatches.append(f"Price Level: '{restaurant_display}' vs Google: '{google_display}'")
-            fixes_to_apply["price_level"] = google_price_level
+            fixes_to_apply["price_level"] = google_price_level_int
 
 
-def _format_price_level_display(price_level):
-    """Format price level for display in mismatch messages."""
-    if price_level is None:
-        return "Not set"
+def _check_website_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for website mismatches."""
+    google_website = validation_result.get("google_website")
 
-    price_levels = {
-        0: "Free",
-        1: "$ (Inexpensive)",
-        2: "$$ (Moderate)",
-        3: "$$$ (Expensive)",
-        4: "$$$$ (Very Expensive)",
-    }
-    return price_levels.get(price_level, str(price_level))
+    if google_website is not None:
+        restaurant_website = restaurant.website
+
+        # Check for mismatch (including None vs non-None)
+        if restaurant_website != google_website:
+            restaurant_display = restaurant_website or "Not set"
+            google_display = google_website or "Not set"
+            mismatches.append(f"Website: '{restaurant_display}' vs Google: '{google_display}'")
+            fixes_to_apply["website"] = google_website
 
 
 def _check_cuisine_mismatch(
@@ -752,22 +807,7 @@ def _check_phone_mismatch(
             fixes_to_apply["phone"] = google_phone
 
 
-def _check_website_mismatch(
-    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
-) -> None:
-    """Check for website mismatches."""
-    google_website = validation_result.get("google_website")
-
-    if google_website is not None:
-        restaurant_website = restaurant.website
-
-        # Check for mismatch (including None vs non-None)
-        if restaurant_website != google_website:
-            restaurant_display = restaurant_website or "Not set"
-            google_display = google_website or "Not set"
-
-            mismatches.append(f"Website: '{restaurant_display}' vs Google: '{google_display}'")
-            fixes_to_apply["website"] = google_website
+# Website validation restored - PRO TIER: websiteUri
 
 
 def _check_type_mismatch(
@@ -816,10 +856,10 @@ def _apply_restaurant_field_fixes(restaurant: Restaurant, fixes_to_apply: dict[s
         "postal_code": "postal_code",
         "country": "country",
         "service_level": "service_level",
-        "price_level": "price_level",
+        "price_level": "price_level",  # PRO TIER: priceLevel (may be deprecated)
+        "website": "website",  # PRO TIER: websiteUri
         "cuisine": "cuisine",
         "phone": "phone",
-        "website": "website",
         "type": "type",
     }
 
@@ -884,10 +924,10 @@ def _display_google_basic_info(validation_result: dict) -> None:
         click.echo(f"   📞 Phone: {validation_result['google_phone']}")
     if validation_result.get("google_website"):
         click.echo(f"   🌐 Website: {validation_result['google_website']}")
-    if validation_result.get("google_price_level"):
-        price_level = validation_result["google_price_level"]
-        price_display = _format_price_level_display(price_level)
-        click.echo(f"   💲 Price Level: {price_display}")
+    if validation_result.get("google_price_level") is not None:
+        price_level = validation_result.get("google_price_level")
+        price_level_display = _format_price_level_display(price_level)
+        click.echo(f"   💲 Price Level: {price_level_display}")
     if validation_result.get("types"):
         # Handle both list and single value
         types_data = validation_result["types"]
@@ -900,8 +940,27 @@ def _display_google_basic_info(validation_result: dict) -> None:
 
 def _display_google_service_info(validation_result: dict) -> None:
     """Display Google service level information."""
-    if validation_result.get("google_service_level"):
-        service_level, confidence = validation_result["google_service_level"]
+    google_service_level_data = validation_result.get("google_service_level")
+    if google_service_level_data:
+        # Handle both tuple (level, confidence) and dict formats
+        if isinstance(google_service_level_data, tuple):
+            service_level = google_service_level_data[0]
+            confidence_value = google_service_level_data[1] if len(google_service_level_data) > 1 else None
+        elif isinstance(google_service_level_data, dict):
+            service_level = google_service_level_data.get("level")
+            confidence_value = google_service_level_data.get("confidence")
+        else:
+            return  # Invalid format, skip
+
+        # Convert confidence to float if it's not already
+        if confidence_value is not None:
+            try:
+                confidence = float(confidence_value)
+            except (ValueError, TypeError):
+                confidence = 0.0
+        else:
+            confidence = 0.0
+
         if service_level != "unknown":
             from app.restaurants.services import get_service_level_display_info
 
@@ -909,10 +968,34 @@ def _display_google_service_info(validation_result: dict) -> None:
             click.echo(f"   🍽️  Service Level: {display_info['display_name']} (confidence: {confidence:.2f})")
 
 
+def _format_price_level_display(price_level: int | None) -> str:
+    """Format price level for display.
+
+    Args:
+        price_level: Price level integer (0-4) or None
+
+    Returns:
+        Formatted price level string
+    """
+    if price_level is None:
+        return "Not set"
+
+    price_level_mapping = {
+        0: "Free",
+        1: "$ (Inexpensive)",
+        2: "$$ (Moderate)",
+        3: "$$$ (Expensive)",
+        4: "$$$$ (Very Expensive)",
+    }
+
+    return price_level_mapping.get(price_level, str(price_level))
+
+
 def _process_restaurant_validation(restaurant: Restaurant, fix_mismatches: bool, dry_run: bool) -> tuple[str, bool]:
     """Process validation for a single restaurant and return status and fix success."""
     click.echo(f"\n🍽️  {restaurant.name} (ID: {restaurant.id})")
-    click.echo(f"   User: {restaurant.user.username}")
+    if restaurant.user:
+        click.echo(f"   User: {restaurant.user.username}")
     click.echo(f"   Google Place ID: {restaurant.google_place_id}")
     click.echo(f"   Full Address: {restaurant.full_address}")
 
@@ -1129,7 +1212,8 @@ def _display_validation_summary(
 def _process_restaurant_place_id_finding(restaurant: Restaurant, closest: bool, dry_run: bool) -> tuple[str, bool]:
     """Process place ID finding for a single restaurant and return status and success."""
     click.echo(f"\n🍽️  {restaurant.name} (ID: {restaurant.id})")
-    click.echo(f"   User: {restaurant.user.username}")
+    if restaurant.user:
+        click.echo(f"   User: {restaurant.user.username}")
     click.echo(f"   Address: {restaurant.full_address}")
 
     place_id, matches = _find_google_place_match(restaurant)

@@ -8,6 +8,8 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
+from flask import Flask
+from flask.testing import FlaskClient
 import pytest
 
 from app import create_app
@@ -21,7 +23,7 @@ class TestExpenseWorkflows:
     """Test complete expense management workflows."""
 
     @pytest.fixture
-    def app(self):
+    def app(self) -> Flask:
         """Create test Flask app with proper configuration."""
         app = create_app("testing")
         app.config["TESTING"] = True
@@ -35,12 +37,12 @@ class TestExpenseWorkflows:
             db.drop_all()
 
     @pytest.fixture
-    def client(self, app):
+    def client(self, app) -> FlaskClient:
         """Create test client."""
         return app.test_client()
 
     @pytest.fixture
-    def user(self, app):
+    def user(self, app) -> tuple[User, int]:
         """Create test user."""
         with app.app_context():
             user = User(username="testuser", email="test@example.com", password_hash="hashed_password")
@@ -49,27 +51,16 @@ class TestExpenseWorkflows:
             return user, user.id
 
     @pytest.fixture
-    def logged_in_client(self, client, user, app):
+    def logged_in_client(self, client, user, app) -> FlaskClient:
         """Create a test client with logged-in user."""
         user_obj, user_id = user  # Unpack user and user_id
 
         # Create a test client that simulates being logged in
-        class LoggedInTestClient:
-            def __init__(self, client, app, user_id):
-                self.client = client
-                self.app = app
-                self.user_id = user_id
-
-            def get(self, *args, **kwargs):
-                return self._make_request("GET", *args, **kwargs)
-
-            def post(self, *args, **kwargs):
-                return self._make_request("POST", *args, **kwargs)
-
+        class LoggedInTestClient(FlaskClient):
             def _make_request(self, method, *args, **kwargs):
                 with self.app.app_context():
                     # Set up the session for this request
-                    with self.client.session_transaction() as sess:
+                    with self.session_transaction() as sess:
                         sess["_user_id"] = str(self.user_id)
                         sess["_fresh"] = True
                         sess["_id"] = str(self.user_id)
@@ -80,7 +71,7 @@ class TestExpenseWorkflows:
         return LoggedInTestClient(client, app, user_id)
 
     @pytest.fixture
-    def restaurant(self, app, user):
+    def restaurant(self, app: Flask, user: tuple[User, int]) -> tuple[Restaurant, int]:
         """Create test restaurant."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():
@@ -90,7 +81,7 @@ class TestExpenseWorkflows:
             return restaurant, restaurant.id
 
     @pytest.fixture
-    def category(self, app, user):
+    def category(self, app: Flask, user: tuple[User, int]) -> tuple[Category, int]:
         """Create test category."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():
@@ -99,7 +90,9 @@ class TestExpenseWorkflows:
             db.session.commit()
             return category, category.id
 
-    def test_expense_creation_workflow(self, app, user, restaurant, category):
+    def test_expense_creation_workflow(
+        self, app: Flask, user: tuple[User, int], restaurant: tuple[Restaurant, int], category: tuple[Category, int]
+    ) -> None:
         """Test complete expense creation workflow."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -131,7 +124,7 @@ class TestExpenseWorkflows:
                 assert result.id == 1
                 assert result.amount == Decimal("25.50")
 
-    def test_expense_filtering_workflow(self, app, user):
+    def test_expense_filtering_workflow(self, app: Flask, user: tuple[User, int]) -> None:
         """Test expense filtering and search workflow."""
         user_obj, user_id = user  # Unpack the tuple
         with app.app_context():

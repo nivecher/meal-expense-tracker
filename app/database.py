@@ -6,10 +6,9 @@ initialization, and utilities for the application.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 import boto3
 from botocore.exceptions import ClientError
@@ -21,45 +20,6 @@ from .extensions import db
 
 # Configure logger
 logger = logging.getLogger(__name__)
-
-
-def _get_aurora_database_uri_from_secrets() -> str:
-    """Get Aurora database URI from AWS Secrets Manager.
-
-    Returns:
-        str: Complete database URI with actual credentials
-
-    Raises:
-        RuntimeError: If unable to retrieve or parse secrets
-    """
-    try:
-        # Get Aurora credentials from Secrets Manager
-        secrets_client = boto3.client("secretsmanager")
-        secret_value = secrets_client.get_secret_value(SecretId="meal-expense-tracker/dev/aurora-credentials")
-
-        # Parse the secret JSON
-        secret_data = json.loads(secret_value["SecretString"])
-
-        # Construct the database URI
-        db_host = secret_data["db_host"]
-        db_port = secret_data["db_port"]
-        db_name = secret_data["db_name"]
-        db_username = secret_data["db_username"]
-        db_password = secret_data["db_password"]
-
-        db_url = f"postgresql+pg8000://{db_username}:{db_password}@{db_host}:{db_port}/{db_name}"
-        logger.info("Successfully retrieved Aurora database URI from Secrets Manager")
-        return db_url
-
-    except ClientError as e:
-        logger.error(f"AWS Secrets Manager error: {e}")
-        raise RuntimeError(f"Failed to retrieve Aurora credentials from Secrets Manager: {e}")
-    except (KeyError, json.JSONDecodeError) as e:
-        logger.error(f"Error parsing Aurora secret data: {e}")
-        raise RuntimeError(f"Invalid Aurora secret format: {e}")
-    except Exception as e:
-        logger.error(f"Unexpected error getting Aurora database URI: {e}")
-        raise RuntimeError(f"Failed to get Aurora database URI: {e}")
 
 
 def _get_database_uri_from_secrets_manager(secret_name: str) -> str:
@@ -76,7 +36,7 @@ def _get_database_uri_from_secrets_manager(secret_name: str) -> str:
 
         # Get the secret
         response = secrets_client.get_secret_value(SecretId=secret_name)
-        secret_string = response["SecretString"]
+        secret_string = str(response["SecretString"])
 
         logger.info(f"Successfully retrieved database URI from secret: {secret_name}")
         return secret_string
@@ -90,8 +50,9 @@ def _get_database_uri_from_secrets_manager(secret_name: str) -> str:
 
 
 if TYPE_CHECKING:
+    from typing import TypeAlias
+
     from flask.typing import ResponseValue
-    from typing_extensions import TypeAlias
     from werkzeug.wrappers import Response as WerkzeugResponse
 
 # Type alias for scoped session
@@ -110,7 +71,7 @@ __all__ = [
 ]
 
 # Initialize SQLAlchemy engine
-engine: Optional[Engine] = None
+engine: Engine | None = None
 
 # Session factory will be created in init_database when engine is available
 
@@ -122,7 +83,7 @@ def _is_lambda_environment() -> bool:
     )
 
 
-def _get_database_uri_from_env() -> Optional[str]:
+def _get_database_uri_from_env() -> str | None:
     """Get database URI from environment variable."""
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -139,26 +100,15 @@ def _get_database_uri_from_env() -> Optional[str]:
 def _get_database_uri_from_lambda(db_url: str) -> str:
     """Get database URI for Lambda environment with Secrets Manager."""
     if "placeholder" in db_url:
-        # Try Supabase first (current setup)
-        try:
-            db_url = _get_database_uri_from_secrets_manager("meal-expense-tracker/dev/supabase-connection")
-            logger.info("Successfully retrieved Supabase connection for Lambda")
-            return db_url
-        except Exception as e:
-            logger.error(f"Failed to get Supabase connection: {e}")
-            # Fall back to Aurora for backwards compatibility (if it exists)
-            try:
-                db_url = _get_aurora_database_uri_from_secrets()
-                logger.info("Fallback: Successfully retrieved Aurora connection")
-                return db_url
-            except Exception as aurora_error:
-                logger.error(f"Also failed to get Aurora connection: {aurora_error}")
-                raise RuntimeError(f"Failed to get database credentials: {e}")
+        # Get Supabase connection from Secrets Manager
+        db_url = _get_database_uri_from_secrets_manager("meal-expense-tracker/dev/supabase-connection")
+        logger.info("Successfully retrieved Supabase connection for Lambda")
+        return db_url
 
     return db_url
 
 
-def _get_database_uri_from_app_config(app: Optional[Flask] = None) -> Optional[str]:
+def _get_database_uri_from_app_config(app: Flask | None = None) -> str | None:
     """Get database URI from app config."""
     try:
         app_to_use = app or current_app._get_current_object()
@@ -215,7 +165,7 @@ def _get_lambda_database_uri() -> str:
         )
 
 
-def _get_database_uri(app: Optional[Flask] = None) -> str:
+def _get_database_uri(app: Flask | None = None) -> str:
     """Get the database URI with proper fallback logic.
 
     Priority order:
@@ -355,4 +305,5 @@ def get_engine() -> Engine:
     """Get the SQLAlchemy engine."""
     if not hasattr(db, "engine") or not db.engine:
         raise RuntimeError("Database engine not initialized. Make sure to call init_database() first.")
-    return db.engine
+    engine: Engine = cast(Engine, db.engine)
+    return engine

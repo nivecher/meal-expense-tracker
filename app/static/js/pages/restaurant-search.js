@@ -10,7 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function setCookie(name, value, days = 365) {
     const expires = new Date();
     expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
-    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+    // Add Secure flag for HTTPS sessions to prevent man-in-the-middle attacks
+    const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax${secureFlag}`;
   }
 
   const form = document.querySelector('form');

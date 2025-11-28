@@ -14,23 +14,45 @@ Following TIGER principles:
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
-import requests
 from flask import current_app
+import requests
 
 logger = logging.getLogger(__name__)
 
 # Google Places API configuration
 PLACES_API_BASE = "https://places.googleapis.com/v1/places"
 
-# Simplified field masks - Essentials tier only
+# Field masks with tier documentation for cost tracking
 # For searchText endpoint, use "places.fieldName" format
 # For individual place details, use "fieldName" format
+# Based on: https://developers.google.com/maps/documentation/places/web-service/data-fields
+#
+# FIELD TIERS (for cost tracking):
+# ESSENTIALS: id, formattedAddress, location, addressComponents (Place Details only), types (Place Details only), viewport (Place Details only)
+# PRO: displayName, primaryType, businessStatus, types (for Search), addressComponents (for Search), viewport (for Search), websiteUri, userRatingCount
+# ENTERPRISE: rating, nationalPhoneNumber
+# NOTE: Some fields have different tiers depending on endpoint (Place Details vs Search)
 FIELD_MASKS = {
-    "basic": "id,displayName,formattedAddress,location,rating,userRatingCount,priceLevel",
-    "search": "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel",
-    "comprehensive": "id,displayName,formattedAddress,location,rating,userRatingCount,priceLevel,nationalPhoneNumber,websiteUri,types,primaryType",
+    # Basic mask - Essentials only (id, formattedAddress, location)
+    # TIER: All Essentials
+    "basic": "id,formattedAddress,location",
+    # Search mask - includes Pro tier fields needed for restaurant matching
+    # TIER NOTES:
+    # - ESSENTIALS: places.id, places.formattedAddress, places.location
+    # - PRO: places.displayName, places.primaryType, places.businessStatus, places.types
+    "search": "places.id,places.formattedAddress,places.location,places.displayName,places.primaryType,places.businessStatus,places.types",
+    # Comprehensive - all fields for Place Details
+    # TIER NOTES:
+    # - ESSENTIALS: id, formattedAddress, location, addressComponents, types, viewport
+    # - PRO: displayName, primaryType, businessStatus, websiteUri, userRatingCount
+    # - ENTERPRISE: rating, nationalPhoneNumber
+    # NOTE: priceLevel field may be deprecated in new API - including it but it may not be returned
+    "comprehensive": "id,formattedAddress,location,addressComponents,displayName,primaryType,businessStatus,types,rating,nationalPhoneNumber,websiteUri,userRatingCount,viewport",
+    # CLI validation - comprehensive for validation checks
+    # TIER NOTES: Same as comprehensive above (includes all tiers for full validation)
+    "cli_validation": "id,formattedAddress,location,addressComponents,displayName,primaryType,businessStatus,types,rating,nationalPhoneNumber,websiteUri,userRatingCount,viewport",
 }
 
 # Food business types for restaurant searches
@@ -50,36 +72,38 @@ FOOD_TYPES = [
 class GooglePlacesService:
     """Simplified service for Google Places API interactions."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize the service with API key."""
         self.api_key = api_key or self._get_api_key()
         if not self.api_key:
             logger.warning("Google Maps API key not configured - Google Places features will not work")
 
         # Simple in-memory cache
-        self._cache = {}
+        self._cache: dict[str, Any] = {}
 
-    def _get_api_key(self) -> Optional[str]:
+    def _get_api_key(self) -> str | None:
         """Get API key from Flask configuration or environment variable."""
         try:
             api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
             if api_key:
-                return api_key
+                return str(api_key) if api_key else None
         except RuntimeError:
             pass
-        return os.getenv("GOOGLE_MAPS_API_KEY")
+        env_key = os.getenv("GOOGLE_MAPS_API_KEY")
+        return str(env_key) if env_key else None
 
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self) -> dict[str, str]:
         """Get headers for API requests."""
-        headers = {
+        api_key_str = str(self.api_key) if self.api_key else ""
+        headers: dict[str, str] = {
             "Content-Type": "application/json",
-            "X-Goog-Api-Key": self.api_key,
+            "X-Goog-Api-Key": api_key_str,
             "User-Agent": "Meal-Expense-Tracker/1.0",
         }
 
         # Set referrer based on API key restrictions
         # Check for explicit referrer configuration first
-        referrer = os.getenv("GOOGLE_API_REFERRER_DOMAIN")
+        referrer: str | None = os.getenv("GOOGLE_API_REFERRER_DOMAIN")
 
         if not referrer:
             # Try to get from Flask config
@@ -99,8 +123,8 @@ class GooglePlacesService:
         return headers
 
     def _make_request(
-        self, url: str, payload: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None
-    ) -> Dict[str, Any]:
+        self, url: str, payload: dict[str, Any] | None = None, headers: dict[str, str] | None = None
+    ) -> dict[str, Any]:
         """Make API request with error handling."""
         if not self.api_key or self.api_key == "dummy_key_for_testing":
             logger.warning("Google Places API key not configured or using dummy key")
@@ -138,7 +162,8 @@ class GooglePlacesService:
                 logger.error(f"API request failed: {response.status_code} - {response.text}")
 
             response.raise_for_status()
-            return response.json()
+            result = response.json()
+            return cast(dict[str, Any], result)
         except requests.exceptions.RequestException as e:
             logger.error(f"Google Places API error: {e}")
             if hasattr(e, "response") and e.response:
@@ -148,10 +173,10 @@ class GooglePlacesService:
     def search_places_by_text(
         self,
         query: str,
-        location_bias: Optional[Tuple[float, float]] = None,
+        location_bias: tuple[float, float] | None = None,
         radius_meters: int = 50000,
         max_results: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search for places using text query."""
         if not query or not isinstance(query, str):
             return []
@@ -159,7 +184,7 @@ class GooglePlacesService:
         # Check cache
         cache_key = f"text_search:{query}:{location_bias}:{radius_meters}"
         if cache_key in self._cache:
-            return self._cache[cache_key]
+            return cast(list[dict[str, Any]], self._cache[cache_key])
 
         url = f"{PLACES_API_BASE}:searchText"
         headers = self._get_headers()
@@ -186,7 +211,7 @@ class GooglePlacesService:
             logger.info("Google Places API search skipped due to referrer restrictions")
             return []
 
-        places = result.get("places", [])
+        places = cast(list[dict[str, Any]], result.get("places", []))
         logger.info(f"Google Places API returned {len(places)} places")
 
         # Cache result
@@ -195,18 +220,15 @@ class GooglePlacesService:
 
     def search_places_nearby(
         self,
-        location: Tuple[float, float],
+        location: tuple[float, float],
         radius_meters: int = 5000,
         included_type: str = "restaurant",
         max_results: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search for places nearby a location."""
-        if not location or len(location) != 2:
-            return []
-
         cache_key = f"nearby:{location}:{radius_meters}:{included_type}"
         if cache_key in self._cache:
-            return self._cache[cache_key]
+            return cast(list[dict[str, Any]], self._cache[cache_key])
 
         url = f"{PLACES_API_BASE}:searchNearby"
         headers = self._get_headers()
@@ -231,24 +253,37 @@ class GooglePlacesService:
             logger.info("Google Places API nearby search skipped due to referrer restrictions")
             return []
 
-        places = result.get("places", [])
+        places = cast(list[dict[str, Any]], result.get("places", []))
 
         self._cache[cache_key] = places
         return places
 
-    def get_place_details(self, place_id: str) -> Optional[Dict[str, Any]]:
-        """Get detailed information about a place."""
+    def get_place_details(self, place_id: str, field_mask: str | None = None) -> dict[str, Any] | None:
+        """Get detailed information about a place.
+
+        Args:
+            place_id: Google Place ID
+            field_mask: Optional field mask string. If not provided, uses "comprehensive" mask.
+                       Use "cli_validation" for CLI operations to minimize costs.
+
+        Returns:
+            Place data dictionary or None if not found
+        """
         if not place_id:
             return None
 
-        cache_key = f"details:{place_id}"
+        # Use provided field mask or default to comprehensive
+        mask = field_mask or FIELD_MASKS["comprehensive"]
+
+        # Use field mask in cache key to avoid cache collisions
+        cache_key = f"details:{place_id}:{mask}"
         if cache_key in self._cache:
             logger.debug(f"Cache hit for place details: {place_id}")
-            return self._cache[cache_key]
+            return cast(dict[str, Any] | None, self._cache[cache_key])
 
         url = f"{PLACES_API_BASE}/{place_id}"
         headers = self._get_headers()
-        headers["X-Goog-FieldMask"] = FIELD_MASKS["comprehensive"]
+        headers["X-Goog-FieldMask"] = mask
 
         result = self._make_request(url, headers=headers)
 
@@ -257,51 +292,85 @@ class GooglePlacesService:
 
         return result
 
-    def extract_restaurant_data(self, place_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract and format restaurant data from Google Places response."""
+    def extract_restaurant_data(self, place_data: dict[str, Any]) -> dict[str, Any]:
+        """Extract and format restaurant data from Google Places response.
+
+        Extracts all fields with tier annotations for cost tracking.
+        """
         if not place_data:
             return {}
 
-        # Extract basic information
-        name = place_data.get("displayName", {}).get("text", "")
+        # ESSENTIALS TIER: Extract basic information
         address = place_data.get("formattedAddress", "")
 
-        # Extract location
+        # PRO TIER: Extract displayName for restaurant names
+        name = place_data.get("displayName", {}).get("text", "") if place_data.get("displayName") else ""
+
+        # ESSENTIALS TIER: Extract location
         location = place_data.get("location", {})
         latitude = location.get("latitude")
         longitude = location.get("longitude")
 
-        # Extract ratings and price
-        rating = place_data.get("rating")
-        user_rating_count = place_data.get("userRatingCount", 0)
-        price_level = self._convert_price_level(place_data.get("priceLevel"))
+        # ESSENTIALS TIER (Place Details) / PRO TIER (Search): Parse address components
+        address_components = place_data.get("addressComponents", [])
+        parsed_address = {}
+        if address_components:
+            parsed_address = self.parse_address_components(address_components)
+        else:
+            # Fallback to parsing formattedAddress
+            parsed_address = self.parse_formatted_address(address)
 
-        # Extract contact info
+        # ENTERPRISE TIER: Extract rating
+        rating = place_data.get("rating")
+
+        # ENTERPRISE TIER: Extract phone number
         phone = place_data.get("nationalPhoneNumber", "")
+
+        # PRO TIER: Extract types and primaryType for categorization
+        types: list[str] = place_data.get("types", [])
+        primary_type = place_data.get("primaryType", "")
+
+        # PRO TIER: Extract business status
+        business_status = place_data.get("businessStatus", "")
+
+        # PRO TIER: Extract website
         website = place_data.get("websiteUri", "")
 
-        # Extract types and determine cuisine
-        types = place_data.get("types", [])
-        primary_type = place_data.get("primaryType", "")
-        cuisine_type = self._detect_cuisine(name, types)
+        # PRO TIER: Extract user rating count
+        user_rating_count = place_data.get("userRatingCount")
+
+        # PRO TIER: Extract price level (may be deprecated in new API)
+        price_level = place_data.get("priceLevel")
+
+        # Detect cuisine from name and types
+        cuisine_type = self._detect_cuisine(name, types) if name else "Unknown"
 
         return {
             "name": name,
-            "address": address,
+            "formatted_address": address,  # Keep original formatted address
+            "address_line_1": parsed_address.get("address_line_1", ""),
+            "address_line_2": parsed_address.get("address_line_2", ""),
+            "city": parsed_address.get("city", ""),
+            "state": parsed_address.get("state", ""),
+            "state_long": parsed_address.get("state_long", ""),
+            "state_short": parsed_address.get("state_short", ""),
+            "postal_code": parsed_address.get("postal_code", ""),
+            "country": parsed_address.get("country", ""),
             "latitude": latitude,
             "longitude": longitude,
             "rating": rating,
-            "user_rating_count": user_rating_count,
-            "price_level": price_level,
-            "phone": phone,
+            "phone_number": phone,
             "website": website,
             "cuisine_type": cuisine_type,
             "primary_type": primary_type,
             "types": types,
+            "business_status": business_status,
+            "user_rating_count": user_rating_count,
+            "price_level": price_level,
             "google_place_id": place_data.get("id") or place_data.get("place_id") or "",
         }
 
-    def _convert_price_level(self, price_level: Any) -> Optional[int]:
+    def _convert_price_level(self, price_level: Any) -> int | None:
         """Convert Google's price level to integer."""
         if price_level is None:
             return None
@@ -321,7 +390,7 @@ class GooglePlacesService:
 
         return None
 
-    def _detect_cuisine(self, name: str, types: List[str]) -> str:
+    def _detect_cuisine(self, name: str, types: list[str]) -> str:
         """Detect cuisine type from name and Google types."""
         name_lower = name.lower()
 
@@ -370,12 +439,12 @@ class GooglePlacesService:
     def search_places_with_fallback(
         self,
         query: str,
-        location: Optional[Tuple[float, float]] = None,
+        location: tuple[float, float] | None = None,
         radius_miles: float = 31.0,
         cuisine: str = "",
         max_results: int = 20,
-        **kwargs,
-    ) -> List[Dict[str, Any]]:
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
         """Search with fallback to different methods."""
         # Convert miles to meters
         radius_meters = int(radius_miles * 1609.34)
@@ -390,37 +459,41 @@ class GooglePlacesService:
         return places
 
     def build_photo_urls(
-        self, photos: List[Dict[str, Any]], api_key: Optional[str] = None, max_width: int = 400
-    ) -> List[Dict[str, str]]:
+        self, photos: list[dict[str, Any]], api_key: str | None = None, max_width: int = 400
+    ) -> list[dict[str, str]]:
         """Build photo URLs from Google Places photo references."""
         # Simplified - photos require separate API calls which are expensive
         # Return empty list to maintain compatibility
         return []
 
-    def build_reviews_summary(self, reviews: List[Dict[str, Any]], max_reviews: int = 3) -> List[Dict[str, Any]]:
+    def build_reviews_summary(self, reviews: list[dict[str, Any]], max_reviews: int = 3) -> list[dict[str, Any]]:
         """Build reviews summary from Google Places reviews."""
         # Simplified - reviews are Pro+ tier feature
         # Return empty list to maintain compatibility
         return []
 
     def filter_places_by_criteria(
-        self, places: List[Dict[str, Any]], min_rating: Optional[float] = None, max_price_level: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
-        """Filter places by rating and price level criteria."""
+        self, places: list[dict[str, Any]], min_rating: float | None = None, max_price_level: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Filter places by rating and price level criteria.
+
+        ENTERPRISE TIER: Uses rating field
+        PRO TIER: Uses priceLevel field (may be deprecated in new API)
+        """
         if not places:
             return []
 
         filtered = []
         for place in places:
-            # Check rating
+            # ENTERPRISE TIER: Check rating
             if min_rating is not None:
                 rating = place.get("rating")
                 if rating is None or rating < min_rating:
                     continue
 
-            # Check price level
+            # PRO TIER: Check price level (may be deprecated)
             if max_price_level is not None:
-                price_level = self._convert_price_level(place.get("priceLevel"))
+                price_level = place.get("priceLevel")
                 if price_level is not None and price_level > max_price_level:
                     continue
 
@@ -428,18 +501,18 @@ class GooglePlacesService:
 
         return filtered
 
-    def process_search_result_place(self, place: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def process_search_result_place(self, place: dict[str, Any]) -> dict[str, Any] | None:
         """Process a single place from search results."""
         if not place:
             return None
 
         return self.extract_restaurant_data(place)
 
-    def convert_price_level_to_int(self, price_level: Any) -> Optional[int]:
+    def convert_price_level_to_int(self, price_level: Any) -> int | None:
         """Convert Google's price level to integer."""
         return self._convert_price_level(price_level)
 
-    def detect_chain_restaurant(self, name: str, place_data: Optional[Dict[str, Any]] = None) -> bool:
+    def detect_chain_restaurant(self, name: str, place_data: dict[str, Any] | None = None) -> bool:
         """Detect if restaurant is likely a chain."""
         if not name:
             return False
@@ -470,46 +543,59 @@ class GooglePlacesService:
 
         return any(pattern in name_lower for pattern in chain_patterns)
 
-    def parse_address_components(self, address_components: List[Dict[str, Any]]) -> Dict[str, str]:
+    def parse_address_components(self, address_components: list[dict[str, Any]]) -> dict[str, str]:
         """Parse Google Places address components into standardized format."""
-        # First parse the raw Google components
-        raw_components = {
+        # Parse components storing state separately for long/short names
+        raw_components: dict[str, Any] = {
             "street_number": "",
             "route": "",
             "locality": "",
-            "administrative_area_level_1": "",
             "postal_code": "",
             "country": "",
         }
+        state_long_name = ""
+        state_short_name = ""
 
         for component in address_components:
             types = component.get("types", [])
             long_name = component.get("longName", "")
+            short_name = component.get("shortName", "")
+            long_name_str = str(long_name) if long_name else ""
+            short_name_str = str(short_name) if short_name else ""
 
             for component_type in types:
-                if component_type in raw_components:
-                    raw_components[component_type] = long_name
+                if component_type == "administrative_area_level_1":
+                    # Store state names separately
+                    state_long_name = long_name_str
+                    state_short_name = short_name_str
+                    break
+                elif component_type in raw_components:
+                    raw_components[component_type] = long_name_str
                     break
 
         # Convert to the expected format for restaurant forms
         address_line_1 = ""
-        if raw_components["street_number"] and raw_components["route"]:
-            address_line_1 = f"{raw_components['street_number']} {raw_components['route']}"
-        elif raw_components["route"]:
-            address_line_1 = raw_components["route"]
-        elif raw_components["street_number"]:
-            address_line_1 = raw_components["street_number"]
+        street_number = raw_components.get("street_number", "")
+        route = raw_components.get("route", "")
+        if street_number and route:
+            address_line_1 = f"{street_number} {route}"
+        elif route:
+            address_line_1 = route
+        elif street_number:
+            address_line_1 = street_number
 
         return {
             "address_line_1": address_line_1.strip(),
             "address_line_2": "",  # Not typically available from Google Places
-            "city": raw_components["locality"],
-            "state": raw_components["administrative_area_level_1"],
-            "postal_code": raw_components["postal_code"],
-            "country": raw_components["country"],
+            "city": raw_components.get("locality", ""),
+            "state": state_long_name or state_short_name,  # Use long name, fallback to short
+            "state_long": state_long_name,
+            "state_short": state_short_name,
+            "postal_code": raw_components.get("postal_code", ""),
+            "country": raw_components.get("country", ""),
         }
 
-    def parse_formatted_address(self, formatted_address: str) -> Dict[str, str]:
+    def parse_formatted_address(self, formatted_address: str) -> dict[str, str]:
         """Parse a formatted address string into structured components.
 
         This is a fallback method when detailed addressComponents are not available.
@@ -534,7 +620,7 @@ class GooglePlacesService:
 
         return result
 
-    def _get_empty_address_result(self) -> Dict[str, str]:
+    def _get_empty_address_result(self) -> dict[str, str]:
         """Get an empty address result dictionary."""
         return {
             "address_line_1": "",
@@ -545,7 +631,7 @@ class GooglePlacesService:
             "country": "",
         }
 
-    def _parse_four_part_address(self, parts: List[str], result: Dict[str, str]) -> None:
+    def _parse_four_part_address(self, parts: list[str], result: dict[str, str]) -> None:
         """Parse address with 4+ parts: Street, City, State ZIP, Country."""
         result["country"] = parts[-1]
         result["city"] = parts[-3]
@@ -558,7 +644,7 @@ class GooglePlacesService:
         street_parts = parts[:-3]
         result["address_line_1"] = ", ".join(street_parts)
 
-    def _parse_three_part_address(self, parts: List[str], result: Dict[str, str]) -> None:
+    def _parse_three_part_address(self, parts: list[str], result: dict[str, str]) -> None:
         """Parse address with 3 parts: Street, City, State ZIP."""
         result["address_line_1"] = parts[0]
         result["city"] = parts[1]
@@ -567,7 +653,7 @@ class GooglePlacesService:
         state_zip_part = parts[2]
         self._extract_state_and_zip(state_zip_part, result)
 
-    def _parse_two_part_address(self, parts: List[str], result: Dict[str, str]) -> None:
+    def _parse_two_part_address(self, parts: list[str], result: dict[str, str]) -> None:
         """Parse address with 2 parts: Street, City State ZIP."""
         result["address_line_1"] = parts[0]
         location_part = parts[1]
@@ -577,11 +663,11 @@ class GooglePlacesService:
         else:
             self._parse_city_state_zip(location_part, result)
 
-    def _parse_one_part_address(self, parts: List[str], result: Dict[str, str]) -> None:
+    def _parse_one_part_address(self, parts: list[str], result: dict[str, str]) -> None:
         """Parse address with 1 part: Street only."""
         result["address_line_1"] = parts[0]
 
-    def _parse_city_comma_state_zip(self, location_part: str, result: Dict[str, str]) -> None:
+    def _parse_city_comma_state_zip(self, location_part: str, result: dict[str, str]) -> None:
         """Parse 'City, State ZIP' format."""
         city_state_parts = [p.strip() for p in location_part.split(",")]
         if len(city_state_parts) >= 1:
@@ -589,7 +675,7 @@ class GooglePlacesService:
         if len(city_state_parts) >= 2:
             self._extract_state_and_zip(city_state_parts[1], result)
 
-    def _parse_city_state_zip(self, location_part: str, result: Dict[str, str]) -> None:
+    def _parse_city_state_zip(self, location_part: str, result: dict[str, str]) -> None:
         """Parse 'City State ZIP' format (no comma)."""
         # Look for ZIP code first
         zip_match = re.search(r"\b(\d{5}(-\d{4})?|\w\d\w\s*\d\w\d)\b", location_part)
@@ -608,7 +694,7 @@ class GooglePlacesService:
             # No clear state, treat as city
             result["city"] = location_part
 
-    def _extract_state_and_zip(self, state_zip_part: str, result: Dict[str, str]) -> None:
+    def _extract_state_and_zip(self, state_zip_part: str, result: dict[str, str]) -> None:
         """Extract state and ZIP code from a combined string."""
         zip_match = re.search(r"\b(\d{5}(-\d{4})?|\w\d\w\s*\d\w\d)\b", state_zip_part)
         if zip_match:
@@ -618,29 +704,25 @@ class GooglePlacesService:
             if state_part:
                 result["state"] = state_part
 
-    def analyze_restaurant_types(self, place_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze restaurant types and return cuisine and service level."""
+    def analyze_restaurant_types(self, place_data: dict[str, Any]) -> dict[str, Any]:
+        """Analyze restaurant types and return cuisine and service level.
+
+        Uses PRO TIER fields: displayName, types, primaryType
+        """
+        # PRO TIER: Extract displayName for name-based cuisine detection
         name = (
             place_data.get("displayName", {}).get("text", "")
             if isinstance(place_data.get("displayName"), dict)
             else place_data.get("displayName", "")
         )
+
+        # PRO TIER: Extract types for cuisine and service level detection
         types = place_data.get("types", [])
 
         cuisine = self._detect_cuisine(name, types)
 
-        # Simple service level detection
-        service_level = "casual_dining"
-        confidence = 0.7
-
-        price_level = self._convert_price_level(place_data.get("priceLevel"))
-        if price_level is not None:
-            if price_level <= 1:
-                service_level = "quick_service"
-                confidence = 0.8
-            elif price_level >= 3:
-                service_level = "fine_dining"
-                confidence = 0.8
+        # PRO TIER: Use service level detection with primaryType and types
+        service_level, confidence = self.detect_service_level_from_data(place_data)
 
         return {
             "cuisine_type": cuisine,
@@ -648,7 +730,7 @@ class GooglePlacesService:
             "confidence": confidence,
         }
 
-    def generate_notes(self, place: Dict[str, Any]) -> Optional[str]:
+    def generate_notes(self, place: dict[str, Any]) -> str | None:
         """Generate notes from Google Places data."""
         if not place:
             return None
@@ -674,7 +756,7 @@ class GooglePlacesService:
 
         return " • ".join(notes) if notes else None
 
-    def generate_description(self, place: Dict[str, Any]) -> str:
+    def generate_description(self, place: dict[str, Any]) -> str:
         """Generate a description for a restaurant."""
         if not place:
             return ""
@@ -688,22 +770,20 @@ class GooglePlacesService:
         else:
             parts.append("Restaurant")
 
-        # Add rating if available
+        # ENTERPRISE TIER: Add rating if available
         rating = place.get("rating")
         if rating:
             parts.append(f"rated {rating:.1f} stars")
 
-        # Add price level
-        price_level = place.get("price_level")
-        if price_level is not None:
-            price_desc = ["Free", "Inexpensive", "Moderate", "Expensive", "Very Expensive"]
-            if 0 <= price_level < len(price_desc):
-                parts.append(f"({price_desc[price_level]})")
+        # PRO TIER: Price level removed from description (may be deprecated in new API)
 
         return " • ".join(parts) if parts else "Restaurant"
 
-    def detect_service_level_from_data(self, place_data: Dict[str, Any]) -> Tuple[str, float]:
+    def detect_service_level_from_data(self, place_data: dict[str, Any]) -> tuple[str, float]:
         """Detect service level from Google Places data.
+
+        Uses PRO TIER fields: primaryType and types for classification.
+        Uses ENTERPRISE TIER field: rating (if available) for confidence scoring.
 
         Args:
             place_data: Place data from Google Places API
@@ -711,38 +791,39 @@ class GooglePlacesService:
         Returns:
             Tuple of (service_level, confidence_score)
         """
-        primary_type = place_data.get("primaryType", "")
-        price_level = place_data.get("priceLevel", "")
+        from app.utils.service_level_detector import ServiceLevel, detect_service_level_from_google_places
 
-        # Convert price level to numeric for easier comparison
-        price_numeric = 0
-        if price_level == "PRICE_LEVEL_INEXPENSIVE":
-            price_numeric = 1
-        elif price_level == "PRICE_LEVEL_MODERATE":
-            price_numeric = 2
-        elif price_level == "PRICE_LEVEL_EXPENSIVE":
-            price_numeric = 3
-        elif price_level == "PRICE_LEVEL_VERY_EXPENSIVE":
-            price_numeric = 4
+        # PRO TIER: Use types and primaryType for classification
+        if not place_data:
+            return "unknown", 0.0
 
-        # Simplified service level detection logic
-        if primary_type == "dessert_shop":
-            if price_numeric <= 1:
-                return "quick_service", 0.8
-            else:
-                return "casual_dining", 0.7
-        elif primary_type == "fast_food_restaurant":
-            return "casual_dining", 0.6  # Simplified logic as per test
-        else:
-            # Default classification based on price
-            if price_numeric <= 1:
-                return "quick_service", 0.5
-            elif price_numeric <= 2:
-                return "casual_dining", 0.6
-            else:
-                return "fine_dining", 0.7
+        # Use the service level detector utility which handles types and primaryType
+        service_level = detect_service_level_from_google_places(place_data)
+        service_level_str = service_level.value if isinstance(service_level, ServiceLevel) else str(service_level)
 
-    def format_primary_type_for_display(self, primary_type: str) -> Optional[str]:
+        # Calculate confidence based on available data
+        # PRO TIER: primaryType and types increase confidence
+        confidence = 0.5  # Base confidence
+
+        primary_type = place_data.get("primaryType")
+        types = place_data.get("types", [])
+
+        if primary_type:
+            confidence += 0.2
+        if types:
+            confidence += 0.2
+
+        # ENTERPRISE TIER: rating available for additional confidence
+        rating = place_data.get("rating")
+        if rating is not None:
+            confidence += 0.1
+
+        # Cap confidence at 1.0
+        confidence = min(confidence, 1.0)
+
+        return service_level_str, confidence
+
+    def format_primary_type_for_display(self, primary_type: str) -> str | None:
         """Format primary type for display.
 
         Args:

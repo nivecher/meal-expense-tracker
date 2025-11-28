@@ -1,8 +1,9 @@
+from collections.abc import Callable
 import logging
-from typing import Optional
+from typing import Any, Optional, cast
 
 from dotenv import load_dotenv
-from flask import Flask, request
+from flask import Flask, Response, request
 from flask_cors import CORS
 
 from config import get_config
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["create_app"]
 
 
-def create_app(config_name: Optional[str] = None) -> Flask:
+def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the Flask application.
 
     Args:
@@ -47,22 +48,22 @@ def create_app(config_name: Optional[str] = None) -> Flask:
 def _is_lambda_env_for_url_generation(app: Flask) -> tuple[bool, str]:
     """Check if we're in Lambda environment and get server name."""
     server_name = app.config.get("SERVER_NAME")
-    is_lambda = server_name and server_name != "localhost:5000" and "localhost" not in server_name
-    return is_lambda, server_name or ""
+    is_lambda = bool(server_name and server_name != "localhost:5000" and "localhost" not in server_name)
+    return is_lambda, str(server_name or "")
 
 
-def _create_lambda_url_for(app: Flask):
+def _create_lambda_url_for(app: Flask) -> Callable[..., str]:
     """Create a Lambda-aware url_for function."""
     original_url_for = app.url_for
 
-    def lambda_url_for(endpoint, **values):
+    def lambda_url_for(endpoint: str, **values: Any) -> str:
         """Override url_for to use correct host in Lambda/API Gateway environment."""
         is_lambda, server_name = _is_lambda_env_for_url_generation(app)
 
         if is_lambda and "_external" not in values:
             # Force external URLs in Lambda to use the configured SERVER_NAME
             values["_external"] = True
-            url = original_url_for(endpoint, **values)
+            url: str = original_url_for(endpoint, **values)
             # Replace the host in the generated URL
             if "://" in url:
                 protocol, rest = url.split("://", 1)
@@ -73,16 +74,16 @@ def _create_lambda_url_for(app: Flask):
                     url = f"{protocol}://{server_name}"
             return url
         else:
-            return original_url_for(endpoint, **values)
+            return cast(str, original_url_for(endpoint, **values))
 
     return lambda_url_for
 
 
-def _create_lambda_redirect(app: Flask):
+def _create_lambda_redirect(app: Flask) -> Callable[[str, int], Response]:
     """Create a Lambda-aware redirect function."""
     from flask import redirect as original_redirect
 
-    def lambda_redirect(location, code=302):
+    def lambda_redirect(location: str, code: int = 302) -> Response:
         """Override redirect to fix Location headers in Lambda environment."""
         is_lambda, server_name = _is_lambda_env_for_url_generation(app)
 
@@ -98,7 +99,7 @@ def _create_lambda_redirect(app: Flask):
                     else:
                         location = f"{protocol}://{server_name}"
 
-        return original_redirect(location, code)
+        return cast(Response, original_redirect(location, code))
 
     return lambda_redirect
 
@@ -112,11 +113,11 @@ def _configure_request_handlers(app: Flask) -> None:
     # Override redirect to fix Location headers in Lambda environment
     import flask
 
-    flask.redirect = _create_lambda_redirect(app)
+    flask.redirect = _create_lambda_redirect(app)  # type: ignore[assignment]
 
     # Configure static file headers
     @app.after_request
-    def add_static_headers(response):
+    def add_static_headers(response: Response) -> Response:
         """Add cache-control and other headers for static files."""
         if response.headers.get("Content-Type"):
             content_type = _fix_content_type_headers(response)
@@ -126,7 +127,7 @@ def _configure_request_handlers(app: Flask) -> None:
 
     # Register service worker route with proper headers
     @app.route("/service-worker.js")
-    def service_worker():
+    def service_worker() -> Response:
         response = app.send_static_file("js/service-worker.js")
         response.headers["Service-Worker-Allowed"] = "/"
         response.headers["Content-Type"] = "application/javascript"
@@ -134,7 +135,7 @@ def _configure_request_handlers(app: Flask) -> None:
         return response
 
 
-def _fix_content_type_headers(response) -> str:
+def _fix_content_type_headers(response: Response) -> str:
     """Fix content-type headers for different file types."""
     content_type = response.headers.get("Content-Type", "")
     path = request.path
@@ -168,12 +169,12 @@ def _fix_content_type_headers(response) -> str:
         base_content_type = content_type.split(";")[0].strip()
         if "charset=" not in content_type:
             response.headers["Content-Type"] = f"{base_content_type}; charset=utf-8"
-            return response.headers["Content-Type"]
+            return cast(str, response.headers["Content-Type"])
 
     return content_type
 
 
-def _set_cache_control_headers(response, content_type: str) -> None:
+def _set_cache_control_headers(response: Response, content_type: str) -> None:
     """Set appropriate cache control headers based on content type."""
     # Static assets that rarely change - cache for 1 year
     if any(ext in content_type for ext in ["css", "javascript", "image", "font/"]):
@@ -186,7 +187,7 @@ def _set_cache_control_headers(response, content_type: str) -> None:
         response.headers["Cache-Control"] = "public, max-age=3600"
 
 
-def _set_security_headers(response, content_type: str) -> None:
+def _set_security_headers(response: Response, content_type: str) -> None:
     """Set security headers for responses."""
     # Essential security headers - always set for all responses
     response.headers["X-Content-Type-Options"] = "nosniff"

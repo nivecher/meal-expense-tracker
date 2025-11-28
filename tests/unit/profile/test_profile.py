@@ -1,7 +1,10 @@
 from flask import url_for
+from flask.testing import FlaskClient
+
+from app.auth.models import User
 
 
-def test_get_profile(client, test_user):
+def test_get_profile(client: FlaskClient, test_user: User) -> None:
     """Test getting user profile page."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True
@@ -13,7 +16,7 @@ def test_get_profile(client, test_user):
     assert test_user.username.encode() in response.data
 
 
-def test_update_profile(client, test_user):
+def test_update_profile(client: FlaskClient, test_user: User) -> None:
     """Test updating user profile via form submission."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True
@@ -36,7 +39,7 @@ def test_update_profile(client, test_user):
     assert b"NewDisplayName" in response.data
 
 
-def test_change_password(client, test_user):
+def test_change_password(client: FlaskClient, test_user: User) -> None:
     """Test changing user password via form submission."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True

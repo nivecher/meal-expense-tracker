@@ -1,16 +1,17 @@
 """Pytest configuration and fixtures for the test suite."""
 
-import os
-import sys
-import uuid
-from datetime import datetime, timezone
+from collections.abc import Generator
+from datetime import UTC, datetime, timezone
 from decimal import Decimal
+import os
 from pathlib import Path
-from typing import Generator, Optional, TypeVar
+import sys
+from typing import Optional, TypeVar
+import uuid
 
-import pytest
 from flask import Flask
 from flask.testing import FlaskClient, FlaskCliRunner
+import pytest
 from sqlalchemy.orm import Session
 
 # Add the project root to the Python path first to avoid import issues
@@ -46,7 +47,7 @@ os.environ.update(
 
 
 @pytest.fixture(scope="function")
-def app() -> Generator[Flask, None, None]:
+def app() -> Generator[Flask]:
     """Create and configure a new app instance for testing.
 
     This fixture is function-scoped to ensure a clean database for each test.
@@ -122,7 +123,7 @@ def app() -> Generator[Flask, None, None]:
 
 
 @pytest.fixture
-def client(app: Flask) -> Generator[FlaskClient, None, None]:
+def client(app: Flask) -> Generator[FlaskClient]:
     """Create a test client for the application with database access.
 
     This fixture provides a test client that can be used to make requests
@@ -158,7 +159,7 @@ def runner(app: Flask) -> FlaskCliRunner:
 
 
 @pytest.fixture
-def _db(app: Flask) -> Generator[Session, None, None]:
+def _db(app: Flask) -> Generator[Session]:
     """Provide a transactional scope around tests.
 
     This fixture is used by Flask-SQLAlchemy to ensure each test runs in a transaction
@@ -199,7 +200,7 @@ class AuthActions:
             client: The Flask test client.
         """
         self._client = client
-        self._app: Optional[Flask] = None
+        self._app: Flask | None = None
 
     def _get_app(self) -> Flask:
         """Get the Flask application instance.
@@ -256,7 +257,7 @@ class AuthActions:
         self._client.get("/")
         return self._client
 
-    def register(self, username: str, password: str, email: Optional[str] = None) -> "User":
+    def register(self, username: str, password: str, email: str | None = None) -> "User":
         """Register and log in a new test user.
 
         Args:
@@ -485,7 +486,7 @@ def test_expense(session: Session, test_user: User, test_restaurant: Restaurant,
     # Create the expense with Decimal amount and timezone-aware datetime
     expense = Expense(
         amount=Decimal("10.99"),
-        date=datetime.now(timezone.utc),
+        date=datetime.now(UTC),
         notes="Test expense",
         user_id=test_user.id,
         restaurant_id=test_restaurant.id,

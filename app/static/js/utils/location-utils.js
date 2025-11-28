@@ -34,7 +34,9 @@ function getCookie(name) {
  */
 function deleteCookie(name, path = '/', domain = '') {
   const domainStr = domain ? `;domain=${domain}` : '';
-  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}${domainStr}`;
+  // Add Secure flag for HTTPS sessions to prevent man-in-the-middle attacks
+  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}${domainStr}${secureFlag}`;
 }
 
 /**

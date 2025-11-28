@@ -31,7 +31,7 @@ def _get_current_user() -> User:
 
 def _create_api_response(
     data: Any = None, message: str = "Success", status: str = "success", code: int = 200
-) -> Tuple[Response, int]:
+) -> tuple[Response, int]:
     """Create a standardized API response."""
     response_data = {"status": status, "message": message}
     if data is not None:
@@ -39,7 +39,7 @@ def _create_api_response(
     return jsonify(response_data), code
 
 
-def _handle_validation_error(error: ValidationError) -> Tuple[Response, int]:
+def _handle_validation_error(error: ValidationError) -> tuple[Response, int]:
     """Handle validation errors consistently."""
     return (
         jsonify({"status": "error", "message": "Validation failed", "errors": error.messages}),
@@ -47,7 +47,7 @@ def _handle_validation_error(error: ValidationError) -> Tuple[Response, int]:
     )
 
 
-def _handle_service_error(error: Exception, operation: str) -> Tuple[Response, int]:
+def _handle_service_error(error: Exception, operation: str) -> tuple[Response, int]:
     """Handle service layer errors consistently."""
     current_app.logger.error(f"Error in {operation}: {str(error)}", exc_info=True)
     return (
@@ -60,12 +60,12 @@ def _handle_service_error(error: Exception, operation: str) -> Tuple[Response, i
 @bp.route("/health")
 def health_check() -> Response:
     """API Health Check"""
-    return jsonify({"status": "healthy"})
+    return cast(Response, jsonify({"status": "healthy"}))
 
 
 # Version Information
 @bp.route("/version")
-def version_info() -> Tuple[Response, int]:
+def version_info() -> tuple[Response, int]:
     """Get application version information.
 
     Returns:
@@ -93,7 +93,7 @@ def version_info() -> Tuple[Response, int]:
 
 # Cuisine Data
 @bp.route("/cuisines")
-def get_cuisines() -> Response:
+def get_cuisines() -> tuple[Response, int]:
     """Get cuisine data for frontend consumption.
 
     Returns:
@@ -104,8 +104,11 @@ def get_cuisines() -> Response:
 
     try:
         # Load from static JSON file
-        json_path = os.path.join(current_app.static_folder, "data", "cuisines.json")
-        with open(json_path, "r") as f:
+        static_folder = current_app.static_folder
+        if not static_folder:
+            raise ValueError("Static folder not configured")
+        json_path = os.path.join(static_folder, "data", "cuisines.json")
+        with open(json_path) as f:
             cuisine_data = json.load(f)
 
         return _create_api_response(data=cuisine_data, message="Cuisine data retrieved successfully")
@@ -117,7 +120,7 @@ def get_cuisines() -> Response:
 # Generic CRUD operations for expenses
 @bp.route("/expenses", methods=["GET"])
 @login_required
-def get_expenses() -> Response:
+def get_expenses() -> tuple[Response, int]:
     """Get all expenses for the current user."""
     try:
         user = _get_current_user()
@@ -130,7 +133,7 @@ def get_expenses() -> Response:
 @bp.route("/expenses", methods=["POST"])
 @login_required
 @validate_api_csrf
-def create_expense() -> Tuple[Response, int]:
+def create_expense() -> tuple[Response, int]:
     """Create a new expense."""
     try:
         user = _get_current_user()
@@ -145,7 +148,7 @@ def create_expense() -> Tuple[Response, int]:
 
 @bp.route("/expenses/<int:expense_id>", methods=["GET"])
 @login_required
-def get_expense(expense_id: int) -> Response:
+def get_expense(expense_id: int) -> tuple[Response, int]:
     """Get a single expense."""
     try:
         user = _get_current_user()
@@ -160,7 +163,7 @@ def get_expense(expense_id: int) -> Response:
 @bp.route("/expenses/<int:expense_id>", methods=["PUT"])
 @login_required
 @validate_api_csrf
-def update_expense(expense_id: int) -> Tuple[Response, int]:
+def update_expense(expense_id: int) -> tuple[Response, int]:
     """Update an expense."""
     try:
         user = _get_current_user()
@@ -180,7 +183,7 @@ def update_expense(expense_id: int) -> Tuple[Response, int]:
 @bp.route("/expenses/<int:expense_id>", methods=["DELETE"])
 @login_required
 @validate_api_csrf
-def delete_expense(expense_id: int) -> Tuple[Response, int]:
+def delete_expense(expense_id: int) -> Response | tuple[Response, int]:
     """Delete an expense."""
     try:
         user = _get_current_user()
@@ -197,7 +200,7 @@ def delete_expense(expense_id: int) -> Tuple[Response, int]:
 # Generic CRUD operations for restaurants
 @bp.route("/restaurants", methods=["GET"])
 @login_required
-def get_restaurants() -> Response:
+def get_restaurants() -> Response | tuple[Response, int]:
     """Get all restaurants for the current user."""
     try:
         user = _get_current_user()
@@ -212,7 +215,7 @@ def get_restaurants() -> Response:
 @bp.route("/restaurants", methods=["POST"])
 @login_required
 @validate_api_csrf
-def create_restaurant() -> Tuple[Response, int]:
+def create_restaurant() -> Response | tuple[Response, int]:
     """Create a new restaurant."""
     try:
         user = _get_current_user()
@@ -231,7 +234,7 @@ def create_restaurant() -> Tuple[Response, int]:
 
 @bp.route("/restaurants/<int:restaurant_id>", methods=["GET"])
 @login_required
-def get_restaurant(restaurant_id: int) -> Response:
+def get_restaurant(restaurant_id: int) -> Response | tuple[Response, int]:
     """Get a single restaurant."""
     try:
         user = _get_current_user()
@@ -248,7 +251,7 @@ def get_restaurant(restaurant_id: int) -> Response:
 @bp.route("/restaurants/<int:restaurant_id>", methods=["PUT"])
 @login_required
 @validate_api_csrf
-def update_restaurant(restaurant_id: int) -> Tuple[Response, int]:
+def update_restaurant(restaurant_id: int) -> tuple[Response, int]:
     """Update a restaurant."""
     try:
         user = _get_current_user()
@@ -271,7 +274,7 @@ def update_restaurant(restaurant_id: int) -> Tuple[Response, int]:
 @bp.route("/restaurants/<int:restaurant_id>", methods=["DELETE"])
 @login_required
 @validate_api_csrf
-def delete_restaurant(restaurant_id: int) -> Tuple[Response, int]:
+def delete_restaurant(restaurant_id: int) -> tuple[Response, int]:
     """Delete a restaurant."""
     try:
         user = _get_current_user()
@@ -287,7 +290,7 @@ def delete_restaurant(restaurant_id: int) -> Tuple[Response, int]:
 
 @bp.route("/restaurants/check", methods=["GET"])
 @login_required
-def check_restaurant_exists() -> Response:
+def check_restaurant_exists() -> Response | tuple[Response, int]:
     """Check if a restaurant already exists for the current user by Google Place ID."""
     place_id = request.args.get("place_id")
     if not place_id:
@@ -314,7 +317,7 @@ def check_restaurant_exists() -> Response:
 @bp.route("/restaurants/validate", methods=["POST"])
 @login_required
 @validate_api_csrf
-def validate_restaurant() -> Tuple[Response, int]:
+def validate_restaurant() -> Response | tuple[Response, int]:
     """Validate restaurant information using Google Places API."""
     try:
         # Validate input data
@@ -328,6 +331,8 @@ def validate_restaurant() -> Tuple[Response, int]:
             return _create_api_response(message="Restaurant not found", status="error", code=404)
 
         # Validate with Google Places API
+        if place_id_to_use is None:
+            return _create_api_response(message="Place ID is required", status="error", code=400)
         validation_result = _validate_restaurant_with_google_api(place_id_to_use)
         if not validation_result.get("valid"):
             return _create_api_response(data=validation_result, message="Validation failed", status="error", code=400)
@@ -340,7 +345,7 @@ def validate_restaurant() -> Tuple[Response, int]:
         return _create_api_response(message=f"Failed to validate restaurant: {str(e)}", status="error", code=500)
 
 
-def _validate_restaurant_input() -> Optional[Tuple[Response, int]]:
+def _validate_restaurant_input() -> tuple[Response, int] | None:
     """Validate input parameters for restaurant validation."""
     data = request.get_json()
     if not data:
@@ -357,7 +362,7 @@ def _validate_restaurant_input() -> Optional[Tuple[Response, int]]:
     return None
 
 
-def _get_and_validate_restaurant() -> Tuple[Optional[Restaurant], Optional[str]]:
+def _get_and_validate_restaurant() -> tuple[Restaurant | None, str | None]:
     """Get restaurant and validate user permissions."""
     data = request.get_json()
     restaurant_id = data.get("restaurant_id")
@@ -381,7 +386,7 @@ def _get_and_validate_restaurant() -> Tuple[Optional[Restaurant], Optional[str]]
     return restaurant, place_id_to_use
 
 
-def _process_validation_results(restaurant, validation_result) -> Tuple[Response, int]:
+def _process_validation_results(restaurant: Any, validation_result: dict[str, Any]) -> tuple[Response, int]:
     """Process validation results and return response."""
     data = request.get_json()
     form_data = data.get("form_data")
@@ -490,10 +495,12 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
         return {"valid": False, "errors": [f"Unexpected error: {str(e)}"]}
 
 
-def _check_restaurant_mismatches_api(current_data, validation_result: dict) -> tuple[list[str], dict[str, str]]:
+def _check_restaurant_mismatches_api(
+    current_data: dict[str, Any], validation_result: dict[str, Any]
+) -> tuple[list[str], dict[str, str]]:
     """Check for mismatches between current data and Google data."""
-    mismatches = []
-    fixes_to_apply = {}
+    mismatches: list[str] = []
+    fixes_to_apply: dict[str, str] = {}
 
     # Check name mismatch
     _check_name_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
@@ -510,16 +517,26 @@ def _check_restaurant_mismatches_api(current_data, validation_result: dict) -> t
     return mismatches, fixes_to_apply
 
 
-def _check_name_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply):
+def _check_name_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
     """Check for name mismatch."""
     google_name = validation_result.get("google_name")
     current_name = current_data.get("name")
-    if google_name and google_name.lower() != current_name.lower():
+    if google_name and current_name and google_name.lower() != current_name.lower():
         mismatches.append(f"Name: '{current_name}' vs Google: '{google_name}'")
         fixes_to_apply["name"] = google_name
 
 
-def _check_state_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply):
+def _check_state_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
     """Check for state field mismatches using multiple comparison methods."""
     from app.restaurants.cli import (
         _states_match_directly,
@@ -534,21 +551,42 @@ def _check_state_mismatch_api(current_data, validation_result, mismatches, fixes
     if not ((google_state or google_state_long or google_state_short) and current_state):
         return
 
+    # Ensure current_state is a string before calling functions
+    if not isinstance(current_state, str):
+        return
+
     # Check direct string matches first
-    if _states_match_directly(current_state, google_state, google_state_long, google_state_short):
+    if _states_match_directly(
+        current_state,
+        google_state or "",
+        google_state_long or "",
+        google_state_short or "",
+    ):
         return
 
     # Try US library matching as fallback
-    if _states_match_with_us_library(current_state, google_state, google_state_long, google_state_short):
+    if _states_match_with_us_library(
+        current_state,
+        google_state or "",
+        google_state_long or "",
+        google_state_short or "",
+    ):
         return
 
     # If no matches found, report mismatch
     google_display = google_state_long or google_state or google_state_short or "Unknown"
     mismatches.append(f"State: '{current_state}' vs Google: '{google_display}'")
-    fixes_to_apply["state"] = google_state_long or google_state or google_state_short
+    state_fix = google_state_long or google_state or google_state_short
+    if state_fix and isinstance(state_fix, str):
+        fixes_to_apply["state"] = state_fix
 
 
-def _check_address_mismatches_api(current_data, validation_result, mismatches, fixes_to_apply):
+def _check_address_mismatches_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
     """Check for address field mismatches."""
     address_fields = [
         ("google_address_line_1", "address_line_1", "Address Line 1"),
@@ -568,7 +606,12 @@ def _check_address_mismatches_api(current_data, validation_result, mismatches, f
             fixes_to_apply[current_field] = google_value
 
 
-def _check_service_level_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply):
+def _check_service_level_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
     """Check for service level mismatch."""
     google_service_level_data = validation_result.get("google_service_level")
     if google_service_level_data:
@@ -585,7 +628,7 @@ def _check_service_level_mismatch_api(current_data, validation_result, mismatche
                 fixes_to_apply["service_level"] = suggested_fix
 
 
-def _apply_restaurant_fixes_api(restaurant, fixes_to_apply: dict[str, str]) -> bool:
+def _apply_restaurant_fixes_api(restaurant: Restaurant, fixes_to_apply: dict[str, str]) -> bool:
     """Apply fixes to restaurant data and return success status."""
     try:
         from app.extensions import db
@@ -601,7 +644,7 @@ def _apply_restaurant_fixes_api(restaurant, fixes_to_apply: dict[str, str]) -> b
         return False
 
 
-def _apply_restaurant_field_fixes_api(restaurant, fixes_to_apply: dict[str, str]) -> None:
+def _apply_restaurant_field_fixes_api(restaurant: Restaurant, fixes_to_apply: dict[str, str]) -> None:
     """Apply individual field fixes to restaurant."""
     field_mapping = {
         "name": "name",
@@ -622,7 +665,7 @@ def _apply_restaurant_field_fixes_api(restaurant, fixes_to_apply: dict[str, str]
 # Generic CRUD operations for categories
 @bp.route("/categories", methods=["GET"])
 @login_required
-def get_categories() -> Response:
+def get_categories() -> Response | tuple[Response, int]:
     """Get all categories for the current user."""
     try:
         user = _get_current_user()
@@ -637,7 +680,7 @@ def get_categories() -> Response:
 @bp.route("/categories", methods=["POST"])
 @login_required
 @validate_api_csrf
-def create_category() -> Tuple[Response, int]:
+def create_category() -> tuple[Response, int]:
     """Create a new category."""
     try:
         user = _get_current_user()
@@ -654,7 +697,7 @@ def create_category() -> Tuple[Response, int]:
 
 @bp.route("/categories/<int:category_id>", methods=["GET"])
 @login_required
-def get_category(category_id: int) -> Response:
+def get_category(category_id: int) -> tuple[Response, int]:
     """Get a single category."""
     try:
         user = _get_current_user()
@@ -669,7 +712,7 @@ def get_category(category_id: int) -> Response:
 @bp.route("/categories/<int:category_id>", methods=["PUT"])
 @login_required
 @validate_api_csrf
-def update_category(category_id: int) -> Tuple[Response, int]:
+def update_category(category_id: int) -> tuple[Response, int]:
     """Update a category."""
     try:
         user = _get_current_user()
@@ -691,10 +734,10 @@ def update_category(category_id: int) -> Tuple[Response, int]:
 @bp.route("/categories/<int:category_id>", methods=["DELETE"])
 @login_required
 @validate_api_csrf
-def delete_category(category_id: int) -> Tuple[Response, int]:
+def delete_category(category_id: int) -> tuple[Response, int]:
     """Delete a category."""
     try:
-        user = _get_current_user()
+        user: User = _get_current_user()
         category = category_services.get_category_by_id_for_user(category_id, user.id)
         if not category:
             return jsonify({"status": "error", "message": "Category not found"}), 404

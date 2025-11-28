@@ -4,8 +4,12 @@ Simplified admin operations using direct functions instead of complex class hier
 Each operation returns a consistent interface for easy remote invocation.
 """
 
+from collections.abc import Callable
 import logging
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional, Type, cast
+
+if TYPE_CHECKING:
+    pass
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -16,10 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 # Operation definitions: name -> (description, requires_confirmation, validate_func, execute_func)
-OPERATIONS = {}
+OPERATIONS: dict[str, dict[str, Any]] = {}
 
 
-def register_operation(name: str, description: str, requires_confirmation: bool, validate_func, execute_func):
+def register_operation(
+    name: str,
+    description: str,
+    requires_confirmation: bool,
+    validate_func: Callable[..., Any],
+    execute_func: Callable[..., Any],
+) -> None:
     """Register an admin operation."""
     OPERATIONS[name] = {
         "description": description,
@@ -29,12 +39,12 @@ def register_operation(name: str, description: str, requires_confirmation: bool,
     }
 
 
-def get_operation_info(name: str) -> Optional[Dict[str, Any]]:
+def get_operation_info(name: str) -> dict[str, Any] | None:
     """Get operation information."""
     return OPERATIONS.get(name)
 
 
-def list_operations() -> Dict[str, str]:
+def list_operations() -> dict[str, str]:
     """List all available operations with descriptions."""
     return {name: info["description"] for name, info in OPERATIONS.items()}
 
@@ -57,7 +67,7 @@ register_operation(
 )
 
 
-def _validate_list_users(**kwargs) -> Dict[str, Any]:
+def _validate_list_users(**kwargs: Any) -> dict[str, Any]:
     """Validate list users parameters."""
     errors = []
 
@@ -72,7 +82,7 @@ def _validate_list_users(**kwargs) -> Dict[str, Any]:
     return {"valid": len(errors) == 0, "errors": errors}
 
 
-def _execute_list_users(**kwargs) -> Dict[str, Any]:
+def _execute_list_users(**kwargs: Any) -> dict[str, Any]:
     """Execute list users operation."""
     try:
         admin_only = kwargs.get("admin_only", False)
@@ -114,7 +124,7 @@ def _execute_list_users(**kwargs) -> Dict[str, Any]:
         return {"success": False, "message": f"Failed to list users: {str(e)}"}
 
 
-def _validate_create_user(**kwargs) -> Dict[str, Any]:
+def _validate_create_user(**kwargs: Any) -> dict[str, Any]:
     """Validate create user parameters."""
     errors = []
 
@@ -133,7 +143,7 @@ def _validate_create_user(**kwargs) -> Dict[str, Any]:
     return {"valid": len(errors) == 0, "errors": errors}
 
 
-def _execute_create_user(**kwargs) -> Dict[str, Any]:
+def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
     """Execute create user operation."""
     try:
         username = kwargs.get("username", "").strip()
@@ -180,33 +190,36 @@ class AdminOperationRegistry:
     """Registry for all available admin operations."""
 
     @classmethod
-    def get_operation(cls, op_name: str):
+    def get_operation(cls, op_name: str) -> type[Any] | None:
         """Get operation class by name."""
         op_info = OPERATIONS.get(op_name)
-        if not op_info:
+        # Explicit None check for type narrowing (replaces assert that would be stripped in -O mode)
+        if op_info is None:
             return None
+        # After None check, op_info is guaranteed to be Dict[str, Any]
+        op_info_dict: dict[str, Any] = op_info
 
         # Create a compatibility class
         class LegacyOperation:
             name = op_name
-            description = op_info["description"]
-            requires_confirmation = op_info["requires_confirmation"]
+            description = op_info_dict["description"]
+            requires_confirmation = op_info_dict["requires_confirmation"]
 
-            def validate_params(self, **kwargs):
-                return op_info["validate"](**kwargs)
+            def validate_params(self, **kwargs: Any) -> dict[str, Any]:
+                return cast(dict[str, Any], op_info_dict["validate"](**kwargs))
 
-            def execute(self, **kwargs):
-                return op_info["execute"](**kwargs)
+            def execute(self, **kwargs: Any) -> dict[str, Any]:
+                return cast(dict[str, Any], op_info_dict["execute"](**kwargs))
 
         return LegacyOperation
 
     @classmethod
-    def list_operations(cls):
+    def list_operations(cls) -> dict[str, str]:
         """List all available operations with descriptions."""
         return list_operations()
 
     @classmethod
-    def register_operation(cls, name: str, operation_class):
+    def register_operation(cls, name: str, operation_class: type[Any]) -> None:
         """Register a new operation."""
         # For backward compatibility, we don't actually register here
         # since we're using the function-based approach

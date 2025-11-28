@@ -124,7 +124,7 @@ If you see 404 errors, check:
 
 ## Benefits
 
-### Performance
+### Performance Benefits
 
 - ✅ Eliminates 503 errors (static files too large for Lambda)
 - ✅ Faster load times (CDN edge locations)

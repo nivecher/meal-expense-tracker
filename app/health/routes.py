@@ -1,9 +1,10 @@
 """Health check endpoints for the application."""
 
+from datetime import UTC, datetime, timezone
 import logging
-from datetime import datetime, timezone
+from typing import cast
 
-from flask import jsonify
+from flask import Response, jsonify
 from sqlalchemy import text
 
 from app.extensions import db
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @bp.route("/")
-def check():
+def check() -> Response:
     """Health check endpoint to verify the application and database are running.
 
     Returns:
@@ -36,11 +37,14 @@ def check():
         logger.warning("Could not import version information")
         __version__ = "unknown"
 
-    return jsonify(
-        {
-            "status": "ok",
-            "version": __version__,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "database": db_status,
-        }
+    return cast(
+        Response,
+        jsonify(
+            {
+                "status": "ok",
+                "version": __version__,
+                "timestamp": datetime.now(UTC).isoformat(),
+                "database": db_status,
+            }
+        ),
     )

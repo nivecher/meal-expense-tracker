@@ -2,9 +2,9 @@
 
 from unittest.mock import Mock, patch
 
-import pytest
 from click.testing import CliRunner
 from flask import Flask
+import pytest
 
 from app.auth.models import User
 from app.restaurants.cli import (
@@ -82,22 +82,22 @@ class TestRestaurantCLI:
             restaurant.full_address = "123 Main St, Test City, TS 12345"
             return restaurant
 
-    def test_restaurant_cli_group(self):
+    def test_restaurant_cli_group(self) -> None:
         """Test restaurant CLI group creation."""
         assert restaurant_cli.name == "restaurant"
         assert restaurant_cli.help == "Restaurant management commands."
 
-    def test_register_commands(self, app):
+    def test_register_commands(self, app) -> None:
         """Test command registration."""
         register_commands(app)
         assert "restaurant" in [cmd.name for cmd in app.cli.commands.values()]
 
-    def test_build_street_address_from_components(self):
+    def test_build_street_address_from_components(self) -> None:
         """Test building street address from components using centralized service."""
         # This test is removed as the function no longer exists in the CLI
         # The functionality has been moved to the GooglePlacesService
 
-    def test_detect_service_level_from_google_data(self):
+    def test_detect_service_level_from_google_data(self) -> None:
         """Test service level detection from Google data using centralized service."""
         with patch("app.services.google_places_service.get_google_places_service") as mock_service:
             mock_places_service = Mock()
@@ -109,7 +109,7 @@ class TestRestaurantCLI:
             assert result == ("casual_dining", 0.8)
 
     @patch("app.extensions.db")
-    def test_get_restaurants_without_google_id_by_restaurant_id(self, mock_db, app, mock_restaurant):
+    def test_get_restaurants_without_google_id_by_restaurant_id(self, mock_db, app, mock_restaurant) -> None:
         """Test getting restaurants without Google ID by restaurant ID."""
         with app.app_context():
             mock_db.session.get.return_value = mock_restaurant
@@ -120,7 +120,7 @@ class TestRestaurantCLI:
             mock_db.session.get.assert_called_once_with(Restaurant, 1)
 
     @patch("app.extensions.db")
-    def test_get_restaurants_without_google_id_not_found(self, mock_db, app):
+    def test_get_restaurants_without_google_id_not_found(self, mock_db, app) -> None:
         """Test getting restaurants without Google ID when restaurant not found."""
         with app.app_context():
             mock_db.session.get.return_value = None
@@ -129,7 +129,7 @@ class TestRestaurantCLI:
             assert result == []
 
     @patch("app.restaurants.cli._get_target_users")
-    def test_get_restaurants_without_google_id_by_users(self, mock_get_users, app, mock_user, mock_restaurant):
+    def test_get_restaurants_without_google_id_by_users(self, mock_get_users, app, mock_user, mock_restaurant) -> None:
         """Test getting restaurants without Google ID by users."""
         with app.app_context():
             mock_get_users.return_value = [mock_user]
@@ -144,7 +144,7 @@ class TestRestaurantCLI:
                 assert result == [mock_restaurant]
 
     @patch("app.restaurants.cli._get_target_users")
-    def test_get_restaurants_without_google_id_no_users(self, mock_get_users):
+    def test_get_restaurants_without_google_id_no_users(self, mock_get_users) -> None:
         """Test getting restaurants without Google ID when no users found."""
         mock_get_users.return_value = []
 
@@ -152,7 +152,7 @@ class TestRestaurantCLI:
         assert result == []
 
     @patch("app.restaurants.cli.db")
-    def test_update_service_levels_for_restaurants_dry_run(self, mock_db, mock_restaurant):
+    def test_update_service_levels_for_restaurants_dry_run(self, mock_db, mock_restaurant) -> None:
         """Test updating service levels in dry run mode."""
         mock_restaurant.service_level = None
 
@@ -163,7 +163,7 @@ class TestRestaurantCLI:
             assert result == 0  # No actual updates in dry run
 
     @patch("app.restaurants.cli.db")
-    def test_update_service_levels_for_restaurants_actual_update(self, mock_db, mock_restaurant):
+    def test_update_service_levels_for_restaurants_actual_update(self, mock_db, mock_restaurant) -> None:
         """Test updating service levels with actual database update."""
         mock_restaurant.service_level = None
 
@@ -176,7 +176,7 @@ class TestRestaurantCLI:
             mock_db.session.commit.assert_called_once()
 
     @patch("app.restaurants.cli.db")
-    def test_update_service_levels_for_restaurants_database_error(self, mock_db, mock_restaurant):
+    def test_update_service_levels_for_restaurants_database_error(self, mock_db, mock_restaurant) -> None:
         """Test updating service levels with database error."""
         mock_restaurant.service_level = None
         mock_db.session.commit.side_effect = Exception("Database error")
@@ -189,7 +189,7 @@ class TestRestaurantCLI:
             mock_db.session.rollback.assert_called_once()
 
     @patch("app.utils.service_level_detector.detect_service_level_from_name")
-    def test_suggest_service_level_from_restaurant_data(self, mock_detect, mock_restaurant):
+    def test_suggest_service_level_from_restaurant_data(self, mock_detect, mock_restaurant) -> None:
         """Test suggesting service level from restaurant data."""
         mock_detect.return_value = Mock(value="casual_dining")
 
@@ -198,7 +198,7 @@ class TestRestaurantCLI:
         mock_detect.assert_called_once_with(mock_restaurant.name)
 
     @patch("app.extensions.db")
-    def test_get_target_users_by_user_id(self, mock_db, app, mock_user):
+    def test_get_target_users_by_user_id(self, mock_db, app, mock_user) -> None:
         """Test getting target users by user ID."""
         with app.app_context():
             mock_db.session.get.return_value = mock_user
@@ -208,7 +208,7 @@ class TestRestaurantCLI:
             mock_db.session.get.assert_called_once_with(User, 1)
 
     @patch("app.extensions.db")
-    def test_get_target_users_by_user_id_not_found(self, mock_db, app):
+    def test_get_target_users_by_user_id_not_found(self, mock_db, app) -> None:
         """Test getting target users by user ID when user not found."""
         with app.app_context():
             mock_db.session.get.return_value = None
@@ -216,7 +216,7 @@ class TestRestaurantCLI:
             result = _get_target_users(1, None, False)
             assert result == []
 
-    def test_get_target_users_by_username(self, mock_user):
+    def test_get_target_users_by_username(self, mock_user) -> None:
         """Test getting target users by username."""
         with patch("app.restaurants.cli.User") as mock_user_class:
             mock_query = Mock()
@@ -226,7 +226,7 @@ class TestRestaurantCLI:
             result = _get_target_users(None, "testuser", False)
             assert result == [mock_user]
 
-    def test_get_target_users_by_username_not_found(self):
+    def test_get_target_users_by_username_not_found(self) -> None:
         """Test getting target users by username when user not found."""
         with patch("app.restaurants.cli.User") as mock_user_class:
             mock_query = Mock()
@@ -236,7 +236,7 @@ class TestRestaurantCLI:
             result = _get_target_users(None, "testuser", False)
             assert result == []
 
-    def test_get_target_users_all_users(self, mock_user):
+    def test_get_target_users_all_users(self, mock_user) -> None:
         """Test getting all users."""
         with patch("app.restaurants.cli.User") as mock_user_class:
             mock_query = Mock()
@@ -246,7 +246,7 @@ class TestRestaurantCLI:
             result = _get_target_users(None, None, True)
             assert result == [mock_user]
 
-    def test_get_target_users_all_users_none_found(self):
+    def test_get_target_users_all_users_none_found(self) -> None:
         """Test getting all users when none found."""
         with patch("app.restaurants.cli.User") as mock_user_class:
             mock_query = Mock()
@@ -256,12 +256,12 @@ class TestRestaurantCLI:
             result = _get_target_users(None, None, True)
             assert result == []
 
-    def test_get_target_users_no_options(self):
+    def test_get_target_users_no_options(self) -> None:
         """Test getting target users with no options specified."""
         result = _get_target_users(None, None, False)
         assert result == []
 
-    def test_validate_restaurant_with_google_success(self, app, mock_restaurant):
+    def test_validate_restaurant_with_google_success(self, app, mock_restaurant) -> None:
         """Test validating restaurant with Google API success."""
         with app.app_context():
             with patch("app.services.google_places_service.get_google_places_service") as mock_get_service:
@@ -310,7 +310,7 @@ class TestRestaurantCLI:
                 assert result["google_name"] == "Google Restaurant Name"
                 assert result["google_address"] == "123 Google St"
 
-    def test_validate_restaurant_with_google_api_error(self, app, mock_restaurant):
+    def test_validate_restaurant_with_google_api_error(self, app, mock_restaurant) -> None:
         """Test validating restaurant with Google API error."""
         with app.app_context():
             with patch("app.services.google_places_service.get_google_places_service") as mock_get_service:
@@ -324,7 +324,7 @@ class TestRestaurantCLI:
                 assert result["valid"] is False
                 assert "Unexpected error" in result["errors"][0]
 
-    def test_validate_restaurant_with_google_no_response(self, app, mock_restaurant):
+    def test_validate_restaurant_with_google_no_response(self, app, mock_restaurant) -> None:
         """Test validating restaurant with no Google API response."""
         with app.app_context():
             with patch("app.services.google_places_service.get_google_places_service") as mock_get_service:
@@ -338,7 +338,7 @@ class TestRestaurantCLI:
                 assert result["valid"] is False
                 assert "Failed to retrieve place data from Google Places API" in result["errors"][0]
 
-    def test_validate_restaurant_with_google_no_place_id(self, mock_restaurant):
+    def test_validate_restaurant_with_google_no_place_id(self, mock_restaurant) -> None:
         """Test validating restaurant with no Google Place ID."""
         mock_restaurant.google_place_id = None
 
@@ -346,7 +346,7 @@ class TestRestaurantCLI:
         assert result["valid"] is None
         assert "No Google Place ID available" in result["errors"][0]
 
-    def test_validate_restaurant_with_google_api_not_configured(self, app, mock_restaurant):
+    def test_validate_restaurant_with_google_api_not_configured(self, app, mock_restaurant) -> None:
         """Test validating restaurant when Google API not configured."""
         with app.app_context():
             with patch("app.services.google_places_service.get_google_places_service") as mock_get_service:
@@ -358,7 +358,7 @@ class TestRestaurantCLI:
                 assert result["valid"] is False
                 assert "Google Places API key not configured" in result["errors"][0]
 
-    def test_validate_restaurant_with_google_import_error(self, app, mock_restaurant):
+    def test_validate_restaurant_with_google_import_error(self, app, mock_restaurant) -> None:
         """Test validating restaurant with import error."""
         with app.app_context():
             with patch(
@@ -371,7 +371,7 @@ class TestRestaurantCLI:
                 assert result["valid"] is False
                 assert "Google Places API service not available" in result["errors"][0]
 
-    def test_validate_restaurant_with_google_exception(self, app, mock_restaurant):
+    def test_validate_restaurant_with_google_exception(self, app, mock_restaurant) -> None:
         """Test validating restaurant with unexpected exception."""
         with app.app_context():
             with patch("app.services.google_places_service.get_google_places_service") as mock_get_service:
@@ -385,7 +385,7 @@ class TestRestaurantCLI:
                 assert result["valid"] is False
                 assert "Unexpected error" in result["errors"][0]
 
-    def test_get_user_restaurants_with_google_id(self, mock_user, mock_restaurant):
+    def test_get_user_restaurants_with_google_id(self, mock_user, mock_restaurant) -> None:
         """Test getting user restaurants with Google ID filter."""
         with patch("app.restaurants.cli.Restaurant") as mock_restaurant_class:
             mock_query = Mock()
@@ -397,7 +397,7 @@ class TestRestaurantCLI:
             result = _get_user_restaurants(mock_user, with_google_id=True)
             assert result == [mock_restaurant]
 
-    def test_get_user_restaurants_without_google_id(self, mock_user, mock_restaurant):
+    def test_get_user_restaurants_without_google_id(self, mock_user, mock_restaurant) -> None:
         """Test getting user restaurants without Google ID filter."""
         with patch("app.restaurants.cli.Restaurant") as mock_restaurant_class:
             mock_query = Mock()
@@ -407,7 +407,7 @@ class TestRestaurantCLI:
             result = _get_user_restaurants(mock_user, with_google_id=False)
             assert result == [mock_restaurant]
 
-    def test_format_restaurant_detailed(self, mock_restaurant, capsys):
+    def test_format_restaurant_detailed(self, mock_restaurant, capsys) -> None:
         """Test formatting detailed restaurant information."""
         # Ensure address_line_2 is None to avoid Mock issues
         mock_restaurant.address_line_2 = None
@@ -424,27 +424,27 @@ class TestRestaurantCLI:
         assert "Expenses: 0" in captured.out
         assert "Rating: 4.5/5.0" in captured.out
 
-    def test_format_restaurant_simple(self, mock_restaurant, capsys):
+    def test_format_restaurant_simple(self, mock_restaurant, capsys) -> None:
         """Test formatting simple restaurant information."""
         _format_restaurant_simple(mock_restaurant)
         captured = capsys.readouterr()
         assert "- Test Restaurant 🌐 (0 expenses)" in captured.out
 
-    def test_display_user_restaurants(self, mock_user, mock_restaurant, capsys):
+    def test_display_user_restaurants(self, mock_user, mock_restaurant, capsys) -> None:
         """Test displaying user restaurants."""
         _display_user_restaurants(mock_user, [mock_restaurant], detailed=False, with_google_id=False)
         captured = capsys.readouterr()
         assert "👤 testuser (ID: 1) - 1 restaurants:" in captured.out
         assert "- Test Restaurant 🌐 (0 expenses)" in captured.out
 
-    def test_display_user_restaurants_detailed(self, mock_user, mock_restaurant, capsys):
+    def test_display_user_restaurants_detailed(self, mock_user, mock_restaurant, capsys) -> None:
         """Test displaying user restaurants in detailed mode."""
         _display_user_restaurants(mock_user, [mock_restaurant], detailed=True, with_google_id=False)
         captured = capsys.readouterr()
         assert "👤 testuser (ID: 1) - 1 restaurants:" in captured.out
         assert "📍 Test Restaurant 🌐" in captured.out
 
-    def test_display_user_restaurants_empty(self, mock_user, capsys):
+    def test_display_user_restaurants_empty(self, mock_user, capsys) -> None:
         """Test displaying empty user restaurants."""
         result = _display_user_restaurants(mock_user, [], detailed=False, with_google_id=False)
         captured = capsys.readouterr()
@@ -452,7 +452,7 @@ class TestRestaurantCLI:
         assert "(No restaurants)" in captured.out
         assert result == 0
 
-    def test_display_summary(self, capsys):
+    def test_display_summary(self, capsys) -> None:
         """Test displaying summary statistics."""
         _display_summary(10, 7)
         captured = capsys.readouterr()
@@ -461,14 +461,14 @@ class TestRestaurantCLI:
         assert "With Google Place ID: 7" in captured.out
         assert "Without Google Place ID: 3" in captured.out
 
-    def test_list_restaurants_no_options(self, runner, app):
+    def test_list_restaurants_no_options(self, runner, app) -> None:
         """Test list restaurants with no options specified."""
         with app.app_context():
             result = runner.invoke(list_restaurants, [])
             assert result.exit_code == 0
             assert "❌ Error: Must specify --user-id, --username, or --all-users" in result.output
 
-    def test_list_restaurants_user_not_found(self, runner, app):
+    def test_list_restaurants_user_not_found(self, runner, app) -> None:
         """Test list restaurants when user not found."""
         with app.app_context():
             with patch("app.restaurants.cli._get_target_users") as mock_get_users:
@@ -478,7 +478,7 @@ class TestRestaurantCLI:
                 assert result.exit_code == 0
                 # Should return early when no users found
 
-    def test_list_restaurants_success(self, runner, app, mock_user, mock_restaurant):
+    def test_list_restaurants_success(self, runner, app, mock_user, mock_restaurant) -> None:
         """Test successful list restaurants."""
         with app.app_context():
             with patch("app.restaurants.cli._get_target_users") as mock_get_users:
@@ -492,7 +492,7 @@ class TestRestaurantCLI:
                         assert result.exit_code == 0
                         assert "🍽️  Restaurants for 1 user(s):" in result.output
 
-    def test_get_restaurants_to_validate_by_restaurant_id(self, app, mock_restaurant):
+    def test_get_restaurants_to_validate_by_restaurant_id(self, app, mock_restaurant) -> None:
         """Test getting restaurants to validate by restaurant ID."""
         with app.app_context():
             with patch("app.extensions.db") as mock_db:
@@ -504,7 +504,7 @@ class TestRestaurantCLI:
                 assert counts["with_google_id"] == 1
                 assert counts["missing_google_id"] == 0
 
-    def test_get_restaurants_to_validate_restaurant_not_found(self, app):
+    def test_get_restaurants_to_validate_restaurant_not_found(self, app) -> None:
         """Test getting restaurants to validate when restaurant not found."""
         with app.app_context():
             with patch("app.extensions.db") as mock_db:
@@ -514,13 +514,13 @@ class TestRestaurantCLI:
                 assert restaurants == []
                 assert counts["total_restaurants"] == 0
 
-    def test_get_restaurants_to_validate_no_options(self):
+    def test_get_restaurants_to_validate_no_options(self) -> None:
         """Test getting restaurants to validate with no options."""
         restaurants, counts = _get_restaurants_to_validate(None, None, False, None)
         assert restaurants == []
         assert counts["total_restaurants"] == 0
 
-    def test_check_restaurant_mismatches_name(self, mock_restaurant):
+    def test_check_restaurant_mismatches_name(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for name."""
         validation_result = {
             "google_name": "Different Name",
@@ -533,7 +533,7 @@ class TestRestaurantCLI:
         assert "Name: 'Test Restaurant' vs Google: 'Different Name'" in mismatches[0]
         assert fixes["name"] == "Different Name"
 
-    def test_check_restaurant_mismatches_address(self, mock_restaurant):
+    def test_check_restaurant_mismatches_address(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for address."""
         validation_result = {
             "google_name": "Test Restaurant",
@@ -546,7 +546,7 @@ class TestRestaurantCLI:
         assert "Address Line 1: '123 Main St' vs Google: '456 Different St'" in mismatches[0]
         assert fixes["address_line_1"] == "456 Different St"
 
-    def test_check_restaurant_mismatches_service_level(self, mock_restaurant):
+    def test_check_restaurant_mismatches_service_level(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for service level."""
         validation_result = {
             "google_name": "Test Restaurant",
@@ -562,7 +562,7 @@ class TestRestaurantCLI:
             assert "Service level mismatch" in mismatches[0]
             assert fixes["service_level"] == "fine_dining"
 
-    def test_check_restaurant_mismatches_price_level(self, mock_restaurant):
+    def test_check_restaurant_mismatches_price_level(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for price level."""
         # Set restaurant price level to 2
         mock_restaurant.price_level = 2
@@ -583,7 +583,7 @@ class TestRestaurantCLI:
             assert "Price Level: '$$ (Moderate)' vs Google: '$$$ (Expensive)'" in mismatches[0]
             assert fixes["price_level"] == 3
 
-    def test_check_restaurant_mismatches_price_level_none_vs_set(self, mock_restaurant):
+    def test_check_restaurant_mismatches_price_level_none_vs_set(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when restaurant has no price level but Google does."""
         # Set restaurant price level to None
         mock_restaurant.price_level = None
@@ -604,7 +604,7 @@ class TestRestaurantCLI:
             assert "Price Level: 'Not set' vs Google: '$$ (Moderate)'" in mismatches[0]
             assert fixes["price_level"] == 2
 
-    def test_check_restaurant_mismatches_price_level_string_conversion(self, mock_restaurant):
+    def test_check_restaurant_mismatches_price_level_string_conversion(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches with Google string price level format."""
         # Set restaurant price level to 1
         mock_restaurant.price_level = 1
@@ -625,7 +625,7 @@ class TestRestaurantCLI:
             assert len(mismatches) == 0
             assert "price_level" not in fixes
 
-    def test_format_price_level_display(self):
+    def test_format_price_level_display(self) -> None:
         """Test the price level display formatting function."""
         from app.restaurants.cli import _format_price_level_display
 
@@ -638,7 +638,7 @@ class TestRestaurantCLI:
         assert _format_price_level_display(None) == "Not set"
         assert _format_price_level_display(99) == "99"  # Unknown level
 
-    def test_check_restaurant_mismatches_cuisine(self, mock_restaurant):
+    def test_check_restaurant_mismatches_cuisine(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for cuisine."""
         # Set restaurant cuisine to 'Italian'
         mock_restaurant.cuisine = "Italian"
@@ -650,7 +650,7 @@ class TestRestaurantCLI:
         assert "Cuisine: 'Italian' vs Google: 'American'" in mismatches[0]
         assert fixes["cuisine"] == "American"
 
-    def test_check_restaurant_mismatches_cuisine_none_vs_set(self, mock_restaurant):
+    def test_check_restaurant_mismatches_cuisine_none_vs_set(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when restaurant has no cuisine but Google does."""
         # Set restaurant cuisine to None
         mock_restaurant.cuisine = None
@@ -662,7 +662,7 @@ class TestRestaurantCLI:
         assert "Cuisine: 'Not set' vs Google: 'Mexican'" in mismatches[0]
         assert fixes["cuisine"] == "Mexican"
 
-    def test_check_restaurant_mismatches_cuisine_match(self, mock_restaurant):
+    def test_check_restaurant_mismatches_cuisine_match(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when cuisines match."""
         # Set restaurant cuisine to match Google
         mock_restaurant.cuisine = "Chinese"
@@ -673,7 +673,7 @@ class TestRestaurantCLI:
         assert len(mismatches) == 0
         assert "cuisine" not in fixes
 
-    def test_check_restaurant_mismatches_cuisine_no_google_data(self, mock_restaurant):
+    def test_check_restaurant_mismatches_cuisine_no_google_data(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when Google has no cuisine data."""
         mock_restaurant.cuisine = "Italian"
 
@@ -683,7 +683,7 @@ class TestRestaurantCLI:
         assert len(mismatches) == 0
         assert "cuisine" not in fixes
 
-    def test_apply_restaurant_fixes_dry_run(self, mock_restaurant):
+    def test_apply_restaurant_fixes_dry_run(self, mock_restaurant) -> None:
         """Test applying restaurant fixes in dry run mode."""
         fixes = {"name": "New Name", "address": "New Address"}
 
@@ -693,7 +693,7 @@ class TestRestaurantCLI:
         assert mock_restaurant.name == "Test Restaurant"
 
     @patch("app.restaurants.cli.db")
-    def test_apply_restaurant_fixes_cuisine(self, mock_db, mock_restaurant):
+    def test_apply_restaurant_fixes_cuisine(self, mock_db, mock_restaurant) -> None:
         """Test applying restaurant fixes with cuisine field."""
         fixes = {"cuisine": "Japanese"}
 
@@ -701,7 +701,7 @@ class TestRestaurantCLI:
         assert result is True
         assert mock_restaurant.cuisine == "Japanese"
 
-    def test_check_restaurant_mismatches_phone(self, mock_restaurant):
+    def test_check_restaurant_mismatches_phone(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for phone."""
         # Set restaurant phone to '(555) 123-4567'
         mock_restaurant.phone = "(555) 123-4567"
@@ -713,7 +713,7 @@ class TestRestaurantCLI:
         assert "Phone: '(555) 123-4567' vs Google: '+1-555-987-6543'" in mismatches[0]
         assert fixes["phone"] == "+1-555-987-6543"
 
-    def test_check_restaurant_mismatches_phone_none_vs_set(self, mock_restaurant):
+    def test_check_restaurant_mismatches_phone_none_vs_set(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when restaurant has no phone but Google does."""
         # Set restaurant phone to None
         mock_restaurant.phone = None
@@ -725,7 +725,7 @@ class TestRestaurantCLI:
         assert "Phone: 'Not set' vs Google: '(555) 111-2222'" in mismatches[0]
         assert fixes["phone"] == "(555) 111-2222"
 
-    def test_check_restaurant_mismatches_phone_match(self, mock_restaurant):
+    def test_check_restaurant_mismatches_phone_match(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when phones match."""
         # Set restaurant phone to match Google
         mock_restaurant.phone = "(555) 333-4444"
@@ -736,7 +736,7 @@ class TestRestaurantCLI:
         assert len(mismatches) == 0
         assert "phone" not in fixes
 
-    def test_check_restaurant_mismatches_phone_no_google_data(self, mock_restaurant):
+    def test_check_restaurant_mismatches_phone_no_google_data(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when Google has no phone data."""
         mock_restaurant.phone = "(555) 123-4567"
 
@@ -746,7 +746,7 @@ class TestRestaurantCLI:
         assert len(mismatches) == 0
         assert "phone" not in fixes
 
-    def test_check_restaurant_mismatches_website(self, mock_restaurant):
+    def test_check_restaurant_mismatches_website(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for website."""
         # Set restaurant website to 'https://old-site.com'
         mock_restaurant.website = "https://old-site.com"
@@ -758,7 +758,7 @@ class TestRestaurantCLI:
         assert "Website: 'https://old-site.com' vs Google: 'https://new-site.com'" in mismatches[0]
         assert fixes["website"] == "https://new-site.com"
 
-    def test_check_restaurant_mismatches_website_none_vs_set(self, mock_restaurant):
+    def test_check_restaurant_mismatches_website_none_vs_set(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when restaurant has no website but Google does."""
         # Set restaurant website to None
         mock_restaurant.website = None
@@ -770,7 +770,7 @@ class TestRestaurantCLI:
         assert "Website: 'Not set' vs Google: 'https://example.com'" in mismatches[0]
         assert fixes["website"] == "https://example.com"
 
-    def test_check_restaurant_mismatches_website_match(self, mock_restaurant):
+    def test_check_restaurant_mismatches_website_match(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when websites match."""
         # Set restaurant website to match Google
         mock_restaurant.website = "https://restaurant.com"
@@ -781,7 +781,7 @@ class TestRestaurantCLI:
         assert len(mismatches) == 0
         assert "website" not in fixes
 
-    def test_check_restaurant_mismatches_website_no_google_data(self, mock_restaurant):
+    def test_check_restaurant_mismatches_website_no_google_data(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when Google has no website data."""
         mock_restaurant.website = "https://old-site.com"
 
@@ -791,7 +791,7 @@ class TestRestaurantCLI:
         assert len(mismatches) == 0
         assert "website" not in fixes
 
-    def test_check_restaurant_mismatches_type(self, mock_restaurant):
+    def test_check_restaurant_mismatches_type(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for type field."""
         mock_restaurant.type = "cafe"
 
@@ -802,7 +802,7 @@ class TestRestaurantCLI:
         assert "Type: 'cafe' vs Google: 'restaurant'" in mismatches
         assert fixes["type"] == "restaurant"
 
-    def test_check_restaurant_mismatches_type_none_vs_set(self, mock_restaurant):
+    def test_check_restaurant_mismatches_type_none_vs_set(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when local type is None but Google has primary type."""
         mock_restaurant.type = None
 
@@ -813,7 +813,7 @@ class TestRestaurantCLI:
         assert "Type: 'Not set' vs Google: 'restaurant'" in mismatches
         assert fixes["type"] == "restaurant"
 
-    def test_check_restaurant_mismatches_type_match(self, mock_restaurant):
+    def test_check_restaurant_mismatches_type_match(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when type matches Google primary type."""
         mock_restaurant.type = "restaurant"
 
@@ -823,7 +823,7 @@ class TestRestaurantCLI:
         assert len(mismatches) == 0
         assert "type" not in fixes
 
-    def test_check_restaurant_mismatches_type_no_google_data(self, mock_restaurant):
+    def test_check_restaurant_mismatches_type_no_google_data(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches when Google has no primary type data."""
         mock_restaurant.type = "restaurant"
 
@@ -834,7 +834,7 @@ class TestRestaurantCLI:
         assert "type" not in fixes
 
     @patch("app.restaurants.cli.db")
-    def test_apply_restaurant_fixes_phone_and_website(self, mock_db, mock_restaurant):
+    def test_apply_restaurant_fixes_phone_and_website(self, mock_db, mock_restaurant) -> None:
         """Test applying restaurant fixes with phone and website fields."""
         fixes = {"phone": "+1-555-999-8888", "website": "https://updated-site.com"}
 
@@ -844,7 +844,7 @@ class TestRestaurantCLI:
         assert mock_restaurant.website == "https://updated-site.com"
 
     @patch("app.restaurants.cli.db")
-    def test_apply_restaurant_fixes_type(self, mock_db, mock_restaurant):
+    def test_apply_restaurant_fixes_type(self, mock_db, mock_restaurant) -> None:
         """Test applying restaurant fixes with type field."""
         fixes = {"type": "restaurant"}
 
@@ -853,7 +853,7 @@ class TestRestaurantCLI:
         assert mock_restaurant.type == "restaurant"
 
     @patch("app.restaurants.cli.db")
-    def test_apply_restaurant_fixes_actual(self, mock_db, mock_restaurant):
+    def test_apply_restaurant_fixes_actual(self, mock_db, mock_restaurant) -> None:
         """Test applying restaurant fixes with actual changes."""
         fixes = {"name": "New Name", "address_line_1": "New Address"}
 
@@ -864,7 +864,7 @@ class TestRestaurantCLI:
         mock_db.session.commit.assert_called_once()
 
     @patch("app.restaurants.cli.db")
-    def test_apply_restaurant_fixes_error(self, mock_db, mock_restaurant):
+    def test_apply_restaurant_fixes_error(self, mock_db, mock_restaurant) -> None:
         """Test applying restaurant fixes with database error."""
         fixes = {"name": "New Name"}
         mock_db.session.commit.side_effect = Exception("Database error")
@@ -873,7 +873,7 @@ class TestRestaurantCLI:
         assert result is False
         mock_db.session.rollback.assert_called_once()
 
-    def test_display_google_info(self, capsys):
+    def test_display_google_info(self, capsys) -> None:
         """Test displaying Google Places information."""
         validation_result = {
             "google_status": "OPERATIONAL",
@@ -898,7 +898,7 @@ class TestRestaurantCLI:
             assert "🏷️  Types: restaurant, food" in captured.out
             assert "🍽️  Service Level: Casual Dining (confidence: 0.80)" in captured.out
 
-    def test_display_google_info_types_list(self, capsys):
+    def test_display_google_info_types_list(self, capsys) -> None:
         """Test displaying Google Places information with types as list."""
         validation_result = {"types": ["restaurant", "food", "establishment", "point_of_interest"]}
 
@@ -906,7 +906,7 @@ class TestRestaurantCLI:
         captured = capsys.readouterr()
         assert "🏷️  Types: restaurant, food, establishment" in captured.out
 
-    def test_display_google_info_types_string(self, capsys):
+    def test_display_google_info_types_string(self, capsys) -> None:
         """Test displaying Google Places information with types as string."""
         validation_result = {"types": "restaurant"}
 
@@ -915,7 +915,7 @@ class TestRestaurantCLI:
         assert "🏷️  Types: restaurant" in captured.out
 
     @patch("app.restaurants.cli._validate_restaurant_with_google")
-    def test_process_restaurant_validation_valid(self, mock_validate, mock_restaurant):
+    def test_process_restaurant_validation_valid(self, mock_validate, mock_restaurant) -> None:
         """Test processing restaurant validation with valid result."""
         mock_validate.return_value = {
             "valid": True,
@@ -934,7 +934,7 @@ class TestRestaurantCLI:
                 assert fixed is False
 
     @patch("app.restaurants.cli._validate_restaurant_with_google")
-    def test_process_restaurant_validation_invalid(self, mock_validate, mock_restaurant):
+    def test_process_restaurant_validation_invalid(self, mock_validate, mock_restaurant) -> None:
         """Test processing restaurant validation with invalid result."""
         mock_validate.return_value = {"valid": False, "errors": ["Invalid place ID"]}
 
@@ -943,7 +943,7 @@ class TestRestaurantCLI:
         assert fixed is False
 
     @patch("app.restaurants.cli._validate_restaurant_with_google")
-    def test_process_restaurant_validation_error(self, mock_validate, mock_restaurant):
+    def test_process_restaurant_validation_error(self, mock_validate, mock_restaurant) -> None:
         """Test processing restaurant validation with error result."""
         mock_validate.return_value = {"valid": None, "errors": ["No Google Place ID available"]}
 
@@ -951,13 +951,13 @@ class TestRestaurantCLI:
         assert status == "error"
         assert fixed is False
 
-    def test_handle_service_level_updates_disabled(self):
+    def test_handle_service_level_updates_disabled(self) -> None:
         """Test handling service level updates when disabled."""
         result = _handle_service_level_updates(None, None, False, None, False, False)
         assert result == (0, 0)
 
     @patch("app.restaurants.cli._get_restaurants_without_google_id")
-    def test_handle_service_level_updates_enabled(self, mock_get_restaurants, mock_restaurant):
+    def test_handle_service_level_updates_enabled(self, mock_get_restaurants, mock_restaurant) -> None:
         """Test handling service level updates when enabled."""
         mock_get_restaurants.return_value = [mock_restaurant]
 
@@ -967,7 +967,7 @@ class TestRestaurantCLI:
             result = _handle_service_level_updates(None, None, True, None, True, False)
             assert result == (1, 1)
 
-    def test_display_validation_summary(self, capsys):
+    def test_display_validation_summary(self, capsys) -> None:
         """Test displaying validation summary."""
         _display_validation_summary(
             valid_count=5,
@@ -997,14 +997,14 @@ class TestRestaurantCLI:
         assert "📊 Total without Google Place ID: 3" in captured.out
         assert "✅ Updated: 2 restaurants" in captured.out
 
-    def test_validate_restaurants_no_options(self, runner, app):
+    def test_validate_restaurants_no_options(self, runner, app) -> None:
         """Test validate restaurants with no options."""
         with app.app_context():
             result = runner.invoke(validate_restaurants, [])
             assert result.exit_code == 0
             # Should show error about missing options
 
-    def test_validate_restaurants_success(self, runner, app, mock_restaurant):
+    def test_validate_restaurants_success(self, runner, app, mock_restaurant) -> None:
         """Test successful restaurant validation."""
         with app.app_context():
             with patch("app.restaurants.cli._get_restaurants_to_validate") as mock_get_restaurants:

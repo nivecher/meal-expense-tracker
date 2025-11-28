@@ -1,18 +1,24 @@
-def test_index(client):
+from flask.testing import FlaskClient
+
+from app.auth.models import User
+from tests.conftest import AuthActions
+
+
+def test_index(client: FlaskClient) -> None:
     """Test the index page."""
     response = client.get("/")
     assert response.status_code == 302  # Redirect to login
     assert "/auth/login" in response.headers["Location"]
 
 
-def test_index_redirects_to_login(client):
+def test_index_redirects_to_login(client: FlaskClient) -> None:
     """Test that index page redirects to login when not authenticated."""
     response = client.get("/")
     assert response.status_code == 302
     assert "/auth/login" in response.headers["Location"]
 
 
-def test_index_with_expenses(client, auth, test_user):
+def test_index_with_expenses(client: FlaskClient, auth: AuthActions, test_user: User) -> None:
     """Test index page with expenses."""
     auth.login("testuser_1", "testpass")
     # Add a restaurant and expense
@@ -50,7 +56,7 @@ def test_index_with_expenses(client, auth, test_user):
     assert b"Test Restaurant" in response.data or b"Dashboard" in response.data
 
 
-def test_index_sorting(client, auth, test_user):
+def test_index_sorting(client: FlaskClient, auth: AuthActions, test_user: User) -> None:
     """Test index page sorting."""
     auth.login("testuser_1", "testpass")
     # Add a restaurant and multiple expenses
@@ -101,7 +107,7 @@ def test_index_sorting(client, auth, test_user):
     assert b"15.50" in response.data or b"35.50" in response.data or b"Dashboard" in response.data
 
 
-def test_index_search(client, auth, test_user):
+def test_index_search(client: FlaskClient, auth: AuthActions, test_user: User) -> None:
     """Test index page search functionality."""
     auth.login("testuser_1", "testpass")
     # Add a restaurant and expense

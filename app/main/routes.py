@@ -4,8 +4,9 @@ Main blueprint routes.
 This module contains the route handlers for the main blueprint.
 """
 
+from datetime import UTC, datetime, timezone
 import os
-from datetime import datetime, timezone
+from typing import Union
 
 from flask import (
     Response,
@@ -32,7 +33,7 @@ PER_PAGE = 10  # Number of expenses per page
 SHOW_ALL = -1  # Special value to show all expenses
 
 
-def _get_page_size_from_cookie(cookie_name="expense_page_size", default_size=PER_PAGE):
+def _get_page_size_from_cookie(cookie_name: str = "expense_page_size", default_size: int = PER_PAGE) -> int:
     """Get page size from cookie with validation and fallback."""
     try:
         cookie_value = request.cookies.get(cookie_name)
@@ -47,16 +48,17 @@ def _get_page_size_from_cookie(cookie_name="expense_page_size", default_size=PER
 
 
 @bp.app_template_global()
-def get_receipt_url(storage_path):
+def get_receipt_url(storage_path: str) -> str:
     """Generate URL for accessing a receipt file."""
     from app.expenses.utils import get_receipt_url
 
-    return get_receipt_url(storage_path)
+    result = get_receipt_url(storage_path)
+    return str(result) if result else ""
 
 
 @bp.route("/uploads/<filename>")
 @login_required
-def serve_uploaded_file(filename):
+def serve_uploaded_file(filename: str) -> Response:
     """Serve uploaded receipt files.
 
     Args:
@@ -89,16 +91,17 @@ def serve_uploaded_file(filename):
 
 @bp.route("/expense-statistics")
 @login_required
-def expense_statistics():
+def expense_statistics() -> Response:
     """Redirect to expense statistics page."""
     from flask import request
 
     # Preserve query parameters in redirect
-    return redirect(url_for("reports.expense_statistics", **request.args.to_dict()))
+    result = redirect(url_for("reports.expense_statistics", **request.args.to_dict()))
+    return result  # type: ignore[return-value]
 
 
 @bp.route("/favicon.ico")
-def favicon():
+def favicon() -> Response:
     """Serve the favicon.ico file.
 
     Returns:
@@ -112,7 +115,7 @@ def favicon():
 
 
 @bp.route("/about")
-def about():
+def about() -> str:
     """Render the about page with version information.
 
     Returns:
@@ -128,7 +131,7 @@ def about():
 
 
 @bp.route("/help")
-def help_page():
+def help_page() -> str:
     """Render the comprehensive help page.
 
     Returns:
@@ -153,27 +156,27 @@ def help_page():
 
 
 @bp.route("/terms")
-def terms():
+def terms() -> str:
     """Render the terms of service page.
 
     Returns:
         Rendered terms of service template with current datetime
     """
-    return render_template("main/terms.html", now=datetime.now(timezone.utc))
+    return render_template("main/terms.html", now=datetime.now(UTC))
 
 
 @bp.route("/privacy")
-def privacy():
+def privacy() -> str:
     """Render the privacy policy page.
 
     Returns:
         Rendered privacy policy template with current datetime
     """
-    return render_template("main/privacy.html", now=datetime.now(timezone.utc))
+    return render_template("main/privacy.html", now=datetime.now(UTC))
 
 
 @bp.route("/contact", methods=["GET", "POST"])
-def contact():
+def contact() -> str | Response:
     """Render the contact page and handle form submissions.
 
     Returns:
@@ -187,19 +190,20 @@ def contact():
         # In a real application, you would process the form here
         # For example, send an email or save to database
         flash("Thank you for your message! We will get back to you soon.", "success")
-        return redirect(url_for("main.contact"))
+        result = redirect(url_for("main.contact"))
+        return result  # type: ignore[return-value]
 
     return render_template("main/contact.html", form=form)
 
 
 @bp.route("/test")
-def test():
+def test() -> str:
     return "Test route works"
 
 
 @bp.route("/")
 @login_required
-def index():
+def index() -> str:
     """Display the main dashboard with welcome message, stats, and recent activity."""
     user_id = current_user.id
 
@@ -221,6 +225,7 @@ def index():
     ).first()
 
     # Get recent expenses (top 5 most recent)
+    # Note: Restaurant.name and Restaurant.website may be None, but SQLAlchemy handles this
     recent_expenses = db.session.execute(
         select(
             Expense,
@@ -261,20 +266,22 @@ def index():
 
 @bp.route("/index.html")
 @login_required
-def index_html():
+def index_html() -> str:
     """Serve the main dashboard for index.html requests (browser default)."""
-    return index()
+    result = index()
+    return str(result) if result else ""
 
 
 @bp.route("/index")
-def index_redirect():
+def index_redirect() -> Response:
     """Redirect to the main index page."""
-    return redirect(url_for("main.index"))
+    result = redirect(url_for("main.index"))
+    return result  # type: ignore[return-value]
 
 
 @bp.route("/css/user-tags.css")
 @login_required
-def user_tag_css():
+def user_tag_css() -> Response:
     """Generate dynamic CSS with user's tag colors.
 
     This route generates CSS that applies the user's custom tag colors
@@ -289,7 +296,7 @@ def user_tag_css():
 
     # Generate CSS rules for each tag
     css_rules = []
-    max_updated_at = None
+    max_updated_at: datetime | None = None
 
     for tag in user_tags:
         # Create a CSS class for each tag using its ID with higher specificity
@@ -301,14 +308,18 @@ def user_tag_css():
         css_rules.append(css_rule)
 
         # Track the most recent update time for cache busting
-        if tag.updated_at and (max_updated_at is None or tag.updated_at > max_updated_at):
-            max_updated_at = tag.updated_at
+        if tag.updated_at:
+            if max_updated_at is None:
+                max_updated_at = tag.updated_at
+            else:
+                if tag.updated_at > max_updated_at:
+                    max_updated_at = tag.updated_at
 
     # Combine all CSS rules
     css_content = "\n".join(css_rules)
 
     # Add a comment with timestamp for cache busting
-    css_content = f"""/* User tag colors - Generated at {datetime.now(timezone.utc).isoformat()} */
+    css_content = f"""/* User tag colors - Generated at {datetime.now(UTC).isoformat()} */
 {css_content}"""
 
     # Create ETag based on user ID, tag count, and last update time
@@ -318,14 +329,17 @@ def user_tag_css():
     etag = f'"{hash("-".join(etag_parts))}"'
 
     # Return CSS response with appropriate headers
+    headers: dict[str, str] = {
+        "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
+        "ETag": etag,  # ETag for cache validation
+    }
+    if max_updated_at:
+        headers["Last-Modified"] = max_updated_at.strftime("%a, %d %b %Y %H:%M:%S GMT")
+
     response = Response(
         css_content,
         mimetype="text/css",
-        headers={
-            "Cache-Control": "public, max-age=300",  # Cache for 5 minutes
-            "ETag": etag,  # ETag for cache validation
-            "Last-Modified": (max_updated_at.strftime("%a, %d %b %Y %H:%M:%S GMT") if max_updated_at else None),
-        },
+        headers=headers,
     )
 
     return response

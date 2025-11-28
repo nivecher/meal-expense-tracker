@@ -28,7 +28,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Type aliases
-SecretDict = Dict[str, str]  # Type for database secret dictionary
+SecretDict = dict[str, str]  # Type for database secret dictionary
 
 
 def _get_secret_dict(secret_arn: str) -> SecretDict:
@@ -54,7 +54,7 @@ def _get_secret_dict(secret_arn: str) -> SecretDict:
         # Get the secret value
         logger.debug("Retrieving secret from ARN: %s", secret_arn)
         secret = client.get_secret_value(SecretId=secret_arn)
-        secret_dict: Dict[str, str] = json.loads(secret["SecretString"])
+        secret_dict: dict[str, str] = json.loads(secret["SecretString"])
 
         # Log available keys for debugging
         logger.debug("Available secret keys: %s", ", ".join(secret_dict.keys()))
@@ -77,17 +77,19 @@ def _get_secret_dict(secret_arn: str) -> SecretDict:
         result = {}
         for std_key, possible_keys in key_mapping.items():
             # Look for each possible key variation
+            found = False
             for key in possible_keys:
                 if key in secret_dict:
                     result[std_key] = secret_dict[key]
+                    found = True
                     break
-            else:
+            if not found:
                 # If we get here, no variation of the key was found
                 raise ValueError(f"Could not find any of {possible_keys} in secret")
 
         # Ensure port is a string
         if "port" in result and not isinstance(result["port"], str):
-            result["port"] = str(result["port"])
+            result["port"] = str(result["port"])  # type: ignore[unreachable]
 
         logger.debug(
             "Resolved secret keys: %s",

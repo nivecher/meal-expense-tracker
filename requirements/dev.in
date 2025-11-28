@@ -34,7 +34,7 @@ types-Jinja2>=2.11.0,<3.0.0            # Type stubs for Jinja2 (templating engin
 types-MarkupSafe>=1.1.0,<2.0.0         # Type stubs for MarkupSafe (string escaping for Jinja2)
 types-click>=7.1.0,<8.0.0              # Type stubs for click (command-line interface library)
 types-cryptography>=3.3.0,<4.0.0       # Type stubs for cryptography (encryption and security)
-types-SQLAlchemy>=1.4.0,<2.0.0         # Type stubs for SQLAlchemy (ORM)
+# types-SQLAlchemy removed: SQLAlchemy 2.0 has built-in type stubs and mypy plugin
 types-PyYAML>=6.0.12,<7.0.0            # Type stubs for PyYAML (YAML parsing and serialization)
 types-jsonschema>=4.24.0,<5.0.0        # Type stubs for jsonschema (JSON Schema validation)
 types-setuptools>=80.0.0,<81.0.0       # Type stubs for setuptools (Python packaging utilities)
@@ -61,15 +61,10 @@ snowballstemmer>=3.0.1,<4.0.0           # Snowball stemming library (used in doc
 stevedore>=5.4.1,<6.0.0                 # Plugin management framework
 
 # Linting & Formatting
-autoflake>=1.7.0,<2.0.0                 # Removes unused imports and variables
 black>=24.0.0,<25.0.0                   # Code formatter (downgraded for safety compatibility)
-djlint>=1.19.0,<2.0.0                   # HTML template linter (latest available version)
-flake8>=7.3.0,<8.0.0                    # Python code linter
-isort>=5.12.0,<6.0.0                    # Import sorting tool
+ruff>=0.8.0,<1.0.0                      # Fast Python linter and import sorter (replaces Flake8, isort, autoflake)
 mypy>=1.0.0,<2.0.0                      # Static type checker for Python
 mypy-extensions>=1.0.0,<2.0.0           # Extensions for mypy type checking
-pylint>=3.0.0,<4.0.0                    # Python code linter and static analyzer
-pyupgrade>=3.0.0,<4.0.0                 # Automatically upgrade syntax for newer Python versions
 
 # Testing
 pytest>=8.0.0,<9.0.0                    # Python testing framework

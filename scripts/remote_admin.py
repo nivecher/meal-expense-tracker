@@ -61,7 +61,7 @@ Examples:
 import argparse
 import json
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
@@ -73,10 +73,10 @@ class RemoteAdminClient:
     def __init__(self, function_name: str, region: str = "us-east-1"):
         self.function_name = function_name
         self.region = region
-        self.lambda_client = None
+        self.lambda_client: Any = None
         self._initialize_client()
 
-    def _initialize_client(self):
+    def _initialize_client(self) -> None:
         """Initialize the Lambda client."""
         try:
             self.lambda_client = boto3.client("lambda", region_name=self.region)
@@ -94,8 +94,8 @@ class RemoteAdminClient:
             sys.exit(1)
 
     def invoke_operation(
-        self, operation_name: str, parameters: Dict[str, Any], confirm: bool = False
-    ) -> Dict[str, Any]:
+        self, operation_name: str, parameters: dict[str, Any], confirm: bool = False
+    ) -> dict[str, Any]:
         """Invoke an admin operation on the Lambda function."""
         payload = {"admin_operation": operation_name, "parameters": parameters, "confirm": confirm}
 
@@ -112,9 +112,10 @@ class RemoteAdminClient:
 
             # Parse the body if it's a Lambda API Gateway response
             if "body" in response_payload:
-                return json.loads(response_payload["body"])
+                body_data = json.loads(response_payload["body"])
+                return cast(dict[str, Any], body_data)
 
-            return response_payload
+            return cast(dict[str, Any], response_payload)
 
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
@@ -133,11 +134,11 @@ class RemoteAdminClient:
         except Exception as e:
             return {"success": False, "message": f"Unexpected error: {str(e)}"}
 
-    def list_operations(self) -> Dict[str, Any]:
+    def list_operations(self) -> dict[str, Any]:
         """List available admin operations."""
         return self.invoke_operation("list_operations", {})
 
-    def format_response(self, response: Dict[str, Any], verbose: bool = False) -> str:
+    def format_response(self, response: dict[str, Any], verbose: bool = False) -> str:
         """Format response for display."""
         if not response.get("success"):
             return f"❌ {response.get('message', 'Operation failed')}"
@@ -154,7 +155,7 @@ class RemoteAdminClient:
 
         return "\n".join(output)
 
-    def _format_data_output(self, data: Dict[str, Any], output: List[str]) -> None:
+    def _format_data_output(self, data: dict[str, Any], output: list[str]) -> None:
         """Format data output for specific data types."""
         if "users" in data and isinstance(data["users"], list):
             self._format_users_output(data["users"], output)
@@ -165,7 +166,7 @@ class RemoteAdminClient:
         elif any(key in data for key in ["users", "content", "system"]):
             self._format_stats_output(data, output)
 
-    def _format_users_output(self, users: List[Dict[str, Any]], output: List[str]) -> None:
+    def _format_users_output(self, users: list[dict[str, Any]], output: list[str]) -> None:
         """Format users list output."""
         output.append(f"\n👥 Users ({len(users)}):")
         for user in users[:10]:  # Show first 10
@@ -175,7 +176,7 @@ class RemoteAdminClient:
         if len(users) > 10:
             output.append(f"  ... and {len(users) - 10} more")
 
-    def _format_operations_output(self, operations: Any, output: List[str]) -> None:
+    def _format_operations_output(self, operations: Any, output: list[str]) -> None:
         """Format operations list output."""
         if isinstance(operations, dict):
             output.append(f"\n🛠️  Available Operations ({len(operations)}):")
@@ -195,7 +196,7 @@ class RemoteAdminClient:
         else:
             output.append(f"\n🛠️  Operations: {operations}")
 
-    def _format_stats_output(self, data: Dict[str, Any], output: List[str]) -> None:
+    def _format_stats_output(self, data: dict[str, Any], output: list[str]) -> None:
         """Format system stats output."""
         if "users" in data:
             stats = data["users"]
@@ -206,7 +207,7 @@ class RemoteAdminClient:
             stats = data["content"]
             output.append(f"📝 Content: {stats.get('restaurants', 0)} restaurants, {stats.get('expenses', 0)} expenses")
 
-    def _format_validation_results_output(self, data: Dict[str, Any], output: List[str]) -> None:
+    def _format_validation_results_output(self, data: dict[str, Any], output: list[str]) -> None:
         """Format restaurant validation results output."""
         validation_results = data.get("validation_results", [])
         summary = data.get("summary", {})
@@ -220,7 +221,7 @@ class RemoteAdminClient:
         self._format_validation_summary(summary, output)
 
     def _format_individual_validation_results(
-        self, validation_results: List[Dict[str, Any]], output: List[str]
+        self, validation_results: list[dict[str, Any]], output: list[str]
     ) -> None:
         """Format individual validation results."""
         for result in validation_results[:5]:  # Show first 5
@@ -264,7 +265,7 @@ class RemoteAdminClient:
         if len(validation_results) > 5:
             output.append(f"  ... and {len(validation_results) - 5} more restaurants")
 
-    def _format_address_comparison(self, address_comparison: Dict[str, Any], output: List[str]) -> None:
+    def _format_address_comparison(self, address_comparison: dict[str, Any], output: list[str]) -> None:
         """Format address comparison output."""
         stored = address_comparison.get("stored_address", {})
         google = address_comparison.get("google_address", {})
@@ -288,12 +289,12 @@ class RemoteAdminClient:
         output.append(f"         ZIP: {google.get('zip', 'N/A')}")
         output.append(f"         Country: {google.get('country', 'N/A')}")
 
-    def _format_google_data(self, google_data: Dict[str, Any], output: List[str]) -> None:
+    def _format_google_data(self, google_data: dict[str, Any], output: list[str]) -> None:
         """Format Google Places data output."""
         self._format_google_basic_info(google_data, output)
         self._format_google_service_info(google_data, output)
 
-    def _format_google_basic_info(self, google_data: Dict[str, Any], output: List[str]) -> None:
+    def _format_google_basic_info(self, google_data: dict[str, Any], output: list[str]) -> None:
         """Format basic Google Places information."""
         if google_data.get("google_address"):
             output.append(f"   🗺️  Google Address: {google_data['google_address']}")
@@ -318,7 +319,7 @@ class RemoteAdminClient:
                 types_str = str(types_data)
             output.append(f"   🏷️  Types: {types_str}")
 
-    def _format_google_service_info(self, google_data: Dict[str, Any], output: List[str]) -> None:
+    def _format_google_service_info(self, google_data: dict[str, Any], output: list[str]) -> None:
         """Format Google service level information."""
         if google_data.get("google_service_level"):
             service_level, confidence = google_data["google_service_level"]
@@ -334,7 +335,7 @@ class RemoteAdminClient:
         else:
             return "⚠️"
 
-    def _format_validation_summary(self, summary: Dict[str, Any], output: List[str]) -> None:
+    def _format_validation_summary(self, summary: dict[str, Any], output: list[str]) -> None:
         """Format validation summary."""
         if not summary:
             return
@@ -493,18 +494,18 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _handle_list_operations(client: RemoteAdminClient) -> Dict[str, Any]:
+def _handle_list_operations(client: RemoteAdminClient) -> dict[str, Any]:
     """Handle list-operations command."""
     return client.list_operations()
 
 
-def _handle_list_users(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+def _handle_list_users(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any]:
     """Handle list-users command."""
     params = {"admin_only": args.admin_only, "limit": args.limit}
     return client.invoke_operation("list_users", params)
 
 
-def _handle_create_user(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+def _handle_create_user(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any]:
     """Handle create-user command."""
     params = {
         "username": args.username,
@@ -516,7 +517,7 @@ def _handle_create_user(client: RemoteAdminClient, args: argparse.Namespace) -> 
     return client.invoke_operation("create_user", params, args.confirm)
 
 
-def _add_identity_params(params: Dict[str, Any], args: argparse.Namespace) -> None:
+def _add_identity_params(params: dict[str, Any], args: argparse.Namespace) -> None:
     """Add identity parameters to params dictionary."""
     if args.user_id:
         params["user_id"] = args.user_id
@@ -526,7 +527,7 @@ def _add_identity_params(params: Dict[str, Any], args: argparse.Namespace) -> No
         params["username"] = args.username
 
 
-def _add_update_params(params: Dict[str, Any], args: argparse.Namespace) -> None:
+def _add_update_params(params: dict[str, Any], args: argparse.Namespace) -> None:
     """Add update parameters to params dictionary."""
     if args.new_email:
         params["new_email"] = args.new_email
@@ -536,7 +537,7 @@ def _add_update_params(params: Dict[str, Any], args: argparse.Namespace) -> None
         params["password"] = args.password
 
 
-def _add_boolean_flags(params: Dict[str, Any], args: argparse.Namespace) -> None:
+def _add_boolean_flags(params: dict[str, Any], args: argparse.Namespace) -> None:
     """Add boolean flag parameters to params dictionary."""
     if args.admin:
         params["admin"] = True
@@ -548,33 +549,33 @@ def _add_boolean_flags(params: Dict[str, Any], args: argparse.Namespace) -> None
         params["active"] = False
 
 
-def _build_update_user_params(args: argparse.Namespace) -> Dict[str, Any]:
+def _build_update_user_params(args: argparse.Namespace) -> dict[str, Any]:
     """Build parameters for update-user command."""
-    params = {}
+    params: dict[str, Any] = {}
     _add_identity_params(params, args)
     _add_update_params(params, args)
     _add_boolean_flags(params, args)
     return params
 
 
-def _handle_update_user(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+def _handle_update_user(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any]:
     """Handle update-user command."""
     params = _build_update_user_params(args)
     return client.invoke_operation("update_user", params, args.confirm)
 
 
-def _handle_system_stats(client: RemoteAdminClient) -> Dict[str, Any]:
+def _handle_system_stats(client: RemoteAdminClient) -> dict[str, Any]:
     """Handle system-stats command."""
     return client.invoke_operation("system_stats", {})
 
 
-def _handle_recent_activity(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+def _handle_recent_activity(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any]:
     """Handle recent-activity command."""
     params = {"days": args.days, "limit": args.limit}
     return client.invoke_operation("recent_activity", params)
 
 
-def _handle_init_db(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+def _handle_init_db(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any]:
     """Handle init-db command."""
     params = {
         "force": args.force,
@@ -583,13 +584,13 @@ def _handle_init_db(client: RemoteAdminClient, args: argparse.Namespace) -> Dict
     return client.invoke_operation("init_db", params, args.confirm)
 
 
-def _handle_db_maintenance(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+def _handle_db_maintenance(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any]:
     """Handle db-maintenance command."""
     params = {"operation": args.operation}
     return client.invoke_operation("db_maintenance", params, args.confirm)
 
 
-def _handle_validate_restaurants(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+def _handle_validate_restaurants(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any]:
     """Handle validate-restaurants command."""
     params = {}
 
@@ -618,7 +619,7 @@ def _handle_validate_restaurants(client: RemoteAdminClient, args: argparse.Names
     return client.invoke_operation("validate_restaurants", params, args.confirm)
 
 
-def _handle_run_migrations(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+def _handle_run_migrations(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any]:
     """Handle run-migrations command."""
     params = {
         "dry_run": args.dry_run,
@@ -629,13 +630,13 @@ def _handle_run_migrations(client: RemoteAdminClient, args: argparse.Namespace) 
     return client.invoke_operation("run_migrations", params, args.confirm)
 
 
-def _handle_stamp(client: RemoteAdminClient, args: argparse.Namespace) -> Dict[str, Any]:
+def _handle_stamp(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any]:
     """Handle stamp command."""
     params = {"revision": args.revision}
     return client.invoke_operation("stamp", params, args.confirm)
 
 
-def _execute_command(client: RemoteAdminClient, args: argparse.Namespace) -> Optional[Dict[str, Any]]:
+def _execute_command(client: RemoteAdminClient, args: argparse.Namespace) -> dict[str, Any] | None:
     """Execute the specified command and return the result."""
     command_handlers = {
         "list-operations": lambda: _handle_list_operations(client),
@@ -655,7 +656,7 @@ def _execute_command(client: RemoteAdminClient, args: argparse.Namespace) -> Opt
     return handler() if handler else None
 
 
-def main():
+def main() -> int:
     """Main entry point."""
     parser = create_parser()
     args = parser.parse_args()

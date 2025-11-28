@@ -130,7 +130,7 @@ def _find_aws_cli() -> str:
     return aws_path
 
 
-def build_aws_cli_command(function_name: str, region: Optional[str] = None, profile: Optional[str] = None) -> List[str]:
+def build_aws_cli_command(function_name: str, region: str | None = None, profile: str | None = None) -> list[str]:
     """Build the AWS CLI command for invoking the Lambda function.
 
     Args:
@@ -182,7 +182,7 @@ def build_aws_cli_command(function_name: str, region: Optional[str] = None, prof
     return cmd_parts
 
 
-def invoke_lambda_migrations(function_name: str, region: Optional[str] = None, profile: Optional[str] = None) -> bool:
+def invoke_lambda_migrations(function_name: str, region: str | None = None, profile: str | None = None) -> bool:
     """Invoke the Lambda function to run migrations.
 
     Args:
@@ -242,9 +242,9 @@ def main() -> None:
         profile=args.profile,
     )
 
+    if success:
+        logger.info("✅ Database migration completed successfully")
     sys.exit(0 if success else 1)
-
-    logger.info("✅ Database migration completed successfully")
 
 
 if __name__ == "__main__":

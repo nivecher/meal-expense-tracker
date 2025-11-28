@@ -2,12 +2,14 @@
 """
 Generate a simple default avatar image.
 """
+
 import os
+from typing import Union
 
 from PIL import Image, ImageDraw, ImageFont
 
 
-def generate_avatar():
+def generate_avatar() -> Image.Image:
     # Create a 200x200 image with a light gray background
     size = 200
     img = Image.new("RGBA", (size, size), (240, 240, 240, 255))
@@ -21,8 +23,8 @@ def generate_avatar():
     # Draw a simple user icon
     try:
         # Try to use a font if available
-        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 100)
-    except IOError:
+        font: Union[ImageFont.FreeTypeFont, ImageFont.ImageFont] = ImageFont.truetype("DejaVuSans-Bold.ttf", 100)
+    except OSError:
         # Fall back to default font
         font = ImageFont.load_default()
 

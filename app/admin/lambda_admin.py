@@ -4,6 +4,7 @@ This module provides the Lambda function handler for remote administration opera
 It integrates with the existing Lambda handler to provide admin functionality.
 """
 
+from datetime import UTC
 import json
 import logging
 from typing import Any, Dict
@@ -21,7 +22,7 @@ class LambdaAdminHandler:
     def __init__(self, app: Flask):
         self.app = app
 
-    def handle_admin_operation(self, event: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_admin_operation(self, event: dict[str, Any]) -> dict[str, Any]:
         """Handle an admin operation from a Lambda event.
 
         Expected event format:
@@ -95,7 +96,7 @@ class LambdaAdminHandler:
             logger.exception(f"Error in admin operation: {e}")
             return self._error_response(f"Internal error: {str(e)}")
 
-    def list_available_operations(self) -> Dict[str, Any]:
+    def list_available_operations(self) -> dict[str, Any]:
         """List all available admin operations."""
         operations = AdminOperationRegistry.list_operations()
 
@@ -122,7 +123,7 @@ class LambdaAdminHandler:
             "headers": {"Content-Type": "application/json"},
         }
 
-    def _error_response(self, message: str) -> Dict[str, Any]:
+    def _error_response(self, message: str) -> dict[str, Any]:
         """Create a standardized error response."""
         return {
             "statusCode": 400,
@@ -134,10 +135,10 @@ class LambdaAdminHandler:
         """Get current timestamp in ISO format."""
         from datetime import datetime, timezone
 
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
 
-def handle_admin_request(app: Flask, event: Dict[str, Any]) -> Dict[str, Any]:
+def handle_admin_request(app: Flask, event: dict[str, Any]) -> dict[str, Any]:
     """Handle admin requests in Lambda function.
 
     This function should be called from the main Lambda handler when an admin operation is detected.

@@ -5,16 +5,20 @@ This module provides safe, automated migration handling for Lambda deployments
 with data preservation and rollback capabilities.
 """
 
+from collections.abc import Callable
+from enum import Enum
 import logging
 import os
 import time
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 from alembic.script import ScriptDirectory
-from flask import current_app
+from flask import Flask, current_app
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DisconnectionError, OperationalError
+
+if TYPE_CHECKING:
+    from flask.ctx import AppContext
 
 from app.extensions import db
 
@@ -45,18 +49,18 @@ class MigrationManager:
     - Connection pooling and timeout handling
     """
 
-    def __init__(self, app=None):
+    def __init__(self, app: Flask | None = None):
         self.app = app
         self._migration_state = MigrationState.PENDING
         self._max_retries = 3
         self._retry_delay = 1.0  # seconds
         self._connection_timeout = 30  # seconds
 
-    def init_app(self, app):
+    def init_app(self, app: Flask) -> None:
         """Initialize with Flask app."""
         self.app = app
 
-    def _detect_migrations_dir(self) -> Optional[str]:
+    def _detect_migrations_dir(self) -> str | None:
         """Detect the migrations directory path in current environment."""
         env_dir = os.environ.get("MIGRATIONS_DIR")
         if env_dir and os.path.isdir(env_dir):
@@ -68,7 +72,7 @@ class MigrationManager:
             if migrate_ext and getattr(migrate_ext, "directory", None):
                 dir_candidate = migrate_ext.directory
                 if dir_candidate and os.path.isdir(dir_candidate):
-                    return dir_candidate
+                    return cast(str, dir_candidate)
         except Exception as e:
             logger.debug(f"Could not detect migrations directory from Flask app: {e}")
             # Continue to fallback options
@@ -84,7 +88,7 @@ class MigrationManager:
 
         return None
 
-    def _list_revisions_from_dir(self, migrations_dir: str) -> List[str]:
+    def _list_revisions_from_dir(self, migrations_dir: str) -> list[str]:
         """List Alembic revision ids from the specified migrations directory."""
         script = ScriptDirectory(migrations_dir)
         try:
@@ -95,15 +99,15 @@ class MigrationManager:
         logger.info(f"Found {len(revisions)} migrations from {migrations_dir}: {revisions}")
         return revisions
 
-    def _get_app_context(self):
+    def _get_app_context(self) -> "AppContext":
         """Get Flask app context."""
         if self.app:
             return self.app.app_context()
         return current_app.app_context()
 
-    def _retry_with_backoff(self, func, *args, **kwargs):
+    def _retry_with_backoff(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Execute function with exponential backoff retry logic."""
-        last_exception = None
+        last_exception: Exception | None = None
 
         for attempt in range(self._max_retries + 1):
             try:
@@ -123,9 +127,13 @@ class MigrationManager:
                 raise e
 
         # If we get here, all retries failed
+        # Type narrowing: last_exception is Exception after None check
+        if last_exception is None:
+            raise RuntimeError("All retries failed but no exception was captured")
+        # Explicit check ensures type narrowing (replaces assert that would be stripped in -O mode)
         raise last_exception
 
-    def _ensure_database_connection(self):
+    def _ensure_database_connection(self) -> bool:
         """Ensure database connection is available with timeout."""
         try:
             # Test connection with timeout
@@ -136,7 +144,7 @@ class MigrationManager:
             logger.error(f"Database connection test failed: {e}")
             return False
 
-    def _copy_migrations_to_writable_location(self) -> Optional[str]:
+    def _copy_migrations_to_writable_location(self) -> str | None:
         """Copy migrations to a writable location in Lambda."""
         import os
         import shutil
@@ -197,10 +205,10 @@ class MigrationManager:
             logger.error(f"Failed to copy migrations: {e}")
             return None
 
-    def _get_database_info(self) -> Dict[str, Any]:
+    def _get_database_info(self) -> dict[str, Any]:
         """Get basic database information with retry logic."""
 
-        def _get_info():
+        def _get_info() -> dict[str, Any]:
             inspector = inspect(db.engine)
             existing_tables = inspector.get_table_names()
 
@@ -213,24 +221,26 @@ class MigrationManager:
                 "has_main_tables": has_main_tables,
             }
 
-        return self._retry_with_backoff(_get_info)
+        result = self._retry_with_backoff(_get_info)
+        return cast(dict[str, Any], result)
 
-    def _get_current_revision(self, has_alembic_version: bool) -> Optional[str]:
+    def _get_current_revision(self, has_alembic_version: bool) -> str | None:
         """Get current revision from alembic_version table with retry logic."""
         if not has_alembic_version:
             return None
 
-        def _get_revision():
+        def _get_revision() -> str | None:
             result = db.session.execute(text("SELECT version_num FROM alembic_version"))
-            return result.scalar()
+            return cast(str | None, result.scalar())
 
         try:
-            return self._retry_with_backoff(_get_revision)
+            result = self._retry_with_backoff(_get_revision)
+            return cast(str | None, result)
         except Exception as e:
             logger.warning(f"Could not read alembic_version: {e}")
             return None
 
-    def _get_available_revisions(self) -> Tuple[List[str], Optional[str]]:
+    def _get_available_revisions(self) -> tuple[list[str], str | None]:
         """Get available migration revisions using Alembic ScriptDirectory."""
         mig_dir = self._detect_migrations_dir()
         if mig_dir:
@@ -251,9 +261,9 @@ class MigrationManager:
 
     def _determine_migration_state(
         self,
-        db_info: Dict[str, Any],
-        current_revision: Optional[str],
-        available_revisions: List[str],
+        db_info: dict[str, Any],
+        current_revision: str | None,
+        available_revisions: list[str],
     ) -> str:
         """Determine the current migration state."""
         if not db_info["has_main_tables"]:
@@ -267,7 +277,7 @@ class MigrationManager:
         else:
             return "pending_migrations"
 
-    def check_migration_state(self) -> Dict[str, Any]:
+    def check_migration_state(self) -> dict[str, Any]:
         """
         Check the current state of migrations.
 
@@ -306,13 +316,13 @@ class MigrationManager:
                 logger.error(f"Error checking migration state: {e}")
                 return {"state": "error", "error": str(e)}
 
-    def _get_latest_revision(self) -> Tuple[Optional[str], Optional[str]]:
+    def _get_latest_revision(self) -> tuple[str | None, str | None]:
         """Get the latest migration revision using Alembic ScriptDirectory.
 
         Avoids relying on Flask-Migrate's history() which may return None.
         """
 
-        def _latest_from_dir(migrations_dir: str) -> Optional[str]:
+        def _latest_from_dir(migrations_dir: str) -> str | None:
             script = ScriptDirectory(migrations_dir)
             try:
                 revisions_desc = list(script.walk_revisions())
@@ -343,7 +353,7 @@ class MigrationManager:
 
         return None, "No migration files found"
 
-    def _create_alembic_version_table(self, existing_tables: List[str]) -> None:
+    def _create_alembic_version_table(self, existing_tables: list[str]) -> None:
         """Create alembic_version table if it doesn't exist."""
         if "alembic_version" not in existing_tables:
             logger.info("Creating alembic_version table...")
@@ -366,7 +376,7 @@ class MigrationManager:
             {"revision": revision},
         )
 
-    def fix_migration_history(self) -> Dict[str, Any]:
+    def fix_migration_history(self) -> dict[str, Any]:
         """
         Fix migration history for existing tables.
 
@@ -381,11 +391,14 @@ class MigrationManager:
                 latest_revision, error = self._get_latest_revision()
                 if error:
                     return {"success": False, "error": error}
+                if not latest_revision:
+                    return {"success": False, "error": "Could not determine latest revision"}
 
                 # Create alembic_version table if it doesn't exist
                 self._create_alembic_version_table(existing_tables)
 
                 # Set the current revision
+                # latest_revision is guaranteed to be str after None check above
                 self._set_migration_revision(latest_revision)
                 db.session.commit()
 
@@ -400,7 +413,7 @@ class MigrationManager:
                 logger.error(f"Error fixing migration history: {e}")
                 return {"success": False, "error": str(e)}
 
-    def _upgrade_once_to_heads(self) -> Dict[str, Any]:
+    def _upgrade_once_to_heads(self) -> dict[str, Any]:
         """Perform a single Alembic upgrade to 'heads' and return revisions before/after.
 
         Uses Alembic's programmatic API directly to avoid CLI argument ambiguity.
@@ -451,7 +464,7 @@ class MigrationManager:
 
         return {"previous_revision": before_rev, "new_revision": after_rev}
 
-    def _upgrade_until_up_to_date(self, max_checks: int = 5) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def _upgrade_until_up_to_date(self, max_checks: int = 5) -> tuple[dict[str, Any], dict[str, Any]]:
         """Upgrade to heads and repeat until state is up_to_date or attempts exhausted."""
         migration_data = self._retry_with_backoff(self._upgrade_once_to_heads)
         for _ in range(max_checks):
@@ -483,7 +496,7 @@ class MigrationManager:
             logger.warning(f"Schema verification failed: {e}")
             return True
 
-    def _stamp_to_previous_of_head(self) -> Optional[str]:
+    def _stamp_to_previous_of_head(self) -> str | None:
         """Stamp alembic_version to the previous revision of the head, if resolvable.
 
         Returns the stamped revision id or None on failure.
@@ -499,11 +512,13 @@ class MigrationManager:
                 logger.error("Could not determine head revision to stamp back from")
                 return None
             head_rev = script.get_revision(head)
-            prev = None
-            if isinstance(head_rev.down_revision, tuple):
-                prev = head_rev.down_revision[0] if head_rev.down_revision else None
-            else:
-                prev = head_rev.down_revision
+            prev: str | None = None
+            down_revision = head_rev.down_revision
+            if isinstance(down_revision, (tuple, list)):
+                prev = down_revision[0] if down_revision else None
+            elif isinstance(down_revision, str):
+                prev = down_revision
+            # else: down_revision is None, prev remains None
             if not prev:
                 logger.error("Head has no down_revision; cannot stamp backwards")
                 return None
@@ -516,7 +531,7 @@ class MigrationManager:
             logger.error(f"Failed stamping to previous of head: {e}")
             return None
 
-    def run_migrations(self, dry_run: bool = False, target_revision: Optional[str] = None) -> Dict[str, Any]:
+    def run_migrations(self, dry_run: bool = False, target_revision: str | None = None) -> dict[str, Any]:
         """
         Run database migrations safely with retry logic.
 
@@ -589,7 +604,7 @@ class MigrationManager:
                     "error": str(e),
                 }
 
-    def _handle_post_upgrade_verification(self, migration_data: Dict[str, Any], final_state: Dict[str, Any]) -> None:
+    def _handle_post_upgrade_verification(self, migration_data: dict[str, Any], final_state: dict[str, Any]) -> None:
         """Verify schema and optionally stamp back one revision and re-apply if needed."""
         if final_state.get("state") != "up_to_date":
             logger.warning(f"Migrations did not reach up-to-date state: {final_state}")
@@ -603,7 +618,7 @@ class MigrationManager:
         logger.info("Re-applying migrations after stamping back one revision...")
         self._upgrade_until_up_to_date(max_checks=3)
 
-    def auto_migrate(self) -> Dict[str, Any]:
+    def auto_migrate(self) -> dict[str, Any]:
         """
         Automatically handle migrations based on environment and state.
 
@@ -656,7 +671,7 @@ class MigrationManager:
 migration_manager = MigrationManager()
 
 
-def init_migration_manager(app):
+def init_migration_manager(app: Flask) -> MigrationManager:
     """Initialize the migration manager with Flask app."""
     migration_manager.init_app(app)
     return migration_manager

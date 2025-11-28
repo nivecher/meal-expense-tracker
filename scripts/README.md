@@ -61,3 +61,86 @@ google_maps_api_key_secret_arn = "arn:aws:secretsmanager:region:account-id:secre
 - The secret is encrypted using AWS KMS
 - The secret is tagged with the environment and application name for better resource management
 - Never commit actual API keys to version control
+
+## S3 MFA Delete Enablement
+
+To enable MFA delete protection on S3 buckets, use the `enable_s3_mfa_delete.sh` script.
+This adds an extra layer of security by requiring MFA authentication to permanently delete object versions or change the bucket's versioning state.
+
+### MFA Delete Prerequisites
+
+- AWS CLI installed and configured
+- Terraform installed (optional, for automatic bucket name detection)
+- Root account credentials with MFA device configured
+- MFA device (hardware or virtual) activated for the root account
+
+### MFA Delete Usage
+
+```bash
+# Basic usage (automatically detects bucket names from Terraform)
+./scripts/enable_s3_mfa_delete.sh
+
+# The script will:
+# 1. Detect bucket names from Terraform outputs (if available)
+# 2. Prompt for MFA code
+# 3. Enable MFA delete on receipts bucket
+# 4. Enable MFA delete on logs bucket (if it exists)
+# 5. Verify the configuration
+```
+
+### MFA Delete Script Process
+
+1. Checks prerequisites (AWS CLI, Terraform, credentials)
+2. Gets AWS account ID automatically
+3. Retrieves bucket names from Terraform outputs or prompts manually
+4. Prompts for MFA code securely (input is hidden)
+5. Enables MFA delete on both receipts and logs buckets
+6. Verifies that MFA delete is enabled
+
+### Important Notes
+
+- **Root Account Required**: MFA delete can only be enabled using root account credentials
+- **MFA Device Required**: You must have an MFA device configured for the root account
+- **One-Time Operation**: After enabling, you'll need MFA to:
+  - Permanently delete object versions
+  - Change bucket versioning settings
+  - Disable MFA delete (also requires MFA)
+- **Terraform Limitation**: While Terraform can declare `mfa_delete = "Enabled"` in the configuration, AWS requires CLI to actually enable it
+
+### Security Benefits
+
+- Prevents accidental or malicious deletion of object versions
+- Requires MFA authentication for critical bucket operations
+- Adds an extra layer of protection for sensitive data
+- Complies with security best practices and compliance requirements
+
+### Troubleshooting
+
+If the script fails:
+
+1. **Check AWS Credentials**: Ensure you're using root account credentials
+   ```bash
+   aws sts get-caller-identity
+   ```
+
+2. **Verify MFA Device**: Ensure MFA is configured for the root account
+   - Go to AWS IAM Console → Security credentials → MFA
+
+3. **Check Bucket Names**: If Terraform outputs aren't available, provide bucket names manually when prompted
+
+4. **Verify Permissions**: Root account should have full S3 permissions
+
+### Manual Alternative
+
+If the script doesn't work, you can enable MFA delete manually:
+
+```bash
+# Get your account ID
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Enable MFA delete (replace MFA_CODE with your current MFA code)
+aws s3api put-bucket-versioning \
+  --bucket YOUR-BUCKET-NAME \
+  --versioning-configuration Status=Enabled,MFADelete=Enabled \
+  --mfa "arn:aws:iam::${ACCOUNT_ID}:mfa/root-account-mfa-device MFA_CODE"
+```

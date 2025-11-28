@@ -3,10 +3,10 @@
 import logging
 import os
 import traceback
+from typing import cast
 
 from flask import current_app
-from flask_migrate import current, history
-from flask_migrate import upgrade as _upgrade
+from flask_migrate import current, history, upgrade as _upgrade
 from sqlalchemy import inspect, text
 
 from app import create_app
@@ -15,7 +15,7 @@ from app.extensions import db
 logger = logging.getLogger(__name__)
 
 
-def _get_safe_db_url(db_url):
+def _get_safe_db_url(db_url: str | None) -> str:
     """Get a safe version of the database URL for logging."""
     if not db_url:
         return "Not configured"
@@ -29,7 +29,7 @@ def _get_safe_db_url(db_url):
     return "***"
 
 
-def _check_database_connection():
+def _check_database_connection() -> bool:
     """Check if database is accessible."""
     try:
         # Test the connection with a simple query
@@ -42,10 +42,10 @@ def _check_database_connection():
         return False
 
 
-def _log_migration_history():
+def _log_migration_history() -> None:
     """Log the current migration history."""
     try:
-        history_revs = history()
+        history_revs = history()  # type: ignore[func-returns-value]
         current_app.logger.info("Available migrations:")
         for rev in history_revs:
             current_app.logger.info(f"  - {rev.revision}: {rev.doc}")
@@ -53,14 +53,14 @@ def _log_migration_history():
         current_app.logger.warning(f"Could not get migration history: {str(e)}")
 
 
-def _check_existing_tables():
+def _check_existing_tables() -> bool:
     """Check if tables already exist in the database."""
     inspector = inspect(db.engine)
     existing_tables = inspector.get_table_names()
     return existing_tables and "restaurant" in existing_tables
 
 
-def _setup_sqlite_database(db_url):
+def _setup_sqlite_database(db_url: str) -> bool:
     """Handle SQLite-specific setup including directory creation and PRAGMAs."""
     if not db_url or not isinstance(db_url, str) or not db_url.startswith("sqlite://"):
         current_app.logger.warning(f"Invalid or non-SQLite database URL: {db_url}")
@@ -103,7 +103,7 @@ def _setup_sqlite_database(db_url):
         return False
 
 
-def _setup_database_connection(db_url):
+def _setup_database_connection(db_url: str) -> bool:
     """Set up the database connection and handle SQLite-specific setup."""
     current_app.logger.info("Testing database connection...")
     if _check_database_connection():
@@ -129,15 +129,16 @@ def _setup_database_connection(db_url):
     return False
 
 
-def _verify_migrations():
+def _verify_migrations() -> str | None:
     """Verify and log current migration state."""
-    current_rev = current()
+    current_rev = current()  # type: ignore[func-returns-value]
     current_app.logger.info(f"Current database revision: {current_rev}")
     _log_migration_history()
-    return current_rev
+    # Type cast to handle Any return from flask_migrate.current()
+    return cast(str | None, current_rev)
 
 
-def _execute_migrations():
+def _execute_migrations() -> tuple[bool, str | None]:
     """Execute the database migrations with proper error handling.
 
     Returns:
@@ -146,7 +147,7 @@ def _execute_migrations():
     current_app.logger.info("Running database migrations...")
     try:
         # Get the current revision before upgrade
-        current_rev = current()
+        current_rev = current()  # type: ignore[func-returns-value]
         current_app.logger.info(f"Current database revision before upgrade: {current_rev}")
 
         # Get the latest revision available
@@ -160,9 +161,9 @@ def _execute_migrations():
         _upgrade()
 
         # Verify the upgrade was successful
-        new_rev = current()
+        new_rev = current()  # type: ignore[func-returns-value]
         if new_rev == current_rev and current_rev != head:
-            error_msg = f"Migration failed - still at revision {current_rev}, " f"expected {head}"
+            error_msg = f"Migration failed - still at revision {current_rev}, expected {head}"
             current_app.logger.error(error_msg)
             return False, error_msg
 
@@ -186,14 +187,15 @@ def _execute_migrations():
         return False, error_msg
 
 
-def _setup_migration_environment():
+def _setup_migration_environment() -> str:
     """Set up the migration environment and return database URL.
 
     Returns:
         str: The database URL being used
     """
     # Log database URL (masking password)
-    db_url = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    # config.get returns Any, so we cast to str
+    db_url = cast(str, current_app.config.get("SQLALCHEMY_DATABASE_URI", ""))
     current_app.logger.info(f"Database URL: {_get_safe_db_url(db_url)}")
 
     # Ensure the migrations directory exists
@@ -210,13 +212,13 @@ def _setup_migration_environment():
     return db_url
 
 
-def _handle_migration_success(initial_rev):
+def _handle_migration_success(initial_rev: str | None) -> None:
     """Handle successful migration completion.
 
     Args:
-        initial_rev (str): The revision before migrations were run
+        initial_rev: The revision before migrations were run
     """
-    final_rev = current()
+    final_rev = current()  # type: ignore[func-returns-value]
     if final_rev != initial_rev:
         current_app.logger.info(f"Database upgraded from {initial_rev} to {final_rev}")
     else:
@@ -229,16 +231,15 @@ def _handle_migration_success(initial_rev):
     head = result.stdout.strip()
     if final_rev != head:
         current_app.logger.warning(
-            f"Database is at revision {final_rev} but the latest is {head}. "
-            "Some migrations may not have been applied."
+            f"Database is at revision {final_rev} but the latest is {head}. Some migrations may not have been applied."
         )
 
 
-def _handle_migration_failure(error):
+def _handle_migration_failure(error: str) -> None:
     """Handle migration failure with appropriate logging and error messages.
 
     Args:
-        error (str): The error message
+        error: The error message
 
     Raises:
         RuntimeError: Always raises with the error message
@@ -248,13 +249,13 @@ def _handle_migration_failure(error):
     # If we're in development, provide helpful reset instructions
     if current_app.debug:
         current_app.logger.warning(
-            "To reset the database in development, you can run: " "flask db downgrade base && flask db upgrade"
+            "To reset the database in development, you can run: flask db downgrade base && flask db upgrade"
         )
 
     raise RuntimeError(f"Migration failed: {error}")
 
 
-def run_migrations():
+def run_migrations() -> bool:
     """Run database migrations.
 
     Returns:
@@ -273,7 +274,7 @@ def run_migrations():
 
             # Check if tables already exist
             if _check_existing_tables():
-                msg = "Tables already exist in the database. " "Skipping migrations. Reset the database if needed."
+                msg = "Tables already exist in the database. Skipping migrations. Reset the database if needed."
                 current_app.logger.warning(msg)
                 return True
 
@@ -282,7 +283,9 @@ def run_migrations():
             success, error = _execute_migrations()
 
             if not success:
-                _handle_migration_failure(error)
+                # error should not be None when success is False, but handle it safely
+                error_msg = error if error is not None else "Unknown migration error"
+                _handle_migration_failure(error_msg)
 
             _handle_migration_success(initial_rev)
             return True
@@ -293,15 +296,14 @@ def run_migrations():
             if current_app.debug:
                 logger.error("Full traceback:\n" + traceback.format_exc())
             return False
-        raise
 
 
-def upgrade():
+def upgrade() -> None:
     """Run database upgrade."""
     _upgrade()
 
 
-def reset_database():
+def reset_database() -> bool:
     """Reset the database by dropping all tables and running migrations.
 
     This function is used by the Lambda function to reset the database to a clean state.
