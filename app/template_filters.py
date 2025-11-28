@@ -303,7 +303,7 @@ def get_app_version() -> str:
     try:
         from app._version import __version__
 
-        return __version__
+        return str(__version__)
     except ImportError:
         return "development"
 

@@ -146,6 +146,13 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 plugins = ["sqlalchemy.ext.mypy.plugin"]
+explicit_package_bases = true  # Resolve module name conflicts (e.g., init_db.py vs scripts/init_db.py)
+exclude = [
+    "^init_db\\.py$",  # Exclude root init_db.py to avoid conflict with scripts/init_db.py
+    "^./init_db\\.py$",  # Also match with ./ prefix
+]
+# Note: _frozen_importlib.ModuleSpec errors are a known issue with mypy 1.13.0 + Python 3.13
+# This is an internal mypy bug and may occur intermittently. The error is non-fatal for CI/CD.
 
 [[tool.mypy.overrides]]
 module = [
@@ -166,6 +173,7 @@ ignore_missing_imports = true
 module = [
     "tests.*",
     "scripts.*",
+    "init_db",  # Root-level init_db.py (exclude to avoid conflict with scripts/init_db.py)
     "migrate_db.py",
     "wsgi.py"
 ]

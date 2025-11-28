@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Optional
 
 import boto3
 from botocore.exceptions import ClientError
@@ -305,5 +305,9 @@ def get_engine() -> Engine:
     """Get the SQLAlchemy engine."""
     if not hasattr(db, "engine") or not db.engine:
         raise RuntimeError("Database engine not initialized. Make sure to call init_database() first.")
-    engine: Engine = cast(Engine, db.engine)
-    return engine
+    # Type assertion: db.engine is Engine after the check above
+    # Flask-SQLAlchemy's db.engine is not properly typed in stubs
+    # Use explicit check instead of assert to avoid Bandit B101 warning
+    if db.engine is None:
+        raise RuntimeError("Database engine is None after initialization check")
+    return db.engine  # type: ignore[no-any-return]
