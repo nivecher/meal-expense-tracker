@@ -25,7 +25,8 @@ types-html5lib==1.1.11.20250708        # Type stubs for html5lib (HTML parser)
 # Web and API
 types-urllib3>=1.26.0                  # Type stubs for urllib3 (HTTP library, used by requests)
 types-Flask>=1.1.6,<2.0.0              # Type stubs for Flask (web framework)
-types-Flask-SQLAlchemy>=2.5.9,<3.0.0   # Type stubs for Flask-SQLAlchemy (ORM integration for Flask)
+# types-Flask-SQLAlchemy removed: Conflicts with SQLAlchemy 2.0 mypy plugin (types-flask-sqlalchemy depends on types-sqlalchemy)
+# Flask-SQLAlchemy 3.x works with SQLAlchemy 2.0's built-in typing support
 types-Werkzeug>=1.0.0,<2.0.0           # Type stubs for Werkzeug (WSGI utilities, used by Flask)
 types-requests>=2.31.0,<3.0.0          # Type stubs for requests (HTTP client)
 types-python-dateutil>=2.8.0,<3.0.0    # Type stubs for python-dateutil (date/time parsing and arithmetic)
