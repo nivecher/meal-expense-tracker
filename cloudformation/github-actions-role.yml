@@ -90,9 +90,34 @@ Resources:
                   - acm:ImportCertificate
                   - acm:List*
                   # CloudFront permissions
+                  - cloudfront:CreateDistribution
                   - cloudfront:GetDistribution
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:DeleteDistribution
+                  - cloudfront:CreateOriginAccessControl
                   - cloudfront:GetOriginAccessControl
+                  - cloudfront:UpdateOriginAccessControl
+                  - cloudfront:DeleteOriginAccessControl
+                  - cloudfront:ListDistributions
+                  - cloudfront:ListOriginAccessControls
                   - cloudfront:ListTagsForResource
+                  - cloudfront:TagResource
+                  - cloudfront:UntagResource
+                  # WAFv2 permissions (required for CloudFront WAF management)
+                  - wafv2:GetWebACL
+                  - wafv2:ListWebACLs
+                  - wafv2:CreateWebACL
+                  - wafv2:UpdateWebACL
+                  - wafv2:DeleteWebACL
+                  - wafv2:GetLoggingConfiguration
+                  - wafv2:PutLoggingConfiguration
+                  - wafv2:DeleteLoggingConfiguration
+                  - wafv2:ListResourcesForWebACL
+                  - wafv2:ListTagsForResource
+                  - wafv2:TagResource
+                  - wafv2:UntagResource
+                  - wafv2:AssociateWebACL
+                  - wafv2:DisassociateWebACL
                   # S3 permissions
                   - s3:GetObject
                   - s3:ListBucket
