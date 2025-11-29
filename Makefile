@@ -273,9 +273,9 @@ lint-markdown: check-npm
 lint-yaml: check-env
 	@echo "\n\033[1m=== Running YAML Linter ===\033[0m"
 	@if command -v yamllint >/dev/null 2>&1; then \
-		find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" -exec yamllint -c .yamllint {} + || (echo "\033[1;31m❌ YAML linting failed\033[0m"; exit 1); \
+		find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" ! -path "./cloudformation/*" -exec yamllint -c .yamllint {} + || (echo "\033[1;31m❌ YAML linting failed\033[0m"; exit 1); \
 	elif [ -d node_modules ] && command -v npm >/dev/null 2>&1; then \
-		find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" -exec npx --yes prettier --check {} + || (echo "\033[1;31m❌ YAML validation failed\033[0m"; exit 1); \
+		find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" ! -path "./cloudformation/*" -exec npx --yes prettier --check {} + || (echo "\033[1;31m❌ YAML validation failed\033[0m"; exit 1); \
 	else \
 		echo "\033[1;33m⚠️  YAML linter not available. Install yamllint or ensure npm is available\033[0m"; \
 		exit 1; \
