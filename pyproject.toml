@@ -181,6 +181,10 @@ ignore_errors = true
 disallow_untyped_defs = false
 check_untyped_defs = false
 
+[[tool.mypy.overrides]]
+module = "app.database"
+warn_redundant_casts = false  # Flask-SQLAlchemy's db.engine type stubs are incomplete, cast is needed
+
 ## Bandit config consolidated to .bandit and pre-commit
 
 

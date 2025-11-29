@@ -310,5 +310,7 @@ def get_engine() -> Engine:
     # Use explicit check instead of assert to avoid Bandit B101 warning
     if db.engine is None:
         raise RuntimeError("Database engine is None after initialization check")
-    # Flask-SQLAlchemy's db.engine type is not properly exposed, so we cast it explicitly
-    return cast(Engine, db.engine)
+    # Flask-SQLAlchemy's db.engine type is not properly exposed in stubs
+    # Store in variable to help mypy understand the type narrowing
+    engine: Engine = cast(Engine, db.engine)
+    return engine
