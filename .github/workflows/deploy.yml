@@ -2,12 +2,11 @@
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**.md'
-      - .gitignore
   workflow_dispatch:
     inputs:
       environment:
@@ -19,11 +18,6 @@ on:
           - dev
           - staging
           - prod
-      skip_tests:
-        description: Skip tests (use with caution)
-        required: false
-        type: boolean
-        default: false
 
 env:
   APP_NAME: meal-expense-tracker
@@ -52,159 +46,43 @@ permissions:
   packages: read
 
 jobs:
-  # Quality gate - comprehensive testing and linting
-  quality-gate:
-    name: Quality Gate
+  # Check if CI workflow succeeded (only for workflow_run trigger)
+  check-ci:
+    name: Check CI Status
     runs-on: ubuntu-latest
-    if: ${{ !inputs.skip_tests }}
-    strategy:
-      fail-fast: false
-      matrix:
-        test-suite: [unit, integration, lint, security]
+    outputs:
+      ci_passed: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for proper versioning
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: requirements*.txt
-
-      - name: Install system dependencies
+      - name: Check CI workflow status
         run: |
-          sudo apt-get update
-          sudo apt-get install -y make
-
-      - name: Set up cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            venv/
-            ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-
-            ${{ runner.os }}-pip-
-
-      - name: Create virtual environment and install dependencies
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          python -m pip install --upgrade pip
-          # Explicitly uninstall SQLAlchemy stubs to avoid conflicts with SQLAlchemy 2.0 mypy plugin
-          pip uninstall -y types-sqlalchemy sqlalchemy-stubs sqlalchemy2-stubs types-flask-sqlalchemy 2>/dev/null || true
-          pip install -r requirements-dev.txt
-
-      - name: Setup Node.js (for frontend linting)
-        if: matrix.test-suite == 'lint'
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Node dependencies
-        if: matrix.test-suite == 'lint'
-        run: |
-          if [ -f package.json ]; then
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+              echo "CI workflow did not succeed, skipping deployment"
+              exit 1
             fi
+            echo "CI workflow succeeded, proceeding with deployment"
           else
-            echo "No package.json found, skipping npm dependencies"
+            echo "Manual trigger via workflow_dispatch, skipping CI check"
           fi
 
-      - name: Run unit tests
-        if: matrix.test-suite == 'unit'
-        run: |
-          source venv/bin/activate
-          make test-unit
-
-      - name: Run integration tests
-        if: matrix.test-suite == 'integration'
-        run: |
-          source venv/bin/activate
-          make test-integration
-
-      - name: Run linting and formatting checks
-        if: matrix.test-suite == 'lint'
-        run: |
-          source venv/bin/activate
-          make lint
-
-      - name: Run security checks
-        if: matrix.test-suite == 'security'
-        run: |
-          source venv/bin/activate
-          make security-check
-
-      - name: Upload coverage reports
-        if: matrix.test-suite == 'unit'
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
-
-  # Enhanced security scanning
-  security-scan:
-    name: Security Scan
-    needs: quality-gate
-    if: ${{ !inputs.skip_tests }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: python
-          queries: security-extended,security-and-quality
-          tools: latest
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-
-      - name: Install security tools
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-          pip install semgrep detect-secrets
-
-      - name: Run Semgrep
-        run: semgrep --config=p/ci --error .
-
-      - name: Run Grype vulnerability scan
-        run: |
-          GRYPE_DB_AUTO_UPDATE=false /usr/local/bin/grype dir:. --fail-on high
-
-      - name: Detect secrets
-        run: |
-          detect-secrets scan --update .secrets.baseline
-          detect-secrets audit .secrets.baseline --report --fail
-
-  # Version tagging - only after all checks pass
+  # Version tagging - only after CI checks pass
   version-tag:
     name: Version & Tag
-    needs: [quality-gate, security-scan]
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && !inputs.skip_tests }}
+    needs: check-ci
+    if: ${{ github.ref == 'refs/heads/main' && needs.check-ci.outputs.ci_passed == 'true' }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -253,17 +131,17 @@ jobs:
   # Build and push Docker image
   build:
     name: Build and Push
-    needs: [quality-gate, security-scan, version-tag]
-    if: ${{ github.event_name != 'pull_request' && (needs.version-tag.result == 'success' || inputs.skip_tests) }}
+    needs: [check-ci, version-tag]
+    if: ${{ github.event_name != 'pull_request' && needs.check-ci.outputs.ci_passed == 'true' && (needs.version-tag.result == 'success' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'dev' }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -319,8 +197,8 @@ jobs:
   # Deploy to development environment
   deploy-dev:
     name: Deploy to Dev
-    needs: [quality-gate, security-scan, build]
-    if: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'dev') }}
+    needs: [check-ci, build]
+    if: ${{ github.event_name != 'pull_request' && needs.check-ci.outputs.ci_passed == 'true' && (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'dev' || github.event_name == 'workflow_run') }}
     environment: dev
     runs-on: ubuntu-latest
     permissions:
@@ -364,8 +242,8 @@ jobs:
   # Deploy to staging environment
   deploy-staging:
     name: Deploy to Staging
-    needs: [quality-gate, security-scan, build]
-    if: ${{ github.event_name != 'pull_request' && github.event.inputs.environment == 'staging' }}
+    needs: [check-ci, build]
+    if: ${{ github.event_name != 'pull_request' && needs.check-ci.outputs.ci_passed == 'true' && github.event.inputs.environment == 'staging' }}
     environment: staging
     runs-on: ubuntu-latest
     permissions:
@@ -374,7 +252,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.2.2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -387,7 +265,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          terraform_version: 1.13.5
           terraform_wrapper: false
 
       - name: Deploy to staging
@@ -409,8 +287,8 @@ jobs:
   # Deploy to production environment
   deploy-prod:
     name: Deploy to Production
-    needs: [quality-gate, security-scan, build]
-    if: ${{ github.event_name != 'pull_request' && github.event.inputs.environment == 'prod' }}
+    needs: [check-ci, build]
+    if: ${{ github.event_name != 'pull_request' && needs.check-ci.outputs.ci_passed == 'true' && github.event.inputs.environment == 'prod' }}
     environment: prod
     runs-on: ubuntu-latest
     permissions:
@@ -419,7 +297,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.2.2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -432,7 +310,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          terraform_version: 1.13.5
           terraform_wrapper: false
 
       - name: Deploy to production
