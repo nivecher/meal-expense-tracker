@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 import boto3
 from botocore.exceptions import ClientError
@@ -310,5 +310,5 @@ def get_engine() -> Engine:
     # Use explicit check instead of assert to avoid Bandit B101 warning
     if db.engine is None:
         raise RuntimeError("Database engine is None after initialization check")
-    # Flask-SQLAlchemy's db.engine type is not properly exposed, so we need to ignore the return type
-    return db.engine  # type: ignore[no-any-return]
+    # Flask-SQLAlchemy's db.engine type is not properly exposed, so we cast it explicitly
+    return cast(Engine, db.engine)
