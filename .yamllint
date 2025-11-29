@@ -21,7 +21,6 @@ rules:
   # Trailing spaces
   trailing-spaces:
     level: error
-    ignore-line-end: true
 
   # Empty lines
   empty-lines:
