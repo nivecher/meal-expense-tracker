@@ -4,17 +4,17 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - v*
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v1.0.0)'
+        description: Tag to release (e.g., v1.0.0)
         required: true
         type: string
       environment:
-        description: 'Environment to deploy to'
+        description: Environment to deploy to
         required: true
-        default: 'staging'
+        default: staging
         type: choice
         options:
           - staging
@@ -22,18 +22,17 @@ on:
 
 env:
   APP_NAME: meal-expense-tracker
-  PYTHON_VERSION: '3.13'
-  NODE_VERSION: '22'
+  PYTHON_VERSION: 3.13
+  NODE_VERSION: 22
   PYTHONPATH: ${{ github.workspace }}
   FLASK_ENV: test
-  TESTING: 'true'
-  
+  TESTING: true
+
   # Deployment settings
   ENV: ${{ github.event.inputs.environment || 'staging' }}
   TF_ENV: ${{ github.event.inputs.environment || 'staging' }}
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY || '123456789012.dkr.ecr.us-east-1.amazonaws.com' }}
-  
   # Release settings
   RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
@@ -55,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-suite: ['unit', 'integration', 'lint', 'security']
+        test-suite: [unit, integration, lint, security]
     
     steps:
       - name: Checkout code
@@ -67,8 +66,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements*.txt'
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Install system dependencies
         run: |
@@ -195,8 +194,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements*.txt'
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Install system dependencies
         run: |

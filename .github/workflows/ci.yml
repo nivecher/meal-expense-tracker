@@ -7,17 +7,17 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**.md'
-      - '.gitignore'
+      - .gitignore
   pull_request:
     branches: [main, develop]
     types: [opened, synchronize, reopened]
 
 env:
-  PYTHON_VERSION: '3.13'
-  NODE_VERSION: '22'
+  PYTHON_VERSION: 3.13
+  NODE_VERSION: 22
   PYTHONPATH: ${{ github.workspace }}
   FLASK_ENV: test
-  TESTING: 'true'
+  TESTING: true
 
 # Required permissions
 permissions:
@@ -38,8 +38,8 @@ jobs:
         uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements*.txt'
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Create virtual environment
         run: |
@@ -56,9 +56,9 @@ jobs:
       - name: Install Node dependencies
         run: |
           if [ -f package.json ]; then
-            if [ -f package-lock.json ]; then 
+            if [ -f package-lock.json ]; then
               npm ci
-            else 
+            else
               npm install
             fi
           else
@@ -92,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-type: ['unit', 'integration']
+        test-type: [unit, integration]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
@@ -101,8 +101,8 @@ jobs:
         uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements*.txt'
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Create virtual environment
         run: |
@@ -133,12 +133,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
-        
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.13.5
-          
+
       - name: Terraform format check
         run: |
           if [ -d "terraform" ]; then
@@ -146,7 +146,7 @@ jobs:
           else
             echo "No terraform directory found, skipping format check"
           fi
-        
+
       - name: Terraform validation (basic)
         env:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
@@ -178,12 +178,10 @@ jobs:
             AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
             echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
             echo "Using AWS Region: $AWS_REGION"
-            
             # Generate backend.hcl files for each environment from templates
             for ENV in dev staging prod; do
               TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
               OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
-              
               if [ -f "$TEMPLATE_FILE" ]; then
                 echo "Generating $OUTPUT_FILE from template..."
                 # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
@@ -247,8 +245,8 @@ jobs:
         uses: actions/setup-python@v5.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements*.txt'
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Create virtual environment
         run: |

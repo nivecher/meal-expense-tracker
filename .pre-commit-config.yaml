@@ -53,9 +53,9 @@ repos:
     rev: 1.8.6
     hooks:
       - id: bandit
-        args: ['-c', '.bandit', '-r']
+        args: [-c, .bandit, -r]
         files: ^app/
-        exclude: '(tests/|venv/|.venv/|migrations/)'
+        exclude: (tests/|venv/|.venv/|migrations/)
 
   # Type checking with mypy (matches make lint-mypy)
   # Uses venv Python if available, otherwise system Python

@@ -31,7 +31,7 @@ include:
 
 # Ignore specific directories or files
 excluded_files:
-  - 'modules/cloudfront/main.tf' # CloudFront logs bucket requires block_public_acls=false for ACLs
+  - modules/cloudfront/main.tf # CloudFront logs bucket requires block_public_acls=false for ACLs
 
 # Customize output format for CI/CD
 # output:

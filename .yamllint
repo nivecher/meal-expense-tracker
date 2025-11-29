@@ -51,6 +51,7 @@ rules:
 
   # Quoted strings
   quoted-strings:
+    level: warning
     quote-type: single
     required: only-when-needed
     extra-required: ['.*\*{2}.*']
