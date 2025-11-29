@@ -3,6 +3,29 @@
  * Handles auto-detection of browser timezone and updates user profile
  */
 
+// Import security utilities for XSS prevention
+let escapeHtml;
+if (typeof window !== 'undefined' && window.SecurityUtils) {
+  ({ escapeHtml } = window.SecurityUtils);
+} else {
+  // Fallback escapeHtml implementation
+  escapeHtml = function(text) {
+    if (text === null || text === undefined) {
+      return '';
+    }
+    const textString = String(text);
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;',
+    };
+    return textString.replace(/[&<>"'/]/g, (char) => map[char]);
+  };
+}
+
 /**
  * Detect browser timezone using Intl API.
  * @returns {string} IANA timezone string (e.g., 'America/New_York') or 'UTC' as fallback
@@ -98,7 +121,9 @@ function initializeTimezoneDetector() {
 
       if (result.success) {
         if (resultDiv) {
-          resultDiv.innerHTML = `<i class="fas fa-check-circle me-1"></i>${result.message}`;
+          // Escape message to prevent XSS
+          const escapedMessage = escapeHtml(result.message || 'Timezone updated successfully');
+          resultDiv.innerHTML = `<i class="fas fa-check-circle me-1"></i>${escapedMessage}`;
           resultDiv.className = 'timezone-detection-result mt-2 text-success';
         }
         // Reload page after a short delay to show updated timezone
@@ -107,7 +132,9 @@ function initializeTimezoneDetector() {
         }, 1000);
       } else {
         if (resultDiv) {
-          resultDiv.innerHTML = `<i class="fas fa-exclamation-circle me-1"></i>${result.message}`;
+          // Escape message to prevent XSS
+          const escapedMessage = escapeHtml(result.message || 'Failed to update timezone');
+          resultDiv.innerHTML = `<i class="fas fa-exclamation-circle me-1"></i>${escapedMessage}`;
           resultDiv.className = 'timezone-detection-result mt-2 text-danger';
         }
         detectButton.disabled = false;

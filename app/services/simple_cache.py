@@ -16,13 +16,13 @@ import time
 from typing import Any, Dict, Optional, Tuple
 
 # Global in-memory cache with thread-safety
-_cache: Dict[str, Any] = {}
-_cache_ttl: Dict[str, float] = {}
+_cache: dict[str, Any] = {}
+_cache_ttl: dict[str, float] = {}
 _cache_lock = threading.Lock()  # Thread-safety for cache operations
 _default_ttl = 3600  # 1 hour
 
 
-def _generate_search_key(query: str, location: Optional[Tuple[float, float]], radius: float) -> str:
+def _generate_search_key(query: str, location: tuple[float, float] | None, radius: float) -> str:
     """Generate cache key for search results."""
     if location:
         return f"search:{query}|{location[0]:.4f},{location[1]:.4f}|{radius:.1f}"
@@ -44,7 +44,7 @@ def _is_expired(cache_key: str, ttl_seconds: int = _default_ttl) -> bool:
         return (time.time() - cached_time) > ttl_seconds
 
 
-def get_search_results(query: str, location: Optional[Tuple[float, float]], radius: float) -> Optional[Any]:
+def get_search_results(query: str, location: tuple[float, float] | None, radius: float) -> Any | None:
     """Get cached search results."""
     cache_key = _generate_search_key(query, location, radius)
     if _is_expired(cache_key):
@@ -54,7 +54,7 @@ def get_search_results(query: str, location: Optional[Tuple[float, float]], radi
         return _cache.get(cache_key)
 
 
-def cache_search_results(query: str, location: Optional[Tuple[float, float]], radius: float, results: Any) -> None:
+def cache_search_results(query: str, location: tuple[float, float] | None, radius: float, results: Any) -> None:
     """Cache search results."""
     cache_key = _generate_search_key(query, location, radius)
     with _cache_lock:
@@ -62,7 +62,7 @@ def cache_search_results(query: str, location: Optional[Tuple[float, float]], ra
         _cache_ttl[cache_key] = time.time()
 
 
-def get_place_details(place_id: str) -> Optional[Any]:
+def get_place_details(place_id: str) -> Any | None:
     """Get cached place details."""
     cache_key = _generate_place_key(place_id)
     if _is_expired(cache_key):
@@ -93,7 +93,7 @@ def clear_expired_cache() -> int:
     return len(expired_keys)
 
 
-def get_cache_stats() -> Dict[str, int]:
+def get_cache_stats() -> dict[str, int]:
     """Get cache statistics."""
     with _cache_lock:
         cache_keys = list(_cache.keys())
@@ -110,16 +110,16 @@ def get_cache_stats() -> Dict[str, int]:
 class SimpleCache:
     """Legacy compatibility class - delegates to global functions."""
 
-    def get_search_results(self, query: str, location: Optional[Tuple[float, float]], radius: float) -> Optional[Any]:
+    def get_search_results(self, query: str, location: tuple[float, float] | None, radius: float) -> Any | None:
         return get_search_results(query, location, radius)
 
     def cache_search_results(
-        self, query: str, location: Optional[Tuple[float, float]], radius: float, results: Any
+        self, query: str, location: tuple[float, float] | None, radius: float, results: Any
     ) -> bool:
         cache_search_results(query, location, radius, results)
         return True
 
-    def get_place_details(self, place_id: str) -> Optional[Any]:
+    def get_place_details(self, place_id: str) -> Any | None:
         return get_place_details(place_id)
 
     def cache_place_details(self, place_id: str, data: Any) -> bool:

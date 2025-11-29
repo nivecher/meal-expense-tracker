@@ -341,28 +341,3 @@ resource "aws_lambda_function" "main" {
     var.tags
   )
 }
-
-# Security group rules for Lambda→Aurora and Lambda→RDS Proxy
-resource "aws_security_group_rule" "lambda_to_aurora" {
-  count = var.vpc_id != "" ? 1 : 0
-
-  type                     = "egress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.lambda[0].id
-  source_security_group_id = var.db_security_group_id
-  description              = "Allow Lambda to access Aurora via RDS Proxy"
-}
-
-resource "aws_security_group_rule" "lambda_to_rds_proxy" {
-  count = var.vpc_id != "" ? 1 : 0
-
-  type                     = "egress"
-  from_port                = 5432
-  to_port                  = 5432
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.lambda[0].id
-  source_security_group_id = var.rds_proxy_security_group_id
-  description              = "Allow Lambda to access RDS Proxy"
-}

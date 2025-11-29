@@ -2,8 +2,8 @@
 
 from unittest.mock import Mock, patch
 
-import pytest
 from flask import Flask
+import pytest
 
 from app.admin.lambda_admin import LambdaAdminHandler, handle_admin_request
 
@@ -24,12 +24,12 @@ class TestLambdaAdminHandler:
         """Create Lambda admin handler."""
         return LambdaAdminHandler(app)
 
-    def test_init(self, app):
+    def test_init(self, app) -> None:
         """Test handler initialization."""
         handler = LambdaAdminHandler(app)
         assert handler.app == app
 
-    def test_handle_admin_operation_missing_operation(self, handler):
+    def test_handle_admin_operation_missing_operation(self, handler) -> None:
         """Test handling admin operation with missing operation name."""
         event = {}
 
@@ -39,7 +39,7 @@ class TestLambdaAdminHandler:
         body = result["body"]
         assert "Missing 'admin_operation'" in body
 
-    def test_handle_admin_operation_unknown_operation(self, handler):
+    def test_handle_admin_operation_unknown_operation(self, handler) -> None:
         """Test handling admin operation with unknown operation."""
         event = {"admin_operation": "unknown_operation", "parameters": {}}
 
@@ -49,7 +49,7 @@ class TestLambdaAdminHandler:
         body = result["body"]
         assert "Unknown operation: unknown_operation" in body
 
-    def test_handle_admin_operation_invalid_parameters(self, handler):
+    def test_handle_admin_operation_invalid_parameters(self, handler) -> None:
         """Test handling admin operation with invalid parameters."""
         event = {"admin_operation": "list_users", "parameters": {"limit": "invalid"}}
 
@@ -66,7 +66,7 @@ class TestLambdaAdminHandler:
             body = result["body"]
             assert "Invalid parameters" in body
 
-    def test_handle_admin_operation_requires_confirmation(self, handler):
+    def test_handle_admin_operation_requires_confirmation(self, handler) -> None:
         """Test handling admin operation that requires confirmation."""
         event = {
             "admin_operation": "create_user",
@@ -90,7 +90,7 @@ class TestLambdaAdminHandler:
             assert "requires confirmation" in body
             assert "confirm" in body
 
-    def test_handle_admin_operation_success(self, handler):
+    def test_handle_admin_operation_success(self, handler) -> None:
         """Test successful admin operation handling."""
         event = {"admin_operation": "list_users", "parameters": {"limit": 10}, "confirm": True}
 
@@ -115,7 +115,7 @@ class TestLambdaAdminHandler:
             assert 'success": true' in body
             assert "Operation completed" in body
 
-    def test_handle_admin_operation_exception(self, handler):
+    def test_handle_admin_operation_exception(self, handler) -> None:
         """Test admin operation handling with exception."""
         event = {"admin_operation": "list_users", "parameters": {}}
 
@@ -130,7 +130,7 @@ class TestLambdaAdminHandler:
             body = result["body"]
             assert "Internal error" in body
 
-    def test_list_available_operations(self, handler):
+    def test_list_available_operations(self, handler) -> None:
         """Test listing available operations."""
         with patch("app.admin.lambda_admin.AdminOperationRegistry") as mock_registry:
             mock_registry.list_operations.return_value = {
@@ -156,7 +156,7 @@ class TestLambdaAdminHandler:
             assert 'success": true' in body
             assert "Available operations: 2" in body
 
-    def test_error_response(self, handler):
+    def test_error_response(self, handler) -> None:
         """Test error response creation."""
         result = handler._error_response("Test error message")
 
@@ -165,7 +165,7 @@ class TestLambdaAdminHandler:
         assert 'success": false' in body
         assert "Test error message" in body
 
-    def test_get_timestamp(self, handler):
+    def test_get_timestamp(self, handler) -> None:
         """Test timestamp generation."""
         timestamp = handler._get_timestamp()
 
@@ -185,7 +185,7 @@ class TestHandleAdminRequest:
         app.config["SECRET_KEY"] = "test-secret-key"
         return app
 
-    def test_handle_admin_request_list_operations(self, app):
+    def test_handle_admin_request_list_operations(self, app) -> None:
         """Test handling list operations request."""
         event = {"admin_operation": "list_operations"}
 
@@ -199,7 +199,7 @@ class TestHandleAdminRequest:
             mock_handler.list_available_operations.assert_called_once()
             assert result["statusCode"] == 200
 
-    def test_handle_admin_request_specific_operation(self, app):
+    def test_handle_admin_request_specific_operation(self, app) -> None:
         """Test handling specific admin operation request."""
         event = {"admin_operation": "list_users", "parameters": {"limit": 10}}
 
@@ -213,7 +213,7 @@ class TestHandleAdminRequest:
             mock_handler.handle_admin_operation.assert_called_once_with(event)
             assert result["statusCode"] == 200
 
-    def test_handle_admin_request_with_parameters(self, app):
+    def test_handle_admin_request_with_parameters(self, app) -> None:
         """Test handling admin operation with parameters."""
         event = {
             "admin_operation": "create_user",
@@ -234,7 +234,7 @@ class TestHandleAdminRequest:
             mock_handler.handle_admin_operation.assert_called_once_with(event)
             assert result["statusCode"] == 200
 
-    def test_handle_admin_request_error_handling(self, app):
+    def test_handle_admin_request_error_handling(self, app) -> None:
         """Test error handling in admin request."""
         event = {"admin_operation": "invalid_operation", "parameters": {}}
 
@@ -251,7 +251,7 @@ class TestHandleAdminRequest:
             mock_handler.handle_admin_operation.assert_called_once_with(event)
             assert result["statusCode"] == 400
 
-    def test_handle_admin_request_empty_event(self, app):
+    def test_handle_admin_request_empty_event(self, app) -> None:
         """Test handling empty event."""
         event = {}
 
@@ -268,7 +268,7 @@ class TestHandleAdminRequest:
             mock_handler.handle_admin_operation.assert_called_once_with(event)
             assert result["statusCode"] == 400
 
-    def test_handle_admin_request_none_event(self, app):
+    def test_handle_admin_request_none_event(self, app) -> None:
         """Test handling None event."""
         event = None
 
@@ -301,7 +301,7 @@ class TestLambdaAdminIntegration:
         app.config["SECRET_KEY"] = "test-secret-key"
         return app
 
-    def test_full_workflow_list_users(self, app):
+    def test_full_workflow_list_users(self, app) -> None:
         """Test full workflow for listing users."""
         event = {"admin_operation": "list_users", "parameters": {"limit": 10, "admin_only": False}}
 
@@ -326,7 +326,7 @@ class TestLambdaAdminIntegration:
             assert 'success": true' in body
             assert "Retrieved 0 users" in body
 
-    def test_error_scenarios(self, app):
+    def test_error_scenarios(self, app) -> None:
         """Test various error scenarios."""
         # Test unknown operation
         event = {"admin_operation": "unknown_op"}

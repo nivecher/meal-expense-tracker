@@ -206,6 +206,58 @@ You can check the current version in several ways:
    - Visit: http://localhost:5000
    - Default admin: `admin@example.com` / `admin123`
 
+## 🔍 Linting Quick Start
+
+This project uses consistent linting tools across VSCode, Make, pre-commit, and GitHub Actions. All tools are configured to use the same versions and settings.
+
+### Quick Commands
+
+```bash
+# Format all code
+make format
+
+# Run all linters
+make lint
+
+# Format and lint with auto-fix
+make lint-fix
+
+# Validate linting tool synchronization
+make validate-linting-sync
+```
+
+### VSCode Setup
+
+1. **Install recommended extensions**: VSCode will prompt you to install recommended extensions when you open the project
+2. **Automatic formatting**: Code is automatically formatted on save
+3. **Inline linting**: Linting errors are shown inline with quick fixes available
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#vscode-setup) for detailed VSCode setup instructions.
+
+### Pre-commit Hooks
+
+Pre-commit hooks automatically run on `git commit`:
+
+```bash
+# Install hooks (one-time setup)
+pre-commit install
+
+# Run hooks manually
+pre-commit run --all-files
+```
+
+### Supported Languages
+
+- **Python**: Ruff, Bandit, MyPy
+- **JavaScript**: ESLint
+- **HTML**: Prettier
+- **CSS**: Stylelint
+- **Markdown**: markdownlint, Prettier
+- **YAML/JSON/TOML**: Validation and Prettier
+- **Terraform**: terraform fmt, terraform validate
+
+For complete linting standards and configuration details, see [docs/LINTING_STANDARDS.md](docs/LINTING_STANDARDS.md).
+
 ### 🔧 Development Commands
 
 ```bash
@@ -439,7 +491,7 @@ make test
 make test-cov
 ```
 
-### Pre-commit Hooks
+### Code Quality with Pre-commit
 
 This project uses pre-commit to maintain code quality. Hooks are automatically installed during setup.
 

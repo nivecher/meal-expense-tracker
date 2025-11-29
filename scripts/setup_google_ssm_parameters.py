@@ -10,8 +10,9 @@ The parameter names follow the patterns:
 
 import argparse
 import os
-import sys
 from pathlib import Path
+import sys
+from typing import Any, cast
 
 import boto3
 from botocore.exceptions import ClientError
@@ -22,7 +23,9 @@ dotenv_path = Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=dotenv_path)
 
 
-def get_parameter_value(parameter_name: str, region: str, profile: str = None, with_decryption: bool = True) -> str:
+def get_parameter_value(
+    parameter_name: str, region: str, profile: str | None = None, with_decryption: bool = True
+) -> str | None:
     """
     Get the current value of an SSM parameter.
 
@@ -33,14 +36,14 @@ def get_parameter_value(parameter_name: str, region: str, profile: str = None, w
         with_decryption(bool): Whether to decrypt the parameter value. Defaults to True.
 
     Returns:
-        str: The parameter value, or None if not found
+        str | None: The parameter value, or None if not found
     """
     session = boto3.Session(profile_name=profile) if profile else boto3.Session()
     client = session.client("ssm", region_name=region)
 
     try:
         response = client.get_parameter(Name=parameter_name, WithDecryption=with_decryption)
-        return response["Parameter"]["Value"]
+        return cast(str, response["Parameter"]["Value"])
     except client.exceptions.ParameterNotFound:
         return None
     except ClientError as e:
@@ -48,7 +51,14 @@ def get_parameter_value(parameter_name: str, region: str, profile: str = None, w
         return None
 
 
-def create_or_update_parameter(parameter_name, parameter_value, description, region, profile=None, secure=True):
+def create_or_update_parameter(
+    parameter_name: str,
+    parameter_value: str,
+    description: str,
+    region: str,
+    profile: str | None = None,
+    secure: bool = True,
+) -> dict[str, Any] | None:
     """
     Create or update an SSM parameter if the value has changed.
 
@@ -83,26 +93,26 @@ def create_or_update_parameter(parameter_name, parameter_value, description, reg
             Tier="Standard",
             DataType="text",
         )
-        return response
+        return cast(dict[str, Any], response)
     except ClientError as e:
         print(f"Error creating/updating parameter {parameter_name}: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 
-def get_parameter_arn(parameter_name, region, profile=None):
+def get_parameter_arn(parameter_name: str, region: str, profile: str | None = None) -> str:
     """Get the ARN of an SSM parameter."""
     session = boto3.Session(profile_name=profile) if profile else boto3.Session()
     client = session.client("ssm", region_name=region)
 
     try:
         response = client.get_parameter(Name=parameter_name, WithDecryption=False)
-        return response["Parameter"]["ARN"]
+        return cast(str, response["Parameter"]["ARN"])
     except ClientError as e:
         print(f"Error getting parameter ARN for {parameter_name}: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 
-def get_args():
+def get_args() -> argparse.Namespace:
     """Parse and validate command-line arguments."""
     parser = argparse.ArgumentParser(description="Set up Google API keys and Map ID in AWS SSM Parameter Store")
 
@@ -133,7 +143,7 @@ def get_args():
     return args
 
 
-def process_service(service, args):
+def process_service(service: str, args: argparse.Namespace) -> dict[str, Any]:
     """Process a single service (maps or map-id)."""
     # Get the appropriate parameter details based on service type
     if service == "maps":
@@ -164,15 +174,21 @@ def process_service(service, args):
     parameter_arn = get_parameter_arn(parameter_name, args.region, args.profile)
     current_version = get_parameter_value(parameter_name, args.region, args.profile, with_decryption=False)
 
+    version: str | None = None
+    if result:
+        version = cast(str, result["Version"])
+    elif current_version:
+        version = current_version
+
     return {
         "name": parameter_name,
         "arn": parameter_arn,
-        "version": result["Version"] if result else current_version,
+        "version": version or "unknown",
         "updated": result is not None,
     }
 
 
-def print_updated_services(services: list[str], results: dict) -> None:
+def print_updated_services(services: list[str], results: dict[str, Any]) -> None:
     """Print details of updated services.
 
     Args:
@@ -188,7 +204,9 @@ def print_updated_services(services: list[str], results: dict) -> None:
         print(f"  Version: {result['version']}\n")
 
 
-def print_unchanged_services(services: list[str], results: dict, region: str, profile: str = None) -> None:
+def print_unchanged_services(
+    services: list[str], results: dict[str, Any], region: str, profile: str | None = None
+) -> None:
     """Print details of unchanged services.
 
     Args:
@@ -211,7 +229,7 @@ def print_unchanged_services(services: list[str], results: dict, region: str, pr
             print(f"- {service.upper()}: {result['name']} (version unknown)")
 
 
-def get_services_to_process(args) -> list[str]:
+def get_services_to_process(args: argparse.Namespace) -> list[str]:
     """Determine which services to process based on command line arguments.
 
     Args:

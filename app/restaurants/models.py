@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from flask import current_app
-from sqlalchemy import UniqueConstraint
-from sqlalchemy.orm import Mapped, relationship
+from sqlalchemy import ForeignKey, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensions import db
 from app.models.base import BaseModel
@@ -36,7 +36,7 @@ class Restaurant(BaseModel):
         notes: Additional notes
     """
 
-    __tablename__ = "restaurant"
+    __tablename__ = "restaurant"  # type: ignore[assignment]
 
     __table_args__ = (
         UniqueConstraint(
@@ -56,69 +56,69 @@ class Restaurant(BaseModel):
     )
 
     # Basic Information
-    name: Mapped[str] = db.Column(db.String(100), nullable=False, comment="Name of the restaurant")
-    type: Mapped[Optional[str]] = db.Column(db.String(50), comment="Type of cuisine or restaurant style")
-    located_within: Mapped[Optional[str]] = db.Column(
+    name: Mapped[str] = mapped_column(db.String(100), nullable=False, comment="Name of the restaurant")
+    type: Mapped[str | None] = mapped_column(db.String(50), comment="Type of cuisine or restaurant style")
+    located_within: Mapped[str | None] = mapped_column(
         db.String(100), comment="Location within (e.g., mall, airport, hotel)"
     )
-    description: Mapped[Optional[str]] = db.Column(db.Text, comment="Detailed description of the restaurant")
+    description: Mapped[str | None] = mapped_column(db.Text, comment="Detailed description of the restaurant")
 
     # Location Information
-    address_line_1: Mapped[Optional[str]] = db.Column(db.String(200), comment="Primary street address")
-    address_line_2: Mapped[Optional[str]] = db.Column(
+    address_line_1: Mapped[str | None] = mapped_column(db.String(200), comment="Primary street address")
+    address_line_2: Mapped[str | None] = mapped_column(
         db.String(200), comment="Secondary address (apartment/suite/unit)"
     )
-    city: Mapped[Optional[str]] = db.Column(db.String(100), comment="City")
-    state: Mapped[Optional[str]] = db.Column(db.String(100), comment="State/Province")
-    postal_code: Mapped[Optional[str]] = db.Column(db.String(20), comment="ZIP/Postal code")
-    country: Mapped[Optional[str]] = db.Column(db.String(100), comment="Country")
+    city: Mapped[str | None] = mapped_column(db.String(100), comment="City")
+    state: Mapped[str | None] = mapped_column(db.String(100), comment="State/Province")
+    postal_code: Mapped[str | None] = mapped_column(db.String(20), comment="ZIP/Postal code")
+    country: Mapped[str | None] = mapped_column(db.String(100), comment="Country")
 
     # Contact Information
-    phone: Mapped[Optional[str]] = db.Column(db.String(20), comment="Contact phone number")
-    website: Mapped[Optional[str]] = db.Column(db.String(500), comment="Restaurant website URL")
-    email: Mapped[Optional[str]] = db.Column(db.String(100), comment="Contact email")
-    google_place_id: Mapped[Optional[str]] = db.Column(
+    phone: Mapped[str | None] = mapped_column(db.String(20), comment="Contact phone number")
+    website: Mapped[str | None] = mapped_column(db.String(500), comment="Restaurant website URL")
+    email: Mapped[str | None] = mapped_column(db.String(100), comment="Contact email")
+    google_place_id: Mapped[str | None] = mapped_column(
         db.String(255), index=True, comment="Google Place ID for the restaurant"
     )
 
     # Business Details - User Customizable
-    cuisine: Mapped[Optional[str]] = db.Column(db.String(100), index=True, comment="Type of cuisine")
-    service_level: Mapped[Optional[str]] = db.Column(
+    cuisine: Mapped[str | None] = mapped_column(db.String(100), index=True, comment="Type of cuisine")
+    service_level: Mapped[str | None] = mapped_column(
         db.String(50),
         index=True,
         comment="Service level (fine_dining, casual_dining, fast_casual, quick_service)",
     )
-    is_chain: Mapped[bool] = db.Column(
+    is_chain: Mapped[bool] = mapped_column(
         db.Boolean,
         default=False,
         nullable=False,
         comment="Whether it's a chain restaurant",
     )
-    rating: Mapped[Optional[float]] = db.Column(db.Float, comment="User's personal rating (1.0-5.0)")
-    price_level: Mapped[Optional[int]] = db.Column(
+    rating: Mapped[float | None] = mapped_column(db.Float, comment="User's personal rating (1.0-5.0)")
+    price_level: Mapped[int | None] = mapped_column(
         db.Integer,
         comment="Price level from Google Places (0=Free, 1=$1-10, 2=$11-30, 3=$31-60, 4=$61+)",
     )
-    primary_type: Mapped[Optional[str]] = db.Column(
+    primary_type: Mapped[str | None] = mapped_column(
         db.String(100),
         comment="Primary business type from Google Places API (e.g., restaurant, cafe, bar)",
     )
-    latitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Restaurant latitude coordinate")
-    longitude: Mapped[Optional[float]] = db.Column(db.Float, comment="Restaurant longitude coordinate")
-    notes: Mapped[Optional[str]] = db.Column(db.Text, comment="Additional notes")
+    latitude: Mapped[float | None] = mapped_column(db.Float, comment="Restaurant latitude coordinate")
+    longitude: Mapped[float | None] = mapped_column(db.Float, comment="Restaurant longitude coordinate")
+    notes: Mapped[str | None] = mapped_column(db.Text, comment="Additional notes")
 
     # Foreign Keys
-    user_id: Mapped[int] = db.Column(
+    user_id: Mapped[int] = mapped_column(
         db.Integer,
-        db.ForeignKey("user.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="Reference to the user who added this restaurant",
     )
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="restaurants", lazy="select")
-    expenses: Mapped[List["Expense"]] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="restaurants", lazy="select")
+    expenses: Mapped[list[Expense]] = relationship(
         "Expense",
         back_populates="restaurant",
         cascade="all, delete-orphan",
@@ -132,18 +132,21 @@ class Restaurant(BaseModel):
         Returns:
             str: The restaurant name with city if available
         """
-        if not self.city or not self.city.strip():
+        city = self.city
+        if city is None:
             return self.name
-        return f"{self.name} - {self.city}"
+        if not city.strip():
+            return self.name
+        return f"{self.name} - {city}"
 
     @property
-    def address(self) -> Optional[str]:
+    def address(self) -> str | None:
         """Return the combined address lines (address_line_1 + address_line_2).
 
         Returns:
             Optional[str]: Combined address lines or None if no address components
         """
-        parts: List[str] = []
+        parts: list[str] = []
         if self.address_line_1:
             parts.append(self.address_line_1)
         if self.address_line_2:
@@ -151,61 +154,66 @@ class Restaurant(BaseModel):
         return ", ".join(parts) if parts else None
 
     @property
-    def full_address(self) -> Optional[str]:
+    def full_address(self) -> str | None:
         """Return the restaurant's full address as a formatted string using US Standard format.
 
         Returns:
             Optional[str]: Formatted address string or None if no address components
         """
-        parts: List[str] = []
+        parts: list[str] = []
 
         # Combine address lines with space (US Standard)
-        address_lines = []
-        if self.address_line_1:
+        address_lines: list[str] = []
+        if self.address_line_1 is not None:
             address_lines.append(self.address_line_1)
-        if self.address_line_2:
+        if self.address_line_2 is not None:
             address_lines.append(self.address_line_2)
         if address_lines:
             parts.append(" ".join(address_lines))
 
         # Combine city and state with comma (US Standard)
-        city_state = []
-        if self.city:
+        city_state: list[str] = []
+        if self.city is not None:
             city_state.append(self.city)
-        if self.state:
+        if self.state is not None:
             city_state.append(self.state)
         if city_state:
             parts.append(", ".join(city_state))
 
         # Add postal code
-        if self.postal_code:
+        if self.postal_code is not None:
             parts.append(self.postal_code)
 
         # Only add country if it's not United States (avoid redundancy for US addresses)
-        if self.country and self.country.lower() not in ["united states", "usa", "us"]:
-            parts.append(self.country)
+        if self.country is not None:
+            country_lower = self.country.lower()
+            if country_lower not in ["united states", "usa", "us"]:
+                parts.append(self.country)
 
         return " ".join(parts) if parts else None
 
     @property
-    def google_search(self) -> Optional[str]:
+    def google_search(self) -> str | None:
         """Return a string suitable for a Google Maps search.
 
         Returns:
             Optional[str]: Search string for Google Maps or None if no location data
         """
+        # Type checker limitation: doesn't narrow Mapped[str] properly
         if not self.name:
             return None
 
         search_terms = [self.name]
-        if self.city:
-            search_terms.append(self.city)
-        if self.state:
-            search_terms.append(self.state)
+        city = self.city
+        if city is not None:
+            search_terms.append(city)
+        state = self.state
+        if state is not None:
+            search_terms.append(state)
 
         return ", ".join(search_terms)
 
-    def get_google_maps_url(self) -> Optional[str]:
+    def get_google_maps_url(self) -> str | None:
         """Return a Google Maps URL for this restaurant.
 
         Uses the best available method in order of preference (all API token-free):
@@ -219,7 +227,7 @@ class Restaurant(BaseModel):
         from urllib.parse import quote_plus
 
         # First preference: Use the improved place_id format with restaurant name
-        if self.google_place_id:
+        if self.google_place_id is not None:
             # Use the recommended Google Maps URLs API format with both query and place_id
             # This provides the most reliable link without API token usage
             restaurant_name = quote_plus(self.name)
@@ -237,7 +245,7 @@ class Restaurant(BaseModel):
 
         return None
 
-    def _build_optimized_search_query(self) -> Optional[str]:
+    def _build_optimized_search_query(self) -> str | None:
         """Build an optimized search query for Google Maps.
 
         Creates a comprehensive search string that includes restaurant name, address,
@@ -248,7 +256,7 @@ class Restaurant(BaseModel):
         """
         from urllib.parse import quote_plus
 
-        search_parts = []
+        search_parts: list[str] = []
 
         # Always include restaurant name
         if self.name:
@@ -262,15 +270,19 @@ class Restaurant(BaseModel):
             search_parts.append(self.city)
 
         # Add city if not already included in address
-        if self.city and self.address_line_1 and self.city.lower() not in self.address_line_1.lower():
-            search_parts.append(self.city)
+        if self.city is not None:
+            if self.address_line_1 is not None:
+                if self.city.lower() not in self.address_line_1.lower():
+                    search_parts.append(self.city)
+            else:
+                search_parts.append(self.city)
 
         # Add state for better disambiguation
         if self.state:
             search_parts.append(self.state)
 
         # Add postal code for precision
-        if self.postal_code:
+        if self.postal_code is not None:
             search_parts.append(self.postal_code)
 
         # Join parts and URL encode
@@ -522,7 +534,7 @@ class Restaurant(BaseModel):
             current_app.logger.error(f"Error updating service level and cuisine: {str(e)}")
             # Don't raise - this is not critical enough to fail the entire update
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the restaurant.
 
         Returns:

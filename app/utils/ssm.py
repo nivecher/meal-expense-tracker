@@ -1,13 +1,13 @@
 """Utility functions for interacting with AWS SSM Parameter Store."""
 
-import os
 from functools import lru_cache
+import os
 from typing import Optional
 
 import boto3
 
 
-def get_ssm_parameter(param_name: str, region: Optional[str] = None, with_decryption: bool = True) -> str:
+def get_ssm_parameter(param_name: str, region: str | None = None, with_decryption: bool = True) -> str:
     """
     Get a parameter from AWS SSM Parameter Store.
 
@@ -28,13 +28,14 @@ def get_ssm_parameter(param_name: str, region: Optional[str] = None, with_decryp
 
         response = ssm.get_parameter(Name=param_name, WithDecryption=with_decryption)
 
-        return response["Parameter"]["Value"]
+        value = response["Parameter"]["Value"]
+        return str(value)
     except Exception as e:
         raise ValueError(f"Failed to get parameter '{param_name}' from SSM: {str(e)}")
 
 
 @lru_cache(maxsize=32)
-def get_cached_ssm_parameter(param_name: str, region: Optional[str] = None) -> str:
+def get_cached_ssm_parameter(param_name: str, region: str | None = None) -> str:
     """
     Get a parameter from SSM with caching.
 
@@ -48,7 +49,7 @@ def get_cached_ssm_parameter(param_name: str, region: Optional[str] = None) -> s
     return get_ssm_parameter(param_name, region, with_decryption=True)
 
 
-def get_parameter_from_env(env_var_name: str, default: Optional[str] = None) -> str:
+def get_parameter_from_env(env_var_name: str, default: str | None = None) -> str:
     """
     Get a parameter from environment variables or SSM Parameter Store.
 

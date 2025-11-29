@@ -103,7 +103,7 @@ def _configure_csrf_handlers(app: Flask) -> None:
             if request.path.startswith("/api/") or request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 response = jsonify({"status": "error", "message": message, "error_type": "csrf_validation_failed"})
                 response.status_code = 403
-                return response
+                return cast(Response, response)
 
             # Normal web request - redirect to login with current URL as next parameter
             flash(message, "error")
@@ -216,7 +216,7 @@ def _handle_api_unauthorized() -> Response:
     """Handle unauthorized API requests."""
     response = jsonify({"status": "error", "message": "Authentication required", "code": 401})
     response.status_code = 401
-    return response
+    return cast(Response, response)
 
 
 def _handle_web_unauthorized() -> Response:
@@ -239,7 +239,7 @@ def _handle_web_unauthorized() -> Response:
 
 
 @login_manager.unauthorized_handler
-def unauthorized() -> Union[Response, str]:
+def unauthorized() -> Response | str:
     """Handle unauthorized requests.
 
     For API requests, return a 401 JSON response.
@@ -252,7 +252,7 @@ def unauthorized() -> Union[Response, str]:
 
 
 @login_manager.user_loader
-def load_user(user_id: str) -> Optional[Any]:
+def load_user(user_id: str) -> Any | None:
     """Load a user from the database.
 
     Only returns active users. Inactive users are treated as non-existent

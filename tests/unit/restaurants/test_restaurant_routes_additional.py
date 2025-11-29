@@ -12,7 +12,7 @@ from app.restaurants.models import Restaurant
 class TestRestaurantRoutesAdditional:
     """Additional tests for restaurant routes."""
 
-    def test_add_restaurant_validation_errors(self, client, auth, test_user):
+    def test_add_restaurant_validation_errors(self, client, auth, test_user) -> None:
         """Test add restaurant with validation errors."""
         auth.login("testuser_1", "testpass")
 
@@ -36,7 +36,7 @@ class TestRestaurantRoutesAdditional:
         # Should show validation errors
         assert b"field is required" in response.data or b"required" in response.data
 
-    def test_edit_restaurant_validation_errors(self, client, auth, test_restaurant, test_user):
+    def test_edit_restaurant_validation_errors(self, client, auth, test_restaurant, test_user) -> None:
         """Test edit restaurant with validation errors."""
         auth.login("testuser_1", "testpass")
 
@@ -58,7 +58,7 @@ class TestRestaurantRoutesAdditional:
         # Should show validation errors or stay on edit page
         assert b"field is required" in response.data or b"edit" in response.data
 
-    def test_restaurant_details_post_update(self, client, auth, test_restaurant, test_user, app):
+    def test_restaurant_details_post_update(self, client, auth, test_restaurant, test_user, app) -> None:
         """Test POST to restaurant details (update functionality)."""
         auth.login("testuser_1", "testpass")
 
@@ -85,7 +85,7 @@ class TestRestaurantRoutesAdditional:
             assert updated_restaurant.city == "Updated City"
             assert updated_restaurant.state == "NY"
 
-    def test_search_places_api(self, client, auth, test_user):
+    def test_search_places_api(self, client, auth, test_user) -> None:
         """Test search places API endpoint."""
         auth.login("testuser_1", "testpass")
 
@@ -97,7 +97,7 @@ class TestRestaurantRoutesAdditional:
         # Just verify the endpoint responds (API key might not be configured)
         assert response.status_code in [200, 400, 500]
 
-    def test_search_places_api_no_api_key(self, client, auth, test_user):
+    def test_search_places_api_no_api_key(self, client, auth, test_user) -> None:
         """Test search places API without API key."""
         auth.login("testuser_1", "testpass")
 
@@ -106,7 +106,7 @@ class TestRestaurantRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 400, 500]
 
-    def test_find_places_post(self, client, auth, test_user):
+    def test_find_places_post(self, client, auth, test_user) -> None:
         """Test find places page POST request."""
         auth.login("testuser_1", "testpass")
 
@@ -122,7 +122,7 @@ class TestRestaurantRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code == 200
 
-    def test_check_restaurant_exists(self, client, auth, test_restaurant, test_user):
+    def test_check_restaurant_exists(self, client, auth, test_restaurant, test_user) -> None:
         """Test check restaurant exists endpoint."""
         auth.login("testuser_1", "testpass")
 
@@ -136,7 +136,7 @@ class TestRestaurantRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 400, 500]
 
-    def test_add_from_google_places_success(self, client, auth, test_user, app):
+    def test_add_from_google_places_success(self, client, auth, test_user, app) -> None:
         """Test adding restaurant from Google Places endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -160,7 +160,7 @@ class TestRestaurantRoutesAdditional:
         # Just verify the endpoint responds (validation might be complex)
         assert response.status_code in [200, 400, 500]
 
-    def test_add_from_google_places_invalid_place_id(self, client, auth, test_user):
+    def test_add_from_google_places_invalid_place_id(self, client, auth, test_user) -> None:
         """Test adding restaurant with invalid Google Place ID."""
         auth.login("testuser_1", "testpass")
 
@@ -180,7 +180,7 @@ class TestRestaurantRoutesAdditional:
             data = response.get_json()
             assert data["success"] is False
 
-    def test_search_restaurants_with_filters(self, client, auth, test_user):
+    def test_search_restaurants_with_filters(self, client, auth, test_user) -> None:
         """Test restaurant search with various filters."""
         auth.login("testuser_1", "testpass")
 
@@ -206,7 +206,7 @@ class TestRestaurantRoutesAdditional:
 
         assert response.status_code == 200
 
-    def test_search_restaurants_pagination(self, client, auth, test_user):
+    def test_search_restaurants_pagination(self, client, auth, test_user) -> None:
         """Test restaurant search with pagination."""
         auth.login("testuser_1", "testpass")
 
@@ -216,7 +216,7 @@ class TestRestaurantRoutesAdditional:
 
         assert response.status_code == 200
 
-    def test_clear_place_id_unauthorized(self, client, test_restaurant):
+    def test_clear_place_id_unauthorized(self, client, test_restaurant) -> None:
         """Test clear place ID without admin access."""
         response = client.post(
             url_for("restaurants.clear_place_id", restaurant_id=test_restaurant.id),
@@ -228,7 +228,7 @@ class TestRestaurantRoutesAdditional:
         assert response.status_code == 200
         assert b"Login" in response.data
 
-    def test_import_restaurants_json(self, client, auth, test_user, session):
+    def test_import_restaurants_json(self, client, auth, test_user, session) -> None:
         """Test importing restaurants from JSON file."""
         auth.login("testuser_1", "testpass")
 
@@ -277,7 +277,7 @@ class TestRestaurantRoutesAdditional:
         # Just verify the endpoint responds (import validation might be complex)
         assert response.status_code == 200
 
-    def test_import_restaurants_empty_file(self, client, auth, test_user):
+    def test_import_restaurants_empty_file(self, client, auth, test_user) -> None:
         """Test importing restaurants with empty file."""
         auth.login("testuser_1", "testpass")
 
@@ -300,7 +300,7 @@ class TestRestaurantRoutesAdditional:
         # Should show error message about empty file
         assert b"empty" in response.data or b"error" in response.data
 
-    def test_export_restaurants_json(self, client, auth, test_restaurant, test_user):
+    def test_export_restaurants_json(self, client, auth, test_restaurant, test_user) -> None:
         """Test exporting restaurants as JSON."""
         auth.login("testuser_1", "testpass")
 
@@ -318,7 +318,7 @@ class TestRestaurantRoutesAdditional:
         assert isinstance(data, list)
         assert len(data) >= 1  # Should have at least the test restaurant
 
-    def test_export_restaurants_invalid_format(self, client, auth, test_user):
+    def test_export_restaurants_invalid_format(self, client, auth, test_user) -> None:
         """Test exporting restaurants with invalid format."""
         auth.login("testuser_1", "testpass")
 
@@ -327,7 +327,7 @@ class TestRestaurantRoutesAdditional:
         # Just verify the endpoint responds (might redirect or default to CSV)
         assert response.status_code in [200, 302, 400]
 
-    def test_restaurant_details_not_found(self, client, auth, test_user):
+    def test_restaurant_details_not_found(self, client, auth, test_user) -> None:
         """Test restaurant details for non-existent restaurant."""
         auth.login("testuser_1", "testpass")
 
@@ -339,7 +339,7 @@ class TestRestaurantRoutesAdditional:
         assert response.status_code == 404
         assert b"not found" in response.data or b"404" in response.data
 
-    def test_edit_restaurant_not_found(self, client, auth, test_user):
+    def test_edit_restaurant_not_found(self, client, auth, test_user) -> None:
         """Test editing non-existent restaurant."""
         auth.login("testuser_1", "testpass")
 
@@ -350,7 +350,7 @@ class TestRestaurantRoutesAdditional:
 
         assert response.status_code == 404
 
-    def test_delete_restaurant_not_found(self, client, auth, test_user):
+    def test_delete_restaurant_not_found(self, client, auth, test_user) -> None:
         """Test deleting non-existent restaurant."""
         auth.login("testuser_1", "testpass")
 
@@ -363,7 +363,7 @@ class TestRestaurantRoutesAdditional:
         # Just verify the endpoint responds (might redirect or show error)
         assert response.status_code in [200, 302, 404]
 
-    def test_list_restaurants_with_pagination(self, client, auth, test_user):
+    def test_list_restaurants_with_pagination(self, client, auth, test_user) -> None:
         """Test list restaurants with pagination."""
         auth.login("testuser_1", "testpass")
 
@@ -371,7 +371,7 @@ class TestRestaurantRoutesAdditional:
 
         assert response.status_code == 200
 
-    def test_list_restaurants_with_sorting(self, client, auth, test_user):
+    def test_list_restaurants_with_sorting(self, client, auth, test_user) -> None:
         """Test list restaurants with sorting."""
         auth.login("testuser_1", "testpass")
 
@@ -379,7 +379,7 @@ class TestRestaurantRoutesAdditional:
 
         assert response.status_code == 200
 
-    def test_restaurant_routes_unauthorized_access(self, client):
+    def test_restaurant_routes_unauthorized_access(self, client) -> None:
         """Test unauthorized access to restaurant routes."""
         routes_to_test = [
             ("restaurants.list_restaurants", "GET"),

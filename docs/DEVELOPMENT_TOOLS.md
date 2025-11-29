@@ -44,15 +44,15 @@ make requirements-dev
 
 ### Core Tools (Pinned Versions)
 
-| Tool       | Version | Purpose             | Configuration    |
-| ---------- | ------- | ------------------- | ---------------- |
-| **black**  | 24.10.0 | Code formatting     | `pyproject.toml` |
-| **flake8** | 7.3.0   | Linting             | `.flake8`        |
-| **isort**  | 5.13.2  | Import sorting      | `pyproject.toml` |
-| **mypy**   | 1.13.0  | Type checking       | `pyproject.toml` |
-| **pylint** | 3.3.1   | Static analysis     | Built-in config  |
-| **bandit** | 1.8.6   | Security linting    | `.bandit`        |
-| **safety** | 3.7.0   | Dependency security | Auto-updated     |
+| Tool       | Version | Purpose                                      | Configuration    |
+| ---------- | ------- | -------------------------------------------- | ---------------- |
+| **black**  | 24.10.0 | Code formatting                              | `pyproject.toml` |
+| **ruff**   | 0.8.0+  | Linting, import sorting, unused code removal | `pyproject.toml` |
+| **mypy**   | 1.13.0  | Type checking                                | `pyproject.toml` |
+| **bandit** | 1.8.6   | Security linting                             | `.bandit`        |
+| **safety** | 3.7.0   | Dependency security                          | Auto-updated     |
+
+**Note**: Ruff replaces Flake8 (linting), isort (import sorting), and autoflake (unused code removal). It provides the same functionality with 10-100x better performance.
 
 ### Testing Tools (Pinned Versions)
 
@@ -114,12 +114,11 @@ repos:
   - repo: https://github.com/psf/black
     rev: 24.10.0 # Matches requirements/dev.in
 
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.3.0 # Matches requirements/dev.in
-
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2 # Matches requirements/dev.in
-
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4 # Matches requirements/dev.in
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
 
   # Prettier disabled - mirrors-prettier repo has version sync issues
   # Use npm scripts instead: npm run format-html
@@ -153,7 +152,7 @@ Werkzeug==3.1.3
 
 # Development tools
 black==24.10.0
-flake8==7.3.0
+ruff>=0.8.0,<1.0.0
 pytest==8.4.2
 ```
 
@@ -213,7 +212,7 @@ make test-fast
 
 ### Updating Dependencies
 
-#### Python Dependencies
+#### Updating Python Dependencies
 
 ```bash
 # Update all dependencies
@@ -223,7 +222,7 @@ make requirements-upgrade
 pip-compile --upgrade-package package-name requirements/dev.in
 ```
 
-#### Node.js Dependencies
+#### Updating Node.js Dependencies
 
 ```bash
 # Check for updates
@@ -251,9 +250,9 @@ make test          # Full test suite
 All commits are automatically validated for:
 
 - Code formatting (Black, Prettier)
-- Linting (flake8, ESLint, Stylelint)
+- Linting (Ruff, MyPy, ESLint, Stylelint)
 - Security (Bandit)
-- Import sorting (isort)
+- Import sorting (Ruff - replaces isort)
 - File validation (YAML, JSON, TOML)
 
 ### CI/CD Pipeline
@@ -276,13 +275,13 @@ The GitHub Actions pipeline validates:
 
 ### Security Update Policy
 
-#### Python Dependencies
+#### Python Security Updates
 
 - **Exact versions** for reproducibility
 - **Manual updates** for security patches after testing
 - **Safety scanning** in CI/CD pipeline
 
-#### Node.js Dependencies
+#### Node.js Security Updates
 
 - **Exact versions** for most packages
 - **Caret ranges** for security-critical packages (e.g., Playwright: `^1.56.1`)

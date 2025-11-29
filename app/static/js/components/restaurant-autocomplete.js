@@ -6,6 +6,8 @@
  * Flow: Type restaurant name → Get suggestions → Select restaurant → Populate form
  */
 
+import { escapeHtml } from '../utils/security-utils.js';
+
 // Cuisine service removed - not needed for basic autocomplete functionality
 
 class RestaurantAutocomplete {
@@ -18,6 +20,11 @@ class RestaurantAutocomplete {
     this.userLocation = null;
     this.locationError = null;
     this.init();
+  }
+
+  // Helper to safely escape user input for HTML insertion
+  safeHtmlEscape(value) {
+    return escapeHtml(value || '');
   }
 
   init() {
@@ -76,7 +83,10 @@ class RestaurantAutocomplete {
     this.input.addEventListener('input', (e) => {
       console.log('Input event triggered, value:', e.target.value);
       clearTimeout(timeout);
-      timeout = setTimeout(() => this.handleInput(e.target.value), 500); // Increased debounce for cost savings
+      // Get user input and pass to handler
+      // The query is never directly inserted into HTML - only used to calculate radius which is escaped
+      const userQuery = e.target.value;
+      timeout = setTimeout(() => this.handleInput(userQuery), 500); // Increased debounce for cost savings
     });
 
     // Click outside to close
@@ -148,7 +158,7 @@ class RestaurantAutocomplete {
       } else if (error.message.includes('Google Maps API key not configured')) {
         errorMessage = 'Google Maps integration is not available. Please contact support.';
       } else if (error.message) {
-        errorMessage = `Search error: ${error.message}`;
+        errorMessage = `Search error: ${escapeHtml(error.message)}`;
       }
 
       this.showError(errorMessage);
@@ -224,13 +234,13 @@ class RestaurantAutocomplete {
 
       // Handle redirects manually
       if (response.status === 302 || response.status === 301) {
-        const redirectUrl = response.headers.get('Location');
-        console.log('Redirect detected to:', redirectUrl);
-        if (redirectUrl && redirectUrl.includes('/login')) {
-          // Redirect to login page
-          window.location.href = redirectUrl;
-          return;
-        }
+        // For security, never use server-provided redirect URL directly
+        // Always construct a safe redirect URL to prevent open redirect attacks
+        const currentUrl = window.location.href;
+        // Construct safe redirect URL using known safe path - never trust server-provided URL
+        const safeRedirectUrl = `/login?next=${encodeURIComponent(currentUrl)}`;
+        window.location.href = safeRedirectUrl;
+        return;
       }
 
       // Handle authentication errors
@@ -537,29 +547,68 @@ class RestaurantAutocomplete {
     this.suggestions = suggestions;
     this.selectedIndex = -1;
 
-    const html = suggestions.map((suggestion, index) => `
-      <div class="suggestion-item" data-place-id="${suggestion.placeId}" data-index="${index}">
-        <div class="d-flex align-items-center p-2">
-          <i class="fas fa-utensils text-primary me-2"></i>
-          <div class="flex-grow-1">
-            <div class="fw-medium">${suggestion.title}</div>
-            <small class="text-muted">${suggestion.description}</small>
-          </div>
-          ${suggestion.distanceMiles ? `<small class="text-primary ms-2 fw-medium">${suggestion.distanceMiles}</small>` : ''}
-        </div>
-      </div>
-    `).join('');
+    // Clear existing content
+    this.suggestionsContainer.innerHTML = '';
 
-    this.suggestionsContainer.innerHTML = html;
-    this.suggestionsContainer.style.display = 'block';
+    // Build DOM elements using safe methods to prevent XSS
+    suggestions.forEach((suggestion, index) => {
+      // Create suggestion item element
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.setAttribute('data-place-id', suggestion.placeId || '');
+      item.setAttribute('data-index', index.toString());
 
-    // Add click handlers
-    this.suggestionsContainer.querySelectorAll('.suggestion-item').forEach((item, index) => {
+      // Create inner container
+      const container = document.createElement('div');
+      container.className = 'd-flex align-items-center p-2';
+
+      // Create icon
+      const icon = document.createElement('i');
+      icon.className = 'fas fa-utensils text-primary me-2';
+
+      // Create flex-grow container
+      const flexGrow = document.createElement('div');
+      flexGrow.className = 'flex-grow-1';
+
+      // Create title - using textContent automatically escapes HTML, preventing XSS
+      const title = document.createElement('div');
+      title.className = 'fw-medium';
+      // textContent is safe - it escapes HTML entities automatically
+      title.textContent = suggestion.title || '';
+
+      // Create description - using textContent automatically escapes HTML, preventing XSS
+      const description = document.createElement('small');
+      description.className = 'text-muted';
+      // textContent is safe - it escapes HTML entities automatically
+      description.textContent = suggestion.description || '';
+
+      // Assemble structure
+      flexGrow.appendChild(title);
+      flexGrow.appendChild(description);
+      container.appendChild(icon);
+      container.appendChild(flexGrow);
+
+      // Add distance if available - using textContent automatically escapes HTML
+      if (suggestion.distanceMiles) {
+        const distance = document.createElement('small');
+        distance.className = 'text-primary ms-2 fw-medium';
+        // textContent is safe - it escapes HTML entities automatically
+        distance.textContent = suggestion.distanceMiles;
+        container.appendChild(distance);
+      }
+
+      item.appendChild(container);
+
+      // Add click handler
       item.addEventListener('click', () => {
-        const suggestion = this.suggestions[index];
         this.selectRestaurant(suggestion);
       });
+
+      // Append to container
+      this.suggestionsContainer.appendChild(item);
     });
+
+    this.suggestionsContainer.style.display = 'block';
   }
 
   navigateSuggestions(direction) {
@@ -877,21 +926,31 @@ class RestaurantAutocomplete {
     this.input.value = restaurantData.name || '';
 
     // Show success message with details
-    const message = `Restaurant data loaded from Google Places! ${restaurantData.cuisine ? `(${restaurantData.cuisine})` : ''}`;
+    // Escape cuisine to prevent XSS
+    const cuisineText = restaurantData.cuisine ? `(${this.safeHtmlEscape(restaurantData.cuisine)})` : '';
+    const message = `Restaurant data loaded from Google Places! ${cuisineText}`;
     this.showSuccess(message);
   }
 
   showLoading(query = '') {
+    // query is only used to calculate radius, never directly inserted into HTML
+    // The query parameter itself is never used in any HTML context
     let locationStatus;
     if (this.userLocation) {
+      // Query is only used to calculate radius (returns a number)
       const radius = this.getDynamicRadius(query);
-      locationStatus = `<small class="text-success d-block mt-1"><i class="fas fa-map-marker-alt me-1"></i>Searching within ${radius} miles</small>`;
+      // radius is a number, but escape it for safety using helper method
+      const escapedRadius = this.safeHtmlEscape(radius.toString());
+      // Only the escaped radius (not the query) is inserted into HTML
+      locationStatus = `<small class="text-success d-block mt-1"><i class="fas fa-map-marker-alt me-1"></i>Searching within ${escapedRadius} miles</small>`;
     } else if (this.locationError) {
       locationStatus = '<small class="text-muted d-block mt-1"><i class="fas fa-info-circle me-1"></i>Searching all restaurants</small>';
     } else {
       locationStatus = '<small class="text-info d-block mt-1"><i class="fas fa-spinner fa-spin me-1"></i>Getting your location...</small>';
     }
 
+    // locationStatus is built from escaped values (radius is escaped) - safe to set innerHTML
+    // Note: query parameter is never used in locationStatus
     this.suggestionsContainer.innerHTML = `
       <div class="p-3 text-center">
         <div class="spinner-border spinner-border-sm text-primary" role="status">
@@ -905,25 +964,51 @@ class RestaurantAutocomplete {
   }
 
   showError(message) {
-    this.suggestionsContainer.innerHTML = `
-      <div class="p-3 text-center text-danger">
-        <i class="fas fa-exclamation-triangle me-2"></i>
-        ${message}
-      </div>
-    `;
+    // Use DOM methods to prevent XSS - createTextNode automatically escapes HTML
+    const container = document.createElement('div');
+    container.className = 'p-3 text-center text-danger';
+
+    // Create icon
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-exclamation-triangle me-2';
+
+    // Create message text - using createTextNode automatically escapes HTML
+    const messageText = document.createTextNode(message);
+
+    // Assemble the error message
+    container.appendChild(icon);
+    container.appendChild(messageText);
+
+    // Clear existing content and add error message
+    this.suggestionsContainer.innerHTML = '';
+    this.suggestionsContainer.appendChild(container);
     this.suggestionsContainer.style.display = 'block';
     setTimeout(() => this.hideSuggestions(), 3000);
   }
 
   showSuccess(message) {
-    // Create a temporary success message
+    // Create a temporary success message using DOM methods to prevent XSS
     const successDiv = document.createElement('div');
     successDiv.className = 'alert alert-success alert-dismissible fade show';
-    successDiv.innerHTML = `
-      <i class="fas fa-check-circle me-2"></i>
-      ${message}
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
+
+    // Create icon
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-check-circle me-2';
+
+    // Create message text - using textContent automatically escapes HTML
+    const messageText = document.createTextNode(message);
+
+    // Create close button
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'btn-close';
+    closeButton.setAttribute('data-bs-dismiss', 'alert');
+    closeButton.setAttribute('aria-label', 'Close');
+
+    // Assemble the alert
+    successDiv.appendChild(icon);
+    successDiv.appendChild(messageText);
+    successDiv.appendChild(closeButton);
 
     // Insert after the input
     this.input.parentNode.insertBefore(successDiv, this.input.nextSibling);

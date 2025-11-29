@@ -6,8 +6,8 @@ It can be run directly or imported as a module.
 """
 import argparse
 import logging
-import sys
 from pathlib import Path
+import sys
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.absolute()

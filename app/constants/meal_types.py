@@ -1,5 +1,7 @@
 """Meal type constants for the meal expense tracker."""
 
+from typing import Dict, List, Optional
+
 # Simple meal type definitions with colors and icons
 MEAL_TYPES = {
     "breakfast": {
@@ -60,30 +62,30 @@ MEAL_TYPES = {
 
 
 # Simple helper functions for backward compatibility
-def get_meal_type_names():
+def get_meal_type_names() -> list[str]:
     """Get list of all meal type names."""
     return list(MEAL_TYPES.keys())
 
 
-def get_meal_type_data(meal_type_name):
+def get_meal_type_data(meal_type_name: str) -> dict[str, str] | None:
     """Get meal type data by name."""
     if not meal_type_name or not isinstance(meal_type_name, str):
         return None
     return MEAL_TYPES.get(meal_type_name.strip().lower())
 
 
-def get_meal_type_color(meal_type_name):
+def get_meal_type_color(meal_type_name: str) -> str:
     """Get color for a meal type."""
     data = get_meal_type_data(meal_type_name)
     return data["color"] if data else "#6c757d"  # Default gray
 
 
-def get_meal_type_icon(meal_type_name):
+def get_meal_type_icon(meal_type_name: str) -> str:
     """Get icon for a meal type."""
     data = get_meal_type_data(meal_type_name)
     return data["icon"] if data else "question"
 
 
-def validate_meal_type_name(meal_type_name):
+def validate_meal_type_name(meal_type_name: str) -> bool:
     """Check if meal type exists."""
     return get_meal_type_data(meal_type_name) is not None

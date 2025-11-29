@@ -74,7 +74,7 @@ def is_within_radius(lat1: float, lon1: float, lat2: float, lon2: float, radius_
     return distance <= radius_km
 
 
-def validate_coordinates(latitude: Optional[float], longitude: Optional[float]) -> bool:
+def validate_coordinates(latitude: float | None, longitude: float | None) -> bool:
     """
     Validate that coordinates are within valid ranges.
 

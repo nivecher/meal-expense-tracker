@@ -84,7 +84,7 @@ class TestRestaurantServices:
             db.session.commit()
             return restaurant, restaurant.id
 
-    def test_create_restaurant_for_user(self, app, user):
+    def test_create_restaurant_for_user(self, app, user) -> None:
         """Test creating a restaurant for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():
@@ -105,7 +105,7 @@ class TestRestaurantServices:
             assert restaurant.service_level == "casual_dining"
             assert restaurant.user_id == user_id
 
-    def test_get_restaurants_for_user(self, app, user, restaurant):
+    def test_get_restaurants_for_user(self, app, user, restaurant) -> None:
         """Test getting restaurants for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -115,7 +115,7 @@ class TestRestaurantServices:
             assert len(restaurants) == 1
             assert restaurants[0].name == "Test Restaurant"
 
-    def test_get_restaurant_for_user(self, app, user, restaurant):
+    def test_get_restaurant_for_user(self, app, user, restaurant) -> None:
         """Test getting a specific restaurant for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -125,7 +125,7 @@ class TestRestaurantServices:
             assert found_restaurant is not None
             assert found_restaurant.name == "Test Restaurant"
 
-    def test_get_restaurant_for_user_not_found(self, app, user):
+    def test_get_restaurant_for_user_not_found(self, app, user) -> None:
         """Test getting a non-existent restaurant."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():
@@ -133,7 +133,7 @@ class TestRestaurantServices:
 
             assert found_restaurant is None
 
-    def test_update_restaurant_for_user(self, app, user, restaurant):
+    def test_update_restaurant_for_user(self, app, user, restaurant) -> None:
         """Test updating a restaurant for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -146,7 +146,7 @@ class TestRestaurantServices:
             assert updated_restaurant.address_line_1 == "789 Updated St"
             assert updated_restaurant.cuisine == "mexican"
 
-    def test_delete_restaurant_by_id(self, app, user, restaurant):
+    def test_delete_restaurant_by_id(self, app, user, restaurant) -> None:
         """Test deleting a restaurant by ID."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -160,7 +160,7 @@ class TestRestaurantServices:
             deleted_restaurant = get_restaurant_for_user(restaurant_id, user_id)
             assert deleted_restaurant is None
 
-    def test_restaurant_exists(self, app, user, restaurant):
+    def test_restaurant_exists(self, app, user, restaurant) -> None:
         """Test checking if a restaurant exists."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -174,7 +174,7 @@ class TestRestaurantServices:
             not_exists = restaurant_exists(user_id, "Non-existent", "Nowhere")
             assert not_exists is None
 
-    def test_validate_restaurant_uniqueness(self, app, user, restaurant):
+    def test_validate_restaurant_uniqueness(self, app, user, restaurant) -> None:
         """Test restaurant uniqueness validation."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -187,7 +187,7 @@ class TestRestaurantServices:
             # Test unique restaurant - should not raise exception
             validate_restaurant_uniqueness(user_id, "Unique Restaurant", "Unique City")  # Should not raise
 
-    def test_get_unique_cuisines(self, app, user, restaurant):
+    def test_get_unique_cuisines(self, app, user, restaurant) -> None:
         """Test getting unique cuisines for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -203,7 +203,7 @@ class TestRestaurantServices:
             assert "chinese" in cuisines
             assert len(cuisines) == 2
 
-    def test_get_unique_cities(self, app, user, restaurant):
+    def test_get_unique_cities(self, app, user, restaurant) -> None:
         """Test getting unique cities for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -219,7 +219,7 @@ class TestRestaurantServices:
             assert "Other City" in cities
             assert len(cities) == 2
 
-    def test_get_unique_service_levels(self, app, user, restaurant):
+    def test_get_unique_service_levels(self, app, user, restaurant) -> None:
         """Test getting unique service levels for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -235,7 +235,7 @@ class TestRestaurantServices:
             assert "fine_dining" in service_levels
             assert len(service_levels) == 2
 
-    def test_get_filter_options(self, app, user, restaurant):
+    def test_get_filter_options(self, app, user, restaurant) -> None:
         """Test getting filter options for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -247,7 +247,7 @@ class TestRestaurantServices:
             assert "service_levels" in options
             assert "italian" in options["cuisines"]
 
-    def test_apply_restaurant_filters(self, app, user, restaurant):
+    def test_apply_restaurant_filters(self, app, user, restaurant) -> None:
         """Test applying restaurant filters."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -272,7 +272,7 @@ class TestRestaurantServices:
             assert len(result) == 1
             assert result[0].name == "Test Restaurant"
 
-    def test_apply_restaurant_sorting(self, app, user, restaurant):
+    def test_apply_restaurant_sorting(self, app, user, restaurant) -> None:
         """Test applying restaurant sorting."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -294,7 +294,7 @@ class TestRestaurantServices:
             assert result[0].name == "A Restaurant"  # Alphabetically first
             assert result[1].name == "Test Restaurant"
 
-    def test_get_restaurants_with_stats(self, app, user, restaurant):
+    def test_get_restaurants_with_stats(self, app, user, restaurant) -> None:
         """Test getting restaurants with statistics."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -307,7 +307,7 @@ class TestRestaurantServices:
             assert "total_restaurants" in stats
             assert stats["total_restaurants"] == 1
 
-    def test_calculate_expense_stats(self, app, user, restaurant):
+    def test_calculate_expense_stats(self, app, user, restaurant) -> None:
         """Test calculating expense statistics for a restaurant."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -326,7 +326,7 @@ class TestRestaurantServices:
                 assert "visit_count" in stats
                 assert "avg_per_visit" in stats
 
-    def test_detect_service_level_from_google_data(self, app):
+    def test_detect_service_level_from_google_data(self, app) -> None:
         """Test detecting service level from Google Places data."""
         google_data = {"types": ["restaurant", "food", "establishment"], "price_level": 2, "rating": 4.5}
 
@@ -340,7 +340,7 @@ class TestRestaurantServices:
             assert service_level in ["quick_service", "casual_dining", "fine_dining"]
             assert 0.0 <= confidence <= 1.0
 
-    def test_export_restaurants_for_user(self, app, user, restaurant):
+    def test_export_restaurants_for_user(self, app, user, restaurant) -> None:
         """Test exporting restaurants for a user."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -352,7 +352,7 @@ class TestRestaurantServices:
             assert export_data[0]["cuisine"] == "italian"
             assert export_data[0]["service_level"] == "casual_dining"
 
-    def test_import_restaurants_from_csv(self, app, user):
+    def test_import_restaurants_from_csv(self, app, user) -> None:
         """Test importing restaurants from CSV."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():
@@ -376,7 +376,7 @@ class TestRestaurantServices:
             assert len(restaurants) == 1
             assert restaurants[0].name == "Imported Restaurant"
 
-    def test_import_restaurants_from_csv_with_errors(self, app, user):
+    def test_import_restaurants_from_csv_with_errors(self, app, user) -> None:
         """Test importing restaurants from CSV with validation errors."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():
@@ -397,7 +397,7 @@ class TestRestaurantServices:
             assert len(result["errors"]) > 0
             assert "Name is required" in result["errors"][0]
 
-    def test_search_restaurants_by_location(self, app, user):
+    def test_search_restaurants_by_location(self, app, user) -> None:
         """Test searching restaurants by location."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():
@@ -423,7 +423,7 @@ class TestRestaurantServices:
             assert len(results) == 1
             assert results[0]["name"] == "Test Restaurant"
 
-    def test_recalculate_restaurant_statistics(self, app, user, restaurant):
+    def test_recalculate_restaurant_statistics(self, app, user, restaurant) -> None:
         """Test recalculating restaurant statistics."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -434,7 +434,7 @@ class TestRestaurantServices:
             # Verify the function completed successfully
             assert True  # If we get here, no exception was raised
 
-    def test_create_restaurant_with_form(self, app, user):
+    def test_create_restaurant_with_form(self, app, user) -> None:
         """Test creating a restaurant with form data."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():
@@ -468,7 +468,7 @@ class TestRestaurantServices:
             assert restaurant.service_level == "casual_dining"
             assert is_new is True
 
-    def test_update_restaurant_with_form(self, app, user, restaurant):
+    def test_update_restaurant_with_form(self, app, user, restaurant) -> None:
         """Test updating a restaurant with form data."""
         user_obj, user_id = user  # Unpack user and user_id
         restaurant_obj, restaurant_id = restaurant  # Unpack restaurant and restaurant_id
@@ -495,7 +495,7 @@ class TestRestaurantServices:
             assert updated_restaurant.address_line_1 == "456 Updated St"
             assert updated_restaurant.cuisine == "Chinese"
 
-    def test_restaurant_services_error_handling(self, app, user):
+    def test_restaurant_services_error_handling(self, app, user) -> None:
         """Test error handling in restaurant services."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():
@@ -512,7 +512,7 @@ class TestRestaurantServices:
             assert success is False
             assert "not found" in message.lower()
 
-    def test_restaurant_services_edge_cases(self, app, user):
+    def test_restaurant_services_edge_cases(self, app, user) -> None:
         """Test edge cases in restaurant services."""
         user_obj, user_id = user  # Unpack user and user_id
         with app.app_context():

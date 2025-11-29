@@ -1,12 +1,16 @@
+from collections.abc import Callable
 from functools import wraps
+from typing import Any, TypeVar, cast
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_wtf.csrf import validate_csrf
 
 bp = Blueprint("api", __name__)
 
+F = TypeVar("F", bound=Callable[..., Any])
 
-def validate_api_csrf(f):
+
+def validate_api_csrf(f: F) -> F:
     """Decorator to validate CSRF tokens for API routes.
 
     This decorator checks for CSRF tokens in the X-CSRFToken header
@@ -14,7 +18,7 @@ def validate_api_csrf(f):
     """
 
     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated_function(*args: Any, **kwargs: Any) -> Any:
         # Skip CSRF validation if CSRF is disabled
         if not current_app.config.get("WTF_CSRF_ENABLED", True):
             return f(*args, **kwargs)
@@ -56,7 +60,7 @@ def validate_api_csrf(f):
 
         return f(*args, **kwargs)
 
-    return decorated_function
+    return cast(F, decorated_function)
 
 
 # Import routes to register them with the blueprint

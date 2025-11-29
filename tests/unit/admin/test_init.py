@@ -4,7 +4,7 @@
 class TestAdminInit:
     """Test admin module initialization."""
 
-    def test_module_imports(self):
+    def test_module_imports(self) -> None:
         """Test that module imports work correctly."""
         import app.admin
 
@@ -17,7 +17,7 @@ class TestAdminInit:
         assert hasattr(app.admin, "AdminOperationRegistry")
         assert hasattr(app.admin, "admin_bp")
 
-    def test_module_imports_all_components(self):
+    def test_module_imports_all_components(self) -> None:
         """Test that all admin components can be imported."""
         from app.admin.lambda_admin import LambdaAdminHandler, handle_admin_request
         from app.admin.operations import (

@@ -18,7 +18,7 @@ class ColorData(TypedDict):
 
 
 # Bootstrap 5 compatible color palette
-BOOTSTRAP_COLORS: Dict[str, ColorData] = {
+BOOTSTRAP_COLORS: dict[str, ColorData] = {
     "orange": {
         "hex": "#fd7e14",
         "name": "Orange",
@@ -69,7 +69,7 @@ BOOTSTRAP_COLORS: Dict[str, ColorData] = {
 
 
 # Category-specific color mapping
-CATEGORY_COLORS: Dict[str, str] = {
+CATEGORY_COLORS: dict[str, str] = {
     "restaurants": BOOTSTRAP_COLORS["orange"]["hex"],  # #fd7e14
     "groceries": BOOTSTRAP_COLORS["green"]["hex"],  # #198754
     "drinks": BOOTSTRAP_COLORS["cyan"]["hex"],  # #0dcaf0
@@ -127,7 +127,7 @@ def get_category_color(category_key: str) -> str:
     return CATEGORY_COLORS[normalized_key]
 
 
-def get_all_bootstrap_colors() -> Dict[str, ColorData]:
+def get_all_bootstrap_colors() -> dict[str, ColorData]:
     """
     Get all Bootstrap colors for use in color selectors.
 

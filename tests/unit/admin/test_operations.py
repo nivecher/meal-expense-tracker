@@ -6,14 +6,14 @@ from app.admin.operations import get_operation_info, list_operations
 class TestOperationsAPI:
     """Test the new operations API."""
 
-    def test_list_operations(self):
+    def test_list_operations(self) -> None:
         """Test that operations can be listed."""
         operations = list_operations()
         assert isinstance(operations, dict)
         assert "list_users" in operations
         assert "create_user" in operations
 
-    def test_get_operation_info(self):
+    def test_get_operation_info(self) -> None:
         """Test getting operation information."""
         info = get_operation_info("list_users")
         assert info is not None
@@ -22,7 +22,7 @@ class TestOperationsAPI:
         assert "validate" in info
         assert "execute" in info
 
-    def test_get_operation_info_invalid(self):
+    def test_get_operation_info_invalid(self) -> None:
         """Test getting info for non-existent operation."""
         info = get_operation_info("non_existent")
         assert info is None
@@ -31,7 +31,7 @@ class TestOperationsAPI:
 class TestListUsersOperation:
     """Test list users operation."""
 
-    def test_validate_params_valid(self):
+    def test_validate_params_valid(self) -> None:
         """Test parameter validation with valid input."""
         info = get_operation_info("list_users")
         validate_func = info["validate"]
@@ -40,7 +40,7 @@ class TestListUsersOperation:
         assert result["valid"] is True
         assert result["errors"] == []
 
-    def test_validate_params_default(self):
+    def test_validate_params_default(self) -> None:
         """Test parameter validation with default values."""
         info = get_operation_info("list_users")
         validate_func = info["validate"]
@@ -49,7 +49,7 @@ class TestListUsersOperation:
         assert result["valid"] is True
         assert result["errors"] == []
 
-    def test_validate_params_invalid_limit(self):
+    def test_validate_params_invalid_limit(self) -> None:
         """Test parameter validation with invalid limit."""
         info = get_operation_info("list_users")
         validate_func = info["validate"]
@@ -57,7 +57,7 @@ class TestListUsersOperation:
         assert result["valid"] is False
         assert "limit must be an integer between 1 and 1000" in result["errors"]
 
-    def test_validate_params_invalid_admin_only(self):
+    def test_validate_params_invalid_admin_only(self) -> None:
         """Test parameter validation with invalid admin_only."""
         info = get_operation_info("list_users")
         validate_func = info["validate"]
@@ -65,7 +65,7 @@ class TestListUsersOperation:
         assert result["valid"] is False
         assert "admin_only must be a boolean" in result["errors"]
 
-    def test_operation_description(self):
+    def test_operation_description(self) -> None:
         """Test operation description."""
         info = get_operation_info("list_users")
         description = info["description"]
@@ -76,7 +76,7 @@ class TestListUsersOperation:
 class TestCreateUserOperation:
     """Test create user operation."""
 
-    def test_validate_params_valid(self):
+    def test_validate_params_valid(self) -> None:
         """Test parameter validation with valid input."""
         info = get_operation_info("create_user")
         validate_func = info["validate"]
@@ -85,7 +85,7 @@ class TestCreateUserOperation:
         assert result["valid"] is True
         assert result["errors"] == []
 
-    def test_validate_params_missing_required(self):
+    def test_validate_params_missing_required(self) -> None:
         """Test parameter validation with missing required fields."""
         info = get_operation_info("create_user")
         validate_func = info["validate"]
@@ -93,7 +93,7 @@ class TestCreateUserOperation:
         assert result["valid"] is False
         assert len(result["errors"]) > 0
 
-    def test_operation_description(self):
+    def test_operation_description(self) -> None:
         """Test operation description."""
         info = get_operation_info("create_user")
         description = info["description"]

@@ -1,15 +1,19 @@
 """Category-specific service functions."""
 
+from flask import abort
+from sqlalchemy import select
+
 from app.expenses.models import Category
 from app.extensions import db
 
 
-def get_categories_for_user(user_id):
+def get_categories_for_user(user_id: int) -> list[Category]:
     """Get all categories for a given user."""
-    return Category.query.filter_by(user_id=user_id).all()
+    stmt = select(Category).filter_by(user_id=user_id)
+    return list(db.session.scalars(stmt).all())
 
 
-def ensure_default_categories_for_user(user_id):
+def ensure_default_categories_for_user(user_id: int) -> None:
     """Ensure a baseline set of categories exist for the given user.
 
     Creates common defaults marked as is_default=True when they are missing.
@@ -38,7 +42,7 @@ def ensure_default_categories_for_user(user_id):
         db.session.commit()
 
 
-def create_category_for_user(user_id, data):
+def create_category_for_user(user_id: int, data: dict) -> Category:
     """Create a new category for a given user."""
     category = Category(user_id=user_id, **data)
     db.session.add(category)
@@ -46,12 +50,17 @@ def create_category_for_user(user_id, data):
     return category
 
 
-def get_category_by_id_for_user(category_id, user_id):
+def get_category_by_id_for_user(category_id: int, user_id: int) -> Category:
     """Get a single category by ID for a given user."""
-    return Category.query.filter_by(id=category_id, user_id=user_id).first_or_404()
+
+    stmt = select(Category).filter_by(id=category_id, user_id=user_id)
+    category = db.session.scalar(stmt)
+    if category is None:
+        abort(404, "Category not found")
+    return category
 
 
-def update_category_for_user(category, data):
+def update_category_for_user(category: Category, data: dict) -> Category:
     """Update a category for a given user."""
     for key, value in data.items():
         setattr(category, key, value)
@@ -59,7 +68,7 @@ def update_category_for_user(category, data):
     return category
 
 
-def delete_category_for_user(category):
+def delete_category_for_user(category: Category) -> None:
     """Delete a category for a given user."""
     db.session.delete(category)
     db.session.commit()

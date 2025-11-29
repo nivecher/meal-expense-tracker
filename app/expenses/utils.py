@@ -1,7 +1,7 @@
 """Utility functions for the expenses module."""
 
+from datetime import UTC, datetime, timezone
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -26,7 +26,7 @@ def save_receipt(file_storage: FileStorage, upload_folder: str) -> str:
     os.makedirs(upload_folder, exist_ok=True)
 
     # Generate a unique filename
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     original_filename = file_storage.filename or "receipt"
     file_ext = Path(original_filename).suffix.lower()
 
@@ -46,7 +46,7 @@ def save_receipt(file_storage: FileStorage, upload_folder: str) -> str:
     return safe_filename
 
 
-def save_receipt_to_storage(file_storage: FileStorage, upload_folder: str) -> Tuple[Optional[str], Optional[str]]:
+def save_receipt_to_storage(file_storage: FileStorage, upload_folder: str) -> tuple[str | None, str | None]:
     """Save a receipt file to either local storage or S3 based on configuration.
 
     Args:
@@ -85,7 +85,7 @@ def save_receipt_to_storage(file_storage: FileStorage, upload_folder: str) -> Tu
             return None, f"Failed to save locally: {str(e)}"
 
 
-def delete_receipt_from_storage(storage_path: str, upload_folder: str) -> Optional[str]:
+def delete_receipt_from_storage(storage_path: str, upload_folder: str) -> str | None:
     """Delete a receipt file from either local storage or S3 based on configuration.
 
     Args:
@@ -124,7 +124,7 @@ def delete_receipt_from_storage(storage_path: str, upload_folder: str) -> Option
             return f"Failed to delete local file: {str(e)}"
 
 
-def get_receipt_url(storage_path: str) -> Optional[str]:
+def get_receipt_url(storage_path: str) -> str | None:
     """Get a URL for accessing a receipt file.
 
     Args:

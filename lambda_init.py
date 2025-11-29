@@ -5,12 +5,12 @@ This script handles Lambda startup tasks including database migrations,
 health checks, and initialization validation.
 """
 
-import json
 import logging
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any, TypedDict
 
+from flask import Flask
 from sqlalchemy import text
 
 from app import create_app
@@ -23,8 +23,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 # Global state tracking
-_INITIALIZATION_STATE = {
+class InitializationState(TypedDict, total=False):
+    initialized: bool
+    migration_attempted: bool
+    migration_successful: bool
+    last_migration_error: str | None
+    initialization_time: float | None
+
+
+_INITIALIZATION_STATE: InitializationState = {
     "initialized": False,
     "migration_attempted": False,
     "migration_successful": False,
@@ -33,7 +42,14 @@ _INITIALIZATION_STATE = {
 }
 
 
-def _validate_environment() -> Dict[str, Any]:
+class EnvValidationResult(TypedDict):
+    valid: bool
+    missing_required: list[str]
+    missing_optional: list[str]
+    warnings: list[str]
+
+
+def _validate_environment() -> EnvValidationResult:
     """Validate required environment variables and configuration."""
     required_vars = [
         "SECRET_KEY",
@@ -42,13 +58,12 @@ def _validate_environment() -> Dict[str, Any]:
     # Either DATABASE_URL or DATABASE_SECRET_NAME must be present
     database_config = os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_SECRET_NAME")
     if not database_config:
-        validation_result = {
+        return {
             "valid": False,
             "missing_required": ["DATABASE_URL or DATABASE_SECRET_NAME"],
             "missing_optional": [],
             "warnings": [],
         }
-        return validation_result
 
     optional_vars = [
         "AUTO_MIGRATE",
@@ -57,7 +72,7 @@ def _validate_environment() -> Dict[str, Any]:
         "GOOGLE_MAPS_API_KEY",
     ]
 
-    validation_result = {
+    validation_result: EnvValidationResult = {
         "valid": True,
         "missing_required": [],
         "missing_optional": [],
@@ -83,7 +98,7 @@ def _validate_environment() -> Dict[str, Any]:
     return validation_result
 
 
-def _test_database_connection(app) -> Dict[str, Any]:
+def _test_database_connection(app: Flask) -> dict[str, Any]:
     """Test database connectivity and basic operations."""
     try:
         with app.app_context():
@@ -123,7 +138,7 @@ def _test_database_connection(app) -> Dict[str, Any]:
         }
 
 
-def _run_startup_migrations(app) -> Dict[str, Any]:
+def _run_startup_migrations(app: Flask) -> dict[str, Any]:
     """Run database migrations during Lambda startup."""
     if _INITIALIZATION_STATE["migration_attempted"]:
         logger.info("Migration already attempted in this container")
@@ -163,9 +178,9 @@ def _run_startup_migrations(app) -> Dict[str, Any]:
         }
 
 
-def _perform_health_check(app) -> Dict[str, Any]:
+def _perform_health_check(app: Flask) -> dict[str, Any]:
     """Perform comprehensive health check."""
-    health_status = {
+    health_status: dict[str, Any] = {
         "healthy": True,
         "checks": {},
         "timestamp": time.time(),
@@ -211,7 +226,7 @@ def _perform_health_check(app) -> Dict[str, Any]:
     return health_status
 
 
-def initialize_lambda() -> Dict[str, Any]:
+def initialize_lambda() -> dict[str, Any]:
     """
     Initialize Lambda function with all startup tasks.
 
@@ -293,7 +308,7 @@ def initialize_lambda() -> Dict[str, Any]:
         }
 
 
-def get_initialization_status() -> Dict[str, Any]:
+def get_initialization_status() -> dict[str, Any]:
     """Get current initialization status."""
     return {
         "state": _INITIALIZATION_STATE.copy(),
@@ -301,7 +316,7 @@ def get_initialization_status() -> Dict[str, Any]:
     }
 
 
-def force_migration_retry() -> Dict[str, Any]:
+def force_migration_retry() -> dict[str, Any]:
     """Force a retry of migrations (useful for debugging)."""
     _INITIALIZATION_STATE["migration_attempted"] = False
     _INITIALIZATION_STATE["migration_successful"] = False

@@ -11,35 +11,53 @@ Following TIGER principles:
 - Refactoring: Single responsibility for API response caching
 """
 
+from __future__ import annotations
+
+from typing import Optional
+
+from sqlalchemy import select
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.extensions import db
+from app.models.base import BaseModel
 
 
-class APICache(db.Model):
+class APICache(BaseModel):
     """Model for caching API responses in the database."""
 
-    __tablename__ = "api_cache"
+    __tablename__ = "api_cache"  # type: ignore[assignment]
 
-    id = db.Column(db.Integer, primary_key=True)
-    key = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    data = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.Float, nullable=False)
-    updated_at = db.Column(db.Float, nullable=False)
+    # Override BaseModel's created_at/updated_at to use Float instead of DateTime
+    created_at: Mapped[float] = mapped_column(  # type: ignore[assignment]
+        db.Float, nullable=False, comment="Cache creation timestamp"
+    )
+    updated_at: Mapped[float] = mapped_column(  # type: ignore[assignment]
+        db.Float, nullable=False, comment="Cache update timestamp"
+    )
 
-    def __repr__(self):
+    key: Mapped[str] = mapped_column(db.String(255), unique=True, nullable=False, index=True, comment="Cache key")
+    data: Mapped[str] = mapped_column(db.Text, nullable=False, comment="Cached API response data")
+
+    def __repr__(self) -> str:
         return f"<APICache {self.key}>"
 
     @classmethod
-    def create_cache_entry(cls, key: str, data: str) -> "APICache":
+    def create_cache_entry(cls, key: str, data: str) -> APICache:
         """Create a new cache entry."""
         import time
 
         current_time = time.time()
-        return cls(key=key, data=data, created_at=current_time, updated_at=current_time)
+        instance = cls(key=key, data=data, created_at=current_time, updated_at=current_time)
+        return instance
 
     @classmethod
-    def get_by_key(cls, key: str) -> "APICache":
+    def get_by_key(cls, key: str) -> APICache | None:
         """Get cache entry by key."""
-        return cls.query.filter_by(key=key).first()
+        stmt = select(cls).filter_by(key=key)
+        result = db.session.scalar(stmt)
+        if result is None:
+            return None
+        return result
 
     @classmethod
     def clear_expired(cls, ttl_seconds: int) -> int:
@@ -47,7 +65,8 @@ class APICache(db.Model):
         import time
 
         cutoff_time = time.time() - ttl_seconds
-        expired_entries = cls.query.filter(cls.updated_at < cutoff_time).all()
+        stmt = select(cls).where(cls.updated_at < cutoff_time)
+        expired_entries = list(db.session.scalars(stmt).all())
 
         count = len(expired_entries)
         for entry in expired_entries:
@@ -59,7 +78,13 @@ class APICache(db.Model):
     @classmethod
     def clear_all(cls) -> int:
         """Clear all cache entries."""
-        count = cls.query.count()
-        cls.query.delete()
+        from sqlalchemy import func
+
+        count_stmt = select(func.count()).select_from(cls)
+        count_result = db.session.scalar(count_stmt)
+        count = int(count_result) if count_result else 0
+
+        delete_stmt = db.delete(cls)
+        db.session.execute(delete_stmt)
         db.session.commit()
         return count

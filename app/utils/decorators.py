@@ -1,8 +1,9 @@
 """Custom decorators for the application."""
 
 # Standard library imports
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 # Third-party imports
 from flask import current_app, flash, jsonify, redirect, request, url_for
@@ -38,7 +39,7 @@ def db_transaction(
                 db.session.commit()
                 if success_message:
                     flash(success_message, "success")
-                return result
+                return cast(ResponseReturnValue, result)
             except SQLAlchemyError as e:
                 db.session.rollback()
                 current_app.logger.error(f"Database error in {func.__name__}: {str(e)}")
@@ -71,7 +72,7 @@ def admin_required(func: F) -> F:
         if not current_user.is_admin:
             flash("You do not have permission to access this page.", "danger")
             return redirect(url_for("main.index"))
-        return func(*args, **kwargs)
+        return cast(ResponseReturnValue, func(*args, **kwargs))
 
     return cast(F, decorated_view)
 
@@ -87,6 +88,6 @@ def confirm_required(func: F) -> F:
         if not current_user.confirmed:
             flash("Please confirm your account to access this page.", "warning")
             return redirect(url_for("auth.unconfirmed"))
-        return func(*args, **kwargs)
+        return cast(ResponseReturnValue, func(*args, **kwargs))
 
     return cast(F, decorated_view)

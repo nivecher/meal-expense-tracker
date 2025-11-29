@@ -1,12 +1,14 @@
 """Test cases for the Expense API endpoints."""
 
-from datetime import date, datetime, timezone
+from collections.abc import Generator
+from datetime import UTC, date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict
 
-import pytest
+from flask import Flask
 from flask.testing import FlaskClient
 from flask_sqlalchemy import SQLAlchemy
+import pytest
 
 from app import create_app
 from app.auth.models import User
@@ -15,11 +17,11 @@ from app.extensions import db as _db
 from app.restaurants.models import Restaurant
 
 # Type aliases
-TestData = Dict[str, Any]
+TestData = dict[str, Any]
 
 
 @pytest.fixture(scope="function")
-def app():
+def app() -> Generator[Flask]:
     """Create and configure a new app instance for testing."""
     app = create_app("testing")
     app.config["WTF_CSRF_ENABLED"] = False
@@ -37,13 +39,13 @@ def app():
 
 
 @pytest.fixture(scope="function")
-def client(app):
+def client(app: Flask) -> FlaskClient:
     """A test client for the app."""
     return app.test_client()
 
 
 @pytest.fixture(scope="function")
-def db(app):
+def db(app: Flask) -> Generator[SQLAlchemy]:
     """Database session with rollback after each test."""
     with app.app_context():
         _db.session.begin_nested()
@@ -53,7 +55,7 @@ def db(app):
 
 
 @pytest.fixture(scope="function")
-def test_user(db):
+def test_user(db: SQLAlchemy) -> User:
     """Create a test user."""
     import uuid
 
@@ -66,7 +68,7 @@ def test_user(db):
 
 
 @pytest.fixture(scope="function")
-def test_category(db, test_user):
+def test_category(db: SQLAlchemy, test_user: User) -> Category:
     """Create a test category."""
     category = Category(name="Test Category", user_id=test_user.id, description="Test Description", color="#000000")
     db.session.add(category)
@@ -75,7 +77,7 @@ def test_category(db, test_user):
 
 
 @pytest.fixture(scope="function")
-def test_restaurant(db, test_user):
+def test_restaurant(db: SQLAlchemy, test_user: User) -> Restaurant:
     """Create a test restaurant."""
     restaurant = Restaurant(
         name="Test Restaurant",
@@ -93,7 +95,7 @@ def test_restaurant(db, test_user):
 
 
 @pytest.fixture(scope="function")
-def auth_headers(client, test_user):
+def auth_headers(client: FlaskClient, test_user: User) -> dict[str, str]:
     """Get authentication headers for the test user."""
     # Use session-based authentication for testing
     with client.session_transaction() as sess:
@@ -106,7 +108,7 @@ class TestExpenseAPI:
     """Test cases for the Expense API endpoints."""
 
     def test_create_expense(
-        self, client: FlaskClient, test_restaurant: Restaurant, test_category: Category, auth_headers: Dict[str, str]
+        self, client: FlaskClient, test_restaurant: Restaurant, test_category: Category, auth_headers: dict[str, str]
     ) -> None:
         """Test creating a new expense."""
         expense_data = {
@@ -133,7 +135,7 @@ class TestExpenseAPI:
         assert data["restaurant_id"] == test_restaurant.id
         assert data["category_id"] == test_category.id
 
-    def test_create_expense_invalid_data(self, client: FlaskClient, auth_headers: Dict[str, str]) -> None:
+    def test_create_expense_invalid_data(self, client: FlaskClient, auth_headers: dict[str, str]) -> None:
         """Test creating an expense with invalid data."""
         response = client.post(
             "/api/v1/expenses",
@@ -150,13 +152,13 @@ class TestExpenseAPI:
         test_user: User,
         test_restaurant: Restaurant,
         test_category: Category,
-        auth_headers: Dict[str, str],
+        auth_headers: dict[str, str],
     ) -> None:
         """Test retrieving all expenses for the current user."""
         # Create a test expense
         expense = Expense(
             amount=30.00,
-            date=datetime.now(timezone.utc),
+            date=datetime.now(UTC),
             notes="Dinner at Test Restaurant",  # Use 'notes' instead of 'description'
             category_id=test_category.id,
             restaurant_id=test_restaurant.id,
@@ -181,7 +183,7 @@ class TestExpenseAPI:
         test_user: User,
         test_restaurant: Restaurant,
         test_category: Category,
-        auth_headers: Dict[str, str],
+        auth_headers: dict[str, str],
     ) -> None:
         """Test retrieving a single expense."""
         # Create an expense
@@ -212,7 +214,7 @@ class TestExpenseAPI:
         test_user: User,
         test_restaurant: Restaurant,
         test_category: Category,
-        auth_headers: Dict[str, str],
+        auth_headers: dict[str, str],
     ) -> None:
         """Test updating an expense."""
         # Create an expense
@@ -257,13 +259,13 @@ class TestExpenseAPI:
         test_user: User,
         test_restaurant: Restaurant,
         test_category: Category,
-        auth_headers: Dict[str, str],
+        auth_headers: dict[str, str],
     ) -> None:
         """Test deleting an expense."""
         # Create a test expense
         expense = Expense(
             amount=Decimal("8.50"),
-            date=datetime.now(timezone.utc),
+            date=datetime.now(UTC),
             notes="Test expense to delete",
             meal_type="lunch",
             category_id=test_category.id,
@@ -320,7 +322,7 @@ class TestExpenseAPI:
         test_user: User,
         test_restaurant: Restaurant,
         test_category: Category,
-        auth_headers: Dict[str, str],
+        auth_headers: dict[str, str],
     ) -> None:
         """Test that users cannot access expenses belonging to other users."""
         # Create a second user
@@ -332,7 +334,7 @@ class TestExpenseAPI:
         # Create an expense for the other user
         other_expense = Expense(
             amount=Decimal("100.00"),
-            date=datetime.now(timezone.utc),
+            date=datetime.now(UTC),
             notes="Other user's expense",
             meal_type="dinner",
             category_id=test_category.id,

@@ -15,7 +15,7 @@ from app.restaurants.models import Restaurant
 class TestExpenseRoutesAdditional:
     """Additional tests for expense routes."""
 
-    def test_expense_details_get(self, client, auth, test_user, app):
+    def test_expense_details_get(self, client, auth, test_user, app) -> None:
         """Test expense details GET request endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -24,7 +24,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 302, 400, 404, 500]
 
-    def test_expense_details_not_found(self, client, auth, test_user):
+    def test_expense_details_not_found(self, client, auth, test_user) -> None:
         """Test expense details for non-existent expense."""
         auth.login("testuser_1", "testpass")
 
@@ -36,7 +36,7 @@ class TestExpenseRoutesAdditional:
         assert response.status_code == 200
         assert b"Expenses" in response.data  # Should redirect to expenses list
 
-    def test_expense_details_unauthorized(self, client, test_user, app):
+    def test_expense_details_unauthorized(self, client, test_user, app) -> None:
         """Test expense details without authentication."""
         # Create an expense for another user (if needed)
         response = client.get(
@@ -48,7 +48,7 @@ class TestExpenseRoutesAdditional:
         assert response.status_code == 200
         assert b"Login" in response.data
 
-    def test_export_expenses_csv(self, client, auth, test_user, app):
+    def test_export_expenses_csv(self, client, auth, test_user, app) -> None:
         """Test exporting expenses as CSV endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -57,7 +57,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 302, 400, 500]
 
-    def test_export_expenses_json(self, client, auth, test_user, app):
+    def test_export_expenses_json(self, client, auth, test_user, app) -> None:
         """Test exporting expenses as JSON endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -66,7 +66,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 302, 400, 500]
 
-    def test_export_expenses_invalid_format(self, client, auth, test_user):
+    def test_export_expenses_invalid_format(self, client, auth, test_user) -> None:
         """Test exporting expenses with invalid format."""
         auth.login("testuser_1", "testpass")
 
@@ -79,7 +79,7 @@ class TestExpenseRoutesAdditional:
         # Either redirects to expenses list or returns CSV
         assert b"Expenses" in response.data or response.headers.get("Content-Type") == "text/csv"
 
-    def test_import_expenses_csv(self, client, auth, test_user, app):
+    def test_import_expenses_csv(self, client, auth, test_user, app) -> None:
         """Test importing expenses from CSV file."""
         auth.login("testuser_1", "testpass")
 
@@ -127,7 +127,7 @@ class TestExpenseRoutesAdditional:
         # Should show success message or redirect to expenses list
         assert b"expenses" in response.data or b"success" in response.data
 
-    def test_import_expenses_invalid_file(self, client, auth, test_user):
+    def test_import_expenses_invalid_file(self, client, auth, test_user) -> None:
         """Test importing expenses with invalid file type."""
         auth.login("testuser_1", "testpass")
 
@@ -145,7 +145,7 @@ class TestExpenseRoutesAdditional:
         assert response.status_code == 200
         assert b"Unsupported file type" in response.data or b"error" in response.data
 
-    def test_list_tags(self, client, auth, test_user):
+    def test_list_tags(self, client, auth, test_user) -> None:
         """Test listing expense tags."""
         auth.login("testuser_1", "testpass")
 
@@ -154,7 +154,7 @@ class TestExpenseRoutesAdditional:
         assert response.status_code == 200
         assert b"tags" in response.data or b"Tags" in response.data
 
-    def test_search_tags(self, client, auth, test_user):
+    def test_search_tags(self, client, auth, test_user) -> None:
         """Test searching expense tags."""
         auth.login("testuser_1", "testpass")
 
@@ -162,7 +162,7 @@ class TestExpenseRoutesAdditional:
 
         assert response.status_code == 200
 
-    def test_create_tag(self, client, auth, test_user):
+    def test_create_tag(self, client, auth, test_user) -> None:
         """Test creating a new expense tag endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -175,7 +175,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 201, 400, 500]
 
-    def test_create_tag_duplicate(self, client, auth, test_user, app):
+    def test_create_tag_duplicate(self, client, auth, test_user, app) -> None:
         """Test creating a duplicate tag endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -188,7 +188,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 201, 400, 409, 500]
 
-    def test_update_tag(self, client, auth, test_user, app):
+    def test_update_tag(self, client, auth, test_user, app) -> None:
         """Test updating an expense tag endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -201,7 +201,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 204, 400, 404, 500]
 
-    def test_update_tag_not_found(self, client, auth, test_user):
+    def test_update_tag_not_found(self, client, auth, test_user) -> None:
         """Test updating a non-existent tag endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -214,7 +214,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 204, 400, 404, 500]
 
-    def test_delete_tag(self, client, auth, test_user, app):
+    def test_delete_tag(self, client, auth, test_user, app) -> None:
         """Test deleting an expense tag."""
         auth.login("testuser_1", "testpass")
 
@@ -234,7 +234,7 @@ class TestExpenseRoutesAdditional:
             deleted_tag = db.session.get(Tag, tag_id)
             assert deleted_tag is None
 
-    def test_delete_tag_not_found(self, client, auth, test_user):
+    def test_delete_tag_not_found(self, client, auth, test_user) -> None:
         """Test deleting a non-existent tag."""
         auth.login("testuser_1", "testpass")
 
@@ -242,7 +242,7 @@ class TestExpenseRoutesAdditional:
 
         assert response.status_code == 404
 
-    def test_get_expense_tags(self, client, auth, test_user, app):
+    def test_get_expense_tags(self, client, auth, test_user, app) -> None:
         """Test getting tags for a specific expense endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -251,7 +251,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 400, 404, 500]
 
-    def test_add_expense_tags(self, client, auth, test_user, app):
+    def test_add_expense_tags(self, client, auth, test_user, app) -> None:
         """Test adding tags to an expense endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -265,7 +265,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 201, 400, 404, 500]
 
-    def test_update_expense_tags(self, client, auth, test_user, app):
+    def test_update_expense_tags(self, client, auth, test_user, app) -> None:
         """Test updating tags for an expense endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -278,7 +278,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 204, 400, 404, 500]
 
-    def test_remove_expense_tags(self, client, auth, test_user, app):
+    def test_remove_expense_tags(self, client, auth, test_user, app) -> None:
         """Test removing tags from an expense endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -291,7 +291,7 @@ class TestExpenseRoutesAdditional:
         # Just verify the endpoint responds
         assert response.status_code in [200, 204, 400, 404, 500]
 
-    def test_get_popular_tags(self, client, auth, test_user):
+    def test_get_popular_tags(self, client, auth, test_user) -> None:
         """Test getting popular tags."""
         auth.login("testuser_1", "testpass")
 
@@ -303,7 +303,7 @@ class TestExpenseRoutesAdditional:
         assert data["success"] is True
         assert isinstance(data["tags"], list)
 
-    def test_list_expenses_with_filters(self, client, auth, test_user):
+    def test_list_expenses_with_filters(self, client, auth, test_user) -> None:
         """Test listing expenses with various filters."""
         auth.login("testuser_1", "testpass")
 
@@ -331,7 +331,7 @@ class TestExpenseRoutesAdditional:
 
         assert response.status_code == 200
 
-    def test_list_expenses_pagination(self, client, auth, test_user):
+    def test_list_expenses_pagination(self, client, auth, test_user) -> None:
         """Test listing expenses with pagination."""
         auth.login("testuser_1", "testpass")
 
@@ -339,7 +339,7 @@ class TestExpenseRoutesAdditional:
 
         assert response.status_code == 200
 
-    def test_expense_routes_unauthorized_access(self, client):
+    def test_expense_routes_unauthorized_access(self, client) -> None:
         """Test unauthorized access to expense routes."""
         routes_to_test = [
             ("expenses.list_expenses", "GET"),
@@ -359,7 +359,7 @@ class TestExpenseRoutesAdditional:
             assert response.status_code == 200
             assert b"Login" in response.data
 
-    def test_add_expense_validation_errors(self, client, auth, test_user):
+    def test_add_expense_validation_errors(self, client, auth, test_user) -> None:
         """Test add expense with validation errors."""
         auth.login("testuser_1", "testpass")
 
@@ -380,7 +380,7 @@ class TestExpenseRoutesAdditional:
         # Should show validation errors or stay on add page
         assert b"field is required" in response.data or b"required" in response.data or b"add" in response.data
 
-    def test_edit_expense_validation_errors(self, client, auth, test_user, app):
+    def test_edit_expense_validation_errors(self, client, auth, test_user, app) -> None:
         """Test edit expense with validation errors endpoint exists."""
         auth.login("testuser_1", "testpass")
 

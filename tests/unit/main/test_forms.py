@@ -1,5 +1,6 @@
 """Tests for main forms to improve coverage."""
 
+from flask import Flask
 from flask_wtf import FlaskForm
 
 from app.main.forms import ContactForm
@@ -8,7 +9,7 @@ from app.main.forms import ContactForm
 class TestContactForm:
     """Test ContactForm class."""
 
-    def test_form_initialization(self, app):
+    def test_form_initialization(self, app: Flask) -> None:
         """Test form initialization."""
         with app.app_context():
             form = ContactForm()
@@ -27,7 +28,7 @@ class TestContactForm:
             assert form.message.label.text == "Message"
             assert form.submit.label.text == "Send Message"
 
-    def test_form_field_attributes(self, app):
+    def test_form_field_attributes(self, app: Flask) -> None:
         """Test form field attributes and configuration."""
         with app.app_context():
             form = ContactForm()
@@ -59,7 +60,7 @@ class TestContactForm:
             # Test submit field
             assert form.submit.render_kw == {"class": "btn btn-primary w-100"}
 
-    def test_form_validation_valid_data(self, app):
+    def test_form_validation_valid_data(self, app: Flask) -> None:
         """Test form validation with valid data."""
         with app.app_context():
             form = ContactForm(
@@ -74,7 +75,7 @@ class TestContactForm:
             assert form.validate() is True
             assert len(form.errors) == 0
 
-    def test_form_validation_missing_name(self, app):
+    def test_form_validation_missing_name(self, app: Flask) -> None:
         """Test form validation with missing name."""
         with app.app_context():
             form = ContactForm(
@@ -89,7 +90,7 @@ class TestContactForm:
             assert "name" in form.errors
             assert "Please enter your name" in form.errors["name"]
 
-    def test_form_validation_empty_name(self, app):
+    def test_form_validation_empty_name(self, app: Flask) -> None:
         """Test form validation with empty name."""
         with app.app_context():
             form = ContactForm(
@@ -105,7 +106,7 @@ class TestContactForm:
             assert "name" in form.errors
             assert "Please enter your name" in form.errors["name"]
 
-    def test_form_validation_name_too_short(self, app):
+    def test_form_validation_name_too_short(self, app: Flask) -> None:
         """Test form validation with name too short."""
         with app.app_context():
             form = ContactForm(
@@ -121,7 +122,7 @@ class TestContactForm:
             assert "name" in form.errors
             assert "Name must be between 2 and 100 characters" in form.errors["name"]
 
-    def test_form_validation_name_too_long(self, app):
+    def test_form_validation_name_too_long(self, app: Flask) -> None:
         """Test form validation with name too long."""
         with app.app_context():
             long_name = "A" * 101  # 101 characters
@@ -138,7 +139,7 @@ class TestContactForm:
             assert "name" in form.errors
             assert "Name must be between 2 and 100 characters" in form.errors["name"]
 
-    def test_form_validation_missing_email(self, app):
+    def test_form_validation_missing_email(self, app: Flask) -> None:
         """Test form validation with missing email."""
         with app.app_context():
             form = ContactForm(
@@ -153,7 +154,7 @@ class TestContactForm:
             assert "email" in form.errors
             assert "Please enter your email" in form.errors["email"]
 
-    def test_form_validation_invalid_email(self, app):
+    def test_form_validation_invalid_email(self, app: Flask) -> None:
         """Test form validation with invalid email."""
         with app.app_context():
             form = ContactForm(
@@ -169,7 +170,7 @@ class TestContactForm:
             assert "email" in form.errors
             assert "Please enter a valid email address" in form.errors["email"]
 
-    def test_form_validation_email_too_long(self, app):
+    def test_form_validation_email_too_long(self, app: Flask) -> None:
         """Test form validation with email too long."""
         with app.app_context():
             long_email = "a" * 115 + "@example.com"  # 130 characters total
@@ -186,7 +187,7 @@ class TestContactForm:
             assert "email" in form.errors
             assert "Email must be less than 120 characters" in form.errors["email"]
 
-    def test_form_validation_missing_subject(self, app):
+    def test_form_validation_missing_subject(self, app: Flask) -> None:
         """Test form validation with missing subject."""
         with app.app_context():
             form = ContactForm(
@@ -201,7 +202,7 @@ class TestContactForm:
             assert "subject" in form.errors
             assert "Please select a subject" in form.errors["subject"]
 
-    def test_form_validation_empty_subject(self, app):
+    def test_form_validation_empty_subject(self, app: Flask) -> None:
         """Test form validation with empty subject."""
         with app.app_context():
             form = ContactForm(
@@ -217,7 +218,7 @@ class TestContactForm:
             assert "subject" in form.errors
             assert "Please select a subject" in form.errors["subject"]
 
-    def test_form_validation_missing_message(self, app):
+    def test_form_validation_missing_message(self, app: Flask) -> None:
         """Test form validation with missing message."""
         with app.app_context():
             form = ContactForm(data={"name": "John Doe", "email": "john@example.com", "subject": "support"})
@@ -226,7 +227,7 @@ class TestContactForm:
             assert "message" in form.errors
             assert "Please enter your message" in form.errors["message"]
 
-    def test_form_validation_message_too_short(self, app):
+    def test_form_validation_message_too_short(self, app: Flask) -> None:
         """Test form validation with message too short."""
         with app.app_context():
             form = ContactForm(
@@ -237,7 +238,7 @@ class TestContactForm:
             assert "message" in form.errors
             assert "Message must be between 10 and 2000 characters" in form.errors["message"]
 
-    def test_form_validation_message_too_long(self, app):
+    def test_form_validation_message_too_long(self, app: Flask) -> None:
         """Test form validation with message too long."""
         with app.app_context():
             long_message = "A" * 2001  # 2001 characters
@@ -249,7 +250,7 @@ class TestContactForm:
             assert "message" in form.errors
             assert "Message must be between 10 and 2000 characters" in form.errors["message"]
 
-    def test_form_validation_multiple_errors(self, app):
+    def test_form_validation_multiple_errors(self, app: Flask) -> None:
         """Test form validation with multiple errors."""
         with app.app_context():
             form = ContactForm(data={"name": "", "email": "invalid-email", "subject": "", "message": "Short"})
@@ -261,7 +262,7 @@ class TestContactForm:
             assert "subject" in form.errors
             assert "message" in form.errors
 
-    def test_form_validation_boundary_values(self, app):
+    def test_form_validation_boundary_values(self, app: Flask) -> None:
         """Test form validation with boundary values."""
         with app.app_context():
             # Test minimum valid values
@@ -286,7 +287,7 @@ class TestContactForm:
             )
             assert form_max.validate() is True
 
-    def test_form_choices(self, app):
+    def test_form_choices(self, app: Flask) -> None:
         """Test form subject choices."""
         with app.app_context():
             form = ContactForm()
@@ -303,7 +304,7 @@ class TestContactForm:
 
             assert form.subject.choices == expected_choices
 
-    def test_form_data_access(self, app):
+    def test_form_data_access(self, app: Flask) -> None:
         """Test accessing form data."""
         with app.app_context():
             form = ContactForm(
@@ -320,13 +321,13 @@ class TestContactForm:
             assert form.subject.data == "support"
             assert form.message.data == "This is a test message with enough characters."
 
-    def test_form_inheritance(self, app):
+    def test_form_inheritance(self, app: Flask) -> None:
         """Test that ContactForm inherits from FlaskForm."""
         with app.app_context():
             form = ContactForm()
             assert isinstance(form, FlaskForm)
 
-    def test_form_csrf_token(self, app):
+    def test_form_csrf_token(self, app: Flask) -> None:
         """Test that form has CSRF token."""
         with app.app_context():
             form = ContactForm()
@@ -335,7 +336,7 @@ class TestContactForm:
             # Just check that the form can be created without errors
             assert form is not None
 
-    def test_form_render_kw_attributes(self, app):
+    def test_form_render_kw_attributes(self, app: Flask) -> None:
         """Test that render_kw attributes are properly set."""
         with app.app_context():
             form = ContactForm()
@@ -358,7 +359,7 @@ class TestContactForm:
             assert "class" in form.submit.render_kw
             assert form.submit.render_kw["class"] == "btn btn-primary w-100"
 
-    def test_form_validation_edge_cases(self, app):
+    def test_form_validation_edge_cases(self, app: Flask) -> None:
         """Test form validation with edge cases."""
         with app.app_context():
             # Test with whitespace-only name
@@ -386,7 +387,7 @@ class TestContactForm:
             )
             assert form_long_email.validate() is True
 
-    def test_form_validation_unicode_data(self, app):
+    def test_form_validation_unicode_data(self, app: Flask) -> None:
         """Test form validation with unicode data."""
         with app.app_context():
             form = ContactForm(

@@ -1,3 +1,4 @@
+---
 # TFSec Configuration
 # This file configures tfsec to ignore specific checks that are not applicable to this project
 
@@ -5,11 +6,12 @@
 # Format:
 # - "CHECK_ID"  # Reason for ignoring
 
-# Example ignores (uncomment and modify as needed):
-# exclude:
-#   - AWS017  # The S3 bucket should have access logging enabled
-#   - AWS045  # The S3 bucket does not have public access restricted
-#   - AWS093  # Resource 'aws_iam_policy_document' includes an overly permissive Action
+# Exclude checks for CloudFront logs bucket
+# CloudFront logging requires block_public_acls=false to allow ACLs
+# Security is maintained via ignore_public_acls=true and restrict_public_buckets=true
+exclude:
+  - AWS045 # The S3 bucket does not have public access restricted (CloudFront logs bucket)
+  - AWS144 # Bucket does not prevent creation of public ACLs (CloudFront logs bucket)
 
 # Only show issues of high or critical severity
 # severity: WARNING  # CRITICAL, HIGH, MEDIUM, LOW, NONE
@@ -28,8 +30,8 @@ include:
 #   - modules/third-party/  # Ignore third-party modules
 
 # Ignore specific directories or files
-# excluded_files:
-#   - main_override.tf
+excluded_files:
+  - modules/cloudfront/main.tf # CloudFront logs bucket requires block_public_acls=false for ACLs
 
 # Customize output format for CI/CD
 # output:

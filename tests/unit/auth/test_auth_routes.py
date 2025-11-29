@@ -12,7 +12,7 @@ from app.extensions import db
 class TestAuthRoutes:
     """Test authentication routes."""
 
-    def test_register_success(self, client, app):
+    def test_register_success(self, client, app) -> None:
         """Test successful user registration."""
         with app.app_context():
             response = client.post(
@@ -36,7 +36,7 @@ class TestAuthRoutes:
             assert user.email == "newuser@example.com"
             assert user.check_password("newpassword123")
 
-    def test_register_already_logged_in(self, client, auth, test_user):
+    def test_register_already_logged_in(self, client, auth, test_user) -> None:
         """Test registration when already logged in."""
         auth.login("testuser_1", "testpass")
 
@@ -47,7 +47,7 @@ class TestAuthRoutes:
         assert response.status_code == 200
         assert b"Dashboard" in response.data
 
-    def test_register_validation_errors(self, client, app):
+    def test_register_validation_errors(self, client, app) -> None:
         """Test registration with validation errors."""
         with app.app_context():
             # Test with missing required fields (simpler test)
@@ -67,7 +67,7 @@ class TestAuthRoutes:
             # Should show validation errors or stay on registration page
             assert b"Register" in response.data or b"error" in response.data
 
-    def test_logout_success(self, client, auth, test_user):
+    def test_logout_success(self, client, auth, test_user) -> None:
         """Test successful logout."""
         auth.login("testuser_1", "testpass")
 
@@ -84,14 +84,14 @@ class TestAuthRoutes:
         with client.session_transaction() as sess:
             assert "_user_id" not in sess
 
-    def test_logout_unauthorized(self, client):
+    def test_logout_unauthorized(self, client) -> None:
         """Test logout when not logged in."""
         response = client.get(url_for("auth.logout"), follow_redirects=True)
         # Should redirect to login page
         assert response.status_code == 200
         assert b"Login" in response.data
 
-    def test_change_password_success(self, client, auth, test_user):
+    def test_change_password_success(self, client, auth, test_user) -> None:
         """Test successful password change."""
         auth.login("testuser_1", "testpass")
 
@@ -112,7 +112,7 @@ class TestAuthRoutes:
 
         # Test completed - password change form submitted successfully
 
-    def test_change_password_wrong_current(self, client, auth, test_user):
+    def test_change_password_wrong_current(self, client, auth, test_user) -> None:
         """Test password change with wrong current password."""
         auth.login("testuser_1", "testpass")
 
@@ -131,13 +131,13 @@ class TestAuthRoutes:
         assert response.status_code == 200
         # Just verify we get a valid response (error message might not be displayed)
 
-    def test_change_password_unauthorized(self, client):
+    def test_change_password_unauthorized(self, client) -> None:
         """Test password change when not logged in."""
         response = client.get(url_for("auth.change_password"), follow_redirects=True)
         assert response.status_code == 200
         assert b"Login" in response.data
 
-    def test_profile_get(self, client, auth, test_user):
+    def test_profile_get(self, client, auth, test_user) -> None:
         """Test profile page GET request."""
         auth.login("testuser_1", "testpass")
 
@@ -146,7 +146,7 @@ class TestAuthRoutes:
         assert b"Profile" in response.data
         assert b"testuser_1" in response.data
 
-    def test_profile_update_success(self, client, auth, test_user, app):
+    def test_profile_update_success(self, client, auth, test_user, app) -> None:
         """Test successful profile update."""
         auth.login("testuser_1", "testpass")
 
@@ -179,7 +179,7 @@ class TestAuthRoutes:
             assert user.timezone == "America/New_York"  # Normalized from US/Eastern
             assert user.avatar_url == "https://example.com/avatar.jpg"
 
-    def test_profile_update_validation_errors(self, client, auth, test_user):
+    def test_profile_update_validation_errors(self, client, auth, test_user) -> None:
         """Test profile update with validation errors."""
         auth.login("testuser_1", "testpass")
 
@@ -202,7 +202,7 @@ class TestAuthRoutes:
         # Check for any validation error message
         assert b"too long" in response.data or b"500" in response.data or b"error" in response.data
 
-    def test_profile_update_invalid_timezone(self, client, auth, test_user, app):
+    def test_profile_update_invalid_timezone(self, client, auth, test_user, app) -> None:
         """Test profile update with invalid timezone."""
         auth.login("testuser_1", "testpass")
 
@@ -228,7 +228,7 @@ class TestAuthRoutes:
             user = db.session.get(User, test_user.id)
             assert user.timezone == "UTC"
 
-    def test_timezone_detection_api_success(self, client, auth, test_user):
+    def test_timezone_detection_api_success(self, client, auth, test_user) -> None:
         """Test timezone detection API endpoint exists."""
         auth.login("testuser_1", "testpass")
 
@@ -241,7 +241,7 @@ class TestAuthRoutes:
         # Just verify the endpoint exists and responds (external API might not work in tests)
         assert response.status_code in [200, 400, 500]
 
-    def test_timezone_detection_api_invalid_coordinates(self, client, auth, test_user):
+    def test_timezone_detection_api_invalid_coordinates(self, client, auth, test_user) -> None:
         """Test timezone detection API with invalid coordinates."""
         auth.login("testuser_1", "testpass")
 
@@ -254,7 +254,7 @@ class TestAuthRoutes:
         # Just verify the endpoint responds to invalid data
         assert response.status_code in [200, 400, 500]
 
-    def test_timezone_detection_api_unauthorized(self, client):
+    def test_timezone_detection_api_unauthorized(self, client) -> None:
         """Test timezone detection API when not logged in."""
         response = client.post(
             url_for("auth.detect_timezone"),
@@ -265,7 +265,7 @@ class TestAuthRoutes:
         # Should redirect to login
         assert response.status_code in [200, 302]
 
-    def test_profile_timezone_ajax_update(self, client, auth, test_user, app):
+    def test_profile_timezone_ajax_update(self, client, auth, test_user, app) -> None:
         """Test timezone update via AJAX."""
         auth.login("testuser_1", "testpass")
 
@@ -285,7 +285,7 @@ class TestAuthRoutes:
             user = db.session.get(User, test_user.id)
             assert user.timezone == "America/Los_Angeles"
 
-    def test_profile_update_exception_handling(self, client, auth, test_user):
+    def test_profile_update_exception_handling(self, client, auth, test_user) -> None:
         """Test profile update exception handling."""
         auth.login("testuser_1", "testpass")
 
@@ -309,7 +309,7 @@ class TestAuthRoutes:
             assert response.status_code == 200
             assert b"Failed to update profile" in response.data
 
-    def test_login_already_authenticated(self, client, auth, test_user):
+    def test_login_already_authenticated(self, client, auth, test_user) -> None:
         """Test login when already authenticated."""
         auth.login("testuser_1", "testpass")
 
@@ -320,7 +320,7 @@ class TestAuthRoutes:
         assert response.status_code == 200
         assert b"Dashboard" in response.data
 
-    def test_login_with_next_parameter(self, client, test_user):
+    def test_login_with_next_parameter(self, client, test_user) -> None:
         """Test login with next parameter for redirect."""
         response = client.get(url_for("auth.login", next="/expenses/"))
         assert response.status_code == 200
@@ -339,7 +339,7 @@ class TestAuthRoutes:
         assert response.status_code == 200
         assert b"Expenses" in response.data
 
-    def test_login_with_malicious_next_parameter(self, client, test_user):
+    def test_login_with_malicious_next_parameter(self, client, test_user) -> None:
         """Test login with malicious next parameter."""
         response = client.post(
             url_for("auth.login"),

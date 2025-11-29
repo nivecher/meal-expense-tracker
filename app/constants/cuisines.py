@@ -3,7 +3,7 @@
 Single source of truth based on Google Places New API supported types.
 """
 
-from typing import Dict
+from typing import Dict, List, Optional
 
 # Google Places API supported cuisine types (single point of truth)
 # Keys are Google Places API types, values are user-friendly display names
@@ -43,7 +43,7 @@ GOOGLE_CUISINE_MAPPING = {
 }
 
 # User-friendly cuisine display data (derived from Google mapping)
-CUISINES: Dict[str, Dict[str, str]] = {}
+CUISINES: dict[str, dict[str, str]] = {}
 
 # Color scheme for consistent UI display
 _CUISINE_COLORS = {
@@ -97,17 +97,17 @@ for google_type, display_name in GOOGLE_CUISINE_MAPPING.items():
 
 
 # Helper functions
-def get_cuisine_constants():
+def get_cuisine_constants() -> list[dict[str, str]]:
     """Get list of all cuisine data."""
     return [{"name": k, **v} for k, v in CUISINES.items()]
 
 
-def get_cuisine_names():
+def get_cuisine_names() -> list[str]:
     """Get list of all cuisine names."""
     return list(CUISINES.keys())
 
 
-def get_cuisine_data(cuisine_name):
+def get_cuisine_data(cuisine_name: str) -> dict[str, str] | None:
     """Get cuisine data by name."""
     if not cuisine_name or not isinstance(cuisine_name, str):
         return None
@@ -126,30 +126,30 @@ def get_cuisine_data(cuisine_name):
     return None
 
 
-def get_cuisine_color(cuisine_name):
+def get_cuisine_color(cuisine_name: str) -> str:
     """Get color for a cuisine."""
     data = get_cuisine_data(cuisine_name)
     return data["color"] if data else "#6c757d"
 
 
-def get_cuisine_icon(cuisine_name):
+def get_cuisine_icon(cuisine_name: str) -> str:
     """Get icon for a cuisine."""
     data = get_cuisine_data(cuisine_name)
     return data["icon"] if data else "question"
 
 
-def validate_cuisine_name(cuisine_name):
+def validate_cuisine_name(cuisine_name: str) -> bool:
     """Check if cuisine exists."""
     return get_cuisine_data(cuisine_name) is not None
 
 
-def get_google_type_for_cuisine(cuisine_name):
+def get_google_type_for_cuisine(cuisine_name: str) -> str | None:
     """Get Google Places API type for a cuisine name."""
     data = get_cuisine_data(cuisine_name)
     return data["google_type"] if data else None
 
 
-def get_cuisine_for_google_type(google_type):
+def get_cuisine_for_google_type(google_type: str) -> str | None:
     """Get user-friendly cuisine name for Google Places API type."""
     if not google_type or not isinstance(google_type, str):
         return None
@@ -162,7 +162,7 @@ def get_cuisine_for_google_type(google_type):
     return None
 
 
-def format_cuisine_type(cuisine_type, max_length=100):
+def format_cuisine_type(cuisine_type: str, max_length: int = 100) -> str:
     """Format cuisine type with proper capitalization and length limits."""
     if not cuisine_type:
         return ""

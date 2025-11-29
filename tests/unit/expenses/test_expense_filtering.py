@@ -24,7 +24,7 @@ from app.expenses.services import (
 class TestGetExpenseFilters:
     """Test the get_expense_filters function that extracts filter parameters from requests."""
 
-    def test_get_expense_filters_with_search_param(self):
+    def test_get_expense_filters_with_search_param(self) -> None:
         """Test filter extraction with 'search' parameter."""
         mock_request = Mock()
         mock_request.args.get.side_effect = lambda key, default="": {
@@ -48,7 +48,7 @@ class TestGetExpenseFilters:
         assert filters["sort_by"] == "amount"
         assert filters["sort_order"] == "asc"
 
-    def test_get_expense_filters_with_q_param(self):
+    def test_get_expense_filters_with_q_param(self) -> None:
         """Test filter extraction with 'q' parameter (legacy support)."""
         mock_request = Mock()
         mock_request.args.get.side_effect = lambda key, default="": {
@@ -68,7 +68,7 @@ class TestGetExpenseFilters:
         assert filters["sort_by"] == "date"
         assert filters["sort_order"] == "desc"
 
-    def test_get_expense_filters_with_defaults(self):
+    def test_get_expense_filters_with_defaults(self) -> None:
         """Test filter extraction with default values."""
         mock_request = Mock()
         mock_request.args.get.side_effect = lambda key, default="": default
@@ -83,7 +83,7 @@ class TestGetExpenseFilters:
         assert filters["sort_by"] == "date"
         assert filters["sort_order"] == "desc"
 
-    def test_get_expense_filters_prioritizes_search_over_q(self):
+    def test_get_expense_filters_prioritizes_search_over_q(self) -> None:
         """Test that 'search' parameter takes priority over 'q' parameter."""
         mock_request = Mock()
         mock_request.args.get.side_effect = lambda key, default="": {
@@ -119,7 +119,7 @@ class TestGetUserExpenses:
             expenses.append(expense)
         return expenses
 
-    def test_get_user_expenses_basic_functionality(self, mock_db_session, sample_expenses):
+    def test_get_user_expenses_basic_functionality(self, mock_db_session, sample_expenses) -> None:
         """Test basic expense retrieval with filters."""
         # This test would require more complex mocking of SQLAlchemy
         # For now, we'll test the function structure
@@ -134,7 +134,7 @@ class TestGetUserExpenses:
 class TestGetMainFilterOptions:
     """Test the get_main_filter_options function."""
 
-    def test_get_main_filter_options_structure(self):
+    def test_get_main_filter_options_structure(self) -> None:
         """Test that the function has correct structure and return type."""
         assert callable(get_main_filter_options)
         # Note: Full testing would require database setup
@@ -144,7 +144,7 @@ class TestGetMainFilterOptions:
 class TestApplyFilters:
     """Test the apply_filters function that modifies SQLAlchemy statements."""
 
-    def test_apply_filters_with_search(self):
+    def test_apply_filters_with_search(self) -> None:
         """Test applying search filters to a statement."""
         # Create a mock statement
         mock_stmt = Mock()
@@ -168,7 +168,7 @@ class TestApplyFilters:
         # Verify the function returns a statement
         assert filtered_stmt is not None
 
-    def test_apply_filters_with_meal_type(self):
+    def test_apply_filters_with_meal_type(self) -> None:
         """Test applying meal type filters."""
         mock_stmt = Mock()
         mock_stmt.join.return_value = mock_stmt
@@ -189,7 +189,7 @@ class TestApplyFilters:
         # Verify where was called for meal_type
         assert mock_stmt.where.call_count >= 1
 
-    def test_apply_filters_with_date_range(self):
+    def test_apply_filters_with_date_range(self) -> None:
         """Test applying date range filters."""
         mock_stmt = Mock()
         mock_stmt.join.return_value = mock_stmt
@@ -210,7 +210,7 @@ class TestApplyFilters:
         # Verify where was called for date filters
         assert mock_stmt.where.call_count >= 2
 
-    def test_apply_filters_with_invalid_dates(self):
+    def test_apply_filters_with_invalid_dates(self) -> None:
         """Test that invalid dates don't break the filtering."""
         mock_stmt = Mock()
         mock_stmt.join.return_value = mock_stmt
@@ -234,7 +234,7 @@ class TestApplyFilters:
 class TestApplySorting:
     """Test the apply_sorting function."""
 
-    def test_apply_sorting_by_date_desc(self):
+    def test_apply_sorting_by_date_desc(self) -> None:
         """Test sorting by date in descending order."""
         mock_stmt = Mock()
         mock_field = Mock()
@@ -252,7 +252,7 @@ class TestApplySorting:
             # Verify order_by was called
             mock_stmt.order_by.assert_called_once()
 
-    def test_apply_sorting_by_amount_asc(self):
+    def test_apply_sorting_by_amount_asc(self) -> None:
         """Test sorting by amount in ascending order."""
         mock_stmt = Mock()
         mock_field = Mock()
@@ -269,7 +269,7 @@ class TestApplySorting:
             # Verify order_by was called
             mock_stmt.order_by.assert_called_once()
 
-    def test_apply_sorting_by_restaurant(self):
+    def test_apply_sorting_by_restaurant(self) -> None:
         """Test sorting by restaurant name."""
         mock_stmt = Mock()
         mock_stmt.order_by.return_value = mock_stmt
@@ -279,7 +279,7 @@ class TestApplySorting:
         # Verify order_by was called
         mock_stmt.order_by.assert_called_once()
 
-    def test_apply_sorting_unknown_field(self):
+    def test_apply_sorting_unknown_field(self) -> None:
         """Test sorting by unknown field returns unchanged statement."""
         mock_stmt = Mock()
 
@@ -292,7 +292,7 @@ class TestApplySorting:
 class TestConsolidationIntegrity:
     """Test that the consolidation maintains all original functionality."""
 
-    def test_all_functions_exist(self):
+    def test_all_functions_exist(self) -> None:
         """Test that all expected functions exist in the consolidated module."""
         from app.expenses import services
 
@@ -309,7 +309,7 @@ class TestConsolidationIntegrity:
         assert hasattr(services, "update_expense")
         assert hasattr(services, "delete_expense")
 
-    def test_function_signatures_match_expected(self):
+    def test_function_signatures_match_expected(self) -> None:
         """Test that function signatures match expectations."""
         import inspect
 

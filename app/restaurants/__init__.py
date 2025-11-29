@@ -8,7 +8,7 @@ bp = Blueprint("restaurants", __name__, template_folder="templates", static_fold
 
 # Register template filters
 @bp.app_template_filter("truncate")
-def truncate_filter(s, length=255, end="..."):
+def truncate_filter(s: str, length: int = 255, end: str = "...") -> str:
     """Truncate a string to the specified length.
 
     Args:
@@ -27,7 +27,7 @@ def truncate_filter(s, length=255, end="..."):
 
 
 @bp.app_template_filter("nl2br")
-def nl2br_filter(s):
+def nl2br_filter(s: str) -> str:
     """Convert newlines to <br> tags for HTML display.
 
     Args:

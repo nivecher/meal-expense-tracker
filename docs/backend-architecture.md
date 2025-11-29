@@ -532,8 +532,8 @@ flask run --debug
 
 ### 2. Code Quality Tools
 
-- **Linting**: `flake8`
-- **Formatting**: `black` + `isort`
+- **Linting**: `ruff` (replaces flake8, isort, autoflake)
+- **Formatting**: `black` (Ruff formatter evaluated in Phase 2)
 - **Type Checking**: `mypy`
 - **Security**: `bandit`
 
@@ -542,7 +542,7 @@ flask run --debug
 1. Create feature branch: `git checkout -b feature/your-feature`
 2. Make changes
 3. Run tests: `pytest`
-4. Format code: `black . && isort .`
+4. Format code: `ruff check --fix . && black .`
 5. Commit changes: `git commit -m "Add your feature"`
 6. Push branch: `git push origin feature/your-feature`
 7. Create pull request

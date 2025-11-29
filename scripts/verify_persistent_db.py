@@ -2,15 +2,15 @@
 """Verify the persistent database connection and data persistence."""
 
 import os
-import sys
 from pathlib import Path
+import sys
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
-def verify_persistent_db():
+def verify_persistent_db() -> int:
     """Verify the persistent database connection and data persistence."""
     try:
         # Set environment variables for persistent database
@@ -25,7 +25,8 @@ def verify_persistent_db():
         # Import after setting environment variables
         from sqlalchemy import inspect, text
 
-        from app import create_app, db
+        from app import create_app
+        from app.extensions import db
 
         # Create app
         app = create_app()

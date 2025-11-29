@@ -7,8 +7,8 @@ correctly before deploying to AWS Lambda.
 
 import argparse
 import logging
-import sys
 from pathlib import Path
+import sys
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent
@@ -22,12 +22,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def test_database_connection():
+def test_database_connection() -> bool:
     """Test the database connection using the application's configuration."""
     try:
         from sqlalchemy import text
 
-        from app import create_app, db
+        from app import create_app
+        from app.extensions import db
 
         # Create the Flask application
         app = create_app()
@@ -55,7 +56,7 @@ def test_database_connection():
         return False
 
 
-def run_migrations():
+def run_migrations() -> bool:
     """Run database migrations using the application's configuration."""
     try:
         from app import create_app
@@ -76,7 +77,7 @@ def run_migrations():
         return False
 
 
-def main():
+def main() -> int:
     """Main function to test database connection and migrations."""
     parser = argparse.ArgumentParser(description="Test database connection and migrations")
     parser.add_argument(

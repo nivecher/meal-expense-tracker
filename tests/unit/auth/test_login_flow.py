@@ -5,7 +5,7 @@ from flask_login import login_user
 from app.auth.models import User
 
 
-def test_login_flow(app, session):
+def test_login_flow(app, session) -> None:
     """Test complete login flow with proper fixtures."""
     # Get or create test user
     username = "testuser"

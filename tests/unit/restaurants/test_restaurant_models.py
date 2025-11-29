@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from app.restaurants.models import Restaurant
 
 
-def test_create_restaurant(session, test_user):
+def test_create_restaurant(session, test_user) -> None:
     """Test creating a new restaurant."""
     restaurant = Restaurant(
         user_id=test_user.id,
@@ -31,7 +31,7 @@ def test_create_restaurant(session, test_user):
     assert restaurant.user_id == test_user.id
 
 
-def test_restaurant_required_fields(session, test_user):
+def test_restaurant_required_fields(session, test_user) -> None:
     """Test that required fields are enforced."""
     # Missing name
     with pytest.raises(IntegrityError):
@@ -48,7 +48,7 @@ def test_restaurant_required_fields(session, test_user):
         session.commit()
 
 
-def test_restaurant_uniqueness(session, test_user):
+def test_restaurant_uniqueness(session, test_user) -> None:
     """Test that restaurant names are unique per user and city."""
     # Create first restaurant
     restaurant1 = Restaurant(
@@ -85,7 +85,7 @@ def test_restaurant_uniqueness(session, test_user):
     assert restaurant3.id is not None
 
 
-def test_restaurant_relationships(session, test_user, test_expense):
+def test_restaurant_relationships(session, test_user, test_expense) -> None:
     """Test relationships with other models."""
     # Test relationship with user
     assert test_expense.restaurant.user_id == test_user.id
@@ -96,7 +96,7 @@ def test_restaurant_relationships(session, test_user, test_expense):
     assert test_expense in test_expense.restaurant.expenses
 
 
-def test_restaurant_properties(test_restaurant):
+def test_restaurant_properties(test_restaurant) -> None:
     """Test computed properties."""
     # Test full_name property with city
     assert test_restaurant.full_name == f"{test_restaurant.name} - {test_restaurant.city}"
@@ -114,12 +114,12 @@ def test_restaurant_properties(test_restaurant):
     assert test_restaurant.full_name == test_restaurant.name
 
 
-def test_restaurant_string_representation(test_restaurant):
+def test_restaurant_string_representation(test_restaurant) -> None:
     """Test the string representation of a restaurant."""
     assert str(test_restaurant) == f"<Restaurant {test_restaurant.name}>"
 
 
-def test_restaurant_serialization(test_restaurant):
+def test_restaurant_serialization(test_restaurant) -> None:
     """Test that a restaurant can be serialized to a dictionary."""
     serialized = test_restaurant.to_dict()
     assert isinstance(serialized, dict)
@@ -129,7 +129,7 @@ def test_restaurant_serialization(test_restaurant):
     assert "updated_at" in serialized
 
 
-def test_restaurant_expenses_relationship(test_restaurant, test_expense):
+def test_restaurant_expenses_relationship(test_restaurant, test_expense) -> None:
     """Test the expenses relationship."""
     assert test_expense in test_restaurant.expenses
     assert test_expense.restaurant == test_restaurant

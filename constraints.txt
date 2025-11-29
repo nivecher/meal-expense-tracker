@@ -8,9 +8,6 @@ itsdangerous==2.2.0
 # MarkupSafe - let Flask determine compatible version
 
 # Development tools - pinned to match requirements/dev.in
-black==24.10.0
-flake8==7.3.0
-isort==5.13.2
 mypy==1.13.0
 pylint==3.3.1
 pytest==8.4.2

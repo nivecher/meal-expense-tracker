@@ -2,6 +2,62 @@
  * Handles form submission for expense forms using Fetch API
  */
 
+// Import security utilities for XSS prevention
+let escapeHtml;
+if (typeof window !== 'undefined' && window.SecurityUtils) {
+  ({ escapeHtml } = window.SecurityUtils);
+} else {
+  // Fallback escapeHtml implementation
+  escapeHtml = function(text) {
+    if (text === null || text === undefined) {
+      return '';
+    }
+    const textString = String(text);
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#x27;',
+      '/': '&#x2F;',
+    };
+    return textString.replace(/[&<>"'/]/g, (char) => map[char]);
+  };
+}
+
+/**
+ * Validate redirect URL to prevent open redirect vulnerabilities
+ * Only allows relative URLs or same-origin absolute URLs
+ * @param {string} url - URL to validate
+ * @returns {string|null} - Validated URL or null if invalid
+ */
+function validateRedirectUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+
+  // Allow relative URLs (starting with /)
+  if (url.startsWith('/')) {
+    // Ensure it doesn't contain protocol or host
+    if (!url.includes('://') && !url.includes('//')) {
+      return url;
+    }
+    return null;
+  }
+
+  // Allow same-origin absolute URLs only
+  try {
+    const urlObj = new URL(url, window.location.origin);
+    if (urlObj.origin === window.location.origin) {
+      return urlObj.pathname + urlObj.search + urlObj.hash;
+    }
+  } catch {
+    // Invalid URL
+  }
+
+  return null;
+}
+
 /**
  * Get browser timezone - uses shared utility if available, otherwise detects it.
  * @returns {string} IANA timezone string (e.g., 'America/New_York') or 'UTC' as fallback
@@ -237,7 +293,8 @@ async function submitFormToServer(form, formData) {
 function showSuccessAlert(result) {
   const alertContainer = document.getElementById('alert-container');
   if (alertContainer) {
-    const message = result.message || 'Expense added successfully!';
+    // Escape message to prevent XSS
+    const message = escapeHtml(result.message || 'Expense added successfully!');
     alertContainer.innerHTML = `
       <div class="alert alert-success alert-dismissible fade show" role="alert">
         ${message}
@@ -252,7 +309,9 @@ function handleSuccessfulSubmission(result) {
 
   showSuccessAlert(result);
 
-  const redirectUrl = result.redirect || result.redirect_url || '/expenses';
+  // Validate redirect URL to prevent open redirect vulnerabilities
+  const requestedUrl = result.redirect || result.redirect_url || '/expenses';
+  const redirectUrl = validateRedirectUrl(requestedUrl) || '/expenses';
   console.log('Form submitted successfully, redirecting to:', redirectUrl);
   window.location.href = redirectUrl;
 }

@@ -21,7 +21,7 @@ from app import create_app
 class ApiGatewayResponse(TypedDict):
     statusCode: int
     body: str
-    headers: Dict[str, str]
+    headers: dict[str, str]
     isBase64Encoded: bool
 
 
@@ -45,7 +45,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Global variable to hold the Flask application instance
-_APP_INSTANCE: Optional[Flask] = None
+_APP_INSTANCE: Flask | None = None
+
+# Track if migration has been checked to avoid running on every request
+_MIGRATION_CHECKED: bool = False
 
 
 def get_or_create_app() -> Flask:
@@ -91,7 +94,7 @@ def get_or_create_app() -> Flask:
     return _APP_INSTANCE
 
 
-def _convert_apigw_v2_to_v1(event: Dict[str, Any]) -> Dict[str, Any]:
+def _convert_apigw_v2_to_v1(event: dict[str, Any]) -> dict[str, Any]:
     """Convert API Gateway v2.0 event format to v1.0 format for awsgi compatibility.
 
     Args:
@@ -179,7 +182,7 @@ def _validate_session_config(app: Flask) -> None:
         logger.warning(f"Unexpected session type in Lambda: {session_type}. Using signed cookie sessions instead.")
 
 
-def handle_migration(app: Flask) -> Dict[str, Any]:
+def handle_migration(app: Flask) -> dict[str, Any]:
     """Handle database migration operation.
 
     Args:
@@ -246,7 +249,7 @@ def handle_database_operation(operation: str, **kwargs: Any) -> ApiGatewayRespon
         }
 
 
-def _get_allowed_domains(headers: Dict[str, str]) -> list[str]:
+def _get_allowed_domains(headers: dict[str, str]) -> list[str]:
     """Get allowed domains for referrer validation."""
     allowed_domains = os.getenv("ALLOWED_REFERRER_DOMAINS", "").split(",")
     if not allowed_domains or allowed_domains == [""]:
@@ -273,7 +276,7 @@ def _get_allowed_domains(headers: Dict[str, str]) -> list[str]:
     return allowed_domains
 
 
-def _should_skip_referrer_validation(event: Dict[str, Any]) -> bool:
+def _should_skip_referrer_validation(event: dict[str, Any]) -> bool:
     """Check if referrer validation should be skipped - RELAXED FOR TESTING."""
     # Skip referrer validation for all requests during testing
     return True
@@ -296,7 +299,7 @@ def _is_referrer_allowed(referer: str, allowed_domains: list[str]) -> bool:
     return False
 
 
-def _validate_referrer(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _validate_referrer(event: dict[str, Any]) -> dict[str, Any] | None:
     """Validate the referrer header for security."""
     if _should_skip_referrer_validation(event):
         return None
@@ -315,7 +318,7 @@ def _validate_referrer(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None  # Don't block during development
 
 
-def _enhance_security_headers(headers: Dict[str, str]) -> None:
+def _enhance_security_headers(headers: dict[str, str]) -> None:
     """Ensure security headers are properly set for Lambda environment."""
     # Essential security headers - always set for all responses
     if "X-Content-Type-Options" not in headers:
@@ -348,7 +351,7 @@ def _enhance_security_headers(headers: Dict[str, str]) -> None:
         )
 
 
-def _fix_cache_control_headers(headers: Dict[str, str]) -> None:
+def _fix_cache_control_headers(headers: dict[str, str]) -> None:
     """Fix cache-control header conflicts and ensure proper caching."""
     cache_control = headers.get("Cache-Control", "")
     content_type = headers.get("Content-Type", "")
@@ -372,7 +375,7 @@ def _fix_cache_control_headers(headers: Dict[str, str]) -> None:
             headers["Cache-Control"] = "public, max-age=3600"
 
 
-def _handle_database_operation(event: Dict[str, Any]) -> Dict[str, Any]:
+def _handle_database_operation(event: dict[str, Any]) -> dict[str, Any]:
     """Handle database operations with enhanced headers."""
     operation = str(event["operation"])
     db_response = handle_database_operation(operation, **event)
@@ -387,7 +390,7 @@ def _handle_database_operation(event: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _handle_admin_operation(event: Dict[str, Any]) -> Dict[str, Any]:
+def _handle_admin_operation(event: dict[str, Any]) -> dict[str, Any]:
     """Handle admin operations with enhanced headers."""
     from app.admin.lambda_admin import handle_admin_request
 
@@ -399,7 +402,7 @@ def _handle_admin_operation(event: Dict[str, Any]) -> Dict[str, Any]:
     return admin_response
 
 
-def _handle_health_check() -> Dict[str, Any]:
+def _handle_health_check() -> dict[str, Any]:
     """Handle health check requests with migration status."""
     try:
         from lambda_init import get_initialization_status
@@ -438,7 +441,103 @@ def _handle_health_check() -> Dict[str, Any]:
         }
 
 
-def _handle_cors_preflight() -> Dict[str, Any]:
+def _match_origin(request_origin: str, allowed_origin: str) -> bool:
+    """Check if request origin matches allowed origin.
+
+    Args:
+        request_origin: The origin from the request
+        allowed_origin: The allowed origin to check against
+
+    Returns:
+        True if origins match, False otherwise
+    """
+    return request_origin == allowed_origin or request_origin.rstrip("/") == allowed_origin.rstrip("/")
+
+
+def _get_production_origin(cors_origins: list[str], request_origin: str) -> tuple[str, bool]:
+    """Get allowed origin for production environment.
+
+    Args:
+        cors_origins: List of allowed origins (wildcard removed)
+        request_origin: The origin from the request
+
+    Returns:
+        Tuple of (allowed_origin, allow_credentials)
+    """
+    # If no origins configured in production, use request origin if present
+    if not cors_origins:
+        if request_origin:
+            return (request_origin, True)
+        return ("null", False)
+
+    # Check if request origin matches any allowed origin
+    if request_origin:
+        for allowed_origin in cors_origins:
+            if _match_origin(request_origin, allowed_origin):
+                return (request_origin, True)
+        # Request origin doesn't match - deny
+        return ("null", False)
+
+    # No request origin but we have allowed origins - return first one
+    return (cors_origins[0], True)
+
+
+def _get_development_origin(cors_origins: list[str], request_origin: str) -> tuple[str, bool]:
+    """Get allowed origin for development environment.
+
+    Args:
+        cors_origins: List of allowed origins
+        request_origin: The origin from the request
+
+    Returns:
+        Tuple of (allowed_origin, allow_credentials)
+    """
+    # Allow wildcard for easier testing in development
+    if "*" in cors_origins:
+        return ("*", False)
+
+    # If no origin in request, return first allowed origin (or wildcard as fallback)
+    if not request_origin:
+        return (cors_origins[0] if cors_origins else "*", len(cors_origins) > 0)
+
+    # Check if request origin matches any allowed origin
+    for allowed_origin in cors_origins:
+        if _match_origin(request_origin, allowed_origin):
+            return (request_origin, True)
+
+    # If no match, return first allowed origin (or wildcard as fallback in dev)
+    return (cors_origins[0] if cors_origins else "*", len(cors_origins) > 0)
+
+
+def _get_allowed_origin(headers: dict[str, str]) -> tuple[str, bool]:
+    """Get the allowed CORS origin based on environment configuration and request.
+
+    Args:
+        headers: Request headers containing the Origin header
+
+    Returns:
+        Tuple of (allowed_origin, allow_credentials)
+        - allowed_origin: The origin to return in Access-Control-Allow-Origin header
+        - allow_credentials: Whether credentials can be allowed (False if wildcard origin)
+    """
+    environment = os.getenv("ENVIRONMENT", "dev")
+    cors_origins_env = os.getenv("CORS_ORIGINS", "*" if environment == "dev" else "")
+    cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+
+    # Get the request origin
+    request_origin = headers.get("Origin") or headers.get("origin", "")
+
+    # In production, never allow wildcard - require explicit origins
+    if environment != "dev":
+        # Remove wildcard from allowed origins in production
+        cors_origins_prod = [origin for origin in cors_origins if origin != "*"]
+        return _get_production_origin(cors_origins_prod, request_origin)
+
+    # Development environment - allow wildcard for easier testing
+    return _get_development_origin(cors_origins, request_origin)
+
+
+def _handle_cors_preflight(event: dict[str, Any] | None = None) -> dict[str, Any]:
     """Handle CORS preflight OPTIONS requests with environment-aware settings."""
     environment = os.getenv("ENVIRONMENT", "dev")
     if environment == "dev":
@@ -453,31 +552,50 @@ def _handle_cors_preflight() -> Dict[str, Any]:
             "isBase64Encoded": False,
         }
     else:
-        # Production - use standard settings
+        # Production - use environment-configured CORS origins
+        headers = event.get("headers", {}) if event else {}
+        allowed_origin, allow_credentials = _get_allowed_origin(headers)
+
+        # Safety check: Never allow wildcard in production
+        if allowed_origin == "*":
+            logger.warning("Wildcard CORS origin detected in production - using null origin instead")
+            allowed_origin = "null"
+            allow_credentials = False
+
+        cors_headers = {
+            "Access-Control-Allow-Origin": allowed_origin,
+            "Access-Control-Allow-Methods": os.getenv("CORS_METHODS", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"),
+            "Access-Control-Allow-Headers": os.getenv(
+                "CORS_HEADERS",
+                "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, X-CSRFToken",
+            ),
+            "Access-Control-Expose-Headers": os.getenv(
+                "CORS_EXPOSE_HEADERS", "Content-Length, Content-Type, X-CSRFToken"
+            ),
+            "Access-Control-Max-Age": os.getenv("CORS_MAX_AGE", "86400"),
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "public, max-age=86400",
+        }
+
+        # Only set credentials if not using wildcard
+        if allow_credentials:
+            cors_headers["Access-Control-Allow-Credentials"] = "true"
+
         return {
             "statusCode": 200,
-            "headers": {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, X-CSRFToken",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Expose-Headers": "Content-Length, Content-Type, X-CSRFToken",
-                "Access-Control-Max-Age": "86400",
-                "X-Content-Type-Options": "nosniff",
-                "Cache-Control": "public, max-age=86400",
-            },
+            "headers": cors_headers,
             "body": "",
             "isBase64Encoded": False,
         }
 
 
-def _process_awsgi_response(response: Dict[str, Any], event: Dict[str, Any] = None) -> Dict[str, str]:
+def _process_awsgi_response(response: dict[str, Any], event: dict[str, Any] | None = None) -> dict[str, str]:
     """Process and enhance AWSGI response headers."""
-    headers = response.get("headers", {})
-    if not isinstance(headers, dict):
-        headers = {}
+    raw_headers = response.get("headers", {})
+    if not isinstance(raw_headers, dict):
+        raw_headers = {}
 
-    headers = {str(k): str(v) for k, v in headers.items()}
+    headers: dict[str, str] = {str(k): str(v) for k, v in raw_headers.items()}
 
     # Environment-specific CORS handling
     environment = os.getenv("ENVIRONMENT", "dev")
@@ -485,27 +603,46 @@ def _process_awsgi_response(response: Dict[str, Any], event: Dict[str, Any] = No
         # Development - disable CORS for simplified testing
         pass
     else:
-        # Production - use standard settings
-        headers.update(
-            {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, X-CSRFToken",
-                "Access-Control-Allow-Credentials": "false",  # Cannot use with wildcard origin
-                "Access-Control-Expose-Headers": "Content-Length, Content-Type, X-CSRFToken",
-            }
-        )
+        # Production - use environment-configured CORS origins
+        request_headers = event.get("headers", {}) if event else {}
+        allowed_origin, allow_credentials = _get_allowed_origin(request_headers)
+
+        # Safety check: Never allow wildcard in production
+        if allowed_origin == "*":
+            logger.warning("Wildcard CORS origin detected in production - using null origin instead")
+            allowed_origin = "null"
+            allow_credentials = False
+
+        cors_headers = {
+            "Access-Control-Allow-Origin": allowed_origin,
+            "Access-Control-Allow-Methods": os.getenv("CORS_METHODS", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"),
+            "Access-Control-Allow-Headers": os.getenv(
+                "CORS_HEADERS",
+                "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, X-CSRFToken",
+            ),
+            "Access-Control-Expose-Headers": os.getenv(
+                "CORS_EXPOSE_HEADERS", "Content-Length, Content-Type, X-CSRFToken"
+            ),
+        }
+
+        # Only set credentials if not using wildcard
+        if allow_credentials:
+            cors_headers["Access-Control-Allow-Credentials"] = "true"
+
+        headers.update(cors_headers)
 
     _enhance_security_headers(headers)
     _fix_cache_control_headers(headers)
-    return headers
+    # Type assertion to ensure return type is correct after mutations
+    return dict(headers)
 
 
 def _run_auto_migration() -> None:
     """Run auto-migration on first request if enabled."""
+    global _MIGRATION_CHECKED
     logger.info("_run_auto_migration called")
 
-    if not hasattr(lambda_handler, "_migration_checked"):
+    if not _MIGRATION_CHECKED:
         logger.info("Migration not yet checked, running initialization...")
         try:
             from lambda_init import initialize_lambda
@@ -523,13 +660,13 @@ def _run_auto_migration() -> None:
             logger.exception("Full traceback:")
 
         # Mark as checked to avoid running on every request
-        lambda_handler._migration_checked = True
+        _MIGRATION_CHECKED = True
         logger.info("Migration check completed")
     else:
         logger.info("Migration already checked, skipping")
 
 
-def _extract_cookies_from_headers(headers: Dict[str, str]) -> list[str]:
+def _extract_cookies_from_headers(headers: dict[str, str]) -> list[str]:
     """Extract Set-Cookie headers and convert to HTTP API cookies format."""
     cookies = []
 
@@ -541,7 +678,7 @@ def _extract_cookies_from_headers(headers: Dict[str, str]) -> list[str]:
     return cookies
 
 
-def _handle_http_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+def _handle_http_request(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Handle HTTP API events."""
     app = get_or_create_app()
 
@@ -553,7 +690,7 @@ def _handle_http_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         # Handle CORS preflight requests for OPTIONS method
         if http_method == "OPTIONS":
-            return _handle_cors_preflight()
+            return _handle_cors_preflight(event)
 
         # Fix Host header for URL generation before processing
         headers = event.get("headers", {})
@@ -612,9 +749,19 @@ def _handle_http_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     except Exception as e:
         logger.exception("Error handling request: %s", str(e))
+        # Get allowed origin for error response
+        request_headers = event.get("headers", {}) if event else {}
+        allowed_origin, _ = _get_allowed_origin(request_headers)
+
+        # Safety check: Never allow wildcard in production
+        environment = os.getenv("ENVIRONMENT", "dev")
+        if environment != "dev" and allowed_origin == "*":
+            logger.warning("Wildcard CORS origin detected in production error handler - using null origin instead")
+            allowed_origin = "null"
+
         error_headers = {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": allowed_origin,
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "no-cache",
         }
@@ -626,7 +773,7 @@ def _handle_http_request(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Handle Lambda events from API Gateway v1.0 (REST API) or v2.0 (HTTP API).
 
     Args:

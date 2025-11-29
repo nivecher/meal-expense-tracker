@@ -1,4 +1,7 @@
-def test_app_health(client):
+from flask.testing import FlaskClient
+
+
+def test_app_health(client: FlaskClient) -> None:
     """Test that the application is running and responding."""
     response = client.get("/", follow_redirects=True)
     assert response.status_code == 200

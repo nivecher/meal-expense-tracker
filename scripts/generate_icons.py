@@ -1,9 +1,10 @@
 import os
+from typing import Union
 
 from PIL import Image, ImageDraw, ImageFont
 
 
-def create_icon(size, text, output_path):
+def create_icon(size: int, text: str, output_path: str) -> None:
     # Create a new image with white background
     img = Image.new("RGB", (size, size), color="#4a90e2")
     d = ImageDraw.Draw(img)
@@ -12,8 +13,8 @@ def create_icon(size, text, output_path):
     try:
         # Try to load a font
         font_size = size // 4
-        font = ImageFont.truetype("Arial", font_size)
-    except IOError:
+        font: Union[ImageFont.FreeTypeFont, ImageFont.ImageFont] = ImageFont.truetype("Arial", font_size)
+    except OSError:
         # Fall back to default font if Arial is not available
         font = ImageFont.load_default()
 

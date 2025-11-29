@@ -209,7 +209,7 @@ run: check-env
 
 ## Run all linters
 .PHONY: lint
-lint: lint-python lint-html lint-css lint-js
+lint: lint-python lint-mypy lint-html lint-css lint-js lint-markdown lint-yaml lint-json lint-toml lint-terraform-fmt
 
 ## Run all linters with auto-fix
 .PHONY: lint-fix
@@ -219,8 +219,14 @@ lint-fix: lint-python-fix lint-html-fix lint-css-fix lint-js-fix
 .PHONY: lint-python
 lint-python: check-env
 	@echo "\n\033[1m=== Running Python Linter ===\033[0m"
-	@$(PYTHON) -m flake8 app tests || (echo "\033[1;31m❌ Flake8 failed\033[0m"; exit 1)
+	@$(PYTHON) -m ruff check app tests || (echo "\033[1;31m❌ Ruff failed\033[0m"; exit 1)
 	@$(PYTHON) -m black --check app tests || (echo "\033[1;31m❌ Black check failed\033[0m"; exit 1)
+
+## Python type checker
+.PHONY: lint-mypy
+lint-mypy: check-env
+	@echo "\n\033[1m=== Running MyPy Type Checker ===\033[0m"
+	@$(PYTHON) -m mypy app --config-file=pyproject.toml || (echo "\033[1;31m❌ MyPy failed\033[0m"; exit 1)
 
 ## Format all code (Python, HTML, CSS, JS)
 .PHONY: format
@@ -230,9 +236,8 @@ format: format-python format-html format-css format-js
 .PHONY: format-python
 format-python: check-env
 	@echo "\n\033[1m=== Formatting Python code ===\033[0m"
-	@$(PYTHON) -m isort app/ tests/ migrations/ *.py || (echo "\033[1;31m❌ isort failed\033[0m"; exit 1)
+	@$(PYTHON) -m ruff check --fix app/ tests/ migrations/ || (echo "\033[1;31m❌ Ruff check --fix failed\033[0m"; exit 1)
 	@$(PYTHON) -m black app/ tests/ migrations/ */*.py *.py || (echo "\033[1;31m❌ black failed\033[0m"; exit 1)
-	@$(PYTHON) -m autoflake --in-place --remove-all-unused-imports --recursive app/ tests/ || (echo "\033[1;31m❌ autoflake failed\033[0m"; exit 1)
 
 ## HTML linter
 .PHONY: lint-html
@@ -252,14 +257,63 @@ lint-js: check-npm
 	@echo "\n\033[1m=== Running JavaScript Linter ===\033[0m"
 	@npm run lint:js 2>/dev/null || (echo "\033[1;31m❌ JavaScript linting failed\033[0m"; exit 1)
 
+## Markdown linter
+.PHONY: lint-markdown
+lint-markdown: check-npm
+	@echo "\n\033[1m=== Running Markdown Linter ===\033[0m"
+	@if command -v markdownlint >/dev/null 2>&1; then \
+		markdownlint --config .markdownlint.json "**/*.md" || (echo "\033[1;31m❌ Markdown linting failed\033[0m"; exit 1); \
+	else \
+		echo "\033[1;33m⚠️  markdownlint-cli not installed. Install with: npm install -g markdownlint-cli\033[0m"; \
+		exit 1; \
+	fi
+
+## YAML linter
+.PHONY: lint-yaml
+lint-yaml: check-env
+	@echo "\n\033[1m=== Running YAML Linter ===\033[0m"
+	@if command -v yamllint >/dev/null 2>&1; then \
+		find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" ! -path "./cloudformation/*" -exec yamllint -c .yamllint {} + || (echo "\033[1;31m❌ YAML linting failed\033[0m"; exit 1); \
+	elif [ -d node_modules ] && command -v npm >/dev/null 2>&1; then \
+		find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" ! -path "./cloudformation/*" -exec npx --yes prettier --check {} + || (echo "\033[1;31m❌ YAML validation failed\033[0m"; exit 1); \
+	else \
+		echo "\033[1;33m⚠️  YAML linter not available. Install yamllint or ensure npm is available\033[0m"; \
+		exit 1; \
+	fi
+
+## JSON linter
+.PHONY: lint-json
+lint-json: check-npm
+	@echo "\n\033[1m=== Running JSON Linter ===\033[0m"
+	@npx --yes prettier --check "**/*.json" || (echo "\033[1;31m❌ JSON validation failed\033[0m"; exit 1)
+
+## TOML linter
+.PHONY: lint-toml
+lint-toml: check-env
+	@echo "\n\033[1m=== Running TOML Linter ===\033[0m"
+	@$(PYTHON) -c "import tomllib; import glob; [tomllib.loads(open(f, 'r').read()) for f in glob.glob('**/*.toml', recursive=True) if not any(x in f for x in ['venv', 'node_modules', '.git'])]" 2>/dev/null || (echo "\033[1;31m❌ TOML validation failed\033[0m"; exit 1)
+
+## Terraform formatter check
+.PHONY: lint-terraform-fmt
+lint-terraform-fmt:
+	@echo "\n\033[1m=== Running Terraform Format Check ===\033[0m"
+	@if command -v terraform >/dev/null 2>&1; then \
+		if [ -d "terraform" ]; then \
+			terraform -chdir=terraform fmt -check -recursive || (echo "\033[1;31m❌ Terraform formatting check failed\033[0m"; exit 1); \
+		else \
+			echo "\033[1;33m⚠️  No terraform directory found, skipping\033[0m"; \
+		fi; \
+	else \
+		echo "\033[1;33m⚠️  Terraform not installed. Skipping format check\033[0m"; \
+	fi
+
 ## Python linter with auto-fix
 .PHONY: lint-python-fix
 lint-python-fix: check-env
 	@echo "\n\033[1m=== Running Python Linter with Auto-fix ===\033[0m"
+	@$(PYTHON) -m ruff check --fix app tests || (echo "\033[1;31m❌ Ruff auto-fix failed\033[0m"; exit 1)
 	@$(PYTHON) -m black app tests || (echo "\033[1;31m❌ Black auto-fix failed\033[0m"; exit 1)
-	@$(PYTHON) -m autoflake --in-place --remove-all-unused-imports --recursive app/ tests/ || (echo "\033[1;31m❌ autoflake auto-fix failed\033[0m"; exit 1)
-	@$(PYTHON) -m isort app/ tests/ migrations/ *.py || (echo "\033[1;31m❌ isort auto-fix failed\033[0m"; exit 1)
-	@$(PYTHON) -m flake8 app tests || (echo "\033[1;31m❌ Flake8 check failed\033[0m"; exit 1)
+	@$(PYTHON) -m ruff check app tests || (echo "\033[1;31m❌ Ruff check failed\033[0m"; exit 1)
 
 ## HTML linter with auto-fix
 .PHONY: lint-html-fix
@@ -302,6 +356,12 @@ format-js: check-npm
 test: check-env
 	@echo "\n\033[1m=== Running Tests ===\033[0m"
 	PYTHONPATH=. $(PYTHON) -m pytest tests/ $(PYTEST_OPTS) || (echo "\033[1;31m❌ Tests failed\033[0m"; exit 1)
+
+## Validate linting synchronization
+.PHONY: validate-linting-sync
+validate-linting-sync:
+	@echo "\n\033[1m=== Validating Linting Synchronization ===\033[0m"
+	@./scripts/validate-linting-sync.sh
 
 ## Run pre-commit checks
 .PHONY: pre-commit
@@ -375,7 +435,7 @@ security-bandit: check-env
 		echo "\033[1;33m⚠️  Installing bandit...\033[0m"; \
 		$(PIP) install bandit; \
 	fi
-	@$(PYTHON) -m bandit -r app/ || true
+	@$(PYTHON) -m bandit -c .bandit -r app/ || true
 	@echo "\033[1;32m✅ Bandit security scan completed\033[0m"
 
 ## Check for outdated dependencies
@@ -509,7 +569,7 @@ ci-local: check-env
 .PHONY: ci-quick
 ci-quick: check-env check-npm
 	@echo "\n\033[1m=== Running Quick CI Checks ===\033[0m"
-	@$(PYTHON) -m flake8 app tests || (echo "\033[1;31m❌ Flake8 failed\033[0m"; exit 1)
+	@$(PYTHON) -m ruff check app tests || (echo "\033[1;31m❌ Ruff failed\033[0m"; exit 1)
 	@$(PYTHON) -m black --check app tests || (echo "\033[1;31m❌ Black check failed\033[0m"; exit 1)
 	@npm run lint-html || (echo "\033[1;31m❌ HTML linting failed\033[0m"; exit 1)
 	@npm run lint:css || (echo "\033[1;31m❌ CSS linting failed\033[0m"; exit 1)

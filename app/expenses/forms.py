@@ -1,6 +1,7 @@
 """Forms for the expenses blueprint."""
 
 from decimal import Decimal, InvalidOperation
+from typing import Any, List, Tuple, Union
 
 from flask import current_app
 from flask_wtf import FlaskForm
@@ -27,10 +28,10 @@ class ExpenseForm(FlaskForm):
         restaurant_choices: List of tuples for restaurant select field (id, name)
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, **kwargs: object) -> None:
         # Pop custom kwargs before calling parent __init__
-        category_choices = kwargs.pop("category_choices", [(None, "Select a category (optional)")])
-        restaurant_choices = kwargs.pop("restaurant_choices", [(None, "Select a restaurant")])
+        category_choices_raw = kwargs.pop("category_choices", [(None, "Select a category (optional)")])
+        restaurant_choices_raw = kwargs.pop("restaurant_choices", [(None, "Select a restaurant")])
         restaurant_id = kwargs.pop("restaurant_id", None)
 
         super().__init__(*args, **kwargs)
@@ -38,13 +39,25 @@ class ExpenseForm(FlaskForm):
         # Set default restaurant if provided
         if restaurant_id is not None:
             try:
-                self.restaurant_id.data = int(restaurant_id)
+                # Type check: restaurant_id could be any type from kwargs
+                if isinstance(restaurant_id, (int, str)):
+                    self.restaurant_id.data = int(restaurant_id)
+                else:
+                    self.restaurant_id.data = None
             except (ValueError, TypeError):
                 self.restaurant_id.data = None
 
         # Set choices for the select fields
-        self.category_id.choices = category_choices
-        self.restaurant_id.choices = restaurant_choices
+        # Type check: ensure choices are the correct type
+        category_choices: list[tuple[int | str | None, str]] = (
+            category_choices_raw if isinstance(category_choices_raw, list) else [(None, "Select a category (optional)")]
+        )
+        restaurant_choices: list[tuple[int | str | None, str]] = (
+            restaurant_choices_raw if isinstance(restaurant_choices_raw, list) else [(None, "Select a restaurant")]
+        )
+        # wtforms SelectField.choices accepts list of tuples, but type stubs are incomplete
+        self.category_id.choices = category_choices  # type: ignore[assignment]
+        self.restaurant_id.choices = restaurant_choices  # type: ignore[assignment]
 
     # Basic Information
     amount = DecimalField(
@@ -56,7 +69,7 @@ class ExpenseForm(FlaskForm):
         places=2,
     )
 
-    def validate_amount(self, field):
+    def validate_amount(self, field: Any) -> None:
         """Validate and convert amount to Decimal with smart amount support."""
         if not field.data:
             return

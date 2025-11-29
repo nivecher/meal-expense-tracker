@@ -4,36 +4,37 @@ from flask.testing import FlaskClient
 
 from app.auth.models import User
 from app.expenses.models import Category
+from tests.conftest import AuthActions
 
 
 class TestAPIRoutesSimple:
     """Simple integration tests for API routes."""
 
-    def test_health_check(self, client: FlaskClient):
+    def test_health_check(self, client: FlaskClient) -> None:
         """Test health check endpoint."""
         response = client.get("/api/v1/health")
         assert response.status_code == 200
         assert response.json["status"] == "healthy"
 
-    def test_version_info(self, client: FlaskClient):
+    def test_version_info(self, client: FlaskClient) -> None:
         """Test version info endpoint."""
         response = client.get("/api/v1/version")
         assert response.status_code == 200
         assert response.json["status"] == "success"
         assert "version" in response.json["data"]
 
-    def test_get_cuisines(self, client: FlaskClient):
+    def test_get_cuisines(self, client: FlaskClient) -> None:
         """Test getting cuisines."""
         response = client.get("/api/v1/cuisines")
         assert response.status_code == 200
         assert response.json["status"] == "success"
 
-    def test_get_expenses_requires_auth(self, client: FlaskClient):
+    def test_get_expenses_requires_auth(self, client: FlaskClient) -> None:
         """Test that getting expenses requires authentication."""
         response = client.get("/api/v1/expenses")
         assert response.status_code == 401
 
-    def test_get_expenses_with_auth(self, client: FlaskClient, auth, test_user: User):
+    def test_get_expenses_with_auth(self, client: FlaskClient, auth, test_user: User) -> None:
         """Test getting expenses with authentication."""
         # Log in the test user
         auth.login("testuser_1", "testpass")
@@ -43,12 +44,12 @@ class TestAPIRoutesSimple:
         assert response.json["status"] == "success"
         assert "data" in response.json
 
-    def test_create_expense_requires_auth(self, client: FlaskClient):
+    def test_create_expense_requires_auth(self, client: FlaskClient) -> None:
         """Test that creating expenses requires authentication."""
         response = client.post("/api/v1/expenses", json={"amount": 25.50, "description": "Test"})
         assert response.status_code == 401
 
-    def test_create_expense_with_auth(self, client: FlaskClient, auth, test_user: User):
+    def test_create_expense_with_auth(self, client: FlaskClient, auth, test_user: User) -> None:
         """Test creating expense with authentication."""
         # Log in the test user
         auth.login("testuser_1", "testpass")
@@ -74,12 +75,12 @@ class TestAPIRoutesSimple:
         assert response.json["status"] == "success"
         assert "data" in response.json
 
-    def test_get_restaurants_requires_auth(self, client: FlaskClient):
+    def test_get_restaurants_requires_auth(self, client: FlaskClient) -> None:
         """Test that getting restaurants requires authentication."""
         response = client.get("/api/v1/restaurants")
         assert response.status_code == 401
 
-    def test_get_restaurants_with_auth(self, client: FlaskClient, auth, test_user: User):
+    def test_get_restaurants_with_auth(self, client: FlaskClient, auth, test_user: User) -> None:
         """Test getting restaurants with authentication."""
         # Log in the test user
         auth.login("testuser_1", "testpass")
@@ -89,7 +90,7 @@ class TestAPIRoutesSimple:
         assert response.json["status"] == "success"
         assert "data" in response.json
 
-    def test_create_restaurant_with_auth(self, client: FlaskClient, auth, test_user: User):
+    def test_create_restaurant_with_auth(self, client: FlaskClient, auth, test_user: User) -> None:
         """Test creating restaurant with authentication."""
         # Log in the test user
         auth.login("testuser_1", "testpass")
@@ -109,12 +110,12 @@ class TestAPIRoutesSimple:
         assert response.json["status"] == "success"
         assert "data" in response.json
 
-    def test_get_categories_requires_auth(self, client: FlaskClient):
+    def test_get_categories_requires_auth(self, client: FlaskClient) -> None:
         """Test that getting categories requires authentication."""
         response = client.get("/api/v1/categories")
         assert response.status_code == 401
 
-    def test_get_categories_with_auth(self, client: FlaskClient, auth, test_user: User):
+    def test_get_categories_with_auth(self, client: FlaskClient, auth, test_user: User) -> None:
         """Test getting categories with authentication."""
         # Log in the test user
         auth.login("testuser_1", "testpass")
@@ -124,7 +125,7 @@ class TestAPIRoutesSimple:
         assert response.json["status"] == "success"
         assert "data" in response.json
 
-    def test_create_category_with_auth(self, client: FlaskClient, auth, test_user: User):
+    def test_create_category_with_auth(self, client: FlaskClient, auth, test_user: User) -> None:
         """Test creating category with authentication."""
         # Log in the test user
         auth.login("testuser_1", "testpass")
@@ -134,14 +135,14 @@ class TestAPIRoutesSimple:
         assert response.json["status"] == "success"
         assert "data" in response.json
 
-    def test_validate_restaurant_requires_auth(self, client: FlaskClient):
+    def test_validate_restaurant_requires_auth(self, client: FlaskClient) -> None:
         """Test that validating restaurants requires authentication."""
         response = client.post(
             "/api/v1/restaurants/validate", json={"name": "Test Restaurant", "address": "123 Test St"}
         )
         assert response.status_code == 401
 
-    def test_validate_restaurant_with_auth(self, client: FlaskClient, auth, test_user: User):
+    def test_validate_restaurant_with_auth(self, client: FlaskClient, auth, test_user: User) -> None:
         """Test validating restaurant with authentication."""
         # Log in the test user
         auth.login("testuser_1", "testpass")
@@ -175,12 +176,12 @@ class TestAPIRoutesSimple:
                 # Expected failure due to missing API key
                 assert response.json["status"] == "error"
 
-    def test_check_restaurant_exists_requires_auth(self, client: FlaskClient):
+    def test_check_restaurant_exists_requires_auth(self, client: FlaskClient) -> None:
         """Test that checking restaurant existence requires authentication."""
         response = client.get("/api/v1/restaurants/check?place_id=test_place_id")
         assert response.status_code == 401
 
-    def test_check_restaurant_exists_with_auth(self, client: FlaskClient, auth, test_user: User):
+    def test_check_restaurant_exists_with_auth(self, client: FlaskClient, auth, test_user: User) -> None:
         """Test checking restaurant existence with authentication."""
         # Log in the test user
         auth.login("testuser_1", "testpass")
@@ -190,7 +191,7 @@ class TestAPIRoutesSimple:
         assert response.json["status"] == "success"
         assert "data" in response.json
 
-    def test_api_error_handling(self, client: FlaskClient, auth, test_user: User):
+    def test_api_error_handling(self, client: FlaskClient, auth: AuthActions, test_user: User) -> None:
         """Test API error handling."""
         # Log in the test user
         auth.login("testuser_1", "testpass")
@@ -200,7 +201,7 @@ class TestAPIRoutesSimple:
         assert response.status_code == 400
         assert response.json["status"] == "error"
 
-    def test_api_not_found(self, client: FlaskClient, auth, test_user: User):
+    def test_api_not_found(self, client: FlaskClient, auth: AuthActions, test_user: User) -> None:
         """Test API 404 handling."""
         # Log in the test user
         auth.login("testuser_1", "testpass")

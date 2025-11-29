@@ -2,8 +2,8 @@
 
 from unittest.mock import Mock, patch
 
-import pytest
 from flask import Flask
+import pytest
 
 from app.admin.routes import (
     _create_user_from_form_data,
@@ -35,7 +35,7 @@ class TestAdminRoutes:
         user.get_display_name.return_value = "Test User"
         return user
 
-    def test_generate_secure_password(self):
+    def test_generate_secure_password(self) -> None:
         """Test secure password generation."""
         password = generate_secure_password()
 
@@ -50,7 +50,7 @@ class TestAdminRoutes:
         password2 = generate_secure_password()
         assert password != password2
 
-    def test_generate_secure_password_characters(self):
+    def test_generate_secure_password_characters(self) -> None:
         """Test that generated passwords contain expected characters."""
         password = generate_secure_password(50)  # Longer password for better testing
 
@@ -60,7 +60,7 @@ class TestAdminRoutes:
         assert any(c.isdigit() for c in password)
         assert any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password)
 
-    def test_generate_secure_password_length_variations(self):
+    def test_generate_secure_password_length_variations(self) -> None:
         """Test password generation with different lengths."""
         # Test minimum length
         password_8 = generate_secure_password(8)
@@ -74,7 +74,7 @@ class TestAdminRoutes:
         password_100 = generate_secure_password(100)
         assert len(password_100) == 100
 
-    def test_generate_secure_password_uniqueness(self):
+    def test_generate_secure_password_uniqueness(self) -> None:
         """Test that generated passwords are unique."""
         passwords = set()
         for _ in range(100):
@@ -84,7 +84,7 @@ class TestAdminRoutes:
         # Should have generated mostly unique passwords
         assert len(passwords) > 90  # Allow for some collisions
 
-    def test_generate_secure_password_character_distribution(self):
+    def test_generate_secure_password_character_distribution(self) -> None:
         """Test that passwords have good character distribution."""
         password = generate_secure_password(100)
 
@@ -107,7 +107,7 @@ class TestAdminRoutes:
         assert digit_count < total * 0.8
         assert special_count < total * 0.8
 
-    def test_generate_secure_password_edge_cases(self):
+    def test_generate_secure_password_edge_cases(self) -> None:
         """Test password generation edge cases."""
         # Test length 1
         password_1 = generate_secure_password(1)
@@ -121,7 +121,7 @@ class TestAdminRoutes:
         password_neg = generate_secure_password(-5)
         assert len(password_neg) == 0
 
-    def test_generate_secure_password_type_safety(self):
+    def test_generate_secure_password_type_safety(self) -> None:
         """Test that function handles type safety."""
         # Test with float input (should raise TypeError)
         try:
@@ -137,12 +137,12 @@ class TestAdminRoutes:
         except TypeError:
             pass  # Expected
 
-    def test_send_password_reset_notification_basic(self, mock_user):
+    def test_send_password_reset_notification_basic(self, mock_user) -> None:
         """Test basic password reset notification functionality."""
         # Test that function exists and can be called
         assert callable(send_password_reset_notification)
 
-    def test_extract_user_form_data(self, app):
+    def test_extract_user_form_data(self, app) -> None:
         """Test extracting user form data."""
         with app.test_request_context(
             "/admin/users/create",
@@ -167,7 +167,7 @@ class TestAdminRoutes:
             assert form_data["is_active"] is True
             assert form_data["send_password_notification"] is True
 
-    def test_extract_user_form_data_empty(self, app):
+    def test_extract_user_form_data_empty(self, app) -> None:
         """Test extracting user form data with empty form."""
         with app.test_request_context("/admin/users/create", method="POST", data={}):
             form_data = _extract_user_form_data()
@@ -180,7 +180,7 @@ class TestAdminRoutes:
             assert form_data["is_active"] is False
             assert form_data["send_password_notification"] is False
 
-    def test_validate_user_form_data_valid(self):
+    def test_validate_user_form_data_valid(self) -> None:
         """Test validating valid user form data."""
         form_data = {
             "username": "testuser",
@@ -201,7 +201,7 @@ class TestAdminRoutes:
             assert is_valid is True
             assert error_message == ""
 
-    def test_validate_user_form_data_missing_required(self):
+    def test_validate_user_form_data_missing_required(self) -> None:
         """Test validating user form data with missing required fields."""
         form_data = {
             "username": "",
@@ -217,7 +217,7 @@ class TestAdminRoutes:
         assert is_valid is False
         assert error_message == "Username and email are required"
 
-    def test_validate_user_form_data_existing_user(self):
+    def test_validate_user_form_data_existing_user(self) -> None:
         """Test validating user form data with existing user."""
         form_data = {
             "username": "testuser",
@@ -239,7 +239,7 @@ class TestAdminRoutes:
             assert is_valid is False
             assert error_message == "User with this username or email already exists"
 
-    def test_create_user_from_form_data(self, app):
+    def test_create_user_from_form_data(self, app) -> None:
         """Test creating user from form data."""
         form_data = {
             "username": "testuser",
@@ -264,14 +264,14 @@ class TestAdminRoutes:
                     mock_db.session.add.assert_called_once_with(mock_user)
                     mock_db.session.flush.assert_called_once()
 
-    def test_handle_password_notification_disabled(self, app, mock_user):
+    def test_handle_password_notification_disabled(self, app, mock_user) -> None:
         """Test handling password notification when disabled."""
         with app.test_request_context():
             with patch("app.admin.routes.flash") as mock_flash:
                 _handle_password_notification(mock_user, "password123", False)
                 mock_flash.assert_called_once_with("User created successfully. Password: password123", "success")
 
-    def test_handle_password_notification_basic(self, app, mock_user):
+    def test_handle_password_notification_basic(self, app, mock_user) -> None:
         """Test basic password notification handling functionality."""
         # Test that function exists and can be called
         assert callable(_handle_password_notification)
@@ -280,7 +280,7 @@ class TestAdminRoutes:
 class TestAdminRoutesAdditional:
     """Additional tests to improve coverage."""
 
-    def test_generate_secure_password_edge_cases(self):
+    def test_generate_secure_password_edge_cases(self) -> None:
         """Test password generation edge cases."""
         # Test with length 0
         password = generate_secure_password(0)
@@ -290,7 +290,7 @@ class TestAdminRoutesAdditional:
         password = generate_secure_password(-1)
         assert password == ""
 
-    def test_generate_secure_password_character_requirements(self):
+    def test_generate_secure_password_character_requirements(self) -> None:
         """Test that generated passwords meet character requirements."""
         password = generate_secure_password(20)
 
@@ -302,7 +302,7 @@ class TestAdminRoutesAdditional:
         # Just check that password is generated
         assert len(password) == 20
 
-    def test_extract_user_form_data_edge_cases(self, app):
+    def test_extract_user_form_data_edge_cases(self, app) -> None:
         """Test extracting user form data with edge cases."""
         # Test with missing fields
         with app.test_request_context(
@@ -323,7 +323,7 @@ class TestAdminRoutesAdditional:
             assert form_data["is_active"] is False
             assert form_data["send_password_notification"] is False
 
-    def test_validate_user_form_data_edge_cases(self):
+    def test_validate_user_form_data_edge_cases(self) -> None:
         """Test validating user form data with edge cases."""
         # Test with None values
         form_data = {
@@ -340,7 +340,7 @@ class TestAdminRoutesAdditional:
         assert is_valid is False
         assert error_message == "Username and email are required"
 
-    def test_create_user_from_form_data_edge_cases(self, app):
+    def test_create_user_from_form_data_edge_cases(self, app) -> None:
         """Test creating user from form data with edge cases."""
         # Test with minimal form data
         form_data = {
@@ -366,12 +366,12 @@ class TestAdminRoutesAdditional:
                     mock_db.session.add.assert_called_once_with(mock_user)
                     mock_db.session.flush.assert_called_once()
 
-    def test_send_password_reset_notification_edge_cases(self):
+    def test_send_password_reset_notification_edge_cases(self) -> None:
         """Test sending password reset notification with edge cases."""
         # Test that function exists and can be called
         assert callable(send_password_reset_notification)
 
-    def test_handle_password_notification_edge_cases(self, app):
+    def test_handle_password_notification_edge_cases(self, app) -> None:
         """Test handling password notification with edge cases."""
         # Test with None user
         with app.test_request_context():
@@ -390,7 +390,7 @@ class TestAdminRoutesAdditional:
 class TestAdminRoutesCoverage:
     """Tests to improve coverage for uncovered routes and functions."""
 
-    def test_route_functions_exist(self):
+    def test_route_functions_exist(self) -> None:
         """Test that route functions exist and are callable."""
         from app.admin.routes import (
             create_user,

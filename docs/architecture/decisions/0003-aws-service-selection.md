@@ -120,8 +120,9 @@ For each component, we considered the following options:
 **Aurora**
 
 - ✅ High performance
-- ❌ Higher cost
+- ❌ Higher cost ($45+/month)
 - ❌ Overkill for current needs
+- ❌ Requires VPC and RDS Proxy complexity
 
 ## Links
 

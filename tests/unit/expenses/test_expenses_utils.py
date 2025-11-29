@@ -13,7 +13,7 @@ from app.expenses.utils import save_receipt
 class TestSaveReceipt:
     """Test the save_receipt utility function."""
 
-    def test_save_receipt_success_pdf(self):
+    def test_save_receipt_success_pdf(self) -> None:
         """Test saving a PDF receipt successfully."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create a mock file storage
@@ -28,7 +28,7 @@ class TestSaveReceipt:
             assert result.endswith("_receipt.pdf")
             assert result.startswith("20")  # timestamp format YYYYMMDD
 
-    def test_save_receipt_success_jpg(self):
+    def test_save_receipt_success_jpg(self) -> None:
         """Test saving a JPG receipt successfully."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -40,7 +40,7 @@ class TestSaveReceipt:
             mock_file.save.assert_called_once()
             assert result.endswith("_receipt.jpg")  # extension normalized to lowercase
 
-    def test_save_receipt_success_jpeg(self):
+    def test_save_receipt_success_jpeg(self) -> None:
         """Test saving a JPEG receipt successfully."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -52,7 +52,7 @@ class TestSaveReceipt:
             mock_file.save.assert_called_once()
             assert result.endswith("_receipt.jpeg")
 
-    def test_save_receipt_success_png(self):
+    def test_save_receipt_success_png(self) -> None:
         """Test saving a PNG receipt successfully."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -64,7 +64,7 @@ class TestSaveReceipt:
             mock_file.save.assert_called_once()
             assert result.endswith("_receipt.png")
 
-    def test_save_receipt_success_gif(self):
+    def test_save_receipt_success_gif(self) -> None:
         """Test saving a GIF receipt successfully."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -76,7 +76,7 @@ class TestSaveReceipt:
             mock_file.save.assert_called_once()
             assert result.endswith("_receipt.gif")
 
-    def test_save_receipt_no_filename(self):
+    def test_save_receipt_no_filename(self) -> None:
         """Test saving a file with no filename."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -87,7 +87,7 @@ class TestSaveReceipt:
             with pytest.raises(ValueError, match="File type not allowed"):
                 save_receipt(mock_file, temp_dir)
 
-    def test_save_receipt_empty_filename(self):
+    def test_save_receipt_empty_filename(self) -> None:
         """Test saving a file with empty filename."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -98,7 +98,7 @@ class TestSaveReceipt:
             with pytest.raises(ValueError, match="File type not allowed"):
                 save_receipt(mock_file, temp_dir)
 
-    def test_save_receipt_invalid_extension(self):
+    def test_save_receipt_invalid_extension(self) -> None:
         """Test saving a file with invalid extension."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -107,7 +107,7 @@ class TestSaveReceipt:
             with pytest.raises(ValueError, match="File type not allowed"):
                 save_receipt(mock_file, temp_dir)
 
-    def test_save_receipt_no_extension(self):
+    def test_save_receipt_no_extension(self) -> None:
         """Test saving a file with no extension."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -116,7 +116,7 @@ class TestSaveReceipt:
             with pytest.raises(ValueError, match="File type not allowed"):
                 save_receipt(mock_file, temp_dir)
 
-    def test_save_receipt_creates_directory(self):
+    def test_save_receipt_creates_directory(self) -> None:
         """Test that the function creates the upload directory if it doesn't exist."""
         with tempfile.TemporaryDirectory() as temp_dir:
             upload_dir = os.path.join(temp_dir, "nonexistent", "subdir")
@@ -132,7 +132,7 @@ class TestSaveReceipt:
             mock_file.save.assert_called_once()
 
     @patch("os.makedirs")
-    def test_save_receipt_os_error(self, mock_makedirs):
+    def test_save_receipt_os_error(self, mock_makedirs) -> None:
         """Test handling of OSError when creating directories."""
         mock_makedirs.side_effect = OSError("Permission denied")
 
@@ -142,7 +142,7 @@ class TestSaveReceipt:
         with pytest.raises(OSError, match="Permission denied"):
             save_receipt(mock_file, "/invalid/path")
 
-    def test_save_receipt_filename_with_spaces(self):
+    def test_save_receipt_filename_with_spaces(self) -> None:
         """Test saving a file with spaces in filename."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -154,7 +154,7 @@ class TestSaveReceipt:
             mock_file.save.assert_called_once()
             assert result.endswith("_my receipt file.pdf")
 
-    def test_save_receipt_filename_with_special_chars(self):
+    def test_save_receipt_filename_with_special_chars(self) -> None:
         """Test saving a file with special characters in filename."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -166,7 +166,7 @@ class TestSaveReceipt:
             mock_file.save.assert_called_once()
             assert result.endswith("_receipt_2024-01-01@12:00.pdf")
 
-    def test_save_receipt_timestamp_format(self):
+    def test_save_receipt_timestamp_format(self) -> None:
         """Test that the timestamp is in the correct format."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -182,7 +182,7 @@ class TestSaveReceipt:
 
                 assert result == "20240101_120000_receipt.pdf"
 
-    def test_save_receipt_multiple_extensions(self):
+    def test_save_receipt_multiple_extensions(self) -> None:
         """Test saving files with multiple dots in filename."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)
@@ -194,7 +194,7 @@ class TestSaveReceipt:
             mock_file.save.assert_called_once()
             assert result.endswith("_receipt.backup.pdf")
 
-    def test_save_receipt_case_insensitive_extension(self):
+    def test_save_receipt_case_insensitive_extension(self) -> None:
         """Test that file extension validation is case insensitive."""
         with tempfile.TemporaryDirectory() as temp_dir:
             mock_file = Mock(spec=FileStorage)

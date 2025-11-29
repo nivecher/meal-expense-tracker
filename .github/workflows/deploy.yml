@@ -1,3 +1,4 @@
+---
 name: Deploy
 
 on:
@@ -6,38 +7,37 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**.md'
-      - '.gitignore'
+      - .gitignore
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy to'
+        description: Environment to deploy to
         required: true
-        default: 'dev'
+        default: dev
         type: choice
         options:
           - dev
           - staging
           - prod
       skip_tests:
-        description: 'Skip tests (use with caution)'
+        description: Skip tests (use with caution)
         required: false
         type: boolean
         default: false
 
 env:
   APP_NAME: meal-expense-tracker
-  PYTHON_VERSION: '3.13'
-  NODE_VERSION: '22'
+  PYTHON_VERSION: 3.13
+  NODE_VERSION: 22
   PYTHONPATH: ${{ github.workspace }}
   FLASK_ENV: test
-  TESTING: 'true'
-  
+  TESTING: true
+
   # Deployment settings
   ENV: ${{ github.event.inputs.environment || 'dev' }}
   TF_ENV: ${{ github.event.inputs.environment || 'dev' }}
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ vars.ECR_REGISTRY || '123456789012.dkr.ecr.us-east-1.amazonaws.com' }}
-  
   # Cache settings
   CACHE_VERSION: v3
 
@@ -60,8 +60,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-suite: ['unit', 'integration', 'lint', 'security']
-    
+        test-suite: [unit, integration, lint, security]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -72,8 +71,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements*.txt'
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Install system dependencies
         run: |
@@ -108,9 +107,9 @@ jobs:
         if: matrix.test-suite == 'lint'
         run: |
           if [ -f package.json ]; then
-            if [ -f package-lock.json ]; then 
+            if [ -f package-lock.json ]; then
               npm ci
-            else 
+            else
               npm install
             fi
           else
@@ -195,7 +194,6 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -226,7 +224,6 @@ jobs:
         run: |
           # Generate version file for build
           python -m setuptools_scm
-          
       - name: Commit version file
         run: |
           # Commit the generated version file if it changed
@@ -267,8 +264,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: 'requirements*.txt'
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Install system dependencies
         run: |

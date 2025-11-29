@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Tuple, Union
+from typing import Tuple, Union, cast
 
 from flask import Blueprint, Flask, Response, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
@@ -28,7 +28,7 @@ def _is_api_request() -> bool:
 
 def _create_error_response(
     message: str, status_code: int, error_type: str = "error"
-) -> Union[Response, Tuple[Response, int]]:
+) -> Response | tuple[Response, int]:
     """Create a standardized error response.
 
     Args:
@@ -42,29 +42,28 @@ def _create_error_response(
     if _is_api_request():
         response = jsonify({"status": error_type, "message": message, "code": status_code})
         response.status_code = status_code
-        return response
+        return cast(Response, response)
 
     # For web requests, render an error template
-    return (
-        render_template("errors/error.html", message=message, status_code=status_code),
-        status_code,
-    )
+    # Flask accepts (str, int) tuples as responses, which it converts to Response
+    template_response = render_template("errors/error.html", message=message, status_code=status_code)
+    return cast(tuple[Response, int], (template_response, status_code))
 
 
 @bp.app_errorhandler(404)
-def not_found_error(error: HTTPException) -> Union[Response, Tuple[Response, int]]:
+def not_found_error(error: HTTPException) -> Response | tuple[Response, int]:
     """Handle 404 Not Found errors."""
     return _create_error_response("Page not found", 404)
 
 
 @bp.app_errorhandler(500)
-def internal_error(error: Exception) -> Union[Response, Tuple[Response, int]]:
+def internal_error(error: Exception) -> Response | tuple[Response, int]:
     """Handle 500 Internal Server errors."""
     return _create_error_response("Internal server error", 500)
 
 
 @bp.app_errorhandler(Exception)
-def handle_exception(error: Exception) -> Union[Response, Tuple[Response, int]]:
+def handle_exception(error: Exception) -> Response | tuple[Response, int]:
     """Handle all unhandled exceptions."""
     # Log the error for debugging
     from flask import current_app
@@ -75,6 +74,7 @@ def handle_exception(error: Exception) -> Union[Response, Tuple[Response, int]]:
 
 
 @bp.app_errorhandler(HTTPException)
-def handle_http_exception(error: HTTPException) -> Union[Response, Tuple[Response, int]]:
+def handle_http_exception(error: HTTPException) -> Response | tuple[Response, int]:
     """Handle HTTP exceptions."""
-    return _create_error_response(error.description or "HTTP error occurred", error.code)
+    status_code = error.code if error.code is not None else 500
+    return _create_error_response(error.description or "HTTP error occurred", status_code)

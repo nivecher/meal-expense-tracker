@@ -1,6 +1,8 @@
 """Report-related routes for the application."""
 
 from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import Any, Dict, List
 
 from flask import render_template, request
 from flask_login import current_user, login_required
@@ -11,11 +13,12 @@ from app.expenses.models import Expense
 from app.extensions import db
 from app.reports import bp
 from app.restaurants import services as restaurant_services
+from app.restaurants.models import Restaurant
 
 
 @bp.route("/")
 @login_required
-def index():
+def index() -> str:
     """Show the reports dashboard with statistics."""
     # Get date range from query parameters with validation
     try:
@@ -46,7 +49,7 @@ def index():
 
 @bp.route("/expenses")
 @login_required
-def expense_report():
+def expense_report() -> str:
     """Generate an expense report with data."""
     # Get date range from query parameters
     days = int(request.args.get("days", 30))
@@ -56,17 +59,17 @@ def expense_report():
     expenses = expense_services.get_expenses_for_user(current_user.id, start_date=start_date)
 
     # Calculate statistics
-    total_amount = sum(expense.amount for expense in expenses)
+    total_amount = float(sum(expense.amount for expense in expenses))
     avg_amount = total_amount / len(expenses) if expenses else 0
 
     # Group by category
-    category_stats = {}
+    category_stats: dict[str, dict[str, int | Decimal]] = {}
     for expense in expenses:
         category_name = expense.category.name if expense.category else "Uncategorized"
         if category_name not in category_stats:
-            category_stats[category_name] = {"count": 0, "total": 0}
-        category_stats[category_name]["count"] += 1
-        category_stats[category_name]["total"] += expense.amount
+            category_stats[category_name] = {"count": 0, "total": Decimal(0)}
+        category_stats[category_name]["count"] = int(category_stats[category_name]["count"]) + 1
+        category_stats[category_name]["total"] = Decimal(category_stats[category_name]["total"]) + expense.amount
 
     return render_template(
         "reports/expense_report.html",
@@ -80,7 +83,7 @@ def expense_report():
 
 @bp.route("/restaurants")
 @login_required
-def restaurant_report():
+def restaurant_report() -> str:
     """Generate a restaurant report with data."""
     restaurants = restaurant_services.get_restaurants_for_user(current_user.id)
 
@@ -100,14 +103,17 @@ def restaurant_report():
             or 0
         )
 
-        restaurant_stats[restaurant.id] = {"count": expense_count, "total": float(total_spent)}
+        restaurant_stats[restaurant.id] = {
+            "count": expense_count or 0,
+            "total": float(total_spent) if total_spent else 0.0,
+        }
 
     return render_template("reports/restaurant_report.html", restaurants=restaurants, restaurant_stats=restaurant_stats)
 
 
 @bp.route("/analytics")
 @login_required
-def analytics():
+def analytics() -> str:
     """Show analytics dashboard with data."""
     # Get date range
     days = int(request.args.get("days", 30))
@@ -124,7 +130,7 @@ def analytics():
 
 @bp.route("/expense-statistics")
 @login_required
-def expense_statistics():
+def expense_statistics() -> str:
     """Show expense statistics page."""
     # Get date range with validation
     try:
@@ -171,7 +177,7 @@ def expense_statistics():
     )
 
 
-def _calculate_analytics_data(expenses, days):
+def _calculate_analytics_data(expenses: list[Expense], days: int) -> dict[str, Any]:
     """Calculate analytics data for charts and insights."""
     if not expenses:
         return {
@@ -188,15 +194,15 @@ def _calculate_analytics_data(expenses, days):
     avg_per_expense = total_spent / len(expenses)
 
     # Category breakdown
-    category_breakdown = {}
+    category_breakdown: dict[str, Decimal] = {}
     for expense in expenses:
         category_name = expense.category.name if expense.category else "Uncategorized"
         if category_name not in category_breakdown:
-            category_breakdown[category_name] = 0
+            category_breakdown[category_name] = Decimal(0)
         category_breakdown[category_name] += expense.amount
 
     # Monthly trends (last 6 months)
-    monthly_trends = {}
+    monthly_trends: dict[str, float] = {}
     for i in range(6):
         month_start = datetime.now().replace(day=1) - timedelta(days=30 * i)
         month_end = month_start + timedelta(days=30)
@@ -208,22 +214,22 @@ def _calculate_analytics_data(expenses, days):
         monthly_trends[month_key] = float(month_total)
 
     # Top restaurants
-    restaurant_totals = {}
+    restaurant_totals: dict[str, Decimal] = {}
     for expense in expenses:
         if expense.restaurant:
             restaurant_name = expense.restaurant.name
             if restaurant_name not in restaurant_totals:
-                restaurant_totals[restaurant_name] = 0
+                restaurant_totals[restaurant_name] = Decimal(0)
             restaurant_totals[restaurant_name] += expense.amount
 
-    top_restaurants = dict(sorted(restaurant_totals.items(), key=lambda x: x[1], reverse=True)[:5])
+    top_restaurants = dict[str, Decimal](sorted(restaurant_totals.items(), key=lambda x: x[1], reverse=True)[:5])
 
     # Meal type breakdown
-    meal_type_breakdown = {}
+    meal_type_breakdown: dict[str, Decimal] = {}
     for expense in expenses:
         meal_type = expense.meal_type or "Unknown"
         if meal_type not in meal_type_breakdown:
-            meal_type_breakdown[meal_type] = 0
+            meal_type_breakdown[meal_type] = Decimal(0)
         meal_type_breakdown[meal_type] += expense.amount
 
     return {
@@ -237,7 +243,7 @@ def _calculate_analytics_data(expenses, days):
     }
 
 
-def _calculate_comprehensive_stats(expenses, days):
+def _calculate_comprehensive_stats(expenses: list[Expense], days: int) -> dict[str, Any]:
     """Calculate comprehensive statistics for the stats page."""
     if not expenses:
         return _get_empty_stats()
@@ -265,7 +271,7 @@ def _calculate_comprehensive_stats(expenses, days):
     }
 
 
-def _get_empty_stats():
+def _get_empty_stats() -> dict[str, Any]:
     """Return empty stats structure."""
     return {
         "summary": {"total_expenses": 0, "total_spent": 0, "avg_per_expense": 0, "avg_per_day": 0},
@@ -276,55 +282,61 @@ def _get_empty_stats():
     }
 
 
-def _calculate_category_stats(expenses):
+def _calculate_category_stats(expenses: list[Expense]) -> dict[str, Any]:
     """Calculate category statistics."""
-    category_stats = {}
+    category_stats: dict[str, dict[str, int | Decimal]] = {}
     for expense in expenses:
         category_name = expense.category.name if expense.category else "Uncategorized"
         if category_name not in category_stats:
-            category_stats[category_name] = {"count": 0, "total": 0}
-        category_stats[category_name]["count"] += 1
-        category_stats[category_name]["total"] += expense.amount
+            category_stats[category_name] = {"count": 0, "total": Decimal(0)}
+        count_val: int | Decimal = category_stats[category_name]["count"]
+        total_val: int | Decimal = category_stats[category_name]["total"]
+        category_stats[category_name]["count"] = int(count_val) + 1
+        category_stats[category_name]["total"] = Decimal(str(total_val)) + expense.amount
     return category_stats
 
 
-def _calculate_restaurant_stats(expenses):
+def _calculate_restaurant_stats(expenses: list[Expense]) -> dict[str, Any]:
     """Calculate restaurant statistics."""
-    restaurant_stats = {}
+    restaurant_stats: dict[str, dict[str, int | Decimal]] = {}
     for expense in expenses:
         if expense.restaurant:
             restaurant_name = expense.restaurant.name
             if restaurant_name not in restaurant_stats:
-                restaurant_stats[restaurant_name] = {"count": 0, "total": 0}
-            restaurant_stats[restaurant_name]["count"] += 1
-            restaurant_stats[restaurant_name]["total"] += expense.amount
+                restaurant_stats[restaurant_name] = {"count": 0, "total": Decimal(0)}
+            count_val: int | Decimal = restaurant_stats[restaurant_name]["count"]
+            total_val: int | Decimal = restaurant_stats[restaurant_name]["total"]
+            restaurant_stats[restaurant_name]["count"] = int(count_val) + 1
+            restaurant_stats[restaurant_name]["total"] = Decimal(str(total_val)) + expense.amount
     return restaurant_stats
 
 
-def _calculate_monthly_data(expenses):
+def _calculate_monthly_data(expenses: list[Expense]) -> dict[str, Any]:
     """Calculate monthly data for charts."""
-    monthly_data = {}
+    monthly_data: dict[str, Decimal] = {}
     for expense in expenses:
         month_key = expense.date.strftime("%Y-%m")
         if month_key not in monthly_data:
-            monthly_data[month_key] = 0
+            monthly_data[month_key] = Decimal(0)
         monthly_data[month_key] += expense.amount
     return monthly_data
 
 
-def _calculate_meal_type_stats(expenses):
+def _calculate_meal_type_stats(expenses: list[Expense]) -> dict[str, Any]:
     """Calculate meal type statistics."""
-    meal_type_stats = {}
+    meal_type_stats: dict[str, dict[str, int | Decimal]] = {}
     for expense in expenses:
         meal_type = expense.meal_type or "Unknown"
         if meal_type not in meal_type_stats:
-            meal_type_stats[meal_type] = {"count": 0, "total": 0}
-        meal_type_stats[meal_type]["count"] += 1
-        meal_type_stats[meal_type]["total"] += expense.amount
+            meal_type_stats[meal_type] = {"count": 0, "total": Decimal(0)}
+        count_val: int | Decimal = meal_type_stats[meal_type]["count"]
+        total_val: int | Decimal = meal_type_stats[meal_type]["total"]
+        meal_type_stats[meal_type]["count"] = int(count_val) + 1
+        meal_type_stats[meal_type]["total"] = Decimal(str(total_val)) + expense.amount
     return meal_type_stats
 
 
-def _format_stats_list(stats_dict):
+def _format_stats_list(stats_dict: dict[str, Any]) -> list[dict[str, Any]]:
     """Format statistics dictionary into sorted list."""
     return [
         {"name": name, "count": data["count"], "total": float(data["total"])}
@@ -332,12 +344,12 @@ def _format_stats_list(stats_dict):
     ]
 
 
-def _format_monthly_data(monthly_data):
+def _format_monthly_data(monthly_data: dict[str, Any]) -> list[dict[str, Any]]:
     """Format monthly data into sorted list."""
     return [{"month": month, "total": float(total)} for month, total in sorted(monthly_data.items())]
 
 
-def _calculate_dashboard_stats(expenses, restaurants, days):
+def _calculate_dashboard_stats(expenses: list[Expense], restaurants: list[Restaurant], days: int) -> dict[str, Any]:
     """Calculate dashboard statistics.
 
     Args:
@@ -357,17 +369,17 @@ def _calculate_dashboard_stats(expenses, restaurants, days):
     avg_per_day = total_spent / days if days > 0 else 0.0
 
     # Top categories
-    category_totals = {}
+    category_totals: dict[str, Decimal] = {}
     for expense in expenses:
         category_name = expense.category.name if expense.category else "Uncategorized"
         if category_name not in category_totals:
-            category_totals[category_name] = 0
+            category_totals[category_name] = Decimal(0)
         category_totals[category_name] += expense.amount
 
     top_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)[:5]
 
     # Top restaurants by expense count
-    restaurant_counts = {}
+    restaurant_counts: dict[str, int] = {}
     for expense in expenses:
         if expense.restaurant:
             restaurant_name = expense.restaurant.name

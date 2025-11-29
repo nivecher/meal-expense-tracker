@@ -5,7 +5,7 @@ from app.auth.models import User
 from app.extensions import db
 
 
-def create_admin_user(username, email, password):
+def create_admin_user(username: str, email: str, password: str) -> None:
     """Create an admin user.
 
     Args:

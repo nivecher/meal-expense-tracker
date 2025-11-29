@@ -15,13 +15,15 @@ class Config:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-key-change-in-production")
 
     # Flask settings
-    DEBUG: bool = os.getenv("FLASK_DEBUG", "0").lower() == "1"
-    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    # Check both FLASK_DEBUG and DEBUG environment variables
+    _debug_flask = os.getenv("FLASK_DEBUG", "0").lower() == "1"
+    _debug_env = os.getenv("DEBUG", "false").lower() == "true"
+    DEBUG: bool = _debug_flask or _debug_env
     TESTING: bool = False
 
     # Database settings
     SQLALCHEMY_TRACK_MODIFICATIONS: bool = False
-    SQLALCHEMY_ENGINE_OPTIONS: Dict[str, Any] = {
+    SQLALCHEMY_ENGINE_OPTIONS: dict[str, Any] = {
         "pool_pre_ping": True,
         "pool_recycle": 300,  # 5 minutes
     }
@@ -49,7 +51,7 @@ class Config:
 
     # S3 settings for receipt storage
     # If S3_RECEIPTS_BUCKET is set, S3 is enabled; otherwise use local storage
-    S3_RECEIPTS_BUCKET: Optional[str] = os.getenv("S3_RECEIPTS_BUCKET")
+    S3_RECEIPTS_BUCKET: str | None = os.getenv("S3_RECEIPTS_BUCKET")
     S3_REGION: str = os.getenv("S3_REGION", "us-east-1")
     S3_RECEIPTS_PREFIX: str = os.getenv("S3_RECEIPTS_PREFIX", "receipts/")
     S3_URL_EXPIRY: int = int(os.getenv("S3_URL_EXPIRY", "3600"))  # 1 hour default

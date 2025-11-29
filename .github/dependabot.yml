@@ -1,10 +1,11 @@
+---
 version: 2
 updates:
   # Maintain dependencies for GitHub Actions
-  - package-ecosystem: 'github-actions'
-    directory: '/'
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: 'weekly'
+      interval: weekly
     # Only allow updates to the patch version
     versioning-strategy: increase-if-necessary
     # Group all GitHub Actions updates together
@@ -14,34 +15,29 @@ updates:
           - '*'
     # Labels to add to pull requests
     labels:
-      - 'dependencies'
-      - 'github-actions'
+      - dependencies
+      - github-actions
     # Auto-merge minor and patch updates that pass CI
     commit-message:
-      prefix: 'chore(deps)'
-      prefix-development: 'chore(deps-dev)'
-      include: 'scope'
-    # Reviewers for major version updates
-    reviewers:
-      - 'nivecher' # Replace with your GitHub username
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+      include: scope
     # Assignees for all updates
     assignees:
-      - 'nivecher' # Replace with your GitHub username
+      - nivecher  # Replace with your GitHub username
 
   # Maintain Python dependencies
-  - package-ecosystem: 'pip'
-    directory: '/'
+  - package-ecosystem: pip
+    directory: /
     schedule:
-      interval: 'weekly'
+      interval: weekly
     versioning-strategy: increase-if-necessary
     labels:
-      - 'dependencies'
-      - 'python'
+      - dependencies
+      - python
     commit-message:
-      prefix: 'chore(deps)'
-      prefix-development: 'chore(deps-dev)'
-      include: 'scope'
-    reviewers:
-      - 'nivecher' # Replace with your GitHub username
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+      include: scope
     assignees:
-      - 'nivecher' # Replace with your GitHub username
+      - nivecher  # Replace with your GitHub username

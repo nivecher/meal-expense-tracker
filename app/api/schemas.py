@@ -45,9 +45,10 @@ class RestaurantSchema(Schema):
     google_maps_url = fields.Method("get_google_maps_url", dump_only=True)
     google_search = fields.Str(dump_only=True)
 
-    def get_google_maps_url(self, obj):
+    def get_google_maps_url(self, obj: object) -> str:
         """Get the Google Maps URL for the restaurant."""
-        return obj.get_google_maps_url()
+        result = obj.get_google_maps_url()  # type: ignore[attr-defined]
+        return str(result)
 
 
 class ExpenseSchema(Schema):

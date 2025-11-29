@@ -4,8 +4,11 @@ These tests focus on complete restaurant service workflows including
 Google Places integration, data processing, and service level detection.
 """
 
+from typing import Any
 from unittest.mock import Mock, patch
 
+from flask import Flask
+from flask.testing import FlaskClient
 import pytest
 
 from app import create_app
@@ -31,12 +34,12 @@ class TestRestaurantServicesWorkflows:
             db.drop_all()
 
     @pytest.fixture
-    def client(self, app):
+    def client(self, app: Flask) -> FlaskClient:
         """Create test client."""
         return app.test_client()
 
     @pytest.fixture
-    def user(self, app):
+    def user(self, app: Flask) -> tuple[User, int]:
         """Create test user."""
         with app.app_context():
             user = User(username="testuser", email="test@example.com", password_hash="hashed_password")
@@ -45,24 +48,24 @@ class TestRestaurantServicesWorkflows:
             return user, user.id
 
     @pytest.fixture
-    def logged_in_client(self, client, user, app):
+    def logged_in_client(self, client: FlaskClient, user: tuple[User, int], app: Flask) -> FlaskClient | None:
         """Create a test client with logged-in user."""
         user_obj, user_id = user  # Unpack user and user_id
 
         # Create a test client that simulates being logged in
         class LoggedInTestClient:
-            def __init__(self, client, app, user_id):
+            def __init__(self, client: FlaskClient, app: Flask, user_id: int):
                 self.client = client
                 self.app = app
                 self.user_id = user_id
 
-            def get(self, *args, **kwargs):
+            def get(self, *args: Any, **kwargs: Any) -> Any:
                 return self._make_request("GET", *args, **kwargs)
 
-            def post(self, *args, **kwargs):
+            def post(self, *args: Any, **kwargs: Any) -> Any:
                 return self._make_request("POST", *args, **kwargs)
 
-            def _make_request(self, method, *args, **kwargs):
+            def _make_request(self, method: str, *args: Any, **kwargs: Any) -> Any:
                 with self.app.app_context():
                     # Set up the session for this request
                     with self.client.session_transaction() as sess:
@@ -76,7 +79,7 @@ class TestRestaurantServicesWorkflows:
         return LoggedInTestClient(client, app, user_id)
 
     @pytest.fixture
-    def mock_google_places_data(self):
+    def mock_google_places_data(self) -> dict[str, Any]:
         """Mock Google Places API response data."""
         return {
             "place_id": "ChIJN1t_tDeuEmsRUsoyG83frY4",
@@ -97,7 +100,9 @@ class TestRestaurantServicesWorkflows:
             ],
         }
 
-    def test_restaurant_creation_from_google_places_workflow(self, app, user, mock_google_places_data):
+    def test_restaurant_creation_from_google_places_workflow(
+        self, app: Flask, user: tuple[User, int], mock_google_places_data: dict[str, Any]
+    ) -> None:
         """Test restaurant creation from Google Places data workflow."""
         user_obj, user_id = user  # Unpack user and user_id
 

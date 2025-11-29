@@ -52,3 +52,15 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_waf" {
+  description = "Enable AWS WAF for CloudFront distribution"
+  type        = bool
+  default     = true
+}
+
+variable "waf_include_common_ruleset" {
+  description = "Include AWS Managed Common Rule Set (has standard pricing, not free tier)"
+  type        = bool
+  default     = false
+}

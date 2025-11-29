@@ -3,11 +3,13 @@ Integration tests for security headers configuration.
 Tests that Flask application properly sets security headers.
 """
 
+from flask.testing import FlaskClient
+
 
 class TestSecurityHeaders:
     """Test security headers are properly configured."""
 
-    def test_html_page_security_headers(self, client):
+    def test_html_page_security_headers(self, client: FlaskClient) -> None:
         """Test that HTML pages have proper security headers."""
         response = client.get("/")
 
@@ -29,7 +31,7 @@ class TestSecurityHeaders:
         # CSP should be present
         assert response.headers.get("Content-Security-Policy") is not None
 
-    def test_css_file_headers(self, client):
+    def test_css_file_headers(self, client: FlaskClient) -> None:
         """Test that CSS files have proper headers."""
         response = client.get("/static/css/main.css")
 
@@ -45,7 +47,7 @@ class TestSecurityHeaders:
         # Security headers should still be present
         assert response.headers.get("X-Content-Type-Options") == "nosniff"
 
-    def test_js_file_headers(self, client):
+    def test_js_file_headers(self, client: FlaskClient) -> None:
         """Test that JavaScript files have proper headers."""
         response = client.get("/static/js/main.js")
 
@@ -61,7 +63,7 @@ class TestSecurityHeaders:
         # Security headers should still be present
         assert response.headers.get("X-Content-Type-Options") == "nosniff"
 
-    def test_no_deprecated_headers(self, client):
+    def test_no_deprecated_headers(self, client: FlaskClient) -> None:
         """Test that deprecated headers are not present."""
         response = client.get("/")
 
@@ -69,7 +71,7 @@ class TestSecurityHeaders:
         assert response.headers.get("Expires") is None
         assert response.headers.get("Pragma") is None
 
-    def test_csp_configuration(self, client):
+    def test_csp_configuration(self, client: FlaskClient) -> None:
         """Test that Content Security Policy is properly configured."""
         response = client.get("/")
         csp = response.headers.get("Content-Security-Policy")
@@ -89,7 +91,7 @@ class TestSecurityHeaders:
         assert "https://maps.gstatic.com" in csp
         assert "https://places.googleapis.com" in csp
 
-    def test_permissions_policy(self, client):
+    def test_permissions_policy(self, client: FlaskClient) -> None:
         """Test that Permissions Policy is set."""
         response = client.get("/")
         permissions_policy = response.headers.get("Permissions-Policy")
@@ -99,7 +101,7 @@ class TestSecurityHeaders:
         assert "microphone=()" in permissions_policy
         assert "camera=()" in permissions_policy
 
-    def test_service_worker_headers(self, client):
+    def test_service_worker_headers(self, client: FlaskClient) -> None:
         """Test that service worker has proper headers."""
         response = client.get("/service-worker.js")
 

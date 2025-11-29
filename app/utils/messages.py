@@ -1,4 +1,9 @@
-"""Message constants for the application."""
+"""Message constants for the application.
+
+Note: Constants containing "PASSWORD" in their names (e.g., PASSWORD_UPDATED, PASSWORD_ERROR)
+are user-facing message strings, not hardcoded passwords. These are false positives for
+security linters that detect the word "password" in identifiers.
+"""
 
 
 class FlashMessages:

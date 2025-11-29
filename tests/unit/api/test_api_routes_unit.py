@@ -1,9 +1,10 @@
 """True unit tests for API routes - no Flask app required."""
 
+from unittest import TestCase
 from unittest.mock import Mock, patch
 
-import pytest
 from marshmallow import ValidationError
+import pytest
 
 from app.api.routes import (
     _create_api_response,
@@ -12,10 +13,10 @@ from app.api.routes import (
 )
 
 
-class TestAPIHelpers:
+class TestAPIHelpers(TestCase):
     """Test API helper functions without Flask app."""
 
-    def test_create_api_response_with_data(self):
+    def test_create_api_response_with_data(self) -> None:
         """Test creating API response with data."""
         with patch("app.api.routes.jsonify") as mock_jsonify:
             mock_jsonify.return_value = Mock()
@@ -27,7 +28,7 @@ class TestAPIHelpers:
             assert status == 200
             mock_jsonify.assert_called_once_with({"status": "success", "message": "Success", "data": {"test": "data"}})
 
-    def test_create_api_response_without_data(self):
+    def test_create_api_response_without_data(self) -> None:
         """Test creating API response without data."""
         with patch("app.api.routes.jsonify") as mock_jsonify:
             mock_jsonify.return_value = Mock()
@@ -37,7 +38,7 @@ class TestAPIHelpers:
             assert status == 200
             mock_jsonify.assert_called_once_with({"status": "success", "message": "Success"})
 
-    def test_handle_validation_error(self):
+    def test_handle_validation_error(self) -> None:
         """Test handling validation error."""
         with patch("app.api.routes.jsonify") as mock_jsonify:
             mock_jsonify.return_value = Mock()
@@ -50,7 +51,7 @@ class TestAPIHelpers:
                 {"status": "error", "message": "Validation failed", "errors": {"field": ["Error message"]}}
             )
 
-    def test_handle_service_error_basic(self):
+    def test_handle_service_error_basic(self) -> None:
         """Test basic service error handling logic."""
         # This function inherently requires Flask context, so we'll test the concept
         Exception("Service error")
@@ -64,7 +65,7 @@ class TestAPIHelpers:
         # The actual testing of this function should be done in integration tests
         # since it requires Flask context for current_app.logger and jsonify
 
-    def test_get_current_user(self):
+    def test_get_current_user(self) -> None:
         """Test getting current user."""
         with patch("app.api.routes.current_user") as mock_current_user:
             mock_user = Mock()
@@ -79,7 +80,7 @@ class TestAPIHelpers:
 class TestAPISchemas:
     """Test API schema validation without Flask app."""
 
-    def test_expense_schema_validation(self):
+    def test_expense_schema_validation(self) -> None:
         """Test expense schema validation."""
         from app.api.schemas import ExpenseSchema
 
@@ -99,7 +100,7 @@ class TestAPISchemas:
         with pytest.raises(ValidationError):
             schema.load(invalid_data)
 
-    def test_restaurant_schema_validation(self):
+    def test_restaurant_schema_validation(self) -> None:
         """Test restaurant schema validation."""
         from app.api.schemas import RestaurantSchema
 
@@ -118,7 +119,7 @@ class TestAPISchemas:
         with pytest.raises(ValidationError):
             schema.load(invalid_data)
 
-    def test_category_schema_validation(self):
+    def test_category_schema_validation(self) -> None:
         """Test category schema validation."""
         from app.api.schemas import CategorySchema
 
@@ -141,7 +142,7 @@ class TestAPISchemas:
 class TestAPIServices:
     """Test API service layer without Flask app."""
 
-    def test_expense_services_get_expenses(self):
+    def test_expense_services_get_expenses(self) -> None:
         """Test expense services get expenses."""
         from app.expenses import services as expense_services
 
@@ -157,7 +158,7 @@ class TestAPIServices:
             assert result == mock_expenses
             mock_get_expenses.assert_called_once_with(mock_user.id)
 
-    def test_restaurant_services_get_restaurants(self):
+    def test_restaurant_services_get_restaurants(self) -> None:
         """Test restaurant services get restaurants."""
         from app.restaurants import services as restaurant_services
 
@@ -173,7 +174,7 @@ class TestAPIServices:
             assert result == mock_restaurants
             mock_get_restaurants.assert_called_once_with(mock_user.id)
 
-    def test_category_services_get_categories(self):
+    def test_category_services_get_categories(self) -> None:
         """Test category services get categories."""
         from app.categories import services as category_services
 

@@ -31,7 +31,7 @@ MAX_TAG_LENGTH = 50
 PG_SPECIAL_CHARS = "~!@#$%^&*_+-=[]{}|;:,.<>?"
 
 
-def _run_git_command(args: List[str], cwd: Optional[str] = None) -> Tuple[bool, str]:
+def _run_git_command(args: list[str], cwd: str | None = None) -> tuple[bool, str]:
     """Safely run a git command with proper error handling.
 
     Args:
@@ -140,9 +140,9 @@ def generate_password(length: int = 16, max_attempts: int = 10) -> str:
 
 
 # Type aliases for better readability
-FieldValidator = Dict[str, Any]
-FieldValidators = Dict[str, FieldValidator]
-SecretDict = Dict[str, Any]
+FieldValidator = dict[str, Any]
+FieldValidators = dict[str, FieldValidator]
+SecretDict = dict[str, Any]
 
 # Constants for field validation
 REQUIRED_FIELDS: FieldValidators = {
@@ -206,7 +206,7 @@ def _validate_stage(stage: str) -> None:
         raise ValueError("Stage must be either 'AWSCURRENT' or 'AWSPENDING'")
 
 
-def _prepare_request_params(arn: str, stage: str, token: Optional[str] = None) -> Dict[str, Any]:
+def _prepare_request_params(arn: str, stage: str, token: str | None = None) -> dict[str, Any]:
     """Prepare the request parameters for AWS Secrets Manager.
 
     Args:
@@ -220,7 +220,7 @@ def _prepare_request_params(arn: str, stage: str, token: Optional[str] = None) -
     Raises:
         ValueError: If the token is invalid
     """
-    params: Dict[str, Any] = {"SecretId": arn}
+    params: dict[str, Any] = {"SecretId": arn}
 
     if token:
         if not isinstance(token, str):
@@ -232,7 +232,7 @@ def _prepare_request_params(arn: str, stage: str, token: Optional[str] = None) -
     return params
 
 
-def _parse_secret_response(response: Dict[str, Any], arn: str) -> Dict[str, Any]:
+def _parse_secret_response(response: dict[str, Any], arn: str) -> dict[str, Any]:
     """Parse and validate the secret response from AWS.
 
     Args:
@@ -297,7 +297,7 @@ def _validate_field_value(field: str, value: Any, validator: FieldValidator) -> 
     return value
 
 
-def _validate_secret_fields(secret: Dict[str, Any], validators: FieldValidators) -> SecretDict:
+def _validate_secret_fields(secret: dict[str, Any], validators: FieldValidators) -> SecretDict:
     """Validate all fields in the secret against the validators.
 
     Args:
@@ -348,7 +348,7 @@ def _handle_aws_error(error: Exception, arn: str) -> None:
         raise ValueError(f"Error retrieving secret {arn}: {str(error)}") from error
 
 
-def get_secret_dict(service_client: Any, arn: str, stage: str, token: Optional[str] = None) -> Dict[str, Any]:
+def get_secret_dict(service_client: Any, arn: str, stage: str, token: str | None = None) -> dict[str, Any]:
     """Get and validate the secret value as a dictionary.
 
     This function retrieves a secret from AWS Secrets Manager and validates that

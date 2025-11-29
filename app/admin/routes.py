@@ -2,10 +2,11 @@
 
 import secrets
 import string
-from typing import Any, Dict
+from typing import Any, Dict, Tuple, cast
 
 from flask import (
     Blueprint,
+    Response,
     current_app,
     flash,
     jsonify,
@@ -63,7 +64,9 @@ def send_password_reset_notification(user: User, new_password: str) -> bool:
             return False
 
         # Try to send notification
-        notification_sent = send_password_reset_notification(user.email, user.username, new_password)
+        user_email = user.email
+        username = user.username
+        notification_sent = send_password_reset_notification(user_email, username, new_password)
 
         if not notification_sent:
             # Fallback: log the password reset
@@ -83,7 +86,7 @@ def send_password_reset_notification(user: User, new_password: str) -> bool:
 @bp.route("/")
 @login_required
 @admin_required
-def dashboard():
+def dashboard() -> str | Response:
     """Admin dashboard showing system overview."""
     try:
         # Get system statistics
@@ -118,13 +121,13 @@ def dashboard():
     except Exception as e:
         current_app.logger.error(f"Error loading admin dashboard: {e}")
         flash("Error loading admin dashboard", "danger")
-        return redirect(url_for("main.index"))
+        return cast(Response, redirect(url_for("main.index")))
 
 
 @bp.route("/users")
 @login_required
 @admin_required
-def list_users():
+def list_users() -> str | Response:
     """List all users with admin controls."""
     try:
         # Get pagination parameters
@@ -170,13 +173,13 @@ def list_users():
     except Exception as e:
         current_app.logger.error(f"Error loading users: {e}")
         flash("Error loading users", "danger")
-        return redirect(url_for("admin.dashboard"))
+        return cast(Response, redirect(url_for("admin.dashboard")))
 
 
 @bp.route("/users/<int:user_id>")
 @login_required
 @admin_required
-def view_user(user_id: int):
+def view_user(user_id: int) -> str | Response:
     """View detailed information about a specific user."""
     try:
         user = User.query.get_or_404(user_id)
@@ -198,14 +201,14 @@ def view_user(user_id: int):
     except Exception as e:
         current_app.logger.error(f"Error loading user {user_id}: {e}")
         flash("Error loading user details", "danger")
-        return redirect(url_for("admin.list_users"))
+        return cast(Response, redirect(url_for("admin.list_users")))
 
 
 @bp.route("/users/<int:user_id>/reset-password", methods=["POST"])
 @login_required
 @admin_required
 @db_transaction(success_message="Password reset successfully", error_message="Failed to reset password")
-def reset_user_password(user_id: int):
+def reset_user_password(user_id: int) -> Response:
     """Reset a user's password and email it to them."""
     try:
         user = User.query.get_or_404(user_id)
@@ -238,19 +241,19 @@ def reset_user_password(user_id: int):
                 "warning",
             )
 
-        return redirect(url_for("admin.view_user", user_id=user_id))
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
     except Exception as e:
         current_app.logger.error(f"Error resetting password for user {user_id}: {e}")
         flash("Error resetting password", "danger")
-        return redirect(url_for("admin.view_user", user_id=user_id))
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
 
 @bp.route("/users/<int:user_id>/toggle-admin", methods=["POST"])
 @login_required
 @admin_required
 @db_transaction(success_message="User admin status updated", error_message="Failed to update admin status")
-def toggle_user_admin(user_id: int):
+def toggle_user_admin(user_id: int) -> Response:
     """Toggle admin status for a user."""
     try:
         user = User.query.get_or_404(user_id)
@@ -258,7 +261,7 @@ def toggle_user_admin(user_id: int):
         # Prevent admin from removing their own admin status
         if user.id == current_user.id:
             flash("You cannot remove admin privileges from yourself", "warning")
-            return redirect(url_for("admin.view_user", user_id=user_id))
+            return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
         # Toggle admin status
         user.is_admin = not user.is_admin
@@ -267,19 +270,19 @@ def toggle_user_admin(user_id: int):
         status = "granted" if user.is_admin else "removed"
         flash(f"Admin privileges {status} for {user.get_display_name()}", "success")
 
-        return redirect(url_for("admin.view_user", user_id=user_id))
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
     except Exception as e:
         current_app.logger.error(f"Error toggling admin status for user {user_id}: {e}")
         flash("Error updating admin status", "danger")
-        return redirect(url_for("admin.view_user", user_id=user_id))
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
 
 @bp.route("/users/<int:user_id>/toggle-active", methods=["POST"])
 @login_required
 @admin_required
 @db_transaction(success_message="User active status updated", error_message="Failed to update active status")
-def toggle_user_active(user_id: int):
+def toggle_user_active(user_id: int) -> Response:
     """Toggle active status for a user."""
     try:
         user = User.query.get_or_404(user_id)
@@ -287,7 +290,7 @@ def toggle_user_active(user_id: int):
         # Prevent admin from deactivating themselves
         if user.id == current_user.id:
             flash("You cannot deactivate your own account", "warning")
-            return redirect(url_for("admin.view_user", user_id=user_id))
+            return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
         # Toggle active status
         user.is_active = not user.is_active
@@ -296,19 +299,19 @@ def toggle_user_active(user_id: int):
         status = "activated" if user.is_active else "deactivated"
         flash(f"Account {status} for {user.get_display_name()}", "success")
 
-        return redirect(url_for("admin.view_user", user_id=user_id))
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
     except Exception as e:
         current_app.logger.error(f"Error toggling active status for user {user_id}: {e}")
         flash("Error updating active status", "danger")
-        return redirect(url_for("admin.view_user", user_id=user_id))
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
 
 @bp.route("/users/<int:user_id>/delete", methods=["POST"])
 @login_required
 @admin_required
 @db_transaction(success_message="User deleted successfully", error_message="Failed to delete user")
-def delete_user(user_id: int):
+def delete_user(user_id: int) -> Response:
     """Delete a user account and all related data."""
     try:
         user = User.query.get_or_404(user_id)
@@ -316,7 +319,7 @@ def delete_user(user_id: int):
         # Prevent admin from deleting themselves
         if user.id == current_user.id:
             flash("You cannot delete your own account", "warning")
-            return redirect(url_for("admin.view_user", user_id=user_id))
+            return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
         # Store user info for confirmation message
         username = user.username
@@ -342,15 +345,15 @@ def delete_user(user_id: int):
         else:
             flash(f"User '{display_name}' ({username}) deleted successfully", "success")
 
-        return redirect(url_for("admin.list_users"))
+        return cast(Response, redirect(url_for("admin.list_users")))
 
     except Exception as e:
         current_app.logger.error(f"Error deleting user {user_id}: {e}")
         flash("Error deleting user", "danger")
-        return redirect(url_for("admin.view_user", user_id=user_id))
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
 
-def _extract_user_form_data() -> Dict[str, Any]:
+def _extract_user_form_data() -> dict[str, Any]:
     """Extract and validate form data for user creation.
 
     Returns:
@@ -367,7 +370,7 @@ def _extract_user_form_data() -> Dict[str, Any]:
     }
 
 
-def _validate_user_form_data(form_data: Dict[str, Any]) -> tuple[bool, str]:
+def _validate_user_form_data(form_data: dict[str, Any]) -> tuple[bool, str]:
     """Validate user form data.
 
     Args:
@@ -389,7 +392,7 @@ def _validate_user_form_data(form_data: Dict[str, Any]) -> tuple[bool, str]:
     return True, ""
 
 
-def _create_user_from_form_data(form_data: Dict[str, Any], password: str) -> User:
+def _create_user_from_form_data(form_data: dict[str, Any], password: str) -> User:
     """Create a new user from form data.
 
     Args:
@@ -451,10 +454,10 @@ def _handle_password_notification(user: User, password: str, send_notification: 
 @login_required
 @admin_required
 @db_transaction(success_message="User created successfully", error_message="Failed to create user")
-def create_user():
+def create_user() -> Response:
     """Create a new user."""
     if request.method == "GET":
-        return render_template("admin/create_user.html", title="Create User")
+        return cast(Response, render_template("admin/create_user.html", title="Create User"))
 
     try:
         # Extract and validate form data
@@ -463,7 +466,7 @@ def create_user():
 
         if not is_valid:
             flash(error_message, "danger")
-            return render_template("admin/create_user.html", title="Create User")
+            return cast(Response, render_template("admin/create_user.html", title="Create User"))
 
         # Generate password and create user
         password = generate_secure_password()
@@ -477,18 +480,18 @@ def create_user():
         # Handle password notification
         _handle_password_notification(user, password, form_data["send_password_notification"])
 
-        return redirect(url_for("admin.view_user", user_id=user.id))
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user.id)))
 
     except Exception as e:
         current_app.logger.error(f"Error creating user: {e}")
         flash("Error creating user", "danger")
-        return render_template("admin/create_user.html", title="Create User")
+        return cast(Response, render_template("admin/create_user.html", title="Create User"))
 
 
 @bp.route("/api/users/<int:user_id>/stats")
 @login_required
 @admin_required
-def get_user_stats(user_id: int):
+def get_user_stats(user_id: int) -> tuple[Response, int]:
     """Get user statistics as JSON."""
     try:
         user = User.query.get_or_404(user_id)
@@ -506,8 +509,8 @@ def get_user_stats(user_id: int):
             "category_count": user.categories.count() if hasattr(user, "categories") else 0,
         }
 
-        return jsonify({"success": True, "data": stats})
+        return cast(tuple[Response, int], (cast(Response, jsonify({"success": True, "data": stats})), 200))
 
     except Exception as e:
         current_app.logger.error(f"Error getting user stats for {user_id}: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return cast(tuple[Response, int], (cast(Response, jsonify({"success": False, "error": str(e)})), 500))

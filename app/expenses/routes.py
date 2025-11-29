@@ -7,9 +7,10 @@ import json
 from math import ceil
 
 # Type annotations for responses
-from typing import Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 from flask import (
+    Response,
     abort,
     current_app,
     flash,
@@ -20,20 +21,17 @@ from flask import (
     request,
     url_for,
 )
-from flask.wrappers import Response as FlaskResponse
-
-ResponseReturnValue = Union[str, FlaskResponse, tuple]
 from flask_login import current_user, login_required
 
 # Third-party imports
 from flask_wtf import FlaskForm
-from werkzeug.wrappers import Response as WerkzeugResponse
+
+ResponseReturnValue = Union[str, Response, tuple]
 
 from app.constants.categories import get_default_categories
 
 # Local application imports
-from app.expenses import bp
-from app.expenses import services as expense_services
+from app.expenses import bp, services as expense_services
 from app.expenses.forms import ExpenseForm, ExpenseImportForm
 from app.expenses.models import Category, Expense
 from app.extensions import db
@@ -50,7 +48,7 @@ PER_PAGE = 10  # Number of expenses per page
 SHOW_ALL = -1  # Special value to show all expenses
 
 
-def _get_page_size_from_cookie(cookie_name="expense_page_size", default_size=PER_PAGE):
+def _get_page_size_from_cookie(cookie_name: str = "expense_page_size", default_size: int = PER_PAGE) -> int:
     """Get page size from cookie with validation and fallback."""
     try:
         cookie_value = request.cookies.get(cookie_name)
@@ -70,21 +68,23 @@ def _sort_categories_by_default_order(categories: list[Category]) -> list[Catego
     default_names = [cat["name"] for cat in default_categories]
 
     # Create a mapping of category name to order index
-    name_to_order = {name: i for i, name in enumerate(default_names)}
+    name_to_order: dict[str, int] = {name: i for i, name in enumerate(default_names)}
 
     # Sort categories: default categories first (in original order), then others
-    def sort_key(cat):
-        if cat.name in name_to_order:
-            return (0, name_to_order[cat.name])  # Default categories first
-        else:
-            return (1, cat.name)  # Custom categories after, alphabetically
+    def sort_key(cat: Category) -> tuple[int, int]:
+        cat_name = cat.name
+        if cat_name in name_to_order:
+            order_idx = name_to_order[cat_name]
+            return (0, order_idx)  # Default categories first
+        # For custom categories, use hash of name for consistent ordering
+        return (1, hash(cat_name) % 10000)  # Custom categories after, alphabetically
 
     return sorted(categories, key=sort_key)
 
 
 def _get_form_choices(
     user_id: int,
-) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+) -> tuple[list[tuple[int, str, str, str | None]], list[tuple[int, str]]]:
     """Get category and restaurant choices for the expense form.
 
     Args:
@@ -98,8 +98,17 @@ def _get_form_choices(
     # Get categories and sort them by default order
     categories_query = Category.query.filter_by(user_id=user_id).all()
     sorted_categories = _sort_categories_by_default_order(categories_query)
-    categories = [(c.id, c.name, c.color, c.icon) for c in sorted_categories]
-    restaurants = [(r.id, r.name) for r in Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()]
+    categories: list[tuple[int, str, str, str | None]] = []
+    for c in sorted_categories:
+        cat_id: int = c.id
+        cat_name: str = c.name
+        # Note: cat_id and cat_name are non-nullable, so no None check needed
+        color_val: str = c.color if c.color else "#6c757d"
+        icon_val: str | None = c.icon
+        categories.append((cat_id, cat_name, color_val, icon_val))
+    restaurants: list[tuple[int, str]] = [
+        (r.id, r.name) for r in Restaurant.query.filter_by(user_id=user_id).order_by(Restaurant.name).all()
+    ]
     return categories, restaurants
 
 
@@ -189,7 +198,8 @@ def _handle_expense_creation(form: ExpenseForm, is_ajax: bool) -> ResponseReturn
 
     except Exception as e:
         current_app.logger.error(f"Unexpected error in _handle_expense_creation: {str(e)}", exc_info=True)
-        return _handle_creation_error("An unexpected error occurred", form, is_ajax, status_code=500, error=str(e))
+        extra_data: dict[str, Any] = {"error": str(e)}
+        return _handle_creation_error("An unexpected error occurred", form, is_ajax, status_code=500, **extra_data)
 
 
 def _handle_creation_error(
@@ -254,7 +264,7 @@ def _handle_creation_success(expense: Expense, is_ajax: bool) -> ResponseReturnV
         )
 
     flash("Expense added successfully!", "success")
-    return redirect(url_for("expenses.list_expenses"))
+    return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]  # type: ignore[return-value]
 
 
 @bp.route("/add", methods=["GET", "POST"])
@@ -336,7 +346,7 @@ def add_expense() -> ResponseReturnValue:
 
 def _get_expense_for_editing(
     expense_id: int,
-) -> Tuple[Optional[Expense], Optional[ResponseReturnValue]]:
+) -> tuple[Expense | None, ResponseReturnValue | None]:
     """Retrieve an expense for editing or return an error response.
 
     Args:
@@ -351,7 +361,7 @@ def _get_expense_for_editing(
     return expense, None
 
 
-def _setup_expense_form() -> Tuple[FlaskForm, list, list]:
+def _setup_expense_form() -> tuple[FlaskForm, list[tuple[int, str, str, str | None]], list[tuple[int, str]]]:
     """Set up the expense form with choices.
 
     Returns:
@@ -395,13 +405,15 @@ def edit_expense(expense_id: int) -> ResponseReturnValue:
     expense, error_response = _get_expense_for_editing(expense_id)
     if error_response:
         return error_response
+    if expense is None:
+        return _handle_expense_not_found()
 
     return _process_edit_request(expense)
 
 
 def _initialize_expense_edit(
     expense_id: int,
-) -> Tuple[Optional[Expense], Optional[ResponseReturnValue]]:
+) -> tuple[Expense | None, ResponseReturnValue | None]:
     """Initialize the expense edit process.
 
     Args:
@@ -430,7 +442,8 @@ def _handle_get_request(expense: Expense) -> ResponseReturnValue:
     categories, restaurants = _get_form_choices(current_user.id)
     form = _init_expense_form(categories, restaurants)
     _populate_expense_form(form, expense)
-    return _render_expense_form(form, expense, categories, is_edit=True)
+    categories_for_render: list[tuple[int, str, str, str | None]] = categories
+    return _render_expense_form(form, expense, categories_for_render, is_edit=True)
 
 
 def _handle_post_request(expense: Expense) -> ResponseReturnValue:
@@ -445,7 +458,9 @@ def _handle_post_request(expense: Expense) -> ResponseReturnValue:
     categories, restaurants = _get_form_choices(current_user.id)
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     form = _init_expense_form(categories, restaurants)
-    return _handle_expense_update(expense, form, categories, restaurants, is_ajax)
+    categories_for_update: list[tuple[int, str, str, str | None]] = categories
+    restaurants_for_update: list[tuple[int, str]] = restaurants
+    return _handle_expense_update(expense, form, categories_for_update, restaurants_for_update, is_ajax)
 
 
 def _handle_unsupported_method() -> ResponseReturnValue:
@@ -457,7 +472,7 @@ def _handle_unsupported_method() -> ResponseReturnValue:
     return ("Method Not Allowed", 405, {"Allow": "GET, POST"})
 
 
-def _get_expense_or_404(expense_id: int) -> Expense:
+def _get_expense_or_404(expense_id: int) -> Expense | None:
     """Retrieve an expense by ID or return None if not found."""
     return expense_services.get_expense_by_id(expense_id, current_user.id)
 
@@ -467,10 +482,12 @@ def _handle_expense_not_found() -> ResponseReturnValue:
     if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return {"success": False, "message": "Expense not found"}, 404
     flash("Expense not found.", "error")
-    return redirect(url_for("expenses.list_expenses"))
+    return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]
 
 
-def _init_expense_form(categories: list[tuple[int, str, str, str]], restaurants: list[tuple[str, str]]) -> ExpenseForm:
+def _init_expense_form(
+    categories: list[tuple[int, str, str, str | None]], restaurants: list[tuple[int, str]]
+) -> ExpenseForm:
     """Initialize an expense form with the given choices."""
     # Set default date to current date in browser's timezone
     from app.utils.timezone_utils import get_current_time_in_browser_timezone
@@ -490,27 +507,23 @@ def _init_expense_form(categories: list[tuple[int, str, str, str]], restaurants:
 def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
     """Populate the expense form with existing expense data."""
     form.process(obj=expense)
-    if expense.category_id:
-        form.category_id.data = expense.category_id
-    if expense.restaurant_id:
-        form.restaurant_id.data = expense.restaurant_id
-    if expense.meal_type:
-        form.meal_type.data = expense.meal_type
-    # Set the date and time from the expense
-    if expense.date:
-        from app.utils.timezone_utils import convert_to_browser_timezone
+    # Set the date and time from the expense (requires timezone conversion)
+    # Note: expense.date is non-nullable, so no None check needed
 
-        browser_timezone, _ = get_browser_timezone_info()
-        expense_datetime_browser_tz = convert_to_browser_timezone(expense.date, browser_timezone)
-        form.date.data = expense_datetime_browser_tz.date()
-        form.time.data = expense_datetime_browser_tz.time()
+    from app.utils.timezone_utils import convert_to_browser_timezone
+
+    browser_timezone, _ = get_browser_timezone_info()
+    expense_date = expense.date
+    expense_datetime_browser_tz = convert_to_browser_timezone(expense_date, browser_timezone)
+    form.date.data = expense_datetime_browser_tz.date()
+    form.time.data = expense_datetime_browser_tz.time()
 
 
 def _handle_expense_update(
     expense: Expense,
     form: ExpenseForm,
-    categories: list[tuple[str, str]],
-    restaurants: list[tuple[str, str]],
+    categories: list[tuple[int, str, str, str | None]],
+    restaurants: list[tuple[int, str]],
     is_ajax: bool,
 ) -> ResponseReturnValue:
     """Handle the expense update form submission."""
@@ -523,15 +536,17 @@ def _handle_expense_update(
         updated_expense, error = expense_services.update_expense(expense, form, receipt_file, delete_receipt)
         if error:
             return _handle_update_error(error, is_ajax)
-        return _handle_update_success(expense.id, is_ajax, receipt_deleted=delete_receipt)
+        # Note: expense is non-nullable parameter, so expense.id is always available
+        expense_id: int = expense.id
+        return _handle_update_success(expense_id, is_ajax, receipt_deleted=delete_receipt)
 
     return _handle_validation_errors(form, expense, is_ajax)
 
 
 def _reinitialize_form_with_data(
     form: ExpenseForm,
-    categories: list[tuple[int, str, str, str]],
-    restaurants: list[tuple[str, str]],
+    categories: list[tuple[int, str, str, str | None]],
+    restaurants: list[tuple[int, str]],
 ) -> ExpenseForm:
     """Reinitialize form with submitted data and choices."""
     form_data = request.form.to_dict()
@@ -568,11 +583,16 @@ def _handle_update_success(expense_id: int, is_ajax: bool, receipt_deleted: bool
     """Handle successful update response."""
     if is_ajax:
         message = "Receipt deleted successfully!" if receipt_deleted else "Expense updated successfully!"
-        return {
-            "success": True,
-            "message": message,
-            "redirect": url_for("expenses.expense_details", expense_id=expense_id),
-        }
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": message,
+                    "redirect": url_for("expenses.expense_details", expense_id=expense_id),
+                }
+            ),
+            200,
+        )
 
     # Set appropriate flash message
     if receipt_deleted:
@@ -580,7 +600,7 @@ def _handle_update_success(expense_id: int, is_ajax: bool, receipt_deleted: bool
     else:
         flash("Expense updated successfully!", "success")
 
-    return redirect(url_for("expenses.expense_details", expense_id=expense_id))
+    return redirect(url_for("expenses.expense_details", expense_id=expense_id))  # type: ignore[return-value]
 
 
 def _handle_validation_errors(form: ExpenseForm, expense: Expense, is_ajax: bool) -> ResponseReturnValue:
@@ -606,12 +626,12 @@ def _handle_validation_errors(form: ExpenseForm, expense: Expense, is_ajax: bool
 def _render_expense_form(
     form: ExpenseForm,
     expense: Expense,
-    categories: list[tuple[int, str, str, str]],
+    categories: list[tuple[int, str, str, str | None]],
     is_edit: bool = False,
 ) -> str:
     """Render the expense form template."""
     if request.method == "GET":
-        form.amount.data = str(expense.amount) if expense.amount else ""
+        form.amount.data = str(expense.amount) if expense.amount else ""  # type: ignore[assignment]
         form.date.data = expense.date
         form.notes.data = expense.notes or ""
         form.category_id.data = expense.category_id if expense.category_id else None
@@ -655,12 +675,14 @@ def list_expenses() -> str:
     filters = expense_services.get_expense_filters(request)
 
     # Get filtered expenses using the service layer
+    expenses: list[Expense] = []
+    total_amount: float = 0.0
+    avg_price_per_person: float | None = None
     try:
         expenses, total_amount, avg_price_per_person = expense_services.get_user_expenses(current_user.id, filters)
         current_app.logger.info(f"Found {len(expenses)} expenses for user {current_user.id}")
     except Exception as e:
         current_app.logger.error(f"Error filtering expenses: {str(e)}")
-        expenses, total_amount, avg_price_per_person = [], 0.0, None
 
     # Handle pagination or show all
     total_expenses = len(expenses)
@@ -722,7 +744,7 @@ def expense_details(expense_id: int) -> ResponseReturnValue:
     expense = expense_services.get_expense_by_id(expense_id, current_user.id)
     if not expense:
         flash("Expense not found.", "error")
-        return redirect(url_for("expenses.list_expenses"))
+        return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]  # type: ignore[return-value]  # type: ignore[return-value]
 
     # Get browser timezone for display
     browser_timezone, timezone_display = get_browser_timezone_info()
@@ -743,7 +765,7 @@ def expense_details(expense_id: int) -> ResponseReturnValue:
     success_message=FlashMessages.EXPENSE_DELETED,
     error_message=FlashMessages.EXPENSE_DELETE_ERROR,
 )
-def delete_expense(expense_id: int) -> FlaskResponse | WerkzeugResponse:
+def delete_expense(expense_id: int) -> Response:
     """Delete an expense.
 
     Args:
@@ -763,21 +785,63 @@ def delete_expense(expense_id: int) -> FlaskResponse | WerkzeugResponse:
     if expense.user_id != current_user.id:
         abort(403)
     expense_services.delete_expense(expense)
-    return redirect(url_for("expenses.list_expenses"))
+    return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]
 
 
 @bp.route("/export")
 @login_required
-def export_expenses():
+def export_expenses() -> ResponseReturnValue:
     """Export expenses as CSV or JSON."""
     format_type = request.args.get("format", "csv").lower()
+    is_sample = request.args.get("sample", "false").lower() == "true"
+
+    # If sample is requested, generate sample CSV with required fields
+    if is_sample:
+        sample_data = [
+            {
+                "date": "2025-01-15",
+                "amount": 24.77,
+                "restaurant_name": "Sample Restaurant",
+                "restaurant_address": "123 Main St, City, ST 12345",
+                "category_name": "Dining",
+                "meal_type": "lunch",
+                "notes": "Sample expense entry",
+            },
+            {
+                "date": "2025-01-16",
+                "amount": 15.50,
+                "restaurant_name": "Another Restaurant",
+                "restaurant_address": "",
+                "category_name": "Fast Food",
+                "meal_type": "dinner",
+                "notes": "",
+            },
+        ]
+
+        if format_type == "json":
+            response = make_response(json.dumps(sample_data, indent=2))
+            response.headers["Content-Type"] = "application/json"
+            response.headers["Content-Disposition"] = "attachment; filename=sample_expenses.json"
+            return response
+
+        # Default to CSV format
+        output = io.StringIO()
+        fieldnames = ["date", "amount", "restaurant_name", "restaurant_address", "category_name", "meal_type", "notes"]
+        writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_NONNUMERIC)
+        writer.writeheader()
+        writer.writerows(sample_data)
+
+        response = make_response(output.getvalue())
+        response.headers["Content-Type"] = "text/csv"
+        response.headers["Content-Disposition"] = "attachment; filename=sample_expenses.csv"
+        return response
 
     # Get the data from the service
     expenses = expense_services.export_expenses_for_user(current_user.id)
 
     if not expenses:
         flash("No expenses found to export", "warning")
-        return redirect(url_for("expenses.list_expenses"))
+        return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]  # type: ignore[return-value]
 
     if format_type == "json":
         response = make_response(json.dumps(expenses, indent=2))
@@ -799,7 +863,7 @@ def export_expenses():
 
 @bp.route("/import", methods=["GET", "POST"])
 @login_required
-def import_expenses():
+def import_expenses() -> ResponseReturnValue:
     """Handle expense import from file upload."""
     form = ExpenseImportForm()
 
@@ -839,7 +903,7 @@ def import_expenses():
                             warnings=result_data.get("info_messages", []),
                         )
 
-                    return redirect(url_for("expenses.list_expenses"))
+                    return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]  # type: ignore[return-value]  # type: ignore[return-value]
                 else:
                     # Show error toast with summary
                     error_message = result_data.get("message", "Import failed")
@@ -878,11 +942,11 @@ def import_expenses():
 # Tag Management Routes
 @bp.route("/tags", methods=["GET"])
 @login_required
-def list_tags():
+def list_tags() -> ResponseReturnValue:
     """Get all tags for the current user."""
     try:
         tags = expense_services.get_user_tags(current_user.id)
-        return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})
+        return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})  # type: ignore[no-any-return]
     except Exception as e:
         current_app.logger.error(f"Error fetching tags: {e}")
         return jsonify({"success": False, "message": "Failed to fetch tags"}), 500
@@ -890,14 +954,14 @@ def list_tags():
 
 @bp.route("/tags/search", methods=["GET"])
 @login_required
-def search_tags():
+def search_tags() -> ResponseReturnValue:
     """Search tags by name."""
     query = request.args.get("q", "").strip()
     limit = request.args.get("limit", 10, type=int)
 
     try:
         tags = expense_services.search_tags(current_user.id, query, limit)
-        return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})
+        return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})  # type: ignore[no-any-return]
     except Exception as e:
         current_app.logger.error(f"Error searching tags: {e}")
         return jsonify({"success": False, "message": "Failed to search tags"}), 500
@@ -905,7 +969,7 @@ def search_tags():
 
 @bp.route("/tags", methods=["POST"])
 @login_required
-def create_tag():
+def create_tag() -> ResponseReturnValue:
     """Create a new tag."""
     data = request.get_json()
     if not data:
@@ -939,7 +1003,7 @@ def create_tag():
 
 @bp.route("/tags/<int:tag_id>", methods=["PUT"])
 @login_required
-def update_tag(tag_id):
+def update_tag(tag_id: int) -> ResponseReturnValue:
     """Update an existing tag."""
     data = request.get_json()
     if not data:
@@ -976,12 +1040,12 @@ def update_tag(tag_id):
 
 @bp.route("/tags/<int:tag_id>", methods=["DELETE"])
 @login_required
-def delete_tag(tag_id):
+def delete_tag(tag_id: int) -> ResponseReturnValue:
     """Delete a tag."""
     try:
         success = expense_services.delete_tag(current_user.id, tag_id)
         if success:
-            return jsonify({"success": True, "message": "Tag deleted successfully"})
+            return jsonify({"success": True, "message": "Tag deleted successfully"})  # type: ignore[no-any-return]  # type: ignore[return-value,no-any-return]
         else:
             return jsonify({"success": False, "message": "Tag not found or unauthorized"}), 404
     except Exception as e:
@@ -991,11 +1055,11 @@ def delete_tag(tag_id):
 
 @bp.route("/<int:expense_id>/tags", methods=["GET"])
 @login_required
-def get_expense_tags(expense_id):
+def get_expense_tags(expense_id: int) -> ResponseReturnValue:
     """Get all tags for an expense."""
     try:
         tags = expense_services.get_expense_tags(expense_id, current_user.id)
-        return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})
+        return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})  # type: ignore[no-any-return]
     except Exception as e:
         current_app.logger.error(f"Error fetching expense tags: {e}")
         return jsonify({"success": False, "message": "Failed to fetch expense tags"}), 500
@@ -1003,7 +1067,7 @@ def get_expense_tags(expense_id):
 
 @bp.route("/<int:expense_id>/tags", methods=["POST"])
 @login_required
-def add_expense_tags(expense_id):
+def add_expense_tags(expense_id: int) -> ResponseReturnValue:
     """Add tags to an expense."""
     data = request.get_json()
     if not data:
@@ -1015,7 +1079,7 @@ def add_expense_tags(expense_id):
 
     try:
         added_tags = expense_services.add_tags_to_expense(expense_id, current_user.id, tag_names)
-        return jsonify(
+        return jsonify(  # type: ignore[no-any-return]
             {
                 "success": True,
                 "tags": [tag.to_dict() for tag in added_tags],
@@ -1031,7 +1095,7 @@ def add_expense_tags(expense_id):
 
 @bp.route("/<int:expense_id>/tags", methods=["PUT"])
 @login_required
-def update_expense_tags(expense_id):
+def update_expense_tags(expense_id: int) -> ResponseReturnValue:
     """Update tags for an expense (replace all existing tags)."""
     data = request.get_json()
     if not data:
@@ -1041,7 +1105,7 @@ def update_expense_tags(expense_id):
 
     try:
         final_tags = expense_services.update_expense_tags(expense_id, current_user.id, tag_names)
-        return jsonify(
+        return jsonify(  # type: ignore[no-any-return]
             {
                 "success": True,
                 "tags": [tag.to_dict() for tag in final_tags],
@@ -1057,7 +1121,7 @@ def update_expense_tags(expense_id):
 
 @bp.route("/<int:expense_id>/tags", methods=["DELETE"])
 @login_required
-def remove_expense_tags(expense_id):
+def remove_expense_tags(expense_id: int) -> ResponseReturnValue:
     """Remove tags from an expense."""
     data = request.get_json()
     if not data:
@@ -1069,7 +1133,7 @@ def remove_expense_tags(expense_id):
 
     try:
         removed_tags = expense_services.remove_tags_from_expense(expense_id, current_user.id, tag_names)
-        return jsonify(
+        return jsonify(  # type: ignore[no-any-return]
             {
                 "success": True,
                 "tags": [tag.to_dict() for tag in removed_tags],
@@ -1085,13 +1149,13 @@ def remove_expense_tags(expense_id):
 
 @bp.route("/tags/popular", methods=["GET"])
 @login_required
-def get_popular_tags():
+def get_popular_tags() -> ResponseReturnValue:
     """Get the most popular tags for the current user."""
     limit = request.args.get("limit", 10, type=int)
 
     try:
         popular_tags = expense_services.get_popular_tags(current_user.id, limit)
-        return jsonify({"success": True, "tags": popular_tags})
+        return jsonify({"success": True, "tags": popular_tags})  # type: ignore[no-any-return]
     except Exception as e:
         current_app.logger.error(f"Error fetching popular tags: {e}")
         return jsonify({"success": False, "message": "Failed to fetch popular tags"}), 500

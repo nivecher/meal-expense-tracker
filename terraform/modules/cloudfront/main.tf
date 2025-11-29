@@ -54,12 +54,214 @@ resource "aws_s3_bucket_policy" "static" {
   })
 }
 
+# S3 Bucket for CloudFront access logs
+# tfsec:ignore:AWS045 tfsec:ignore:AWS144 - CloudFront logging requires block_public_acls=false to allow ACLs
+# checkov:skip=CKV_AWS_144 - CloudFront logging requires ACLs enabled via separate public_access_block resource
+# This is secure because ignore_public_acls=true and restrict_public_buckets=true prevent public access
+# The public_access_block resource (lines 85-91) provides security controls
+resource "aws_s3_bucket" "logs" { # tfsec:ignore:AWS045 # checkov:skip=CKV_AWS_144
+  bucket = "${var.app_name}-${var.environment}-cloudfront-logs"
+
+  tags = merge(var.tags, {
+    Name = "${var.app_name}-${var.environment}-cloudfront-logs"
+  })
+}
+
+# Enable versioning for the logs bucket
+# Note: MFA delete must be enabled separately using the enable_s3_mfa_delete.sh script
+# This is because AWS requires MFA authentication during the enable operation,
+# which cannot be automated in Terraform. Enable versioning first, then run the script.
+resource "aws_s3_bucket_versioning" "logs" {
+  bucket = aws_s3_bucket.logs.id
+
+  versioning_configuration {
+    status     = "Enabled"
+    mfa_delete = "Disabled" # Enable via enable_s3_mfa_delete.sh script after bucket creation
+  }
+}
+
+# Public access block for logs bucket
+# Note: block_public_acls must be false to allow CloudFront to use ACLs for logging
+# This is secure because ignore_public_acls and restrict_public_buckets prevent public access
+resource "aws_s3_bucket_public_access_block" "logs" {
+  bucket = aws_s3_bucket.logs.id
+
+  block_public_acls       = false # Allow ACLs for CloudFront logging
+  block_public_policy     = true
+  ignore_public_acls      = true # Ignore public ACLs (security)
+  restrict_public_buckets = true # Restrict public buckets (security)
+}
+
+# Bucket ownership controls for CloudFront logging
+# CloudFront logging requires ACLs to be enabled
+# We use BucketOwnerPreferred to allow ACLs while defaulting to bucket owner
+resource "aws_s3_bucket_ownership_controls" "logs" {
+  bucket = aws_s3_bucket.logs.id
+
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+
+  depends_on = [
+    aws_s3_bucket_public_access_block.logs
+  ]
+}
+
+# Enable ACLs on the bucket for CloudFront logging
+# The log-delivery-write ACL is specifically designed for CloudFront log delivery
+resource "aws_s3_bucket_acl" "logs" {
+  bucket = aws_s3_bucket.logs.id
+  acl    = "log-delivery-write"
+
+  depends_on = [
+    aws_s3_bucket_ownership_controls.logs
+  ]
+}
+
+# Server-side encryption for logs bucket
+resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
+  bucket = aws_s3_bucket.logs.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# Lifecycle configuration to manage old log versions
+# Automatically deletes non-current versions after 90 days to manage costs
+resource "aws_s3_bucket_lifecycle_configuration" "logs" {
+  bucket = aws_s3_bucket.logs.id
+
+  rule {
+    id     = "delete_old_versions"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 90
+    }
+  }
+
+  depends_on = [
+    aws_s3_bucket_versioning.logs
+  ]
+}
+
+# Bucket policy to allow CloudFront to write logs
+# Note: Policy allows CloudFront service to write logs with bucket-owner-full-control ACL
+# This is secure as the bucket is private and only CloudFront service can write
+resource "aws_s3_bucket_policy" "logs" {
+  bucket = aws_s3_bucket.logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontLogging"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:PutObject"
+        Resource = "${aws_s3_bucket.logs.arn}/*"
+        Condition = {
+          StringEquals = {
+            "s3:x-amz-acl" = "bucket-owner-full-control"
+          }
+        }
+      }
+    ]
+  })
+
+  depends_on = [
+    aws_s3_bucket_ownership_controls.logs
+  ]
+}
+
 # Use AWS managed cache policies directly with known IDs (more reliable)
 locals {
   # AWS managed policy IDs (stable and documented)
   cache_policy_optimized_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingOptimized
   cache_policy_disabled_id  = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingDisabled
   origin_request_policy_id  = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
+}
+
+# WAF Web ACL for CloudFront (using free tier options)
+# Bot Control managed rule group: 10M requests/month free
+resource "aws_wafv2_web_acl" "cloudfront" {
+  count    = var.enable_waf ? 1 : 0
+  name     = "${var.app_name}-${var.environment}-cloudfront-waf"
+  scope    = "CLOUDFRONT"
+  provider = aws.us-east-1 # WAF for CloudFront must be in us-east-1
+
+  default_action {
+    allow {}
+  }
+
+  # Bot Control managed rule group (FREE: 10M requests/month)
+  # This helps protect against automated traffic and bots
+  rule {
+    name     = "AWSManagedRulesBotControlRuleSet"
+    priority = 1
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesBotControlRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    override_action {
+      none {}
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "BotControlRule"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # AWS Managed Common Rule Set (basic protection)
+  # Note: This has standard pricing ($1/month + $0.60 per million requests)
+  # Only include if you need additional protection beyond Bot Control
+  dynamic "rule" {
+    for_each = var.waf_include_common_ruleset ? [1] : []
+    content {
+      name     = "AWSManagedRulesCommonRuleSet"
+      priority = 2
+
+      statement {
+        managed_rule_group_statement {
+          name        = "AWSManagedRulesCommonRuleSet"
+          vendor_name = "AWS"
+        }
+      }
+
+      override_action {
+        none {}
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = "CommonRuleSet"
+        sampled_requests_enabled   = true
+      }
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${var.app_name}-${var.environment}-waf"
+    sampled_requests_enabled   = true
+  }
+
+  tags = var.tags
 }
 
 # CloudFront Distribution
@@ -154,6 +356,16 @@ resource "aws_cloudfront_distribution" "main" {
 
   # Custom domain
   aliases = var.aliases
+
+  # WAF Web ACL association (if enabled)
+  web_acl_id = var.enable_waf ? aws_wafv2_web_acl.cloudfront[0].arn : null
+
+  # Access logging configuration
+  logging_config {
+    bucket          = aws_s3_bucket.logs.bucket_domain_name
+    include_cookies = false
+    prefix          = "cloudfront-access-logs/"
+  }
 
   tags = var.tags
 }

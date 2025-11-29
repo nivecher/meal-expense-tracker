@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime, timezone
+from typing import Any, TypeVar, Union, cast
 from zoneinfo import ZoneInfo, available_timezones
 
 from flask import (
+    Response,
     current_app,
     flash,
     jsonify,
@@ -21,23 +24,68 @@ from app.extensions import db
 from .forms import ChangePasswordForm, LoginForm, RegistrationForm
 
 
+def _is_safe_url(url: str | None) -> bool:
+    """Check if a URL is safe for redirect (internal only, no external URLs).
+
+    Args:
+        url: The URL to validate
+
+    Returns:
+        True if the URL is safe for redirect, False otherwise
+    """
+    if not url:
+        return False
+
+    # Reject external URLs (http://, https://)
+    if url.startswith(("http://", "https://")):
+        return False
+
+    # Reject protocol-relative URLs (//example.com)
+    if url.startswith("//"):
+        return False
+
+    # Accept relative URLs that start with /
+    if url.startswith("/"):
+        # Additional validation: ensure no dangerous patterns
+        # Reject URLs with query parameters that could be exploited
+        # (We allow query params but validate the path itself)
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        # Only allow paths, not full URLs
+        if parsed.netloc:
+            return False
+        return True
+
+    return False
+
+
+def _get_safe_redirect_url(next_url: str | None) -> str:
+    """Get a safe redirect URL from user input, defaulting to home if invalid.
+
+    Args:
+        next_url: The URL from user input (query parameter or form field)
+
+    Returns:
+        A safe URL for redirect (always an internal route)
+    """
+    if next_url and _is_safe_url(next_url):
+        return next_url
+    return url_for("main.index")
+
+
 @bp.route("/login", methods=["GET", "POST"])
-def login():
+def login() -> str | Response:
     """Handle user login with standard Flask-Login patterns."""
     # If user is already logged in, redirect to next page or home
     if current_user.is_authenticated:
-        next_page = request.args.get("next")
-        if not next_page:
-            next_page = url_for("main.index")
-        elif next_page.startswith("http"):
-            # Extract path from full URL for security
-            from urllib.parse import urlparse
+        # Security: _get_safe_redirect_url() validates the URL and only allows
+        # internal relative URLs (starting with /) or returns url_for("main.index")
+        # This prevents open redirect vulnerabilities
+        next_page = _get_safe_redirect_url(request.args.get("next"))
+        # The URL is guaranteed safe at this point - validated or defaulted to home
 
-            parsed = urlparse(next_page)
-            next_page = parsed.path or url_for("main.index")
-        elif not next_page.startswith("/"):
-            next_page = url_for("main.index")
-        return redirect(next_page)
+        return cast(Response, redirect(next_page))  # noqa: S303  # Validated by _get_safe_redirect_url()
 
     form = LoginForm()
 
@@ -47,18 +95,8 @@ def login():
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
 
-            # Handle redirect after login
-            next_page = request.form.get("next") or request.args.get("next")
-            if not next_page:
-                next_page = url_for("main.index")
-            elif next_page.startswith("http"):
-                # Extract path from full URL for security
-                from urllib.parse import urlparse
-
-                parsed = urlparse(next_page)
-                next_page = parsed.path or url_for("main.index")
-            elif not next_page.startswith("/"):
-                next_page = url_for("main.index")
+            # Handle redirect after login (validate to prevent open redirect)
+            next_page = _get_safe_redirect_url(request.form.get("next") or request.args.get("next"))
 
             flash("Login successful!", "success")
             # Ensure session is properly saved before redirect (important for Lambda/API Gateway)
@@ -71,48 +109,55 @@ def login():
 
             session["_csrf_token"] = generate_csrf()
 
-            return redirect(next_page)
+            # Security: next_page is validated by _get_safe_redirect_url() which only allows
+            # internal relative URLs (starting with /) and rejects external URLs
+
+            return cast(Response, redirect(next_page))  # noqa: S303
         else:
             flash("Invalid username or password", "error")
 
-    return render_template("auth/login.html", form=form, title="Login", now=datetime.now(timezone.utc))
+    return render_template("auth/login.html", form=form, title="Login", now=datetime.now(UTC))
 
 
 @bp.route("/logout")
 @login_required
-def logout():
+def logout() -> Response:
     logout_user()
-    return redirect(url_for("main.index"))
+    return cast(Response, redirect(url_for("main.index")))
 
 
 @bp.route("/register", methods=["GET", "POST"])
-def register():
+def register() -> str | Response:
     if current_user.is_authenticated:
-        return redirect(url_for("main.index"))
+        return cast(Response, redirect(url_for("main.index")))
     form = RegistrationForm()
     if form.validate_on_submit():
         user = User(username=form.username.data, email=form.email.data)
-        user.set_password(form.password.data)
+        password = form.password.data
+        if password:
+            user.set_password(password)
         db.session.add(user)
         db.session.commit()
         flash("Congratulations, you are now a registered user!")
-        return redirect(url_for("auth.login"))
+        return cast(Response, redirect(url_for("auth.login")))
 
-    return render_template("auth/register.html", form=form, title="Register", now=datetime.now(timezone.utc))
+    return render_template("auth/register.html", form=form, title="Register", now=datetime.now(UTC))
 
 
 @bp.route("/change-password", methods=["GET", "POST"])
 @login_required
-def change_password():
+def change_password() -> str | Response:
     form = ChangePasswordForm()
     # Pre-populate username field for accessibility (hidden from user)
     if request.method == "GET":
         form.username.data = current_user.username
     if form.validate_on_submit():
-        if current_user.check_password(form.current_password.data):
-            services.change_user_password(current_user, form.current_password.data, form.new_password.data)
+        current_password = form.current_password.data
+        new_password = form.new_password.data
+        if current_password and new_password and current_user.check_password(current_password):
+            services.change_user_password(current_user, current_password, new_password)
             flash("Your password has been updated.")
-            return redirect(url_for("main.index"))
+            return cast(Response, redirect(url_for("main.index")))
         else:
             flash("Invalid password.")
 
@@ -120,11 +165,11 @@ def change_password():
         "auth/change_password.html",
         form=form,
         title="Change Password",
-        now=datetime.now(timezone.utc),
+        now=datetime.now(UTC),
     )
 
 
-def _handle_timezone_update():
+def _handle_timezone_update() -> Response:
     """Handle timezone-only update via AJAX."""
     from app.utils.timezone_utils import normalize_timezone
 
@@ -140,10 +185,10 @@ def _handle_timezone_update():
     db.session.commit()
 
     current_app.logger.info(f"Timezone updated for user {current_user.id}: {normalized_tz} (from {new_timezone})")
-    return jsonify({"success": True, "message": "Timezone updated successfully"})
+    return cast(Response, jsonify({"success": True, "message": "Timezone updated successfully"}))
 
 
-def _handle_regular_profile_update():
+def _handle_regular_profile_update() -> Response:
     """Handle regular profile update."""
     current_user.first_name = request.form.get("first_name", "").strip() or None
     current_user.last_name = request.form.get("last_name", "").strip() or None
@@ -156,16 +201,16 @@ def _handle_regular_profile_update():
     # Basic validation
     if current_user.phone and len(current_user.phone) > 20:
         flash("Phone number is too long (max 20 characters)", "error")
-        return redirect(url_for("auth.profile"))
+        return cast(Response, redirect(url_for("auth.profile")))
 
     if current_user.bio and len(current_user.bio) > 500:
         flash("Bio is too long (max 500 characters)", "error")
-        return redirect(url_for("auth.profile"))
+        return cast(Response, redirect(url_for("auth.profile")))
 
     # Validate avatar URL if provided
     if current_user.avatar_url and len(current_user.avatar_url) > 255:
         flash("Avatar URL is too long (max 255 characters)", "error")
-        return redirect(url_for("auth.profile"))
+        return cast(Response, redirect(url_for("auth.profile")))
 
     # Validate and normalize timezone
     from app.utils.timezone_utils import normalize_timezone
@@ -183,12 +228,12 @@ def _handle_regular_profile_update():
 
     db.session.commit()
     flash("Profile updated successfully!", "success")
-    return redirect(url_for("auth.profile"))
+    return cast(Response, redirect(url_for("auth.profile")))
 
 
 @bp.route("/profile", methods=["GET", "POST"])
 @login_required
-def profile():
+def profile() -> str | Response:
     """User profile management page."""
     if request.method == "POST":
         try:
@@ -202,10 +247,12 @@ def profile():
         except Exception as e:
             db.session.rollback()
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"success": False, "message": "Failed to update timezone"}), 500
+                response = cast(Response, jsonify({"success": False, "message": "Failed to update timezone"}))
+                response.status_code = 500
+                return response
             flash("Failed to update profile. Please try again.", "error")
             current_app.logger.error(f"Profile update failed for user {current_user.id}: {e}")
-            return redirect(url_for("auth.profile"))
+            return cast(Response, redirect(url_for("auth.profile")))
 
     # Get common timezones for the dropdown (using IANA timezone names)
     common_timezones_raw = [
@@ -250,7 +297,7 @@ def profile():
     return render_template(
         "auth/profile.html",
         title="Profile",
-        now=datetime.now(timezone.utc),
+        now=datetime.now(UTC),
         current_time_user_tz=current_time_display,
         timezone_display=timezone_display,
         common_timezones=common_timezones,
@@ -259,9 +306,93 @@ def profile():
     )
 
 
+def _get_timezone_mappings() -> list[dict[str, Any]]:
+    """Get timezone mappings for coordinate-based detection.
+
+    Returns:
+        List of timezone mapping dictionaries with bounds and timezone names
+    """
+    return [
+        # North America
+        {
+            "bounds": {"north": 71, "south": 25, "west": -130, "east": -114},
+            "tz": "America/Los_Angeles",
+        },
+        {
+            "bounds": {"north": 71, "south": 25, "west": -114, "east": -104},
+            "tz": "America/Denver",
+        },
+        {
+            "bounds": {"north": 71, "south": 25, "west": -104, "east": -80},
+            "tz": "America/Chicago",
+        },
+        {
+            "bounds": {"north": 71, "south": 25, "west": -80, "east": -60},
+            "tz": "America/New_York",
+        },
+        # Europe
+        {"bounds": {"north": 71, "south": 35, "west": -10, "east": 15}, "tz": "Europe/London"},
+        {"bounds": {"north": 71, "south": 35, "west": 15, "east": 30}, "tz": "Europe/Berlin"},
+        # Asia
+        {"bounds": {"north": 71, "south": 10, "west": 75, "east": 105}, "tz": "Asia/Bangkok"},
+        {"bounds": {"north": 71, "south": 10, "west": 105, "east": 135}, "tz": "Asia/Shanghai"},
+        {"bounds": {"north": 71, "south": 25, "west": 135, "east": 180}, "tz": "Asia/Tokyo"},
+        # Australia
+        {
+            "bounds": {"north": -10, "south": -45, "west": 110, "east": 155},
+            "tz": "Australia/Sydney",
+        },
+    ]
+
+
+def _detect_timezone_from_coordinates(lat: float, lng: float) -> str:
+    """Detect timezone from latitude and longitude coordinates.
+
+    Args:
+        lat: Latitude coordinate
+        lng: Longitude coordinate
+
+    Returns:
+        Detected timezone name, or "UTC" as fallback
+    """
+    timezone_mappings = _get_timezone_mappings()
+
+    for mapping in timezone_mappings:
+        if isinstance(mapping, dict):
+            bounds = mapping.get("bounds", {})
+            if isinstance(bounds, dict):
+                if (
+                    lat <= bounds.get("north", 90)
+                    and lat >= bounds.get("south", -90)
+                    and lng >= bounds.get("west", -180)
+                    and lng <= bounds.get("east", 180)
+                ):
+                    tz_value = mapping.get("tz")
+                    if isinstance(tz_value, str):
+                        return tz_value
+
+    return "UTC"  # Default fallback
+
+
+def _validate_timezone(timezone: str) -> str:
+    """Validate that a timezone string is valid.
+
+    Args:
+        timezone: Timezone name to validate
+
+    Returns:
+        Valid timezone name, or "UTC" if invalid
+    """
+    try:
+        ZoneInfo(timezone)
+        return timezone
+    except Exception:
+        return "UTC"
+
+
 @bp.route("/api/detect-timezone", methods=["POST"])
 @login_required
-def detect_timezone():
+def detect_timezone() -> Response | tuple[Response, int]:
     """API endpoint for timezone detection from coordinates."""
     try:
         data = request.get_json()
@@ -271,76 +402,38 @@ def detect_timezone():
         # Basic timezone detection logic (simplified)
         # In production, you might want to use a more sophisticated
         # timezone boundary database or external service
+        detected_timezone = _detect_timezone_from_coordinates(lat, lng)
+        detected_timezone = _validate_timezone(detected_timezone)
 
-        timezone_mappings = [
-            # North America
-            {
-                "bounds": {"north": 71, "south": 25, "west": -130, "east": -114},
-                "tz": "America/Los_Angeles",
-            },
-            {
-                "bounds": {"north": 71, "south": 25, "west": -114, "east": -104},
-                "tz": "America/Denver",
-            },
-            {
-                "bounds": {"north": 71, "south": 25, "west": -104, "east": -80},
-                "tz": "America/Chicago",
-            },
-            {
-                "bounds": {"north": 71, "south": 25, "west": -80, "east": -60},
-                "tz": "America/New_York",
-            },
-            # Europe
-            {"bounds": {"north": 71, "south": 35, "west": -10, "east": 15}, "tz": "Europe/London"},
-            {"bounds": {"north": 71, "south": 35, "west": 15, "east": 30}, "tz": "Europe/Berlin"},
-            # Asia
-            {"bounds": {"north": 71, "south": 10, "west": 75, "east": 105}, "tz": "Asia/Bangkok"},
-            {"bounds": {"north": 71, "south": 10, "west": 105, "east": 135}, "tz": "Asia/Shanghai"},
-            {"bounds": {"north": 71, "south": 25, "west": 135, "east": 180}, "tz": "Asia/Tokyo"},
-            # Australia
-            {
-                "bounds": {"north": -10, "south": -45, "west": 110, "east": 155},
-                "tz": "Australia/Sydney",
-            },
-        ]
-
-        detected_timezone = "UTC"  # Default fallback
-
-        for mapping in timezone_mappings:
-            bounds = mapping["bounds"]
-            if lat <= bounds["north"] and lat >= bounds["south"] and lng >= bounds["west"] and lng <= bounds["east"]:
-                detected_timezone = mapping["tz"]
-                break
-
-        # Validate the timezone
-        try:
-            ZoneInfo(detected_timezone)
-        except Exception:
-            detected_timezone = "UTC"
-
-        return jsonify(
-            {
-                "success": True,
-                "timezone": detected_timezone,
-                "confidence": "medium",
-                "method": "coordinate_lookup",
-            }
+        return cast(
+            Response,
+            jsonify(
+                {
+                    "success": True,
+                    "timezone": detected_timezone,
+                    "confidence": "medium",
+                    "method": "coordinate_lookup",
+                }
+            ),
         )
 
     except (ValueError, TypeError, KeyError):
         return (
-            jsonify({"success": False, "error": "Invalid coordinates provided", "timezone": "UTC"}),
+            cast(Response, jsonify({"success": False, "error": "Invalid coordinates provided", "timezone": "UTC"})),
             400,
         )
     except Exception as e:
         current_app.logger.error(f"Timezone detection API error: {e}")
         return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": "Server error during timezone detection",
-                    "timezone": "UTC",
-                }
+            cast(
+                Response,
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "Server error during timezone detection",
+                        "timezone": "UTC",
+                    }
+                ),
             ),
             500,
         )

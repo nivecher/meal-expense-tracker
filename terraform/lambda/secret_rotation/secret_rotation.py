@@ -24,8 +24,8 @@ from typing import Any, Dict, Optional
 # Third-party imports
 import boto3
 import botocore
-import psycopg2
 from botocore.client import BaseClient
+import psycopg2
 
 # Configure logging
 logger = logging.getLogger()
@@ -37,7 +37,7 @@ MAX_RETRIES = 3
 RETRY_DELAY = 1  # seconds
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Handle the Lambda function invocation from AWS Secrets Manager.
 
     This function processes the secret rotation request by delegating to the
@@ -362,7 +362,7 @@ def finish_secret(service_client: BaseClient, arn: str, token: str) -> None:
         raise ValueError(error_msg) from e
 
 
-def _get_pending_version(service_client: BaseClient, arn: str, token: str) -> Optional[str]:
+def _get_pending_version(service_client: BaseClient, arn: str, token: str) -> str | None:
     """Get the pending version ID for the secret.
 
     Args:
@@ -401,7 +401,7 @@ def _update_secret_stage(service_client: BaseClient, arn: str, token: str, pendi
     )
 
 
-def _get_field_validators() -> Dict[str, Dict[str, Any]]:
+def _get_field_validators() -> dict[str, dict[str, Any]]:
     """Return the field validation configuration.
 
     Returns:
@@ -442,7 +442,7 @@ def _get_field_validators() -> Dict[str, Dict[str, Any]]:
     }
 
 
-def _validate_secret_structure(secret: Any) -> Dict[str, Any]:
+def _validate_secret_structure(secret: Any) -> dict[str, Any]:
     """Validate the basic structure of the secret.
 
     Args:
@@ -459,7 +459,7 @@ def _validate_secret_structure(secret: Any) -> Dict[str, Any]:
     return secret
 
 
-def _process_secret_field(field: str, value: Any, validator: Dict[str, Any]) -> Any:
+def _process_secret_field(field: str, value: Any, validator: dict[str, Any]) -> Any:
     """Process and validate a single secret field.
 
     Args:
@@ -492,7 +492,7 @@ def _process_secret_field(field: str, value: Any, validator: Dict[str, Any]) -> 
     return value
 
 
-def _get_secret_value(service_client: Any, request_params: Dict[str, Any]) -> Dict[str, Any]:
+def _get_secret_value(service_client: Any, request_params: dict[str, Any]) -> dict[str, Any]:
     """Retrieve and parse the secret value from AWS Secrets Manager.
 
     Args:
@@ -522,7 +522,7 @@ def _get_secret_value(service_client: Any, request_params: Dict[str, Any]) -> Di
         raise ValueError(f"Invalid parameter for secret {request_params['SecretId']}: {e}") from e
 
 
-def _validate_secret_parameters(arn: str, stage: str, token: Optional[str]) -> None:
+def _validate_secret_parameters(arn: str, stage: str, token: str | None) -> None:
     """Validate the input parameters for secret retrieval.
 
     Args:
@@ -543,7 +543,7 @@ def _validate_secret_parameters(arn: str, stage: str, token: Optional[str]) -> N
         raise ValueError("Token must be a string or None")
 
 
-def _prepare_secret_request_params(arn: str, stage: str, token: Optional[str]) -> Dict[str, Any]:
+def _prepare_secret_request_params(arn: str, stage: str, token: str | None) -> dict[str, Any]:
     """Prepare the request parameters for retrieving a secret.
 
     Args:
@@ -554,7 +554,7 @@ def _prepare_secret_request_params(arn: str, stage: str, token: Optional[str]) -
     Returns:
         Dictionary of request parameters
     """
-    request_params: Dict[str, Any] = {"SecretId": arn}
+    request_params: dict[str, Any] = {"SecretId": arn}
     if token:
         request_params["VersionId"] = token
     else:
@@ -562,7 +562,7 @@ def _prepare_secret_request_params(arn: str, stage: str, token: Optional[str]) -
     return request_params
 
 
-def _process_secret_fields(secret: Dict[str, Any]) -> Dict[str, Any]:
+def _process_secret_fields(secret: dict[str, Any]) -> dict[str, Any]:
     """Process and validate all fields in the secret.
 
     Args:
@@ -575,7 +575,7 @@ def _process_secret_fields(secret: Dict[str, Any]) -> Dict[str, Any]:
         ValueError: If required fields are missing or invalid
     """
     field_validators = _get_field_validators()
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
 
     for field, validator in field_validators.items():
         if field not in secret and validator["required"]:
@@ -587,7 +587,7 @@ def _process_secret_fields(secret: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def get_secret_dict(service_client: Any, arn: str, stage: str, token: Optional[str] = None) -> Dict[str, Any]:
+def get_secret_dict(service_client: Any, arn: str, stage: str, token: str | None = None) -> dict[str, Any]:
     """Get and validate the secret value as a dictionary.
 
     This function retrieves a secret from AWS Secrets Manager and validates that

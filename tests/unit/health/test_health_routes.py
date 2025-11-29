@@ -11,7 +11,7 @@ from app.health.routes import check
 class TestHealthRoutes:
     """Test health check endpoints."""
 
-    def test_health_check_success(self, client, app):
+    def test_health_check_success(self, client, app) -> None:
         """Test successful health check."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:
@@ -31,7 +31,7 @@ class TestHealthRoutes:
                     assert data["version"] is not None
                     assert data["timestamp"] == "2024-01-01T12:00:00+00:00"
 
-    def test_health_check_database_error(self, client, app):
+    def test_health_check_database_error(self, client, app) -> None:
         """Test health check when database connection fails."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:
@@ -51,7 +51,7 @@ class TestHealthRoutes:
                     assert data["version"] is not None
                     assert data["timestamp"] == "2024-01-01T12:00:00+00:00"
 
-    def test_health_check_database_generic_error(self, client, app):
+    def test_health_check_database_generic_error(self, client, app) -> None:
         """Test health check when database raises a generic exception."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:
@@ -71,7 +71,7 @@ class TestHealthRoutes:
                     assert data["version"] is not None
                     assert data["timestamp"] == "2024-01-01T12:00:00+00:00"
 
-    def test_health_check_logs_database_error(self, client, app):
+    def test_health_check_logs_database_error(self, client, app) -> None:
         """Test that database errors are logged."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:
@@ -87,7 +87,7 @@ class TestHealthRoutes:
                     assert "Database connection error" in log_call
                     assert "Connection failed" in log_call
 
-    def test_health_check_version_included(self, client, app):
+    def test_health_check_version_included(self, client, app) -> None:
         """Test that version information is included in response."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:
@@ -100,7 +100,7 @@ class TestHealthRoutes:
                 assert "version" in data
                 assert data["version"] is not None
 
-    def test_health_check_timestamp_format(self, client, app):
+    def test_health_check_timestamp_format(self, client, app) -> None:
         """Test that timestamp is in ISO format."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:
@@ -116,7 +116,7 @@ class TestHealthRoutes:
                 assert "T" in timestamp
                 assert "+" in timestamp or "Z" in timestamp
 
-    def test_health_check_response_structure(self, client, app):
+    def test_health_check_response_structure(self, client, app) -> None:
         """Test that response has all expected fields."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:
@@ -132,7 +132,7 @@ class TestHealthRoutes:
                 for field in expected_fields:
                     assert field in data, f"Missing field: {field}"
 
-    def test_health_check_status_always_ok(self, client, app):
+    def test_health_check_status_always_ok(self, client, app) -> None:
         """Test that status is always 'ok' even when database fails."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:
@@ -145,7 +145,7 @@ class TestHealthRoutes:
                 # Status should always be "ok" - the endpoint itself is working
                 assert data["status"] == "ok"
 
-    def test_health_check_database_query(self, client, app):
+    def test_health_check_database_query(self, client, app) -> None:
         """Test that the correct database query is executed."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:
@@ -159,7 +159,7 @@ class TestHealthRoutes:
                 call_args = mock_execute.call_args[0][0]
                 assert "SELECT 1" in str(call_args)
 
-    def test_health_check_function_directly(self, app):
+    def test_health_check_function_directly(self, app) -> None:
         """Test the health check function directly without Flask client."""
         with app.app_context():
             with patch("app.health.routes.db.session.execute") as mock_execute:

@@ -1,0 +1,91 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.28.0
+
+# Exclude unnecessary files from scanning to reduce bundle size
+# This prevents bundle upload errors by excluding large directories
+exclude:
+  global:
+    - "**/node_modules/**"
+    - "**/venv/**"
+    - "**/.venv/**"
+    - "**/__pycache__/**"
+    - "**/dist/**"
+    - "**/build/**"
+    - "**/.pytest_cache/**"
+    - "**/.mypy_cache/**"
+    - "**/htmlcov/**"
+    - "**/.terraform/**"
+    - "**/*.tfstate*"
+    - "**/migrations/**"
+    - "**/test-data/**"
+    - "**/tests/**"
+    - "**/scripts/**"
+    - "**/docs/**"
+    - "**/.git/**"
+    - "**/instance/**"
+    - "**/lambda*.zip"
+    - "**/migration*.zip"
+    - "**/*.zip"
+    - "**/*.log"
+    - "**/bandit-report.json"
+    - "**/safety-report.json"
+    - "**/cloudformation/**"
+    - "**/frontend/**"
+    - "**/python/**"
+    - "**/typings/**"
+    - "**/.egg-info/**"
+    - "**/coverage.xml"
+    - "**/.coverage"
+    - "**/*.pyc"
+    - "**/*.pyo"
+    - "**/*.pyd"
+    - "**/.DS_Store"
+    - "**/Thumbs.db"
+    - "**/*.swp"
+    - "**/*.swo"
+    - "**/*~"
+    - "**/.idea/**"
+    - "**/.vscode/**"
+    - "**/.vs/**"
+
+# Ignore vulnerabilities (add specific ones if needed)
+ignore:
+  # S3 MFA Delete - CloudFront buckets
+  # MFA delete must be enabled separately using enable_s3_mfa_delete.sh script
+  # AWS requires MFA authentication during enable operation, which cannot be automated in Terraform
+  SNYK-CC-TF-127:
+    - "*":
+        reason: MFA delete for S3 buckets must be enabled via script (enable_s3_mfa_delete.sh) as AWS requires MFA authentication during enable operation, which cannot be automated in Terraform.
+        expires: "2025-12-31T23:59:59.000Z"
+
+  # S3 Bucket Public ACLs - CloudFront logs bucket requires block_public_acls=false
+  # CloudFront logging requires ACLs to be enabled, but security is maintained via:
+  # - ignore_public_acls=true (ignores any public ACLs)
+  # - restrict_public_buckets=true (prevents public bucket access)
+  # - Bucket policy restricts access to CloudFront service only
+  SNYK-CC-TF-95:
+    - "*":
+        reason: CloudFront logging requires block_public_acls=false to allow ACLs. Security maintained via ignore_public_acls and restrict_public_buckets settings.
+        expires: "2025-12-31T23:59:59.000Z"
+
+  # S3 Server Access Logging - CloudFront buckets and Terraform backend
+  # The logs buckets themselves don't need access logging as they ARE the access logs buckets
+  # Static bucket doesn't need access logging as it's only accessed via CloudFront OAC
+  SNYK-CC-TF-45:
+    - "*":
+        reason: Logs buckets are destinations for access logs and don't need their own access logging. Static bucket is only accessed via CloudFront OAC.
+        expires: "2025-12-31T23:59:59.000Z"
+
+  # S3 Bucket Versioning - Static bucket
+  # Versioning is not required for static assets bucket as files are immutable
+  SNYK-CC-TF-124:
+    - "*":
+        reason: Static assets bucket doesn't require versioning as files are immutable and managed via deployment process.
+        expires: "2025-12-31T23:59:59.000Z"
+
+# Patch vulnerabilities (add specific ones if needed)
+patch: {}
+# Ignore false positives
+# SNYK-PYTHON-*: Hardcoded password in messages.py is a false positive
+# The constant PASSWORD_UPDATED is a user-facing message string, not an actual password
+# The code already has nosec B105 comments for Bandit, but Snyk doesn't recognize them

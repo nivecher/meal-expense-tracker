@@ -21,7 +21,7 @@ class CategoryData(TypedDict):
 
 
 # Default categories created for new users
-DEFAULT_CATEGORIES: List[CategoryData] = [
+DEFAULT_CATEGORIES: list[CategoryData] = [
     {
         "name": "Restaurants",
         "description": "Restaurant meals and takeout",
@@ -67,7 +67,7 @@ DEFAULT_CATEGORIES: List[CategoryData] = [
 ]
 
 
-def get_default_categories() -> List[CategoryData]:
+def get_default_categories() -> list[CategoryData]:
     """Get the default categories for new users.
 
     Returns:
@@ -76,7 +76,7 @@ def get_default_categories() -> List[CategoryData]:
     return DEFAULT_CATEGORIES.copy()
 
 
-def get_category_names() -> List[str]:
+def get_category_names() -> list[str]:
     """Get just the names of default categories.
 
     Returns:

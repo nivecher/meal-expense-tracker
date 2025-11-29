@@ -6,6 +6,7 @@ development servers (Flask's built-in) or production WSGI servers (Gunicorn).
 
 import os
 import sys
+from typing import Any, Dict
 
 # Load environment variables before importing app
 from dotenv import load_dotenv
@@ -43,7 +44,7 @@ def run_migrations() -> None:
 
 
 # AWS Lambda handler
-def lambda_handler(event, context):
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """Lambda handler that delegates to the lambda_handler module.
 
     This function imports and calls the actual lambda_handler from lambda_handler.py.
@@ -78,5 +79,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Warning: Could not run migrations: {e}")
 
+    debug = os.environ.get("DEBUG", "False").lower() == "true"
+
     # Start the development server
-    application.run(host=host, port=port, debug=True)
+    application.run(host=host, port=port, debug=debug)

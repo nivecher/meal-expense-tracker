@@ -3,7 +3,7 @@
 from flask import url_for
 
 
-def test_login_success(client, test_user, app):
+def test_login_success(client, test_user, app) -> None:
     """Test successful login."""
     with app.app_context():
         login_url = url_for("auth.login")
@@ -52,7 +52,7 @@ def test_login_success(client, test_user, app):
         ), "No success indicator found in response"
 
 
-def test_login_invalid_username(client, test_user, app):
+def test_login_invalid_username(client, test_user, app) -> None:
     """Test login with invalid username."""
     with app.app_context():
         login_url = url_for("auth.login")
@@ -75,7 +75,7 @@ def test_login_invalid_username(client, test_user, app):
             assert "user_id" not in sess
 
 
-def test_login_invalid_password(client, test_user, app):
+def test_login_invalid_password(client, test_user, app) -> None:
     """Test login with invalid password."""
     with app.app_context():
         login_url = url_for("auth.login")
@@ -98,7 +98,7 @@ def test_login_invalid_password(client, test_user, app):
             assert "user_id" not in sess
 
 
-def test_login_required_redirect(client, app):
+def test_login_required_redirect(client, app) -> None:
     """Test that login is required for protected routes."""
     with app.app_context():
         # Get the URL for the protected route

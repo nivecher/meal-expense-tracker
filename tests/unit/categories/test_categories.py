@@ -3,7 +3,7 @@ from flask import url_for
 from app.expenses.models import Category
 
 
-def test_create_category(client, test_user):
+def test_create_category(client, test_user) -> None:
     """Test creating a category via API."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True
@@ -17,7 +17,7 @@ def test_create_category(client, test_user):
     assert response.json["data"]["name"] == "Test Category"
 
 
-def test_create_category_invalid_data(client, test_user):
+def test_create_category_invalid_data(client, test_user) -> None:
     """Test creating a category with invalid data."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True
@@ -27,7 +27,7 @@ def test_create_category_invalid_data(client, test_user):
     assert response.status_code == 400
 
 
-def test_get_categories(client, test_user, session):
+def test_get_categories(client, test_user, session) -> None:
     """Test getting categories via API."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True
@@ -43,7 +43,7 @@ def test_get_categories(client, test_user, session):
     assert len(response.json["data"]) == 1
 
 
-def test_get_category(client, test_user, session):
+def test_get_category(client, test_user, session) -> None:
     """Test getting a specific category via API."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True
@@ -59,7 +59,7 @@ def test_get_category(client, test_user, session):
     assert response.json["data"]["name"] == "Test Category"
 
 
-def test_update_category(client, test_user, session):
+def test_update_category(client, test_user, session) -> None:
     """Test updating a category via API."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True
@@ -78,7 +78,7 @@ def test_update_category(client, test_user, session):
     assert response.json["data"]["name"] == "Updated Category"
 
 
-def test_delete_category(client, test_user, session):
+def test_delete_category(client, test_user, session) -> None:
     """Test deleting a category via API."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True
@@ -97,7 +97,7 @@ def test_delete_category(client, test_user, session):
     assert response.status_code == 500  # API returns 500 for missing categories
 
 
-def test_access_other_user_category(client, test_user, test_user2, session):
+def test_access_other_user_category(client, test_user, test_user2, session) -> None:
     """Test that users cannot access other users' categories."""
     with client.session_transaction() as sess:
         sess["_fresh"] = True
