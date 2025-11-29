@@ -4,6 +4,10 @@
 
 extends: default
 
+# Ignore files that use CloudFormation-specific YAML tags (e.g., !Sub, !GetAtt)
+ignore: |
+  cloudformation/*.yml
+
 rules:
   # Line length
   line-length:
@@ -42,7 +46,7 @@ rules:
   # Truthy values
   truthy:
     level: warning
-    allowed-values: ['true', 'false', 'True', 'False', 'YES', 'NO', 'Yes', 'No', 'On', 'Off', 'ON', 'OFF']
+    allowed-values: ["true", "false", "True", "False", "YES", "NO", "Yes", "No", "On", "Off", "ON", "OFF"]
     check-keys: false
 
   # Quoted strings
@@ -58,4 +62,4 @@ rules:
   commas: {}
 
   # YAML version
-  document-start: {present: true}
+  document-start: { present: true }
