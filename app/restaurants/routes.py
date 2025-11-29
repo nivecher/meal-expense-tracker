@@ -1358,6 +1358,7 @@ def _prepare_restaurant_form(
 
     from app.restaurants.forms import RestaurantForm
 
+    # Note: data is already validated as dict[str, Any] in function signature
     # Detect service level from Google Places data if available
     # PRO TIER: Uses price_level, types for service level detection
     # ENTERPRISE TIER: Uses rating, user_ratings_total for confidence scoring

@@ -311,6 +311,5 @@ def get_engine() -> Engine:
     if db.engine is None:
         raise RuntimeError("Database engine is None after initialization check")
     # Flask-SQLAlchemy's db.engine type is not properly exposed in stubs
-    # Store in variable to help mypy understand the type narrowing
-    engine: Engine = cast(Engine, db.engine)
-    return engine
+    # Cast is needed for type safety; redundant cast warnings are disabled globally
+    return cast(Engine, db.engine)
