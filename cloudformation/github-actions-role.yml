@@ -1,3 +1,4 @@
+---
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'IAM Role for GitHub Actions to interact with ECR and other AWS services'
 

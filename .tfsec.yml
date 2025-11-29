@@ -1,3 +1,4 @@
+---
 # TFSec Configuration
 # This file configures tfsec to ignore specific checks that are not applicable to this project
 
