@@ -55,7 +55,6 @@ jobs:
       fail-fast: false
       matrix:
         test-suite: [unit, integration, lint, security]
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -102,11 +101,12 @@ jobs:
         if: matrix.test-suite == 'lint'
         run: |
           if [ -f package.json ]; then
-            if [ -f package-lock.json ]; then 
+            if [ -f package-lock.json ]; then
               npm ci
-            else 
+            else
               npm install
             fi
+          fi
           else
             echo "No package.json found, skipping npm dependencies"
           fi
