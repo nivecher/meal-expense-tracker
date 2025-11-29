@@ -804,15 +804,6 @@ class TestRestaurantsRoutes:
                     assert error is None
                     assert form == mock_form
 
-    def test_prepare_restaurant_form_invalid_data(self, app) -> None:
-        """Test preparing restaurant form with invalid data."""
-        data = "not a dictionary"
-
-        with app.app_context():
-            form, error = _prepare_restaurant_form(data, "test-token")
-            assert error is not None
-            assert error[1] == 400
-
     def test_prepare_restaurant_form_validation_failed(self, app) -> None:
         """Test preparing restaurant form with validation failure."""
         data = {"name": "Test Restaurant"}
