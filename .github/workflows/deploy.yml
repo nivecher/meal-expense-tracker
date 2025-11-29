@@ -102,18 +102,27 @@ jobs:
 
       - name: Create version file
         run: |
-          # Generate version file for build
-          python -m setuptools_scm
+          # Generate version file using setuptools_scm
+          # This will read config from pyproject.toml and write the version file
+          python -c "
+          import setuptools_scm
+          version = setuptools_scm.get_version(write_to='app/_version.py', write_to_template='__version__ = \"{version}\"\n')
+          print(f'Generated version: {version}')
+          "
       - name: Commit version file
         run: |
           # Commit the generated version file if it changed
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          if [ -f "app/_version.py" ] && git diff --exit-code app/_version.py; then
-            echo "Version file unchanged"
+          if [ -f "app/_version.py" ]; then
+            if git diff --exit-code --quiet app/_version.py; then
+              echo "Version file unchanged"
+            else
+              git add app/_version.py
+              git commit -m "chore: update version to ${{ steps.version.outputs.version }} [skip ci]" || echo "No version changes to commit"
+            fi
           else
-            git add app/_version.py
-            git commit -m "chore: update version to ${{ steps.version.outputs.version }} [skip ci]" || echo "No version changes to commit"
+            echo "Warning: Version file app/_version.py was not created"
           fi
 
       - name: Create and push tag
