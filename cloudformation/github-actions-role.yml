@@ -88,6 +88,15 @@ Resources:
                   - cloudwatch:PutDashboard
                   - cloudwatch:DeleteDashboard
                   - cloudwatch:ListDashboards
+                  # CloudWatch Metric Alarm permissions
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:DescribeAlarmHistory
+                  - cloudwatch:SetAlarmState
+                  - cloudwatch:ListTagsForResource
+                  - cloudwatch:TagResource
+                  - cloudwatch:UntagResource
                   - acm:RequestCertificate
                   - acm:DeleteCertificate
                   - acm:DeleteCertificateAuthority
