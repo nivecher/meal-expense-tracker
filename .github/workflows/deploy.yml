@@ -46,7 +46,7 @@ permissions:
   checks: write
   statuses: write
   security-events: write
-  packages: read
+  packages: write  # Changed from read to write for GHCR push
 
 jobs:
   # Check if CI workflow succeeded and get version/tag
@@ -58,8 +58,8 @@ jobs:
         ${{ github.event_name == 'workflow_run' &&
         github.event.workflow_run.conclusion == 'success' ||
         github.event_name == 'workflow_dispatch' }}
-      version: ${{ steps.get_version.outputs.version }}
-      tag: ${{ steps.get_version.outputs.tag }}
+      version: ${{ steps.get_version.outputs.version || steps.get_version_git.outputs.version }}
+      tag: ${{ steps.get_version.outputs.tag || steps.get_version_git.outputs.tag }}
     steps:
       - name: Check CI workflow status
         run: |
@@ -123,7 +123,7 @@ jobs:
 
       - name: Get version from git (fallback)
         id: get_version_git
-        if: steps.get_version.outputs.version == 'unknown' || github.event_name != 'workflow_run'
+        if: steps.get_version.outputs.version == 'unknown' || steps.get_version.outputs.version == '' || github.event_name != 'workflow_run'
         run: |
           git fetch --tags || true
           TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -187,11 +187,9 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=raw,value=${{ needs.check-ci.outputs.version || 'dev' }}
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=long
+            type=raw,value=${{ needs.check-ci.outputs.version || 'dev' }},enable=${{ needs.check-ci.outputs.version != '' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && needs.check-ci.outputs.version != '' }}
+            type=sha,format=short
           labels: |
             org.opencontainers.image.version=${{ needs.check-ci.outputs.version || 'dev' }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -451,6 +449,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      packages: read  # Need to read packages to pull from GHCR
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
@@ -519,21 +518,36 @@ jobs:
           TAG="${{ steps.get_version.outputs.tag }}"
           ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
           
-          # Pull the image from GHCR (use tag or latest)
-          if [ -n "${TAG}" ]; then
-            docker pull ghcr.io/${{ github.repository }}:${TAG} || \
-              docker pull ghcr.io/${{ github.repository }}:${VERSION} || \
-              docker pull ghcr.io/${{ github.repository }}:latest
+          # Determine which image tag to pull from GHCR
+          # Try version tag first, then fall back to SHA if available
+          if [ -n "${VERSION}" ] && [ "${VERSION}" != "dev" ]; then
+            # Try pulling by version tag
+            if docker pull ghcr.io/${{ github.repository }}:${VERSION} 2>/dev/null; then
+              echo "Pulled image with version tag: ${VERSION}"
+              docker tag ghcr.io/${{ github.repository }}:${VERSION} ${ECR_REPO}:${VERSION}
+              docker tag ${ECR_REPO}:${VERSION} ${ECR_REPO}:latest
+            # Try pulling by full tag (v0.6.0 format)
+            elif [ -n "${TAG}" ] && docker pull ghcr.io/${{ github.repository }}:${TAG} 2>/dev/null; then
+              echo "Pulled image with tag: ${TAG}"
+              docker tag ghcr.io/${{ github.repository }}:${TAG} ${ECR_REPO}:${VERSION}
+              docker tag ${ECR_REPO}:${VERSION} ${ECR_REPO}:latest
+            # Fall back to SHA tag
+            elif docker pull ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} 2>/dev/null; then
+              echo "Pulled image with SHA tag: ${GITHUB_SHA::7}"
+              docker tag ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} ${ECR_REPO}:${VERSION}
+              docker tag ${ECR_REPO}:${VERSION} ${ECR_REPO}:latest
+            else
+              echo "Error: Could not pull image from GHCR with any available tag"
+              echo "Tried: ${VERSION}, ${TAG}, ${GITHUB_SHA::7}"
+              exit 1
+            fi
           else
-            docker pull ghcr.io/${{ github.repository }}:latest
+            echo "Error: No valid version or tag found for staging deployment"
+            exit 1
           fi
           
-          # Tag for ECR
-          docker tag ghcr.io/${{ github.repository }}:latest ${ECR_REPO}:${VERSION:-latest}
-          docker tag ${ECR_REPO}:${VERSION:-latest} ${ECR_REPO}:latest
-          
-          # Push both tags
-          docker push ${ECR_REPO}:${VERSION:-latest}
+          # Push both tags to ECR
+          docker push ${ECR_REPO}:${VERSION}
           docker push ${ECR_REPO}:latest
 
       - name: Update Lambda function
@@ -577,7 +591,7 @@ jobs:
   # Notify deployment status
   notify:
     name: Notify
-    needs: [deploy-dev, deploy-staging, deploy-staging-after-release, deploy-prod, check-ci]
+    needs: [deploy-dev, deploy-staging, deploy-prod, check-ci]
     if: always()
     runs-on: ubuntu-latest
     steps:
