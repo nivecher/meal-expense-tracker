@@ -165,6 +165,7 @@ help:  ## Show this help message
 	@echo "  \033[1mmake deps-update\033[0m       Update dependencies to latest versions"
 
 	@echo "\n\033[1mUtilities:\033[0m"
+	@echo "  \033[1mmake version\033[0m         Get current application version"
 	@echo "  \033[1mmake clean\033[0m           Remove build artifacts and temporary files"
 	@echo "  \033[1mmake distclean\033[0m        Remove all generated files including virtual environment"
 	@echo "  \033[1mmake check-env\033[0m        Check development environment setup"
@@ -1354,6 +1355,24 @@ package-layer-arm:
 # =============================================================================
 # Utilities
 # =============================================================================
+
+## Get current application version
+.PHONY: version
+version:
+	@echo "\n\033[1m=== Application Version ===\033[0m"
+	@if [ -f "app/_version.py" ]; then \
+		$(PYTHON) -c "from app._version import __version__; print(__version__)" 2>/dev/null || \
+		echo "\033[1;33m⚠️  Could not import version from app/_version.py\033[0m"; \
+	else \
+		echo "\033[1;33m⚠️  Version file not found. Generating from git tags...\033[0m"; \
+		if command -v setuptools_scm >/dev/null 2>&1 || $(PIP) show setuptools-scm >/dev/null 2>&1; then \
+			$(PYTHON) -c "import setuptools_scm; print(setuptools_scm.get_version())"; \
+		else \
+			echo "\033[1;31m❌ setuptools-scm not installed. Install with: pip install setuptools-scm[toml]\033[0m"; \
+			exit 1; \
+		fi; \
+	fi
+	@echo "\033[1;32m✅ Version retrieved\033[0m"
 
 ## Clean up build artifacts and temporary files
 .PHONY: clean
