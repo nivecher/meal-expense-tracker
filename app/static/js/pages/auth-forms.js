@@ -6,142 +6,6 @@
  */
 
 /**
- * Validate redirect URL to prevent open redirect vulnerabilities
- * Only allows relative URLs or same-origin absolute URLs
- * @param {string} url - URL to validate
- * @returns {string|null} - Validated URL or null if invalid
- */
-function validateRedirectUrl(url) {
-  if (!url || typeof url !== 'string') {
-    return null;
-  }
-
-  // Allow relative URLs (starting with /)
-  if (url.startsWith('/')) {
-    // Ensure it doesn't contain protocol or host
-    if (!url.includes('://') && !url.includes('//')) {
-      return url;
-    }
-    return null;
-  }
-
-  // Allow same-origin absolute URLs only
-  try {
-    const urlObj = new URL(url, window.location.origin);
-    if (urlObj.origin === window.location.origin) {
-      return urlObj.pathname + urlObj.search + urlObj.hash;
-    }
-  } catch {
-    // Invalid URL
-  }
-
-  return null;
-}
-
-// Helper function to display validation errors
-function displayValidationErrors(form, errors) {
-  // Clear existing errors
-  form.querySelectorAll('.text-danger').forEach((el) => el.remove());
-  form.querySelectorAll('.is-invalid').forEach((el) => el.classList.remove('is-invalid'));
-
-  // Display new errors
-  for (const [fieldName, errorMessages] of Object.entries(errors)) {
-    const field = form.querySelector(`[name="${fieldName}"]`);
-    if (field) {
-      field.classList.add('is-invalid');
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'text-danger mt-1';
-      errorDiv.textContent = Array.isArray(errorMessages) ? errorMessages[0] : errorMessages;
-      field.parentNode.appendChild(errorDiv);
-    }
-  }
-}
-
-// Helper function to show error message
-function showErrorMessage(message) {
-  // Remove existing alerts
-  document.querySelectorAll('.alert-danger').forEach((el) => el.remove());
-
-  // Create new alert
-  const alertDiv = document.createElement('div');
-  alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-
-  // Append message as text node to prevent XSS - safely escape HTML
-  alertDiv.appendChild(document.createTextNode(message));
-
-  // Create and append close button separately
-  const closeButton = document.createElement('button');
-  closeButton.type = 'button';
-  closeButton.className = 'btn-close';
-  closeButton.setAttribute('data-bs-dismiss', 'alert');
-  alertDiv.appendChild(closeButton);
-
-  // Insert at the top of the form
-  const form = document.querySelector('form');
-  if (form) {
-    form.insertBefore(alertDiv, form.firstChild);
-  }
-}
-
-async function handleErrorResponse(response, form) {
-  console.error('Response failed with status:', response.status);
-
-  const contentType = response.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
-    try {
-      const errorData = await response.json();
-      console.error('Form validation errors:', errorData);
-
-      // Display validation errors
-      if (errorData.errors) {
-        displayValidationErrors(form, errorData.errors);
-      } else if (errorData.message) {
-        showErrorMessage(errorData.message);
-      }
-      return;
-    } catch (e) {
-      console.error('Failed to parse error response:', e);
-    }
-  }
-
-  console.error('Form submission failed:', response.status, response.statusText);
-  // Don't reload to preserve error info for debugging
-}
-
-/**
- * Handle redirect from response data
- * @param {string} redirectUrl - URL to redirect to
- * @returns {boolean} - True if redirect was handled, false otherwise
- */
-function handleRedirect(redirectUrl) {
-  const validatedUrl = validateRedirectUrl(redirectUrl);
-  if (validatedUrl) {
-    window.location.href = validatedUrl;
-    return true;
-  }
-  // Default to home page if redirect URL is invalid
-  window.location.href = '/';
-  return true;
-}
-
-/**
- * Handle successful JSON response
- * @param {Object} data - Response data
- * @returns {boolean} - True if response was handled, false otherwise
- */
-function handleJsonResponse(data) {
-  if (data.redirect) {
-    handleRedirect(data.redirect);
-    return true;
-  }
-  if (data.success) {
-    window.location.reload();
-    return true;
-  }
-  return false;
-}
-
-/**
  * Detect browser timezone using Intl API.
  * This is the standard, non-intrusive way to detect user timezone.
  *
@@ -231,10 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       true, // Use capture phase to ensure it runs before form submits
     );
-  } else {
-    // Registration form not found - expected on login page
-    console.debug('Registration form not found (expected on non-registration pages)');
   }
+  // Registration form not found - expected on login page (no logging needed)
 
   // Simple form submission handler for auth forms
   const authForms = document.querySelectorAll('#login-form, #register-form');
@@ -242,75 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
   authForms.forEach((form) => {
     form.addEventListener('submit', async(_e) => {
       // Allow normal form submission for better reliability
-      return;
-
-      const submitBtn = form.querySelector('input[type="submit"], button[type="submit"]');
-      const originalText = submitBtn.value || submitBtn.textContent;
-
-      // Show loading state
-      submitBtn.disabled = true;
-      if (submitBtn.tagName === 'INPUT') {
-        submitBtn.value = 'Processing...';
-      } else {
-        submitBtn.textContent = 'Processing...';
-      }
-
-      try {
-        const formData = new FormData(form);
-
-        // Include CSRF token only if available in form (local dev)
-        const csrfInput = form.querySelector('input[name="csrf_token"]');
-        if (csrfInput && csrfInput.value) {
-          formData.set('csrf_token', csrfInput.value);
-        } else {
-          // For Lambda deployment, add empty CSRF token to satisfy form validation
-          formData.set('csrf_token', '');
-        }
-
-        const url = form.action || window.location.pathname;
-
-        const response = await fetch(url, {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-        });
-
-        // Check response status
-        if (response.ok) {
-          // Check if it's a redirect (successful login/registration)
-          if (response.redirected || response.url !== window.location.href) {
-            handleRedirect(response.url);
-            return;
-          }
-
-          // Try to parse as JSON for API responses
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            const data = await response.json();
-            if (handleJsonResponse(data)) {
-              return;
-            }
-          }
-
-          // For HTML responses, reload the page to show any messages
-          window.location.reload();
-        } else {
-          await handleErrorResponse(response, form);
-        }
-      } catch (error) {
-        console.error('Form submission error:', error);
-        alert('An error occurred. Please try again.');
-      } finally {
-        // Restore button state
-        submitBtn.disabled = false;
-        if (submitBtn.tagName === 'INPUT') {
-          submitBtn.value = originalText;
-        } else {
-          submitBtn.textContent = originalText;
-        }
-      }
+      // Note: AJAX form submission code removed to use standard form submission
+      // This ensures better compatibility and reliability
     });
   });
 });

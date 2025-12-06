@@ -38,7 +38,7 @@ rules:
   # Comments
   comments:
     require-starting-space: true
-    min-spaces-from-content: 2
+    min-spaces-from-content: 1
 
   # Document end
   document-end: disable
@@ -50,11 +50,8 @@ rules:
     check-keys: false
 
   # Quoted strings
-  quoted-strings:
-    level: warning
-    quote-type: single
-    required: only-when-needed
-    extra-required: ['.*\*{2}.*']
+  # Disabled to avoid conflicts with Prettier (Prettier handles formatting)
+  quoted-strings: disable
 
   # Braces
   braces: {}

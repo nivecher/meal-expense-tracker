@@ -129,10 +129,12 @@ help:  ## Show this help message
 	@echo "  \033[1mmake test-integration\033[0m Run only integration tests"
 	@echo "  \033[1mmake test-smoke\033[0m       Run smoke tests"
 	@echo "  \033[1mmake test-frontend\033[0m    Run Playwright frontend tests"
+	@echo "  \033[1mmake test-user-flows\033[0m  Run Playwright user flow/usability tests"
 	@echo "  \033[1mmake test-security\033[0m    Run security headers tests"
 	@echo "  \033[1mmake test-console\033[0m     Run console error tests"
 	@echo "  \033[1mmake test-e2e\033[0m         Run all end-to-end tests"
 	@echo "  \033[1mmake test-frontend-headed\033[0m Run frontend tests with browser visible"
+	@echo "  \033[1mmake test-user-flows-headed\033[0m Run user flow tests with browser visible"
 	@echo "  \033[1mmake test-frontend-debug\033[0m Run frontend tests in debug mode"
 	@echo "  \033[1mmake test-report\033[0m      Generate HTML test report"
 	@echo "  \033[1mmake install-playwright\033[0m Install Playwright dependencies"
@@ -268,18 +270,11 @@ lint-markdown: check-npm
 		exit 1; \
 	fi
 
-## YAML linter
+## YAML linter (formatting check with Prettier)
 .PHONY: lint-yaml
-lint-yaml: check-env
-	@echo "\n\033[1m=== Running YAML Linter ===\033[0m"
-	@if command -v yamllint >/dev/null 2>&1; then \
-		find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" ! -path "./cloudformation/*" -exec yamllint -c .yamllint {} + || (echo "\033[1;31m❌ YAML linting failed\033[0m"; exit 1); \
-	elif [ -d node_modules ] && command -v npm >/dev/null 2>&1; then \
-		find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" ! -path "./cloudformation/*" -exec npx --yes prettier --check {} + || (echo "\033[1;31m❌ YAML validation failed\033[0m"; exit 1); \
-	else \
-		echo "\033[1;33m⚠️  YAML linter not available. Install yamllint or ensure npm is available\033[0m"; \
-		exit 1; \
-	fi
+lint-yaml: check-npm
+	@echo "\n\033[1m=== Running YAML Format Check ===\033[0m"
+	@find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" ! -path "./cloudformation/*" -exec npx --yes prettier --check {} + || (echo "\033[1;31m❌ YAML formatting check failed\033[0m"; exit 1)
 
 ## JSON linter
 .PHONY: lint-json
@@ -870,6 +865,40 @@ test-console: check-npm check-playwright
 	fi
 	@echo "\033[1;32m✅ Console error tests completed\033[0m"
 
+## Run user flow tests (Playwright)
+.PHONY: test-user-flows
+test-user-flows: check-npm check-playwright setup-test-user
+	@echo "\n\033[1m=== Running User Flow Tests ===\033[0m"
+	@if ! pgrep -f "flask run" > /dev/null; then \
+		echo "\033[1;33m⚠️  Flask app not running. Starting in background...\033[0m"; \
+		$(PYTHON) -m flask run --host=127.0.0.1 --port=5000 > /dev/null 2>&1 & \
+		FLASK_PID=$$!; \
+		sleep 3; \
+		BASE_URL=http://127.0.0.1:5000 npx playwright test tests/playwright/user-flows.spec.js || (echo "\033[1;31m❌ User flow tests failed\033[0m"; kill $$FLASK_PID 2>/dev/null; exit 1); \
+		kill $$FLASK_PID 2>/dev/null; \
+	else \
+		echo "\033[1;32m✅ Flask app is running\033[0m"; \
+		BASE_URL=http://127.0.0.1:5000 npx playwright test tests/playwright/user-flows.spec.js || (echo "\033[1;31m❌ User flow tests failed\033[0m"; exit 1); \
+	fi
+	@echo "\033[1;32m✅ User flow tests completed\033[0m"
+
+## Run user flow tests in headed mode (see browser)
+.PHONY: test-user-flows-headed
+test-user-flows-headed: check-npm check-playwright setup-test-user
+	@echo "\n\033[1m=== Running User Flow Tests (Headed Mode) ===\033[0m"
+	@if ! pgrep -f "flask run" > /dev/null; then \
+		echo "\033[1;33m⚠️  Flask app not running. Starting in background...\033[0m"; \
+		$(PYTHON) -m flask run --host=127.0.0.1 --port=5000 > /dev/null 2>&1 & \
+		FLASK_PID=$$!; \
+		sleep 3; \
+		BASE_URL=http://127.0.0.1:5000 npx playwright test tests/playwright/user-flows.spec.js --headed || (echo "\033[1;31m❌ User flow tests failed\033[0m"; kill $$FLASK_PID 2>/dev/null; exit 1); \
+		kill $$FLASK_PID 2>/dev/null; \
+	else \
+		echo "\033[1;32m✅ Flask app is running\033[0m"; \
+		BASE_URL=http://127.0.0.1:5000 npx playwright test tests/playwright/user-flows.spec.js --headed || (echo "\033[1;31m❌ User flow tests failed\033[0m"; exit 1); \
+	fi
+	@echo "\033[1;32m✅ User flow tests completed\033[0m"
+
 ## Run all frontend tests (Playwright)
 .PHONY: test-e2e
 test-e2e: test-frontend test-security test-console
@@ -955,6 +984,13 @@ db-upgrade: check-env
 .PHONY: db-downgrade
 db-downgrade: check-env
 	$(PYTHON) -m flask db downgrade
+
+## Setup test user for Playwright tests
+.PHONY: setup-test-user
+setup-test-user: check-env
+	@echo "\n\033[1m=== Setting up Test User ===\033[0m"
+	@$(PYTHON) scripts/setup_test_user.py || (echo "\033[1;31m❌ Failed to setup test user\033[0m"; exit 1)
+	@echo "\033[1;32m✅ Test user setup complete\033[0m"
 
 # =============================================================================
 # Docker

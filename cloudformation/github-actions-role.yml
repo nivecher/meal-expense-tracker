@@ -83,6 +83,11 @@ Resources:
                   - route53:ListResourceRecordSets
                   - route53:ListTagsForResource
                   - logs:ListTagsForResource
+                  # CloudWatch Dashboard permissions
+                  - cloudwatch:GetDashboard
+                  - cloudwatch:PutDashboard
+                  - cloudwatch:DeleteDashboard
+                  - cloudwatch:ListDashboards
                   - acm:RequestCertificate
                   - acm:DeleteCertificate
                   - acm:DeleteCertificateAuthority

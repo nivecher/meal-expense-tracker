@@ -153,11 +153,24 @@ class ErrorHandler {
     // Resource loading error handler
     window.addEventListener('error', (event) => {
       if (event.target !== window) {
-        this.handleError({
-          type: 'resource',
-          message: `Failed to load resource: ${event.target.src || event.target.href}`,
-          element: event.target,
-        });
+        const resourceUrl = event.target.src || event.target.href || '';
+
+        // Filter out false positives:
+        // - Root URL loads (likely navigation, not resource errors)
+        // - Empty or invalid URLs
+        // - Data URIs (which can't fail to load)
+        const isRootUrl = resourceUrl === window.location.origin ||
+                         resourceUrl === `${window.location.origin}/` ||
+                         resourceUrl === window.location.href;
+        const isEmptyOrInvalid = !resourceUrl || resourceUrl.startsWith('data:');
+
+        if (!isRootUrl && !isEmptyOrInvalid) {
+          this.handleError({
+            type: 'resource',
+            message: `Failed to load resource: ${resourceUrl}`,
+            element: event.target,
+          });
+        }
       }
     }, true);
   }

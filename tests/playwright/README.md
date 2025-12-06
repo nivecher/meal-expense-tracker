@@ -6,6 +6,7 @@ This directory contains end-to-end tests using Playwright for the Meal Expense T
 
 - `console-tests.spec.js` - Tests browser console for errors and warnings
 - `security-headers.spec.js` - Tests security headers configuration
+- `user-flows.spec.js` - Comprehensive user flow and usability tests
 
 ## Running Tests
 
@@ -17,15 +18,43 @@ This directory contains end-to-end tests using Playwright for the Meal Expense T
    npx playwright install
    ```
 
-2. Start your Flask application:
+2. Setup test user (required for user flow tests):
    ```bash
-   python app.py
+   make setup-test-user
+   # or
+   python scripts/setup_test_user.py
+   ```
+
+3. Start your Flask application:
+   ```bash
+   make run
+   # or
+   python wsgi.py
    ```
 
 ### Run All Tests
 
 ```bash
 npx playwright test
+```
+
+### Run Using Makefile (Recommended)
+
+```bash
+# User flow tests (automatically sets up test user)
+make test-user-flows
+
+# User flow tests with visible browser
+make test-user-flows-headed
+
+# All frontend tests
+make test-e2e
+
+# Console tests
+make test-console
+
+# Security headers tests
+make test-security
 ```
 
 ### Run Specific Test File
@@ -36,6 +65,9 @@ npx playwright test console-tests.spec.js
 
 # Security headers tests
 npx playwright test security-headers.spec.js
+
+# User flow tests
+npx playwright test user-flows.spec.js
 ```
 
 ### Run with Different Base URL
@@ -80,6 +112,17 @@ Tests use the following configuration:
 - Cache-Control headers
 - Content-Type headers with proper charset
 - Absence of deprecated headers (Expires, Pragma)
+
+### User Flow Tests
+- Authentication flows (login, logout, registration, password change)
+- Expense management (add, edit, delete, list, filter, search)
+- Restaurant management (add, edit, delete, search)
+- Navigation and page transitions
+- Form validation and error handling
+- Mobile responsiveness
+- Accessibility (keyboard navigation, form labels)
+- Performance (page load times, task completion times)
+- Loading states and user feedback
 
 ## Test Data
 
