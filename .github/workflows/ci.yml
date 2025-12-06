@@ -305,8 +305,8 @@ jobs:
       contents: write
       id-token: write
     outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.semantic_release.outputs.version }}
+      tag: ${{ steps.semantic_release.outputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
@@ -319,59 +319,106 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install setuptools-scm
+      - name: Install python-semantic-release and setuptools-scm
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools-scm[toml]
+          pip install python-semantic-release[all] setuptools-scm[toml]
 
-      - name: Generate version
-        id: version
+      - name: Run semantic release (version and tag)
+        id: semantic_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Generate version using setuptools-scm (based on git tags)
-          VERSION=$(python -m setuptools_scm)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-          echo "Generated version: $VERSION"
+          # Run semantic-release to analyze commits and create version/tag
+          # This will:
+          # 1. Analyze conventional commits since last tag
+          # 2. Determine version bump (major/minor/patch)
+          # 3. Create git tag
+          # 4. Push tag to repository
+          
+          # Check what version would be created (dry run)
+          echo "Analyzing commits for version bump..."
+          semantic-release version --noop || true
+          
+          # Actually create the version and tag
+          echo "Creating version and tag..."
+          if semantic-release version --vcs-release; then
+            # Get the tag that was just created
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -n "$LATEST_TAG" ]; then
+              VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
+              echo "version=${VERSION}" >> $GITHUB_OUTPUT
+              echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+              echo "✅ Created tag: ${LATEST_TAG}, version: ${VERSION}"
+            else
+              echo "⚠️  Tag was created but could not be retrieved"
+              # Fallback: try to get from git
+              git fetch --tags
+              LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+              if [ -n "$LATEST_TAG" ]; then
+                VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
+                echo "version=${VERSION}" >> $GITHUB_OUTPUT
+                echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+              else
+                echo "❌ Could not determine version"
+                exit 1
+              fi
+            fi
+          else
+            # No version bump needed, get current version
+            echo "No version bump needed, using existing version"
+            git fetch --tags
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -n "$LATEST_TAG" ]; then
+              VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
+              echo "version=${VERSION}" >> $GITHUB_OUTPUT
+              echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+              echo "Using existing tag: ${LATEST_TAG}"
+            else
+              echo "❌ No tags found"
+              exit 1
+            fi
+          fi
 
-      - name: Create version file
+      - name: Generate version file using setuptools-scm
         run: |
-          # Generate version file using setuptools_scm
-          # This will read config from pyproject.toml and write the version file
+          # Now that the tag exists, use setuptools-scm to generate version from git tags
+          # This will read the tag and generate the version file
+          # setuptools-scm will use the tag for the base version and add dev info for non-tagged commits
           python -c "
           import setuptools_scm
           version = setuptools_scm.get_version(
             write_to='app/_version.py',
             write_to_template='__version__ = \"{version}\"\n'
           )
-          print(f'Generated version: {version}')
+          print(f'Generated version from git tag: {version}')
           "
+          
+          # Verify the version file was created
+          if [ -f "app/_version.py" ]; then
+            echo "Version file contents:"
+            cat app/_version.py
+          else
+            echo "Warning: Version file app/_version.py was not created"
+            exit 1
+          fi
 
       - name: Commit version file
         run: |
           # Commit the generated version file if it changed
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          VERSION="${{ steps.semantic_release.outputs.version }}"
+          
           if [ -f "app/_version.py" ]; then
             if git diff --exit-code --quiet app/_version.py; then
               echo "Version file unchanged"
             else
               git add app/_version.py
-              git commit -m "chore: update version to ${{ steps.version.outputs.version }} [skip ci]" || \
+              git commit -m "chore: update version to ${VERSION} [skip ci]" || \
                 echo "No version changes to commit"
               git push origin HEAD:main || echo "Failed to push version file commit"
             fi
           else
             echo "Warning: Version file app/_version.py was not created"
-          fi
-
-      - name: Create and push tag
-        run: |
-          # Create annotated tag with version info
-          TAG="${{ steps.version.outputs.tag }}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, skipping"
-          else
-            git tag -a "$TAG" -m "Release ${{ steps.version.outputs.version }}"
-            git push origin "$TAG"
-            echo "Created and pushed tag: $TAG"
           fi

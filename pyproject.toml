@@ -15,9 +15,27 @@ email = "mtd37@hotmail.com"
 homepage = "https://github.com/nivecher/meal-expense-tracker"
 
 [tool.setuptools_scm]
-version_scheme = "no-guess-dev"
+# Use release-branch-semver for proper semantic versioning
+# This will use the latest tag and add dev/branch info for non-tagged commits
+version_scheme = "release-branch-semver"
 write_to = "app/_version.py"
 write_to_template = "__version__ = \"{version}\"\n"
+# Fallback version if no tags exist
+fallback_version = "0.1.0"
+
+[tool.semantic_release]
+# Semantic release configuration for automated versioning
+version_variable = "app/_version.py:__version__"
+version_toml = "pyproject.toml:project.version"
+build_command = "pip install build && python -m build"
+dist_path = "dist"
+upload_to_vcs_release = true
+upload_to_pypi = false
+hvcs = "github"
+commit_author = "github-actions <action@github.com>"
+major_on_zero = true
+tag_commit = true
+changelog_file = "CHANGELOG.md"
 
 [tool.setuptools]
 packages = [ "app",]
