@@ -336,14 +336,13 @@ jobs:
           # 3. Create git tag
           # 4. Push tag to repository
           
-          # Check what version would be created (dry run)
           echo "Analyzing commits for version bump..."
-          semantic-release version --noop || true
           
           # Actually create the version and tag
-          echo "Creating version and tag..."
+          # semantic-release will only create a tag if there are commits that warrant a version bump
           if semantic-release version --vcs-release; then
             # Get the tag that was just created
+            git fetch --tags
             LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
             if [ -n "$LATEST_TAG" ]; then
               VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
@@ -352,17 +351,7 @@ jobs:
               echo "✅ Created tag: ${LATEST_TAG}, version: ${VERSION}"
             else
               echo "⚠️  Tag was created but could not be retrieved"
-              # Fallback: try to get from git
-              git fetch --tags
-              LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-              if [ -n "$LATEST_TAG" ]; then
-                VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
-                echo "version=${VERSION}" >> $GITHUB_OUTPUT
-                echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
-              else
-                echo "❌ Could not determine version"
-                exit 1
-              fi
+              exit 1
             fi
           else
             # No version bump needed, get current version

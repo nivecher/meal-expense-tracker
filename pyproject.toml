@@ -25,8 +25,8 @@ fallback_version = "0.1.0"
 
 [tool.semantic_release]
 # Semantic release configuration for automated versioning
+# Version is managed by setuptools-scm, so we only update the version file
 version_variable = "app/_version.py:__version__"
-version_toml = "pyproject.toml:project.version"
 build_command = "pip install build && python -m build"
 dist_path = "dist"
 upload_to_vcs_release = true
