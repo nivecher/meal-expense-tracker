@@ -328,50 +328,129 @@ jobs:
           python -m pip install --upgrade pip
           pip install python-semantic-release[all] setuptools-scm[toml]
 
+      - name: Configure git for tagging
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Run semantic release (version and tag)
         id: semantic_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Run semantic-release to analyze commits and create version/tag
+          # Run semantic-release to analyze commits and determine next version
           # This will:
           # 1. Analyze conventional commits since last tag
           # 2. Determine version bump (major/minor/patch)
-          # 3. Create git tag
-          # 4. Push tag to repository
+          # 3. Output the next version
           
           echo "Analyzing commits for version bump..."
           
-          # Actually create the version and tag
-          # semantic-release will only create a tag if there are commits that warrant a version bump
-          if semantic-release version --vcs-release; then
-            # Get the tag that was just created
-            git fetch --tags
-            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-            if [ -n "$LATEST_TAG" ]; then
-              VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
-              echo "version=${VERSION}" >> $GITHUB_OUTPUT
-              echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
-              echo "✅ Created tag: ${LATEST_TAG}, version: ${VERSION}"
-            else
-              echo "⚠️  Tag was created but could not be retrieved"
-              exit 1
-            fi
-          else
-            # No version bump needed, get current version
-            echo "No version bump needed, using existing version"
-            git fetch --tags
-            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-            if [ -n "$LATEST_TAG" ]; then
-              VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
-              echo "version=${VERSION}" >> $GITHUB_OUTPUT
-              echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
-              echo "Using existing tag: ${LATEST_TAG}"
-            else
-              echo "❌ No tags found"
-              exit 1
-            fi
+          # Get current latest tag
+          git fetch --tags --force
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No existing tags found, starting from v0.1.0"
+            LATEST_TAG="v0.1.0"
           fi
+          
+          echo "Latest tag: ${LATEST_TAG}"
+          
+          # Run semantic-release to determine next version
+          # Use --dry-run to see what version would be created without actually creating it
+          echo "Running semantic-release in dry-run mode..."
+          semantic-release version --dry-run > semantic_output.txt 2>&1 || {
+            # If dry-run fails, might mean no version bump needed
+            echo "Semantic-release dry-run output:"
+            cat semantic_output.txt
+            
+            # Try to extract version from any output
+            NEXT_VERSION=$(grep -iE "new version|bumped|would bump|version" semantic_output.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            
+            if [ -z "$NEXT_VERSION" ]; then
+              echo "No version bump needed"
+              CURRENT_VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
+              echo "version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
+              echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+              echo "bump_needed=false" >> $GITHUB_OUTPUT
+              echo "Using existing tag: ${LATEST_TAG}"
+              exit 0
+            fi
+          }
+          
+          # Extract the next version from output
+          # Look for patterns like "New version: 0.6.0" or "Bumped version to 0.6.0"
+          NEXT_VERSION=$(grep -iE "new version|bumped version|would bump|next version" semantic_output.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          
+          # Alternative: try to parse from the actual version file if semantic-release created it
+          if [ -z "$NEXT_VERSION" ] && [ -f "app/_version.py" ]; then
+            NEXT_VERSION=$(grep -oE '__version__ = "[0-9]+\.[0-9]+\.[0-9]+' app/_version.py | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          fi
+          
+          if [ -z "$NEXT_VERSION" ]; then
+            echo "⚠️  Could not determine next version from semantic-release output"
+            echo "Semantic-release output:"
+            cat semantic_output.txt
+            echo ""
+            echo "No version bump needed, using existing version"
+            CURRENT_VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
+            echo "version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
+            echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+            echo "bump_needed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          NEW_TAG="v${NEXT_VERSION}"
+          echo "✅ Next version: ${NEXT_VERSION}"
+          echo "✅ New tag: ${NEW_TAG}"
+          
+          # Store outputs
+          echo "version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+          echo "bump_needed=true" >> $GITHUB_OUTPUT
+          
+          # Show semantic-release output for debugging
+          echo "Semantic-release output:"
+          cat semantic_output.txt
+
+      - name: Create and push git tag
+        if: steps.semantic_release.outputs.bump_needed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.semantic_release.outputs.tag }}"
+          VERSION="${{ steps.semantic_release.outputs.version }}"
+          
+          if [ -z "$TAG" ] || [ -z "$VERSION" ]; then
+            echo "❌ Error: Tag or version is empty"
+            exit 1
+          fi
+          
+          echo "Creating tag: ${TAG}"
+          
+          # Check if tag already exists (shouldn't, but be safe)
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "⚠️  Tag ${TAG} already exists locally, skipping creation"
+          else
+            # Create annotated tag
+            git tag -a "${TAG}" -m "chore(release): ${VERSION} [skip ci]"
+            echo "✅ Created tag: ${TAG}"
+          fi
+          
+          # Push tag to remote
+          echo "Pushing tag to remote..."
+          git push origin "${TAG}" || {
+            echo "⚠️  Failed to push tag, checking if it exists remotely..."
+            if git ls-remote --tags origin | grep -q "refs/tags/${TAG}"; then
+              echo "Tag ${TAG} already exists on remote, continuing..."
+            else
+              echo "❌ Failed to push tag ${TAG}"
+              exit 1
+            fi
+          }
+          
+          echo "✅ Successfully pushed tag: ${TAG}"
 
       - name: Generate version file using setuptools-scm
         run: |
