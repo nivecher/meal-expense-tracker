@@ -111,33 +111,15 @@ else
     report_success "Black" "${BLACK_REQ:-${BLACK_PRECOMMIT:-unknown}}"
 fi
 
-# Flake8
-FLAKE8_REQ=$(get_requirements_version "flake8" "requirements-dev.txt")
-FLAKE8_PRECOMMIT=$(get_precommit_version "github.com/pycqa/flake8")
-if [ "$FLAKE8_REQ" != "$FLAKE8_PRECOMMIT" ] && [ "$FLAKE8_REQ" != "not-found" ] && [ "$FLAKE8_PRECOMMIT" != "not-found" ]; then
-    report_discrepancy "Flake8" "requirements vs pre-commit" "$FLAKE8_REQ" "$FLAKE8_PRECOMMIT"
-else
-    report_success "Flake8" "${FLAKE8_REQ:-${FLAKE8_PRECOMMIT:-unknown}}"
-fi
-
-# isort
-ISORT_REQ=$(get_requirements_version "isort" "requirements-dev.txt")
-ISORT_PRECOMMIT=$(get_precommit_version "github.com/pycqa/isort")
-if [ "$ISORT_REQ" != "$ISORT_PRECOMMIT" ] && [ "$ISORT_REQ" != "not-found" ] && [ "$ISORT_PRECOMMIT" != "not-found" ]; then
-    report_discrepancy "isort" "requirements vs pre-commit" "$ISORT_REQ" "$ISORT_PRECOMMIT"
-else
-    report_success "isort" "${ISORT_REQ:-${ISORT_PRECOMMIT:-unknown}}"
-fi
-
-# autoflake
-AUTOFLAKE_REQ=$(get_requirements_version "autoflake" "requirements-dev.txt")
-AUTOFLAKE_PRECOMMIT=$(get_precommit_version "github.com/PyCQA/autoflake")
+# Ruff (replaces Flake8, isort, autoflake)
+RUFF_REQ=$(get_requirements_version "ruff" "requirements-dev.txt")
+RUFF_PRECOMMIT=$(get_precommit_version "github.com/astral-sh/ruff-pre-commit")
 # Remove 'v' prefix from pre-commit version for comparison
-AUTOFLAKE_PRECOMMIT_CLEAN=$(echo "$AUTOFLAKE_PRECOMMIT" | sed 's/^v//')
-if [ "$AUTOFLAKE_REQ" != "$AUTOFLAKE_PRECOMMIT_CLEAN" ] && [ "$AUTOFLAKE_REQ" != "not-found" ] && [ "$AUTOFLAKE_PRECOMMIT_CLEAN" != "" ] && [ "$AUTOFLAKE_PRECOMMIT_CLEAN" != "not-found" ]; then
-    report_discrepancy "autoflake" "requirements vs pre-commit" "$AUTOFLAKE_REQ" "$AUTOFLAKE_PRECOMMIT"
+RUFF_PRECOMMIT_CLEAN=$(echo "$RUFF_PRECOMMIT" | sed 's/^v//')
+if [ "$RUFF_REQ" != "$RUFF_PRECOMMIT_CLEAN" ] && [ "$RUFF_REQ" != "not-found" ] && [ "$RUFF_PRECOMMIT_CLEAN" != "" ] && [ "$RUFF_PRECOMMIT_CLEAN" != "not-found" ]; then
+    report_discrepancy "Ruff" "requirements vs pre-commit" "$RUFF_REQ" "$RUFF_PRECOMMIT"
 else
-    report_success "autoflake" "${AUTOFLAKE_REQ:-${AUTOFLAKE_PRECOMMIT_CLEAN:-unknown}}"
+    report_success "Ruff" "${RUFF_REQ:-${RUFF_PRECOMMIT_CLEAN:-unknown}}"
 fi
 
 # Bandit
@@ -184,14 +166,12 @@ echo "=== Configuration Files ==="
 
 # Check for required config files
 CONFIG_FILES=(
-    ".flake8:Flake8"
     ".bandit:Bandit"
-    "pyproject.toml:Black/isort"
+    "pyproject.toml:Black/Ruff"
     "eslint.config.js:ESLint"
     ".stylelintrc.json:Stylelint"
     ".markdownlint.json:Markdownlint"
     ".prettierrc:Prettier"
-    ".yamllint:YAML"
 )
 
 for config in "${CONFIG_FILES[@]}"; do
@@ -233,9 +213,7 @@ echo "=== Pre-commit Hooks ==="
 # Check if pre-commit config has required hooks
 PRECOMMIT_HOOKS=(
     "black:Python formatting"
-    "flake8:Python linting"
-    "isort:Import sorting"
-    "autoflake:Remove unused imports"
+    "ruff:Python linting/import sorting/unused imports"
     "bandit:Security scanning"
     "markdownlint:Markdown linting"
     "prettier:Code formatting"

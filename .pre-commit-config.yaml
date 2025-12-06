@@ -43,7 +43,7 @@ repos:
   # Python linting, import sorting, and unused code removal (replaces Flake8, isort, autoflake)
   # Note: Keeping Black for formatting in Phase 1, Ruff formatter will be evaluated in Phase 2
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.6 # Match installed Ruff version
+    rev: v0.14.8 # Match installed Ruff version
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]

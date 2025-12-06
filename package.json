@@ -12,6 +12,9 @@
     "lint:css": "stylelint --config .stylelintrc.json \"app/static/css/**/*.css\"",
     "lint:js": "eslint --config eslint.config.js \"app/static/js/**/*.js\"",
     "format:js": "eslint --config eslint.config.js \"app/static/js/**/*.js\" --fix",
+    "format:yaml": "prettier --write \"**/*.{yaml,yml}\"",
+    "format:yaml-check": "prettier --check \"**/*.{yaml,yml}\"",
+    "lint:yaml": "prettier --check \"**/*.{yaml,yml}\"",
     "install-deps": "npm install"
   },
   "devDependencies": {

@@ -25,7 +25,7 @@ The following extensions are recommended for this project:
 
 - **Python**: `ms-python.python` - Python language support
 - **Black Formatter**: `ms-python.black-formatter` - Python code formatting
-- **Flake8**: `ms-python.flake8` - Python linting
+- **Ruff**: `charliermarsh.ruff` - Python linting (replaces Flake8)
 - **ESLint**: `dbaeumer.vscode-eslint` - JavaScript linting
 - **Prettier**: `esbenp.prettier-vscode` - Code formatting (HTML, CSS, Markdown, JSON, YAML)
 - **Stylelint**: `stylelint.vscode-stylelint` - CSS linting
@@ -125,9 +125,8 @@ pre-commit install
 ### Python
 
 - **Formatter**: Black (120 char line length, Python 3.13 target)
-- **Linter**: Flake8 (max complexity 10, configured in `.flake8`)
-- **Import sorting**: isort (Black profile, configured in `pyproject.toml`)
-- **Unused imports**: autoflake (removes unused imports automatically)
+- **Linter**: Ruff (max complexity 10, configured in `pyproject.toml`)
+  - Replaces Flake8 (linting), isort (import sorting), and autoflake (unused imports)
 - **Type checking**: Mypy (configured but not actively enforced)
 - **Security**: Bandit (configured in `.bandit`)
 - **CSRF**: Enabled for all forms
@@ -187,8 +186,8 @@ With the recommended extensions installed:
 
 Pre-commit hooks automatically:
 
-- Format Python code (Black, isort, autoflake)
-- Lint Python code (Flake8, Bandit)
+- Format Python code (Black, Ruff for imports/unused code)
+- Lint Python code (Ruff, Bandit)
 - Lint JavaScript (ESLint)
 - Lint HTML/CSS (Prettier, Stylelint)
 - Lint Markdown (markdownlint, Prettier)

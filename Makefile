@@ -230,9 +230,9 @@ lint-mypy: check-env
 	@echo "\n\033[1m=== Running MyPy Type Checker ===\033[0m"
 	@$(PYTHON) -m mypy app --config-file=pyproject.toml || (echo "\033[1;31m❌ MyPy failed\033[0m"; exit 1)
 
-## Format all code (Python, HTML, CSS, JS)
+## Format all code (Python, HTML, CSS, JS, YAML)
 .PHONY: format
-format: format-python format-html format-css format-js
+format: format-python format-html format-css format-js format-yaml
 
 ## Format Python code
 .PHONY: format-python
@@ -270,11 +270,17 @@ lint-markdown: check-npm
 		exit 1; \
 	fi
 
-## YAML linter (formatting check with Prettier)
+## YAML linter (formatting check)
 .PHONY: lint-yaml
 lint-yaml: check-npm
 	@echo "\n\033[1m=== Running YAML Format Check ===\033[0m"
 	@find . -type f \( -name "*.yaml" -o -name "*.yml" \) ! -path "./venv/*" ! -path "./node_modules/*" ! -path "./.git/*" ! -path "./cloudformation/*" -exec npx --yes prettier --check {} + || (echo "\033[1;31m❌ YAML formatting check failed\033[0m"; exit 1)
+
+## Format YAML files
+.PHONY: format-yaml
+format-yaml: check-npm
+	@echo "\n\033[1m=== Formatting YAML files ===\033[0m"
+	@npm run format:yaml 2>/dev/null | grep -v "unchanged" || true
 
 ## JSON linter
 .PHONY: lint-json

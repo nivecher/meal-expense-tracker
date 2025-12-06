@@ -350,12 +350,12 @@ warn_unreachable = true
 
 **Environment Usage**:
 
-- **VSCode**: Extension: `redhat.vscode-yaml`
-- **Make**: `yamllint .yamllint **/*.yaml **/*.yml` (if yamllint installed)
+- **VSCode**: Extension: `redhat.vscode-yaml` (validation enabled, formatter disabled)
+- **Make**: N/A (syntax validation handled by pre-commit)
 - **Pre-commit**: `check-yaml --unsafe`
 - **GitHub Actions**: `check-yaml --unsafe`
 
-**Notes**: Pre-commit hook uses `--unsafe` flag for custom tags.
+**Notes**: Pre-commit hook uses `--unsafe` flag for custom tags. Syntax validation is handled by pre-commit hooks; Makefile focuses on formatting checks.
 
 #### check-json (v6.0.0)
 
@@ -389,14 +389,25 @@ warn_unreachable = true
 
 **Configuration File**: `.prettierrc`
 
-**Standard Command**: `prettier --check "**/*.{yaml,yml,json}"`
+**Standard Command**:
+
+- **Lint (check)**: `prettier --check "**/*.{yaml,yml}"`
+- **Format**: `prettier --write "**/*.{yaml,yml}"`
 
 **Environment Usage**:
 
-- **VSCode**: Extension: `esbenp.prettier-vscode`
-- **Make**: `prettier --check "**/*.{yaml,yml,json}"`
+- **VSCode**: Extension: `esbenp.prettier-vscode` (format on save enabled)
+- **Make**:
+  - `make lint-yaml` (formatting check only)
+  - `make format-yaml` (formatting via npm script)
 - **Pre-commit**: `prettier` (files: \.(md|json|ya?ml)$)
 - **GitHub Actions**: Via `make lint-yaml` and `make lint-json`
+
+**Notes**:
+
+- `lint-yaml` checks formatting only (syntax validation handled by pre-commit)
+- `format-yaml` uses npm script: `npm run format:yaml`
+- Syntax validation is handled by pre-commit `check-yaml` hook
 
 ### Terraform Linting
 
@@ -438,7 +449,7 @@ warn_unreachable = true
 
 - `ms-python.python` - Python language support
 - `ms-python.black-formatter` - Black formatter
-- `ms-python.flake8` - Flake8 linter
+- `charliermarsh.ruff` - Ruff linter (replaces Flake8)
 - `dbaeumer.vscode-eslint` - ESLint
 - `esbenp.prettier-vscode` - Prettier
 - `stylelint.vscode-stylelint` - Stylelint
@@ -452,19 +463,20 @@ warn_unreachable = true
 
 **Targets**:
 
-- `make lint` - Run all linters (Python, MyPy, HTML, CSS, JS)
+- `make lint` - Run all linters (Python, MyPy, HTML, CSS, JS, Markdown, YAML, JSON, TOML, Terraform)
 - `make lint-python` - Python linting only (ruff check, black check)
 - `make lint-mypy` - Python type checking only
 - `make lint-html` - HTML linting only
 - `make lint-css` - CSS linting only
 - `make lint-js` - JavaScript linting only
 - `make lint-markdown` - Markdown linting
-- `make lint-yaml` - YAML validation
+- `make lint-yaml` - YAML formatting check
 - `make lint-json` - JSON validation
 - `make lint-toml` - TOML validation
 - `make lint-terraform-fmt` - Terraform formatting check
-- `make format` - Format all code
+- `make format` - Format all code (Python, HTML, CSS, JS, YAML)
 - `make format-python` - Format Python code
+- `make format-yaml` - Format YAML files
 - `make security-check` - Run security checks (includes Bandit)
 
 ### Pre-commit
