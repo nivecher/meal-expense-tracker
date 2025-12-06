@@ -166,6 +166,7 @@ help:  ## Show this help message
 
 	@echo "\n\033[1mUtilities:\033[0m"
 	@echo "  \033[1mmake version\033[0m         Get current application version"
+	@echo "  \033[1mmake version-preview\033[0m Preview what version CI workflow would create"
 	@echo "  \033[1mmake clean\033[0m           Remove build artifacts and temporary files"
 	@echo "  \033[1mmake distclean\033[0m        Remove all generated files including virtual environment"
 	@echo "  \033[1mmake check-env\033[0m        Check development environment setup"
@@ -1376,6 +1377,77 @@ version:
 		fi; \
 	fi
 	@echo "\033[1;32m✅ Version retrieved\033[0m"
+
+## Preview version bump that would be created by CI workflow
+.PHONY: version-preview
+version-preview: check-env
+	@echo "\n\033[1m=== Preview CI Versioning Steps ===\033[0m"
+	@echo "\033[1;36mThis simulates what the CI workflow would do for versioning\033[0m\n"
+	@# Check prerequisites
+	@if ! $(PIP) show python-semantic-release >/dev/null 2>&1; then \
+		echo "\033[1;33m⚠️  python-semantic-release not found. Installing...\033[0m"; \
+		$(PIP) install python-semantic-release[all] >/dev/null 2>&1 || { \
+			echo "\033[1;31m❌ Failed to install python-semantic-release\033[0m"; \
+			exit 1; \
+		}; \
+	fi
+	@# Fetch tags
+	@echo "\033[1m📥 Fetching tags...\033[0m"
+	@git fetch --tags --force >/dev/null 2>&1 || true
+	@# Get latest tag
+	@LATEST_TAG=$$(git describe --tags --abbrev=0 2>/dev/null || echo ""); \
+	if [ -z "$$LATEST_TAG" ]; then \
+		echo "\033[1;33m⚠️  No existing tags found, would start from v0.1.0\033[0m"; \
+		LATEST_TAG="v0.1.0"; \
+	else \
+		echo "\033[1;32m✅ Latest tag: $$LATEST_TAG\033[0m"; \
+	fi
+	@echo ""
+	@# Show commits since latest tag
+	@echo "\033[1m📝 Commits since $$LATEST_TAG:\033[0m"
+	@LATEST_TAG_VAL=$$(git describe --tags --abbrev=0 2>/dev/null || echo ""); \
+	if [ -n "$$LATEST_TAG_VAL" ]; then \
+		git log $$LATEST_TAG_VAL..HEAD --oneline --format="  - %s" | head -20 || echo "  (no commits)"; \
+	else \
+		git log --oneline --format="  - %s" | head -20; \
+	fi
+	@echo ""
+	@# Analyze commits to determine next version using semantic-release logic
+	@echo "\033[1m🔍 Analyzing commits for version bump...\033[0m"
+	@$(PYTHON) scripts/preview_version.py 2>&1 || true
+	@if [ -f "version_preview.txt" ]; then \
+		BUMP_TYPE=$$(grep "^BUMP_TYPE=" version_preview.txt | cut -d= -f2); \
+		NEXT_VERSION=$$(grep "^NEXT_VERSION=" version_preview.txt | cut -d= -f2); \
+		if [ -n "$$NEXT_VERSION" ]; then \
+			NEW_TAG="v$$NEXT_VERSION"; \
+			echo ""; \
+			echo "\033[1;32m✅ Next version would be: $$NEXT_VERSION ($$BUMP_TYPE bump)\033[0m"; \
+			echo "\033[1;32m✅ New tag would be: $$NEW_TAG\033[0m"; \
+			echo ""; \
+			echo "\033[1m📋 Preview of what would happen in CI:\033[0m"; \
+			echo "  1. Create git tag: $$NEW_TAG"; \
+			echo "  2. Generate app/_version.py with version: $$NEXT_VERSION"; \
+			echo "  3. Commit version file (if changed)"; \
+			echo "  4. Push tag to origin"; \
+		else \
+			LATEST_TAG_VAL=$$(git describe --tags --abbrev=0 2>/dev/null || echo ""); \
+			CURRENT_VERSION=$$(echo "$$LATEST_TAG_VAL" | sed 's/^v//'); \
+			echo ""; \
+			echo "\033[1;33m⚠️  No version bump detected\033[0m"; \
+			echo "\033[1;33m   Current version: $$CURRENT_VERSION\033[0m"; \
+			echo ""; \
+			echo "\033[1m💡 Tip: Make commits with conventional commit messages to trigger version bumps:\033[0m"; \
+			echo "  - feat: new feature → minor bump (0.5.1 → 0.6.0)"; \
+			echo "  - fix: bug fix → patch bump (0.5.1 → 0.5.2)"; \
+			echo "  - feat!: breaking change → major bump (0.5.1 → 1.0.0)"; \
+		fi; \
+		rm -f version_preview.txt; \
+	fi
+	@# Cleanup
+	@rm -f semantic_output.txt
+	@echo ""
+	@echo "\033[1;32m✅ Version preview completed\033[0m"
+	@echo "\033[1;36mℹ️  This is a preview only - no tags or files were created\033[0m"
 
 ## Clean up build artifacts and temporary files
 .PHONY: clean

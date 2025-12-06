@@ -242,12 +242,20 @@ jobs:
           terraform_version: 1.13.5
           terraform_wrapper: false
 
+      - name: Setup Terraform plugin cache
+        run: |
+          mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
+          echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y make jq
 
       - name: Deploy Infrastructure (Terraform)
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
+          TF_IN_AUTOMATION: 1
         run: |
           make TF_ENV=dev tf-init
           make TF_ENV=dev tf-plan
@@ -373,7 +381,15 @@ jobs:
           terraform_version: 1.13.5
           terraform_wrapper: false
 
+      - name: Setup Terraform plugin cache
+        run: |
+          mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
+          echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
+
       - name: Deploy to staging
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
+          TF_IN_AUTOMATION: 1
         run: |
           make TF_ENV=staging tf-init
           make TF_ENV=staging tf-plan
@@ -421,7 +437,15 @@ jobs:
           terraform_version: 1.13.5
           terraform_wrapper: false
 
+      - name: Setup Terraform plugin cache
+        run: |
+          mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
+          echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
+
       - name: Deploy to production
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
+          TF_IN_AUTOMATION: 1
         run: |
           make TF_ENV=prod tf-init
           make TF_ENV=prod tf-plan
@@ -479,6 +503,11 @@ jobs:
           terraform_version: 1.13.5
           terraform_wrapper: false
 
+      - name: Setup Terraform plugin cache
+        run: |
+          mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
+          echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -495,6 +524,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy Infrastructure (Terraform)
+        env:
+          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
+          TF_IN_AUTOMATION: 1
         run: |
           make TF_ENV=staging tf-init
           make TF_ENV=staging tf-plan
