@@ -638,7 +638,17 @@ act-setup: check-act
 .PHONY: act-ci
 act-ci: check-act
 	@echo "\033[1m🚀 Running CI workflow locally with act...\033[0m"
-	act -W .github/workflows/ci.yml --artifact-server-path $(ACT_ARTIFACT_SERVER_PATH)
+	@echo "\033[1;36mℹ️  Note: version-tag job will only run if:"
+	@echo "   1. All CI jobs pass (lint, test, terraform, security)"
+	@echo "   2. You're on the main branch"
+	@echo "   3. It's a push event\033[0m"
+	@CURRENT_BRANCH=$$(git branch --show-current); \
+	CURRENT_REF="refs/heads/$$CURRENT_BRANCH"; \
+	echo "\033[1;33m📝 Current branch: $$CURRENT_BRANCH (ref: $$CURRENT_REF)\033[0m"; \
+	act push \
+		-W .github/workflows/ci.yml \
+		--artifact-server-path $(ACT_ARTIFACT_SERVER_PATH) \
+		--env GITHUB_REF=$$CURRENT_REF
 
 ## Run pipeline workflow locally (if available)
 .PHONY: act-pipeline

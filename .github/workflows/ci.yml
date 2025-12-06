@@ -300,6 +300,10 @@ jobs:
       ${{ github.ref == 'refs/heads/main' &&
       github.event_name == 'push' &&
       needs.ci-success.outputs.all_passed == 'true' }}
+    # Note: This job will be skipped if:
+    # - Not on main branch (github.ref != 'refs/heads/main')
+    # - Not a push event (github.event_name != 'push')
+    # - CI jobs failed (needs.ci-success.outputs.all_passed != 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write
