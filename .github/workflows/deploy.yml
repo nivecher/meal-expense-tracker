@@ -18,6 +18,9 @@ on:
           - dev
           - staging
           - prod
+  repository_dispatch:
+    types:
+      - deploy-staging
 
 env:
   APP_NAME: meal-expense-tracker
@@ -74,6 +77,9 @@ jobs:
     needs: check-ci
     if: ${{ github.ref == 'refs/heads/main' && needs.check-ci.outputs.ci_passed == 'true' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -218,7 +224,7 @@ jobs:
   # Deploy to development environment
   deploy-dev:
     name: Deploy to Dev
-    needs: [check-ci, build]
+    needs: [check-ci, build, version-tag]
     if: >
       ${{ github.event_name != 'pull_request' &&
       needs.check-ci.outputs.ci_passed == 'true' &&
@@ -230,10 +236,14 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    outputs:
+      version: ${{ needs.version-tag.outputs.version }}
+      tag: ${{ needs.version-tag.outputs.tag }}
+      deployment_url: ${{ steps.get_url.outputs.url }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.2.2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -246,24 +256,107 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.7.5
+          terraform_version: 1.13.5
           terraform_wrapper: false
 
-      - name: Deploy to dev
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make jq
+
+      - name: Deploy Infrastructure (Terraform)
         run: |
           make TF_ENV=dev tf-init
           make TF_ENV=dev tf-plan
           make TF_ENV=dev tf-apply
 
+      - name: Get ECR repository URI
+        id: ecr_repo
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/meal-expense-tracker-${TF_ENV}-lambda"
+          echo "repository=${ECR_REPO}" >> $GITHUB_OUTPUT
+          echo "ECR Repository: ${ECR_REPO}"
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin ${{ steps.ecr_repo.outputs.repository }}
+
+      - name: Tag and push Docker image to ECR
+        run: |
+          IMAGE_TAG="${{ needs.version-tag.outputs.version || 'dev' }}"
+          ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
+          
+          # Tag image with version and latest
+          docker tag ghcr.io/${{ github.repository }}:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG}
+          docker tag ghcr.io/${{ github.repository }}:${IMAGE_TAG} ${ECR_REPO}:latest
+          
+          # Push both tags
+          docker push ${ECR_REPO}:${IMAGE_TAG}
+          docker push ${ECR_REPO}:latest
+
+      - name: Update Lambda function
+        run: |
+          FUNCTION_NAME="meal-expense-tracker-dev"
+          ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
+          
+          aws lambda update-function-code \
+            --function-name ${FUNCTION_NAME} \
+            --image-uri ${ECR_REPO}:latest \
+            --region ${{ env.AWS_REGION }}
+          
+          # Wait for Lambda to be ready
+          aws lambda wait function-updated \
+            --function-name ${FUNCTION_NAME} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Sync static files to S3
+        env:
+          ENVIRONMENT: dev
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          chmod +x scripts/sync_static_to_s3.sh
+          ./scripts/sync_static_to_s3.sh || echo "Warning: Static file sync failed, but continuing..."
+
+      - name: Get deployment URL
+        id: get_url
+        run: |
+          # Try to get API Gateway URL from Terraform outputs or AWS
+          API_URL=$(aws apigatewayv2 get-apis \
+            --query "Items[?contains(Name, 'meal-expense-tracker-dev')].ApiEndpoint" \
+            --output text \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
+          
+          if [ -z "$API_URL" ]; then
+            # Fallback: try CloudFront URL from Terraform
+            API_URL=$(cd terraform && terraform output -raw api_url 2>/dev/null || echo "")
+          fi
+          
+          if [ -z "$API_URL" ]; then
+            API_URL="https://meals.dev.nivecher.com"
+          fi
+          
+          echo "url=${API_URL}" >> $GITHUB_OUTPUT
+          echo "Deployment URL: ${API_URL}"
+
       - name: Verify Deployment
         run: |
-          LOAD_BALANCER_DNS=$(aws cloudformation describe-stacks \
-            --stack-name dev-stack \
-            --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-
-          curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
+          DEPLOYMENT_URL="${{ steps.get_url.outputs.url }}"
+          echo "Verifying deployment at: ${DEPLOYMENT_URL}"
+          
+          # Health check with retries
+          for i in {1..10}; do
+            if curl -f -s "${DEPLOYMENT_URL}/health" > /dev/null; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "Attempt ${i}/10 failed, retrying in 10 seconds..."
+            sleep 10
+          done
+          
+          echo "❌ Health check failed after 10 attempts"
+          exit 1
 
   # Deploy to staging environment
   deploy-staging:
@@ -361,10 +454,145 @@ jobs:
 
           curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
 
+
+  # Deploy to staging after release is created (triggered by test workflow)
+  deploy-staging-after-release:
+    name: Deploy to Staging (After Release)
+    if: >
+      ${{ github.event_name == 'repository_dispatch' &&
+      github.event.action == 'deploy-staging' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Get latest version tag
+        id: get_version
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          VERSION=$(echo "$TAG" | sed 's/^v//')
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Using tag: ${TAG}, version: ${VERSION}"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          role-duration-seconds: 3600
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.5
+          terraform_wrapper: false
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make jq
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy Infrastructure (Terraform)
+        run: |
+          make TF_ENV=staging tf-init
+          make TF_ENV=staging tf-plan
+          make TF_ENV=staging tf-apply
+
+      - name: Get ECR repository URI
+        id: ecr_repo
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/meal-expense-tracker-staging-lambda"
+          echo "repository=${ECR_REPO}" >> $GITHUB_OUTPUT
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            docker login --username AWS --password-stdin ${{ steps.ecr_repo.outputs.repository }}
+
+      - name: Pull and push Docker image to ECR
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          TAG="${{ steps.get_version.outputs.tag }}"
+          ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
+          
+          # Pull the image from GHCR (use tag or latest)
+          if [ -n "${TAG}" ]; then
+            docker pull ghcr.io/${{ github.repository }}:${TAG} || \
+              docker pull ghcr.io/${{ github.repository }}:${VERSION} || \
+              docker pull ghcr.io/${{ github.repository }}:latest
+          else
+            docker pull ghcr.io/${{ github.repository }}:latest
+          fi
+          
+          # Tag for ECR
+          docker tag ghcr.io/${{ github.repository }}:latest ${ECR_REPO}:${VERSION:-latest}
+          docker tag ${ECR_REPO}:${VERSION:-latest} ${ECR_REPO}:latest
+          
+          # Push both tags
+          docker push ${ECR_REPO}:${VERSION:-latest}
+          docker push ${ECR_REPO}:latest
+
+      - name: Update Lambda function
+        run: |
+          FUNCTION_NAME="meal-expense-tracker-staging"
+          ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
+          
+          aws lambda update-function-code \
+            --function-name ${FUNCTION_NAME} \
+            --image-uri ${ECR_REPO}:latest \
+            --region ${{ env.AWS_REGION }}
+          
+          aws lambda wait function-updated \
+            --function-name ${FUNCTION_NAME} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Sync static files to S3
+        env:
+          ENVIRONMENT: staging
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          chmod +x scripts/sync_static_to_s3.sh
+          ./scripts/sync_static_to_s3.sh || echo "Warning: Static file sync failed"
+
+      - name: Verify Deployment
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis \
+            --query "Items[?contains(Name, 'meal-expense-tracker-staging')].ApiEndpoint" \
+            --output text \
+            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "https://meals.staging.nivecher.com")
+          
+          for i in {1..10}; do
+            if curl -f -s "${API_URL}/health" > /dev/null; then
+              echo "✅ Staging deployment verified"
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
   # Notify deployment status
   notify:
     name: Notify
-    needs: [deploy-dev, deploy-staging, deploy-prod, version-tag]
+    needs: [deploy-dev, deploy-staging, deploy-staging-after-release, deploy-prod, version-tag]
     if: always()
     runs-on: ubuntu-latest
     steps:
