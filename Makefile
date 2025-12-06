@@ -1360,16 +1360,19 @@ package-layer-arm:
 .PHONY: version
 version:
 	@echo "\n\033[1m=== Application Version ===\033[0m"
-	@if [ -f "app/_version.py" ]; then \
-		$(PYTHON) -c "from app._version import __version__; print(__version__)" 2>/dev/null || \
-		echo "\033[1;33m⚠️  Could not import version from app/_version.py\033[0m"; \
+	@EXACT_TAG=$$(git describe --tags --exact-match HEAD 2>/dev/null || echo ""); \
+	if [ -n "$$EXACT_TAG" ]; then \
+		VERSION=$$(echo "$$EXACT_TAG" | sed 's/^v//'); \
+		echo "$$VERSION (exact tag: $$EXACT_TAG)"; \
 	else \
-		echo "\033[1;33m⚠️  Version file not found. Generating from git tags...\033[0m"; \
 		if command -v setuptools_scm >/dev/null 2>&1 || $(PIP) show setuptools-scm >/dev/null 2>&1; then \
-			$(PYTHON) -c "import setuptools_scm; print(setuptools_scm.get_version())"; \
+			$(PYTHON) -c "import setuptools_scm; print(setuptools_scm.get_version())" 2>/dev/null || \
+			$(PYTHON) -c "import setuptools_scm; print(setuptools_scm.get_version(write_to='app/_version.py'))" 2>/dev/null || \
+			echo "\033[1;33m⚠️  Could not get version from setuptools-scm\033[0m"; \
 		else \
-			echo "\033[1;31m❌ setuptools-scm not installed. Install with: pip install setuptools-scm[toml]\033[0m"; \
-			exit 1; \
+			GIT_VERSION=$$(git describe --tags --always 2>/dev/null | sed 's/^v//' || echo "unknown"); \
+			echo "$$GIT_VERSION (from git describe)"; \
+			echo "\033[1;33m⚠️  setuptools-scm not installed. Install with: pip install setuptools-scm[toml]\033[0m"; \
 		fi; \
 	fi
 	@echo "\033[1;32m✅ Version retrieved\033[0m"
