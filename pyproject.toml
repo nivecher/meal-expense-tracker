@@ -15,11 +15,22 @@ email = "mtd37@hotmail.com"
 homepage = "https://github.com/nivecher/meal-expense-tracker"
 
 [tool.setuptools_scm]
-# Use release-branch-semver for proper semantic versioning
-# This will use the latest tag and add dev/branch info for non-tagged commits
-version_scheme = "release-branch-semver"
+# Use no-guess-dev scheme to show current tag with post-release marker
+# This will use the latest tag and add .post1.devN for commits after the tag
+# Example: if tag is v0.6.0, dev version is 0.6.0.post1.dev0+hash.date
+# (post-release is deprecated, no-guess-dev is the recommended replacement)
+version_scheme = "no-guess-dev"
 write_to = "app/_version.py"
-write_to_template = "__version__ = \"{version}\"\n"
+write_to_template = """\"\"\"Version and build information for the application.\"\"\"
+
+__version__ = "{version}"
+
+# Build timestamp - set at build time via environment variable
+# Format: ISO 8601 (YYYY-MM-DDTHH:MM:SS+00:00)
+import os
+
+__build_timestamp__ = os.getenv("BUILD_TIMESTAMP", "Not set")
+"""
 # Fallback version if no tags exist
 fallback_version = "0.1.0"
 

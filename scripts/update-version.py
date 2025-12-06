@@ -145,10 +145,23 @@ def update_pyproject_version(version: str) -> bool:
     with open(pyproject_path, "w") as f:
         toml.dump(pyproject, f)
 
-    # Update the version file that setuptools_scm writes to
-    version_file = Path("app/_version.py")
-    version_file.parent.mkdir(parents=True, exist_ok=True)
-    version_file.write_text(f'__version__ = "{version}"\n')
+    # Use setuptools-scm to generate version file (handles dev versions correctly)
+    try:
+        import setuptools_scm
+
+        version_file = Path("app/_version.py")
+        version_file.parent.mkdir(parents=True, exist_ok=True)
+        # Generate version using setuptools-scm (will include dev info if not at tag)
+        generated_version = setuptools_scm.get_version(
+            write_to=str(version_file),
+            write_to_template='__version__ = "{version}"\n',
+        )
+        logger.info("Generated version using setuptools-scm: %s", generated_version)
+    except ImportError:
+        logger.warning("setuptools-scm not available, writing static version")
+        version_file = Path("app/_version.py")
+        version_file.parent.mkdir(parents=True, exist_ok=True)
+        version_file.write_text(f'__version__ = "{version}"\n')
 
     return True
 

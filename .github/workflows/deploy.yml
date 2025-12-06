@@ -247,6 +247,34 @@ jobs:
           mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
           echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
 
+      - name: Generate backend.hcl files from templates
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          if [ -d "terraform" ]; then
+            # Get AWS account ID
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
+            echo "Using AWS Region: $AWS_REGION"
+            # Generate backend.hcl files for each environment from templates
+            for ENV in dev staging prod; do
+              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
+              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
+              if [ -f "$TEMPLATE_FILE" ]; then
+                echo "Generating $OUTPUT_FILE from template..."
+                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
+                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
+                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
+                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+                echo "✅ Generated $OUTPUT_FILE"
+              else
+                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
+              fi
+            done
+          else
+            echo "No terraform directory found, skipping backend.hcl generation"
+          fi
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -386,6 +414,34 @@ jobs:
           mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
           echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
 
+      - name: Generate backend.hcl files from templates
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          if [ -d "terraform" ]; then
+            # Get AWS account ID
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
+            echo "Using AWS Region: $AWS_REGION"
+            # Generate backend.hcl files for each environment from templates
+            for ENV in dev staging prod; do
+              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
+              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
+              if [ -f "$TEMPLATE_FILE" ]; then
+                echo "Generating $OUTPUT_FILE from template..."
+                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
+                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
+                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
+                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+                echo "✅ Generated $OUTPUT_FILE"
+              else
+                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
+              fi
+            done
+          else
+            echo "No terraform directory found, skipping backend.hcl generation"
+          fi
+
       - name: Deploy to staging
         env:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
@@ -441,6 +497,34 @@ jobs:
         run: |
           mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
           echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
+
+      - name: Generate backend.hcl files from templates
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          if [ -d "terraform" ]; then
+            # Get AWS account ID
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
+            echo "Using AWS Region: $AWS_REGION"
+            # Generate backend.hcl files for each environment from templates
+            for ENV in dev staging prod; do
+              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
+              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
+              if [ -f "$TEMPLATE_FILE" ]; then
+                echo "Generating $OUTPUT_FILE from template..."
+                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
+                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
+                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
+                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+                echo "✅ Generated $OUTPUT_FILE"
+              else
+                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
+              fi
+            done
+          else
+            echo "No terraform directory found, skipping backend.hcl generation"
+          fi
 
       - name: Deploy to production
         env:
@@ -507,6 +591,34 @@ jobs:
         run: |
           mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
           echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
+
+      - name: Generate backend.hcl files from templates
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          if [ -d "terraform" ]; then
+            # Get AWS account ID
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
+            echo "Using AWS Region: $AWS_REGION"
+            # Generate backend.hcl files for each environment from templates
+            for ENV in dev staging prod; do
+              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
+              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
+              if [ -f "$TEMPLATE_FILE" ]; then
+                echo "Generating $OUTPUT_FILE from template..."
+                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
+                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
+                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
+                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+                echo "✅ Generated $OUTPUT_FILE"
+              else
+                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
+              fi
+            done
+          else
+            echo "No terraform directory found, skipping backend.hcl generation"
+          fi
 
       - name: Install system dependencies
         run: |
