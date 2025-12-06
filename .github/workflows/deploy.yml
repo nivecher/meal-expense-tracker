@@ -3,7 +3,7 @@ name: Deploy
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: [CI]
     types:
       - completed
     branches: [main]
@@ -51,7 +51,10 @@ jobs:
     name: Check CI Status
     runs-on: ubuntu-latest
     outputs:
-      ci_passed: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+      ci_passed: >
+        ${{ github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' ||
+        github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Check CI workflow status
         run: |
@@ -106,7 +109,10 @@ jobs:
           # This will read config from pyproject.toml and write the version file
           python -c "
           import setuptools_scm
-          version = setuptools_scm.get_version(write_to='app/_version.py', write_to_template='__version__ = \"{version}\"\n')
+          version = setuptools_scm.get_version(
+            write_to='app/_version.py',
+            write_to_template='__version__ = \"{version}\"\n'
+          )
           print(f'Generated version: {version}')
           "
       - name: Commit version file
@@ -119,7 +125,9 @@ jobs:
               echo "Version file unchanged"
             else
               git add app/_version.py
-              git commit -m "chore: update version to ${{ steps.version.outputs.version }} [skip ci]" || echo "No version changes to commit"
+              git commit -m "chore: update version to \
+                ${{ steps.version.outputs.version }} [skip ci]" ||
+                echo "No version changes to commit"
             fi
           else
             echo "Warning: Version file app/_version.py was not created"
@@ -141,7 +149,11 @@ jobs:
   build:
     name: Build and Push
     needs: [check-ci, version-tag]
-    if: ${{ github.event_name != 'pull_request' && needs.check-ci.outputs.ci_passed == 'true' && (needs.version-tag.result == 'success' || github.event_name == 'workflow_dispatch') }}
+    if: >
+      ${{ github.event_name != 'pull_request' &&
+      needs.check-ci.outputs.ci_passed == 'true' &&
+      (needs.version-tag.result == 'success' ||
+      github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment || 'dev' }}
 
@@ -207,7 +219,12 @@ jobs:
   deploy-dev:
     name: Deploy to Dev
     needs: [check-ci, build]
-    if: ${{ github.event_name != 'pull_request' && needs.check-ci.outputs.ci_passed == 'true' && (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'dev' || github.event_name == 'workflow_run') }}
+    if: >
+      ${{ github.event_name != 'pull_request' &&
+      needs.check-ci.outputs.ci_passed == 'true' &&
+      (github.ref == 'refs/heads/main' ||
+      github.event.inputs.environment == 'dev' ||
+      github.event_name == 'workflow_run') }}
     environment: dev
     runs-on: ubuntu-latest
     permissions:
@@ -252,7 +269,10 @@ jobs:
   deploy-staging:
     name: Deploy to Staging
     needs: [check-ci, build]
-    if: ${{ github.event_name != 'pull_request' && needs.check-ci.outputs.ci_passed == 'true' && github.event.inputs.environment == 'staging' }}
+    if: >
+      ${{ github.event_name != 'pull_request' &&
+      needs.check-ci.outputs.ci_passed == 'true' &&
+      github.event.inputs.environment == 'staging' }}
     environment: staging
     runs-on: ubuntu-latest
     permissions:
@@ -297,7 +317,10 @@ jobs:
   deploy-prod:
     name: Deploy to Production
     needs: [check-ci, build]
-    if: ${{ github.event_name != 'pull_request' && needs.check-ci.outputs.ci_passed == 'true' && github.event.inputs.environment == 'prod' }}
+    if: >
+      ${{ github.event_name != 'pull_request' &&
+      needs.check-ci.outputs.ci_passed == 'true' &&
+      github.event.inputs.environment == 'prod' }}
     environment: prod
     runs-on: ubuntu-latest
     permissions:
@@ -361,8 +384,10 @@ jobs:
 
       - name: Set version and tag
         id: set_version
-        # Use conditional expression with short-circuiting: if result is 'success', access outputs; otherwise use 'unknown'
-        # The && operator short-circuits, so outputs are only accessed when result is 'success'
+        # Use conditional expression with short-circuiting:
+        # if result is 'success', access outputs; otherwise use 'unknown'
+        # The && operator short-circuits, so outputs are only accessed
+        # when result is 'success'
         env:
           VERSION_VALUE: ${{ needs.version-tag.result == 'success' && needs.version-tag.outputs.version || 'unknown' }}
           TAG_VALUE: ${{ needs.version-tag.result == 'success' && needs.version-tag.outputs.tag || 'unknown' }}

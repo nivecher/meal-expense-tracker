@@ -1,820 +1,383 @@
-"""AWS Lambda handler for Meal Expense Tracker API.
+"""AWS Lambda handler with enhanced error handling and structured logging.
 
-This module handles API Gateway v2.0 (HTTP API) events and routes them
-to the Flask application. It also provides database migration capabilities.
+This module provides a Lambda handler that wraps the Flask application
+with comprehensive error handling, structured logging, and CloudWatch
+integration for easier debugging.
 """
 
+from collections.abc import Callable
 import json
 import logging
 import os
-import time
-from typing import Any, Dict, Optional, TypedDict
+import sys
+import traceback
+from typing import Any, Dict
 
-import awsgi
-from flask import Flask
+# Try to import AWS X-Ray SDK for tracing
+try:
+    from aws_xray_sdk.core import patch_all, xray_recorder
 
-from app import create_app
+    XRAY_AVAILABLE = True
+    # Patch libraries for X-Ray tracing
+    patch_all()
+except ImportError:
+    XRAY_AVAILABLE = False
+    xray_recorder = None
 
-# Type definitions
-
-
-class ApiGatewayResponse(TypedDict):
-    statusCode: int
-    body: str
-    headers: dict[str, str]
-    isBase64Encoded: bool
-
-
-class LambdaContext:
-    function_name: str
-    function_version: str
-    invoked_function_arn: str
-    memory_limit_in_mb: int
-    aws_request_id: str
-    log_group_name: str
-    log_stream_name: str
-    identity: Any
-    client_context: Any
+# Configure structured logging for CloudWatch
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
-# Configure logging
-logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO"),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+# Create a structured formatter for JSON logs
+class StructuredFormatter(logging.Formatter):
+    """JSON formatter for structured CloudWatch logs."""
 
-# Global variable to hold the Flask application instance
-_APP_INSTANCE: Flask | None = None
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record as JSON."""
+        log_data = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
 
-# Track if migration has been checked to avoid running on every request
-_MIGRATION_CHECKED: bool = False
+        # Add exception info if present
+        if record.exc_info:
+            log_data["exception"] = {
+                "type": record.exc_info[0].__name__ if record.exc_info[0] else None,
+                "message": str(record.exc_info[1]) if record.exc_info[1] else None,
+                "traceback": traceback.format_exception(*record.exc_info),
+            }
 
+        # Add extra fields from record
+        if hasattr(record, "request_id"):
+            log_data["request_id"] = record.request_id
+        if hasattr(record, "lambda_request_id"):
+            log_data["lambda_request_id"] = record.lambda_request_id
+        if hasattr(record, "path"):
+            log_data["path"] = record.path
+        if hasattr(record, "method"):
+            log_data["method"] = record.method
+        if hasattr(record, "status_code"):
+            log_data["status_code"] = record.status_code
+        if hasattr(record, "duration_ms"):
+            log_data["duration_ms"] = record.duration_ms
 
-def get_or_create_app() -> Flask:
-    """Get or create the Flask application instance with proper configuration.
-
-    Implements the singleton pattern to ensure we only create one Flask app instance
-    per Lambda container, which is important for performance.
-
-    Returns:
-        Flask: The configured Flask application instance
-    """
-    global _APP_INSTANCE
-
-    if _APP_INSTANCE is None:
-        try:
-            _APP_INSTANCE = create_app()
-            logger.info("Created new Flask application instance")
-
-            # Validate session configuration for Lambda environment
-            _validate_session_config(_APP_INSTANCE)
-
-            # Initialize migration manager
-            from app.utils.migration_manager import init_migration_manager
-
-            migration_manager = init_migration_manager(_APP_INSTANCE)
-
-            # Run auto-migration if enabled (force refresh)
-            try:
-                auto_migration_result = migration_manager.auto_migrate()
-                if auto_migration_result.get("success"):
-                    logger.info(f"Auto-migration completed: {auto_migration_result.get('message', 'Success')}")
-                else:
-                    logger.warning(f"Auto-migration failed: {auto_migration_result.get('message', 'Unknown error')}")
-            except Exception as e:
-                logger.error(f"Auto-migration error: {e}")
-                # Don't fail the entire Lambda initialization for migration issues
-                logger.info("Continuing Lambda initialization despite migration error")
-
-        except Exception as e:
-            logger.exception("Failed to create Flask application")
-            raise RuntimeError(f"Failed to initialize application: {str(e)}")
-
-    return _APP_INSTANCE
+        return json.dumps(log_data)
 
 
-def _convert_apigw_v2_to_v1(event: dict[str, Any]) -> dict[str, Any]:
-    """Convert API Gateway v2.0 event format to v1.0 format for awsgi compatibility.
+# Configure handler with structured formatter
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(StructuredFormatter())
+logger.addHandler(handler)
 
-    Args:
-        event: API Gateway v2.0 event
+# Prevent duplicate logs
+logger.propagate = False
 
-    Returns:
-        API Gateway v1.0 compatible event
-    """
-    request_context = event.get("requestContext", {})
-    http_context = request_context.get("http", {})
 
-    # Get headers and handle cookies from v2.0 format
-    headers = dict(event.get("headers", {}))
+def _extract_request_context(event: dict[str, Any], context: Any) -> dict[str, Any]:
+    """Extract request context from Lambda event and context."""
+    request_context = {
+        "lambda_request_id": getattr(context, "request_id", None) if context else None,
+        "function_name": getattr(context, "function_name", None) if context else None,
+        "function_version": getattr(context, "function_version", None) if context else None,
+        "memory_limit_mb": getattr(context, "memory_limit_in_mb", None) if context else None,
+        "remaining_time_ms": getattr(context, "get_remaining_time_in_millis", lambda: None)(),
+    }
 
-    # Convert cookies array to Cookie header for Flask compatibility
-    cookies = event.get("cookies", [])
-    if cookies:
-        cookie_header = "; ".join(cookies)
-        headers["Cookie"] = cookie_header
+    # Extract API Gateway request context
+    if "requestContext" in event:
+        api_context = event["requestContext"]
+        request_context.update(
+            {
+                "api_request_id": api_context.get("requestId"),
+                "api_stage": api_context.get("stage"),
+                "api_path": api_context.get("path"),
+                "api_method": api_context.get("httpMethod") or api_context.get("http", {}).get("method"),
+                "api_source_ip": api_context.get("identity", {}).get("sourceIp")
+                or api_context.get("http", {}).get("sourceIp"),
+                "api_user_agent": api_context.get("identity", {}).get("userAgent")
+                or api_context.get("http", {}).get("userAgent"),
+            }
+        )
 
-    # Fix Host header for CloudFront routing - replace API Gateway domain with CloudFront domain
-    # This ensures Flask generates correct redirect URLs
-    host_header = headers.get("host") or headers.get("Host", "")
-    if host_header and ("execute-api" in host_header or "amazonaws.com" in host_header):
-        # Get the configured server name (CloudFront domain) from environment
-        server_name = os.getenv("SERVER_NAME")
-        if server_name:
-            headers["Host"] = server_name
-            headers["host"] = server_name
-            logger.info(f"Replaced Host header from {host_header} to {server_name} for URL generation")
+    # Extract X-Ray trace ID if available
+    trace_id = os.environ.get("_X_AMZN_TRACE_ID")
+    if trace_id:
+        request_context["xray_trace_id"] = trace_id.split(";")[0] if ";" in trace_id else trace_id
 
-    # Convert v2.0 event to v1.0 format
-    v1_event = {
-        "httpMethod": http_context.get("method", "GET"),
-        "path": event.get("rawPath", "/"),
-        "pathParameters": event.get("pathParameters"),
-        "queryStringParameters": event.get("queryStringParameters"),
-        "headers": headers,
-        "body": event.get("body"),
-        "isBase64Encoded": event.get("isBase64Encoded", False),
-        "requestContext": {
-            "requestId": request_context.get("requestId", ""),
-            "stage": request_context.get("stage", ""),
-            "resourcePath": event.get("rawPath", "/"),
-            "httpMethod": http_context.get("method", "GET"),
-            "requestTime": request_context.get("time", ""),
-            "protocol": http_context.get("protocol", "HTTP/1.1"),
-            "resourceId": request_context.get("resourceId", ""),
-            "accountId": request_context.get("accountId", ""),
-            "apiId": request_context.get("apiId", ""),
-            "identity": request_context.get("identity", {}),
+    return request_context
+
+
+def _log_request_start(event: dict[str, Any], context: Any) -> dict[str, Any]:
+    """Log the start of a request with context."""
+    request_context = _extract_request_context(event, context)
+
+    path = event.get("path", event.get("rawPath", "/"))
+    method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method", "UNKNOWN")
+
+    logger.info(
+        "Lambda request started",
+        extra={
+            "request_id": request_context.get("api_request_id"),
+            "lambda_request_id": request_context.get("lambda_request_id"),
+            "path": path,
+            "method": method,
+            "source_ip": request_context.get("api_source_ip"),
+            "user_agent": request_context.get("api_user_agent"),
+            "xray_trace_id": request_context.get("xray_trace_id"),
         },
-        "multiValueHeaders": {},
-        "multiValueQueryStringParameters": {},
+    )
+
+    return request_context
+
+
+def _log_request_end(
+    request_context: dict[str, Any],
+    status_code: int,
+    duration_ms: float,
+    error: Exception | None = None,
+) -> None:
+    """Log the end of a request with results."""
+    extra = {
+        "request_id": request_context.get("api_request_id"),
+        "lambda_request_id": request_context.get("lambda_request_id"),
+        "path": request_context.get("api_path"),
+        "method": request_context.get("api_method"),
+        "status_code": status_code,
+        "duration_ms": round(duration_ms, 2),
+        "xray_trace_id": request_context.get("xray_trace_id"),
     }
 
-    # Convert headers to multiValueHeaders format if needed
-    if isinstance(v1_event["headers"], dict):
-        v1_event["multiValueHeaders"] = {k: [v] for k, v in v1_event["headers"].items()}
-
-    # Convert query parameters to multiValue format if needed
-    if isinstance(v1_event["queryStringParameters"], dict):
-        v1_event["multiValueQueryStringParameters"] = {k: [v] for k, v in v1_event["queryStringParameters"].items()}
-
-    return v1_event
-
-
-def _validate_session_config(app: Flask) -> None:
-    """Validate session configuration for Lambda deployment.
-
-    Ensures that session configuration is properly set up
-    for the Lambda environment using signed cookie sessions.
-
-    Args:
-        app: Flask application instance
-
-    Raises:
-        RuntimeError: If session configuration is invalid
-    """
-    session_type = app.config.get("SESSION_TYPE")
-
-    if session_type is None:
-        logger.info("Using Flask's default signed cookie sessions (ideal for Lambda)")
+    if error:
+        logger.error(
+            f"Lambda request failed: {str(error)}",
+            exc_info=error,
+            extra=extra,
+        )
+    elif status_code >= 500:
+        logger.error(
+            f"Lambda request returned error status: {status_code}",
+            extra=extra,
+        )
+    elif status_code >= 400:
+        logger.warning(
+            f"Lambda request returned client error: {status_code}",
+            extra=extra,
+        )
     else:
-        logger.warning(f"Unexpected session type in Lambda: {session_type}. Using signed cookie sessions instead.")
-
-
-def handle_migration(app: Flask) -> dict[str, Any]:
-    """Handle database migration operation.
-
-    Args:
-        app: Flask application instance
-
-    Returns:
-        Dict with operation results
-    """
-    from app.utils.migration_manager import migration_manager
-
-    try:
-        with app.app_context():
-            # Use the migration manager for safe migrations
-            result = migration_manager.run_migrations()
-
-            if result["success"]:
-                return {
-                    "statusCode": 200,
-                    "body": json.dumps({"message": result["message"], "data": result.get("data", {})}),
-                    "headers": {"Content-Type": "application/json"},
-                }
-            else:
-                return {
-                    "statusCode": 500,
-                    "body": json.dumps({"error": result["message"]}),
-                    "headers": {"Content-Type": "application/json"},
-                }
-    except Exception as e:
-        logger.exception("Database migration failed")
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": f"Database migration failed: {str(e)}"}),
-            "headers": {"Content-Type": "application/json"},
-        }
-
-
-def handle_database_operation(operation: str, **kwargs: Any) -> ApiGatewayResponse:
-    """Handle database operations like migrations.
-
-    Args:
-        operation: Operation to perform (currently only 'migrate' is supported)
-        **kwargs: Additional operation-specific arguments
-
-    Returns:
-        Dict with operation results in API Gateway format
-    """
-    app = get_or_create_app()
-
-    if operation == "migrate":
-        result = handle_migration(app)
-        # Ensure the response matches ApiGatewayResponse type
-        return {
-            "statusCode": result["statusCode"],
-            "body": result["body"],
-            "headers": result["headers"],
-            "isBase64Encoded": False,
-        }
-    else:
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"error": f"Unsupported operation: {operation}"}),
-            "headers": {"Content-Type": "application/json"},
-            "isBase64Encoded": False,
-        }
-
-
-def _get_allowed_domains(headers: dict[str, str]) -> list[str]:
-    """Get allowed domains for referrer validation."""
-    allowed_domains = os.getenv("ALLOWED_REFERRER_DOMAINS", "").split(",")
-    if not allowed_domains or allowed_domains == [""]:
-        host = headers.get("Host") or headers.get("host", "")
-        if host:
-            allowed_domains = [f"https://{host}"]
-            if "execute-api" in host or "lambda-url" in host or "amazonaws.com" in host:
-                allowed_domains.extend([f"https://{host}", f"http://{host}"])
-        else:
-            allowed_domains = ["http://localhost:5000", "https://localhost:5000"]
-    else:
-        # Always include the current host for Lambda Function URLs and API Gateway
-        host = headers.get("Host") or headers.get("host", "")
-        if host and ("lambda-url" in host or "execute-api" in host or "amazonaws.com" in host):
-            allowed_domains.append(f"https://{host}")
-            allowed_domains.append(f"http://{host}")
-
-    # Always allow localhost for development
-    if "http://localhost:5000" not in allowed_domains:
-        allowed_domains.append("http://localhost:5000")
-    if "https://localhost:5000" not in allowed_domains:
-        allowed_domains.append("https://localhost:5000")
-
-    return allowed_domains
-
-
-def _should_skip_referrer_validation(event: dict[str, Any]) -> bool:
-    """Check if referrer validation should be skipped - RELAXED FOR TESTING."""
-    # Skip referrer validation for all requests during testing
-    return True
-
-
-def _is_referrer_allowed(referer: str, allowed_domains: list[str]) -> bool:
-    """Check if referrer is allowed."""
-    if not referer:
-        return True  # Allow requests without referrer
-
-    # Check against allowed domains
-    for domain in allowed_domains:
-        if referer.startswith(domain.strip()):
-            return True
-
-    # Additional check for AWS domains
-    if "amazonaws.com" in referer:
-        return True
-
-    return False
-
-
-def _validate_referrer(event: dict[str, Any]) -> dict[str, Any] | None:
-    """Validate the referrer header for security."""
-    if _should_skip_referrer_validation(event):
-        return None
-
-    headers = event.get("headers", {})
-    referer = headers.get("Referer") or headers.get("referer", "")
-    allowed_domains = _get_allowed_domains(headers)
-
-    if _is_referrer_allowed(referer, allowed_domains):
-        if referer:
-            logging.info(f"Referrer validation passed: {referer}")
-        return None
-
-    # Log but don't block for now
-    logging.warning(f"Invalid referrer: {referer}. Allowed domains: {allowed_domains}")
-    return None  # Don't block during development
-
-
-def _enhance_security_headers(headers: dict[str, str]) -> None:
-    """Ensure security headers are properly set for Lambda environment."""
-    # Essential security headers - always set for all responses
-    if "X-Content-Type-Options" not in headers:
-        headers["X-Content-Type-Options"] = "nosniff"
-    if "X-Frame-Options" not in headers:
-        headers["X-Frame-Options"] = "DENY"
-    if "Referrer-Policy" not in headers:
-        headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-
-    # Additional security headers
-    if "X-XSS-Protection" not in headers:
-        headers["X-XSS-Protection"] = "1; mode=block"
-    if "Permissions-Policy" not in headers:
-        headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-
-    # Remove deprecated headers
-    headers.pop("Pragma", None)
-
-    # Ensure CSP header for HTML responses
-    content_type = headers.get("Content-Type", "")
-    if "html" in content_type and "Content-Security-Policy" not in headers:
-        headers["Content-Security-Policy"] = (
-            "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline' "
-            "https://cdn.jsdelivr.net https://code.jquery.com https://maps.googleapis.com "
-            "https://maps.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net "
-            "https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' "
-            "https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
-            "img-src 'self' data: https: blob: https://places.googleapis.com https://maps.googleapis.com; connect-src 'self' https://maps.googleapis.com "
-            "https://places.googleapis.com https://cdn.jsdelivr.net; object-src 'none'; base-uri 'self';"
+        logger.info(
+            "Lambda request completed successfully",
+            extra=extra,
         )
 
 
-def _fix_cache_control_headers(headers: dict[str, str]) -> None:
-    """Fix cache-control header conflicts and ensure proper caching."""
-    cache_control = headers.get("Cache-Control", "")
-    content_type = headers.get("Content-Type", "")
-
-    # Remove conflicting directives
-    if "no-cache" in cache_control and "max-age" in cache_control:
-        if "html" in content_type:
-            headers["Cache-Control"] = "no-cache"
-        elif any(ext in content_type for ext in ["css", "javascript", "image", "font/"]):
-            headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        else:
-            headers["Cache-Control"] = "public, max-age=3600"
-
-    # Set proper cache control if missing
-    if not cache_control:
-        if "html" in content_type:
-            headers["Cache-Control"] = "no-cache"
-        elif any(ext in content_type for ext in ["css", "javascript", "image", "font/"]):
-            headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        else:
-            headers["Cache-Control"] = "public, max-age=3600"
-
-
-def _handle_database_operation(event: dict[str, Any]) -> dict[str, Any]:
-    """Handle database operations with enhanced headers."""
-    operation = str(event["operation"])
-    db_response = handle_database_operation(operation, **event)
-    db_headers = db_response.get("headers", {})
-    _enhance_security_headers(db_headers)
-    _fix_cache_control_headers(db_headers)
-    return {
-        "statusCode": db_response["statusCode"],
-        "body": db_response["body"],
-        "headers": db_headers,
-        "isBase64Encoded": db_response["isBase64Encoded"],
-    }
-
-
-def _handle_admin_operation(event: dict[str, Any]) -> dict[str, Any]:
-    """Handle admin operations with enhanced headers."""
-    from app.admin.lambda_admin import handle_admin_request
-
-    app = get_or_create_app()
-    admin_response = handle_admin_request(app, event)
-    if isinstance(admin_response, dict) and "headers" in admin_response:
-        _enhance_security_headers(admin_response["headers"])
-        _fix_cache_control_headers(admin_response["headers"])
-    return admin_response
-
-
-def _handle_health_check() -> dict[str, Any]:
-    """Handle health check requests with migration status."""
-    try:
-        from lambda_init import get_initialization_status
-
-        status = get_initialization_status()
-        return {
-            "statusCode": 200,
-            "body": json.dumps(
-                {
-                    "status": "healthy" if status["state"]["initialized"] else "initializing",
-                    "initialization": status["state"],
-                    "health": status["health"],
-                    "timestamp": time.time(),
-                }
-            ),
-            "headers": {
-                "Content-Type": "application/json",
-                "Cache-Control": "no-cache",
-            },
-        }
-    except Exception as e:
-        logger.exception("Health check failed")
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "status": "unhealthy",
-                    "error": str(e),
-                    "timestamp": time.time(),
-                }
-            ),
-            "headers": {
-                "Content-Type": "application/json",
-                "Cache-Control": "no-cache",
-            },
-        }
-
-
-def _match_origin(request_origin: str, allowed_origin: str) -> bool:
-    """Check if request origin matches allowed origin.
-
-    Args:
-        request_origin: The origin from the request
-        allowed_origin: The allowed origin to check against
-
-    Returns:
-        True if origins match, False otherwise
-    """
-    return request_origin == allowed_origin or request_origin.rstrip("/") == allowed_origin.rstrip("/")
-
-
-def _get_production_origin(cors_origins: list[str], request_origin: str) -> tuple[str, bool]:
-    """Get allowed origin for production environment.
-
-    Args:
-        cors_origins: List of allowed origins (wildcard removed)
-        request_origin: The origin from the request
-
-    Returns:
-        Tuple of (allowed_origin, allow_credentials)
-    """
-    # If no origins configured in production, use request origin if present
-    if not cors_origins:
-        if request_origin:
-            return (request_origin, True)
-        return ("null", False)
-
-    # Check if request origin matches any allowed origin
-    if request_origin:
-        for allowed_origin in cors_origins:
-            if _match_origin(request_origin, allowed_origin):
-                return (request_origin, True)
-        # Request origin doesn't match - deny
-        return ("null", False)
-
-    # No request origin but we have allowed origins - return first one
-    return (cors_origins[0], True)
-
-
-def _get_development_origin(cors_origins: list[str], request_origin: str) -> tuple[str, bool]:
-    """Get allowed origin for development environment.
-
-    Args:
-        cors_origins: List of allowed origins
-        request_origin: The origin from the request
-
-    Returns:
-        Tuple of (allowed_origin, allow_credentials)
-    """
-    # Allow wildcard for easier testing in development
-    if "*" in cors_origins:
-        return ("*", False)
-
-    # If no origin in request, return first allowed origin (or wildcard as fallback)
-    if not request_origin:
-        return (cors_origins[0] if cors_origins else "*", len(cors_origins) > 0)
-
-    # Check if request origin matches any allowed origin
-    for allowed_origin in cors_origins:
-        if _match_origin(request_origin, allowed_origin):
-            return (request_origin, True)
-
-    # If no match, return first allowed origin (or wildcard as fallback in dev)
-    return (cors_origins[0] if cors_origins else "*", len(cors_origins) > 0)
-
-
-def _get_allowed_origin(headers: dict[str, str]) -> tuple[str, bool]:
-    """Get the allowed CORS origin based on environment configuration and request.
-
-    Args:
-        headers: Request headers containing the Origin header
-
-    Returns:
-        Tuple of (allowed_origin, allow_credentials)
-        - allowed_origin: The origin to return in Access-Control-Allow-Origin header
-        - allow_credentials: Whether credentials can be allowed (False if wildcard origin)
-    """
-    environment = os.getenv("ENVIRONMENT", "dev")
-    cors_origins_env = os.getenv("CORS_ORIGINS", "*" if environment == "dev" else "")
-    cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
-
-    # Get the request origin
-    request_origin = headers.get("Origin") or headers.get("origin", "")
-
-    # In production, never allow wildcard - require explicit origins
-    if environment != "dev":
-        # Remove wildcard from allowed origins in production
-        cors_origins_prod = [origin for origin in cors_origins if origin != "*"]
-        return _get_production_origin(cors_origins_prod, request_origin)
-
-    # Development environment - allow wildcard for easier testing
-    return _get_development_origin(cors_origins, request_origin)
-
-
-def _handle_cors_preflight(event: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Handle CORS preflight OPTIONS requests with environment-aware settings."""
-    environment = os.getenv("ENVIRONMENT", "dev")
-    if environment == "dev":
-        # Disable CORS completely for dev environment
-        return {
-            "statusCode": 200,
-            "headers": {
-                "X-Content-Type-Options": "nosniff",
-                "Cache-Control": "public, max-age=86400",
-            },
-            "body": "",
-            "isBase64Encoded": False,
-        }
-    else:
-        # Production - use environment-configured CORS origins
-        headers = event.get("headers", {}) if event else {}
-        allowed_origin, allow_credentials = _get_allowed_origin(headers)
-
-        # Safety check: Never allow wildcard in production
-        if allowed_origin == "*":
-            logger.warning("Wildcard CORS origin detected in production - using null origin instead")
-            allowed_origin = "null"
-            allow_credentials = False
-
-        cors_headers = {
-            "Access-Control-Allow-Origin": allowed_origin,
-            "Access-Control-Allow-Methods": os.getenv("CORS_METHODS", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"),
-            "Access-Control-Allow-Headers": os.getenv(
-                "CORS_HEADERS",
-                "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, X-CSRFToken",
-            ),
-            "Access-Control-Expose-Headers": os.getenv(
-                "CORS_EXPOSE_HEADERS", "Content-Length, Content-Type, X-CSRFToken"
-            ),
-            "Access-Control-Max-Age": os.getenv("CORS_MAX_AGE", "86400"),
-            "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "public, max-age=86400",
-        }
-
-        # Only set credentials if not using wildcard
-        if allow_credentials:
-            cors_headers["Access-Control-Allow-Credentials"] = "true"
-
-        return {
-            "statusCode": 200,
-            "headers": cors_headers,
-            "body": "",
-            "isBase64Encoded": False,
-        }
-
-
-def _process_awsgi_response(response: dict[str, Any], event: dict[str, Any] | None = None) -> dict[str, str]:
-    """Process and enhance AWSGI response headers."""
-    raw_headers = response.get("headers", {})
-    if not isinstance(raw_headers, dict):
-        raw_headers = {}
-
-    headers: dict[str, str] = {str(k): str(v) for k, v in raw_headers.items()}
-
-    # Environment-specific CORS handling
-    environment = os.getenv("ENVIRONMENT", "dev")
-    if environment == "dev":
-        # Development - disable CORS for simplified testing
-        pass
-    else:
-        # Production - use environment-configured CORS origins
-        request_headers = event.get("headers", {}) if event else {}
-        allowed_origin, allow_credentials = _get_allowed_origin(request_headers)
-
-        # Safety check: Never allow wildcard in production
-        if allowed_origin == "*":
-            logger.warning("Wildcard CORS origin detected in production - using null origin instead")
-            allowed_origin = "null"
-            allow_credentials = False
-
-        cors_headers = {
-            "Access-Control-Allow-Origin": allowed_origin,
-            "Access-Control-Allow-Methods": os.getenv("CORS_METHODS", "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"),
-            "Access-Control-Allow-Headers": os.getenv(
-                "CORS_HEADERS",
-                "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, X-CSRFToken",
-            ),
-            "Access-Control-Expose-Headers": os.getenv(
-                "CORS_EXPOSE_HEADERS", "Content-Length, Content-Type, X-CSRFToken"
-            ),
-        }
-
-        # Only set credentials if not using wildcard
-        if allow_credentials:
-            cors_headers["Access-Control-Allow-Credentials"] = "true"
-
-        headers.update(cors_headers)
-
-    _enhance_security_headers(headers)
-    _fix_cache_control_headers(headers)
-    # Type assertion to ensure return type is correct after mutations
-    return dict(headers)
-
-
-def _run_auto_migration() -> None:
-    """Run auto-migration on first request if enabled."""
-    global _MIGRATION_CHECKED
-    logger.info("_run_auto_migration called")
-
-    if not _MIGRATION_CHECKED:
-        logger.info("Migration not yet checked, running initialization...")
-        try:
-            from lambda_init import initialize_lambda
-
-            # Initialize Lambda with migrations
-            logger.info("Calling initialize_lambda...")
-            init_result = initialize_lambda()
-            if init_result.get("success"):
-                logger.info(f"Lambda initialization: {init_result['message']}")
-            else:
-                logger.warning(f"Lambda initialization failed: {init_result.get('message', 'Unknown error')}")
-
-        except Exception as e:
-            logger.error(f"Lambda initialization error: {e}")
-            logger.exception("Full traceback:")
-
-        # Mark as checked to avoid running on every request
-        _MIGRATION_CHECKED = True
-        logger.info("Migration check completed")
-    else:
-        logger.info("Migration already checked, skipping")
-
-
-def _extract_cookies_from_headers(headers: dict[str, str]) -> list[str]:
-    """Extract Set-Cookie headers and convert to HTTP API cookies format."""
-    cookies = []
-
-    # Find all Set-Cookie headers (case insensitive)
-    for header_name, header_value in headers.items():
-        if header_name.lower() == "set-cookie":
-            cookies.append(header_value)
-
-    return cookies
-
-
-def _handle_http_request(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    """Handle HTTP API events."""
-    app = get_or_create_app()
-
-    # Extract and log request details
-    http_method = event.get("httpMethod") or event.get("requestContext", {}).get("http", {}).get("method")
-    path = event.get("path") or event.get("rawPath") or event.get("requestContext", {}).get("http", {}).get("path")
-    logger.info(f"Processing request: {http_method} {path}")
-
-    try:
-        # Handle CORS preflight requests for OPTIONS method
-        if http_method == "OPTIONS":
-            return _handle_cors_preflight(event)
-
-        # Fix Host header for URL generation before processing
-        headers = event.get("headers", {})
-        host_header = headers.get("host") or headers.get("Host", "")
-        if host_header and ("execute-api" in host_header or "amazonaws.com" in host_header):
-            server_name = os.getenv("SERVER_NAME")
-            if server_name:
-                headers["Host"] = server_name
-                headers["host"] = server_name
-                event["headers"] = headers
-                logger.info(f"Fixed Host header from {host_header} to {server_name} for URL generation")
-
-        # Convert API Gateway v2.0 format to v1.0 format for awsgi compatibility
-        # Note: With payload_format_version = "2.0", this conversion is always needed
-        if "httpMethod" not in event and "requestContext" in event:
-            http_context = event.get("requestContext", {})
-            if "http" in http_context:
-                # API Gateway v2.0 format - convert to v1.0
-                event = _convert_apigw_v2_to_v1(event)
-                logger.info("Converted API Gateway v2.0 event to v1.0 format")
-
-        # Use awsgi for HTTP request handling
-        response = awsgi.response(
-            app,
-            event,
-            context,
-            base64_content_types={
-                "image/png",
-                "image/jpg",
-                "image/jpeg",
-                "image/gif",
-                "image/webp",
-                "application/octet-stream",
-                "application/pdf",
-                "application/zip",
-                "font/woff",
-                "font/woff2",
-                "application/font-woff",
-                "application/font-woff2",
-            },
-        )
-
-        # Process and enhance response headers
-        headers = _process_awsgi_response(response, event)
-
-        # Convert Set-Cookie headers to HTTP API cookies format
-        cookies = _extract_cookies_from_headers(headers)
-
-        return {
-            "statusCode": response.get("statusCode", 500),
-            "body": response.get("body", ""),
-            "headers": headers,
-            "cookies": cookies,  # HTTP API format
-            "isBase64Encoded": response.get("isBase64Encoded", False),
-        }
-
-    except Exception as e:
-        logger.exception("Error handling request: %s", str(e))
-        # Get allowed origin for error response
-        request_headers = event.get("headers", {}) if event else {}
-        allowed_origin, _ = _get_allowed_origin(request_headers)
-
-        # Safety check: Never allow wildcard in production
-        environment = os.getenv("ENVIRONMENT", "dev")
-        if environment != "dev" and allowed_origin == "*":
-            logger.warning("Wildcard CORS origin detected in production error handler - using null origin instead")
-            allowed_origin = "null"
-
-        error_headers = {
+def _create_error_response(
+    status_code: int,
+    error_message: str,
+    error_type: str | None = None,
+    traceback_str: str | None = None,
+    request_id: str | None = None,
+) -> dict[str, Any]:
+    """Create a standardized error response."""
+    response = {
+        "statusCode": status_code,
+        "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": allowed_origin,
-            "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "no-cache",
-        }
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": "Internal server error"}),
-            "headers": error_headers,
-            "isBase64Encoded": False,
-        }
+            "X-Request-ID": request_id or "unknown",
+        },
+        "body": json.dumps(
+            {
+                "error": error_message,
+                "error_type": error_type or "InternalServerError",
+                "request_id": request_id,
+            }
+        ),
+        "isBase64Encoded": False,
+    }
+
+    # Include traceback in non-production environments
+    if traceback_str and os.environ.get("ENVIRONMENT", "prod") != "prod":
+        error_body = json.loads(response["body"])
+        error_body["traceback"] = traceback_str.split("\n")
+        response["body"] = json.dumps(error_body)
+
+    return response
 
 
 def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    """Handle Lambda events from API Gateway v1.0 (REST API) or v2.0 (HTTP API).
+    """AWS Lambda handler with enhanced error handling and logging.
 
     Args:
-        event: The Lambda event
-        context: The Lambda context object (not used but required by Lambda)
+        event: Lambda event dictionary containing API Gateway request data
+        context: Lambda context object
 
     Returns:
-        dict: Response in appropriate API Gateway format
+        API Gateway compatible response dictionary
     """
-    print(
-        f"*** LAMBDA_HANDLER START: routeKey: {event.get('routeKey', 'MISSING')} rawPath: {event.get('rawPath', 'MISSING')} ***"
-    )
-    logger.error(
-        f"*** LAMBDA_HANDLER START: routeKey: {event.get('routeKey', 'MISSING')} rawPath: {event.get('rawPath', 'MISSING')} ***"
-    )
-    _ = context  # Mark as unused
+    import time
 
-    # Handle direct invocation for database operations
-    if "operation" in event:
-        return _handle_database_operation(event)
+    start_time = time.time()
+    request_context = _log_request_start(event, context)
+    request_id = request_context.get("api_request_id") or request_context.get("lambda_request_id")
 
-    # Handle admin operations
-    if "admin_operation" in event:
-        return _handle_admin_operation(event)
+    # Start X-Ray segment if available
+    if XRAY_AVAILABLE and xray_recorder:
+        segment = xray_recorder.begin_segment(name="lambda_handler")
+        segment.put_metadata("request_context", request_context)
+        segment.put_metadata("event", event)
+        segment.put_annotation("function_name", request_context.get("function_name", "unknown"))
+        segment.put_annotation("path", request_context.get("api_path", "/"))
+        segment.put_annotation("method", request_context.get("api_method", "UNKNOWN"))
+    else:
+        segment = None
 
-    # Handle health check requests
-    if event.get("path") == "/health" or event.get("rawPath") == "/health":
-        logger.info("Health check request detected")
-        # Run auto-migration on health check (first request)
-        logger.info("About to call _run_auto_migration")
-        _run_auto_migration()
-        logger.info("Finished calling _run_auto_migration")
-        return _handle_health_check()
+    try:
+        # Import the actual handler from wsgi module
+        from wsgi import application
 
-    # Auto-migrate on first request (if enabled)
-    _run_auto_migration()
+        # Use mangum for HTTP API v2 support (works with Flask/WSGI apps)
+        try:
+            from mangum import Mangum
 
-    # Validate referrer for security (before processing HTTP requests)
-    referrer_error = _validate_referrer(event)
-    if referrer_error:
-        return referrer_error
+            handler = Mangum(application, lifespan="off")
+            response = handler(event, context)
+        except ImportError:
+            # Fallback: simple WSGI adapter
+            import base64
+            from io import BytesIO
 
-    # Handle HTTP API events
-    return _handle_http_request(event, context)
+            path = event.get("rawPath", "/")
+            method = event.get("requestContext", {}).get("http", {}).get("method", "GET")
+            query_string = event.get("rawQueryString", "")
+            headers = event.get("headers", {})
+            body = event.get("body", "")
+
+            # Handle cookies - HTTP API v2 may pass cookies in array or Cookie header
+            cookies = event.get("cookies", [])
+            if cookies and "cookie" not in headers:
+                # Convert cookies array to Cookie header format
+                cookie_header = "; ".join(cookies)
+                headers["cookie"] = cookie_header
+
+            # Handle body
+            if body and event.get("isBase64Encoded", False):
+                body_bytes = base64.b64decode(body)
+            elif body:
+                body_bytes = body.encode("utf-8") if isinstance(body, str) else body
+            else:
+                body_bytes = b""
+
+            # Create WSGI environment
+            environ = {
+                "REQUEST_METHOD": method,
+                "PATH_INFO": path,
+                "QUERY_STRING": query_string,
+                "CONTENT_TYPE": headers.get("content-type", ""),
+                "CONTENT_LENGTH": str(len(body_bytes)),
+                "SERVER_NAME": "lambda",
+                "SERVER_PORT": "443",
+                "wsgi.version": (1, 0),
+                "wsgi.url_scheme": "https",
+                "wsgi.input": BytesIO(body_bytes),
+                "wsgi.errors": sys.stderr,
+                "wsgi.multithread": False,
+                "wsgi.multiprocess": False,
+                "wsgi.run_once": False,
+            }
+
+            # Add headers (including Cookie header)
+            for key, value in headers.items():
+                key = key.upper().replace("-", "_")
+                if key not in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+                    environ[f"HTTP_{key}"] = value
+
+            # Call Flask application
+            with application.request_context(environ):
+                flask_response = application.full_dispatch_request()
+
+            # Convert to API Gateway format
+            # Extract cookies from Set-Cookie headers for HTTP API v2
+            response_headers = {}
+            cookies = []
+            for key, value in flask_response.headers:
+                if key.lower() == "set-cookie":
+                    cookies.append(value)
+                else:
+                    response_headers[key] = value
+
+            response = {
+                "statusCode": flask_response.status_code,
+                "headers": response_headers,
+                "body": flask_response.get_data(as_text=True),
+                "isBase64Encoded": False,
+            }
+
+            # HTTP API v2 uses cookies array, not Set-Cookie headers
+            if cookies:
+                response["cookies"] = cookies
+
+        # Calculate duration and log
+        duration_ms = (time.time() - start_time) * 1000
+        status_code = response.get("statusCode", 200)
+        _log_request_end(request_context, status_code, duration_ms)
+
+        # Add X-Ray annotations
+        if segment:
+            segment.put_annotation("status_code", status_code)
+            segment.put_metadata("response", {"status_code": status_code, "duration_ms": duration_ms})
+            xray_recorder.end_segment()
+
+        return response
+
+    except Exception as e:
+        # Calculate duration
+        duration_ms = (time.time() - start_time) * 1000
+
+        # Log the error with full context
+        error_type = type(e).__name__
+        error_message = str(e)
+        traceback_str = traceback.format_exc()
+
+        logger.error(
+            f"Unhandled exception in Lambda handler: {error_type}: {error_message}",
+            exc_info=True,
+            extra={
+                "request_id": request_id,
+                "lambda_request_id": request_context.get("lambda_request_id"),
+                "error_type": error_type,
+                "error_message": error_message,
+                "duration_ms": round(duration_ms, 2),
+                "xray_trace_id": request_context.get("xray_trace_id"),
+            },
+        )
+
+        # Log request completion with error
+        _log_request_end(request_context, 500, duration_ms, error=e)
+
+        # Add X-Ray error annotations
+        if segment:
+            segment.put_annotation("error", True)
+            segment.put_annotation("error_type", error_type)
+            segment.put_annotation("status_code", 500)
+            segment.put_metadata(
+                "error",
+                {
+                    "type": error_type,
+                    "message": error_message,
+                    "traceback": traceback_str.split("\n") if traceback_str else None,
+                },
+            )
+            xray_recorder.end_segment()
+
+        # Return error response
+        return _create_error_response(
+            status_code=500,
+            error_message="Internal server error",
+            error_type=error_type,
+            traceback_str=traceback_str,
+            request_id=request_id,
+        )

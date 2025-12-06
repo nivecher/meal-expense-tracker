@@ -19,7 +19,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 
 from app.auth import bp, services
 from app.auth.models import User
-from app.extensions import db
+from app.extensions import db, limiter
 
 from .forms import ChangePasswordForm, LoginForm, RegistrationForm
 
@@ -74,9 +74,19 @@ def _get_safe_redirect_url(next_url: str | None) -> str:
     return url_for("main.index")
 
 
+def _exempt_get_requests() -> bool:
+    """Exempt GET requests from rate limiting on login page."""
+    return request.method == "GET"
+
+
 @bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute", methods=["POST"], override_defaults=True, exempt_when=_exempt_get_requests)
 def login() -> str | Response:
-    """Handle user login with standard Flask-Login patterns."""
+    """Handle user login with standard Flask-Login patterns.
+
+    Rate limiting: Only POST requests (login attempts) are rate limited to 10 per minute.
+    GET requests (viewing the login page) are exempt from rate limiting.
+    """
     # If user is already logged in, redirect to next page or home
     if current_user.is_authenticated:
         # Security: _get_safe_redirect_url() validates the URL and only allows

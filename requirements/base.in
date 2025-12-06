@@ -22,6 +22,7 @@ SQLAlchemy>=2.0.0,<3.0.0           # Core SQLAlchemy ORM and database toolkit
 # AWS
 boto3>=1.38.46,<2.0.0              # AWS SDK for Python, used for S3 and other AWS services
 requests>=2.32.4,<3.0.0            # HTTP library for making API requests (used by boto3 and for integrations)
+aws-xray-sdk>=2.13.0,<3.0.0        # AWS X-Ray SDK for distributed tracing and performance monitoring
 
 # WSGI Server
 gunicorn>=23.0.0,<24.0.0           # Production WSGI server for running Flask apps

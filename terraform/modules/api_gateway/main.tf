@@ -138,19 +138,27 @@ resource "aws_apigatewayv2_stage" "main" {
   name        = "$default"
   auto_deploy = true
 
-  # Access logging settings
+  # Access logging settings with enhanced error details
   access_log_settings {
     destination_arn = aws_cloudwatch_log_group.api_gw.arn
     format = jsonencode({
-      requestId        = "$context.requestId"
-      ip               = "$context.identity.sourceIp"
-      requestTime      = "$context.requestTime"
-      httpMethod       = "$context.httpMethod"
-      routeKey         = "$context.routeKey"
-      status           = "$context.status"
-      protocol         = "$context.protocol"
-      responseLength   = "$context.responseLength"
-      integrationError = "$context.integrationErrorMessage"
+      requestId          = "$context.requestId"
+      ip                 = "$context.identity.sourceIp"
+      requestTime        = "$context.requestTime"
+      requestTimeEpoch   = "$context.requestTimeEpoch"
+      httpMethod         = "$context.httpMethod"
+      routeKey           = "$context.routeKey"
+      path               = "$context.path"
+      protocol           = "$context.protocol"
+      status             = "$context.status"
+      responseLength     = "$context.responseLength"
+      responseLatency    = "$context.responseLatency"
+      integrationStatus  = "$context.integrationStatus"
+      integrationError   = "$context.integrationErrorMessage"
+      integrationLatency = "$context.integrationLatency"
+      userAgent          = "$context.identity.userAgent"
+      error              = "$context.error.message"
+      errorResponseType  = "$context.error.responseType"
     })
   }
 

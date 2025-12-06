@@ -90,7 +90,8 @@ jobs:
           source venv/bin/activate
           python -m pip install --upgrade pip
           # Explicitly uninstall SQLAlchemy stubs to avoid conflicts with SQLAlchemy 2.0 mypy plugin
-          pip uninstall -y types-sqlalchemy sqlalchemy-stubs sqlalchemy2-stubs types-flask-sqlalchemy 2>/dev/null || true
+          pip uninstall -y types-sqlalchemy sqlalchemy-stubs \
+            sqlalchemy2-stubs types-flask-sqlalchemy 2>/dev/null || true
           pip install -r requirements-dev.txt
 
       - name: Setup Node.js (for frontend linting)

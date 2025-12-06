@@ -154,3 +154,14 @@ output "static_bucket_name" {
   description = "The name of the S3 bucket for static files"
   value       = module.cloudfront.bucket_name
 }
+
+# CloudWatch Dashboard Outputs
+output "cloudwatch_dashboard_url" {
+  description = "The URL of the CloudWatch debug dashboard"
+  value       = module.cloudwatch_dashboard.dashboard_url
+}
+
+output "cloudwatch_dashboard_name" {
+  description = "The name of the CloudWatch debug dashboard"
+  value       = module.cloudwatch_dashboard.dashboard_name
+}

@@ -65,7 +65,17 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        entry: bash -c 'REPO_ROOT="$(git rev-parse --show-toplevel)"; cd "$REPO_ROOT" && export PYTHONPATH=. && if [ -f "./venv/bin/python3" ]; then ./venv/bin/python3 -m mypy app --config-file=pyproject.toml; elif command -v python3 >/dev/null 2>&1; then python3 -m mypy app --config-file=pyproject.toml; else echo "Skipping mypy - Python not found"; exit 0; fi'
+        entry: >
+          bash -c 'REPO_ROOT="$(git rev-parse --show-toplevel)";
+          cd "$REPO_ROOT" && export PYTHONPATH=. &&
+          if [ -f "./venv/bin/python3" ]; then
+            ./venv/bin/python3 -m mypy app --config-file=pyproject.toml;
+          elif command -v python3 >/dev/null 2>&1; then
+            python3 -m mypy app --config-file=pyproject.toml;
+          else
+            echo "Skipping mypy - Python not found";
+            exit 0;
+          fi'
         language: system
         files: ^app/.*\.py$
         exclude: ^(tests/|migrations/|venv/|.venv/)
@@ -95,7 +105,16 @@ repos:
     hooks:
       - id: prettier-html
         name: prettier-html
-        entry: sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then OUTPUT=$(npm run lint-html 2>&1); EXIT_CODE=$?; echo "$OUTPUT" | grep -v "unchanged" || true; exit $EXIT_CODE; else echo Skipping prettier-html; exit 0; fi'
+        entry: >
+          sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then
+            OUTPUT=$(npm run lint-html 2>&1);
+            EXIT_CODE=$?;
+            echo "$OUTPUT" | grep -v "unchanged" || true;
+            exit $EXIT_CODE;
+          else
+            echo Skipping prettier-html;
+            exit 0;
+          fi'
         language: system
         types: [html]
         files: ^app/templates/.*\.html$
@@ -107,7 +126,13 @@ repos:
     hooks:
       - id: stylelint
         name: stylelint
-        entry: sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then npm run lint:css; else echo Skipping stylelint; exit 0; fi'
+        entry: >
+          sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then
+            npm run lint:css;
+          else
+            echo Skipping stylelint;
+            exit 0;
+          fi'
         language: system
         types: [css]
         files: ^app/static/css/.*\.css$
@@ -119,7 +144,13 @@ repos:
     hooks:
       - id: eslint
         name: eslint
-        entry: sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then npm run lint:js; else echo Skipping eslint; exit 0; fi'
+        entry: >
+          sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then
+            npm run lint:js;
+          else
+            echo Skipping eslint;
+            exit 0;
+          fi'
         language: system
         files: ^app/static/js/.*\.js$
         require_serial: true

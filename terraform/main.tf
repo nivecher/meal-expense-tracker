@@ -321,3 +321,55 @@ module "cloudfront" {
 # 4. API Gateway CORS allows: meals.dev.nivecher.com ✅
 #
 # This is the standard, simple approach - no circular dependencies needed!
+
+# CloudWatch Dashboard for debugging
+module "cloudwatch_dashboard" {
+  source = "./modules/cloudwatch_dashboard"
+
+  app_name    = var.app_name
+  environment = var.environment
+  aws_region  = var.aws_region
+
+  lambda_log_group_name      = module.lambda.log_group_name
+  api_gateway_log_group_name = "/aws/api-gateway/${var.app_name}-${var.environment}"
+  lambda_function_name       = module.lambda.name
+  api_gateway_id             = module.api_gateway.api_id
+
+  tags = local.tags
+
+  depends_on = [
+    module.lambda,
+    module.api_gateway
+  ]
+}
+
+# CloudWatch Alarms for error monitoring
+module "cloudwatch_alarms" {
+  source = "./modules/cloudwatch_alarms"
+
+  app_name    = var.app_name
+  environment = var.environment
+
+  lambda_function_name = module.lambda.name
+  api_gateway_name     = "${var.app_name}-${var.environment}"
+
+  sns_topic_arn = aws_sns_topic.notifications.arn
+
+  # Adjust thresholds based on environment
+  lambda_error_threshold       = var.environment == "prod" ? 5 : 10
+  lambda_throttle_threshold    = var.environment == "prod" ? 1 : 5
+  lambda_duration_threshold_ms = var.environment == "prod" ? 10000 : 15000
+  lambda_concurrent_threshold  = var.environment == "prod" ? 100 : 200
+
+  api_4xx_error_threshold  = var.environment == "prod" ? 10 : 20
+  api_5xx_error_threshold  = var.environment == "prod" ? 1 : 5
+  api_latency_threshold_ms = var.environment == "prod" ? 5000 : 8000
+
+  tags = local.tags
+
+  depends_on = [
+    module.lambda,
+    module.api_gateway,
+    aws_sns_topic.notifications
+  ]
+}
