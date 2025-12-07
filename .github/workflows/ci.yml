@@ -58,12 +58,26 @@ jobs:
             sqlalchemy2-stubs types-flask-sqlalchemy 2>/dev/null || true
           pip install -r requirements-dev.txt
 
+      - name: Check for package files
+        id: package_files
+        run: |
+          if [ -f package.json ]; then
+            echo "has_package=true" >> $GITHUB_OUTPUT
+            if [ -f package-lock.json ]; then
+              echo "has_lockfile=true" >> $GITHUB_OUTPUT
+            else
+              echo "has_lockfile=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "has_package=false" >> $GITHUB_OUTPUT
+            echo "has_lockfile=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: package-lock.json
+          cache: ${{ steps.package_files.outputs.has_package == 'true' && 'npm' || '' }}
 
       - name: Install Node dependencies
         run: |
