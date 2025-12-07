@@ -10,39 +10,30 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Environment to deploy to (only dev is enabled)
+        description: Environment to deploy to
         required: true
         default: dev
         type: choice
         options:
           - dev
-          # staging and prod are disabled at this time
-  repository_dispatch:
-    types:
-      - deploy-staging
+          - staging
+          - prod
+      image_tag:
+        description: Optional image tag/version to deploy (defaults to latest commit SHA)
+        required: false
+        type: string
 
-# Concurrency control to prevent duplicate runs
+# Concurrency: One deployment per environment at a time
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.environment || 'dev' }}
-  cancel-in-progress: false  # Don't cancel deployments in progress
+  group: deploy-${{ github.event.inputs.environment || 'dev' }}
+  cancel-in-progress: false
 
 env:
   APP_NAME: meal-expense-tracker
   PYTHON_VERSION: 3.13
   NODE_VERSION: 22
-  PYTHONPATH: ${{ github.workspace }}
-  FLASK_ENV: test
-  TESTING: true
-
-  # Deployment settings
-  ENV: ${{ github.event.inputs.environment || 'dev' }}
-  TF_ENV: ${{ github.event.inputs.environment || 'dev' }}
   AWS_REGION: us-east-1
-  ECR_REGISTRY: ${{ vars.ECR_REGISTRY || '123456789012.dkr.ecr.us-east-1.amazonaws.com' }}
-  # Cache settings
-  CACHE_VERSION: v3
 
-# Required permissions for the workflow
 permissions:
   contents: read
   id-token: write
@@ -50,60 +41,88 @@ permissions:
   checks: write
   statuses: write
   security-events: write
-  packages: write  # Changed from read to write for GHCR push
+  packages: write
+  issues: write
 
 jobs:
-  # Check CI workflow status and get version from tag
-  check-ci:
-    name: Check CI Status & Get Version
+  # Validate deployment conditions and determine deployment parameters
+  validate:
+    name: Validate Deployment
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      ci_passed: >
-        ${{ github.event_name == 'workflow_run' &&
-        github.event.workflow_run.conclusion == 'success' ||
-        github.event_name == 'workflow_dispatch' }}
-      version: ${{ steps.get_version.outputs.version }}
-      tag: ${{ steps.get_version.outputs.tag }}
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+      environment: ${{ steps.determine_env.outputs.environment }}
+      image_tag: ${{ steps.determine_tag.outputs.image_tag }}
+      version: ${{ steps.determine_tag.outputs.version }}
+      tag: ${{ steps.determine_tag.outputs.tag }}
     steps:
-      - name: Check CI workflow status
+      - name: Check CI status
+        id: check
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
-              echo "CI workflow did not succeed, skipping deployment"
-              exit 1
+              echo "should_deploy=false" >> $GITHUB_OUTPUT
+              echo "❌ CI workflow did not succeed, skipping deployment"
+              exit 0
             fi
-            echo "CI workflow succeeded, proceeding with deployment"
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ CI workflow succeeded, proceeding with deployment"
           else
-            echo "Manual trigger via workflow_dispatch, proceeding with deployment"
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "✅ Manual trigger via workflow_dispatch"
           fi
 
-      - name: Get version from latest tag
-        id: get_version
+      - name: Determine environment
+        id: determine_env
         run: |
-          git fetch --tags --force || true
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -n "$TAG" ]; then
-            VERSION=$(echo "$TAG" | sed 's/^v//')
-            echo "tag=${TAG}" >> $GITHUB_OUTPUT
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
-            echo "Found tag from git: ${TAG}, version: ${VERSION}"
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            ENV="dev"
           else
-            echo "tag=dev" >> $GITHUB_OUTPUT
-            echo "version=dev" >> $GITHUB_OUTPUT
-            echo "No tag found, using dev"
+            ENV="${{ github.event.inputs.environment || 'dev' }}"
           fi
+          echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          echo "Deploying to: ${ENV}"
 
-  # Build and push Docker image
+      - name: Determine image tag and version
+        id: determine_tag
+        run: |
+          # Check if manual tag provided
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+            VERSION="${{ github.event.inputs.image_tag }}"
+            TAG="${{ github.event.inputs.image_tag }}"
+            echo "Using provided tag: ${IMAGE_TAG}"
+          else
+            # Auto-determine from git tags or use SHA
+            git fetch --tags --force || true
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            
+            if [ -n "${LATEST_TAG}" ]; then
+              VERSION=$(echo "${LATEST_TAG}" | sed 's/^v//')
+              TAG="${LATEST_TAG}"
+              IMAGE_TAG="${VERSION}"
+              echo "Found tag: ${TAG}, version: ${VERSION}"
+            else
+              # Use commit SHA as fallback
+              IMAGE_TAG="${GITHUB_SHA::7}"
+              VERSION="dev"
+              TAG="dev"
+              echo "No tag found, using SHA: ${IMAGE_TAG}"
+            fi
+          fi
+          
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+  # Build and push Docker image to GHCR
   build:
     name: Build and Push
-    needs: [check-ci]
-    if: >
-      ${{ github.event_name != 'pull_request' &&
-      needs.check-ci.outputs.ci_passed == 'true' }}
+    needs: [validate]
+    if: needs.validate.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
-
+    environment: ${{ needs.validate.outputs.environment }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -143,11 +162,11 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=${{ needs.check-ci.outputs.version || 'dev' }},enable=${{ needs.check-ci.outputs.version != '' }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && needs.check-ci.outputs.version != '' }}
+            type=raw,value=${{ needs.validate.outputs.image_tag }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=short
           labels: |
-            org.opencontainers.image.version=${{ needs.check-ci.outputs.version || 'dev' }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push Docker image
@@ -160,26 +179,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Deploy to development environment
-  deploy-dev:
-    name: Deploy to Dev
-    needs: [check-ci, build]
-    if: >
-      ${{ github.event_name != 'pull_request' &&
-      needs.check-ci.outputs.ci_passed == 'true' &&
-      (github.ref == 'refs/heads/main' ||
-      github.event.inputs.environment == 'dev' ||
-      github.event_name == 'workflow_run') }}
-    environment: dev
+  # Unified deployment job for all environments
+  deploy:
+    name: Deploy to ${{ needs.validate.outputs.environment }}
+    needs: [validate, build]
+    if: needs.validate.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
+    environment: ${{ needs.validate.outputs.environment }}
     permissions:
       id-token: write
       contents: read
+      issues: write
     outputs:
-      version: ${{ needs.check-ci.outputs.version }}
-      tag: ${{ needs.check-ci.outputs.tag }}
       deployment_url: ${{ steps.get_url.outputs.url }}
-
+      deployment_status: ${{ steps.deploy_status.outputs.status }}
+      rollback_status: ${{ steps.rollback.outputs.status }}
+    env:
+      ENVIRONMENT: ${{ needs.validate.outputs.environment }}
+      IMAGE_TAG: ${{ needs.validate.outputs.image_tag }}
+      VERSION: ${{ needs.validate.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -201,531 +219,29 @@ jobs:
       - name: Setup Terraform plugin cache
         run: |
           mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
-          echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
+          echo "Terraform plugin cache directory created"
 
       - name: Generate backend.hcl files from templates
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
         run: |
           if [ -d "terraform" ]; then
-            # Get AWS account ID
             AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
-            echo "Using AWS Region: $AWS_REGION"
-            # Generate backend.hcl files for each environment from templates
+            echo "Using AWS Account ID: ${AWS_ACCOUNT_ID}, Region: ${AWS_REGION}"
             for ENV in dev staging prod; do
               TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
               OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
               if [ -f "$TEMPLATE_FILE" ]; then
-                echo "Generating $OUTPUT_FILE from template..."
-                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
-                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
-                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
+                sed -e "s/\${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID}/g" \
+                    -e "s/\${AWS_REGION}/${AWS_REGION}/g" \
                     "$TEMPLATE_FILE" > "$OUTPUT_FILE"
                 echo "✅ Generated $OUTPUT_FILE"
-              else
-                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
               fi
             done
-          else
-            echo "No terraform directory found, skipping backend.hcl generation"
           fi
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq
-
-      - name: Deploy Infrastructure (Terraform)
-        env:
-          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
-          TF_IN_AUTOMATION: 1
-          TF_ENV: dev
-        run: |
-          cd terraform/environments/dev
-          terraform init -backend-config=backend.hcl
-          terraform plan -var-file=terraform.tfvars -out=tfplan
-          terraform apply -auto-approve tfplan
-
-      - name: Get ECR repository URI
-        id: ecr_repo
-        run: |
-          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/meal-expense-tracker-${TF_ENV}-lambda"
-          echo "repository=${ECR_REPO}" >> $GITHUB_OUTPUT
-          echo "ECR Repository: ${ECR_REPO}"
-
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-            docker login --username AWS --password-stdin ${{ steps.ecr_repo.outputs.repository }}
-
-      - name: Tag and push Docker image to ECR
-        run: |
-          IMAGE_TAG="${{ needs.check-ci.outputs.version || 'dev' }}"
-          ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
-          
-          # Tag image with version and latest
-          docker tag ghcr.io/${{ github.repository }}:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG}
-          docker tag ghcr.io/${{ github.repository }}:${IMAGE_TAG} ${ECR_REPO}:latest
-          
-          # Push both tags
-          docker push ${ECR_REPO}:${IMAGE_TAG}
-          docker push ${ECR_REPO}:latest
-
-      - name: Update Lambda function
-        run: |
-          FUNCTION_NAME="meal-expense-tracker-dev"
-          ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
-          
-          aws lambda update-function-code \
-            --function-name ${FUNCTION_NAME} \
-            --image-uri ${ECR_REPO}:latest \
-            --region ${{ env.AWS_REGION }}
-          
-          # Wait for Lambda to be ready
-          aws lambda wait function-updated \
-            --function-name ${FUNCTION_NAME} \
-            --region ${{ env.AWS_REGION }}
-
-      - name: Sync static files to S3
-        env:
-          ENVIRONMENT: dev
-          AWS_REGION: ${{ env.AWS_REGION }}
-        run: |
-          chmod +x scripts/sync_static_to_s3.sh
-          ./scripts/sync_static_to_s3.sh || echo "Warning: Static file sync failed, but continuing..."
-
-      - name: Get deployment URL
-        id: get_url
-        run: |
-          # Try to get API Gateway URL from Terraform outputs or AWS
-          API_URL=$(aws apigatewayv2 get-apis \
-            --query "Items[?contains(Name, 'meal-expense-tracker-dev')].ApiEndpoint" \
-            --output text \
-            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
-          
-          if [ -z "$API_URL" ]; then
-            # Fallback: try CloudFront URL from Terraform
-            API_URL=$(cd terraform && terraform output -raw api_url 2>/dev/null || echo "")
-          fi
-          
-          if [ -z "$API_URL" ]; then
-            API_URL="https://meals.dev.nivecher.com"
-          fi
-          
-          echo "url=${API_URL}" >> $GITHUB_OUTPUT
-          echo "Deployment URL: ${API_URL}"
-
-      - name: Verify Deployment
-        id: verify
-        run: |
-          DEPLOYMENT_URL="${{ steps.get_url.outputs.url }}"
-          echo "Verifying deployment at: ${DEPLOYMENT_URL}"
-          
-          # Health check with exponential backoff
-          MAX_ATTEMPTS=15
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            if curl -f -s "${DEPLOYMENT_URL}/health" > /dev/null; then
-              echo "✅ Health check passed on attempt ${i}"
-              echo "deployment_healthy=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-            WAIT_TIME=$((2 ** (i - 1)))
-            if [ $WAIT_TIME -gt 60 ]; then
-              WAIT_TIME=60
-            fi
-            echo "Attempt ${i}/${MAX_ATTEMPTS} failed, retrying in ${WAIT_TIME} seconds..."
-            sleep $WAIT_TIME
-          done
-          
-          echo "❌ Health check failed after ${MAX_ATTEMPTS} attempts"
-          echo "deployment_healthy=false" >> $GITHUB_OUTPUT
-          exit 1
-
-      - name: Get previous Lambda version
-        if: steps.verify.outcome == 'failure'
-        id: previous_version
-        run: |
-          FUNCTION_NAME="meal-expense-tracker-dev"
-          # Get current function configuration to find previous version
-          CURRENT_VERSION=$(aws lambda get-function \
-            --function-name ${FUNCTION_NAME} \
-            --query 'Configuration.Version' \
-            --output text \
-            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
-          
-          if [ -n "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "\$LATEST" ]; then
-            # Get aliases to find previous version
-            PREVIOUS_ALIAS=$(aws lambda list-aliases \
-              --function-name ${FUNCTION_NAME} \
-              --query 'Aliases[?Name==`previous`].FunctionVersion' \
-              --output text \
-              --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
-            
-            if [ -z "$PREVIOUS_ALIAS" ]; then
-              # Try to get version from tags
-              git fetch --tags --force || true
-              PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-              if [ -n "$PREVIOUS_TAG" ]; then
-                PREVIOUS_VERSION=$(echo "$PREVIOUS_TAG" | sed 's/^v//')
-                echo "version=${PREVIOUS_VERSION}" >> $GITHUB_OUTPUT
-                echo "tag=${PREVIOUS_TAG}" >> $GITHUB_OUTPUT
-                echo "Found previous version from tag: ${PREVIOUS_VERSION}"
-              else
-                echo "version=unknown" >> $GITHUB_OUTPUT
-                echo "tag=unknown" >> $GITHUB_OUTPUT
-                echo "Could not determine previous version"
-              fi
-            else
-              echo "version=${PREVIOUS_ALIAS}" >> $GITHUB_OUTPUT
-              echo "Found previous version from alias: ${PREVIOUS_ALIAS}"
-            fi
-          else
-            echo "version=unknown" >> $GITHUB_OUTPUT
-            echo "Could not determine previous version"
-          fi
-
-      - name: Rollback on failure
-        if: steps.verify.outcome == 'failure' && steps.previous_version.outputs.version != 'unknown'
-        env:
-          PREVIOUS_VERSION: ${{ steps.previous_version.outputs.version }}
-          PREVIOUS_TAG: ${{ steps.previous_version.outputs.tag }}
-        run: |
-          echo "❌ Deployment verification failed, initiating rollback..."
-          FUNCTION_NAME="meal-expense-tracker-dev"
-          ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
-          
-          if [ -n "${PREVIOUS_TAG}" ] && [ "${PREVIOUS_TAG}" != "unknown" ]; then
-            # Try to rollback to previous tagged version
-            echo "Attempting to rollback to ${PREVIOUS_TAG}..."
-            
-            # Pull previous image from GHCR
-            docker pull ghcr.io/${{ github.repository }}:${PREVIOUS_VERSION} || \
-            docker pull ghcr.io/${{ github.repository }}:${PREVIOUS_TAG} || {
-              echo "⚠️  Could not pull previous image, trying ECR..."
-              # Try ECR
-              docker pull ${ECR_REPO}:${PREVIOUS_VERSION} || {
-                echo "❌ Could not rollback - previous image not found"
-                exit 1
-              }
-            }
-            
-            # Tag and push to ECR
-            docker tag ghcr.io/${{ github.repository }}:${PREVIOUS_VERSION} ${ECR_REPO}:rollback || \
-            docker tag ${ECR_REPO}:${PREVIOUS_VERSION} ${ECR_REPO}:rollback
-            
-            docker push ${ECR_REPO}:rollback || true
-            
-            # Update Lambda to rollback version
-            aws lambda update-function-code \
-              --function-name ${FUNCTION_NAME} \
-              --image-uri ${ECR_REPO}:rollback \
-              --region ${{ env.AWS_REGION }} || {
-              echo "❌ Failed to rollback Lambda function"
-              exit 1
-            }
-            
-            echo "✅ Rolled back to version ${PREVIOUS_VERSION}"
-          else
-            echo "⚠️  Could not determine previous version for rollback"
-            echo "Manual intervention required"
-            exit 1
-          fi
-
-      - name: Verify rollback
-        if: steps.verify.outcome == 'failure' && steps.previous_version.outputs.version != 'unknown'
-        run: |
-          DEPLOYMENT_URL="${{ steps.get_url.outputs.url }}"
-          echo "Verifying rollback at: ${DEPLOYMENT_URL}"
-          
-          # Wait for Lambda to update
-          sleep 30
-          
-          # Health check rollback
-          for i in {1..5}; do
-            if curl -f -s "${DEPLOYMENT_URL}/health" > /dev/null; then
-              echo "✅ Rollback verified - health check passed"
-              exit 0
-            fi
-            echo "Rollback verification attempt ${i}/5 failed, retrying..."
-            sleep 10
-          done
-          
-          echo "❌ Rollback verification failed"
-          exit 1
-
-      - name: Notify rollback
-        if: steps.verify.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const repo = context.repo;
-            const workflowRunId = context.runId;
-            const workflowUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${workflowRunId}`;
-            
-            await github.rest.issues.create({
-              ...repo,
-              title: `🚨 Deployment Rollback Required - ${context.sha.slice(0, 7)}`,
-              body: `## Deployment Verification Failed
-              
-              Deployment to **dev** environment failed health checks.
-              
-              - **Commit:** ${context.sha.slice(0, 7)}
-              - **Workflow:** [View Run](${workflowUrl})
-              - **Environment:** dev
-              - **Status:** Rollback ${steps.rollback && steps.rollback.outcome === 'success' ? '✅ Successful' : '❌ Failed'}
-              
-              Manual intervention may be required.`,
-              labels: ['deployment', 'rollback', 'urgent']
-            });
-
-  # Deploy to staging environment
-  # DISABLED: Only dev environment is deployed at this time
-  deploy-staging:
-    name: Deploy to Staging
-    needs: [check-ci, build]
-    if: false  # Disabled - only dev deployments are enabled
-    environment: staging
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-${{ github.run_id }}
-          role-duration-seconds: 3600
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.13.5
-          terraform_wrapper: false
-
-      - name: Setup Terraform plugin cache
-        run: |
-          mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
-          echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
-
-      - name: Generate backend.hcl files from templates
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-        run: |
-          if [ -d "terraform" ]; then
-            # Get AWS account ID
-            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
-            echo "Using AWS Region: $AWS_REGION"
-            # Generate backend.hcl files for each environment from templates
-            for ENV in dev staging prod; do
-              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
-              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
-              if [ -f "$TEMPLATE_FILE" ]; then
-                echo "Generating $OUTPUT_FILE from template..."
-                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
-                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
-                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
-                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
-                echo "✅ Generated $OUTPUT_FILE"
-              else
-                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
-              fi
-            done
-          else
-            echo "No terraform directory found, skipping backend.hcl generation"
-          fi
-
-      - name: Deploy to staging
-        env:
-          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
-          TF_IN_AUTOMATION: 1
-          TF_ENV: staging
-        run: |
-          cd terraform/environments/staging
-          terraform init -backend-config=backend.hcl
-          terraform plan -var-file=terraform.tfvars -out=tfplan
-          terraform apply -auto-approve tfplan
-
-      - name: Verify Deployment
-        run: |
-          LOAD_BALANCER_DNS=$(aws cloudformation describe-stacks \
-            --stack-name staging-stack \
-            --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-
-          curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
-
-  # Deploy to production environment
-  # DISABLED: Only dev environment is deployed at this time
-  deploy-prod:
-    name: Deploy to Production
-    needs: [check-ci, build]
-    if: false  # Disabled - only dev deployments are enabled
-    environment: prod
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-${{ github.run_id }}
-          role-duration-seconds: 3600
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.13.5
-          terraform_wrapper: false
-
-      - name: Setup Terraform plugin cache
-        run: |
-          mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
-          echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
-
-      - name: Generate backend.hcl files from templates
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-        run: |
-          if [ -d "terraform" ]; then
-            # Get AWS account ID
-            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
-            echo "Using AWS Region: $AWS_REGION"
-            # Generate backend.hcl files for each environment from templates
-            for ENV in dev staging prod; do
-              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
-              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
-              if [ -f "$TEMPLATE_FILE" ]; then
-                echo "Generating $OUTPUT_FILE from template..."
-                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
-                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
-                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
-                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
-                echo "✅ Generated $OUTPUT_FILE"
-              else
-                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
-              fi
-            done
-          else
-            echo "No terraform directory found, skipping backend.hcl generation"
-          fi
-
-      - name: Deploy to production
-        env:
-          TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
-          TF_IN_AUTOMATION: 1
-          TF_ENV: prod
-        run: |
-          cd terraform/environments/prod
-          terraform init -backend-config=backend.hcl
-          terraform plan -var-file=terraform.tfvars -out=tfplan
-          terraform apply -auto-approve tfplan
-
-      - name: Verify Deployment
-        run: |
-          LOAD_BALANCER_DNS=$(aws cloudformation describe-stacks \
-            --stack-name prod-stack \
-            --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
-            --output text \
-            --region ${{ env.AWS_REGION }})
-
-          curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
-
-
-  # Deploy to staging after release is created (triggered by test workflow)
-  # DISABLED: Only dev environment is deployed at this time
-  deploy-staging-after-release:
-    name: Deploy to Staging (After Release)
-    if: false  # Disabled - only dev deployments are enabled
-    runs-on: ubuntu-latest
-    environment: staging
-    permissions:
-      id-token: write
-      contents: read
-      packages: read  # Need to read packages to pull from GHCR
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Get latest version tag
-        id: get_version
-        run: |
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          VERSION=$(echo "$TAG" | sed 's/^v//')
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Using tag: ${TAG}, version: ${VERSION}"
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-${{ github.run_id }}
-          role-duration-seconds: 3600
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.13.5
-          terraform_wrapper: false
-
-      - name: Setup Terraform plugin cache
-        run: |
-          mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
-          echo "Terraform plugin cache directory created: ${{ runner.temp }}/.terraform.d/plugin-cache"
-
-      - name: Generate backend.hcl files from templates
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-        run: |
-          if [ -d "terraform" ]; then
-            # Get AWS account ID
-            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
-            echo "Using AWS Region: $AWS_REGION"
-            # Generate backend.hcl files for each environment from templates
-            for ENV in dev staging prod; do
-              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
-              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
-              if [ -f "$TEMPLATE_FILE" ]; then
-                echo "Generating $OUTPUT_FILE from template..."
-                # Replace ${AWS_ACCOUNT_ID} and ${AWS_REGION} placeholders
-                sed -e "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" \
-                    -e "s/\${AWS_REGION}/$AWS_REGION/g" \
-                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
-                echo "✅ Generated $OUTPUT_FILE"
-              else
-                echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
-              fi
-            done
-          else
-            echo "No terraform directory found, skipping backend.hcl generation"
-          fi
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
+          sudo apt-get install -y jq docker.io
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -741,9 +257,8 @@ jobs:
         env:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
           TF_IN_AUTOMATION: 1
-          TF_ENV: staging
         run: |
-          cd terraform/environments/staging
+          cd terraform/environments/${ENVIRONMENT}
           terraform init -backend-config=backend.hcl
           terraform plan -var-file=terraform.tfvars -out=tfplan
           terraform apply -auto-approve tfplan
@@ -752,162 +267,335 @@ jobs:
         id: ecr_repo
         run: |
           AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/meal-expense-tracker-staging-lambda"
+          ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/meal-expense-tracker-${ENVIRONMENT}-lambda"
           echo "repository=${ECR_REPO}" >> $GITHUB_OUTPUT
+          echo "ECR Repository: ${ECR_REPO}"
+
+      - name: Get current Lambda function configuration
+        id: current_lambda
+        run: |
+          FUNCTION_NAME="meal-expense-tracker-${ENVIRONMENT}"
+          
+          # Get current function configuration for rollback
+          CURRENT_CONFIG=$(aws lambda get-function \
+            --function-name ${FUNCTION_NAME} \
+            --region ${AWS_REGION} 2>/dev/null || echo "{}")
+          
+          if [ "$CURRENT_CONFIG" != "{}" ]; then
+            CURRENT_IMAGE_URI=$(echo "$CURRENT_CONFIG" | jq -r '.Code.ImageUri // empty')
+            CURRENT_VERSION=$(echo "$CURRENT_CONFIG" | jq -r '.Configuration.Version // empty')
+            echo "current_image_uri=${CURRENT_IMAGE_URI}" >> $GITHUB_OUTPUT
+            echo "current_version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
+            echo "Current Lambda image: ${CURRENT_IMAGE_URI}, version: ${CURRENT_VERSION}"
+          else
+            echo "current_image_uri=" >> $GITHUB_OUTPUT
+            echo "current_version=" >> $GITHUB_OUTPUT
+            echo "⚠️  Function not found or first deployment"
+          fi
 
       - name: Login to ECR
         run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          aws ecr get-login-password --region ${AWS_REGION} | \
             docker login --username AWS --password-stdin ${{ steps.ecr_repo.outputs.repository }}
 
-      - name: Pull and push Docker image to ECR
+      - name: Tag and push Docker image to ECR
         run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          TAG="${{ steps.get_version.outputs.tag }}"
           ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
+          IMAGE_TAG="${IMAGE_TAG}"
           
-          # Determine which image tag to pull from GHCR
-          # Try version tag first, then fall back to SHA if available
-          if [ -n "${VERSION}" ] && [ "${VERSION}" != "dev" ]; then
-            # Try pulling by version tag
-            if docker pull ghcr.io/${{ github.repository }}:${VERSION} 2>/dev/null; then
-              echo "Pulled image with version tag: ${VERSION}"
-              docker tag ghcr.io/${{ github.repository }}:${VERSION} ${ECR_REPO}:${VERSION}
-              docker tag ${ECR_REPO}:${VERSION} ${ECR_REPO}:latest
-            # Try pulling by full tag (v0.6.0 format)
-            elif [ -n "${TAG}" ] && docker pull ghcr.io/${{ github.repository }}:${TAG} 2>/dev/null; then
-              echo "Pulled image with tag: ${TAG}"
-              docker tag ghcr.io/${{ github.repository }}:${TAG} ${ECR_REPO}:${VERSION}
-              docker tag ${ECR_REPO}:${VERSION} ${ECR_REPO}:latest
-            # Fall back to SHA tag
-            elif docker pull ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} 2>/dev/null; then
-              echo "Pulled image with SHA tag: ${GITHUB_SHA::7}"
-              docker tag ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} ${ECR_REPO}:${VERSION}
-              docker tag ${ECR_REPO}:${VERSION} ${ECR_REPO}:latest
-            else
-              echo "Error: Could not pull image from GHCR with any available tag"
-              echo "Tried: ${VERSION}, ${TAG}, ${GITHUB_SHA::7}"
-              exit 1
-            fi
-          else
-            echo "Error: No valid version or tag found for staging deployment"
+          # Pull from GHCR and push to ECR
+          docker pull ghcr.io/${{ github.repository }}:${IMAGE_TAG} || \
+          docker pull ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} || {
+            echo "❌ Could not pull image from GHCR"
             exit 1
-          fi
+          }
           
-          # Push both tags to ECR
-          docker push ${ECR_REPO}:${VERSION}
+          # Tag and push to ECR
+          docker tag ghcr.io/${{ github.repository }}:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG} || \
+          docker tag ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} ${ECR_REPO}:${IMAGE_TAG}
+          docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_REPO}:latest
+          
+          docker push ${ECR_REPO}:${IMAGE_TAG}
           docker push ${ECR_REPO}:latest
 
       - name: Update Lambda function
+        id: update_lambda
         run: |
-          FUNCTION_NAME="meal-expense-tracker-staging"
+          FUNCTION_NAME="meal-expense-tracker-${ENVIRONMENT}"
           ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
           
           aws lambda update-function-code \
             --function-name ${FUNCTION_NAME} \
             --image-uri ${ECR_REPO}:latest \
-            --region ${{ env.AWS_REGION }}
+            --region ${AWS_REGION}
           
           aws lambda wait function-updated \
             --function-name ${FUNCTION_NAME} \
-            --region ${{ env.AWS_REGION }}
+            --region ${AWS_REGION}
+          
+          echo "✅ Lambda function updated"
 
       - name: Sync static files to S3
-        env:
-          ENVIRONMENT: staging
-          AWS_REGION: ${{ env.AWS_REGION }}
         run: |
           chmod +x scripts/sync_static_to_s3.sh
-          ./scripts/sync_static_to_s3.sh || echo "Warning: Static file sync failed"
+          ./scripts/sync_static_to_s3.sh || echo "⚠️  Static file sync failed, continuing..."
 
-      - name: Verify Deployment
+      - name: Get deployment URL
+        id: get_url
         run: |
+          # Try API Gateway first
           API_URL=$(aws apigatewayv2 get-apis \
-            --query "Items[?contains(Name, 'meal-expense-tracker-staging')].ApiEndpoint" \
+            --query "Items[?contains(Name, 'meal-expense-tracker-${ENVIRONMENT}')].ApiEndpoint" \
             --output text \
-            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "https://meals.staging.nivecher.com")
+            --region ${AWS_REGION} 2>/dev/null || echo "")
           
-          for i in {1..10}; do
-            if curl -f -s "${API_URL}/health" > /dev/null; then
-              echo "✅ Staging deployment verified"
+          # Fallback to environment-specific defaults
+          if [ -z "$API_URL" ]; then
+            case "${ENVIRONMENT}" in
+              dev)
+                API_URL="https://meals.dev.nivecher.com"
+                ;;
+              staging)
+                API_URL="https://meals.staging.nivecher.com"
+                ;;
+              prod)
+                API_URL="https://meals.nivecher.com"
+                ;;
+            esac
+          fi
+          
+          echo "url=${API_URL}" >> $GITHUB_OUTPUT
+          echo "Deployment URL: ${API_URL}"
+
+      - name: Verify Deployment (Health Check with Exponential Backoff)
+        id: verify
+        run: |
+          DEPLOYMENT_URL="${{ steps.get_url.outputs.url }}"
+          echo "Verifying deployment at: ${DEPLOYMENT_URL}"
+          
+          MAX_ATTEMPTS=15
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            if curl -f -s "${DEPLOYMENT_URL}/health" > /dev/null; then
+              echo "✅ Health check passed on attempt ${i}"
+              echo "deployment_healthy=true" >> $GITHUB_OUTPUT
               exit 0
             fi
-            sleep 10
+            
+            # Exponential backoff: 2^(i-1) seconds, capped at 60s
+            WAIT_TIME=$((2 ** (i - 1)))
+            if [ $WAIT_TIME -gt 60 ]; then
+              WAIT_TIME=60
+            fi
+            
+            if [ $i -lt $MAX_ATTEMPTS ]; then
+              echo "Attempt ${i}/${MAX_ATTEMPTS} failed, retrying in ${WAIT_TIME} seconds..."
+              sleep $WAIT_TIME
+            fi
           done
+          
+          echo "❌ Health check failed after ${MAX_ATTEMPTS} attempts"
+          echo "deployment_healthy=false" >> $GITHUB_OUTPUT
           exit 1
 
-  # Notify deployment status
-  notify:
-    name: Notify
-    needs: [deploy-dev, deploy-staging, deploy-prod, check-ci]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set environment status
-        id: set_status
+      - name: Get previous Lambda version for rollback
+        if: steps.verify.outcome == 'failure'
+        id: previous_version
         run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            echo "STATUS=succeeded" >> $GITHUB_OUTPUT
-            echo "COLOR=good" >> $GITHUB_OUTPUT
-            echo "EMOJI=✅" >> $GITHUB_OUTPUT
+          FUNCTION_NAME="meal-expense-tracker-${ENVIRONMENT}"
+          
+          # Try to get previous version from Lambda version history
+          PREVIOUS_VERSION=$(aws lambda list-versions-by-function \
+            --function-name ${FUNCTION_NAME} \
+            --region ${AWS_REGION} \
+            --query 'Versions[-2].Version' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$PREVIOUS_VERSION" ] && [ "$PREVIOUS_VERSION" != "\$LATEST" ]; then
+            # Get image URI from previous version
+            PREVIOUS_CONFIG=$(aws lambda get-function \
+              --function-name ${FUNCTION_NAME} \
+              --qualifier ${PREVIOUS_VERSION} \
+              --region ${AWS_REGION} 2>/dev/null || echo "{}")
+            
+            PREVIOUS_IMAGE_URI=$(echo "$PREVIOUS_CONFIG" | jq -r '.Code.ImageUri // empty')
+            
+            if [ -n "$PREVIOUS_IMAGE_URI" ]; then
+              echo "previous_image_uri=${PREVIOUS_IMAGE_URI}" >> $GITHUB_OUTPUT
+              echo "previous_version=${PREVIOUS_VERSION}" >> $GITHUB_OUTPUT
+              echo "Found previous version: ${PREVIOUS_VERSION}, image: ${PREVIOUS_IMAGE_URI}"
+            else
+              # Fallback: use current_image_uri if available
+              if [ -n "${{ steps.current_lambda.outputs.current_image_uri }}" ]; then
+                echo "previous_image_uri=${{ steps.current_lambda.outputs.current_image_uri }}" >> $GITHUB_OUTPUT
+                echo "previous_version=${{ steps.current_lambda.outputs.current_version }}" >> $GITHUB_OUTPUT
+                echo "Using current image as fallback: ${{ steps.current_lambda.outputs.current_image_uri }}"
+              else
+                echo "previous_image_uri=" >> $GITHUB_OUTPUT
+                echo "previous_version=" >> $GITHUB_OUTPUT
+                echo "⚠️  Could not determine previous version"
+              fi
+            fi
           else
-            echo "STATUS=failed" >> $GITHUB_OUTPUT
-            echo "COLOR=danger" >> $GITHUB_OUTPUT
-            echo "EMOJI=❌" >> $GITHUB_OUTPUT
+            # Fallback: use current_image_uri if available
+            if [ -n "${{ steps.current_lambda.outputs.current_image_uri }}" ]; then
+              echo "previous_image_uri=${{ steps.current_lambda.outputs.current_image_uri }}" >> $GITHUB_OUTPUT
+              echo "previous_version=${{ steps.current_lambda.outputs.current_version }}" >> $GITHUB_OUTPUT
+              echo "Using current image as fallback: ${{ steps.current_lambda.outputs.current_image_uri }}"
+            else
+              echo "previous_image_uri=" >> $GITHUB_OUTPUT
+              echo "previous_version=" >> $GITHUB_OUTPUT
+              echo "⚠️  Could not determine previous version"
+            fi
           fi
-          echo "ENV=${{ github.event.inputs.environment || 'dev' }}" >> $GITHUB_OUTPUT
 
-      - name: Set version and tag
-        id: set_version
-        # Use conditional expression with short-circuiting:
-        # if result is 'success', access outputs; otherwise use 'unknown'
-        # The && operator short-circuits, so outputs are only accessed
-        # when result is 'success'
-        env:
-          VERSION_VALUE: ${{ needs.check-ci.outputs.version || 'unknown' }}
-          TAG_VALUE: ${{ needs.check-ci.outputs.tag || 'unknown' }}
+      - name: Rollback on failure
+        if: steps.verify.outcome == 'failure' && steps.previous_version.outputs.previous_image_uri != ''
+        id: rollback
         run: |
-          echo "VERSION=$VERSION_VALUE" >> $GITHUB_OUTPUT
-          echo "TAG=$TAG_VALUE" >> $GITHUB_OUTPUT
+          FUNCTION_NAME="meal-expense-tracker-${ENVIRONMENT}"
+          PREVIOUS_IMAGE_URI="${{ steps.previous_version.outputs.previous_image_uri }}"
+          
+          echo "❌ Deployment verification failed, initiating rollback..."
+          echo "Rolling back to: ${PREVIOUS_IMAGE_URI}"
+          
+          # Update Lambda to previous version
+          if aws lambda update-function-code \
+            --function-name ${FUNCTION_NAME} \
+            --image-uri ${PREVIOUS_IMAGE_URI} \
+            --region ${AWS_REGION}; then
+            
+            aws lambda wait function-updated \
+              --function-name ${FUNCTION_NAME} \
+              --region ${AWS_REGION}
+            
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "✅ Rolled back to previous version"
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "❌ Failed to rollback Lambda function"
+            exit 1
+          fi
 
-      - name: Send Deployment Status
+      - name: Verify rollback
+        if: steps.verify.outcome == 'failure' && steps.rollback.outputs.status == 'success'
+        run: |
+          DEPLOYMENT_URL="${{ steps.get_url.outputs.url }}"
+          echo "Verifying rollback at: ${DEPLOYMENT_URL}"
+          
+          # Wait for Lambda to update
+          sleep 30
+          
+          # Health check rollback with exponential backoff
+          MAX_ATTEMPTS=5
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            if curl -f -s "${DEPLOYMENT_URL}/health" > /dev/null; then
+              echo "✅ Rollback verified - health check passed"
+              exit 0
+            fi
+            
+            WAIT_TIME=$((2 ** (i - 1)))
+            if [ $WAIT_TIME -gt 30 ]; then
+              WAIT_TIME=30
+            fi
+            
+            if [ $i -lt $MAX_ATTEMPTS ]; then
+              echo "Rollback verification attempt ${i}/${MAX_ATTEMPTS} failed, retrying in ${WAIT_TIME} seconds..."
+              sleep $WAIT_TIME
+            fi
+          done
+          
+          echo "❌ Rollback verification failed"
+          exit 1
+
+      - name: Set deployment status
+        id: deploy_status
+        if: always()
+        run: |
+          if [ "${{ steps.verify.outcome }}" = "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          elif [ "${{ steps.rollback.outcome }}" = "success" ]; then
+            echo "status=rolled_back" >> $GITHUB_OUTPUT
+          else
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub issue on failure
+        if: steps.verify.outcome == 'failure'
         uses: actions/github-script@v7
-        if: success() || failure()
-        env:
-          VERSION: ${{ steps.set_version.outputs.VERSION || 'unknown' }}
-          TAG: ${{ steps.set_version.outputs.TAG || 'unknown' }}
         with:
           script: |
-            const { STATUS, COLOR, ENV, EMOJI, VERSION, TAG } = process.env;
             const repo = context.repo;
             const workflowRunId = context.runId;
             const workflowUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${workflowRunId}`;
+            const environment = '${{ ENVIRONMENT }}';
+            const version = '${{ VERSION }}';
+            const rollbackStatus = '${{ steps.rollback.outputs.status }}';
+            const rollbackSuccess = rollbackStatus === 'success';
+            
+            const title = `🚨 Deployment Failed - ${environment} (${version})`;
+            const body = `## Deployment Verification Failed
+              
+            Deployment to **${environment}** environment failed health checks.
+            
+            - **Environment:** ${environment}
+            - **Version:** ${version}
+            - **Commit:** ${context.sha.slice(0, 7)}
+            - **Workflow:** [View Run](${workflowUrl})
+            - **Rollback:** ${rollbackSuccess ? '✅ Successful' : '❌ Failed'}
+            
+            ${rollbackSuccess ? '⚠️ System has been rolled back to previous version. Please investigate the deployment issue.' : '🚨 Manual intervention required - rollback failed.'}
+            
+            ### Next Steps
+            1. Review the workflow logs: ${workflowUrl}
+            2. Check application logs in CloudWatch
+            3. Verify infrastructure status
+            4. ${rollbackSuccess ? 'Investigate why the new version failed' : 'Manually rollback if needed'}`;
+            
+            await github.rest.issues.create({
+              ...repo,
+              title: title,
+              body: body,
+              labels: ['deployment', 'rollback', 'urgent', environment]
+            });
 
-            // Create a comment on the PR if this is a PR
-            if (context.eventName === 'pull_request') {
-              await github.rest.issues.createComment({
-                ...repo,
-                issue_number: context.issue.number,
-                body: `${EMOJI} **Deployment to ${ENV} ${STATUS}**\n\n` +
-                      `- **Version:** ${VERSION}\n` +
-                      `- **Tag:** ${TAG}\n` +
-                      `- **Workflow:** [View Workflow Run](${workflowUrl})\n` +
-                      `- **Commit:** ${context.sha.slice(0, 7)}\n` +
-                      `- **Triggered by:** ${context.actor}\n`
-              });
-            }
-
-            // Update PR check status
+  # Notify deployment status
+  notify:
+    name: Notify Deployment Status
+    needs: [validate, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Deployment Status
+        uses: actions/github-script@v7
+        env:
+          ENVIRONMENT: ${{ needs.validate.outputs.environment }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          STATUS: ${{ needs.deploy.outputs.deployment_status }}
+          ROLLBACK_STATUS: ${{ needs.deploy.outputs.rollback_status }}
+        with:
+          script: |
+            const { ENVIRONMENT, VERSION, TAG, STATUS, ROLLBACK_STATUS } = process.env;
+            const repo = context.repo;
+            const workflowRunId = context.runId;
+            const workflowUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${workflowRunId}`;
+            
+            const conclusion = STATUS === 'success' ? 'success' : 
+                              STATUS === 'rolled_back' ? 'neutral' : 'failure';
+            
+            const emoji = STATUS === 'success' ? '✅' : 
+                         STATUS === 'rolled_back' ? '⚠️' : '❌';
+            
             await github.rest.checks.create({
               ...repo,
-              name: `Deployment to ${ENV}`,
+              name: `Deployment to ${ENVIRONMENT}`,
               head_sha: context.sha,
               status: 'completed',
-              conclusion: STATUS === 'succeeded' ? 'success' : 'failure',
+              conclusion: conclusion,
               details_url: workflowUrl,
               output: {
                 title: `Deployment ${STATUS} - Version ${VERSION}`,
-                summary: `Deployment to ${ENV} ${STATUS} - Version ${VERSION}`,
-                text: `Workflow run: ${workflowUrl}\nVersion: ${VERSION}\nTag: ${TAG}`
+                summary: `${emoji} Deployment to ${ENVIRONMENT} ${STATUS} - Version ${VERSION}`,
+                text: `Workflow run: ${workflowUrl}\nVersion: ${VERSION}\nTag: ${TAG}\nRollback: ${ROLLBACK_STATUS || 'N/A'}`
               }
             });
