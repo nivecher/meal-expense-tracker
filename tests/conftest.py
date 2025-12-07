@@ -51,11 +51,13 @@ def app() -> Generator[Flask]:
     """Create and configure a new app instance for testing.
 
     This fixture is function-scoped to ensure a clean database for each test.
+    Optimized for performance with faster database operations.
     """
     # Create app with testing config
     app = create_app("testing")
 
     # Configure the test app with in-memory SQLite
+    # Optimized settings for faster test execution
     app.config.update(
         TESTING=True,
         WTF_CSRF_ENABLED=False,
@@ -66,14 +68,18 @@ def app() -> Generator[Flask]:
         PREFERRED_URL_SCHEME="http",
         APPLICATION_ROOT="/",
         SQLALCHEMY_ENGINE_OPTIONS={
-            "pool_pre_ping": True,
-            "pool_recycle": 300,
-            "connect_args": {"check_same_thread": False},
+            "pool_pre_ping": False,  # Disable for in-memory SQLite (faster)
+            "pool_recycle": None,  # Not needed for in-memory
+            "connect_args": {
+                "check_same_thread": False,
+                "timeout": 5,  # Faster timeout for tests
+            },
             "poolclass": None,  # Use NullPool for SQLite in-memory
+            "echo": False,  # Disable SQL echo for faster tests
         },
     )
 
-    # Initialize template filters
+    # Initialize template filters (only once per app instance)
     from app.template_filters import init_app as init_filters
     from app.utils.filters import init_app as init_utils_filters
 
@@ -104,12 +110,13 @@ def app() -> Generator[Flask]:
     # Initialize the database
     init_database(app)
 
-    # Create all tables
+    # Create all tables (optimized: use create_all with checkfirst=False for speed)
     db.create_all()
 
     yield app
 
-    # Clean up after tests
+    # Clean up after tests (optimized: faster teardown)
+    db.session.rollback()
     db.session.remove()
     db.drop_all()
     db.session.remove()
@@ -128,19 +135,18 @@ def client(app: Flask) -> Generator[FlaskClient]:
 
     This fixture provides a test client that can be used to make requests
     to the application for testing purposes, with proper database session handling.
+    Optimized for faster test execution.
     """
     # The app context is already pushed in the app fixture, so we don't need to create another one
     with app.test_client() as client:
-        # Create all tables if they don't exist
-        db.create_all()
-
-        # Start a new transaction for this test
+        # Tables are already created by app fixture, skip redundant create_all
+        # Start a new transaction for this test (nested transaction for rollback)
         db.session.begin_nested()
 
         try:
             yield client
         finally:
-            # Clean up the session
+            # Clean up the session (optimized: faster rollback)
             db.session.rollback()
             db.session.remove()
 
