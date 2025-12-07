@@ -10,14 +10,13 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Environment to deploy to
+        description: Environment to deploy to (only dev is enabled)
         required: true
         default: dev
         type: choice
         options:
           - dev
-          - staging
-          - prod
+          # staging and prod are disabled at this time
   repository_dispatch:
     types:
       - deploy-staging
@@ -235,16 +234,18 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make jq
+          sudo apt-get install -y jq
 
       - name: Deploy Infrastructure (Terraform)
         env:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
           TF_IN_AUTOMATION: 1
+          TF_ENV: dev
         run: |
-          make TF_ENV=dev tf-init
-          make TF_ENV=dev tf-plan
-          make TF_ENV=dev tf-apply
+          cd terraform/environments/dev
+          terraform init -backend-config=backend.hcl
+          terraform plan -var-file=terraform.tfvars -out=tfplan
+          terraform apply -auto-approve tfplan
 
       - name: Get ECR repository URI
         id: ecr_repo
@@ -480,13 +481,11 @@ jobs:
             });
 
   # Deploy to staging environment
+  # DISABLED: Only dev environment is deployed at this time
   deploy-staging:
     name: Deploy to Staging
     needs: [check-ci, build]
-    if: >
-      ${{ github.event_name != 'pull_request' &&
-      needs.check-ci.outputs.ci_passed == 'true' &&
-      github.event.inputs.environment == 'staging' }}
+    if: false  # Disabled - only dev deployments are enabled
     environment: staging
     runs-on: ubuntu-latest
     permissions:
@@ -548,10 +547,12 @@ jobs:
         env:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
           TF_IN_AUTOMATION: 1
+          TF_ENV: staging
         run: |
-          make TF_ENV=staging tf-init
-          make TF_ENV=staging tf-plan
-          make TF_ENV=staging tf-apply
+          cd terraform/environments/staging
+          terraform init -backend-config=backend.hcl
+          terraform plan -var-file=terraform.tfvars -out=tfplan
+          terraform apply -auto-approve tfplan
 
       - name: Verify Deployment
         run: |
@@ -564,13 +565,11 @@ jobs:
           curl --retry 5 --retry-delay 5 --retry-max-time 30 $LOAD_BALANCER_DNS/health
 
   # Deploy to production environment
+  # DISABLED: Only dev environment is deployed at this time
   deploy-prod:
     name: Deploy to Production
     needs: [check-ci, build]
-    if: >
-      ${{ github.event_name != 'pull_request' &&
-      needs.check-ci.outputs.ci_passed == 'true' &&
-      github.event.inputs.environment == 'prod' }}
+    if: false  # Disabled - only dev deployments are enabled
     environment: prod
     runs-on: ubuntu-latest
     permissions:
@@ -632,10 +631,12 @@ jobs:
         env:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
           TF_IN_AUTOMATION: 1
+          TF_ENV: prod
         run: |
-          make TF_ENV=prod tf-init
-          make TF_ENV=prod tf-plan
-          make TF_ENV=prod tf-apply
+          cd terraform/environments/prod
+          terraform init -backend-config=backend.hcl
+          terraform plan -var-file=terraform.tfvars -out=tfplan
+          terraform apply -auto-approve tfplan
 
       - name: Verify Deployment
         run: |
@@ -649,11 +650,10 @@ jobs:
 
 
   # Deploy to staging after release is created (triggered by test workflow)
+  # DISABLED: Only dev environment is deployed at this time
   deploy-staging-after-release:
     name: Deploy to Staging (After Release)
-    if: >
-      ${{ github.event_name == 'repository_dispatch' &&
-      github.event.action == 'deploy-staging' }}
+    if: false  # Disabled - only dev deployments are enabled
     runs-on: ubuntu-latest
     environment: staging
     permissions:
@@ -725,7 +725,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make jq
+          sudo apt-get install -y jq
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -741,10 +741,12 @@ jobs:
         env:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
           TF_IN_AUTOMATION: 1
+          TF_ENV: staging
         run: |
-          make TF_ENV=staging tf-init
-          make TF_ENV=staging tf-plan
-          make TF_ENV=staging tf-apply
+          cd terraform/environments/staging
+          terraform init -backend-config=backend.hcl
+          terraform plan -var-file=terraform.tfvars -out=tfplan
+          terraform apply -auto-approve tfplan
 
       - name: Get ECR repository URI
         id: ecr_repo
