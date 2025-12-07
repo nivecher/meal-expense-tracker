@@ -522,14 +522,18 @@ jobs:
       - name: Create GitHub issue on failure
         if: steps.verify.outcome == 'failure'
         uses: actions/github-script@v7
+        env:
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+          VERSION: ${{ env.VERSION }}
+          ROLLBACK_STATUS: ${{ steps.rollback.outputs.status }}
         with:
           script: |
             const repo = context.repo;
             const workflowRunId = context.runId;
             const workflowUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${workflowRunId}`;
-            const environment = '${{ ENVIRONMENT }}';
-            const version = '${{ VERSION }}';
-            const rollbackStatus = '${{ steps.rollback.outputs.status }}';
+            const environment = process.env.ENVIRONMENT;
+            const version = process.env.VERSION;
+            const rollbackStatus = process.env.ROLLBACK_STATUS || '';
             const rollbackSuccess = rollbackStatus === 'success';
             
             const title = `🚨 Deployment Failed - ${environment} (${version})`;
