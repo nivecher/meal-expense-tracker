@@ -230,6 +230,8 @@ jobs:
           if-no-files-found: ignore
 
   # Enhanced security scanning
+  # Note: CodeQL analysis is handled by the dedicated codeql.yml workflow
+  # to avoid conflicts with GitHub's default CodeQL setup
   security-scan:
     name: Security Scan
     needs: quality-gate
@@ -239,16 +241,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: python
-          queries: security-extended,security-and-quality
-          tools: latest
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
 
       - name: Install security tools
         run: |
