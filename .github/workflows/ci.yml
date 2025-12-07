@@ -147,14 +147,19 @@ jobs:
       - name: Run ${{ matrix.test-type }} tests
         run: |
           source venv/bin/activate
-          # Generate JUnit XML and coverage reports
+          # Optimized test execution with parallel processing
+          # Unit tests: 4 workers, Integration tests: 2 workers (slower I/O)
+          WORKERS=${{ matrix.test-type == 'unit' && '4' || '2' }}
           PYTHONPATH=. pytest tests/${{ matrix.test-type }}/ \
             --junitxml=test-results-${{ matrix.test-type }}.xml \
             --cov=app \
             --cov-report=term-missing \
             --cov-report=xml:coverage-${{ matrix.test-type }}.xml \
             --cov-report=html:htmlcov-${{ matrix.test-type }} \
-            -v
+            -v \
+            -n $WORKERS \
+            --tb=short \
+            --maxfail=10
 
       - name: Upload test results
         if: always()

@@ -225,6 +225,34 @@ python_functions = [ "test_",]
 filterwarnings = [
     "ignore::DeprecationWarning:flask_login.*",
 ]
+# Performance optimizations
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",  # Shorter traceback format
+    "-ra",  # Show extra test summary info for all tests
+]
+# Parallel execution configuration
+# Use pytest-xdist for parallel test execution
+# Auto-detect number of CPU cores, but cap at 4 for CI stability
+# Override with -n flag: pytest -n 8 for more workers
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+# Test discovery optimization
+norecursedirs = [
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "dist",
+    "build",
+    "*.egg-info",
+    ".pytest_cache",
+    ".mypy_cache",
+]
 
 [tool.coverage.run]
 source = [ "app",]
