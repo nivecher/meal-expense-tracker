@@ -74,10 +74,12 @@ jobs:
           fi
 
       - name: Setup Node.js ${{ env.NODE_VERSION }}
+        id: setup_node
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: ${{ steps.package_files.outputs.has_package == 'true' && 'npm' || '' }}
+          cache: ${{ steps.package_files.outputs.has_lockfile == 'true' && 'npm' || '' }}
+          cache-dependency-path: ${{ steps.package_files.outputs.has_lockfile == 'true' && 'package-lock.json' || '' }}
 
       - name: Install Node dependencies
         run: |
