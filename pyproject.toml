@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "meal-expense-tracker"
-dynamic = [ "version",]
+dynamic = ["version"]
 description = "A Flask-based web application for tracking meal expenses"
 requires-python = ">=3.13,<3.14"
 [[project.authors]]
@@ -15,10 +15,12 @@ email = "mtd37@hotmail.com"
 homepage = "https://github.com/nivecher/meal-expense-tracker"
 
 [tool.setuptools_scm]
+# Version is generated from git tags using semantic versioning
+# setuptools-scm automatically handles:
+# - Tagged commits: shows the tag version (e.g., 0.6.1)
+# - Post-tag commits: shows tag.postN.devM+hash.date (e.g., 0.6.1.post1.dev3+gabc123.d20251207)
+# - Local/branch changes: includes commit hash and date
 # Use no-guess-dev scheme to show current tag with post-release marker
-# This will use the latest tag and add .post1.devN for commits after the tag
-# Example: if tag is v0.6.0, dev version is 0.6.0.post1.dev0+hash.date
-# (post-release is deprecated, no-guess-dev is the recommended replacement)
 version_scheme = "no-guess-dev"
 write_to = "app/_version.py"
 write_to_template = """\"\"\"Version and build information for the application.\"\"\"

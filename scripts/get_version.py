@@ -22,14 +22,19 @@ def check_local_changes():
 
 
 def main():
-    """Main function - uses setuptools-scm directly."""
+    """Main function - uses setuptools-scm to get version from git tags.
+
+    setuptools-scm automatically handles:
+    - Tagged commits: shows the tag version (e.g., 0.6.1)
+    - Post-tag commits: shows tag.postN.devM+hash.date (e.g., 0.6.1.post1.dev3+gabc123.d20251207)
+    - Local/branch changes: includes commit hash and date
+    """
     try:
         import setuptools_scm
 
-        # Generate version file and get version string
-        # Use no-guess-dev scheme to show current tag with .post1.devN
-        # The version string already includes all info: base.postN.devM+hash.date
-        # Example: 0.6.0.post1.dev0+g6a757ab3d.d20251206
+        # Generate version file and get version string from git tags
+        # Explicitly use no-guess-dev scheme to show current tag with post-release marker
+        # This matches the pyproject.toml configuration
         version = setuptools_scm.get_version(
             version_scheme="no-guess-dev",
             write_to="app/_version.py",

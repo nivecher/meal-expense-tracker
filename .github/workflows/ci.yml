@@ -309,8 +309,8 @@ jobs:
       contents: write
       id-token: write
     outputs:
-      version: ${{ steps.semantic_release.outputs.version }}
-      tag: ${{ steps.semantic_release.outputs.tag }}
+      version: ${{ steps.version_tag.outputs.version }}
+      tag: ${{ steps.version_tag.outputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
@@ -333,65 +333,81 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Run semantic release (version and tag)
-        id: semantic_release
+      - name: Determine next version using semantic-release
+        id: version_tag
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Run semantic-release to analyze commits and determine next version
-          # This will:
-          # 1. Analyze conventional commits since last tag
-          # 2. Determine version bump (major/minor/patch)
-          # 3. Output the next version
+          # Use python-semantic-release to analyze conventional commits and determine version bump
+          echo "Analyzing commits for version bump using conventional commits..."
           
-          echo "Analyzing commits for version bump..."
-          
-          # Get current latest tag
+          # Get latest tag
           git fetch --tags --force
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           
           if [ -z "$LATEST_TAG" ]; then
             echo "No existing tags found, starting from v0.1.0"
             LATEST_TAG="v0.1.0"
-          fi
-          
-          echo "Latest tag: ${LATEST_TAG}"
-          
-          # Run semantic-release to determine and create next version
-          # Use --no-commit --no-push to analyze without actually pushing
-          echo "Running semantic-release version analysis..."
-          semantic-release version --no-commit --no-push > semantic_output.txt 2>&1 || {
-            # If it fails, might mean no version bump needed
-            echo "Semantic-release output:"
-            cat semantic_output.txt || echo "  (no output)"
-          }
-          
-          # Check if semantic-release generated a version file
-          if [ -f "app/_version.py" ]; then
-            # Extract version from the generated file (semantic-release updates it)
-            NEXT_VERSION=$(grep -oE '__version__ = "[0-9]+\.[0-9]+\.[0-9]+' app/_version.py | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-            if [ -n "$NEXT_VERSION" ]; then
-              NEW_TAG="v${NEXT_VERSION}"
-              echo "✅ Next version: ${NEXT_VERSION}"
-              echo "✅ New tag: ${NEW_TAG}"
-              echo "version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
-              echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
-              echo "bump_needed=true" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-          fi
-          
-          # If no version file was created, check output or analyze commits manually
-          NEXT_VERSION=$(grep -iE "new version|bumped version|version" semantic_output.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-          
-          if [ -z "$NEXT_VERSION" ]; then
-            echo "No version bump needed, using existing version"
+            CURRENT_VERSION="0.1.0"
+          else
             CURRENT_VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
+            echo "Latest tag: ${LATEST_TAG} (version: ${CURRENT_VERSION})"
+          fi
+          
+          # Check if there are commits since the last tag
+          COMMITS_SINCE_TAG=$(git rev-list --count "${LATEST_TAG}..HEAD" 2>/dev/null || echo "0")
+          echo "Commits since tag: ${COMMITS_SINCE_TAG}"
+          
+          if [ "$COMMITS_SINCE_TAG" -eq 0 ]; then
+            # No commits, no version bump needed
+            echo "No commits since tag, no version bump needed"
             echo "version=${CURRENT_VERSION}" >> $GITHUB_OUTPUT
             echo "tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
             echo "bump_needed=false" >> $GITHUB_OUTPUT
-            echo "Using existing tag: ${LATEST_TAG}"
             exit 0
+          fi
+          
+          # Use semantic-release to determine next version based on conventional commits
+          # This analyzes commit messages (feat:, fix:, BREAKING CHANGE, etc.)
+          echo "Running semantic-release to determine version bump..."
+          SEMANTIC_NEXT=$(python -m semantic_release version --print 2>&1 | tail -1 | tr -d '\n' || echo "")
+          
+          # Remove any warnings from the output
+          SEMANTIC_NEXT=$(echo "$SEMANTIC_NEXT" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+          
+          echo "Semantic-release next version: ${SEMANTIC_NEXT}"
+          
+          # Validate semantic-release suggestion is reasonable
+          if [ -n "$SEMANTIC_NEXT" ] && [ "$SEMANTIC_NEXT" != "$CURRENT_VERSION" ]; then
+            # Check if the suggested version is a valid increment
+            IFS='.' read -r CURR_MAJOR CURR_MINOR CURR_PATCH <<< "$CURRENT_VERSION"
+            IFS='.' read -r NEXT_MAJOR NEXT_MINOR NEXT_PATCH <<< "$SEMANTIC_NEXT"
+            
+            # Validate: prevent invalid jumps (e.g., 0.6.0 -> 1.0.0 unless breaking change)
+            if [ "$CURR_MAJOR" = "0" ] && [ "$NEXT_MAJOR" = "1" ]; then
+              # Check if this is a valid breaking change (should have been detected by semantic-release)
+              # If semantic-release suggested it, it's likely valid, but we'll be cautious
+              echo "⚠️  Major version jump from ${CURRENT_VERSION} to ${SEMANTIC_NEXT}"
+              echo "   (This should only happen with BREAKING CHANGE commits)"
+            elif [ "$NEXT_MAJOR" -gt $((CURR_MAJOR + 1)) ]; then
+              # Invalid: major version jumped by more than 1
+              echo "⚠️  Semantic-release suggested invalid major jump, ignoring"
+              SEMANTIC_NEXT=""
+            fi
+          fi
+          
+          if [ -n "$SEMANTIC_NEXT" ] && [ "$SEMANTIC_NEXT" != "$CURRENT_VERSION" ]; then
+            # Semantic-release detected a valid version bump
+            NEXT_VERSION="$SEMANTIC_NEXT"
+            echo "✅ Semantic-release detected version bump: ${NEXT_VERSION}"
+          else
+            # No semantic bump detected - this shouldn't happen if commits exist
+            # But if it does, we'll do a patch bump as fallback
+            echo "⚠️  No semantic bump detected, doing patch bump as fallback"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            PATCH=$((PATCH + 1))
+            NEXT_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            echo "✅ Fallback patch bump: ${NEXT_VERSION}"
           fi
           
           NEW_TAG="v${NEXT_VERSION}"
@@ -402,18 +418,14 @@ jobs:
           echo "version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
           echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
           echo "bump_needed=true" >> $GITHUB_OUTPUT
-          
-          # Show semantic-release output for debugging
-          echo "Semantic-release output:"
-          cat semantic_output.txt || echo "  (no output)"
 
       - name: Create and push git tag
-        if: steps.semantic_release.outputs.bump_needed == 'true'
+        if: steps.version_tag.outputs.bump_needed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${{ steps.semantic_release.outputs.tag }}"
-          VERSION="${{ steps.semantic_release.outputs.version }}"
+          TAG="${{ steps.version_tag.outputs.tag }}"
+          VERSION="${{ steps.version_tag.outputs.version }}"
           
           if [ -z "$TAG" ] || [ -z "$VERSION" ]; then
             echo "❌ Error: Tag or version is empty"
@@ -448,13 +460,16 @@ jobs:
       - name: Generate version file using setuptools-scm
         run: |
           # Now that the tag exists, use setuptools-scm to generate version from git tags
-          # This will read the tag and generate the version file
-          # setuptools-scm will use the tag for the base version and add dev info for non-tagged commits
+          # setuptools-scm automatically handles:
+          # - Tagged commits: shows the tag version (e.g., 0.6.1)
+          # - Post-tag commits: shows tag.postN.devM+hash.date (e.g., 0.6.1.post1.dev3+gabc123.d20251207)
+          # - Local/branch changes: includes commit hash and date
+          # Configuration is read from pyproject.toml automatically
           python -c "
           import setuptools_scm
           version = setuptools_scm.get_version(
             write_to='app/_version.py',
-            write_to_template='__version__ = \"{version}\"\n'
+            write_to_template='\"\"\"Version and build information for the application.\"\"\"\n\n__version__ = \"{version}\"\n\n# Build timestamp - set at build time via environment variable\n# Format: ISO 8601 (YYYY-MM-DDTHH:MM:SS+00:00)\nimport os\n\n__build_timestamp__ = os.getenv(\"BUILD_TIMESTAMP\", \"Not set\")\n'
           )
           print(f'Generated version from git tag: {version}')
           "
@@ -473,7 +488,7 @@ jobs:
           # Commit the generated version file if it changed
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          VERSION="${{ steps.semantic_release.outputs.version }}"
+          VERSION="${{ steps.version_tag.outputs.version }}"
           
           if [ -f "app/_version.py" ]; then
             if git diff --exit-code --quiet app/_version.py; then
