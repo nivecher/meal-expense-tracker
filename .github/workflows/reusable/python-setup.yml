@@ -1,0 +1,64 @@
+---
+name: Python Setup
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        required: true
+        type: string
+      cache_dependency_path:
+        required: false
+        type: string
+        default: |
+          requirements*.txt
+          constraints.txt
+      install_dev_deps:
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      python_version:
+        description: Python version used
+        value: ${{ inputs.python_version }}
+      venv_path:
+        description: Path to virtual environment
+        value: ${{ steps.setup.outputs.venv_path }}
+
+jobs:
+  setup:
+    name: Setup Python Environment
+    runs-on: ubuntu-latest
+    outputs:
+      python_version: ${{ inputs.python_version }}
+      venv_path: ${{ steps.setup.outputs.venv_path }}
+    steps:
+      - name: Set up Python ${{ inputs.python_version }}
+        id: setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: pip
+          cache-dependency-path: ${{ inputs.cache_dependency_path }}
+
+      - name: Create virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          echo "venv_path=$(pwd)/venv" >> $GITHUB_OUTPUT
+
+      - name: Uninstall conflicting SQLAlchemy stubs
+        run: |
+          source venv/bin/activate
+          pip uninstall -y types-sqlalchemy sqlalchemy-stubs \
+            sqlalchemy2-stubs types-flask-sqlalchemy 2>/dev/null || true
+
+      - name: Install dependencies
+        run: |
+          source venv/bin/activate
+          if [ "${{ inputs.install_dev_deps }}" = "true" ]; then
+            pip install -r requirements-dev.txt
+          else
+            pip install -r requirements.txt
+          fi
