@@ -174,7 +174,7 @@ jobs:
         with:
           files: test-results-*.xml
           check_name: Test Results (${{ matrix.test-type }})
-          comment_mode: create new
+          comment_mode: always
           report_individual_runs: true
           check_run_annotations: all tests, skipped tests
 
