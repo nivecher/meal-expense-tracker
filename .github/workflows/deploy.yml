@@ -221,21 +221,9 @@ jobs:
           echo "Terraform plugin cache directory created"
 
       - name: Generate backend.hcl files from templates
-        run: |
-          if [ -d "terraform" ]; then
-            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            echo "Using AWS Account ID: ${AWS_ACCOUNT_ID}, Region: ${AWS_REGION}"
-            for ENV in dev staging prod; do
-              TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
-              OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
-              if [ -f "$TEMPLATE_FILE" ]; then
-                sed -e "s/\${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID}/g" \
-                    -e "s/\${AWS_REGION}/${AWS_REGION}/g" \
-                    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
-                echo "✅ Generated $OUTPUT_FILE"
-              fi
-            done
-          fi
+        uses: ./.github/actions/generate-backend-hcl
+        with:
+          aws_region: ${{ env.AWS_REGION }}
 
       - name: Install system dependencies
         run: |
@@ -257,10 +245,15 @@ jobs:
           TF_PLUGIN_CACHE_DIR: ${{ runner.temp }}/.terraform.d/plugin-cache
           TF_IN_AUTOMATION: 1
         run: |
-          cd terraform/environments/${ENVIRONMENT}
-          terraform init -backend-config=backend.hcl
-          terraform plan -var-file=terraform.tfvars -out=tfplan
-          terraform apply -auto-approve tfplan
+          cd terraform
+          terraform init -reconfigure -backend-config=environments/${ENVIRONMENT}/backend.hcl
+          terraform plan \
+            -var-file=environments/${ENVIRONMENT}/terraform.tfvars \
+            -var="environment=${ENVIRONMENT}" \
+            -out=environments/${ENVIRONMENT}/tfplan \
+            -input=false \
+            -lock=true
+          terraform apply -auto-approve environments/${ENVIRONMENT}/tfplan
 
       - name: Get ECR repository URI
         id: ecr_repo
@@ -565,7 +558,7 @@ jobs:
   notify:
     name: Notify Deployment Status
     needs: [validate, deploy]
-    if: always()
+    if: always() && github.event.inputs.skip_notify != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Send Deployment Status

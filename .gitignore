@@ -172,6 +172,10 @@ terraform/.terraform.tfstate.lock.info
 !.env.sample
 !.env.template
 
+# Act testing secrets
+.secrets
+!.secrets.example
+
 # Logs
 logs/
 *.log

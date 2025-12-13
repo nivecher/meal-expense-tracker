@@ -1,22 +1,17 @@
-# act configuration file
-# This file configures act to run GitHub Actions locally
+# Act configuration for local GitHub Actions testing
+# See: https://github.com/nektos/act
 
-# Use specific Docker images for different platforms
+# Use larger runner image for better compatibility
 -P ubuntu-latest=catthehacker/ubuntu:act-latest
--P ubuntu-22.04=catthehacker/ubuntu:act-22.04
--P ubuntu-20.04=catthehacker/ubuntu:act-20.04
 
-# Container architecture
---container-architecture linux/amd64
+# Secrets file (create .secrets file with your secrets)
+--secret-file .secrets
 
-# Artifact server path
+# Enable artifact server
 --artifact-server-path /tmp/artifacts
 
-# Environment file
---env-file .env.local
-
-# Verbose output for debugging
---verbose
-
-# Bind mounts for better performance
+# Bind mounts for better file access
 --bind
+
+# Container options
+--container-options "--privileged"

@@ -1,0 +1,36 @@
+---
+name: 'Generate Backend HCL Files'
+description: 'Generate backend.hcl files from templates using AWS account ID'
+inputs:
+  aws_region:
+    description: 'AWS region to use'
+    required: false
+    default: 'us-east-1'
+runs:
+  using: 'composite'
+  steps:
+    - name: Generate backend.hcl files from templates
+      shell: bash
+      env:
+        AWS_REGION: ${{ inputs.aws_region }}
+      run: |
+        if [ -d "terraform" ]; then
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          echo "Using AWS Account ID: ${AWS_ACCOUNT_ID}"
+          echo "Using AWS Region: ${AWS_REGION}"
+          for ENV in dev staging prod; do
+            TEMPLATE_FILE="terraform/environments/${ENV}/backend.hcl.template"
+            OUTPUT_FILE="terraform/environments/${ENV}/backend.hcl"
+            if [ -f "$TEMPLATE_FILE" ]; then
+              echo "Generating $OUTPUT_FILE from template..."
+              sed -e "s/\${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID}/g" \
+                  -e "s/\${AWS_REGION}/${AWS_REGION}/g" \
+                  "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+              echo "✅ Generated $OUTPUT_FILE"
+            else
+              echo "⚠️  Template file $TEMPLATE_FILE not found, skipping..."
+            fi
+          done
+        else
+          echo "No terraform directory found, skipping backend.hcl generation"
+        fi

@@ -53,13 +53,40 @@ if [ -z "$GITHUB_ORG" ]; then
   exit 1
 fi
 
-# Get the AWS account ID
+# Get the AWS account ID and current caller identity (introspect from logged-in account)
 if ! AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null); then
   echo -e "${RED}Failed to get AWS account ID. Are you logged in?${NC}"
   exit 1
 fi
 
+# Get the current caller identity ARN for SSO role assumption
+CALLER_ARN=$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)
+if [ -z "$CALLER_ARN" ]; then
+  echo -e "${YELLOW}Warning: Could not get caller ARN. SSO role assumption will not be enabled.${NC}"
+  SSO_ROLE_ARN=""
+else
+  # Extract the SSO role name from the assumed role ARN and convert to IAM role ARN
+  # Pattern: arn:aws:sts::ACCOUNT:assumed-role/ROLE_NAME/USERNAME
+  # Convert to: arn:aws:iam::ACCOUNT:role/aws-reserved/sso.amazonaws.com/ROLE_NAME
+  # This allows any user with the same SSO role to assume the GitHub Actions role
+  if echo "$CALLER_ARN" | grep -q "assumed-role.*AWSReservedSSO"; then
+    # Extract account and role name, then construct IAM role ARN
+    ROLE_NAME=$(echo "$CALLER_ARN" | sed 's|.*assumed-role/\([^/]*\)/.*|\1|')
+    SSO_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/aws-reserved/sso.amazonaws.com/${ROLE_NAME}"
+    echo -e "${GREEN}Detected SSO role ARN: ${SSO_ROLE_ARN}${NC}"
+  else
+    echo -e "${YELLOW}Warning: Caller is not using an SSO assumed role. SSO role assumption will not be enabled.${NC}"
+    SSO_ROLE_ARN=""
+  fi
+fi
+
 echo -e "${GREEN}Setting up GitHub Actions IAM role in AWS account: ${AWS_ACCOUNT_ID} (${REGION})${NC}"
+
+# Build parameter overrides
+PARAM_OVERRIDES="GitHubOrg=${GITHUB_ORG} RepositoryName=${REPO_NAME}"
+if [ -n "$SSO_ROLE_ARN" ]; then
+  PARAM_OVERRIDES="${PARAM_OVERRIDES} SSORoleArn=${SSO_ROLE_ARN}"
+fi
 
 # Deploy CloudFormation stack
 echo -e "${YELLOW}Deploying CloudFormation stack '${STACK_NAME}'...${NC}"
@@ -67,7 +94,7 @@ if aws cloudformation deploy \
   --stack-name "$STACK_NAME" \
   --region "$REGION" \
   --template-file cloudformation/github-actions-role.yml \
-  --parameter-overrides "GitHubOrg=${GITHUB_ORG}" "RepositoryName=${REPO_NAME}" \
+  --parameter-overrides $PARAM_OVERRIDES \
   --capabilities CAPABILITY_NAMED_IAM; then
   echo -e "${GREEN}✅ GitHub Actions IAM role deployed successfully!${NC}"
 
@@ -75,7 +102,7 @@ if aws cloudformation deploy \
   ROLE_ARN=$(aws cloudformation describe-stacks \
     --stack-name "$STACK_NAME" \
     --region "$REGION" \
-    --query "Stacks[0].Outputs[?OutputKey=='GitHubActionsRoleArn'].OutputValue" \
+    --query "Stacks[0].Outputs[?OutputKey=='RoleARN'].OutputValue" \
     --output text)
 
   echo -e "\n${GREEN}GitHub Actions IAM Role ARN:${NC}"

@@ -5,9 +5,18 @@
 # and then exports them as environment variables.
 
 # --- Configuration ---
+# Get AWS account ID if not set (introspect from logged-in account)
+if [ -z "${AWS_ACCOUNT_ID}" ]; then
+    AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+    if [ -z "${AWS_ACCOUNT_ID}" ]; then
+        echo "❌ ERROR: Could not determine AWS account ID. Please ensure AWS CLI is configured."
+        exit 1
+    fi
+fi
+
 # Replace with the ARN of the GitHub Actions IAM Role from your cloudformation/github-actions-role.yml
-# e.g., "arn:aws:iam::123456789012:role/github-actions-role"
-AWS_ROLE_ARN="arn:aws:iam::562427544284:role/github-actions-role"
+# The account ID is automatically detected from your logged-in AWS account
+AWS_ROLE_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:role/github-actions-role"
 AWS_REGION="us-east-1" # Or your desired AWS region
 ROLE_SESSION_NAME="act-session" # A name for the assumed role session
 
@@ -18,6 +27,7 @@ then
     exit 1
 fi
 
+echo "AWS Account ID: ${AWS_ACCOUNT_ID}"
 echo "Attempting to assume role: $AWS_ROLE_ARN in region $AWS_REGION..."
 
 # --- Assume the role ---
