@@ -32,11 +32,27 @@ runs:
 
     - name: Install setuptools-scm
       shell: bash
-      run: python3 -m pip install --quiet setuptools-scm[toml]
+      run: |
+        # Handle externally-managed Python environments (PEP 668)
+        # Try --user first (works in both GitHub Actions and local act)
+        if python3 -m pip install --user --quiet setuptools-scm[toml] 2>/dev/null; then
+          # Add user site-packages to PYTHONPATH
+          PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
+          export PYTHONPATH="${HOME}/.local/lib/python3.${PYTHON_MINOR}/site-packages:${PYTHONPATH}"
+          echo "PYTHONPATH=${PYTHONPATH}" >> $GITHUB_ENV
+        elif python3 -m pip install --quiet setuptools-scm[toml] 2>/dev/null; then
+          # Standard install (works in GitHub Actions)
+          :
+        else
+          # Fallback for strict environments (local act testing)
+          python3 -m pip install --break-system-packages --quiet setuptools-scm[toml]
+        fi
 
     - name: Generate version file
       id: generate
       shell: bash
+      env:
+        PYTHONPATH: ${{ env.PYTHONPATH }}
       run: |
         VERSION=$(python3 -c "
         import setuptools_scm
