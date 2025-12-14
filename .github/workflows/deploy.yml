@@ -119,7 +119,7 @@ jobs:
     name: Build and Push
     needs: [validate]
     if: needs.validate.outputs.should_deploy == 'true'
-    uses: ./.github/workflows/reusable/docker-build.yml
+    uses: ./.github/workflows/docker-build.yml
     with:
       image_name: ${{ github.repository }}
       version: ${{ needs.validate.outputs.image_tag }}
