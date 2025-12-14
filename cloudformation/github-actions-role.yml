@@ -130,6 +130,9 @@ Resources:
                   - cloudfront:GetDistribution
                   - cloudfront:UpdateDistribution
                   - cloudfront:DeleteDistribution
+                  - cloudfront:CreateInvalidation
+                  - cloudfront:GetInvalidation
+                  - cloudfront:ListInvalidations
                   - cloudfront:CreateOriginAccessControl
                   - cloudfront:GetOriginAccessControl
                   - cloudfront:UpdateOriginAccessControl

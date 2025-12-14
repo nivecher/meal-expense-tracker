@@ -37,7 +37,7 @@ variable "aws_region" {
 
 # Lambda Function Configuration
 variable "handler" {
-  description = "The function entrypoint in your code (not needed for container images)"
+  description = "The function entrypoint in your code (not needed for container images - use CMD in Dockerfile instead)"
   type        = string
   default     = "lambda_handler"
 }
