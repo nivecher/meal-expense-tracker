@@ -173,11 +173,15 @@ jobs:
         with:
           context: .
           target: lambda
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            BUILDPLATFORM=linux/arm64
+            TARGETPLATFORM=linux/arm64
 
   # Unified deployment job for all environments
   deploy:
@@ -296,9 +300,9 @@ jobs:
           ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
           IMAGE_TAG="${IMAGE_TAG}"
           
-          # Pull from GHCR and push to ECR
-          docker pull ghcr.io/${{ github.repository }}:${IMAGE_TAG} || \
-          docker pull ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} || {
+          # Pull from GHCR with platform specification (arm64 for Lambda)
+          docker pull --platform linux/arm64 ghcr.io/${{ github.repository }}:${IMAGE_TAG} || \
+          docker pull --platform linux/arm64 ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} || {
             echo "❌ Could not pull image from GHCR"
             exit 1
           }
