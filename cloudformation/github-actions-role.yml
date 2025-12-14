@@ -1,4 +1,8 @@
 ---
+# CloudFormation Template
+# This file uses CloudFormation intrinsic functions (!Sub, !Ref, !If, !GetAtt, etc.)
+# which are valid CloudFormation syntax but may trigger YAML linter warnings.
+# The template is validated using: aws cloudformation validate-template
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'IAM Role for GitHub Actions to interact with ECR and other AWS services'
 
@@ -11,6 +15,17 @@ Parameters:
     Type: String
     Description: GitHub repository name
     Default: meal-expense-tracker
+  SSORoleArn:
+    Type: String
+    Description: ARN pattern for SSO role that can assume this role (e.g., arn:aws:sts::${AWS::AccountId}:assumed-role/AWSReservedSSO_AdministratorAccess_*/*)
+    Default: ''
+
+Conditions:
+  HasSSORole:
+    Fn::Not:
+      - Fn::Equals:
+          - Ref: SSORoleArn
+          - ''
 
 Resources:
   GitHubActionsRole:
@@ -22,17 +37,23 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+              Federated:
+                Fn::Sub: 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringLike:
-                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubOrg}/${RepositoryName}:*'
+                'token.actions.githubusercontent.com:sub':
+                  Fn::Sub: 'repo:${GitHubOrg}/${RepositoryName}:*'
               StringEquals:
                 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com'
-          - Effect: Allow
-            Principal:
-              AWS: 'arn:aws:sts::562427544284:assumed-role/AWSReservedSSO_AdministratorAccess_c93d252d500730e3/mtd37'
-            Action: sts:AssumeRole
+          - Fn::If:
+              - HasSSORole
+              - Effect: Allow
+                Principal:
+                  AWS:
+                    Ref: SSORoleArn
+                Action: sts:AssumeRole
+              - Ref: 'AWS::NoValue'
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
         - arn:aws:iam::aws:policy/AWSLambda_FullAccess
@@ -109,6 +130,9 @@ Resources:
                   - cloudfront:GetDistribution
                   - cloudfront:UpdateDistribution
                   - cloudfront:DeleteDistribution
+                  - cloudfront:CreateInvalidation
+                  - cloudfront:GetInvalidation
+                  - cloudfront:ListInvalidations
                   - cloudfront:CreateOriginAccessControl
                   - cloudfront:GetOriginAccessControl
                   - cloudfront:UpdateOriginAccessControl
@@ -160,4 +184,7 @@ Resources:
 Outputs:
   RoleARN:
     Description: ARN of the GitHub Actions IAM Role
-    Value: !GetAtt GitHubActionsRole.Arn
+    Value:
+      Fn::GetAtt:
+        - GitHubActionsRole
+        - Arn

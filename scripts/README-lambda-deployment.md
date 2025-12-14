@@ -24,19 +24,22 @@ This script:
 If you prefer manual control:
 
 ```bash
-# 1. Build the image
+# 1. Get AWS account ID (auto-detected from logged-in account)
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# 2. Build the image
 docker build --platform linux/arm64 --no-cache --provenance=false --sbom=false -t meal-expense-tracker-dev-lambda:latest -f Dockerfile.lambda .
 
-# 2. Tag and push
+# 3. Tag and push
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-docker tag meal-expense-tracker-dev-lambda:latest 562427544284.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:latest
-docker tag meal-expense-tracker-dev-lambda:latest 562427544284.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:$TIMESTAMP
+docker tag meal-expense-tracker-dev-lambda:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:latest
+docker tag meal-expense-tracker-dev-lambda:latest ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:$TIMESTAMP
 
-docker push 562427544284.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:latest
-docker push 562427544284.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:$TIMESTAMP
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:latest
+docker push ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:$TIMESTAMP
 
-# 3. Update Lambda
-aws lambda update-function-code --function-name meal-expense-tracker-dev --image-uri 562427544284.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:latest
+# 4. Update Lambda
+aws lambda update-function-code --function-name meal-expense-tracker-dev --image-uri ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda:latest
 ```
 
 ## Benefits

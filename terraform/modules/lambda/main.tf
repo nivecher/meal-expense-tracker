@@ -216,6 +216,7 @@ resource "aws_lambda_function" "main" {
   package_type = var.package_type
 
   # Handler and runtime only needed for ZIP packages
+  # For container images, handler is specified in Dockerfile CMD, not here
   handler = var.package_type == "Zip" ? var.handler : null
   runtime = var.package_type == "Zip" ? var.runtime : null
 

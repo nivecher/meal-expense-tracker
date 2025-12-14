@@ -154,7 +154,19 @@ fi
 
 # Set deployment timestamp
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Get AWS account ID (always introspect from logged-in account via caller identity)
+# Unset any existing value to ensure we get the current account
+unset ACCOUNT_ID
+log "🔍 Detecting AWS account ID from current session..."
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
+if [ -z "${ACCOUNT_ID}" ] || [ "${ACCOUNT_ID}" = "null" ]; then
+  log "❌ ERROR: Could not determine AWS account ID. Please ensure AWS CLI is configured."
+  log "   Run: aws sts get-caller-identity"
+  exit 1
+fi
+log "✅ Detected AWS Account ID: ${ACCOUNT_ID}"
+
 S3_BUCKET="meal-expense-tracker-${ENVIRONMENT}-deployment-${ACCOUNT_ID}"
 
 # Package Lambda
@@ -165,9 +177,43 @@ package() {
   ./scripts/package.sh --layer --"$ARCHITECTURE"
 }
 
+# Ensure S3 bucket exists
+ensure_s3_bucket() {
+  log "🔍 Checking if S3 bucket exists: $S3_BUCKET"
+  if ! aws s3api head-bucket --bucket "$S3_BUCKET" 2>/dev/null; then
+    log "📦 S3 bucket does not exist. Creating bucket: $S3_BUCKET"
+    local region
+    region=${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}
+
+    # us-east-1 doesn't need LocationConstraint
+    if [ "$region" = "us-east-1" ]; then
+      if ! aws s3api create-bucket --bucket "$S3_BUCKET" --region "$region" 2>/dev/null; then
+        log "❌ ERROR: Failed to create S3 bucket: $S3_BUCKET"
+        log "   Please create the bucket manually or check your AWS permissions"
+        return 1
+      fi
+    else
+      if ! aws s3api create-bucket \
+        --bucket "$S3_BUCKET" \
+        --region "$region" \
+        --create-bucket-configuration LocationConstraint="$region" 2>/dev/null; then
+        log "❌ ERROR: Failed to create S3 bucket: $S3_BUCKET"
+        log "   Please create the bucket manually or check your AWS permissions"
+        return 1
+      fi
+    fi
+    log "✅ S3 bucket created successfully: $S3_BUCKET"
+  else
+    log "✅ S3 bucket exists: $S3_BUCKET"
+  fi
+}
+
 # Upload to S3
 upload() {
   log "Uploading to S3 bucket: $S3_BUCKET"
+
+  # Ensure bucket exists before uploading
+  ensure_s3_bucket || return 1
 
   local app_key="${ENVIRONMENT}/app/${ARCHITECTURE}/app-${TIMESTAMP}.zip"
   local layer_key="${ENVIRONMENT}/layers/${ARCHITECTURE}/python-dependencies-${TIMESTAMP}.zip"
@@ -210,14 +256,31 @@ upload() {
 update_lambda() {
   log "Updating Lambda function: $FUNCTION_NAME with architecture: $ARCHITECTURE"
 
-  # First update the function code
-  if ! aws lambda update-function-code \
+  # Detect the package type of the existing Lambda function
+  local package_type
+  package_type=$(aws lambda get-function \
     --function-name "$FUNCTION_NAME" \
-    --s3-bucket "$S3_BUCKET" \
-    --s3-key "$S3_KEY"; then
+    --query 'Configuration.PackageType' \
+    --output text 2>/dev/null || echo "Zip")
 
-    log "Failed to update Lambda function code"
-    return 1
+  log "📦 Detected Lambda package type: $package_type"
+
+  if [ "$package_type" = "Image" ]; then
+    log "⚠️  Lambda function uses container images (packageType: Image)"
+    log "   This script is for ZIP package deployments."
+    log "   For container image deployments, use: ./scripts/redeploy-lambda.sh"
+    log "   Or update the image in ECR and Lambda will use the 'latest' tag automatically."
+    return 0  # Don't fail, just inform the user
+  else
+    # Update using S3 for ZIP packages
+    log "📤 Updating Lambda function code from S3..."
+    if ! aws lambda update-function-code \
+      --function-name "$FUNCTION_NAME" \
+      --s3-bucket "$S3_BUCKET" \
+      --s3-key "$S3_KEY"; then
+      log "Failed to update Lambda function code"
+      return 1
+    fi
   fi
 }
 
@@ -229,7 +292,7 @@ run_migrations() {
     local REGION
     REGION=${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}
     local PROFILE
-    PROFILE=${AWS_PROFILE:-AdministratorAccess-562427544284}
+    PROFILE=${AWS_PROFILE:-default}
 
     if ! python3 scripts/invoke_migrations.py -f "$FUNCTION_NAME" -r "$REGION" -p "$PROFILE"; then
       log "Warning: Database migrations completed with errors"
@@ -245,6 +308,7 @@ run_migrations() {
 main() {
   log "🚀 Starting deployment for: $FUNCTION_NAME"
   log "🌍 Environment: $ENVIRONMENT"
+  log "🔢 AWS Account ID: $ACCOUNT_ID"
   log "📦 S3 Bucket: $S3_BUCKET"
 
   # Package Lambda

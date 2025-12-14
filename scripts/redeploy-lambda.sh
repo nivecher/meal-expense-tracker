@@ -5,7 +5,16 @@
 set -e  # Exit on error
 set -o pipefail  # Exit on pipe failures
 
-ECR_REPO="562427544284.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda"
+# Get AWS account ID if not set (introspect from logged-in account)
+if [ -z "${AWS_ACCOUNT_ID}" ]; then
+    AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+    if [ -z "${AWS_ACCOUNT_ID}" ]; then
+        echo "❌ ERROR: Could not determine AWS account ID. Please ensure AWS CLI is configured."
+        exit 1
+    fi
+fi
+
+ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/meal-expense-tracker-dev-lambda"
 FUNCTION_NAME="meal-expense-tracker-dev"
 REGION="us-east-1"
 
@@ -21,6 +30,7 @@ error_exit() {
 }
 
 log "🚀 Starting Lambda redeployment..."
+log "   AWS Account ID: ${AWS_ACCOUNT_ID}"
 log "   Function: ${FUNCTION_NAME}"
 log "   ECR Repo: ${ECR_REPO}"
 log "   Region: ${REGION}"
