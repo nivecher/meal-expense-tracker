@@ -1,0 +1,62 @@
+name: Generate Version File
+description: Generate app/_version.py using setuptools-scm from git tags
+
+inputs:
+  build_timestamp:
+    description: Build timestamp in ISO 8601 format (optional, will be generated if not provided)
+    required: false
+    default: ""
+
+outputs:
+  version:
+    description: Generated version string
+    value: ${{ steps.generate.outputs.version }}
+  build_timestamp:
+    description: Build timestamp used
+    value: ${{ steps.timestamp.outputs.build_timestamp }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set build timestamp
+      id: timestamp
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.build_timestamp }}" ]; then
+          BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S+00:00")
+        else
+          BUILD_TIMESTAMP="${{ inputs.build_timestamp }}"
+        fi
+        echo "BUILD_TIMESTAMP=${BUILD_TIMESTAMP}" >> $GITHUB_ENV
+        echo "build_timestamp=${BUILD_TIMESTAMP}" >> $GITHUB_OUTPUT
+
+    - name: Install setuptools-scm
+      shell: bash
+      run: python3 -m pip install --quiet setuptools-scm[toml]
+
+    - name: Generate version file
+      id: generate
+      shell: bash
+      run: |
+        VERSION=$(python3 -c "
+        import setuptools_scm
+        version = setuptools_scm.get_version(
+          version_scheme='no-guess-dev',
+          write_to='app/_version.py',
+          write_to_template='\"\"\"Version and build information for the application.\"\"\"\n\n__version__ = \"{version}\"\n\n# Build timestamp - set at build time via environment variable\n# Format: ISO 8601 (YYYY-MM-DDTHH:MM:SS+00:00)\nimport os\n\n__build_timestamp__ = os.getenv(\"BUILD_TIMESTAMP\", \"Not set\")\n'
+        )
+        print(version)
+        ")
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Generated version: ${VERSION}"
+
+    - name: Verify version file
+      shell: bash
+      run: |
+        if [ -f "app/_version.py" ]; then
+          echo "✅ Version file generated successfully"
+          cat app/_version.py
+        else
+          echo "❌ Failed to generate version file"
+          exit 1
+        fi

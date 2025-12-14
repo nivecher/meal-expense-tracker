@@ -27,24 +27,66 @@ on:
         required: false
         type: string
         default: type=gha,mode=max
+      target:
+        required: false
+        type: string
+        description: Dockerfile target stage
+      platforms:
+        required: false
+        type: string
+        description: Platform(s) to build for (e.g., linux/arm64)
+      build_args:
+        required: false
+        type: string
+        description: Build arguments (multiline string, key=value format)
+      fetch_depth:
+        required: false
+        type: number
+        description: Git fetch depth (0 for full history, needed for version generation)
+        default: 1
+      generate_version:
+        required: false
+        type: boolean
+        description: Generate app/_version.py before building
+        default: false
+      custom_tags:
+        required: false
+        type: string
+        description: Custom tag format (multiline, overrides default tags)
+      custom_labels:
+        required: false
+        type: string
+        description: Custom labels (multiline, overrides default labels)
+      environment:
+        required: false
+        type: string
+        description: Environment name for deployment protection rules
     outputs:
       image_tag:
         description: Full image tag
-        value: ${{ steps.meta.outputs.tags }}
+        value: ${{ jobs.build.outputs.image_tag }}
       image_digest:
         description: Image digest
-        value: ${{ steps.build.outputs.digest }}
+        value: ${{ jobs.build.outputs.image_digest }}
 
 jobs:
   build:
     name: Build Docker Image
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     outputs:
       image_tag: ${{ steps.meta.outputs.tags }}
       image_digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Generate version file
+        if: inputs.generate_version
+        uses: ./.github/actions/generate-version
+        id: version
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -57,26 +99,79 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Prepare metadata tags
+        id: prepare_tags
+        run: |
+          if [ -n "${{ inputs.custom_tags }}" ]; then
+            echo "tags<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ inputs.custom_tags }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "tags<<EOF" >> $GITHUB_OUTPUT
+            echo "type=raw,value=${{ inputs.version }},enable=${{ inputs.version != 'dev' }}" >> $GITHUB_OUTPUT
+            echo "type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && inputs.version != 'dev' }}" >> $GITHUB_OUTPUT
+            echo "type=sha,format=short" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Prepare metadata labels
+        id: prepare_labels
+        run: |
+          if [ -n "${{ inputs.custom_labels }}" ]; then
+            echo "labels<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ inputs.custom_labels }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "labels<<EOF" >> $GITHUB_OUTPUT
+            echo "org.opencontainers.image.version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+            echo "org.opencontainers.image.revision=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ inputs.registry }}/${{ inputs.image_name }}
-          tags: |
-            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != 'dev' }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && inputs.version != 'dev' }}
-            type=sha,format=short
-          labels: |
-            org.opencontainers.image.version=${{ inputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}
+          tags: ${{ steps.prepare_tags.outputs.tags }}
+          labels: ${{ steps.prepare_labels.outputs.labels }}
+
+      - name: Prepare build args
+        id: build_args_prep
+        run: |
+          BUILD_ARGS="${{ inputs.build_args }}"
+          if [ "${{ inputs.generate_version }}" = "true" ] && [ -n "${{ steps.version.outputs.build_timestamp }}" ]; then
+            if [ -n "$BUILD_ARGS" ]; then
+              echo "build_args<<EOF" >> $GITHUB_OUTPUT
+              echo "$BUILD_ARGS" >> $GITHUB_OUTPUT
+              echo "BUILD_TIMESTAMP=${{ steps.version.outputs.build_timestamp }}" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            else
+              echo "build_args<<EOF" >> $GITHUB_OUTPUT
+              echo "BUILD_TIMESTAMP=${{ steps.version.outputs.build_timestamp }}" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            fi
+          else
+            if [ -n "$BUILD_ARGS" ]; then
+              echo "build_args<<EOF" >> $GITHUB_OUTPUT
+              echo "$BUILD_ARGS" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            fi
+          fi
+        shell: bash
 
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
+          target: ${{ inputs.target }}
+          platforms: ${{ inputs.platforms }}
           push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ inputs.cache_from }}
           cache-to: ${{ inputs.cache_to }}
+          build-args: ${{ steps.build_args_prep.outputs.build_args }}

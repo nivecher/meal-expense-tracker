@@ -39,7 +39,6 @@ permissions:
   actions: read
   checks: write
   statuses: write
-  security-events: write
   packages: write
   issues: write
 
@@ -120,68 +119,28 @@ jobs:
     name: Build and Push
     needs: [validate]
     if: needs.validate.outputs.should_deploy == 'true'
-    runs-on: ubuntu-latest
-    environment: ${{ needs.validate.outputs.environment }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: requirements*.txt
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y make
-
-      - name: Create virtual environment and install dependencies
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=${{ needs.validate.outputs.image_tag }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,format=short
-          labels: |
-            org.opencontainers.image.version=${{ needs.validate.outputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          target: lambda
-          platforms: linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            BUILDPLATFORM=linux/arm64
-            TARGETPLATFORM=linux/arm64
+    uses: ./.github/workflows/reusable/docker-build.yml
+    with:
+      image_name: ${{ github.repository }}
+      version: ${{ needs.validate.outputs.image_tag }}
+      push: true
+      registry: ghcr.io
+      target: lambda
+      platforms: linux/arm64
+      fetch_depth: 0
+      generate_version: true
+      custom_tags: |
+        type=raw,value=${{ needs.validate.outputs.image_tag }}
+        type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+        type=sha,format=short
+      custom_labels: |
+        org.opencontainers.image.version=${{ needs.validate.outputs.version }}
+        org.opencontainers.image.revision=${{ github.sha }}
+      build_args: |
+        BUILDPLATFORM=linux/arm64
+        TARGETPLATFORM=linux/arm64
+      environment: ${{ needs.validate.outputs.environment }}
+    secrets: inherit
 
   # Unified deployment job for all environments
   deploy:
@@ -221,9 +180,12 @@ jobs:
           terraform_wrapper: false
 
       - name: Setup Terraform plugin cache
-        run: |
-          mkdir -p ${{ runner.temp }}/.terraform.d/plugin-cache
-          echo "Terraform plugin cache directory created"
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/.terraform.d/plugin-cache
+          key: terraform-plugins-${{ hashFiles('terraform/**/*.tf') }}
+          restore-keys: |
+            terraform-plugins-
 
       - name: Generate backend.hcl files from templates
         uses: ./.github/actions/generate-backend-hcl
@@ -563,7 +525,7 @@ jobs:
   notify:
     name: Notify Deployment Status
     needs: [validate, deploy]
-    if: always() && github.event.inputs.skip_notify != 'true'
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Send Deployment Status
