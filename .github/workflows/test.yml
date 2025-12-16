@@ -13,6 +13,16 @@ on:
         description: Deployment URL to test against
         required: false
         type: string
+      test_suite:
+        description: Test suite to run
+        required: false
+        type: choice
+        default: all
+        options:
+          - all
+          - health
+          - api
+          - e2e
 
 env:
   PYTHON_VERSION: 3.13
@@ -21,17 +31,17 @@ env:
   FLASK_ENV: test
   TESTING: true
 
-# Required permissions
 permissions:
   contents: read
   checks: write
   pull-requests: write
 
 jobs:
-  # Check if deploy workflow succeeded
   check-deploy:
     name: Check Deploy Status
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       deploy_passed: >
         ${{ github.event_name == 'workflow_run' &&
@@ -43,116 +53,129 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
-              echo "Deploy workflow did not succeed, skipping tests"
+              echo "❌ Deploy workflow did not succeed, skipping tests"
               exit 1
             fi
-            echo "Deploy workflow succeeded, proceeding with tests"
+            echo "✅ Deploy workflow succeeded, proceeding with tests"
           else
-            echo "Manual trigger via workflow_dispatch, skipping deploy check"
+            echo "✅ Manual trigger via workflow_dispatch"
           fi
 
-      - name: Get deployment URL from deploy workflow
-        id: get_url
-        if: github.event_name == 'workflow_run'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const workflowRun = context.payload.workflow_run;
-            const runId = workflowRun.id;
-            
-            // Try to get deployment URL from deploy-dev job
-            // Default to known dev URL
-            const deploymentUrl = '${{ github.event.inputs.deployment_url }}' || 
-                                 'https://meals.dev.nivecher.com';
-            
-            core.setOutput('url', deploymentUrl);
-            console.log(`Using deployment URL: ${deploymentUrl}`);
-
-      - name: Set deployment URL
+      - name: Determine deployment URL
         id: set_url
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.deployment_url }}" ]; then
+          if [ -n "${{ github.event.inputs.deployment_url }}" ]; then
             DEPLOYMENT_URL="${{ github.event.inputs.deployment_url }}"
-          elif [ "${{ github.event_name }}" = "workflow_run" ] && [ -n "${{ steps.get_url.outputs.url }}" ]; then
-            DEPLOYMENT_URL="${{ steps.get_url.outputs.url }}"
           else
             DEPLOYMENT_URL="https://meals.dev.nivecher.com"
           fi
+          
           echo "url=${DEPLOYMENT_URL}" >> $GITHUB_OUTPUT
           echo "Using deployment URL: ${DEPLOYMENT_URL}"
 
-  # Health checks
+      - name: Add status summary
+        run: |
+          echo "## Deployment Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Deploy Passed: ${{ steps.set_url.outputs.deploy_passed }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Deployment URL: ${{ steps.set_url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+
   health-checks:
     name: Health Checks
     needs: check-deploy
-    if: needs.check-deploy.outputs.deploy_passed == 'true'
+    if: needs.check-deploy.outputs.deploy_passed == 'true' && (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'health' || github.event.inputs.test_suite == '')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
 
       - name: Health check endpoint
         env:
-          BASE_URL: ${{ needs.check-deploy.outputs.deployment_url || 'https://meals.dev.nivecher.com' }}
+          BASE_URL: ${{ needs.check-deploy.outputs.deployment_url }}
         run: |
           echo "Testing health endpoint at: ${BASE_URL}/health"
           
-          for i in {1..10}; do
+          MAX_ATTEMPTS=10
+          for i in $(seq 1 $MAX_ATTEMPTS); do
             if curl -f -s "${BASE_URL}/health" > /dev/null; then
-              echo "✅ Health check passed"
+              echo "✅ Health check passed on attempt ${i}"
               curl -s "${BASE_URL}/health" | jq '.' || echo "Response received (not JSON)"
               exit 0
             fi
-            echo "Attempt ${i}/10 failed, retrying in 5 seconds..."
+            echo "Attempt ${i}/${MAX_ATTEMPTS} failed, retrying in 5 seconds..."
             sleep 5
           done
           
-          echo "❌ Health check failed after 10 attempts"
+          echo "❌ Health check failed after ${MAX_ATTEMPTS} attempts"
           exit 1
 
-  # API integration tests
+      - name: Add health check summary
+        if: always()
+        run: |
+          echo "## Health Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Endpoint: ${{ needs.check-deploy.outputs.deployment_url }}/health" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+
   api-tests:
     name: API Integration Tests
     needs: check-deploy
-    if: needs.check-deploy.outputs.deploy_passed == 'true'
+    if: needs.check-deploy.outputs.deploy_passed == 'true' && (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'api' || github.event.inputs.test_suite == '')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5.3.0
+      - name: Setup Python Environment
+        uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: requirements*.txt
-
-      - name: Create virtual environment
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          requirements-file: requirements-dev.txt
 
       - name: Run API integration tests
+        continue-on-error: true
         env:
-          BASE_URL: ${{ needs.check-deploy.outputs.deployment_url || 'https://meals.dev.nivecher.com' }}
-          TESTING: true
+          BASE_URL: ${{ needs.check-deploy.outputs.deployment_url }}
         run: |
           source venv/bin/activate
-          # Run integration tests against deployed environment
           pytest tests/integration/ \
             -v \
             --base-url="${BASE_URL}" \
             -m "not slow" \
-            || echo "Some API tests failed, but continuing..."
+            --junitxml=api-test-results.xml \
+            || echo "⚠️  Some API tests failed"
 
-  # Runtime E2E tests with Playwright
-  runtime-tests:
-    name: Runtime E2E Tests
+      - name: Upload API test results
+        if: always()
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: api-test-results
+          path: api-test-results.xml
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Add API test summary
+        if: always()
+        run: |
+          echo "## API Integration Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Base URL: ${{ needs.check-deploy.outputs.deployment_url }}" >> $GITHUB_STEP_SUMMARY
+          if [ -f api-test-results.xml ]; then
+            echo "- Results: ✅ Generated" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  e2e-tests:
+    name: E2E Tests
     needs: check-deploy
-    if: needs.check-deploy.outputs.deploy_passed == 'true'
+    if: needs.check-deploy.outputs.deploy_passed == 'true' && (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'e2e' || github.event.inputs.test_suite == '')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
@@ -161,46 +184,54 @@ jobs:
         uses: actions/setup-node@v4.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Install Node dependencies
-        run: |
-          if [ -f package.json ]; then
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-            fi
-          fi
+      - name: Install dependencies
+        run: npm ci
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
+        continue-on-error: true
         env:
-          BASE_URL: ${{ needs.check-deploy.outputs.deployment_url || 'https://meals.dev.nivecher.com' }}
+          BASE_URL: ${{ needs.check-deploy.outputs.deployment_url }}
         run: |
           BASE_URL="${BASE_URL}" npx playwright test \
             --project=chromium \
             --reporter=html \
-            || echo "Some E2E tests failed, but continuing..."
+            || echo "⚠️  Some E2E tests failed"
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.0
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+          if-no-files-found: ignore
 
-  # Test results summary
+      - name: Add E2E test summary
+        if: always()
+        run: |
+          echo "## E2E Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Browser: Chromium" >> $GITHUB_STEP_SUMMARY
+          echo "- Base URL: ${{ needs.check-deploy.outputs.deployment_url }}" >> $GITHUB_STEP_SUMMARY
+          if [ -d playwright-report ]; then
+            echo "- Report: ✅ Generated" >> $GITHUB_STEP_SUMMARY
+          fi
+
   test-summary:
     name: Test Summary
-    needs: [health-checks, api-tests, runtime-tests]
+    needs: [health-checks, api-tests, e2e-tests]
     if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
+      checks: write
     outputs:
       tests_passed: ${{ steps.check_results.outputs.passed }}
     steps:
@@ -209,16 +240,27 @@ jobs:
         run: |
           HEALTH_STATUS="${{ needs.health-checks.result }}"
           API_STATUS="${{ needs.api-tests.result }}"
-          RUNTIME_STATUS="${{ needs.runtime-tests.result }}"
+          E2E_STATUS="${{ needs.e2e-tests.result }}"
           
           echo "Health Checks: ${HEALTH_STATUS}"
           echo "API Tests: ${API_STATUS}"
-          echo "Runtime Tests: ${RUNTIME_STATUS}"
+          echo "E2E Tests: ${E2E_STATUS}"
           
-          if [ "${HEALTH_STATUS}" != "success" ] || \
-             [ "${API_STATUS}" != "success" ] || \
-             [ "${RUNTIME_STATUS}" != "success" ]; then
-            echo "❌ Some tests failed"
+          # Consider skipped as success (tests filtered by test_suite input)
+          if [ "${HEALTH_STATUS}" != "success" ] && [ "${HEALTH_STATUS}" != "skipped" ]; then
+            echo "❌ Health checks failed"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          if [ "${API_STATUS}" != "success" ] && [ "${API_STATUS}" != "skipped" ]; then
+            echo "❌ API tests failed"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          if [ "${E2E_STATUS}" != "success" ] && [ "${E2E_STATUS}" != "skipped" ]; then
+            echo "❌ E2E tests failed"
             echo "passed=false" >> $GITHUB_OUTPUT
             exit 1
           fi
@@ -226,107 +268,45 @@ jobs:
           echo "✅ All tests passed"
           echo "passed=true" >> $GITHUB_OUTPUT
 
-  # Create release after tests pass
-  create-release:
-    name: Create Release
-    needs: [check-deploy, test-summary]
-    if: >
-      ${{ needs.test-summary.outputs.tests_passed == 'true' &&
-      needs.check-deploy.outputs.deploy_passed == 'true' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.2.2
-        with:
-          fetch-depth: 0
-
-      - name: Get version and tag from deploy workflow
-        id: get_version
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const workflowRun = context.payload.workflow_run;
-            const runId = workflowRun.id;
-            
-            // Get the deploy workflow run to find version-tag job outputs
-            const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: runId,
-            });
-            
-            // Find version-tag job
-            const versionTagJob = jobs.jobs.find(job => job.name === 'Version & Tag');
-            
-            if (!versionTagJob) {
-              core.setFailed('Could not find version-tag job in deploy workflow');
-              return;
-            }
-            
-            // Get job details to extract outputs
-            const { data: jobDetails } = await github.rest.actions.getJobForWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              job_id: versionTagJob.id,
-            });
-            
-            // Try to get version from the tag that was created
-            // Get the latest tag from the repository
-            const { data: tags } = await github.rest.repos.listTags({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 1,
-            });
-            
-            if (tags.length > 0) {
-              const tag = tags[0].name;
-              const version = tag.replace(/^v/, '');
-              core.setOutput('tag', tag);
-              core.setOutput('version', version);
-              console.log(`Found tag: ${tag}, version: ${version}`);
-            } else {
-              core.setFailed('No tags found in repository');
-            }
-
-      - name: Generate release notes
-        id: release_notes
-        env:
-          TAG: ${{ steps.get_version.outputs.tag }}
-          VERSION: ${{ steps.get_version.outputs.version }}
+      - name: Add final summary
+        if: always()
         run: |
-          # Get commits since last tag
-          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          echo "## Test Suite Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
           
-          if [ -z "$LAST_TAG" ]; then
-            NOTES="## Release ${VERSION}\n\nInitial release or first tag."
+          HEALTH="${{ needs.health-checks.result }}"
+          API="${{ needs.api-tests.result }}"
+          E2E="${{ needs.e2e-tests.result }}"
+          
+          if [ "$HEALTH" = "success" ]; then
+            echo "| Health Checks | ✅ |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$HEALTH" = "skipped" ]; then
+            echo "| Health Checks | ⏭️ |" >> $GITHUB_STEP_SUMMARY
           else
-            NOTES="## Release ${VERSION}\n\n### Changes since ${LAST_TAG}\n\n"
-            NOTES="${NOTES}$(git log ${LAST_TAG}..HEAD --pretty=format:'- %s (%h)' | head -20)\n"
+            echo "| Health Checks | ❌ |" >> $GITHUB_STEP_SUMMARY
           fi
           
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "${NOTES}" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.get_version.outputs.tag }}
-          name: Release ${{ steps.get_version.outputs.version }}
-          body: ${{ steps.release_notes.outputs.notes }}
-          draft: false
-          prerelease: false
-
-      - name: Trigger staging deployment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.repos.createDispatchEvent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              event_type: 'deploy-staging',
-            });
-            console.log('Triggered staging deployment via repository_dispatch');
+          if [ "$API" = "success" ]; then
+            echo "| API Tests | ✅ |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$API" = "skipped" ]; then
+            echo "| API Tests | ⏭️ |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| API Tests | ❌ |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "$E2E" = "success" ]; then
+            echo "| E2E Tests | ✅ |" >> $GITHUB_STEP_SUMMARY
+          elif [ "$E2E" = "skipped" ]; then
+            echo "| E2E Tests | ⏭️ |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| E2E Tests | ❌ |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check_results.outputs.passed }}" = "true" ]; then
+            echo "### ✅ All Tests Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Some Tests Failed" >> $GITHUB_STEP_SUMMARY
+          fi

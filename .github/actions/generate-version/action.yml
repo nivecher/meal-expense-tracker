@@ -1,9 +1,13 @@
 name: Generate Version File
-description: Generate app/_version.py using setuptools-scm from git tags
+description: Generate app/_version.py using setuptools-scm from git tags or explicit version
 
 inputs:
   build_timestamp:
     description: Build timestamp in ISO 8601 format (optional, will be generated if not provided)
+    required: false
+    default: ""
+  explicit_version:
+    description: Explicit version to use (optional, if provided, this will be used instead of generating from git)
     required: false
     default: ""
 
@@ -53,16 +57,16 @@ runs:
       shell: bash
       env:
         PYTHONPATH: ${{ env.PYTHONPATH }}
+        BUILD_TIMESTAMP: ${{ env.BUILD_TIMESTAMP }}
       run: |
-        VERSION=$(python3 -c "
-        import setuptools_scm
-        version = setuptools_scm.get_version(
-          version_scheme='no-guess-dev',
-          write_to='app/_version.py',
-          write_to_template='\"\"\"Version and build information for the application.\"\"\"\n\n__version__ = \"{version}\"\n\n# Build timestamp - set at build time via environment variable\n# Format: ISO 8601 (YYYY-MM-DDTHH:MM:SS+00:00)\nimport os\n\n__build_timestamp__ = os.getenv(\"BUILD_TIMESTAMP\", \"Not set\")\n'
-        )
-        print(version)
-        ")
+        # If explicit version provided, use it; otherwise use setuptools-scm
+        if [ -n "${{ inputs.explicit_version }}" ]; then
+          VERSION="${{ inputs.explicit_version }}"
+          python3 scripts/generate_version_file.py "${VERSION}"
+        else
+          VERSION=$(python3 scripts/generate_version_file.py)
+        fi
+        
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
         echo "Generated version: ${VERSION}"
 

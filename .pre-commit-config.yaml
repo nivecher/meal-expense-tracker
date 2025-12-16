@@ -57,10 +57,8 @@ repos:
         files: ^app/
         exclude: (tests/|venv/|.venv/|migrations/)
 
-  # Type checking with mypy (matches make lint-mypy)
-  # Uses venv Python if available, otherwise system Python
-  # Sets PYTHONPATH to match Makefile behavior
-  # Runs on all app/ files when any Python file changes (like Makefile)
+  # Type checking with mypy - fast incremental check on changed files only
+  # Full check runs in CI for comprehensive coverage
   - repo: local
     hooks:
       - id: mypy
@@ -69,18 +67,27 @@ repos:
           bash -c 'REPO_ROOT="$(git rev-parse --show-toplevel)";
           cd "$REPO_ROOT" && export PYTHONPATH=. &&
           if [ -f "./venv/bin/python3" ]; then
-            ./venv/bin/python3 -m mypy app --config-file=pyproject.toml;
+            PYTHON="./venv/bin/python3";
           elif command -v python3 >/dev/null 2>&1; then
-            python3 -m mypy app --config-file=pyproject.toml;
+            PYTHON="python3";
           else
             echo "Skipping mypy - Python not found";
             exit 0;
-          fi'
+          fi
+          # Get changed Python files (staged + unstaged for pre-commit)
+          CHANGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep "^app/.*\.py$" || true);
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No Python files changed, skipping mypy";
+            exit 0;
+          fi
+          # Run mypy on changed files with incremental mode
+          echo "Running mypy on changed files: $CHANGED_FILES";
+          $PYTHON -m mypy $CHANGED_FILES --config-file=pyproject.toml --incremental'
         language: system
         files: ^app/.*\.py$
         exclude: ^(tests/|migrations/|venv/|.venv/)
         require_serial: true
-        pass_filenames: false
+        pass_filenames: true
 
   # Markdown linting (pinned to v0.38.0 for Node.js 18 compatibility)
   - repo: https://github.com/igorshubovych/markdownlint-cli

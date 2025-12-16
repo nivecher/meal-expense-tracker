@@ -1,0 +1,295 @@
+# GitHub Actions Best Practices
+
+## Philosophy: Native Actions Over Custom Abstractions
+
+This project follows a **minimalist approach** to GitHub Actions to maximize maintainability and reduce complexity.
+
+## Core Principles
+
+### 1. Prefer Native Actions
+Always use official GitHub actions before creating custom ones:
+- ✅ `actions/checkout` for repository checkout
+- ✅ `actions/setup-node` for Node.js (has built-in caching!)
+- ✅ `actions/setup-python` for Python setup
+- ✅ `actions/cache` for caching
+- ✅ Vendor actions (`aws-actions/*`, `hashicorp/*`, `docker/*`)
+
+### 2. The "Rule of Three" for Abstractions
+Create a composite action ONLY when ALL are true:
+1. ✅ Used in **3 or more** workflows
+2. ✅ Saves **30+ lines** per usage
+3. ✅ Contains **project-specific** logic
+4. ✅ Significantly **simpler** than inline
+
+**Example**: `setup-python-env` meets all criteria:
+- Used in 3+ workflows
+- Saves 30+ lines (venv + caching + SQLAlchemy cleanup)
+- Has project-specific SQLAlchemy stubs removal
+- Much simpler than duplicating everywhere
+
+### 3. Inline Logic Over Hidden Complexity
+Prefer visible inline logic over hidden abstractions:
+
+```yaml
+# ✅ GOOD - Clear and visible
+- name: Run tests
+  run: |
+    pytest tests/ \
+      --cov=app \
+      --junitxml=results.xml
+
+# ❌ BAD - Hidden in composite action
+- uses: ./.github/actions/run-tests
+  with:
+    magic-param: value
+```
+
+### 4. Never Use Reusable Workflows
+Reusable workflows (with `workflow_call`) have major downsides:
+- ❌ Clutter the Actions tab on GitHub.com
+- ❌ Users can accidentally trigger them
+- ❌ Add indirection without benefit
+- ❌ Composite actions are better for reuse
+
+**Use composite actions instead** - they don't appear in the UI.
+
+## Decision Framework
+
+### When to Create a Composite Action
+
+Ask these questions in order:
+1. **Will it be used 3+ times?** NO → Stop, use native or inline
+2. **Does it save 30+ lines per usage?** NO → Stop, use native or inline
+3. **Does it have project-specific logic?** NO → Stop, use native action
+4. **Is it simpler than inline?** NO → Stop, use inline
+
+If **ALL answers are YES** → Create composite action
+
+### Examples Applied
+
+| Action | 3+ Uses? | 30+ Lines? | Project-Specific? | Simpler? | Decision |
+|--------|----------|------------|-------------------|----------|----------|
+| setup-python-env | ✅ Yes (3) | ✅ Yes (90) | ✅ Yes (SQLAlchemy) | ✅ Yes | **KEEP** |
+| setup-node-env | ❌ No (1) | ❌ No (5) | ❌ No | ❌ No | **DELETE** |
+| run-tests | ❌ No (2) | ❌ No (15) | ❌ No | ❌ No | **DELETE** |
+| aws-deploy | ❌ No (1) | ❌ No (20) | ❌ No | ❌ No | **DELETE** |
+
+## Anti-Patterns to Avoid
+
+### ❌ Wrapping Official Actions
+Don't create custom actions that just wrap official ones:
+
+```yaml
+# ❌ BAD - Custom wrapper adds no value
+- uses: ./.github/actions/aws-deploy  # Just wraps aws-actions/*
+
+# ✅ GOOD - Use official action directly
+- uses: aws-actions/configure-aws-credentials@v4
+  with:
+    role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+```
+
+### ❌ Creating Abstractions Prematurely
+Don't create abstractions before you know reuse patterns:
+
+```yaml
+# ❌ BAD - Created after 1st use
+# "We might reuse this!" (spoiler: you won't)
+
+# ✅ GOOD - Wait for 3rd duplication, then abstract
+```
+
+### ❌ Complex Composite Actions
+If your composite action needs documentation, it's too complex:
+
+```yaml
+# ❌ BAD - 200 lines with magic parameters
+- uses: ./.github/actions/mega-action
+  with:
+    mode: advanced
+    workers: auto  # What does this mean?
+
+# ✅ GOOD - Simple, clear, focused
+- uses: ./.github/actions/setup-python-env
+  with:
+    python-version: 3.13
+```
+
+## Patterns to Follow
+
+### ✅ Native Actions with Inline Logic
+The best pattern for most use cases:
+
+```yaml
+- name: Setup Node.js
+  uses: actions/setup-node@v4.1.0
+  with:
+    node-version: 22
+    cache: npm  # Built-in caching!
+
+- name: Install dependencies
+  run: npm ci
+
+- name: Run tests
+  run: npm test
+```
+
+### ✅ Composite Actions for High Reuse
+Only when justified by the "Rule of Three":
+
+```yaml
+- name: Setup Python Environment
+  uses: ./.github/actions/setup-python-env
+  with:
+    python-version: 3.13
+    requirements-file: requirements-dev.txt
+
+# This saves 30+ lines of venv + caching + project-specific logic
+```
+
+### ✅ Matrix Strategy for Parallelization
+Use matrix instead of reusable workflows:
+
+```yaml
+strategy:
+  matrix:
+    test-type: [unit, integration]
+steps:
+  - run: pytest tests/${{ matrix.test-type }}/
+```
+
+## Code Review Checklist
+
+When reviewing workflow changes, check:
+
+### For New Composite Actions
+- [ ] Is it used in 3+ workflows? (or will be soon)
+- [ ] Does it save 30+ lines per usage?
+- [ ] Does it contain project-specific logic?
+- [ ] Is it simpler than inline alternative?
+- [ ] Is documentation needed? (if yes, it's too complex!)
+
+### For New Workflows
+- [ ] Uses native actions where possible
+- [ ] Inline logic is clear and visible
+- [ ] No reusable workflows created
+- [ ] Job summaries included for observability
+- [ ] Permissions are job-level (least privilege)
+- [ ] Caching strategy is appropriate
+
+### For Changes to Workflows
+- [ ] No unnecessary abstractions added
+- [ ] Logic remains visible and debuggable
+- [ ] Native actions updated to latest versions
+- [ ] Tests validated with `act` locally
+
+## Testing Workflows Locally
+
+Use [act](https://github.com/nektos/act) for local testing:
+
+```bash
+# Validate all workflows parse correctly
+act --list
+
+# Dry run to see what would execute
+act -j lint --dryrun
+
+# Run specific job
+act -j test
+
+# Test specific event
+act push
+```
+
+## Migration Guide
+
+### Removing Overengineered Actions
+
+1. **Identify candidates**: Single-use or low-reuse actions
+2. **Find all usages**: `grep -r "uses: ./.github/actions/NAME"`
+3. **Replace with native/inline**: Use decision framework
+4. **Test with act**: Validate changes work
+5. **Delete action**: Remove action directory
+6. **Update docs**: Reflect changes in README
+
+### Converting Reusable Workflows
+
+1. **Check if needed**: Can it be inlined or made a composite action?
+2. **If truly reusable**: Convert to composite action (doesn't clutter UI)
+3. **If not reusable**: Inline into calling workflows
+4. **Delete reusable workflow**: Remove from `.github/workflows/reusable/`
+5. **Test with act**: Validate changes
+
+## Maintenance
+
+### Monthly Review
+- Check for unused composite actions
+- Update action versions via Dependabot
+- Review new GitHub action features
+- Simplify if complexity creeps in
+
+### Version Updates
+- Use Dependabot for automatic PRs
+- Pin to major versions: `actions/checkout@v4`
+- Review changelogs before merging
+- Test with `act` after updates
+
+## Success Metrics
+
+Track these to ensure maintainability:
+
+| Metric | Target | Current |
+|--------|--------|---------|
+| Composite Actions | ≤ 3 | 1 ✅ |
+| Reusable Workflows | 0 | 0 ✅ |
+| Custom Code Lines | < 200 | 110 ✅ |
+| Workflows in Actions Tab | ≤ 8 | 6 ✅ |
+| Native Action Usage | > 90% | 100% ✅ |
+
+## Examples
+
+### Good Workflow Design
+```yaml
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: pytest tests/
+```
+
+**Why good**:
+- Uses native actions
+- Clear, inline logic
+- Caching built-in
+- Easy to understand
+
+### Bad Workflow Design
+```yaml
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    uses: ./.github/workflows/reusable/test.yml
+    with:
+      magic-parameter: value
+```
+
+**Why bad**:
+- Reusable workflow clutters UI
+- Hidden logic
+- Magic parameters
+- Hard to debug
+
+## Remember
+
+> "Prefer boring technology. Use GitHub actions as intended."
+
+The best abstraction is often **no abstraction at all**.

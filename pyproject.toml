@@ -178,6 +178,9 @@ warn_no_return = true
 warn_unreachable = true
 plugins = ["sqlalchemy.ext.mypy.plugin"]
 explicit_package_bases = true  # Resolve module name conflicts (e.g., init_db.py vs scripts/init_db.py)
+# Performance optimizations
+incremental = true  # Enable incremental mode for faster checks
+cache_fine_grained = true  # Fine-grained cache for better performance
 exclude = [
     "^init_db\\.py$",  # Exclude root init_db.py to avoid conflict with scripts/init_db.py
     "^./init_db\\.py$",  # Also match with ./ prefix

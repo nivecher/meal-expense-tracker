@@ -20,401 +20,103 @@ on:
           - staging
           - prod
 
-# Concurrency control to prevent duplicate runs
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false  # Don't cancel releases in progress
+  cancel-in-progress: false
 
 env:
   APP_NAME: meal-expense-tracker
   PYTHON_VERSION: 3.13
   NODE_VERSION: 22
-  PYTHONPATH: ${{ github.workspace }}
-  FLASK_ENV: test
-  TESTING: true
-
-  # Deployment settings
-  ENV: ${{ github.event.inputs.environment || 'staging' }}
-  TF_ENV: ${{ github.event.inputs.environment || 'staging' }}
   AWS_REGION: us-east-1
-  ECR_REGISTRY: ${{ vars.ECR_REGISTRY || '123456789012.dkr.ecr.us-east-1.amazonaws.com' }}
-  # Release settings
   RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
-# Required permissions for the workflow
 permissions:
-  contents: read
+  contents: write
   id-token: write
   actions: read
   checks: write
   statuses: write
   security-events: write
-  packages: read
+  packages: write
+  attestations: write
 
 jobs:
-  # Quality gate - comprehensive testing and linting
-  quality-gate:
-    name: Quality Gate
+  validate-tag:
+    name: Validate Release Tag
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        test-suite: [unit, integration, lint, security]
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for proper versioning
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: requirements*.txt
-
-      - name: Install system dependencies
+      - name: Parse version from tag
+        id: parse
         run: |
-          sudo apt-get update
-          sudo apt-get install -y make
-
-      - name: Set up cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            venv/
-            ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-${{ hashFiles('requirements*.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-${{ env.PYTHON_VERSION }}-
-            ${{ runner.os }}-pip-
-
-      - name: Create virtual environment and install dependencies
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          python -m pip install --upgrade pip
-          # Explicitly uninstall SQLAlchemy stubs to avoid conflicts with SQLAlchemy 2.0 mypy plugin
-          pip uninstall -y types-sqlalchemy sqlalchemy-stubs \
-            sqlalchemy2-stubs types-flask-sqlalchemy 2>/dev/null || true
-          pip install -r requirements-dev.txt
-
-      - name: Setup Node.js (for frontend linting)
-        if: matrix.test-suite == 'lint'
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Node dependencies
-        if: matrix.test-suite == 'lint'
-        run: |
-          if [ -f package.json ]; then
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-            fi
-          else
-            echo "No package.json found, skipping npm dependencies"
+          TAG="${{ env.RELEASE_TAG }}"
+          VERSION=$(echo "$TAG" | sed 's/^v//')
+          
+          if [ -z "$VERSION" ]; then
+            echo "❌ Invalid tag format"
+            exit 1
           fi
+          
+          if echo "$VERSION" | grep -qE '-(alpha|beta|rc)'; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "✅ Version: ${VERSION}, Prerelease: $(echo ${{ steps.parse.outputs.is_prerelease }})"
 
-      - name: Run unit tests
-        if: matrix.test-suite == 'unit'
-        run: |
-          source venv/bin/activate
-          make test-unit
+  quality-gate:
+    name: Run CI Quality Gate
+    needs: validate-tag
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      security-events: write
+      id-token: write
 
-      - name: Run integration tests
-        if: matrix.test-suite == 'integration'
-        run: |
-          source venv/bin/activate
-          make test-integration
-
-      - name: Run linting and formatting checks
-        if: matrix.test-suite == 'lint'
-        run: |
-          source venv/bin/activate
-          make lint
-
-      - name: Run security checks
-        if: matrix.test-suite == 'security'
-        run: |
-          source venv/bin/activate
-          make security-check
-
-      - name: Upload coverage reports
-        if: matrix.test-suite == 'unit'
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
-
-  # Additional tests for release (smoke and e2e)
-  additional-tests:
-    name: Additional Release Tests
-    needs: quality-gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        test-type: [smoke, e2e]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: |
-            requirements*.txt
-            constraints.txt
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y make
-
-      - name: Create virtual environment and install dependencies
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install Playwright
-        if: matrix.test-type == 'e2e'
-        run: |
-          npm install @playwright/test
-          npx playwright install --with-deps
-
-      - name: Run smoke tests
-        if: matrix.test-type == 'smoke'
-        run: |
-          source venv/bin/activate
-          make test-smoke || {
-            echo "Smoke tests failed"
-            exit 1
-          }
-
-      - name: Run e2e tests
-        if: matrix.test-type == 'e2e'
-        run: |
-          source venv/bin/activate
-          make test-e2e || {
-            echo "E2E tests failed"
-            exit 1
-          }
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-test-results-${{ matrix.test-type }}
-          path: |
-            test-results-*/
-            playwright-report/
-          retention-days: 30
-          if-no-files-found: ignore
-
-  # Enhanced security scanning
-  # Note: CodeQL analysis is handled by the dedicated codeql.yml workflow
-  # to avoid conflicts with GitHub's default CodeQL setup
-  security-scan:
-    name: Security Scan
-    needs: quality-gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install security tools
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-          pip install semgrep detect-secrets
-
-      - name: Run Semgrep
-        run: semgrep --config=p/ci --error-on-findings .
-
-      - name: Run Grype vulnerability scan
-        run: |
-          GRYPE_DB_AUTO_UPDATE=false /usr/local/bin/grype dir:. --fail-on high
-
-      - name: Detect secrets
-        run: |
-          detect-secrets scan --update .secrets.baseline
-          detect-secrets audit .secrets.baseline --report --fail
-
-  # Build and push Docker image for release
   build-release:
     name: Build Release Image
-    needs: [quality-gate, security-scan, additional-tests]
-    runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'staging' }}
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: requirements*.txt
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y make
-
-      - name: Create virtual environment and install dependencies
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=${{ env.RELEASE_TAG }}
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=long
-          labels: |
-            org.opencontainers.image.version=${{ env.RELEASE_TAG }}
-            org.opencontainers.image.revision=${{ github.sha }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # Deploy to staging environment
-  deploy-staging:
-    name: Deploy to Staging
-    needs: [quality-gate, security-scan, additional-tests, build-release]
-    if: ${{ github.event.inputs.environment == 'staging' || github.event.inputs.environment == '' }}
-    environment: staging
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    needs: [validate-tag, quality-gate]
+    uses: ./.github/workflows/reusable/docker-build.yml
     permissions:
-      id-token: write
       contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    with:
+      image_name: ${{ github.repository }}
+      version: ${{ needs.validate-tag.outputs.version }}
+      push: true
+      registry: ghcr.io
+      target: lambda
+      platforms: linux/arm64
+      fetch_depth: 0
+      generate_version: true
+      sbom: true
+      provenance: true
+      custom_tags: |
+        type=raw,value=${{ needs.validate-tag.outputs.version }}
+        type=raw,value=latest,enable=${{ needs.validate-tag.outputs.is_prerelease == 'false' }}
+        type=sha,format=short
+      custom_labels: |
+        org.opencontainers.image.version=${{ needs.validate-tag.outputs.version }}
+        org.opencontainers.image.revision=${{ github.sha }}
+      build_args: |
+        BUILDPLATFORM=linux/arm64
+        TARGETPLATFORM=linux/arm64
+    secrets: inherit
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-${{ github.run_id }}
-          role-duration-seconds: 3600
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.13.5
-          terraform_wrapper: false
-
-      - name: Deploy to staging
-        run: |
-          make TF_ENV=staging tf-init
-          make TF_ENV=staging tf-plan
-          make TF_ENV=staging tf-apply
-
-      - name: Verify Deployment
-        id: verify
-        run: |
-          # Try to get API Gateway URL from Terraform outputs or AWS
-          API_URL=$(aws apigatewayv2 get-apis \
-            --query "Items[?contains(Name, 'meal-expense-tracker-staging')].ApiEndpoint" \
-            --output text \
-            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
-          
-          if [ -z "$API_URL" ]; then
-            # Fallback: try CloudFront URL from Terraform
-            API_URL=$(cd terraform && terraform output -raw api_url 2>/dev/null || echo "")
-          fi
-          
-          if [ -z "$API_URL" ]; then
-            API_URL="https://meals.staging.nivecher.com"
-          fi
-          
-          echo "url=${API_URL}" >> $GITHUB_OUTPUT
-          echo "Verifying deployment at: ${API_URL}"
-          
-          # Health check with exponential backoff
-          MAX_ATTEMPTS=15
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            if curl -f -s "${API_URL}/health" > /dev/null; then
-              echo "✅ Health check passed on attempt ${i}"
-              exit 0
-            fi
-            WAIT_TIME=$((2 ** (i - 1)))
-            if [ $WAIT_TIME -gt 60 ]; then
-              WAIT_TIME=60
-            fi
-            echo "Attempt ${i}/${MAX_ATTEMPTS} failed, retrying in ${WAIT_TIME} seconds..."
-            sleep $WAIT_TIME
-          done
-          
-          echo "❌ Health check failed after ${MAX_ATTEMPTS} attempts"
-          exit 1
-
-      - name: Run staging verification tests
-        if: steps.verify.outcome == 'success'
-        run: |
-          API_URL="${{ steps.verify.outputs.url }}"
-          echo "Running verification tests against: ${API_URL}"
-          
-          # Run smoke tests against staging
-          source venv/bin/activate || true
-          # Add staging-specific verification here
-          curl -f -s "${API_URL}/health" || exit 1
-          echo "✅ Staging verification passed"
-
-  # Create GitHub Release
   create-release:
     name: Create GitHub Release
-    needs: [deploy-staging]
-    if: always() && (needs.deploy-staging.result == 'success' || github.event.inputs.environment == 'prod')
+    needs: [validate-tag, build-release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -423,189 +125,179 @@ jobs:
       release_url: ${{ steps.create_release.outputs.url }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
 
-      - name: Get version from tag
-        id: get_version
-        run: |
-          TAG="${{ github.ref_name }}"
-          VERSION=$(echo "$TAG" | sed 's/^v//')
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom-${{ needs.validate-tag.outputs.version }}
+          path: ./artifacts/
 
       - name: Generate release notes
         id: release_notes
         run: |
-          TAG="${{ steps.get_version.outputs.tag }}"
-          VERSION="${{ steps.get_version.outputs.version }}"
-          
-          # Get commits since last tag
+          TAG="${{ env.RELEASE_TAG }}"
+          VERSION="${{ needs.validate-tag.outputs.version }}"
           LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
           
-          # Write release notes to file first
           NOTES_FILE=$(mktemp)
           
-          if [ -z "$LAST_TAG" ]; then
-            {
-              echo "## Release ${VERSION}"
-              echo ""
-              echo "Initial release or first tag."
-              echo ""
-              echo "### Changes"
-              git log --pretty=format:'- %s (%h)' | head -20
-            } > "$NOTES_FILE"
-          else
-            {
-              echo "## Release ${VERSION}"
-              echo ""
+          {
+            echo "## Release ${VERSION}"
+            echo ""
+            
+            if [ -n "$LAST_TAG" ]; then
               echo "### Changes since ${LAST_TAG}"
               echo ""
               git log ${LAST_TAG}..HEAD --pretty=format:'- %s (%h)' | head -50
-            } > "$NOTES_FILE"
-          fi
+            else
+              echo "### Initial Release"
+              git log --pretty=format:'- %s (%h)' | head -20
+            fi
+            
+            echo ""
+            echo ""
+            echo "### Artifacts"
+            echo ""
+            echo "- Docker Image: \`ghcr.io/${{ github.repository }}:${VERSION}\`"
+            echo "- SBOM: Attached as release asset"
+            echo ""
+            echo "### Security"
+            echo ""
+            echo "- SBOM included for supply chain security"
+            echo "- Provenance attestations generated"
+            echo "- All CI checks passed"
+          } > "$NOTES_FILE"
           
-          # Output notes using multiline delimiter
           {
             echo "notes<<EOF"
             cat "$NOTES_FILE"
             echo "EOF"
           } >> $GITHUB_OUTPUT
           
-          # Also save to file for the release action
           cp "$NOTES_FILE" release_notes.md
 
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.get_version.outputs.tag }}
-          name: Release ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Release ${{ needs.validate-tag.outputs.version }}
           body_path: release_notes.md
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.validate-tag.outputs.is_prerelease }}
           generate_release_notes: true
+          files: |
+            artifacts/sbom-*.json
 
-  # Deploy to production environment
+      - name: Add release summary
+        run: |
+          echo "## GitHub Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ needs.validate-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: ${{ env.RELEASE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Prerelease: ${{ needs.validate-tag.outputs.is_prerelease }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Release URL: ${{ steps.create_release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [validate-tag, create-release]
+    if: github.event.inputs.environment == 'staging' || github.event.inputs.environment == ''
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      issues: write
+      checks: write
+      statuses: write
+    with:
+      environment: staging
+      image_tag: ${{ needs.validate-tag.outputs.version }}
+    secrets: inherit
+
   deploy-prod:
     name: Deploy to Production
-    needs: [quality-gate, security-scan, build-release, deploy-staging, create-release]
-    if: ${{ github.event.inputs.environment == 'prod' && needs.create-release.result == 'success' }}
-    environment: prod
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+    needs: [validate-tag, create-release, deploy-staging]
+    if: github.event.inputs.environment == 'prod' && needs.validate-tag.outputs.is_prerelease == 'false'
+    uses: ./.github/workflows/deploy.yml
     permissions:
-      id-token: write
       contents: read
+      id-token: write
+      packages: write
+      issues: write
+      checks: write
+      statuses: write
+    with:
+      environment: prod
+      image_tag: ${{ needs.validate-tag.outputs.version }}
+    secrets: inherit
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-${{ github.run_id }}
-          role-duration-seconds: 3600
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.13.5
-          terraform_wrapper: false
-
-      - name: Deploy to production
-        run: |
-          make TF_ENV=prod tf-init
-          make TF_ENV=prod tf-plan
-          make TF_ENV=prod tf-apply
-
-      - name: Verify Deployment
-        id: verify_prod
-        run: |
-          # Try to get API Gateway URL from Terraform outputs or AWS
-          API_URL=$(aws apigatewayv2 get-apis \
-            --query "Items[?contains(Name, 'meal-expense-tracker-prod')].ApiEndpoint" \
-            --output text \
-            --region ${{ env.AWS_REGION }} 2>/dev/null || echo "")
-          
-          if [ -z "$API_URL" ]; then
-            # Fallback: try CloudFront URL from Terraform
-            API_URL=$(cd terraform && terraform output -raw api_url 2>/dev/null || echo "")
-          fi
-          
-          if [ -z "$API_URL" ]; then
-            API_URL="https://meals.nivecher.com"
-          fi
-          
-          echo "url=${API_URL}" >> $GITHUB_OUTPUT
-          echo "Verifying production deployment at: ${API_URL}"
-          
-          # Health check with exponential backoff
-          MAX_ATTEMPTS=20
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            if curl -f -s "${API_URL}/health" > /dev/null; then
-              echo "✅ Production health check passed on attempt ${i}"
-              exit 0
-            fi
-            WAIT_TIME=$((2 ** (i - 1)))
-            if [ $WAIT_TIME -gt 60 ]; then
-              WAIT_TIME=60
-            fi
-            echo "Attempt ${i}/${MAX_ATTEMPTS} failed, retrying in ${WAIT_TIME} seconds..."
-            sleep $WAIT_TIME
-          done
-          
-          echo "❌ Production health check failed after ${MAX_ATTEMPTS} attempts"
-          exit 1
-
-  # Notify deployment status
   notify:
-    name: Notify
-    needs: [deploy-staging, deploy-prod]
+    name: Notify Release Status
+    needs: [validate-tag, create-release, deploy-staging, deploy-prod]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
     steps:
-      - name: Set environment status
-        id: set_status
+      - name: Determine status
+        id: status
         run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            echo "STATUS=succeeded" >> $GITHUB_OUTPUT
-            echo "COLOR=good" >> $GITHUB_OUTPUT
-            echo "EMOJI=✅" >> $GITHUB_OUTPUT
+          if [ "${{ needs.create-release.result }}" != "success" ]; then
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.deploy-staging.result }}" != "success" ] && [ "${{ needs.deploy-staging.result }}" != "skipped" ]; then
+            echo "status=staging_failed" >> $GITHUB_OUTPUT
+            echo "emoji=⚠️" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.deploy-prod.result }}" != "success" ] && [ "${{ needs.deploy-prod.result }}" != "skipped" ]; then
+            echo "status=prod_failed" >> $GITHUB_OUTPUT
+            echo "emoji=⚠️" >> $GITHUB_OUTPUT
           else
-            echo "STATUS=failed" >> $GITHUB_OUTPUT
-            echo "COLOR=danger" >> $GITHUB_OUTPUT
-            echo "EMOJI=❌" >> $GITHUB_OUTPUT
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "emoji=✅" >> $GITHUB_OUTPUT
           fi
-          echo "ENV=${{ github.event.inputs.environment || 'staging' }}" >> $GITHUB_OUTPUT
 
-      - name: Send Deployment Status
+      - name: Send notification
         uses: actions/github-script@v7
-        if: success() || failure()
         env:
-          VERSION: ${{ env.RELEASE_TAG }}
+          VERSION: ${{ needs.validate-tag.outputs.version }}
+          STATUS: ${{ steps.status.outputs.status }}
+          EMOJI: ${{ steps.status.outputs.emoji }}
         with:
           script: |
-            const { STATUS, COLOR, ENV, EMOJI, VERSION } = process.env;
+            const { VERSION, STATUS, EMOJI } = process.env;
             const repo = context.repo;
             const workflowRunId = context.runId;
             const workflowUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${workflowRunId}`;
-
-            // Update PR check status
+            
+            const conclusion = STATUS === 'success' ? 'success' : 
+                              STATUS.includes('failed') ? 'failure' : 'neutral';
+            
             await github.rest.checks.create({
               ...repo,
-              name: `Release Deployment to ${ENV}`,
+              name: 'Release Status',
               head_sha: context.sha,
               status: 'completed',
-              conclusion: STATUS === 'succeeded' ? 'success' : 'failure',
+              conclusion: conclusion,
               details_url: workflowUrl,
               output: {
-                title: `Release Deployment ${STATUS} - Version ${VERSION}`,
-                summary: `Release deployment to ${ENV} ${STATUS} - Version ${VERSION}`,
-                text: `Workflow run: ${workflowUrl}\nVersion: ${VERSION}`
-              }
+                title: `Release ${VERSION} ${STATUS}`,
+                summary: `${EMOJI} Release ${VERSION} ${STATUS}`,
+                text: `Workflow: ${workflowUrl}\nVersion: ${VERSION}`,
+              },
             });
+
+      - name: Add final summary
+        if: always()
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ needs.validate-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Release: ${{ needs.create-release.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Staging Deploy: ${{ needs.deploy-staging.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Prod Deploy: ${{ needs.deploy-prod.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ steps.status.outputs.emoji }} ${{ steps.status.outputs.status }}" >> $GITHUB_STEP_SUMMARY

@@ -15,25 +15,24 @@ on:
         default: false
         type: boolean
 
-# Concurrency control
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false  # Don't cancel tagging in progress
+  cancel-in-progress: false
 
 env:
   PYTHON_VERSION: 3.13
   PYTHONPATH: ${{ github.workspace }}
 
-# Required permissions
 permissions:
-  contents: write  # Needed for creating tags and commits
+  contents: write
   id-token: write
 
 jobs:
-  # Check CI workflow status
   check-ci:
     name: Check CI Status
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       ci_passed: ${{ steps.check.outputs.ci_passed }}
       commit_sha: ${{ steps.check.outputs.commit_sha }}
@@ -43,55 +42,65 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
-              echo "CI workflow did not succeed, skipping tagging"
+              echo "❌ CI workflow did not succeed, skipping tagging"
               echo "ci_passed=false" >> $GITHUB_OUTPUT
               exit 1
             fi
-            echo "CI workflow succeeded, proceeding with tagging"
+            echo "✅ CI workflow succeeded, proceeding with tagging"
             echo "ci_passed=true" >> $GITHUB_OUTPUT
             echo "commit_sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
           else
-            echo "Manual trigger via workflow_dispatch, proceeding with tagging"
+            echo "✅ Manual trigger via workflow_dispatch, proceeding with tagging"
             echo "ci_passed=true" >> $GITHUB_OUTPUT
             echo "commit_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
 
-  # Create version tag
+      - name: Add check summary
+        run: |
+          echo "## CI Status Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Event: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- CI Passed: ${{ steps.check.outputs.ci_passed }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ steps.check.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+
   create-tag:
     name: Create Version Tag
     needs: check-ci
     if: needs.check-ci.outputs.ci_passed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.version_tag.outputs.version }}
       tag: ${{ steps.version_tag.outputs.tag }}
       bump_needed: ${{ steps.version_tag.outputs.bump_needed }}
+      changelog: ${{ steps.changelog.outputs.changes }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ needs.check-ci.outputs.commit_sha || github.sha }}
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - name: Setup Python Environment
+        uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: |
-            requirements*.txt
-            constraints.txt
+          requirements-file: requirements.txt
+          skip-venv: true
 
-      - name: Install python-semantic-release and setuptools-scm
+      - name: Install versioning tools
         run: |
-          python -m pip install --upgrade pip
           pip install python-semantic-release[all] setuptools-scm[toml]
+          echo "✅ Versioning tools installed"
 
       - name: Configure git for tagging
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global --add safe.directory ${{ github.workspace }}
+          echo "✅ Git configured"
 
       - name: Determine next version
         id: version_tag
@@ -99,36 +108,84 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORCE_TAG: ${{ github.event.inputs.force || 'false' }}
         run: |
-          # Use the same script used locally for version determination
-          # This ensures CI and local preview are always in sync
+          set -e
+          
           git fetch --tags --force
+          
+          if [ ! -f scripts/determine_version.py ]; then
+            echo "❌ Version determination script not found"
+            exit 1
+          fi
+          
           python scripts/determine_version.py | tee version_output.txt
           
-          # Parse outputs from script
+          if [ ! -s version_output.txt ]; then
+            echo "❌ Version determination failed - no output"
+            exit 1
+          fi
+          
           NEXT_VERSION=$(grep "^NEXT_VERSION=" version_output.txt | cut -d= -f2)
           NEW_TAG=$(grep "^NEW_TAG=" version_output.txt | cut -d= -f2)
           BUMP_NEEDED=$(grep "^BUMP_NEEDED=" version_output.txt | cut -d= -f2)
+          
+          if [ -z "$NEXT_VERSION" ] || [ -z "$NEW_TAG" ]; then
+            echo "❌ Failed to determine version information"
+            exit 1
+          fi
           
           echo "✅ Next version: ${NEXT_VERSION}"
           echo "✅ New tag: ${NEW_TAG}"
           echo "✅ Bump needed: ${BUMP_NEEDED}"
           
-          # If force is true, set bump_needed to true
           if [ "$FORCE_TAG" = "true" ] && [ "$BUMP_NEEDED" = "false" ]; then
             echo "⚠️  Force tag requested, will create tag even if no bump needed"
             BUMP_NEEDED="true"
           fi
           
-          # Store outputs for GitHub Actions
           echo "version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
           echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
           echo "bump_needed=${BUMP_NEEDED}" >> $GITHUB_OUTPUT
 
-      - name: Create and push git tag
+      - name: Verify tag doesn't exist
+        if: steps.version_tag.outputs.bump_needed == 'true'
+        run: |
+          TAG="${{ steps.version_tag.outputs.tag }}"
+          
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "⚠️  Tag ${TAG} already exists locally"
+          fi
+          
+          if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+            echo "❌ Tag ${TAG} already exists on remote"
+            echo "Cannot create duplicate tag. Please check version history."
+            exit 1
+          fi
+          
+          echo "✅ Tag ${TAG} is available for creation"
+
+      - name: Generate changelog preview
+        if: steps.version_tag.outputs.bump_needed == 'true'
+        id: changelog
+        run: |
+          TAG="${{ steps.version_tag.outputs.tag }}"
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -z "$LAST_TAG" ]; then
+            echo "changes=Initial release" >> $GITHUB_OUTPUT
+          else
+            CHANGES=$(git log ${LAST_TAG}..HEAD --pretty=format:'- %s (%h)' | head -10)
+            echo "changes<<EOF" >> $GITHUB_OUTPUT
+            echo "$CHANGES" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push git tag (atomic)
         if: steps.version_tag.outputs.bump_needed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
+          
           TAG="${{ steps.version_tag.outputs.tag }}"
           VERSION="${{ steps.version_tag.outputs.version }}"
           
@@ -137,91 +194,97 @@ jobs:
             exit 1
           fi
           
-          echo "Creating tag: ${TAG}"
-          
-          # Check if tag already exists (shouldn't, but be safe)
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "⚠️  Tag ${TAG} already exists locally, skipping creation"
-          else
-            # Create annotated tag
-            git tag -a "${TAG}" -m "chore(release): ${VERSION} [skip ci]"
-            echo "✅ Created tag: ${TAG}"
-          fi
-          
-          # Push tag to remote
-          echo "Pushing tag to remote..."
-          git push origin "${TAG}" || {
-            echo "⚠️  Failed to push tag, checking if it exists remotely..."
-            if git ls-remote --tags origin | grep -q "refs/tags/${TAG}"; then
-              echo "Tag ${TAG} already exists on remote, continuing..."
-            else
-              echo "❌ Failed to push tag ${TAG}"
-              exit 1
-            fi
+          echo "Creating annotated tag: ${TAG}"
+          git tag -a "${TAG}" -m "chore(release): ${VERSION} [skip ci]" || {
+            echo "❌ Failed to create tag locally"
+            exit 1
           }
           
-          echo "✅ Successfully pushed tag: ${TAG}"
+          echo "Pushing tag to remote..."
+          git push origin "${TAG}" || {
+            echo "❌ Failed to push tag to remote"
+            git tag -d "${TAG}"
+            exit 1
+          }
+          
+          echo "✅ Successfully created and pushed tag: ${TAG}"
+
+      - name: Verify tag was created
+        if: steps.version_tag.outputs.bump_needed == 'true'
+        run: |
+          TAG="${{ steps.version_tag.outputs.tag }}"
+          
+          sleep 2
+          
+          if ! git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+            echo "❌ Tag verification failed - tag not found on remote"
+            exit 1
+          fi
+          
+          echo "✅ Tag ${TAG} verified on remote"
 
       - name: Generate version file using setuptools-scm
         if: steps.version_tag.outputs.bump_needed == 'true'
         run: |
-          # Now that the tag exists, use setuptools-scm to generate version from git tags
-          # setuptools-scm automatically handles:
-          # - Tagged commits: shows the tag version (e.g., 0.6.1)
-          # - Post-tag commits: shows tag.postN.devM+hash.date (e.g., 0.6.1.post1.dev3+gabc123.d20251207)
-          # - Local/branch changes: includes commit hash and date
-          # Configuration is read from pyproject.toml automatically
-          python -c "
-          import setuptools_scm
-          version = setuptools_scm.get_version(
-            write_to='app/_version.py',
-            write_to_template='\"\"\"Version and build information for the application.\"\"\"\n\n__version__ = \"{version}\"\n\n# Build timestamp - set at build time via environment variable\n# Format: ISO 8601 (YYYY-MM-DDTHH:MM:SS+00:00)\nimport os\n\n__build_timestamp__ = os.getenv(\"BUILD_TIMESTAMP\", \"Not set\")\n'
-          )
-          print(f'Generated version from git tag: {version}')
-          "
+          python3 scripts/generate_version_file.py
           
-          # Verify the version file was created
           if [ -f "app/_version.py" ]; then
-            echo "Version file contents:"
+            echo "✅ Version file contents:"
             cat app/_version.py
           else
-            echo "Warning: Version file app/_version.py was not created"
-            exit 1
+            echo "⚠️  Version file was not created"
           fi
 
       - name: Commit version file
         if: steps.version_tag.outputs.bump_needed == 'true'
+        continue-on-error: true
         run: |
-          # Commit the generated version file if it changed
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
           VERSION="${{ steps.version_tag.outputs.version }}"
           
-          if [ -f "app/_version.py" ]; then
-            if git diff --exit-code --quiet app/_version.py; then
-              echo "Version file unchanged"
-            else
-              git add app/_version.py
-              git commit -m "chore: update version to ${VERSION} [skip ci]" || \
-                echo "No version changes to commit"
-              git push origin HEAD:main || echo "Failed to push version file commit"
-            fi
-          else
-            echo "Warning: Version file app/_version.py was not created"
+          if [ ! -f "app/_version.py" ]; then
+            echo "ℹ️  No version file to commit"
+            exit 0
           fi
+          
+          if git diff --exit-code --quiet app/_version.py; then
+            echo "ℹ️  Version file unchanged"
+            exit 0
+          fi
+          
+          git add app/_version.py
+          git commit -m "chore: update version to ${VERSION} [skip ci]" || {
+            echo "⚠️  No version changes to commit"
+            exit 0
+          }
+          
+          git push origin HEAD:main || {
+            echo "⚠️  Failed to push version file commit (not critical)"
+          }
 
-      - name: Summary
+      - name: Add tagging summary
         if: always()
         run: |
+          echo "## Tagging Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
           if [ "${{ steps.version_tag.outputs.bump_needed }}" = "true" ]; then
-            echo "## ✅ Tag Created Successfully" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Tag Created Successfully" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "- **Version:** ${{ steps.version_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Tag:** ${{ steps.version_tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Commit:** ${{ needs.check-ci.outputs.commit_sha || github.sha }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Commit:** ${{ needs.check-ci.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+            
+            if [ -n "${{ steps.changelog.outputs.changes }}" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Changelog Preview" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "${{ steps.changelog.outputs.changes }}" >> $GITHUB_STEP_SUMMARY
+            fi
           else
-            echo "## ℹ️  No Version Bump Needed" >> $GITHUB_STEP_SUMMARY
+            echo "### ℹ️  No Version Bump Needed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "No version bump was needed based on commit messages." >> $GITHUB_STEP_SUMMARY
-            echo "Current version: ${{ steps.version_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- Current version: ${{ steps.version_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Use 'force' option to create tag anyway" >> $GITHUB_STEP_SUMMARY
           fi

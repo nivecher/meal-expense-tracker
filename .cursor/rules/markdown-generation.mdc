@@ -1,0 +1,85 @@
+# Markdown Generation and Linting Rule
+
+## Overview
+This rule ensures all markdown files generated in Cursor follow project linting standards by automatically fixing issues after generation.
+
+## Rule: Always Fix Markdown Linting After Generation
+
+### When Generating Markdown Files
+After creating or modifying any markdown file (`.md`), you MUST:
+
+1. **Run the markdown linting fix script** to automatically fix issues:
+   ```bash
+   ./scripts/fix-markdown-linting.sh <generated-file.md>
+   ```
+
+   Or for all markdown files:
+   ```bash
+   ./scripts/fix-markdown-linting.sh
+   ```
+
+2. **Verify the fixes** (optional but recommended):
+   ```bash
+   VERIFY=true ./scripts/fix-markdown-linting.sh <generated-file.md>
+   ```
+
+### What the Script Does
+
+The `fix-markdown-linting.sh` script:
+- Runs `markdownlint --fix` to automatically fix linting issues according to `.markdownlint.json`
+- Runs `prettier` to format markdown files according to `.prettierrc`
+- Ensures consistency with project standards
+
+### Integration Points
+
+The script uses these project configuration files:
+- **`.markdownlint.json`**: Markdown linting rules (line length, heading styles, etc.)
+- **`.prettierrc`**: Formatting rules (80 char width for prose, 2-space tabs, etc.)
+
+### Examples
+
+#### After Generating Documentation
+```markdown
+# User generates: docs/NEW_FEATURE.md
+
+# Then automatically run:
+./scripts/fix-markdown-linting.sh docs/NEW_FEATURE.md
+```
+
+#### After Modifying Multiple Files
+```markdown
+# User modifies: README.md, docs/ARCHITECTURE.md
+
+# Then run:
+./scripts/fix-markdown-linting.sh README.md docs/ARCHITECTURE.md
+```
+
+### Enforcement
+
+This rule is MANDATORY for all markdown file generation. The AI assistant should:
+1. Generate the markdown file
+2. Immediately run the fix script
+3. Verify no linting errors remain
+4. Inform the user that linting fixes have been applied
+
+### Benefits
+
+- **Consistency**: All markdown files follow the same standards
+- **Quality**: Catches common formatting issues automatically
+- **Efficiency**: No manual linting fixes needed
+- **CI/CD Ready**: Files pass pre-commit hooks without manual intervention
+
+### Troubleshooting
+
+If the script fails:
+1. Check that `markdownlint-cli` is installed: `npm install -g markdownlint-cli@0.38.0`
+2. Verify Node.js and npm are available
+3. Check file permissions: `chmod +x scripts/fix-markdown-linting.sh`
+4. Review the script output for specific error messages
+
+### Related Files
+
+- **Script**: `scripts/fix-markdown-linting.sh`
+- **Hook**: `.cursor/hooks/post-generate-markdown.sh`
+- **Config**: `.markdownlint.json`, `.prettierrc`
+- **Documentation**: `.cursor/hooks/README.md`
