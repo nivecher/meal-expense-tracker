@@ -44,7 +44,9 @@ runs:
       uses: actions/cache@v4.2.0
       with:
         path: venv/
-        key: ${{ runner.os }}-venv-${{ inputs.python-version }}-${{ hashFiles(format('**/{}', inputs.requirements-file)) }}-${{ inputs.cache-key-suffix }}
+        # Use simpler cache key pattern that works in both GitHub Actions and act
+        # Direct file path instead of nested format() for act compatibility
+        key: ${{ runner.os }}-venv-${{ inputs.python-version }}-${{ hashFiles(inputs.requirements-file) }}-${{ inputs.cache-key-suffix }}
         restore-keys: |
           ${{ runner.os }}-venv-${{ inputs.python-version }}-
           ${{ runner.os }}-venv-
