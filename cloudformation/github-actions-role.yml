@@ -43,8 +43,18 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  # IAM permissions for task execution role
+                  # IAM permissions for task execution role and policy management
                   - iam:PassRole
+                  - iam:CreatePolicy
+                  - iam:DeletePolicy
+                  - iam:GetPolicy
+                  - iam:ListPolicyVersions
+                  - iam:CreatePolicyVersion
+                  - iam:DeletePolicyVersion
+                  - iam:SetDefaultPolicyVersion
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:ListAttachedRolePolicies
                   # EC2 permissions for VPC setup
                   - ec2:CreateVpc
                   - ec2:CreateSubnet
@@ -67,6 +77,8 @@ Resources:
                   - kms:EnableKeyRotation
                   - kms:Get*
                   - kms:List*
+                  - kms:TagResource
+                  - kms:UntagResource
                   # ACM permissions
                   - acm:RequestCertificate
                   - acm:DeleteCertificate
@@ -75,6 +87,17 @@ Resources:
                   - acm:Get*
                   - acm:ImportCertificate
                   - acm:List*
+                  # SSM Parameter Store permissions
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:DeleteParameter
+                  - ssm:DeleteParameters
+                  - ssm:DescribeParameters
+                  - ssm:AddTagsToResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:ListTagsForResource
                 Resource: '*'
 
 Outputs:
