@@ -2,7 +2,7 @@
 
 **Simplified, non-redundant rules for efficient development.**
 
-## 📋 Rule Files (6 total)
+## 📋 Rule Files (7 total)
 
 ### 🎯 **tiger-style.mdc** (Always Applied)
 
@@ -43,6 +43,12 @@
 
 - Feature specifications and requirements
 
+### 📄 **markdown-generation.mdc**
+
+- Automatic markdown linting fixes after generation
+- Ensures all markdown files follow project standards
+- Integration with markdownlint and prettier
+
 ## 🗂️ Coverage Areas
 
 | Area                 | Rule File                                                      | Focus                                   |
@@ -51,6 +57,7 @@
 | **Web Code**         | `web-patterns.mdc`                                             | JavaScript, HTML, Python Flask          |
 | **Business Logic**   | `project-specific.mdc`                                         | Restaurant/expense specific patterns    |
 | **Project Specs**    | `app-requirements.mdc`, `feature-specs.mdc`, `ui-ux-specs.mdc` | Requirements and design                 |
+| **Documentation**    | `markdown-generation.mdc`                                        | Markdown linting and formatting         |
 
 ## ✅ Radical Simplification
 
@@ -58,7 +65,7 @@
 
 ### 📏 Before vs After:
 
-- **From 12 rules** → **6 rules** (-50%)
+- **From 12 rules** → **7 rules** (-42%)
 - **Eliminated 6 redundant Tiger Style rules** → **1 comprehensive rule**
 - **Merged web + backend patterns** → **Single web-patterns rule**
 - **Combined all development principles** → **Everything in tiger-style.mdc**

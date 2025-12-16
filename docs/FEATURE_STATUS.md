@@ -2,6 +2,10 @@
 
 This document serves as the single source of truth for the implementation status of all features in the Meal Expense Tracker application.
 
+**Related Documents:**
+
+- [Feature Roadmap](./FEATURE_ROADMAP.md) - Planned features and future enhancements
+
 ## Status Legend
 
 - ✅ **Fully Implemented** - Feature is complete and functional
@@ -250,6 +254,12 @@ This document serves as the single source of truth for the implementation status
 - ✅ **Reports Dashboard**: Enhanced with statistics and date filtering
 - ✅ **Visual Charts**: Connected Chart.js to expense statistics data
 - ✅ **Expense Statistics**: Complete route with comprehensive statistics
+
+---
+
+## Related Documentation
+
+- **[Feature Roadmap](./FEATURE_ROADMAP.md)** - Comprehensive list of planned features and enhancements organized by priority
 
 ---
 

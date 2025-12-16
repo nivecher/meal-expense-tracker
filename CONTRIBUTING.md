@@ -4,10 +4,29 @@ Thank you for considering contributing to Meal Expense Tracker!
 
 ## Development workflow
 
-- Create a feature branch from `main`.
+- Create a feature branch from `main` following the [branch naming convention](docs/BRANCH_NAMING.md).
 - Make small, focused edits aligned with TIGER principles.
 - Write/adjust tests to cover changes (80%+ coverage).
 - Run formatters/linters/tests locally before opening a PR.
+
+## Branch naming
+
+Branches must follow the format: `<type>/<description>`
+
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `perf`, `revert`, `wip`
+
+**Examples**:
+
+- `feat/add-expense-filtering`
+- `fix/restaurant-search-bug`
+- `docs/update-api-documentation`
+
+Branch naming is enforced via:
+
+- Pre-push hook (validates before pushing)
+- CI workflow (validates on pull requests)
+
+See [Branch Naming Convention](docs/BRANCH_NAMING.md) for complete details.
 
 ## VSCode Setup
 

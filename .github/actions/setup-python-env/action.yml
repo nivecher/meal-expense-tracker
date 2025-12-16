@@ -1,0 +1,111 @@
+---
+name: Setup Python Environment
+description: Set up Python with caching, create virtual environment, and install dependencies
+inputs:
+  python-version:
+    description: Python version to use
+    required: true
+  requirements-file:
+    description: Requirements file to install
+    required: false
+    default: requirements-dev.txt
+  cache-key-suffix:
+    description: Additional suffix for cache key
+    required: false
+    default: ''
+  skip-venv:
+    description: Skip virtual environment creation (for Docker builds)
+    required: false
+    default: 'false'
+outputs:
+  cache-hit:
+    description: Whether the cache was hit
+    value: ${{ steps.cache.outputs.cache-hit }}
+  python-path:
+    description: Path to Python executable
+    value: ${{ steps.setup.outputs.python-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python ${{ inputs.python-version }}
+      id: setup
+      uses: actions/setup-python@v5.3.0
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: |
+          requirements*.txt
+          constraints.txt
+
+    - name: Cache virtual environment
+      if: inputs.skip-venv != 'true'
+      id: cache
+      uses: actions/cache@v4.2.0
+      with:
+        path: venv/
+        # Use simpler cache key pattern that works in both GitHub Actions and act
+        # Direct file path instead of nested format() for act compatibility
+        key: ${{ runner.os }}-venv-${{ inputs.python-version }}-${{ hashFiles(inputs.requirements-file) }}-${{ inputs.cache-key-suffix }}
+        restore-keys: |
+          ${{ runner.os }}-venv-${{ inputs.python-version }}-
+          ${{ runner.os }}-venv-
+
+    - name: Create virtual environment
+      if: inputs.skip-venv != 'true' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "Creating Python virtual environment..."
+        python -m venv venv
+        echo "✅ Virtual environment created"
+
+    - name: Upgrade pip
+      shell: bash
+      run: |
+        if [ "${{ inputs.skip-venv }}" != "true" ]; then
+          source venv/bin/activate
+        fi
+        python -m pip install --upgrade pip
+        echo "✅ pip upgraded to $(pip --version)"
+
+    - name: Clean SQLAlchemy stubs
+      shell: bash
+      run: |
+        if [ "${{ inputs.skip-venv }}" != "true" ]; then
+          source venv/bin/activate
+        fi
+        # Explicitly uninstall SQLAlchemy stubs to avoid conflicts with SQLAlchemy 2.0 mypy plugin
+        pip uninstall -y types-sqlalchemy sqlalchemy-stubs \
+          sqlalchemy2-stubs types-flask-sqlalchemy 2>/dev/null || true
+        echo "✅ SQLAlchemy stubs cleaned"
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        if [ "${{ inputs.skip-venv }}" != "true" ]; then
+          source venv/bin/activate
+        fi
+        if [ -f "${{ inputs.requirements-file }}" ]; then
+          echo "Installing from ${{ inputs.requirements-file }}..."
+          pip install -r "${{ inputs.requirements-file }}"
+          echo "✅ Dependencies installed"
+        else
+          echo "⚠️  Requirements file ${{ inputs.requirements-file }} not found"
+          exit 1
+        fi
+
+    - name: Add activation helper to env
+      if: inputs.skip-venv != 'true'
+      shell: bash
+      run: |
+        echo "VIRTUAL_ENV=${{ github.workspace }}/venv" >> $GITHUB_ENV
+        echo "${{ github.workspace }}/venv/bin" >> $GITHUB_PATH
+
+    - name: Report cache status
+      shell: bash
+      run: |
+        if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ]; then
+          echo "✅ Cache hit - dependencies restored from cache"
+        else
+          echo "ℹ️  Cache miss - dependencies installed fresh"
+        fi

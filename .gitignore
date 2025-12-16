@@ -240,7 +240,8 @@ cache/
 
 *.zip
 
-package-lock.json
+# package-lock.json should be committed (removed from gitignore)
+# package-lock.json
 package
 package/*
 tmp
