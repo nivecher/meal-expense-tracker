@@ -75,13 +75,19 @@ if aws cloudformation deploy \
   ROLE_ARN=$(aws cloudformation describe-stacks \
     --stack-name "$STACK_NAME" \
     --region "$REGION" \
-    --query "Stacks[0].Outputs[?OutputKey=='GitHubActionsRoleArn'].OutputValue" \
-    --output text)
+    --query "Stacks[0].Outputs[?OutputKey=='RoleARN'].OutputValue" \
+    --output text 2>/dev/null)
 
-  echo -e "\n${GREEN}GitHub Actions IAM Role ARN:${NC}"
-  echo "$ROLE_ARN"
-  echo -e "\n${YELLOW}Add this ARN to your GitHub repository secrets as 'AWS_ROLE_ARN'${NC}"
-  echo -e "GitHub Repository: https://github.com/${GITHUB_ORG}/${REPO_NAME}/settings/secrets/actions"
+  if [ -z "$ROLE_ARN" ]; then
+    echo -e "${YELLOW}⚠️  Warning: Could not retrieve role ARN from stack outputs${NC}"
+    echo -e "${YELLOW}You can retrieve it manually with:${NC}"
+    echo "  aws cloudformation describe-stacks --stack-name $STACK_NAME --region $REGION --query \"Stacks[0].Outputs[?OutputKey=='RoleARN'].OutputValue\" --output text"
+  else
+    echo -e "\n${GREEN}GitHub Actions IAM Role ARN:${NC}"
+    echo "$ROLE_ARN"
+    echo -e "\n${YELLOW}Add this ARN to your GitHub repository secrets as 'AWS_ROLE_ARN'${NC}"
+    echo -e "GitHub Repository: https://github.com/${GITHUB_ORG}/${REPO_NAME}/settings/secrets/actions"
+  fi
 else
   echo -e "${RED}❌ Failed to deploy GitHub Actions IAM role${NC}"
   exit 1

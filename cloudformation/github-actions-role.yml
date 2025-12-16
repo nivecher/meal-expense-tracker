@@ -74,11 +74,21 @@ Resources:
                   - kms:CreateAlias
                   - kms:DeleteAlias
                   - kms:Describe*
+                  - kms:DescribeKey
                   - kms:EnableKeyRotation
                   - kms:Get*
                   - kms:List*
                   - kms:TagResource
                   - kms:UntagResource
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:ReEncrypt*
+                  - kms:GenerateDataKey
+                  - kms:GenerateDataKeyWithoutPlaintext
+                  - kms:CreateGrant
+                  - kms:ListGrants
+                  - kms:RevokeGrant
+                  - kms:RetireGrant
                   # ACM permissions
                   - acm:RequestCertificate
                   - acm:DeleteCertificate
@@ -98,6 +108,18 @@ Resources:
                   - ssm:AddTagsToResource
                   - ssm:RemoveTagsFromResource
                   - ssm:ListTagsForResource
+                  # Route 53 permissions
+                  - route53:ListHostedZones
+                  - route53:GetHostedZone
+                  - route53:ListHostedZonesByName
+                  - route53:ListResourceRecordSets
+                  - route53:GetChange
+                  - route53:ChangeResourceRecordSets
+                  - route53:CreateHostedZone
+                  - route53:DeleteHostedZone
+                  - route53:UpdateHostedZoneComment
+                  - route53:ListTagsForResource
+                  - route53:ChangeTagsForResource
                 Resource: '*'
 
 Outputs:
