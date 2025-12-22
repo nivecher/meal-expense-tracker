@@ -9,13 +9,14 @@ from typing import Any, cast
 
 from flask import current_app
 from PIL import Image, ImageEnhance, ImageFilter
-import pytesseract  # type: ignore[import-untyped]
+import pytesseract
 from werkzeug.datastructures import FileStorage
 
+fitz: Any = None
 try:
-    import fitz  # type: ignore[import-untyped]  # PyMuPDF
+    import fitz  # PyMuPDF
 except ImportError:
-    fitz = None
+    pass
 
 # PyMuPDF is the primary PDF library (required dependency)
 # pdf2image removed - PyMuPDF is faster, has no system dependencies, and handles embedded images better

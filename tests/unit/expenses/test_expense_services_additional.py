@@ -270,11 +270,11 @@ class TestExpenseServicesAdditional:
             # Should be timezone-aware UTC datetime
             assert result.tzinfo is not None
             assert result.tzinfo == UTC
-            # July 23, 2024 19:27:00 CST = July 24, 2024 01:27:00 UTC (next day!)
+            # July 23, 2024 19:27:00 CDT = July 24, 2024 00:27:00 UTC (next day!)
             # But we want to preserve the date, so the date should be July 23
-            # Actually, 19:27 CST = 01:27 UTC next day, so date shifts
+            # Actually, 19:27 CDT = 00:27 UTC next day, so date shifts
             # This is expected behavior - the time is interpreted in browser timezone
-            assert result.hour == 1  # 19:27 CST = 01:27 UTC
+            assert result.hour == 0  # 19:27 CDT = 00:27 UTC
             assert result.minute == 27
 
     def test_date_preservation_when_editing_expense_cst(
@@ -305,9 +305,6 @@ class TestExpenseServicesAdditional:
             db.session.commit()
             db.session.refresh(expense)
 
-            original_date_utc = expense.date.date()
-            expense_id = expense.id
-
             # Create a form with the same date (as it would appear in browser timezone)
             # In CST, July 23, 2024 18:00:00 UTC displays as July 23, 2024 12:00:00
             # So the form should show July 23, 2024
@@ -324,8 +321,8 @@ class TestExpenseServicesAdditional:
             form.tags.data = ""
 
             # Mock browser timezone as CST
-            with patch("app.expenses.services.get_browser_timezone", return_value="America/Chicago"):
-                with patch("app.expenses.services.normalize_timezone", return_value="America/Chicago"):
+            with patch("app.utils.timezone_utils.get_browser_timezone", return_value="America/Chicago"):
+                with patch("app.utils.timezone_utils.normalize_timezone", return_value="America/Chicago"):
                     updated_expense, error = update_expense(expense, form)
 
             assert error is None, f"Update failed with error: {error}"
@@ -370,8 +367,6 @@ class TestExpenseServicesAdditional:
             db.session.commit()
             db.session.refresh(expense)
 
-            expense_id = expense.id
-
             # In CST, this displays as January 14, 2024
             # So the form should show January 14, 2024 (browser timezone date)
             form = ExpenseForm()
@@ -387,8 +382,8 @@ class TestExpenseServicesAdditional:
             form.tags.data = ""
 
             # Mock browser timezone as CST
-            with patch("app.expenses.services.get_browser_timezone", return_value="America/Chicago"):
-                with patch("app.expenses.services.normalize_timezone", return_value="America/Chicago"):
+            with patch("app.utils.timezone_utils.get_browser_timezone", return_value="America/Chicago"):
+                with patch("app.utils.timezone_utils.normalize_timezone", return_value="America/Chicago"):
                     updated_expense, error = update_expense(expense, form)
 
             assert error is None, f"Update failed with error: {error}"
@@ -442,8 +437,8 @@ class TestExpenseServicesAdditional:
             form.tags.data = ""
 
             # Mock browser timezone as PST
-            with patch("app.expenses.services.get_browser_timezone", return_value="America/Los_Angeles"):
-                with patch("app.expenses.services.normalize_timezone", return_value="America/Los_Angeles"):
+            with patch("app.utils.timezone_utils.get_browser_timezone", return_value="America/Los_Angeles"):
+                with patch("app.utils.timezone_utils.normalize_timezone", return_value="America/Los_Angeles"):
                     updated_expense, error = update_expense(expense, form)
 
             assert error is None, f"Update failed with error: {error}"
