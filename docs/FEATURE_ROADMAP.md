@@ -55,14 +55,17 @@ This document outlines planned features and enhancements for the Meal Expense Tr
 
 **Technical Considerations:**
 
-- Integration with OCR service (Google Cloud Vision API, AWS Textract, or Tesseract)
+- **FREE Solution**: Using Tesseract OCR (open-source, zero cost)
 - Image preprocessing for better OCR accuracy
 - Confidence scoring for extracted fields
 - Manual override capability
+- No cloud services or API costs required
 
-**Estimated Effort:** High (3-4 weeks)
+**Estimated Effort:** Medium (2-3 weeks)
 
 **Dependencies:** Receipt Image Upload (✅ Complete)
+
+**Cost:** $0 - Completely free using Tesseract OCR
 
 ---
 

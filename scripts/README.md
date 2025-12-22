@@ -144,3 +144,142 @@ aws s3api put-bucket-versioning \
   --versioning-configuration Status=Enabled,MFADelete=Enabled \
   --mfa "arn:aws:iam::${ACCOUNT_ID}:mfa/root-account-mfa-device MFA_CODE"
 ```
+
+## Receipt OCR Extraction
+
+The `extract_receipt.py` script extracts structured information from receipt images or PDFs using Tesseract OCR, similar to the OCR service used in the web application.
+
+### Extract Receipt Prerequisites
+
+- Python 3.8 or higher
+- Tesseract OCR installed on your system:
+  - **Linux**: `sudo apt-get install tesseract-ocr`
+  - **macOS**: `brew install tesseract`
+  - **Windows**: Download from [Tesseract GitHub](https://github.com/UB-Mannheim/tesseract/wiki)
+- Required Python packages (from project requirements):
+  - `pytesseract` - Python wrapper for Tesseract OCR
+  - `Pillow` - Image processing library
+  - `PyMuPDF` or `pdf2image` - For PDF support (optional but recommended)
+
+### Extract Receipt Usage
+
+```bash
+# Basic usage with human-readable output
+python scripts/extract_receipt.py receipt.jpg
+
+# Output as JSON for programmatic use
+python scripts/extract_receipt.py receipt.pdf --output-format json
+
+# Specify custom Tesseract binary path
+python scripts/extract_receipt.py receipt.png --tesseract-cmd /usr/local/bin/tesseract
+
+# Enable verbose logging
+python scripts/extract_receipt.py receipt.jpg --verbose
+```
+
+### Extract Receipt Options
+
+- `file_path`: (Required) Path to receipt image or PDF file
+- `--output-format {json,text}`: Output format - 'json' for JSON, 'text' for human-readable (default: text)
+- `--tesseract-cmd PATH`: Optional path to Tesseract binary (auto-detected if not set)
+- `--confidence-threshold FLOAT`: Confidence threshold (default: 0.7)
+- `--verbose, -v`: Enable verbose logging
+
+### Extract Receipt Functionality
+
+1. **Image Preprocessing**: Converts images to grayscale, enhances contrast, and sharpens for better OCR accuracy
+2. **PDF Handling**: Extracts text directly from PDFs if they have a text layer, otherwise converts to images for OCR
+3. **Text Extraction**: Uses Tesseract OCR to extract text from images or scanned PDFs
+4. **Data Parsing**: Parses extracted text to identify:
+   - Restaurant name
+   - Date
+   - Amount (total, tax, tip, subtotal)
+   - Line items
+   - Confidence scores for each field
+5. **Bank Statement Support**: Automatically detects and parses bank statements differently from receipts
+
+### Output Format
+
+#### Text Output (default)
+```
+============================================================
+RECEIPT EXTRACTION RESULTS
+============================================================
+
+Restaurant: Joe's Pizza
+Date: 2024-01-15 14:30:00
+Amount: $25.50
+Total: $25.50
+Tax: $2.04
+Tip: $5.00
+
+Items:
+  - Large Pizza
+  - Soft Drink
+
+Confidence Scores:
+  amount: 90.0%
+  date: 80.0%
+  restaurant_name: 85.0%
+  total: 90.0%
+  items: 20.0%
+```
+
+#### JSON Output
+```json
+{
+  "amount": "25.50",
+  "date": "2024-01-15T14:30:00",
+  "restaurant_name": "Joe's Pizza",
+  "items": ["Large Pizza", "Soft Drink"],
+  "tax": "2.04",
+  "tip": "5.00",
+  "total": "25.50",
+  "confidence_scores": {
+    "amount": 0.9,
+    "date": 0.8,
+    "restaurant_name": 0.85,
+    "total": 0.9,
+    "items": 0.2
+  },
+  "raw_text": "..."
+}
+```
+
+### Supported File Formats
+
+- **Images**: JPEG, PNG, GIF, BMP, TIFF
+- **PDFs**: Both text-based PDFs (direct text extraction) and scanned PDFs (OCR)
+
+### Error Handling
+
+The script handles various error scenarios:
+
+- **File not found**: Returns error with clear message
+- **Tesseract not installed**: Provides installation instructions for your platform
+- **Unsupported file format**: Returns error with supported formats
+- **OCR processing failures**: Returns error with details
+
+### Integration with Web Application
+
+This script uses the same OCR logic as the web application's OCR service (`app/services/ocr_service.py`), but adapted for standalone command-line use without Flask dependencies.
+
+The extracted data format matches what the web application expects, making it useful for:
+
+- Testing OCR accuracy on sample receipts
+- Batch processing receipts offline
+- Debugging OCR extraction issues
+- Integration with other tools or scripts
+
+### Examples
+
+```bash
+# Extract from a receipt image
+python scripts/extract_receipt.py ~/receipts/dinner.jpg
+
+# Extract from PDF and save JSON output
+python scripts/extract_receipt.py ~/receipts/lunch.pdf --output-format json > receipt_data.json
+
+# Process with verbose logging for debugging
+python scripts/extract_receipt.py ~/receipts/breakfast.png --verbose
+```

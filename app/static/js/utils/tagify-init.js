@@ -2,65 +2,108 @@
  * Tagify initialization for expense forms
  */
 
-// Fix Tagify elements to be compatible with browser extensions
-function fixTagifyElementsForExtensions() {
-  // Patch all existing tag elements
-  const tagElements = document.querySelectorAll('tag');
-  tagElements.forEach((tag) => {
-    if (!tag.tagName || typeof tag.tagName.toLowerCase !== 'function') {
-      Object.defineProperty(tag, 'tagName', {
-        value: 'TAG',
-        writable: false,
-        configurable: false,
-      });
+// Comprehensive fix for tagName.toLowerCase errors from browser extensions
+// This ensures all elements have a proper tagName property that's a string
+function fixElementTagName(element) {
+  if (!element || element.nodeType !== Node.ELEMENT_NODE) {
+    return;
+  }
 
-      if (!tag.tagName.toLowerCase) {
-        tag.tagName.toLowerCase = function() {
-          return 'tag';
-        };
+  try {
+    // Get the actual tag name (handles custom elements)
+    const actualTagName = element.localName || element.nodeName || 'UNKNOWN';
+    const upperTagName = typeof actualTagName === 'string' ? actualTagName.toUpperCase() : 'UNKNOWN';
+
+    // Check if tagName is missing, not a string, or doesn't have toLowerCase
+    const currentTagName = element.tagName;
+    const needsFix = !currentTagName ||
+      typeof currentTagName !== 'string' ||
+      typeof currentTagName.toLowerCase !== 'function';
+
+    if (needsFix) {
+      // Try to get the original tagName descriptor
+      let descriptor = Object.getOwnPropertyDescriptor(element, 'tagName');
+      if (!descriptor) {
+        // Try parent prototype
+        const proto = Object.getPrototypeOf(element);
+        if (proto) {
+          descriptor = Object.getOwnPropertyDescriptor(proto, 'tagName');
+        }
+      }
+
+      // Only try to fix if configurable or if we can't determine
+      if (!descriptor || descriptor.configurable !== false) {
+        try {
+          // Replace with a string value
+          Object.defineProperty(element, 'tagName', {
+            value: upperTagName,
+            writable: false,
+            configurable: true,
+            enumerable: false,
+          });
+        } catch (defineError) {
+          // If defineProperty fails, try to wrap it
+          try {
+            // Create a wrapper that ensures tagName is always a string
+            const originalTagName = currentTagName || upperTagName;
+            Object.defineProperty(element, 'tagName', {
+              get() {
+                const tagName = originalTagName || (element.localName || element.nodeName || 'UNKNOWN').toUpperCase();
+                return typeof tagName === 'string' ? tagName : String(tagName).toUpperCase();
+              },
+              configurable: true,
+              enumerable: false,
+            });
+          } catch (wrapError) {
+            // If all else fails, just log and continue
+            console.debug('Could not fix tagName for element:', wrapError);
+          }
+        }
       }
     }
-  });
+  } catch (error) {
+    // Silently handle errors (e.g., if element is not configurable)
+    console.debug('Error fixing element tagName:', error);
+  }
+}
 
-  // Watch for new tag elements being added
+// Fix elements to be compatible with browser extensions
+// This ensures all elements have proper tagName properties
+function fixTagifyElementsForExtensions() {
+  // Patch all existing elements (especially custom elements like <tag>)
+  try {
+    const allElements = document.querySelectorAll('*');
+    allElements.forEach((el) => {
+      fixElementTagName(el);
+    });
+  } catch (error) {
+    // Silently handle errors (e.g., from browser extensions)
+    console.debug('Error fixing existing elements:', error);
+  }
+
+  // Watch for new elements being added and fix them
+  if (!document.body) {
+    return; // Body not ready yet
+  }
+
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          if (node.tagName === 'TAG') {
-            if (!node.tagName || typeof node.tagName.toLowerCase !== 'function') {
-              Object.defineProperty(node, 'tagName', {
-                value: 'TAG',
-                writable: false,
-                configurable: false,
+          // Fix the node itself
+          fixElementTagName(node);
+
+          // Fix all child elements (including custom elements)
+          if (node.querySelectorAll) {
+            try {
+              const allElements = node.querySelectorAll('*');
+              allElements.forEach((el) => {
+                fixElementTagName(el);
               });
-
-              if (!node.tagName.toLowerCase) {
-                node.tagName.toLowerCase = function() {
-                  return 'tag';
-                };
-              }
+            } catch (error) {
+              // Silently handle errors from browser extensions
+              console.debug('Error fixing child elements:', error);
             }
-          }
-
-          // Also check child elements
-          const childTags = node.querySelectorAll && node.querySelectorAll('tag');
-          if (childTags) {
-            childTags.forEach((childTag) => {
-              if (!childTag.tagName || typeof childTag.tagName.toLowerCase !== 'function') {
-                Object.defineProperty(childTag, 'tagName', {
-                  value: 'TAG',
-                  writable: false,
-                  configurable: false,
-                });
-
-                if (!childTag.tagName.toLowerCase) {
-                  childTag.tagName.toLowerCase = function() {
-                    return 'tag';
-                  };
-                }
-              }
-            });
           }
         }
       });
@@ -70,6 +113,45 @@ function fixTagifyElementsForExtensions() {
   observer.observe(document.body, {
     childList: true,
     subtree: true,
+  });
+}
+
+// Global fix: Ensure all elements have proper tagName property
+// This prevents errors from browser extensions that traverse the DOM
+(function() {
+  'use strict';
+
+  // Fix all existing elements immediately
+  function fixAllElements() {
+    try {
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach((el) => {
+        fixElementTagName(el);
+      });
+    } catch (error) {
+      // Silently handle errors (e.g., from browser extensions)
+      console.debug('Error fixing all elements:', error);
+    }
+  }
+
+  // Run fix when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', fixAllElements);
+  } else {
+    // DOM is already loaded
+    fixAllElements();
+  }
+
+  // Also fix elements as they're added (handled by MutationObserver in fixTagifyElementsForExtensions)
+})();
+
+// Run fix immediately for elements that already exist
+if (document.body) {
+  fixTagifyElementsForExtensions();
+} else {
+  // Wait for body to be available
+  document.addEventListener('DOMContentLoaded', () => {
+    fixTagifyElementsForExtensions();
   });
 }
 
@@ -250,13 +332,10 @@ document.addEventListener('DOMContentLoaded', () => {
           tagEl.style.setProperty('background', tagColor, 'important');
           tagEl.style.setProperty('background-image', 'none', 'important');
         }
+        // Ensure tagName is fixed for this element
+        fixElementTagName(tagEl);
       });
     }, 50);
-
-    // Fix Tagify elements for browser extensions
-    setTimeout(() => {
-      fixTagifyElementsForExtensions();
-    }, 100);
   }
 
   // Ensure tag manager is initialized

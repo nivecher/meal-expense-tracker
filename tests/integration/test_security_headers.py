@@ -78,6 +78,7 @@ class TestSecurityHeaders:
 
         assert csp is not None
         assert "default-src 'self'" in csp
+        assert "frame-src 'self' data: blob:" in csp
         assert "frame-ancestors 'none'" in csp
         assert "object-src 'none'" in csp
         assert "base-uri 'self'" in csp

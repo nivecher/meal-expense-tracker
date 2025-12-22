@@ -440,7 +440,12 @@ def _handle_get_request(expense: Expense) -> ResponseReturnValue:
         Rendered template with the edit form
     """
     categories, restaurants = _get_form_choices(current_user.id)
-    form = _init_expense_form(categories, restaurants)
+    # CRITICAL: Don't initialize form with default date when editing
+    # The default date from _init_expense_form might interfere with our browser timezone date
+    form = ExpenseForm(
+        category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
+        restaurant_choices=[(None, "Select a restaurant")] + restaurants,
+    )
     _populate_expense_form(form, expense)
     categories_for_render: list[tuple[int, str, str, str | None]] = categories
     return _render_expense_form(form, expense, categories_for_render, is_edit=True)
@@ -505,18 +510,47 @@ def _init_expense_form(
 
 
 def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
-    """Populate the expense form with existing expense data."""
-    form.process(obj=expense)
-    # Set the date and time from the expense (requires timezone conversion)
-    # Note: expense.date is non-nullable, so no None check needed
+    """Populate the expense form with existing expense data.
+
+    CRITICAL: Date and time must be converted to browser timezone BEFORE extracting
+    the date component. This ensures WYSIWYG - what the user sees is what they get.
+    """
+    from datetime import UTC
 
     from app.utils.timezone_utils import convert_to_browser_timezone
 
     browser_timezone, _ = get_browser_timezone_info()
     expense_date = expense.date
+
+    # Ensure expense_date is timezone-aware (assume UTC if naive)
+    if expense_date.tzinfo is None:
+        expense_date = expense_date.replace(tzinfo=UTC)
+
+    # CRITICAL: Convert to browser timezone FIRST, then extract date and time
+    # This ensures the date shown in the form matches what the user sees in list/details
+    # DO NOT extract date from UTC datetime - always convert to browser TZ first!
     expense_datetime_browser_tz = convert_to_browser_timezone(expense_date, browser_timezone)
-    form.date.data = expense_datetime_browser_tz.date()
-    form.time.data = expense_datetime_browser_tz.time()
+
+    # Extract date and time from the browser timezone datetime (NOT from UTC!)
+    browser_date = expense_datetime_browser_tz.date()
+    browser_time = expense_datetime_browser_tz.time()
+
+    # CRITICAL: Do NOT use form.process(obj=expense) because it extracts expense.date.date()
+    # which is the UTC date, overwriting our browser timezone date!
+    # Instead, manually populate all form fields to ensure browser timezone date is preserved
+
+    # Set date FIRST before anything else to ensure it's not overwritten
+    form.date.data = browser_date  # Browser timezone date, NOT UTC!
+    form.time.data = browser_time  # Browser timezone time
+
+    # Now set all other fields
+    form.amount.data = expense.amount
+    form.notes.data = expense.notes
+    form.restaurant_id.data = expense.restaurant_id
+    form.category_id.data = expense.category_id
+    form.meal_type.data = expense.meal_type
+    form.order_type.data = expense.order_type
+    form.party_size.data = expense.party_size
 
 
 def _handle_expense_update(
@@ -629,14 +663,20 @@ def _render_expense_form(
     categories: list[tuple[int, str, str, str | None]],
     is_edit: bool = False,
 ) -> str:
-    """Render the expense form template."""
-    if request.method == "GET":
-        form.amount.data = str(expense.amount) if expense.amount else ""  # type: ignore[assignment]
-        form.date.data = expense.date
-        form.notes.data = expense.notes or ""
-        form.category_id.data = expense.category_id if expense.category_id else None
-        form.restaurant_id.data = expense.restaurant_id if expense.restaurant_id else None
-        form.meal_type.data = expense.meal_type or ""
+    """Render the expense form template.
+
+    CRITICAL: Do NOT overwrite form data here!
+    The form has already been populated by _populate_expense_form() with the correct
+    browser timezone date. Overwriting it here would replace the browser TZ date with
+    the UTC date from expense.date, causing the date to display incorrectly.
+
+    The form data is already set correctly by _populate_expense_form() which:
+    1. Converts expense.date (UTC) to browser timezone
+    2. Extracts the date component from the browser timezone datetime
+    3. Sets form.date.data to the browser timezone date
+
+    The old code that was overwriting form.date.data with expense.date (UTC) has been removed.
+    """
 
     # Transform categories for template (include color and icon info)
     categories_for_template = [{"id": c[0], "name": c[1], "color": c[2], "icon": c[3]} for c in categories]

@@ -165,6 +165,7 @@ force-sort-within-sections = true
 
 [tool.mypy]
 python_version = "3.13"
+mypy_path = "types"  # Custom type stubs location
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

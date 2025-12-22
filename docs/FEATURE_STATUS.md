@@ -34,20 +34,22 @@ This document serves as the single source of truth for the implementation status
 
 ### 2. Expense Management
 
-| Feature              | Status | Implementation | Code Location                      | Completion |
-| -------------------- | ------ | -------------- | ---------------------------------- | ---------- |
-| Add Expense          | ✅     | Complete       | `app/expenses/routes.py:218`       | 100%       |
-| Edit Expense         | ✅     | Complete       | `app/expenses/routes.py:312`       | 100%       |
-| Delete Expense       | ✅     | Complete       | `app/expenses/routes.py:586`       | 100%       |
-| List Expenses        | ✅     | Complete       | `app/expenses/routes.py:504`       | 100%       |
-| Expense Details      | ✅     | Complete       | `app/expenses/routes.py:567`       | 100%       |
-| Expense Filtering    | ✅     | Complete       | `app/expenses/services.py`         | 100%       |
-| Expense Search       | ✅     | Complete       | `app/expenses/services.py`         | 100%       |
-| CSV Export           | ✅     | Complete       | `app/expenses/routes.py:612`       | 100%       |
-| CSV Import           | ✅     | Complete       | `app/expenses/routes.py:643`       | 100%       |
-| JSON Export          | ✅     | Complete       | `app/expenses/routes.py:612`       | 100%       |
-| Receipt Image Upload | ✅     | Complete       | `app/expenses/models.py:248`       | 100%       |
-| Auto-save Draft      | ✅     | Complete       | `app/static/js/utils/auto-save.js` | 100%       |
+| Feature                | Status | Implementation | Code Location                      | Completion |
+| ---------------------- | ------ | -------------- | ---------------------------------- | ---------- |
+| Add Expense            | ✅     | Complete       | `app/expenses/routes.py:218`       | 100%       |
+| Edit Expense           | ✅     | Complete       | `app/expenses/routes.py:312`       | 100%       |
+| Delete Expense         | ✅     | Complete       | `app/expenses/routes.py:586`       | 100%       |
+| List Expenses          | ✅     | Complete       | `app/expenses/routes.py:504`       | 100%       |
+| Expense Details        | ✅     | Complete       | `app/expenses/routes.py:567`       | 100%       |
+| Expense Filtering      | ✅     | Complete       | `app/expenses/services.py`         | 100%       |
+| Expense Search         | ✅     | Complete       | `app/expenses/services.py`         | 100%       |
+| CSV Export             | ✅     | Complete       | `app/expenses/routes.py:612`       | 100%       |
+| CSV Import             | ✅     | Complete       | `app/expenses/routes.py:643`       | 100%       |
+| JSON Export            | ✅     | Complete       | `app/expenses/routes.py:612`       | 100%       |
+| Receipt Image Upload   | ✅     | Complete       | `app/expenses/models.py:248`       | 100%       |
+| Receipt OCR            | ✅     | Complete       | `app/services/ocr_service.py`      | 100%       |
+| Receipt Reconciliation | ✅     | Complete       | `app/expenses/services.py:2255`    | 100%       |
+| Auto-save Draft        | ✅     | Complete       | `app/static/js/utils/auto-save.js` | 100%       |
 
 ### 3. Expense Categorization
 
@@ -128,6 +130,7 @@ This document serves as the single source of truth for the implementation status
 | Authentication API | ✅     | Complete       | `app/auth/api.py`       | 100%       |
 | Profile API        | ✅     | Complete       | `app/profile/api.py`    | 100%       |
 | Google Places API  | ✅     | Complete       | `app/api/routes.py:90`  | 100%       |
+| Receipt OCR API    | ✅     | Complete       | `app/api/routes.py:665` | 100%       |
 
 ### 9. User Interface
 

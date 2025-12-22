@@ -258,11 +258,14 @@ function initAutoSave(form) {
   });
 
   // Restore draft on page load if it exists
-  if (hasDraft(form)) {
-    // Show restore button
+  // CRITICAL: Don't auto-restore for edit forms - they have server-provided values
+  // that should not be overwritten by drafts (especially date/time in browser timezone)
+  const isEditForm = form.action && form.action.includes('/edit');
+  if (hasDraft(form) && !isEditForm) {
+    // Show restore button for add forms only
     showRestoreButton(form);
-  } else {
-    // Try to restore immediately if no user interaction needed
+  } else if (!isEditForm) {
+    // Try to restore immediately if no user interaction needed (add forms only)
     restoreDraft(form);
   }
 }

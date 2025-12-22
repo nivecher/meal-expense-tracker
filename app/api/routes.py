@@ -662,6 +662,176 @@ def _apply_restaurant_field_fixes_api(restaurant: Restaurant, fixes_to_apply: di
             setattr(restaurant, restaurant_field, fixes_to_apply[fix_key])
 
 
+# Receipt OCR endpoint
+@bp.route("/receipts/ocr", methods=["POST"])
+@login_required
+@validate_api_csrf
+def process_receipt_ocr() -> tuple[Response, int]:
+    """Process receipt image/PDF with OCR to extract expense data.
+
+    Returns:
+        JSON response with extracted receipt data
+    """
+    try:
+        # Check if OCR is enabled
+        if not current_app.config.get("OCR_ENABLED", True):
+            return (
+                jsonify({"status": "error", "message": "OCR is disabled"}),
+                503,
+            )
+
+        # Get uploaded file
+        if "receipt_file" not in request.files:
+            return (
+                jsonify({"status": "error", "message": "No receipt file provided"}),
+                400,
+            )
+
+        receipt_file = request.files["receipt_file"]
+        if not receipt_file or not receipt_file.filename:
+            return (
+                jsonify({"status": "error", "message": "No receipt file provided"}),
+                400,
+            )
+
+        # Validate file type
+        allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".pdf"}
+        file_ext = "." + receipt_file.filename.rsplit(".", 1)[1].lower() if "." in receipt_file.filename else ""
+        if file_ext not in allowed_extensions:
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": f"Invalid file type. Allowed types: {', '.join(allowed_extensions)}",
+                    }
+                ),
+                400,
+            )
+
+        # Validate file size (5MB max)
+        receipt_file.seek(0, 2)  # Seek to end
+        file_size = receipt_file.tell()
+        receipt_file.seek(0)  # Reset
+
+        max_size = current_app.config.get("MAX_CONTENT_LENGTH", 5 * 1024 * 1024)
+        if file_size > max_size:
+            return (
+                jsonify({"status": "error", "message": f"File too large. Max size: {max_size / 1024 / 1024}MB"}),
+                400,
+            )
+
+        # Get form hints from request if provided (for better matching)
+        form_hints: dict[str, Any] | None = None
+        form_restaurant_id: int | None = None
+        if request.form:
+            hints_dict: dict[str, str] = {}
+            form_amount = request.form.get("form_amount")
+            form_date = request.form.get("form_date")
+            form_restaurant = request.form.get("form_restaurant_name")
+            form_restaurant_id_str = request.form.get("form_restaurant_id")
+
+            if form_amount:
+                hints_dict["amount"] = form_amount
+            if form_date:
+                hints_dict["date"] = form_date
+            if form_restaurant:
+                hints_dict["restaurant_name"] = form_restaurant
+            if form_restaurant_id_str:
+                try:
+                    form_restaurant_id = int(form_restaurant_id_str)
+                except ValueError:
+                    pass
+
+            # Only use hints if at least one is provided
+            if hints_dict:
+                form_hints = hints_dict
+
+        # Process with OCR service
+        try:
+            from app.services.ocr_service import get_ocr_service
+
+            ocr_service = get_ocr_service()
+            if not ocr_service:
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "message": "OCR service not available. Tesseract OCR binary is not installed.",
+                        }
+                    ),
+                    503,
+                )
+
+            receipt_data = ocr_service.extract_receipt_data(receipt_file, form_hints=form_hints)
+        except RuntimeError as e:
+            # Handle Tesseract not installed error
+            current_app.logger.error(f"OCR service error: {e}")
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": str(e),
+                    }
+                ),
+                503,
+            )
+
+        # If restaurant ID provided, get restaurant address for comparison
+        restaurant_address_data = None
+        if form_restaurant_id:
+            try:
+                from app.restaurants.models import Restaurant
+
+                restaurant = Restaurant.query.filter_by(id=form_restaurant_id, user_id=current_user.id).first()
+                if restaurant:
+                    restaurant_address_data = {
+                        "full_address": restaurant.full_address,
+                        "address_line_1": restaurant.address_line_1,
+                        "address_line_2": restaurant.address_line_2,
+                        "city": restaurant.city,
+                        "state": restaurant.state,
+                        "postal_code": restaurant.postal_code,
+                        "phone": restaurant.phone,
+                        "website": restaurant.website,
+                    }
+            except Exception as e:
+                current_app.logger.warning(f"Failed to get restaurant address: {e}")
+
+        # Convert to JSON-serializable format
+        data = {
+            "amount": str(receipt_data.amount) if receipt_data.amount else None,
+            "date": receipt_data.date.isoformat() if receipt_data.date else None,
+            "time": receipt_data.time,
+            "restaurant_name": receipt_data.restaurant_name,
+            "restaurant_address": receipt_data.restaurant_address,
+            "restaurant_phone": receipt_data.restaurant_phone,
+            "restaurant_website": receipt_data.restaurant_website,
+            "items": receipt_data.items,
+            "tax": str(receipt_data.tax) if receipt_data.tax else None,
+            "tip": str(receipt_data.tip) if receipt_data.tip else None,
+            "total": str(receipt_data.total) if receipt_data.total else None,
+            "confidence_scores": receipt_data.confidence_scores,
+            "raw_text": receipt_data.raw_text[:500],  # Limit raw text length
+            "restaurant_address_data": restaurant_address_data,  # For UI comparison
+        }
+
+        return _create_api_response(data=data, message="Receipt processed successfully")
+
+    except ValueError as e:
+        return (
+            jsonify({"status": "error", "message": str(e)}),
+            400,
+        )
+    except RuntimeError as e:
+        current_app.logger.error(f"OCR processing error: {e}")
+        return (
+            jsonify({"status": "error", "message": f"OCR processing failed: {str(e)}"}),
+            500,
+        )
+    except Exception as e:
+        return _handle_service_error(e, "process receipt OCR")
+
+
 # Generic CRUD operations for categories
 @bp.route("/categories", methods=["GET"])
 @login_required
