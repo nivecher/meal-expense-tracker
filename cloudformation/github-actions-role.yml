@@ -95,6 +95,12 @@ Resources:
                   - ec2:DeleteTags
                   - ec2:Describe*
                   - ec2:Get*
+                  - ec2:CreateSecurityGroup
+                  - ec2:DeleteSecurityGroup
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupEgress
                   - kms:CreateKey
                   - kms:CreateAlias
                   - kms:DeleteAlias
@@ -118,12 +124,20 @@ Resources:
                   - ssm:RemoveTagsFromResource
                   - ssm:ListTagsForResource
                   - sns:GetTopicAttributes
+                  - sns:GetSubscriptionAttributes
                   - sns:ListTagsForResource
+                  - sns:ListTopics
                   - sns:Publish
+                  - sns:SetTopicAttributes
+                  - sns:DeleteTopic
                   - route53:ListHostedZones
                   - route53:GetHostedZone
                   - route53:ListResourceRecordSets
+                  - route53:ChangeResourceRecordSets
                   - route53:ListTagsForResource
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:DescribeLogGroups
                   - logs:ListTagsForResource
                   # CloudWatch Dashboard permissions
                   - cloudwatch:GetDashboard
@@ -139,6 +153,12 @@ Resources:
                   - cloudwatch:ListTagsForResource
                   - cloudwatch:TagResource
                   - cloudwatch:UntagResource
+                  # API Gateway v2 permissions
+                  - apigateway:GET
+                  - apigateway:POST
+                  - apigateway:PUT
+                  - apigateway:DELETE
+                  - apigateway:PATCH
                   # ACM permissions
                   - acm:RequestCertificate
                   - acm:DeleteCertificate
@@ -179,6 +199,9 @@ Resources:
                   - wafv2:UntagResource
                   - wafv2:AssociateWebACL
                   - wafv2:DisassociateWebACL
+                  - wafv2:CreateWebACL
+                  - wafv2:UpdateWebACL
+                  - wafv2:DeleteWebACL
                   # S3 permissions
                   - s3:GetObject
                   - s3:ListBucket
@@ -201,6 +224,10 @@ Resources:
                   - s3:GetBucketCORS
                   - s3:GetBucketPolicy
                   - s3:PutBucketPolicy
+                  # Lambda permissions
+                  - lambda:CreatePermission
+                  - lambda:GetPolicy
+                  - lambda:RemovePermission
                 Resource: '*'
 
 Outputs:

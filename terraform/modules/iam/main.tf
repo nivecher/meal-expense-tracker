@@ -32,11 +32,14 @@ resource "aws_iam_policy" "lambda_combined" {
           "arn:aws:logs:*:*:*"
         ]
       },
-      # SNS Publish for Dead Letter Queue
+      # SNS access for notifications and dead letter queues
       {
         Effect = "Allow"
         Action = [
-          "sns:Publish"
+          "sns:Publish",
+          "sns:GetTopicAttributes",
+          "sns:ListTopics",
+          "sns:GetSubscriptionAttributes"
         ]
         Resource = [
           "*" # Temporarily using wildcard to test, will scope down after verification
