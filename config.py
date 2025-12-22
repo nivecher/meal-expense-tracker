@@ -56,6 +56,13 @@ class Config:
     S3_RECEIPTS_PREFIX: str = os.getenv("S3_RECEIPTS_PREFIX", "receipts/")
     S3_URL_EXPIRY: int = int(os.getenv("S3_URL_EXPIRY", "3600"))  # 1 hour default
 
+    # OCR Configuration (Tesseract - FREE, open-source)
+    OCR_ENABLED: bool = os.getenv("OCR_ENABLED", "true").lower() == "true"
+    OCR_CONFIDENCE_THRESHOLD: float = float(os.getenv("OCR_CONFIDENCE_THRESHOLD", "0.7"))
+    TESSERACT_CMD: str | None = os.getenv(
+        "TESSERACT_CMD"
+    )  # Optional path to tesseract binary (auto-detected if not set)
+
     # Notification configuration (AWS SNS)
     NOTIFICATIONS_ENABLED: bool = os.getenv("NOTIFICATIONS_ENABLED", "true").lower() == "true"
     SNS_TOPIC_ARN: str = ""  # Will be set in __init__

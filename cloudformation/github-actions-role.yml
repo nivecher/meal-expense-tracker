@@ -69,7 +69,19 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
+                  # IAM permissions for task execution role and policy management
                   - iam:PassRole
+                  - iam:CreatePolicy
+                  - iam:DeletePolicy
+                  - iam:GetPolicy
+                  - iam:ListPolicyVersions
+                  - iam:CreatePolicyVersion
+                  - iam:DeletePolicyVersion
+                  - iam:SetDefaultPolicyVersion
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:ListAttachedRolePolicies
+                  # EC2 permissions for VPC setup
                   - ec2:CreateVpc
                   - ec2:CreateSubnet
                   - ec2:CreateRouteTable
@@ -92,10 +104,19 @@ Resources:
                   - kms:List*
                   - kms:Decrypt
                   - kms:GenerateDataKey
+                  - kms:TagResource
+                  - kms:UntagResource
+                  # SSM Parameter Store permissions
+                  - ssm:PutParameter
                   - ssm:GetParameter
-                  - ssm:DescribeParameters
-                  - ssm:ListTagsForResource
                   - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - ssm:DeleteParameter
+                  - ssm:DeleteParameters
+                  - ssm:DescribeParameters
+                  - ssm:AddTagsToResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:ListTagsForResource
                   - sns:GetTopicAttributes
                   - sns:ListTagsForResource
                   - sns:Publish
@@ -118,6 +139,7 @@ Resources:
                   - cloudwatch:ListTagsForResource
                   - cloudwatch:TagResource
                   - cloudwatch:UntagResource
+                  # ACM permissions
                   - acm:RequestCertificate
                   - acm:DeleteCertificate
                   - acm:DeleteCertificateAuthority

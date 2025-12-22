@@ -22,6 +22,7 @@
                 **({'data-restaurant-id': expense.restaurant_id} if expense and expense.restaurant_id else {})
                 ) }}
                 {% if form.restaurant_id.errors %}<div class="invalid-feedback">{{ form.restaurant_id.errors[0] }}</div>{% endif %}
+                <div id="restaurant-address-display" class="mt-2" style="display: none;"></div>
                 <div class="form-text">
                     <a href="{{ url_for('restaurants.add_restaurant') }}">Add a new restaurant</a>
                 </div>
@@ -139,23 +140,39 @@
                 <label for="receipt_image" class="form-label">
                     <i class="fas fa-receipt me-1"></i>Receipt Image (Optional)
                 </label>
-                <input type="file"
-                       id="receipt_image"
-                       name="receipt_image"
-                       class="form-control"
-                       accept="image/*"
-                       {% if expense and expense.receipt_image %}
-                           data-existing-receipt="{{ expense.receipt_image }}"
-                       {% endif %}>
+                <div class="input-group">
+                    <input type="file"
+                           id="receipt_image"
+                           name="receipt_image"
+                           class="form-control"
+                           accept="image/*,.pdf"
+                           {% if expense and expense.receipt_image %}
+                               data-existing-receipt="{{ get_receipt_url(expense.receipt_image) }}"
+                           {% endif %}>
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            id="view-receipt-btn"
+                            disabled
+                            title="Preview receipt">
+                        <i class="fas fa-eye me-1"></i>View
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-primary"
+                            id="process-receipt-btn"
+                            disabled
+                            title="Process receipt with OCR to extract data">
+                        <i class="fas fa-magic me-1"></i>Process Receipt
+                    </button>
+                </div>
                 <!-- Hidden field to track receipt deletion -->
                 <input type="hidden" id="delete_receipt" name="delete_receipt" value="false">
                 <div class="form-text">
                     <small class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
-                        Upload a photo of your receipt. Supported formats: JPG, PNG, GIF. Max size: 5MB.
+                        Upload a photo of your receipt. Supported formats: JPG, PNG, GIF, PDF. Max size: 5MB.
                         {% if expense and expense.receipt_image %}
                             <br>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 mt-2">
                                 <a href="{{ get_receipt_url(expense.receipt_image) }}" class="text-primary">
                                     <i class="fas fa-eye me-1"></i>View current receipt
                                 </a>
@@ -168,6 +185,58 @@
                             </div>
                         {% endif %}
                     </small>
+                </div>
+                <!-- OCR Processing Status -->
+                <div id="ocr-processing-status" class="mt-2" style="display: none;">
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        <span id="ocr-status-text">Processing receipt with OCR...</span>
+                    </div>
+                </div>
+                <!-- Receipt Preview Modal -->
+                <div class="modal fade" id="receiptPreviewModal" tabindex="-1" aria-labelledby="receiptPreviewModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="receiptPreviewModalLabel">
+                                    <i class="fas fa-receipt me-2"></i>Receipt Preview
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center">
+                                <div id="receipt-preview-container">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Reconciliation Panel -->
+                <div id="reconciliation-panel" class="mt-3" style="display: none;">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <i class="fas fa-check-circle me-2"></i>Receipt Reconciliation
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text">
+                                <small>Compare the extracted data with your form entries:</small>
+                            </p>
+                            <div id="reconciliation-results"></div>
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-sm btn-success" onclick="applyAllSuggestions()">
+                                    <i class="fas fa-check-double me-1"></i>Apply All Suggestions
+                                </button>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="dismissReconciliation()">
+                                    <i class="fas fa-times me-1"></i>Dismiss
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -211,12 +280,18 @@
 {% macro expense_scripts() %}
     <!-- Unified Error Handler already loaded in base template -->
 
+    <!-- Expense Form CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/expense-form.css') }}">
+
     <!-- Tagify CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.17.9/dist/tagify.css">
     <!-- Pretty Tagify styling with rounded edges -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tagify-pretty.css') }}">
     <!-- Dynamic user tag colors -->
     <link rel="stylesheet" href="{{ url_for('main.user_tag_css') }}">
+
+    <!-- Address normalization utilities (must load before expense-form-handler) -->
+    <script src="{{ url_for('static', filename='js/utils/address-utils.js') }}"></script>
 
     <!-- Expense form handler (handles form submission via Fetch API) -->
     <script type="module"

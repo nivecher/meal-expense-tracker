@@ -26,8 +26,26 @@ if (typeof window !== 'undefined' && window.SecurityUtils) {
 }
 
 /**
- * Validate redirect URL to prevent open redirect vulnerabilities
- * Only allows relative URLs or same-origin absolute URLs
+ * Escape value for safe use in HTML data attributes
+ * @param {string} value - Value to escape
+ * @returns {string} Escaped value safe for data attributes
+ */
+function escapeDataAttribute(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Validate redirect URL to prevent open redirect vulnerabilities.
+ * Only allows relative URLs or same-origin absolute URLs.
+ * Uses whitelist approach for security.
  * @param {string} url - URL to validate
  * @returns {string|null} - Validated URL or null if invalid
  */
@@ -36,10 +54,16 @@ function validateRedirectUrl(url) {
     return null;
   }
 
-  // Allow relative URLs (starting with /)
+  // Whitelist approach: Only allow relative URLs starting with /
+  // This prevents open redirect vulnerabilities
   if (url.startsWith('/')) {
-    // Ensure it doesn't contain protocol or host
+    // Ensure it doesn't contain protocol or host indicators
     if (!url.includes('://') && !url.includes('//')) {
+      // Additional validation: ensure it's a valid path
+      // Reject URLs with suspicious patterns
+      if (!url.match(/^\/[a-zA-Z0-9\-_\/?=&]*$/)) {
+        return null;
+      }
       return url;
     }
     return null;
@@ -310,9 +334,12 @@ function handleSuccessfulSubmission(result) {
   showSuccessAlert(result);
 
   // Validate redirect URL to prevent open redirect vulnerabilities
+  // Security: validateRedirectUrl() uses whitelist approach - only allows relative URLs
+  // starting with '/' or same-origin URLs. This prevents open redirect attacks.
   const requestedUrl = result.redirect || result.redirect_url || '/expenses';
   const redirectUrl = validateRedirectUrl(requestedUrl) || '/expenses';
   console.log('Form submitted successfully, redirecting to:', redirectUrl);
+  // Security: redirectUrl is validated and sanitized by validateRedirectUrl()
   window.location.href = redirectUrl;
 }
 
@@ -413,6 +440,155 @@ async function handleFormSubmit(event) {
 /**
  * Set up category and restaurant type handling
  */
+/**
+ * Show notification (using existing notification system if available)
+ */
+function showNotification(message, type) {
+  // Try to use existing notification system
+  if (typeof window.showToast === 'function') {
+    window.showToast(message, type);
+  } else if (typeof window.showNotification === 'function') {
+    window.showNotification(message, type);
+  } else {
+    // Fallback to alert
+    alert(message);
+  }
+}
+
+/**
+ * Hide restaurant address display
+ */
+function hideRestaurantAddress() {
+  const addressDisplay = document.getElementById('restaurant-address-display');
+  if (addressDisplay) {
+    addressDisplay.style.display = 'none';
+    addressDisplay.innerHTML = '';
+  }
+}
+
+/**
+ * Display restaurant address
+ */
+function displayRestaurantAddress(restaurant) {
+  const addressDisplay = document.getElementById('restaurant-address-display');
+  if (!addressDisplay) return;
+
+  const addressParts = [];
+  if (restaurant.full_address) {
+    addressParts.push(restaurant.full_address);
+  } else {
+    if (restaurant.address_line_1) addressParts.push(restaurant.address_line_1);
+    if (restaurant.address_line_2) addressParts.push(restaurant.address_line_2);
+    if (restaurant.city) addressParts.push(restaurant.city);
+    if (restaurant.state) addressParts.push(restaurant.state);
+    if (restaurant.postal_code) addressParts.push(restaurant.postal_code);
+  }
+
+  if (addressParts.length > 0) {
+    const addressText = addressParts.join(', ');
+    addressDisplay.innerHTML = `<small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${escapeHtml(addressText)}</small>`;
+    addressDisplay.style.display = 'block';
+  } else {
+    hideRestaurantAddress();
+  }
+}
+
+/**
+ * Fetch restaurant address for reconciliation (returns address string)
+ */
+async function fetchRestaurantAddressForReconciliation(restaurantId) {
+  if (!restaurantId) {
+    return 'Not set';
+  }
+
+  try {
+    // Get CSRF token
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) {
+      const csrfInput = document.querySelector('input[name="csrf_token"]');
+      csrfToken = csrfInput ? csrfInput.value : '';
+    }
+
+    const response = await fetch(`/api/v1/restaurants/${restaurantId}`, {
+      method: 'GET',
+      headers: {
+        'X-CSRFToken': csrfToken,
+      },
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      if (result.status === 'success' && result.data) {
+        const restaurant = result.data;
+        const addressParts = [];
+        if (restaurant.full_address) {
+          return restaurant.full_address;
+        }
+        if (restaurant.address_line_1) addressParts.push(restaurant.address_line_1);
+        if (restaurant.address_line_2) addressParts.push(restaurant.address_line_2);
+        if (restaurant.city) addressParts.push(restaurant.city);
+        if (restaurant.state) addressParts.push(restaurant.state);
+        if (restaurant.postal_code) addressParts.push(restaurant.postal_code);
+        if (addressParts.length > 0) {
+          return addressParts.join(', ');
+        }
+
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to fetch restaurant address for reconciliation:', error);
+  }
+  return 'Not set';
+}
+
+/**
+ * Fetch restaurant address and display it
+ */
+async function fetchRestaurantAddress(restaurantId) {
+  if (!restaurantId) {
+    hideRestaurantAddress();
+    return;
+  }
+
+  const addressDisplay = document.getElementById('restaurant-address-display');
+  if (!addressDisplay) return;
+
+  try {
+    // Show loading state
+    addressDisplay.innerHTML = '<small class="text-muted"><i class="fas fa-spinner fa-spin"></i> Loading address...</small>';
+    addressDisplay.style.display = 'block';
+
+    // Get CSRF token
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) {
+      const csrfInput = document.querySelector('input[name="csrf_token"]');
+      csrfToken = csrfInput ? csrfInput.value : '';
+    }
+
+    const response = await fetch(`/api/v1/restaurants/${restaurantId}`, {
+      method: 'GET',
+      headers: {
+        'X-CSRFToken': csrfToken,
+      },
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      if (result.status === 'success' && result.data) {
+        const restaurant = result.data;
+        displayRestaurantAddress(restaurant);
+      } else {
+        hideRestaurantAddress();
+      }
+    } else {
+      hideRestaurantAddress();
+    }
+  } catch (error) {
+    console.warn('Failed to fetch restaurant address:', error);
+    hideRestaurantAddress();
+  }
+}
+
 function setupCategoryRestaurantHandling(form) {
   const categorySelect = form.querySelector('select[name="category_id"]');
   const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
@@ -434,12 +610,25 @@ function setupCategoryRestaurantHandling(form) {
   // Handle restaurant change
   restaurantSelect.addEventListener('change', function() {
     updateCategory(this.value);
+    // Fetch and display restaurant address
+    if (this.value) {
+      fetchRestaurantAddress(this.value);
+    } else {
+      hideRestaurantAddress();
+    }
   });
 
   // Track manual category changes
   categorySelect.addEventListener('change', function() {
     categoryManuallyChanged = this.value !== '';
   });
+
+  // Initialize restaurant address display if restaurant is pre-selected
+  // Note: This happens during setup, but address will also be fetched in initializeExpenseForm
+  // if the restaurant value is set after this function runs
+  if (restaurantSelect.value) {
+    fetchRestaurantAddress(restaurantSelect.value);
+  }
 }
 
 /**
@@ -455,7 +644,6 @@ async function initializeExpenseForm() {
     try {
       const detectedTimezone = await getBrowserTimezone();
       timezoneInput.value = detectedTimezone;
-      console.log('Browser timezone detected:', detectedTimezone);
     } catch (error) {
       console.warn('Failed to detect timezone:', error);
       timezoneInput.value = 'UTC';
@@ -468,11 +656,10 @@ async function initializeExpenseForm() {
   // Set up category and restaurant type handling
   setupCategoryRestaurantHandling(form);
 
-  // Initialize auto-save draft functionality
-  const { initAutoSave } = await import('../utils/auto-save.js');
-  initAutoSave(form);
+  // Auto-save draft functionality has been removed - it was causing confusion
+  // and overwriting correct server-provided values (especially date/time in browser timezone)
 
-  // Check if we're editing an existing expense
+  // Check if we're editing an existing expense or if restaurant is pre-selected
   const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
   if (restaurantSelect) {
     // If there's a data-restaurant-id attribute, use it to set the selected option
@@ -482,12 +669,993 @@ async function initializeExpenseForm() {
       if (optionToSelect) {
         optionToSelect.selected = true;
         console.log('Set selected restaurant:', restaurantId);
+        // Fetch and display restaurant address
+        fetchRestaurantAddress(restaurantId);
       } else {
         console.warn('Could not find restaurant option with value:', restaurantId);
       }
+    } else if (restaurantSelect.value) {
+      // If restaurant is already selected (e.g., from form data), fetch address
+      fetchRestaurantAddress(restaurantSelect.value);
     }
   }
 }
+
+// =============================================================================
+// RECEIPT OCR PROCESSING FUNCTIONALITY
+// =============================================================================
+
+/**
+ * Apply OCR suggestion to form field
+ */
+function applyOCRSuggestion(field, value) {
+  if (field === 'amount') {
+    const amountInput = document.getElementById('amount');
+    if (amountInput) {
+      amountInput.value = value;
+      amountInput.dispatchEvent(new Event('change', { bubbles: true }));
+      showNotification('Amount updated from receipt', 'success');
+    }
+  } else if (field === 'date') {
+    const dateInput = document.getElementById('date');
+    if (dateInput) {
+      dateInput.value = value;
+      dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+      showNotification('Date updated from receipt', 'success');
+    }
+  } else if (field === 'restaurant') {
+    // Try to find matching restaurant in dropdown
+    const restaurantSelect = document.getElementById('restaurant_id');
+    if (restaurantSelect) {
+      // Search for restaurant by name (fuzzy match)
+      for (const option of restaurantSelect.options) {
+        if (option.text.toLowerCase().includes(value.toLowerCase()) ||
+          value.toLowerCase().includes(option.text.toLowerCase())) {
+          restaurantSelect.value = option.value;
+          restaurantSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          showNotification('Restaurant updated from receipt', 'success');
+          return;
+        }
+      }
+      showNotification('Restaurant not found in your list. Please add it manually.', 'info');
+    }
+  } else if (field === 'time') {
+    // Update time input field (type="time" expects HH:mm format)
+    const timeInput = document.getElementById('time');
+    if (timeInput) {
+      // Parse the time value (e.g., "12:55 PM")
+      const timeMatch = value.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (timeMatch) {
+        let hours = parseInt(timeMatch[1], 10);
+        const minutes = parseInt(timeMatch[2], 10);
+        const ampm = timeMatch[3].toUpperCase();
+
+        // Convert to 24-hour format
+        if (ampm === 'PM' && hours !== 12) {
+          hours += 12;
+        } else if (ampm === 'AM' && hours === 12) {
+          hours = 0;
+        }
+
+        // Format as HH:mm for time input
+        const hours24 = String(hours).padStart(2, '0');
+        const mins = String(minutes).padStart(2, '0');
+        timeInput.value = `${hours24}:${mins}`;
+        timeInput.dispatchEvent(new Event('change', { bubbles: true }));
+        showNotification('Time updated from receipt', 'success');
+      }
+    }
+  } else if (field === 'restaurant_phone' || field === 'restaurant_website') {
+    // Phone and website are restaurant fields, not expense fields
+    // Show notification that these need to be updated on the restaurant record
+    showNotification('Phone and website are restaurant fields. Please update them in the restaurant settings.', 'info');
+  }
+}
+
+/**
+ * Convert 24-hour time format to 12-hour format with AM/PM
+ * @param {string} timeValue - Time in HH:mm format (24-hour)
+ * @returns {string} Time in HH:MM AM/PM format or 'Not set'
+ */
+function formatTimeTo12Hour(timeValue) {
+  if (!timeValue) {
+    return 'Not set';
+  }
+  const [hours24, minutes] = timeValue.split(':');
+  const hours = parseInt(hours24, 10);
+  const mins = parseInt(minutes, 10);
+  if (isNaN(hours) || isNaN(mins)) {
+    return 'Not set';
+  }
+  // Convert to 12-hour format
+  let hours12 = hours;
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  if (hours > 12) {
+    hours12 = hours - 12;
+  } else if (hours === 0) {
+    hours12 = 12;
+  }
+  return `${hours12}:${String(mins).padStart(2, '0')} ${ampm}`;
+}
+
+/**
+ * Compare two time strings with ±15 minute tolerance
+ * @param {string} formTime - Form time in HH:MM AM/PM format
+ * @param {string} ocrTime - OCR time in HH:MM AM/PM format
+ * @returns {boolean} True if times match within tolerance
+ */
+function compareTimes(formTime, ocrTime) {
+  if (formTime === 'Not set' || !ocrTime) {
+    return false;
+  }
+  try {
+    const formTimeMatch = formTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    const ocrTimeMatch = ocrTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!formTimeMatch || !ocrTimeMatch) {
+      return false;
+    }
+    let formHours = parseInt(formTimeMatch[1], 10);
+    const formMinutes = parseInt(formTimeMatch[2], 10);
+    const formAmpm = formTimeMatch[3].toUpperCase();
+    let ocrHours = parseInt(ocrTimeMatch[1], 10);
+    const ocrMinutes = parseInt(ocrTimeMatch[2], 10);
+    const ocrAmpm = ocrTimeMatch[3].toUpperCase();
+
+    // Convert to 24-hour format for comparison
+    if (formAmpm === 'PM' && formHours !== 12) formHours += 12;
+    if (formAmpm === 'AM' && formHours === 12) formHours = 0;
+    if (ocrAmpm === 'PM' && ocrHours !== 12) ocrHours += 12;
+    if (ocrAmpm === 'AM' && ocrHours === 12) ocrHours = 0;
+
+    const formTotalMinutes = formHours * 60 + formMinutes;
+    const ocrTotalMinutes = ocrHours * 60 + ocrMinutes;
+    const timeDiff = Math.abs(formTotalMinutes - ocrTotalMinutes);
+    return timeDiff <= 15; // ±15 minute tolerance
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Update address comparison in reconciliation table row
+ * @param {HTMLElement} formValueCell - Cell containing form address value
+ * @param {HTMLElement} row - Table row element
+ * @param {string} address - Form address value
+ * @param {string} ocrAddress - OCR extracted address value
+ */
+function updateAddressComparisonInRow(formValueCell, row, address, ocrAddress) {
+  // Use semantic address comparison
+  let addressMatch = false;
+  let addressFormatDiffers = false;
+  if (typeof window.AddressUtils !== 'undefined' && window.AddressUtils.compareAddressesSemantic) {
+    const comparison = window.AddressUtils.compareAddressesSemantic(address, ocrAddress);
+    addressMatch = comparison.isMatch;
+    addressFormatDiffers = comparison.formatDiffers;
+  } else {
+    // Fallback: Simple comparison
+    const formAddressLower = address.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+    const ocrAddressLower = ocrAddress.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+    addressMatch = formAddressLower && ocrAddressLower && (
+      formAddressLower === ocrAddressLower ||
+      formAddressLower.includes(ocrAddressLower) ||
+      ocrAddressLower.includes(formAddressLower)
+    );
+  }
+  const matchClass = addressMatch && !addressFormatDiffers ? 'text-success' : 'text-warning';
+  formValueCell.className = matchClass;
+  const ocrValueCell = row.querySelector('td:nth-child(3)');
+  if (ocrValueCell) {
+    ocrValueCell.className = matchClass;
+  }
+  const matchIcon = row.querySelector('td:first-child i');
+  if (matchIcon) {
+    matchIcon.className = addressMatch && !addressFormatDiffers
+      ? 'fas fa-check-circle'
+      : addressMatch && addressFormatDiffers
+        ? 'fas fa-check-circle text-warning'
+        : 'fas fa-exclamation-triangle';
+  }
+  const actionCell = row.querySelector('td:last-child');
+  if (actionCell) {
+    if (addressMatch && addressFormatDiffers) {
+      actionCell.textContent = 'Match (format differs)';
+    } else if (addressMatch) {
+      actionCell.textContent = 'Match';
+    }
+  }
+}
+
+/**
+ * Display reconciliation results
+ * Optimized to prevent long tasks by using DocumentFragment and batching DOM operations
+ */
+function displayReconciliationResults(ocrData) {
+  const panelDiv = document.getElementById('reconciliation-panel');
+  const resultsDiv = document.getElementById('reconciliation-results');
+
+  if (!panelDiv || !resultsDiv) return;
+
+  // Cache DOM queries to avoid repeated lookups
+  const amountInput = document.getElementById('amount');
+  const dateInput = document.getElementById('date');
+  const restaurantSelect = document.getElementById('restaurant_id');
+  const timeInput = document.getElementById('time');
+
+  // Get current form values (cached)
+  const formAmount = amountInput?.value || '';
+  const formDate = dateInput?.value || '';
+  const formRestaurant = restaurantSelect?.selectedOptions[0]?.text || '';
+  const formRestaurantId = restaurantSelect?.value;
+
+  // Use DocumentFragment for efficient DOM manipulation
+  const fragment = document.createDocumentFragment();
+  const table = document.createElement('table');
+  table.className = 'table table-sm table-bordered reconciliation-table';
+
+  // Create table header
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  ['Field', 'Form Value', 'Receipt Value', 'Action'].forEach((text) => {
+    const th = document.createElement('th');
+    th.textContent = text;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+
+  /**
+   * Helper function to create a table row for reconciliation
+   */
+  function createReconciliationRow(fieldName, formValue, ocrValue, isMatch, ocrDataValue, fieldType) {
+    const row = document.createElement('tr');
+    const matchClass = isMatch ? 'text-success' : 'text-warning';
+    const matchIconClass = isMatch ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle';
+
+    // Field name cell
+    const fieldCell = document.createElement('td');
+    const strong = document.createElement('strong');
+    strong.textContent = fieldName;
+    const icon = document.createElement('i');
+    icon.className = matchIconClass;
+    fieldCell.appendChild(strong);
+    fieldCell.appendChild(document.createTextNode(' '));
+    fieldCell.appendChild(icon);
+    row.appendChild(fieldCell);
+
+    // Form value cell
+    const formValueCell = document.createElement('td');
+    formValueCell.className = matchClass;
+    formValueCell.textContent = formValue;
+    row.appendChild(formValueCell);
+
+    // OCR value cell
+    const ocrValueCell = document.createElement('td');
+    ocrValueCell.className = matchClass;
+    ocrValueCell.textContent = ocrValue;
+    row.appendChild(ocrValueCell);
+
+    // Action cell
+    const actionCell = document.createElement('td');
+    if (!isMatch && ocrDataValue) {
+      const button = document.createElement('button');
+      button.className = 'btn btn-sm btn-primary';
+      button.textContent = 'Apply';
+      button.setAttribute('data-field', fieldType);
+      // Escape value to prevent XSS in data attribute
+      button.setAttribute('data-value', escapeDataAttribute(String(ocrDataValue || '')));
+      actionCell.appendChild(button);
+    } else {
+      actionCell.textContent = 'Match';
+    }
+    row.appendChild(actionCell);
+
+    return row;
+  }
+
+  // Amount comparison
+  if (ocrData.amount) {
+    const formAmountNum = parseFloat(formAmount) || 0;
+    const ocrAmountNum = parseFloat(ocrData.amount) || 0;
+    const amountMatch = Math.abs(formAmountNum - ocrAmountNum) < 0.01; // ±1 cent tolerance
+    const row = createReconciliationRow(
+      'Amount',
+      `$${formAmountNum.toFixed(2)}`,
+      `$${ocrAmountNum.toFixed(2)}`,
+      amountMatch,
+      ocrData.amount,
+      'amount',
+    );
+    tbody.appendChild(row);
+  }
+
+  // Date comparison with timezone awareness
+  if (ocrData.date) {
+    // Form date is in YYYY-MM-DD format (browser timezone context)
+    const [formDateOnly] = formDate.split('T');
+
+    // OCR date is an ISO datetime string (UTC)
+    // Convert to browser timezone and extract date part
+    let ocrDateInBrowserTz;
+    let ocrDateOnly;
+    try {
+      // Parse the OCR date (assumed to be in UTC)
+      const ocrDateUtc = new Date(ocrData.date);
+
+      // Convert to browser's local timezone
+      // Use Intl.DateTimeFormat to format in browser timezone
+      // eslint-disable-next-line new-cap
+      const dateTimeFormat = Intl.DateTimeFormat();
+      const browserTimezone = dateTimeFormat.resolvedOptions().timeZone;
+
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: browserTimezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+
+      // Format the UTC date in browser timezone to get YYYY-MM-DD
+      const parts = formatter.formatToParts(ocrDateUtc);
+      const year = parts.find((p) => p.type === 'year')?.value || '';
+      const month = parts.find((p) => p.type === 'month')?.value || '';
+      const day = parts.find((p) => p.type === 'day')?.value || '';
+      ocrDateOnly = `${year}-${month}-${day}`;
+
+      // Also format for display (with timezone context)
+      ocrDateInBrowserTz = ocrDateOnly;
+    } catch (error) {
+      // Fallback: try simple date extraction if timezone conversion fails
+      console.warn('Timezone conversion failed, using fallback:', error);
+      const [fallbackDate] = ocrData.date.split('T');
+      ocrDateOnly = fallbackDate;
+      ocrDateInBrowserTz = ocrDateOnly;
+    }
+
+    // Compare dates (both should now be in YYYY-MM-DD format, browser timezone context)
+    // Allow ±1 day difference for timezone edge cases
+    const formDateObj = new Date(`${formDateOnly}T12:00:00`);
+    const ocrDateObj = new Date(`${ocrDateOnly}T12:00:00`);
+    const dateDiff = Math.abs(formDateObj - ocrDateObj);
+    const dateMatch = formDateOnly === ocrDateOnly || dateDiff < 86400000; // ±1 day
+
+    const row = createReconciliationRow(
+      'Date',
+      formDateOnly || 'Not set',
+      ocrDateInBrowserTz,
+      dateMatch,
+      ocrDateOnly, // Use date-only format for applying
+      'date',
+    );
+    tbody.appendChild(row);
+  }
+
+  // Time comparison
+  if (ocrData.time) {
+    // Extract time from form time input (type="time" format: HH:mm in 24-hour format)
+    const formTime = timeInput && timeInput.value
+      ? formatTimeTo12Hour(timeInput.value)
+      : 'Not set';
+
+    // Compare times with ±15 minute tolerance
+    const timeMatch = compareTimes(formTime, ocrData.time);
+
+    const row = createReconciliationRow(
+      'Time',
+      formTime,
+      ocrData.time,
+      timeMatch,
+      ocrData.time,
+      'time',
+    );
+    tbody.appendChild(row);
+  }
+
+  // Restaurant comparison (fuzzy match)
+  if (ocrData.restaurant_name) {
+    const restaurantMatch = formRestaurant.toLowerCase().includes(ocrData.restaurant_name.toLowerCase()) ||
+      ocrData.restaurant_name.toLowerCase().includes(formRestaurant.toLowerCase());
+    const row = createReconciliationRow(
+      'Restaurant',
+      formRestaurant || 'Not set',
+      ocrData.restaurant_name,
+      restaurantMatch,
+      ocrData.restaurant_name,
+      'restaurant',
+    );
+    tbody.appendChild(row);
+  }
+
+  // Restaurant address comparison
+  if (ocrData.restaurant_address) {
+    // Get restaurant address from API response data (restaurant_address_data)
+    let formAddress = 'Not set';
+
+    // First try: Get address from API response (restaurant_address_data from selected restaurant)
+    if (ocrData.restaurant_address_data) {
+      const restaurantAddr = ocrData.restaurant_address_data;
+      if (restaurantAddr.full_address) {
+        formAddress = restaurantAddr.full_address;
+      } else {
+        // Build from components
+        const addressParts = [];
+        if (restaurantAddr.address_line_1) addressParts.push(restaurantAddr.address_line_1);
+        if (restaurantAddr.address_line_2) addressParts.push(restaurantAddr.address_line_2);
+        if (restaurantAddr.city) addressParts.push(restaurantAddr.city);
+        if (restaurantAddr.state) addressParts.push(restaurantAddr.state);
+        if (restaurantAddr.postal_code) addressParts.push(restaurantAddr.postal_code);
+        if (addressParts.length > 0) {
+          formAddress = addressParts.join(', ');
+        }
+      }
+    } else if (formRestaurantId) {
+      // Fallback: Fetch restaurant address from API if not in OCR response
+      // Note: This is async, so we'll show "Loading..." initially and update when it arrives
+      formAddress = 'Loading...';
+      // Defer async operation to avoid blocking
+      requestAnimationFrame(() => {
+        fetchRestaurantAddressForReconciliation(formRestaurantId).then((address) => {
+          if (!address || address === 'Not set') {
+            return;
+          }
+          // Update the reconciliation table with the fetched address
+          const addressRow = tbody.querySelector('tr[data-field="restaurant_address"]');
+          if (!addressRow) {
+            return;
+          }
+          const formValueCell = addressRow.querySelector('td:nth-child(2)');
+          if (!formValueCell) {
+            return;
+          }
+          formValueCell.textContent = address;
+          // Re-evaluate match status with the fetched address
+          const ocrAddress = ocrData.restaurant_address;
+          if (ocrAddress) {
+            updateAddressComparisonInRow(formValueCell, addressRow, address, ocrAddress);
+          }
+        });
+      });
+    }
+
+    // Check if address matches from reconciliation data
+    let addressMatch = false;
+    let addressFormatDiffers = false;
+    let addressMatchStatus = 'Match';
+    let matchClass = 'text-warning';
+    let matchIconClass = 'fas fa-exclamation-triangle';
+
+    if (ocrData.reconciliation && ocrData.reconciliation.matches) {
+      addressMatch = ocrData.reconciliation.matches.restaurant_address === true;
+      // Check if format differs (would be in warnings if available)
+      if (addressMatch && ocrData.reconciliation.warnings) {
+        const formatWarning = ocrData.reconciliation.warnings.find((w) =>
+          w.includes('formats differ but match semantically'),
+        );
+        addressFormatDiffers = !!formatWarning;
+      }
+    } else {
+      // Use semantic address comparison with USPS normalization
+      if (typeof window.AddressUtils !== 'undefined' && window.AddressUtils.compareAddressesSemantic) {
+        const comparison = window.AddressUtils.compareAddressesSemantic(formAddress, ocrData.restaurant_address);
+        addressMatch = comparison.isMatch;
+        addressFormatDiffers = comparison.formatDiffers;
+      } else {
+        // Fallback: Simple address comparison (normalize and compare)
+        const formAddressLower = formAddress.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+        const ocrAddressLower = ocrData.restaurant_address.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+        addressMatch = formAddressLower && ocrAddressLower && (
+          formAddressLower === ocrAddressLower ||
+          formAddressLower.includes(ocrAddressLower) ||
+          ocrAddressLower.includes(formAddressLower)
+        );
+      }
+    }
+
+    // Determine match status and styling
+    if (addressMatch && addressFormatDiffers) {
+      addressMatchStatus = 'Match (format differs)';
+      matchClass = 'text-warning';
+      matchIconClass = 'fas fa-check-circle text-warning';
+    } else if (addressMatch) {
+      addressMatchStatus = 'Match';
+      matchClass = 'text-success';
+      matchIconClass = 'fas fa-check-circle';
+    } else {
+      addressMatchStatus = 'Mismatch';
+      matchClass = 'text-warning';
+      matchIconClass = 'fas fa-exclamation-triangle';
+    }
+
+    // Create address row
+    const addressRow = document.createElement('tr');
+    addressRow.setAttribute('data-field', 'restaurant_address');
+    const fieldCell = document.createElement('td');
+    const strong = document.createElement('strong');
+    strong.textContent = 'Restaurant Address';
+    const icon = document.createElement('i');
+    icon.className = matchIconClass;
+    fieldCell.appendChild(strong);
+    fieldCell.appendChild(document.createTextNode(' '));
+    fieldCell.appendChild(icon);
+    addressRow.appendChild(fieldCell);
+
+    const formValueCell = document.createElement('td');
+    formValueCell.className = matchClass;
+    // Use textContent which is safe - it doesn't execute HTML/JS
+    // textContent automatically escapes HTML entities, but we escape for extra safety
+    // Note: formAddress comes from ocrData but is safely escaped and used with textContent
+    const safeAddress = escapeHtml(formAddress);
+    formValueCell.textContent = safeAddress;
+    addressRow.appendChild(formValueCell);
+
+    const ocrValueCell = document.createElement('td');
+    ocrValueCell.className = matchClass;
+    // textContent automatically escapes HTML, but escape for extra safety
+    ocrValueCell.textContent = escapeHtml(ocrData.restaurant_address);
+    addressRow.appendChild(ocrValueCell);
+
+    const actionCell = document.createElement('td');
+    if (!addressMatch) {
+      const button = document.createElement('button');
+      button.className = 'btn btn-sm btn-primary';
+      button.textContent = 'Apply';
+      button.setAttribute('data-field', 'restaurant_address');
+      // Escape value to prevent XSS in data attribute
+      button.setAttribute('data-value', escapeDataAttribute(String(ocrData.restaurant_address || '')));
+      actionCell.appendChild(button);
+    } else {
+      actionCell.textContent = addressMatchStatus;
+    }
+    addressRow.appendChild(actionCell);
+
+    tbody.appendChild(addressRow);
+  }
+
+  // Restaurant phone comparison (always show if restaurant is selected)
+  if (formRestaurantId || ocrData.restaurant_phone) {
+    // Get phone from API response data (restaurant_address_data)
+    let formPhone = 'Not set';
+    if (ocrData.restaurant_address_data && ocrData.restaurant_address_data.phone) {
+      formPhone = ocrData.restaurant_address_data.phone;
+    }
+
+    const ocrPhone = ocrData.restaurant_phone || 'Not found on receipt';
+
+    // Normalize phone numbers for comparison (remove spaces, dashes, parentheses)
+    const normalizePhone = (phone) => {
+      if (!phone || phone === 'Not set' || phone === 'Not found on receipt') return '';
+      return phone.replace(/[\s\-()]/g, '').replace(/^\+?1/, '');
+    };
+
+    const formPhoneNormalized = normalizePhone(formPhone);
+    const ocrPhoneNormalized = normalizePhone(ocrPhone);
+    const phoneMatch = formPhoneNormalized && ocrPhoneNormalized && formPhoneNormalized === ocrPhoneNormalized;
+    const hasBothValues = formPhoneNormalized && ocrPhoneNormalized;
+
+    const matchClass = phoneMatch ? 'text-success' : (hasBothValues ? 'text-warning' : 'text-muted');
+    const matchIconClass = phoneMatch ? 'fas fa-check-circle' : (hasBothValues ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle');
+
+    const row = document.createElement('tr');
+    const fieldCell = document.createElement('td');
+    const strong = document.createElement('strong');
+    strong.textContent = 'Restaurant Phone';
+    const icon = document.createElement('i');
+    icon.className = matchIconClass;
+    fieldCell.appendChild(strong);
+    fieldCell.appendChild(document.createTextNode(' '));
+    fieldCell.appendChild(icon);
+    row.appendChild(fieldCell);
+
+    const formValueCell = document.createElement('td');
+    formValueCell.className = matchClass;
+    formValueCell.textContent = formPhone;
+    row.appendChild(formValueCell);
+
+    const ocrValueCell = document.createElement('td');
+    ocrValueCell.className = matchClass;
+    ocrValueCell.textContent = ocrPhone;
+    row.appendChild(ocrValueCell);
+
+    const actionCell = document.createElement('td');
+    if (ocrData.restaurant_phone && !phoneMatch) {
+      const button = document.createElement('button');
+      button.className = 'btn btn-sm btn-primary';
+      button.textContent = 'Apply';
+      button.setAttribute('data-field', 'restaurant_phone');
+      // Escape value to prevent XSS in data attribute
+      button.setAttribute('data-value', escapeDataAttribute(String(ocrData.restaurant_phone || '')));
+      actionCell.appendChild(button);
+    } else {
+      actionCell.textContent = phoneMatch ? 'Match' : '-';
+    }
+    row.appendChild(actionCell);
+
+    tbody.appendChild(row);
+  }
+
+  // Restaurant website comparison (always show if restaurant is selected)
+  if (formRestaurantId || ocrData.restaurant_website) {
+    // Get website from API response data (restaurant_address_data)
+    let formWebsite = 'Not set';
+    if (ocrData.restaurant_address_data && ocrData.restaurant_address_data.website) {
+      formWebsite = ocrData.restaurant_address_data.website;
+    }
+
+    const ocrWebsite = ocrData.restaurant_website || 'Not found on receipt';
+
+    // Normalize URLs for comparison (remove http://, https://, www., trailing slashes)
+    const normalizeWebsite = (url) => {
+      if (!url || url === 'Not set' || url === 'Not found on receipt') return '';
+      return url.toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .replace(/\/$/, '');
+    };
+
+    const formWebsiteNormalized = normalizeWebsite(formWebsite);
+    const ocrWebsiteNormalized = normalizeWebsite(ocrWebsite);
+    const websiteMatch = formWebsiteNormalized && ocrWebsiteNormalized && formWebsiteNormalized === ocrWebsiteNormalized;
+    const hasBothValues = formWebsiteNormalized && ocrWebsiteNormalized;
+
+    const matchClass = websiteMatch ? 'text-success' : (hasBothValues ? 'text-warning' : 'text-muted');
+    const matchIconClass = websiteMatch ? 'fas fa-check-circle' : (hasBothValues ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle');
+
+    const row = document.createElement('tr');
+    const fieldCell = document.createElement('td');
+    const strong = document.createElement('strong');
+    strong.textContent = 'Restaurant Website';
+    const icon = document.createElement('i');
+    icon.className = matchIconClass;
+    fieldCell.appendChild(strong);
+    fieldCell.appendChild(document.createTextNode(' '));
+    fieldCell.appendChild(icon);
+    row.appendChild(fieldCell);
+
+    const formValueCell = document.createElement('td');
+    formValueCell.className = matchClass;
+    formValueCell.textContent = formWebsite;
+    row.appendChild(formValueCell);
+
+    const ocrValueCell = document.createElement('td');
+    ocrValueCell.className = matchClass;
+    ocrValueCell.textContent = ocrWebsite;
+    row.appendChild(ocrValueCell);
+
+    const actionCell = document.createElement('td');
+    if (ocrData.restaurant_website && !websiteMatch) {
+      const button = document.createElement('button');
+      button.className = 'btn btn-sm btn-primary';
+      button.textContent = 'Apply';
+      button.setAttribute('data-field', 'restaurant_website');
+      // Escape value to prevent XSS in data attribute
+      button.setAttribute('data-value', escapeDataAttribute(String(ocrData.restaurant_website || '')));
+      actionCell.appendChild(button);
+    } else {
+      actionCell.textContent = websiteMatch ? 'Match' : '-';
+    }
+    row.appendChild(actionCell);
+
+    tbody.appendChild(row);
+  }
+
+  // Complete table structure
+  table.appendChild(tbody);
+  fragment.appendChild(table);
+
+  // Use requestAnimationFrame to batch DOM updates and prevent blocking
+  requestAnimationFrame(() => {
+    resultsDiv.innerHTML = '';
+    resultsDiv.appendChild(fragment);
+    panelDiv.style.display = 'block';
+
+    // Attach event listeners after DOM is updated (defer to avoid blocking)
+    requestAnimationFrame(() => {
+      const applyButtons = resultsDiv.querySelectorAll('button.btn-primary');
+      applyButtons.forEach((button) => {
+        const field = button.getAttribute('data-field');
+        const value = button.getAttribute('data-value');
+        if (field && value) {
+          button.addEventListener('click', (e) => {
+            e.preventDefault();
+            applyOCRSuggestion(field, value);
+          });
+        }
+      });
+    });
+  });
+}
+
+/**
+ * View receipt in new tab
+ */
+function viewReceipt() {
+  const receiptInput = document.getElementById('receipt_image');
+  if (!receiptInput) return;
+
+  // Clean up previous blob URL if exists
+  if (window.currentReceiptBlobUrl) {
+    URL.revokeObjectURL(window.currentReceiptBlobUrl);
+    window.currentReceiptBlobUrl = null;
+  }
+
+  if (receiptInput.files && receiptInput.files.length > 0) {
+    const [file] = receiptInput.files;
+    try {
+      // Create blob URL and open in new tab
+      const blobUrl = URL.createObjectURL(file);
+      window.currentReceiptBlobUrl = blobUrl;
+      window.open(blobUrl, '_blank');
+    } catch (_error) {
+      showNotification('Failed to open receipt', 'error');
+    }
+  } else {
+    // Check for existing receipt URL
+    const existingReceiptUrl = receiptInput.getAttribute('data-existing-receipt');
+    if (existingReceiptUrl) {
+      window.open(existingReceiptUrl, '_blank');
+    } else {
+      showNotification('No receipt file available', 'warning');
+    }
+  }
+}
+
+/**
+ * Process receipt with OCR to extract data
+ */
+async function processReceiptOCR() {
+  const receiptInput = document.getElementById('receipt_image');
+  const processBtn = document.getElementById('process-receipt-btn');
+  const statusDiv = document.getElementById('ocr-processing-status');
+  const statusText = document.getElementById('ocr-status-text');
+  const panelDiv = document.getElementById('reconciliation-panel');
+
+  if (!receiptInput) {
+    showNotification('Receipt input not found', 'error');
+    return;
+  }
+
+  let file;
+  const hasNewFile = receiptInput.files && receiptInput.files.length > 0;
+
+  if (hasNewFile) {
+    // Existing behavior: use newly selected file
+    [file] = receiptInput.files;
+  } else {
+    // New behavior: fetch existing receipt
+    const existingReceiptUrl = receiptInput.getAttribute('data-existing-receipt');
+    if (!existingReceiptUrl) {
+      showNotification('Please select a receipt file first', 'warning');
+      return;
+    }
+
+    // Fetch existing receipt and convert to File
+    try {
+      // Include credentials to ensure authenticated requests work
+      const response = await fetch(existingReceiptUrl, {
+        credentials: 'same-origin',
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch receipt: ${response.status} ${response.statusText}`);
+      }
+      const blob = await response.blob();
+      // Determine filename from URL or use default
+      const urlParts = existingReceiptUrl.split('/');
+      const filename = urlParts[urlParts.length - 1].split('?')[0] || 'receipt.pdf';
+      file = new File([blob], filename, { type: blob.type });
+    } catch (error) {
+      console.error('Error fetching existing receipt:', error);
+      showNotification(`Failed to load existing receipt: ${error.message}`, 'error');
+      return;
+    }
+  }
+
+  // Validate file size (5MB)
+  const maxSize = 5 * 1024 * 1024;
+  if (file.size > maxSize) {
+    showNotification('File is too large. Maximum size is 5MB.', 'error');
+    return;
+  }
+
+  // Show processing status
+  if (statusDiv && statusText) {
+    statusDiv.style.display = 'block';
+    statusText.textContent = 'Processing receipt with OCR...';
+    processBtn.disabled = true;
+  }
+
+  // Hide previous reconciliation results
+  if (panelDiv) {
+    panelDiv.style.display = 'none';
+  }
+
+  try {
+    // Create form data
+    const formData = new FormData();
+    formData.append('receipt_file', file);
+
+    // Add form values as hints for better matching (especially for bank statements)
+    const amountInput = document.getElementById('amount');
+    const dateInput = document.getElementById('date');
+    const restaurantSelect = document.getElementById('restaurant_id');
+
+    if (amountInput && amountInput.value) {
+      formData.append('form_amount', amountInput.value);
+    }
+    if (dateInput && dateInput.value) {
+      formData.append('form_date', dateInput.value);
+    }
+    if (restaurantSelect && restaurantSelect.selectedOptions[0]) {
+      formData.append('form_restaurant_name', restaurantSelect.selectedOptions[0].text);
+      if (restaurantSelect.value) {
+        formData.append('form_restaurant_id', restaurantSelect.value);
+      }
+    }
+
+    // Get CSRF token (check meta tag first, then form input)
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) {
+      const csrfInput = document.querySelector('input[name="csrf_token"]');
+      csrfToken = csrfInput ? csrfInput.value : '';
+    }
+
+    if (!csrfToken) {
+      showNotification('CSRF token not found', 'error');
+      return;
+    }
+
+    // Send to OCR API
+    const response = await fetch('/api/v1/receipts/ocr', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+      },
+      body: formData,
+    });
+
+    const result = await response.json();
+
+    if (result.status === 'success' && result.data) {
+      // Display reconciliation results
+      displayReconciliationResults(result.data);
+      showNotification('Receipt processed successfully', 'success');
+    } else {
+      showNotification(result.message || 'Failed to process receipt', 'error');
+    }
+  } catch (_error) {
+    showNotification('Failed to process receipt', 'error');
+  } finally {
+    // Reset processing status
+    if (statusDiv && statusText) {
+      statusDiv.style.display = 'none';
+      statusText.textContent = '';
+      processBtn.disabled = false;
+    }
+  }
+}
+
+/**
+ * Process receipt with OCR when file is selected
+ */
+function setupReceiptOCR() {
+  const receiptInput = document.getElementById('receipt_image');
+  const processBtn = document.getElementById('process-receipt-btn');
+  const viewBtn = document.getElementById('view-receipt-btn');
+
+  if (receiptInput && processBtn && viewBtn) {
+    // Function to check if buttons should be enabled
+    const updateButtonState = () => {
+      const hasFile = receiptInput.files && receiptInput.files.length > 0;
+      const hasExistingReceipt = receiptInput.getAttribute('data-existing-receipt');
+
+      // View button: only enable when new file is selected
+      viewBtn.disabled = !hasFile;
+
+      // Process button: enable when new file OR existing receipt is available
+      processBtn.disabled = !(hasFile || hasExistingReceipt);
+    };
+
+    // Update button state when file is selected
+    receiptInput.addEventListener('change', () => {
+      updateButtonState();
+    });
+
+    // Initial state check - buttons start disabled unless file is selected
+    updateButtonState();
+
+    // Simple click handler - opens receipt in new tab
+    viewBtn.removeAttribute('onclick');
+    viewBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      viewReceipt();
+    });
+
+    // Process receipt button click handler
+    processBtn.removeAttribute('onclick');
+    processBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      processReceiptOCR();
+    });
+  }
+}
+
+/**
+ * Apply all OCR suggestions
+ */
+function applyAllSuggestions() {
+  const resultsDiv = document.getElementById('reconciliation-results');
+  if (!resultsDiv) {
+    return;
+  }
+
+  const applyButtons = resultsDiv.querySelectorAll('button.btn-primary');
+  applyButtons.forEach((button) => {
+    const onclick = button.getAttribute('onclick');
+    if (onclick) {
+      // Extract function call and execute it
+      const match = onclick.match(/applyOCRSuggestion\('([^']+)',\s*'([^']+)'\)/);
+      if (match) {
+        applyOCRSuggestion(match[1], match[2]);
+      }
+    }
+  });
+
+  showNotification('All suggestions applied', 'success');
+}
+
+/**
+ * Dismiss reconciliation panel
+ */
+function dismissReconciliation() {
+  const panelDiv = document.getElementById('reconciliation-panel');
+  if (panelDiv) {
+    panelDiv.style.display = 'none';
+  }
+}
+
+/**
+ * Delete receipt (matches inline template function behavior)
+ */
+function deleteReceipt() {
+  if (confirm('Are you sure you want to delete this receipt? This action cannot be undone.')) {
+    const deleteReceiptInput = document.getElementById('delete_receipt');
+    const receiptInput = document.getElementById('receipt_image');
+
+    if (deleteReceiptInput) {
+      deleteReceiptInput.value = 'true';
+    }
+
+    if (receiptInput) {
+      receiptInput.value = '';
+    }
+
+    // Hide reconciliation panel if visible
+    dismissReconciliation();
+
+    // Hide the receipt actions
+    const receiptActions = document.querySelector('.d-flex.gap-2');
+    if (receiptActions) {
+      receiptActions.style.display = 'none';
+    }
+
+    showNotification('Receipt marked for deletion', 'info');
+  }
+}
+
+// Make OCR functions globally accessible for onclick handlers
+window.processReceiptOCR = processReceiptOCR;
+window.applyOCRSuggestion = applyOCRSuggestion;
+window.applyAllSuggestions = applyAllSuggestions;
+window.dismissReconciliation = dismissReconciliation;
+window.deleteReceipt = deleteReceipt;
+window.viewReceipt = viewReceipt;
+
+// Initialize receipt OCR when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  setupReceiptOCR();
+});
 
 // Initialize the form when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', initializeExpenseForm);

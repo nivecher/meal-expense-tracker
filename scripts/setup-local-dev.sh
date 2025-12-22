@@ -540,6 +540,37 @@ install_aws_cli_impl() {
   esac
 }
 
+# Tesseract OCR installation (single responsibility)
+install_tesseract_impl() {
+  local -r pkg_mgr="$(detect_package_manager)"
+
+  case "$pkg_mgr" in
+    "apt")
+      # Check if Tesseract is already installed
+      if dpkg -l | grep -q "^ii.*tesseract-ocr"; then
+        log_info "Tesseract OCR already installed via package manager"
+      else
+        # Install Tesseract OCR and Poppler (for PDF support)
+        sudo apt-get update
+        sudo apt-get install -y tesseract-ocr poppler-utils
+      fi
+      ;;
+    "yum")
+      sudo yum install -y tesseract poppler-utils
+      ;;
+    "dnf")
+      sudo dnf install -y tesseract poppler-utils
+      ;;
+    "brew")
+      brew install tesseract poppler
+      ;;
+    *)
+      log_error "Unsupported package manager for Tesseract OCR: $pkg_mgr"
+      return 1
+      ;;
+  esac
+}
+
 # =============================================================================
 # PYTHON ENVIRONMENT (Single Responsibility)
 # =============================================================================
@@ -746,6 +777,7 @@ install_all_tools() {
   install_tool_if_missing "terraform" install_terraform_impl
   install_tool_if_missing "aws" install_aws_cli_impl
   install_tool_if_missing "act" install_act_impl
+  install_tool_if_missing "tesseract" install_tesseract_impl
   install_arm64_toolchain_impl
 }
 
@@ -850,7 +882,7 @@ run_auto_mode() {
 
   # Check what's missing
   local missing_tools=()
-  local tools=("terraform" "trivy" "aws" "docker")
+  local tools=("terraform" "trivy" "aws" "docker" "tesseract")
 
   for tool in "${tools[@]}"; do
     if ! command_exists "$tool"; then
@@ -929,7 +961,7 @@ run_minimal_mode() {
 
   # Check what's missing
   local missing_tools=()
-  local tools=("terraform" "trivy" "aws" "docker")
+  local tools=("terraform" "trivy" "aws" "docker" "tesseract")
 
   for tool in "${tools[@]}"; do
     if ! command_exists "$tool"; then
@@ -981,12 +1013,12 @@ run_debug_mode() {
 
   # Check existing installations
   log_section "Existing Tool Installations"
-  local tools=("terraform" "trivy" "aws" "act" "docker" "aarch64-linux-gnu-gcc" "qemu-aarch64-static")
+  local tools=("terraform" "trivy" "aws" "act" "docker" "tesseract" "aarch64-linux-gnu-gcc" "qemu-aarch64-static")
 
   for tool in "${tools[@]}"; do
     if command_exists "$tool"; then
       log_info "$tool: ✅ Installed"
-      if [[ "$tool" == "terraform" || "$tool" == "aws" || "$tool" == "trivy" ]]; then
+      if [[ "$tool" == "terraform" || "$tool" == "aws" || "$tool" == "trivy" || "$tool" == "tesseract" ]]; then
         log_info "  Version: $($tool --version 2>/dev/null | head -n1 || echo 'Version check failed')"
       fi
     else

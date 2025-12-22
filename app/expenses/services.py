@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime, time, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 import io
 import json
+import re
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 from flask import Request, current_app
@@ -577,27 +578,56 @@ def create_expense(
 def _combine_date_time_with_timezone(date_value: date, time_value: time | None, browser_timezone: str) -> datetime:
     """Combine date and time into a datetime object, handling timezone conversion.
 
+    WYSIWYG (What You See Is What You Get): The user enters date/time in their browser timezone,
+    and that's exactly what gets stored (converted to UTC). When displayed back, it will show
+    the same date/time in the browser timezone.
+
     Args:
-        date_value: The date value (required)
-        time_value: The time value (optional)
+        date_value: The date value (required) - interpreted as date in browser timezone
+        time_value: The time value (optional) - interpreted as time in browser timezone
         browser_timezone: Browser timezone string (already normalized)
 
     Returns:
-        Datetime object in UTC (without tzinfo for storage)
+        Datetime object in UTC (timezone-aware for proper database storage)
+        Note: The UTC date may differ from date_value if time_value causes a date shift.
+        This is expected and correct - when converted back to browser timezone, it will
+        display as the original date_value and time_value.
     """
+    from datetime import UTC
+
+    from flask import current_app
+
+    from app.utils.timezone_utils import get_timezone
+
+    browser_tz = get_timezone(browser_timezone)
+
     if time_value:
         # Use the provided time - interpret as browser's local time
-        from zoneinfo import ZoneInfo
-
-        from app.utils.timezone_utils import get_timezone
-
-        browser_tz = get_timezone(browser_timezone)
+        # This is WYSIWYG: what user enters is what gets stored (in UTC)
         browser_datetime = datetime.combine(date_value, time_value)
         # Localize to browser's timezone, then convert to UTC for storage
         browser_datetime_tz = browser_datetime.replace(tzinfo=browser_tz)
-        return browser_datetime_tz.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
-    # Use noon to avoid timezone issues (as we did before)
-    return datetime.combine(date_value, time(12, 0))
+        result = browser_datetime_tz.astimezone(UTC)
+        current_app.logger.debug(
+            f"_combine_date_time_with_timezone: date={date_value}, time={time_value}, "
+            f"browser_tz={browser_timezone}, browser_datetime={browser_datetime_tz}, "
+            f"result_utc={result} (UTC date may differ if time crosses midnight)"
+        )
+        return result
+
+    # Use noon in browser timezone to avoid date shifts when no time is provided
+    # This ensures the date_value is preserved when displayed back
+    browser_datetime = datetime.combine(date_value, time(12, 0))
+    browser_datetime_tz = browser_datetime.replace(tzinfo=browser_tz)
+    # Convert to UTC and return timezone-aware datetime
+    # Database expects timezone-aware for timezone=True columns
+    result = browser_datetime_tz.astimezone(UTC)
+    current_app.logger.debug(
+        f"_combine_date_time_with_timezone: date={date_value}, time=None (using noon), "
+        f"browser_tz={browser_timezone}, browser_datetime={browser_datetime_tz}, "
+        f"result_utc={result}"
+    )
+    return result
 
 
 def _process_expense_form_data(
@@ -648,6 +678,11 @@ def _process_expense_form_data(
 
     # Combine date and time into a datetime object
     datetime_value = _combine_date_time_with_timezone(date_value, time_value, browser_timezone)
+    current_app.logger.debug(
+        f"Date processing: form_date={form.date.data}, processed_date={date_value}, "
+        f"form_time={form.time.data}, processed_time={time_value}, "
+        f"browser_tz={browser_timezone}, result_datetime={datetime_value}"
+    )
 
     return category_id, restaurant_id, datetime_value, amount, tags
 
@@ -764,7 +799,16 @@ def update_expense(
 
         # Update expense fields
         expense.amount = Decimal(str(amount))
+        # date_value from _combine_date_time_with_timezone is already timezone-aware (UTC)
+        old_date = expense.date
         expense.date = date_value
+        current_app.logger.info(
+            f"Updating expense {expense.id} date: "
+            f"OLD: {old_date} (tz-aware: {old_date.tzinfo is not None if old_date else 'N/A'}), "
+            f"NEW: {date_value} (tz-aware: {date_value.tzinfo is not None}), "
+            f"Browser TZ={browser_timezone}, "
+            f"Form date={form.date.data}, Form time={form.time.data}"
+        )
         expense.notes = form.notes.data.strip() if form.notes.data else None
         expense.category_id = category_id
         expense.restaurant_id = restaurant_id
@@ -2250,3 +2294,188 @@ def get_popular_tags(user_id: int, limit: int = 10) -> list[dict]:
     )
 
     return [{"tag": tag.to_dict(), "usage_count": usage_count} for tag, usage_count in result]
+
+
+# =============================================================================
+# RECEIPT OCR RECONCILIATION FUNCTIONALITY
+# =============================================================================
+
+
+def _parse_time_string(time_str: str) -> tuple[int, int, str]:
+    """Parse time string in HH:MM AM/PM format.
+
+    Args:
+        time_str: Time string like "12:55 PM" or "9:30 AM"
+
+    Returns:
+        Tuple of (hour, minute, am_pm) where hour is 1-12, minute is 0-59, am_pm is "AM" or "PM"
+    """
+    time_str = time_str.strip().upper()
+    # Match pattern like "12:55 PM" or "9:30 AM"
+    match = re.match(r"(\d{1,2}):(\d{2})\s*(AM|PM)?", time_str)
+    if match:
+        hour = int(match.group(1))
+        minute = int(match.group(2))
+        am_pm = match.group(3) if match.group(3) else "AM"
+        return hour, minute, am_pm
+    raise ValueError(f"Invalid time format: {time_str}")
+
+
+def reconcile_receipt_with_expense(expense: Expense, receipt_data: dict[str, Any]) -> dict[str, Any]:
+    """Reconcile OCR-extracted receipt data with expense form data.
+
+    Args:
+        expense: The expense object to reconcile
+        receipt_data: Dictionary containing OCR-extracted data from receipt
+
+    Returns:
+        Dictionary containing:
+        - matches: dict mapping field names to boolean match status
+        - suggestions: dict mapping field names to suggested values
+        - warnings: list of mismatch warning messages
+        - confidence: overall confidence score (0.0-1.0)
+    """
+    matches: dict[str, bool] = {}
+    suggestions: dict[str, Any] = {}
+    warnings: list[str] = []
+
+    # Extract OCR data
+    ocr_amount = Decimal(receipt_data.get("amount") or receipt_data.get("total") or "0")
+    ocr_date_str = receipt_data.get("date")
+    ocr_time_str = receipt_data.get("time", "").strip()
+    ocr_restaurant = receipt_data.get("restaurant_name", "").strip()
+    ocr_address = receipt_data.get("restaurant_address", "").strip()
+    ocr_confidence = receipt_data.get("confidence_scores", {})
+
+    # Compare amount
+    if ocr_amount > 0:
+        expense_amount = expense.amount
+        amount_diff = abs(expense_amount - ocr_amount)
+        amount_tolerance = Decimal("0.01")  # Allow 1 cent difference
+
+        if amount_diff <= amount_tolerance:
+            matches["amount"] = True
+        else:
+            matches["amount"] = False
+            suggestions["amount"] = str(ocr_amount)
+            warnings.append(f"Amount mismatch: Form has ${expense_amount}, receipt shows ${ocr_amount}")
+
+    # Compare date
+    if ocr_date_str:
+        try:
+            from datetime import datetime
+
+            ocr_date = datetime.fromisoformat(ocr_date_str.replace("Z", "+00:00"))
+            expense_date = expense.date.replace(tzinfo=None) if expense.date.tzinfo else expense.date
+            ocr_date_only = ocr_date.date()
+            expense_date_only = expense_date.date()
+
+            # Allow ±1 day difference (timezone/rounding issues)
+            date_diff = abs((ocr_date_only - expense_date_only).days)
+
+            if date_diff <= 1:
+                matches["date"] = True
+            else:
+                matches["date"] = False
+                suggestions["date"] = ocr_date_only.isoformat()
+                warnings.append(f"Date mismatch: Form has {expense_date_only}, receipt shows {ocr_date_only}")
+        except Exception as e:
+            current_app.logger.warning(f"Failed to compare dates: {e}")
+            matches["date"] = False
+
+    # Compare restaurant name (fuzzy matching)
+    if ocr_restaurant and expense.restaurant:
+        import jellyfish
+
+        expense_restaurant_name = expense.restaurant.name.strip().lower()
+        ocr_restaurant_lower = ocr_restaurant.lower()
+
+        # Exact match
+        if expense_restaurant_name == ocr_restaurant_lower:
+            matches["restaurant"] = True
+        else:
+            # Fuzzy match using Jaro-Winkler similarity
+            similarity = jellyfish.jaro_winkler_similarity(expense_restaurant_name, ocr_restaurant_lower)
+
+            if similarity >= 0.85:  # 85% similarity threshold
+                matches["restaurant"] = True
+            else:
+                matches["restaurant"] = False
+                suggestions["restaurant"] = ocr_restaurant
+                warnings.append(
+                    f"Restaurant name mismatch: Form has '{expense.restaurant.name}', receipt shows '{ocr_restaurant}'"
+                )
+
+    # Compare restaurant address (if both are available)
+    if ocr_address and expense.restaurant:
+        expense_address = expense.restaurant.full_address or ""
+
+        if expense_address and ocr_address:
+            # Use semantic address comparison with USPS normalization
+            from app.utils.address_utils import compare_addresses_semantic
+
+            is_match, format_differs = compare_addresses_semantic(expense_address, ocr_address)
+
+            if is_match:
+                matches["restaurant_address"] = True
+                if format_differs:
+                    warnings.append(
+                        f"Restaurant address formats differ but match semantically: "
+                        f"Form has '{expense_address}', receipt shows '{ocr_address}'"
+                    )
+            else:
+                # Fallback to fuzzy match using Jaro-Winkler similarity
+                expense_normalized = re.sub(r"[^\w\s]", "", expense_address.lower())
+                expense_normalized = re.sub(r"\s+", " ", expense_normalized).strip()
+                ocr_normalized = re.sub(r"[^\w\s]", "", ocr_address.lower())
+                ocr_normalized = re.sub(r"\s+", " ", ocr_normalized).strip()
+
+                similarity = jellyfish.jaro_winkler_similarity(expense_normalized, ocr_normalized)
+
+                if similarity >= 0.80:  # 80% similarity threshold for addresses
+                    matches["restaurant_address"] = True
+                else:
+                    matches["restaurant_address"] = False
+                    suggestions["restaurant_address"] = ocr_address
+                    warnings.append(
+                        f"Restaurant address mismatch: Form has '{expense_address}', receipt shows '{ocr_address}'"
+                    )
+        elif ocr_address:
+            # OCR found address but expense doesn't have one - suggest it
+            matches["restaurant_address"] = False
+            suggestions["restaurant_address"] = ocr_address
+
+    # Calculate overall confidence
+    if matches:
+        match_count = sum(1 for v in matches.values() if v)
+        total_fields = len(matches)
+        confidence = match_count / total_fields if total_fields > 0 else 0.0
+
+        # Adjust confidence based on OCR confidence scores
+        if ocr_confidence:
+            avg_ocr_confidence = sum(ocr_confidence.values()) / len(ocr_confidence) if ocr_confidence else 0.0
+            confidence = (confidence + avg_ocr_confidence) / 2.0
+    else:
+        confidence = 0.0
+
+    # Include restaurant address in response for UI comparison
+    restaurant_address_data = None
+    if expense.restaurant:
+        restaurant_address_data = {
+            "full_address": expense.restaurant.full_address,
+            "address_line_1": expense.restaurant.address_line_1,
+            "address_line_2": expense.restaurant.address_line_2,
+            "city": expense.restaurant.city,
+            "state": expense.restaurant.state,
+            "postal_code": expense.restaurant.postal_code,
+        }
+
+    return {
+        "matches": matches,
+        "suggestions": suggestions,
+        "warnings": warnings,
+        "confidence": round(confidence, 2),
+        "restaurant_address": restaurant_address_data,
+        "ocr_restaurant_address": ocr_address,
+        "ocr_time": ocr_time_str,
+    }

@@ -37,6 +37,13 @@ your culinary experiences.
   - Automatic fallback to ensure compatibility
   - No deprecation warnings
 
+- **Receipt OCR (Optical Character Recognition)**
+  - Extract expense data from receipt images/PDFs using Tesseract OCR (FREE)
+  - Automatic reconciliation of OCR data with form entries
+  - Visual comparison of extracted vs entered data
+  - One-click application of OCR suggestions
+  - **Note:** Requires Tesseract OCR binary (system dependency) - see Installation section
+
 ## 🛠️ Command Line Interface (CLI)
 
 The application provides several useful CLI commands for administration and maintenance:
@@ -183,6 +190,13 @@ You can check the current version in several ways:
 ### Prerequisites
 
 - **Python 3.13+** (required)
+- **Tesseract OCR** (optional, for receipt OCR feature)
+  - Linux/WSL: `sudo apt-get install tesseract-ocr poppler-utils`
+  - macOS: `brew install tesseract poppler`
+  - Windows: 
+    - Tesseract: Download from https://github.com/UB-Mannheim/tesseract/wiki
+    - Poppler: Download from https://github.com/oschwartz10612/poppler-windows/releases
+  - **Note:** The app works without these - OCR feature will be disabled if not installed. Poppler is required for PDF receipt processing.
 - **Docker & Docker Compose** (optional, for containerized development)
 - **Terraform** (optional, for infrastructure deployment)
 - **AWS CLI** (optional, for cloud deployment)
@@ -296,6 +310,20 @@ make security-scan     # Security vulnerability scan
 ```
 
 ### 📦 Requirements & Dependencies
+
+**Python Dependencies:**
+All Python dependencies are pinned in `requirements.txt` and `requirements-dev.txt`. Install with:
+```bash
+pip install -r requirements.txt  # Production dependencies
+pip install -r requirements-dev.txt  # Development dependencies
+```
+
+**System Binary Dependencies:**
+- **Tesseract OCR** (optional, for receipt OCR feature)
+  - Required only if you want OCR functionality
+  - Cannot be installed via pip (it's a system binary, like PostgreSQL)
+  - See Prerequisites section above for installation instructions
+  - The application gracefully handles missing Tesseract - OCR simply won't be available
 
 ```bash
 # Requirements management

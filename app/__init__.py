@@ -210,6 +210,7 @@ def _set_security_headers(response: Response, content_type: str) -> None:
             "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
             "img-src 'self' data: https: blob: https://places.googleapis.com https://maps.googleapis.com; "
             "connect-src 'self' https://maps.googleapis.com https://places.googleapis.com https://cdn.jsdelivr.net; "
+            "frame-src 'self' data: blob:; "
             "frame-ancestors 'none'; "
             "object-src 'none'; "
             "base-uri 'self';"

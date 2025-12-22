@@ -9,7 +9,7 @@ click==8.1.7                       # Command-line interface creation, used for F
 
 # Security
 Flask-Login>=0.6.3,<0.7.0          # User session management and authentication for Flask
-Flask-Limiter==3.5.0               # Rate limiting for Flask endpoints to prevent abuse (pinned to stable version)
+Flask-Limiter>=4.0.0,<5.0.0       # Rate limiting for Flask endpoints to prevent abuse (4.0.0+ supports rich 14.x)
 Flask-Cors>=6.0.1,<7.0.0           # Cross-Origin Resource Sharing (CORS) support for API endpoints (6.0.1+ fixes CVE-2024-6839, CVE-2024-6844, CVE-2024-6866)
 
 # Database
@@ -40,3 +40,8 @@ msgspec>=0.18.0,<1.0.0             # Fast serialization/deserialization for JSON
 
 # US state and territory lookup library
 us==3.2.0                         # US state and territory lookup library
+
+# OCR (Optical Character Recognition) - FREE open-source solution
+pytesseract>=0.3.10,<1.0.0        # Python wrapper for Tesseract OCR (FREE, open-source)
+Pillow>=10.0.0,<11.0.0            # Image processing library for OCR preprocessing (FREE, open-source)
+PyMuPDF>=1.24.0,<2.0.0            # PDF text extraction and rendering (FREE, AGPL license) - faster than pdf2image, no system deps

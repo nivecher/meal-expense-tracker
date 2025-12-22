@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Version management script with security enhancements.
 
 This script updates version information in project files with proper security measures.
@@ -10,9 +11,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-from typing import List, Optional, Tuple
-
-import toml
 
 # Configure logging
 logging.basicConfig(
@@ -23,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 VERSION_PATTERN = r"^v\d+\.\d+\.\d+$"
+VERSION_WITH_SUFFIX_PATTERN = r"^v\d+\.\d+\.\d+(\.dev\d+)?(\+.*)?$"
 MAX_TAG_LENGTH = 50
 
 
@@ -74,7 +73,7 @@ def validate_version(version: str) -> bool:
     """Validate version string format.
 
     Args:
-        version: Version string to validate (e.g., 'v1.2.3')
+        version: Version string to validate (e.g., 'v1.2.3' or 'v1.2.3.dev1')
 
     Returns:
         bool: True if valid, False otherwise
@@ -83,7 +82,8 @@ def validate_version(version: str) -> bool:
         return False
     if len(version) > MAX_TAG_LENGTH:
         return False
-    return bool(re.match(VERSION_PATTERN, version))
+    # Accept both base version and version with dev/local suffix
+    return bool(re.match(VERSION_PATTERN, version) or re.match(VERSION_WITH_SUFFIX_PATTERN, version))
 
 
 def get_latest_git_tag() -> str | None:
@@ -100,7 +100,8 @@ def get_latest_git_tag() -> str | None:
     valid_tags = []
     for tag in output.splitlines():
         tag = tag.strip()
-        if validate_version(tag):
+        # Only accept base version tags (no dev/local suffixes)
+        if re.match(VERSION_PATTERN, tag):
             try:
                 # Convert version string to tuple of integers for proper sorting
                 version_parts = tuple(map(int, tag[1:].split(".")))
@@ -116,34 +117,63 @@ def get_latest_git_tag() -> str | None:
     return valid_tags[-1][1]
 
 
-def update_pyproject_version(version: str) -> bool:
-    """Update version in pyproject.toml with validation.
+def get_commits_after_tag(tag: str) -> int:
+    """Get the number of commits after the given tag.
 
     Args:
-        version: Version string to set (e.g., 'v1.2.3')
+        tag: Git tag to check
+
+    Returns:
+        int: Number of commits after the tag, or 0 if tag not found or error
+    """
+    success, output = _run_git_command(["rev-list", "--count", f"{tag}..HEAD"])
+    if not success:
+        return 0
+    try:
+        return int(output)
+    except ValueError:
+        return 0
+
+
+def has_uncommitted_changes() -> bool:
+    """Check if there are uncommitted changes in the working directory.
+
+    Returns:
+        bool: True if there are uncommitted changes, False otherwise
+    """
+    success, output = _run_git_command(["status", "--porcelain"])
+    if not success:
+        return False
+    return bool(output.strip())
+
+
+def update_pyproject_version(version: str) -> bool:
+    """Update version in _version.py with validation.
+
+    Args:
+        version: Version string to set (e.g., 'v1.2.3' or '1.2.3' or '1.2.3.dev1+local')
 
     Returns:
         bool: True if update was successful, False otherwise
     """
-    if not validate_version(version):
+    # For validation, check if it's a base version (needs 'v' prefix) or already has suffix
+    if version.startswith("v"):
+        version_for_validation = version
+    elif re.match(r"^\d+\.\d+\.\d+(\.dev\d+)?(\+.*)?$", version):
+        # Already has dev/local suffix, add 'v' prefix for validation
+        version_for_validation = f"v{version}"
+    else:
+        # Base version without 'v', add it for validation
+        version_for_validation = f"v{version}"
+
+    is_valid = validate_version(version_for_validation)
+
+    if not is_valid:
         logger.error("Invalid version format: %s", version)
         return False
 
-    pyproject_path = Path("pyproject.toml")
-    if not pyproject_path.exists() or not pyproject_path.is_file():
-        logger.error("pyproject.toml not found or is not a file")
-        return False
-
-    # Read current pyproject.toml
-    pyproject = toml.load(pyproject_path)
-
-    # Update Python version in mypy configuration
-    if "tool" in pyproject and "mypy" in pyproject["tool"]:
-        pyproject["tool"]["mypy"]["python_version"] = ".".join(version.split(".")[:2])
-
-    # Write back to file
-    with open(pyproject_path, "w") as f:
-        toml.dump(pyproject, f)
+    # Normalize version for file storage (remove 'v' prefix if present)
+    normalized_version = version[1:] if version.startswith("v") else version
 
     # Use setuptools-scm to generate version file (handles dev versions correctly)
     try:
@@ -161,7 +191,7 @@ def update_pyproject_version(version: str) -> bool:
         logger.warning("setuptools-scm not available, writing static version")
         version_file = Path("app/_version.py")
         version_file.parent.mkdir(parents=True, exist_ok=True)
-        version_file.write_text(f'__version__ = "{version}"\n')
+        version_file.write_text(f'__version__ = "{normalized_version}"\n')
 
     return True
 
@@ -209,17 +239,39 @@ def main() -> None:
             logger.error("No valid version tags found in the repository")
             sys.exit(1)
 
-        # Normalize versions for comparison (remove 'v' prefix if present)
-        normalized_latest = latest_tag[1:] if latest_tag.startswith("v") else latest_tag
+        # Normalize base version (remove 'v' prefix if present)
+        base_version = latest_tag[1:] if latest_tag.startswith("v") else latest_tag
 
-        if current_version and normalized_latest == current_version:
-            logger.info("Current version %s is already up to date", current_version)
-            return
+        # Check for commits after tag and uncommitted changes
+        commits_after = get_commits_after_tag(latest_tag)
+        has_uncommitted = has_uncommitted_changes()
 
-        # Update pyproject.toml
-        logger.info("Updating to version %s", normalized_latest)
-        if update_pyproject_version(normalized_latest):
-            logger.info("Successfully updated to version %s", normalized_latest)
+        # Build version string following PEP 440
+        version_parts = [base_version]
+        if commits_after > 0:
+            version_parts.append(f".dev{commits_after}")
+        if has_uncommitted:
+            version_parts.append("+local")
+
+        computed_version = "".join(version_parts)
+
+        logger.info("Commits after tag: %d", commits_after)
+        logger.info("Uncommitted changes: %s", "Yes" if has_uncommitted else "No")
+        logger.info("Computed version: %s", computed_version)
+
+        # Compare with current version (compare base versions, ignoring dev/local suffixes)
+        if current_version:
+            # Extract base version from current (remove .dev* and +* suffixes)
+            current_base = re.sub(r"\.dev\d+.*$", "", current_version)
+            current_base = re.sub(r"\+.*$", "", current_base)
+            if current_base == base_version and current_version == computed_version:
+                logger.info("Current version %s is already up to date", current_version)
+                return
+
+        # Update version file
+        logger.info("Updating to version %s", computed_version)
+        if update_pyproject_version(computed_version):
+            logger.info("Successfully updated to version %s", computed_version)
         else:
             logger.error("Failed to update project files")
             sys.exit(1)
