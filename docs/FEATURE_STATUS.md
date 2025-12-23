@@ -253,6 +253,7 @@ This document serves as the single source of truth for the implementation status
 
 - ✅ **API Authentication**: Completed with health check and status endpoints
 - ✅ **Receipt Image Upload**: Full implementation with local/S3 storage support
+- ✅ **Receipt OCR Container Support**: Added tesseract-ocr to Docker builds
 - ✅ **Auto-save Draft**: localStorage-based draft system with restoration
 - ✅ **Reports Dashboard**: Enhanced with statistics and date filtering
 - ✅ **Visual Charts**: Connected Chart.js to expense statistics data

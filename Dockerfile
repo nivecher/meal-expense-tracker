@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     postgresql-client \
     curl \
+    tesseract-ocr \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -109,6 +110,7 @@ RUN dnf install -y \
     openssl-devel \
     postgresql-devel \
     postgresql-libs \
+    tesseract \
     && dnf clean all
 
 WORKDIR ${LAMBDA_TASK_ROOT}
