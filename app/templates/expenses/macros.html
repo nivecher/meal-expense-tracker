@@ -28,6 +28,25 @@
                 </div>
             </div>
             <div class="col-md-6">
+                {{ form.category_id.label(class="form-label") }}
+                <select name="{{ form.category_id.name }}"
+                        id="{{ form.category_id.id }}"
+                        class="form-select{{ ' is-invalid' if form.category_id.errors else '' }}"
+                        data-category-select>
+                    {% for choice in form.category_id.choices %}
+                        <option value="{{ choice[0] if choice[0] is not none else '' }}"
+                                {% if form.category_id.data == choice[0] %}selected{% endif %}
+                                {% if choice[0] is not none %}
+                                    {% set cat_data = categories | selectattr('id', 'equalto', choice[0]) | first %}
+                                    {% if cat_data %}data-color="{{ cat_data.color }}" data-icon="{{ cat_data.icon if cat_data.icon else '' }}"{% endif %}
+                                {% endif %}>{{ choice[1] }}</option>
+                    {% endfor %}
+                </select>
+                {% if form.category_id.errors %}<div class="invalid-feedback">{{ form.category_id.errors[0] }}</div>{% endif %}
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
                 {{ form.date.label(class="form-label") }}
                 {% set default_date = form.date.data.strftime('%Y-%m-%d') if form.date.data else '' %}
                 <input type="date"
@@ -109,23 +128,6 @@
             </div>
         </div>
         <div class="row mb-3">
-            <div class="col-md-6">
-                {{ form.category_id.label(class="form-label") }}
-                <select name="{{ form.category_id.name }}"
-                        id="{{ form.category_id.id }}"
-                        class="form-select{{ ' is-invalid' if form.category_id.errors else '' }}"
-                        data-category-select>
-                    {% for choice in form.category_id.choices %}
-                        <option value="{{ choice[0] if choice[0] is not none else '' }}"
-                                {% if form.category_id.data == choice[0] %}selected{% endif %}
-                                {% if choice[0] is not none %}
-                                    {% set cat_data = categories | selectattr('id', 'equalto', choice[0]) | first %}
-                                    {% if cat_data %}data-color="{{ cat_data.color }}" data-icon="{{ cat_data.icon if cat_data.icon else '' }}"{% endif %}
-                                {% endif %}>{{ choice[1] }}</option>
-                    {% endfor %}
-                </select>
-                {% if form.category_id.errors %}<div class="invalid-feedback">{{ form.category_id.errors[0] }}</div>{% endif %}
-            </div>
             <div class="col-md-6">
                 {{ form.notes.label(class="form-label") }}
                 {{ form.notes(class="form-control" + (' is-invalid' if form.notes.errors else '') ,

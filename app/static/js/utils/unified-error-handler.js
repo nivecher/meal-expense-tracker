@@ -14,33 +14,115 @@
   // This fix ensures tagName is always a string with toLowerCase method
 
   // Immediate synchronous fix - patch Element.prototype.tagName if possible
-  try {
-    const ElementProto = Element.prototype;
-    const originalTagNameDescriptor = Object.getOwnPropertyDescriptor(ElementProto, 'tagName');
+  (function patchTagNameProperty() {
+    'use strict';
 
-    if (originalTagNameDescriptor && originalTagNameDescriptor.configurable) {
-      // Override tagName getter to ensure it always returns a string
-      Object.defineProperty(ElementProto, 'tagName', {
-        get() {
-          try {
-            const tagName = originalTagNameDescriptor.get ? originalTagNameDescriptor.get.call(this) : this.nodeName;
-            if (typeof tagName === 'string') {
+    function getSafeTagName(element) {
+      try {
+        // Try to get tagName from the original descriptor
+        if (element.nodeType === Node.ELEMENT_NODE) {
+          // Use nodeName as fallback (always available on elements)
+          const { nodeName } = element;
+          if (nodeName && typeof nodeName === 'string') {
+            return nodeName;
+          }
+          // Try localName (for custom elements)
+          const { localName } = element;
+          if (localName && typeof localName === 'string') {
+            return localName.toUpperCase();
+          }
+        }
+        return 'UNKNOWN';
+      } catch (_error) {
+        return 'UNKNOWN';
+      }
+    }
+
+    function createTagNameGetter(originalDescriptor) {
+      return function() {
+        try {
+          // Try original getter first
+          if (originalDescriptor && originalDescriptor.get) {
+            const tagName = originalDescriptor.get.call(this);
+            if (tagName && typeof tagName === 'string') {
               return tagName;
             }
-            // Fallback: use nodeName or localName
-            return (this.localName || this.nodeName || 'UNKNOWN').toUpperCase();
-          } catch (_error) {
-            // Fallback if getter fails
-            return (this.localName || this.nodeName || 'UNKNOWN').toUpperCase();
           }
-        },
-        configurable: true,
-        enumerable: false,
-      });
+          // Fallback to nodeName
+          return getSafeTagName(this);
+        } catch (_error) {
+          // Fallback if getter fails
+          return getSafeTagName(this);
+        }
+      };
     }
-  } catch (_error) {
-    // If we can't patch prototype, use per-element fixing
-  }
+
+    function patchElementPrototype(proto, descriptor) {
+      if (!descriptor) {
+        // No descriptor found, try to create one
+        try {
+          Object.defineProperty(proto, 'tagName', {
+            get() {
+              return getSafeTagName(this);
+            },
+            configurable: true,
+            enumerable: false,
+          });
+        } catch (_createError) {
+          // If creation fails, use per-element fixing
+        }
+        return;
+      }
+
+      if (descriptor.configurable) {
+        // Override tagName getter to ensure it always returns a string
+        Object.defineProperty(proto, 'tagName', {
+          get: createTagNameGetter(descriptor),
+          configurable: true,
+          enumerable: false,
+        });
+        return;
+      }
+
+      // If not configurable, try to wrap the getter
+      const originalGetter = descriptor.get;
+      if (!originalGetter) {
+        return;
+      }
+
+      try {
+        const wrappedGetter = createTagNameGetter(descriptor);
+        // Try to replace (may fail if not configurable)
+        Object.defineProperty(proto, 'tagName', {
+          get: wrappedGetter,
+          configurable: false,
+          enumerable: false,
+        });
+      } catch (_wrapError) {
+        // If wrapping fails, we'll use per-element fixing
+      }
+    }
+
+    // Patch Element.prototype.tagName
+    try {
+      const ElementProto = Element.prototype;
+      const originalTagNameDescriptor = Object.getOwnPropertyDescriptor(ElementProto, 'tagName');
+      patchElementPrototype(ElementProto, originalTagNameDescriptor);
+    } catch (_error) {
+      // If we can't patch prototype, use per-element fixing
+    }
+
+    // Also patch HTMLElement.prototype as a fallback
+    try {
+      if (typeof HTMLElement !== 'undefined' && HTMLElement.prototype) {
+        const HTMLElementProto = HTMLElement.prototype;
+        const htmlTagNameDescriptor = Object.getOwnPropertyDescriptor(HTMLElementProto, 'tagName');
+        patchElementPrototype(HTMLElementProto, htmlTagNameDescriptor);
+      }
+    } catch (_htmlError) {
+      // Silently fail
+    }
+  })();
 
   (function fixElementTagNameGlobally() {
     'use strict';
@@ -197,20 +279,39 @@
   window.addEventListener('error', (event) => {
     const { error } = event;
     const message = event.message || 'Unknown error';
+    const filename = event.filename || '';
+    const stack = error?.stack || '';
 
     // Filter out Chrome extension connection errors
     if (message.includes('Could not establish connection') ||
         message.includes('Receiving end does not exist') ||
         message.includes('runtime.lastError')) {
       // Suppress extension-related errors
-      return;
+      event.preventDefault();
+      event.stopPropagation();
+      return false;
     }
 
-    // Filter out tagName.toLowerCase errors (we're fixing these)
-    if (message.includes('tagName.toLowerCase is not a function') ||
-        (error && error.message && error.message.includes('tagName.toLowerCase is not a function'))) {
-      // Suppress - we're fixing this globally
-      return;
+    // Filter out tagName.toLowerCase errors from browser extensions
+    const isTagNameError =
+      message.includes('tagName.toLowerCase is not a function') ||
+      (error && error.message && error.message.includes('tagName.toLowerCase is not a function')) ||
+      filename.includes('bootstrap-autofill-overlay-notifications') ||
+      filename.includes('bootstrap-autofill') ||
+      stack.includes('bootstrap-autofill-overlay-notifications') ||
+      stack.includes('bootstrap-autofill') ||
+      stack.includes('elementIsInstanceOf') ||
+      stack.includes('elementIsFormElement') ||
+      stack.includes('nodeIsFormElement') ||
+      stack.includes('DomQueryService') ||
+      stack.includes('CollectAutofillContentService');
+
+    if (isTagNameError) {
+      // Suppress - these are from browser extensions, not our code
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      return false;
     }
 
     // Only log actual JavaScript errors, not resource loading issues
@@ -235,8 +336,52 @@
   });
 
   // Log unhandled promise rejections (filter out extension errors)
+  // MUST be added early to catch errors before they're logged
   window.addEventListener('unhandledrejection', (event) => {
     const { reason } = event;
+
+    // Extract error information from various possible formats
+    let message = '';
+    let stack = '';
+    let errorString = '';
+
+    if (reason) {
+      if (typeof reason === 'string') {
+        message = reason;
+        errorString = reason;
+      } else if (typeof reason === 'object') {
+        message = reason.message || reason.toString() || '';
+        stack = reason.stack || '';
+        errorString = JSON.stringify(reason);
+      } else {
+        message = String(reason);
+        errorString = String(reason);
+      }
+    }
+
+    // Filter out bootstrap-autofill extension errors - comprehensive check
+    const isBootstrapAutofillError =
+      message.includes('tagName.toLowerCase is not a function') ||
+      message.includes('bootstrap-autofill-overlay-notifications') ||
+      message.includes('bootstrap-autofill') ||
+      stack.includes('bootstrap-autofill-overlay-notifications') ||
+      stack.includes('bootstrap-autofill') ||
+      stack.includes('elementIsInstanceOf') ||
+      stack.includes('elementIsFormElement') ||
+      stack.includes('nodeIsFormElement') ||
+      stack.includes('DomQueryService') ||
+      stack.includes('CollectAutofillContentService') ||
+      errorString.includes('bootstrap-autofill-overlay-notifications') ||
+      errorString.includes('bootstrap-autofill') ||
+      errorString.includes('tagName.toLowerCase');
+
+    if (isBootstrapAutofillError) {
+      // Suppress the error completely
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      return false;
+    }
 
     // Filter out Chrome extension connection errors
     if (reason && typeof reason === 'object' && reason.message) {
@@ -245,7 +390,9 @@
           reason.message.includes('runtime.lastError') ||
           reason.message.includes('tagName.toLowerCase is not a function')) {
         // Suppress extension-related errors
-        return;
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
       }
     }
 
@@ -254,14 +401,89 @@
       if (reason.includes('Could not establish connection') ||
           reason.includes('Receiving end does not exist') ||
           reason.includes('runtime.lastError') ||
-          reason.includes('tagName.toLowerCase is not a function')) {
+          reason.includes('tagName.toLowerCase is not a function') ||
+          reason.includes('bootstrap-autofill')) {
         // Suppress extension-related errors
-        return;
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+    }
+
+    // Check error object properties for extension indicators
+    if (reason && typeof reason === 'object') {
+      const reasonString = JSON.stringify(reason);
+      if (reasonString.includes('bootstrap-autofill') ||
+          reasonString.includes('tagName.toLowerCase')) {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
       }
     }
 
     console.error('Unhandled Promise Rejection:', event.reason);
   });
+
+  // Override console.error to filter extension errors - MUST be set up early
+  const originalConsoleError = console.error;
+  console.error = function(...args) {
+    // Convert all arguments to string for checking
+    const message = args.map((arg) => {
+      if (typeof arg === 'string') return arg;
+      if (arg && typeof arg === 'object') {
+        if (arg.message) return arg.message;
+        if (arg.stack) return arg.stack;
+        return JSON.stringify(arg);
+      }
+      return String(arg);
+    }).join(' ');
+
+    // Filter out bootstrap-autofill extension errors - comprehensive check
+    const isExtensionError =
+      message.includes('tagName.toLowerCase is not a function') ||
+      message.includes('bootstrap-autofill-overlay-notifications') ||
+      message.includes('bootstrap-autofill') ||
+      message.includes('elementIsInstanceOf') ||
+      message.includes('elementIsFormElement') ||
+      message.includes('nodeIsFormElement') ||
+      message.includes('DomQueryService') ||
+      message.includes('CollectAutofillContentService');
+
+    if (isExtensionError) {
+      // Suppress - these are from browser extensions, not our code
+      return;
+    }
+
+    // Check individual arguments for extension indicators
+    for (const arg of args) {
+      if (typeof arg === 'string' && (
+        arg.includes('bootstrap-autofill') ||
+        arg.includes('tagName.toLowerCase')
+      )) {
+        return; // Suppress
+      }
+
+      if (arg && typeof arg === 'object') {
+        const argString = JSON.stringify(arg);
+        if (argString.includes('bootstrap-autofill') ||
+            argString.includes('tagName.toLowerCase')) {
+          return; // Suppress
+        }
+
+        // Check stack property
+        if (arg.stack && (
+          arg.stack.includes('bootstrap-autofill') ||
+          arg.stack.includes('elementIsInstanceOf') ||
+          arg.stack.includes('elementIsFormElement')
+        )) {
+          return; // Suppress
+        }
+      }
+    }
+
+    // Call original console.error for legitimate errors
+    originalConsoleError.apply(console, args);
+  };
 
   // Development mode - log initialization
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {

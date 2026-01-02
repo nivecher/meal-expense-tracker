@@ -147,19 +147,17 @@ aws s3api put-bucket-versioning \
 
 ## Receipt OCR Extraction
 
-The `extract_receipt.py` script extracts structured information from receipt images or PDFs using Tesseract OCR, similar to the OCR service used in the web application.
+The `extract_receipt.py` script extracts structured information from receipt images or PDFs using AWS Textract, similar to the OCR service used in the web application.
 
 ### Extract Receipt Prerequisites
 
-- Python 3.8 or higher
-- Tesseract OCR installed on your system:
-  - **Linux**: `sudo apt-get install tesseract-ocr`
-  - **macOS**: `brew install tesseract`
-  - **Windows**: Download from [Tesseract GitHub](https://github.com/UB-Mannheim/tesseract/wiki)
+- Python 3.13 or higher
+- AWS credentials configured:
+  - Set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables
+  - Or configure `~/.aws/credentials` file
+  - Or use IAM role (for Lambda/ECS deployments)
 - Required Python packages (from project requirements):
-  - `pytesseract` - Python wrapper for Tesseract OCR
-  - `Pillow` - Image processing library
-  - `PyMuPDF` or `pdf2image` - For PDF support (optional but recommended)
+  - `boto3` - AWS SDK for Python (already in requirements)
 
 ### Extract Receipt Usage
 
@@ -170,8 +168,8 @@ python scripts/extract_receipt.py receipt.jpg
 # Output as JSON for programmatic use
 python scripts/extract_receipt.py receipt.pdf --output-format json
 
-# Specify custom Tesseract binary path
-python scripts/extract_receipt.py receipt.png --tesseract-cmd /usr/local/bin/tesseract
+# Specify AWS region (default: us-east-1)
+python scripts/extract_receipt.py receipt.png --region us-west-2
 
 # Enable verbose logging
 python scripts/extract_receipt.py receipt.jpg --verbose

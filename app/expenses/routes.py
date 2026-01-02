@@ -31,7 +31,7 @@ ResponseReturnValue = Union[str, Response, tuple]
 from app.constants.categories import get_default_categories
 
 # Local application imports
-from app.expenses import bp, services as expense_services
+from app.expenses import bp, models as expense_models, services as expense_services
 from app.expenses.forms import ExpenseForm, ExpenseImportForm
 from app.expenses.models import Category, Expense
 from app.extensions import db
@@ -552,6 +552,10 @@ def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
     form.order_type.data = expense.order_type
     form.party_size.data = expense.party_size
 
+    # Don't set form.tags.data for editing - let the template handle the display
+    # The template sets value="" and data-existing-tags="..." attributes
+    # Tagify will initialize with the data-existing-tags and handle the JSON conversion
+
 
 def _handle_expense_update(
     expense: Expense,
@@ -985,10 +989,24 @@ def import_expenses() -> ResponseReturnValue:
 def list_tags() -> ResponseReturnValue:
     """Get all tags for the current user."""
     try:
-        tags = expense_services.get_user_tags(current_user.id)
+        user_id = current_user.id
+        current_app.logger.debug(f"Fetching tags for user {user_id}")
+        tags = expense_services.get_user_tags(user_id)
+
+        # Defensive check: Verify all tags belong to the current user
+        invalid_tags = [tag for tag in tags if tag.user_id != user_id]
+        if invalid_tags:
+            current_app.logger.error(
+                f"SECURITY ISSUE: User {user_id} received {len(invalid_tags)} tags that don't belong to them. "
+                f"Tag IDs: {[tag.id for tag in invalid_tags]}"
+            )
+            # Filter out any tags that don't belong to the user
+            tags = [tag for tag in tags if tag.user_id == user_id]
+
+        current_app.logger.debug(f"Returning {len(tags)} tags for user {user_id}")
         return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})  # type: ignore[no-any-return]
     except Exception as e:
-        current_app.logger.error(f"Error fetching tags: {e}")
+        current_app.logger.error(f"Error fetching tags for user {current_user.id}: {e}", exc_info=True)
         return jsonify({"success": False, "message": "Failed to fetch tags"}), 500
 
 
@@ -1082,15 +1100,79 @@ def update_tag(tag_id: int) -> ResponseReturnValue:
 @login_required
 def delete_tag(tag_id: int) -> ResponseReturnValue:
     """Delete a tag."""
+    from flask import make_response
+
     try:
+        # Check if tag exists and belongs to user before attempting deletion
+        tag = db.session.get(expense_models.Tag, tag_id)
+        if not tag:
+            current_app.logger.warning(
+                f"User {current_user.id} attempted to delete non-existent tag {tag_id}. "
+                f"This may indicate a race condition or stale UI state."
+            )
+            response = make_response(
+                jsonify(
+                    {
+                        "success": False,
+                        "message": f"Tag {tag_id} not found. It may have been deleted already. Please refresh the page.",
+                        "code": 404,
+                    }
+                ),
+                404,
+            )
+            response.headers["Content-Type"] = "application/json"
+            return response
+
+        if tag.user_id != current_user.id:
+            current_app.logger.warning(
+                f"User {current_user.id} attempted to delete tag {tag_id} owned by user {tag.user_id}. "
+                f"This indicates a security issue - tag should not have been visible to this user."
+            )
+            response = make_response(
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "You don't have permission to delete this tag. It may belong to another user.",
+                        "code": 403,
+                    }
+                ),
+                403,
+            )
+            response.headers["Content-Type"] = "application/json"
+            return response
+
         success = expense_services.delete_tag(current_user.id, tag_id)
         if success:
-            return jsonify({"success": True, "message": "Tag deleted successfully"})  # type: ignore[no-any-return]  # type: ignore[return-value,no-any-return]
+            current_app.logger.info(f"Tag {tag_id} deleted successfully by user {current_user.id}")
+            response = make_response(jsonify({"success": True, "message": "Tag deleted successfully"}), 200)
+            response.headers["Content-Type"] = "application/json"
+            return response
         else:
-            return jsonify({"success": False, "message": "Tag not found or unauthorized"}), 404
+            # This shouldn't happen if we checked above, but handle it anyway
+            current_app.logger.error(
+                f"delete_tag service returned False for tag {tag_id} and user {current_user.id}, "
+                f"but tag exists and belongs to user. This indicates a service layer issue."
+            )
+            response = make_response(
+                jsonify(
+                    {
+                        "success": False,
+                        "message": "Failed to delete tag. Please try again or refresh the page.",
+                        "code": 500,
+                    }
+                ),
+                500,
+            )
+            response.headers["Content-Type"] = "application/json"
+            return response
     except Exception as e:
-        current_app.logger.error(f"Error deleting tag: {e}")
-        return jsonify({"success": False, "message": "Failed to delete tag"}), 500
+        current_app.logger.error(f"Error deleting tag {tag_id} for user {current_user.id}: {e}", exc_info=True)
+        response = make_response(
+            jsonify({"success": False, "message": f"An error occurred while deleting the tag: {str(e)}", "code": 500}),
+            500,
+        )
+        response.headers["Content-Type"] = "application/json"
+        return response
 
 
 @bp.route("/<int:expense_id>/tags", methods=["GET"])

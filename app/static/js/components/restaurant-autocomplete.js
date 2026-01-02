@@ -226,7 +226,7 @@ class RestaurantAutocomplete {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'same-origin', // Include cookies for authentication
+        credentials: 'include', // Include cookies for authentication (required for CORS)
         redirect: 'manual', // Don't follow redirects automatically
       });
 
@@ -400,7 +400,7 @@ class RestaurantAutocomplete {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'same-origin', // Include cookies for authentication
+        credentials: 'include', // Include cookies for authentication (required for CORS)
       });
 
       console.log('Fallback search response status:', response.status);
@@ -503,7 +503,7 @@ class RestaurantAutocomplete {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'same-origin', // Include cookies for authentication
+        credentials: 'include', // Include cookies for authentication (required for CORS)
       });
 
       if (!response.ok) {
@@ -699,7 +699,7 @@ class RestaurantAutocomplete {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'same-origin', // Include cookies for authentication
+        credentials: 'include', // Include cookies for authentication (required for CORS)
       });
 
       if (!response.ok) {

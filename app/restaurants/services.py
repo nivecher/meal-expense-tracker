@@ -10,7 +10,7 @@ from sqlalchemy.sql import Select
 from werkzeug.datastructures import FileStorage
 
 from app.constants.cuisines import format_cuisine_type
-from app.expenses.models import Expense
+from app.expenses.models import Category, Expense
 from app.extensions import db
 from app.restaurants.exceptions import (
     DuplicateGooglePlaceIdError,
@@ -1309,6 +1309,36 @@ def calculate_expense_stats(restaurant_id: int, user_id: int) -> dict[str, Any]:
         "avg_per_visit": avg_per_visit,
         "last_visit": stats.last_visit if stats else None,
     }
+
+
+def get_default_category_for_restaurant(restaurant_id: int, user_id: int) -> int | None:
+    """Get the default category for a restaurant based on past expenses.
+
+    Args:
+        restaurant_id: The ID of the restaurant
+        user_id: The ID of the user (for security)
+
+    Returns:
+        The category ID that is most commonly used for this restaurant, or None if no expenses exist
+    """
+    result = db.session.execute(
+        select(
+            Expense.category_id,
+            func.count(Expense.id).label("expense_count"),
+        )
+        .where(
+            Expense.restaurant_id == restaurant_id,
+            Expense.user_id == user_id,
+            Expense.category_id.isnot(None),
+        )
+        .group_by(Expense.category_id)
+        .order_by(func.count(Expense.id).desc())
+        .limit(1)
+    ).first()
+
+    if result and result.category_id:
+        return int(result.category_id)
+    return None
 
 
 def detect_service_level_from_google_data(google_data: dict[str, Any]) -> tuple[str, float]:

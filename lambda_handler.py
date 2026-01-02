@@ -271,6 +271,12 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             else:
                 body_bytes = b""
 
+            # Extract host from headers for proper cookie domain handling
+            host = headers.get("host", headers.get("Host", "lambda"))
+            # Remove port if present (e.g., "example.com:443" -> "example.com")
+            if ":" in host:
+                host = host.split(":")[0]
+
             # Create WSGI environment
             environ = {
                 "REQUEST_METHOD": method,
@@ -278,8 +284,9 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
                 "QUERY_STRING": query_string,
                 "CONTENT_TYPE": headers.get("content-type", ""),
                 "CONTENT_LENGTH": str(len(body_bytes)),
-                "SERVER_NAME": "lambda",
+                "SERVER_NAME": host,  # Use actual host for proper cookie domain
                 "SERVER_PORT": "443",
+                "HTTP_HOST": host,  # Also set HTTP_HOST header
                 "wsgi.version": (1, 0),
                 "wsgi.url_scheme": "https",
                 "wsgi.input": BytesIO(body_bytes),

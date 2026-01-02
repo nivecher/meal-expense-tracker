@@ -252,7 +252,13 @@ class TagManager {
       loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Loading tags...';
       container.replaceChildren(loadingDiv);
 
-      const response = await fetch('/expenses/tags');
+      const response = await fetch('/expenses/tags', {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          Accept: 'application/json',
+        },
+        credentials: 'include', // Include cookies for authentication (required for CORS)
+      });
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Failed to fetch tags:', response.status, errorText);
@@ -262,7 +268,32 @@ class TagManager {
       const data = await response.json();
       console.log('Tags API response:', data);
       if (data.success && Array.isArray(data.tags)) {
-        const { tags } = data;
+        let { tags } = data;
+
+        // Defensive check: Filter out any tags that might have inconsistent user_id
+        // (This should never happen if backend is correct, but adds safety)
+        const originalCount = tags.length;
+        if (tags.length > 0 && tags[0].user_id !== undefined) {
+          // If tags have user_id, check for consistency
+          const userIds = [...new Set(tags.map((tag) => tag.user_id).filter((id) => id !== undefined))];
+          if (userIds.length > 1) {
+            console.error(
+              `SECURITY WARNING: Received tags from multiple users: ${userIds.join(', ')}. ` +
+              'This indicates a backend security issue. Filtering to first user ID.',
+            );
+            // Filter to the first user_id (should be current user)
+            const [currentUserId] = userIds;
+            tags = tags.filter((tag) => tag.user_id === currentUserId);
+            console.warn(`Filtered ${originalCount - tags.length} tags from other users.`);
+          }
+        }
+
+        if (tags.length !== originalCount) {
+          console.warn(
+            `Tag list filtered: ${originalCount} -> ${tags.length} tags. ` +
+            'Some tags were removed due to user_id mismatch.',
+          );
+        }
 
         if (tags.length === 0) {
           const noTagsDiv = document.createElement('div');
@@ -478,7 +509,10 @@ class TagManager {
           headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '',
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
           },
+          credentials: 'include', // Include cookies for authentication (required for CORS)
           body: JSON.stringify(formData),
         });
       } else {
@@ -488,7 +522,10 @@ class TagManager {
           headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '',
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
           },
+          credentials: 'include', // Include cookies for authentication (required for CORS)
           body: JSON.stringify(formData),
         });
       }
@@ -536,6 +573,15 @@ class TagManager {
       return;
     }
 
+    // Verify tag ID is valid (numeric)
+    const tagIdNum = parseInt(tagId, 10);
+    if (isNaN(tagIdNum) || tagIdNum <= 0) {
+      alert('Invalid tag ID. Please select a tag to delete.');
+      this.resetForm();
+      await this.loadAllTags();
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this tag? This will remove it from all expenses.')) {
       return;
     }
@@ -545,8 +591,19 @@ class TagManager {
         method: 'DELETE',
         headers: {
           'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '',
+          'X-Requested-With': 'XMLHttpRequest',
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for authentication (required for CORS)
       });
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+      }
 
       const result = await response.json();
 
@@ -568,11 +625,34 @@ class TagManager {
           this.refreshTagifyInstance();
         }
       } else {
-        alert(`Error: ${result.message}`);
+        // Handle specific error codes
+        if (response.status === 404) {
+          // Tag not found - likely deleted already, refresh the list
+          console.warn(`Tag ${tagId} not found, refreshing tag list`);
+          await this.loadAllTags();
+          alert(result.message || 'Tag not found. The tag list has been refreshed.');
+        } else if (response.status === 403) {
+          // Permission denied - tag belongs to another user
+          console.error(`Permission denied to delete tag ${tagId}`);
+          alert(result.message || 'You do not have permission to delete this tag.');
+          // Refresh the list to remove any tags that shouldn't be visible
+          await this.loadAllTags();
+        } else {
+          alert(`Error: ${result.message || 'Failed to delete tag'}`);
+        }
       }
     } catch (error) {
       console.error('Error deleting tag:', error);
-      alert('Error deleting tag. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // If it's a 404, refresh the list
+      if (errorMessage.includes('404') || errorMessage.includes('not found')) {
+        console.warn('Tag not found during delete, refreshing tag list');
+        await this.loadAllTags();
+        alert('Tag not found. The tag list has been refreshed.');
+      } else {
+        alert(`Error deleting tag: ${errorMessage}`);
+      }
     }
   }
 
@@ -597,8 +677,20 @@ class TagManager {
     if (!window.tagifyInstance) return;
 
     try {
-      const response = await fetch('/expenses/tags');
+      const response = await fetch('/expenses/tags', {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          Accept: 'application/json',
+        },
+        credentials: 'include', // Include cookies for authentication (required for CORS)
+      });
       if (!response.ok) return;
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        return;
+      }
 
       const data = await response.json();
       if (data.success && data.tags) {

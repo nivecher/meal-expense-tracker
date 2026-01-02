@@ -93,6 +93,10 @@ class ErrorHandler {
       /chrome-extension/i,
       /moz-extension/i,
       /safari-extension/i,
+
+      // Browser autofill extension errors
+      /bootstrap-autofill-overlay-notifications/i,
+      /tagName\.toLowerCase is not a function/i,
     ];
 
     // Check if message should be filtered

@@ -248,6 +248,25 @@ def get_restaurant(restaurant_id: int) -> Response | tuple[Response, int]:
         return _handle_service_error(e, "retrieve restaurant")
 
 
+@bp.route("/restaurants/<int:restaurant_id>/default-category", methods=["GET"])
+@login_required
+def get_restaurant_default_category(restaurant_id: int) -> Response | tuple[Response, int]:
+    """Get the default category for a restaurant based on past expenses."""
+    try:
+        user = _get_current_user()
+        # Verify restaurant exists and belongs to user
+        restaurant = restaurant_services.get_restaurant_for_user(restaurant_id, user.id)
+        if not restaurant:
+            return jsonify({"status": "error", "message": "Restaurant not found"}), 404
+
+        category_id = restaurant_services.get_default_category_for_restaurant(restaurant_id, user.id)
+        return _create_api_response(
+            data={"category_id": category_id}, message="Default category retrieved successfully"
+        )
+    except Exception as e:
+        return _handle_service_error(e, "retrieve default category")
+
+
 @bp.route("/restaurants/<int:restaurant_id>", methods=["PUT"])
 @login_required
 @validate_api_csrf
@@ -694,15 +713,15 @@ def process_receipt_ocr() -> tuple[Response, int]:
                 400,
             )
 
-        # Validate file type
-        allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".pdf"}
+        # Validate file type (AWS Textract supports PNG, JPEG, and PDF only)
+        allowed_extensions = {".jpg", ".jpeg", ".png", ".pdf"}
         file_ext = "." + receipt_file.filename.rsplit(".", 1)[1].lower() if "." in receipt_file.filename else ""
         if file_ext not in allowed_extensions:
             return (
                 jsonify(
                     {
                         "status": "error",
-                        "message": f"Invalid file type. Allowed types: {', '.join(allowed_extensions)}",
+                        "message": f"Invalid file type. AWS Textract supports: PNG, JPEG, and PDF only. Received: {file_ext or 'unknown'}",
                     }
                 ),
                 400,
@@ -756,7 +775,7 @@ def process_receipt_ocr() -> tuple[Response, int]:
                     jsonify(
                         {
                             "status": "error",
-                            "message": "OCR service not available. Tesseract OCR binary is not installed.",
+                            "message": "OCR service not available. AWS Textract is not configured. Please configure AWS credentials.",
                         }
                     ),
                     503,
@@ -764,7 +783,7 @@ def process_receipt_ocr() -> tuple[Response, int]:
 
             receipt_data = ocr_service.extract_receipt_data(receipt_file, form_hints=form_hints)
         except RuntimeError as e:
-            # Handle Tesseract not installed error
+            # Handle Textract not available error
             current_app.logger.error(f"OCR service error: {e}")
             return (
                 jsonify(
@@ -798,7 +817,7 @@ def process_receipt_ocr() -> tuple[Response, int]:
                 current_app.logger.warning(f"Failed to get restaurant address: {e}")
 
         # Convert to JSON-serializable format
-        data = {
+        receipt_dict = {
             "amount": str(receipt_data.amount) if receipt_data.amount else None,
             "date": receipt_data.date.isoformat() if receipt_data.date else None,
             "time": receipt_data.time,
@@ -814,6 +833,50 @@ def process_receipt_ocr() -> tuple[Response, int]:
             "raw_text": receipt_data.raw_text[:500],  # Limit raw text length
             "restaurant_address_data": restaurant_address_data,  # For UI comparison
         }
+
+        # Perform reconciliation if form data is available
+        reconciliation_data = None
+        if form_restaurant_id and form_hints:
+            try:
+                from datetime import datetime
+                from decimal import Decimal
+
+                from app.expenses.models import Expense
+                from app.expenses.services import reconcile_receipt_with_expense
+
+                # Get restaurant (already fetched above)
+                restaurant = Restaurant.query.filter_by(id=form_restaurant_id, user_id=current_user.id).first()
+                if restaurant:
+                    # Parse form hints
+                    form_amount = Decimal(form_hints.get("amount", "0"))
+                    form_date_str = form_hints.get("date")
+                    if form_date_str:
+                        try:
+                            # Parse date string (could be ISO format or YYYY-MM-DD)
+                            if "T" in form_date_str:
+                                form_date = datetime.fromisoformat(form_date_str.replace("Z", "+00:00"))
+                            else:
+                                form_date = datetime.strptime(form_date_str, "%Y-%m-%d")
+                        except (ValueError, TypeError):
+                            form_date = datetime.now()
+                    else:
+                        form_date = datetime.now()
+
+                    # Create minimal expense object for reconciliation
+                    temp_expense = Expense(
+                        user_id=current_user.id,
+                        restaurant_id=restaurant.id,
+                        restaurant=restaurant,
+                        amount=form_amount,
+                        date=form_date,
+                    )
+                    reconciliation_data = reconcile_receipt_with_expense(temp_expense, receipt_dict)
+            except Exception as e:
+                current_app.logger.warning(f"Failed to perform reconciliation: {e}", exc_info=True)
+
+        data = receipt_dict
+        if reconciliation_data:
+            data["reconciliation"] = reconciliation_data
 
         return _create_api_response(data=data, message="Receipt processed successfully")
 

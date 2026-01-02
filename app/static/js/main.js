@@ -83,8 +83,16 @@ async function refreshTagifyInstance() {
 
   try {
     // Update the whitelist with latest tags
-    const response = await fetch('/expenses/tags');
+    const response = await fetch('/expenses/tags', {
+      credentials: 'include', // Include cookies for authentication (required for CORS)
+    });
     if (!response.ok) return;
+
+    // Check if response is JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return;
+    }
 
     const data = await response.json();
     if (data.success && data.tags) {

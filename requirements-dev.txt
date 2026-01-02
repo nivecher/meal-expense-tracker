@@ -43,14 +43,14 @@ blinker==1.9.0
     # via flask
 boto3==1.40.26
     # via -r requirements/base.in
-boto3-stubs==1.42.10
+boto3-stubs==1.42.19
     # via -r requirements/dev.in
 botocore==1.40.76
     # via
     #   aws-xray-sdk
     #   boto3
     #   s3transfer
-botocore-stubs==1.42.10
+botocore-stubs==1.42.19
     # via
     #   -r requirements/dev.in
     #   boto3-stubs
@@ -114,7 +114,7 @@ faker==25.9.2
     # via
     #   -r requirements/dev.in
     #   factory-boy
-filelock==3.20.1
+filelock==3.20.2
     # via
     #   safety
     #   virtualenv
@@ -212,7 +212,7 @@ markupsafe==3.0.3
     #   types-wtforms
     #   werkzeug
     #   wtforms
-marshmallow==4.1.1
+marshmallow==4.1.2
     # via
     #   -r requirements/base.in
     #   safety
@@ -228,13 +228,13 @@ mypy==1.13.0
     #   -r requirements/dev.in
 mypy-boto3-cloudformation==1.42.3
     # via -r requirements/dev.in
-mypy-boto3-ec2==1.42.10
+mypy-boto3-ec2==1.42.15
     # via -r requirements/dev.in
 mypy-boto3-lambda==1.42.8
     # via -r requirements/dev.in
 mypy-boto3-rds==1.42.5
     # via -r requirements/dev.in
-mypy-boto3-s3==1.42.10
+mypy-boto3-s3==1.42.16
     # via -r requirements/dev.in
 mypy-boto3-sqs==1.42.3
     # via -r requirements/dev.in
@@ -245,7 +245,7 @@ mypy-extensions==1.1.0
     #   mypy
 nltk==3.9.2
     # via safety
-nodeenv==1.9.1
+nodeenv==1.10.0
     # via pre-commit
 openpyxl==3.1.5
     # via -r requirements/dev.in
@@ -261,7 +261,6 @@ packaging==25.0
     #   dparse
     #   gunicorn
     #   limits
-    #   pytesseract
     #   pytest
     #   safety
     #   safety-schemas
@@ -280,14 +279,13 @@ pillow==10.4.0
     # via
     #   -r requirements/base.in
     #   -r requirements/dev.in
-    #   pytesseract
 platformdirs==4.5.1
     # via
     #   black
     #   virtualenv
 pluggy==1.6.0
     # via pytest
-pre-commit==4.5.0
+pre-commit==4.5.1
     # via -r requirements/dev.in
 prompt-toolkit==3.0.52
     # via ipython
@@ -314,8 +312,6 @@ pyproject-hooks==1.2.0
     # via -r requirements/dev.in
 pysocks==1.7.1
     # via urllib3
-pytesseract==0.3.13
-    # via -r requirements/base.in
 pytest==8.4.2
     # via
     #   -c constraints.txt
@@ -370,7 +366,7 @@ ruamel-yaml-clib==0.2.12
     # via
     #   -r requirements/dev.in
     #   ruamel-yaml
-ruff==0.14.9
+ruff==0.14.10
     # via -r requirements/dev.in
 s3transfer==0.13.1
     # via
@@ -400,7 +396,7 @@ snowballstemmer==3.0.1
     #   sphinx
 sortedcontainers==2.4.0
     # via trio
-soupsieve==2.8
+soupsieve==2.8.1
     # via beautifulsoup4
 sphinx==7.4.7
     # via
@@ -455,7 +451,7 @@ trio==0.32.0
     #   trio-websocket
 trio-websocket==0.12.2
     # via selenium
-typer==0.20.0
+typer==0.21.0
     # via safety
 types-awscrt==0.30.0
     # via botocore-stubs
@@ -503,7 +499,7 @@ types-requests==2.32.0.20241016
     #   -r requirements/dev.in
 types-s3transfer==0.16.0
     # via boto3-stubs
-types-setuptools==80.9.0.20250822
+types-setuptools==80.9.0.20251223
     # via -r requirements/dev.in
 types-simplejson==3.20.0.20250822
     # via -r requirements/dev.in

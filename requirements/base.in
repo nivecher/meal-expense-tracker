@@ -41,7 +41,9 @@ msgspec>=0.18.0,<1.0.0             # Fast serialization/deserialization for JSON
 # US state and territory lookup library
 us==3.2.0                         # US state and territory lookup library
 
-# OCR (Optical Character Recognition) - FREE open-source solution
-pytesseract>=0.3.10,<1.0.0        # Python wrapper for Tesseract OCR (FREE, open-source)
-Pillow>=10.0.0,<11.0.0            # Image processing library for OCR preprocessing (FREE, open-source)
-PyMuPDF>=1.24.0,<2.0.0            # PDF text extraction and rendering (FREE, AGPL license) - faster than pdf2image, no system deps
+# Image processing
+# Note: Pillow is still required for avatar generation (scripts/generate_default_avatar.py, scripts/generate_icons.py)
+Pillow>=10.0.0,<11.0.0            # Image processing library for avatar generation
+pdf2image>=1.17.0,<2.0.0         # PDF to image conversion for OCR fallback (used by OCR service for unsupported PDFs)
+# Note: easyocr is NOT included here - it is only needed for development scripts
+# Install it separately if needed: pip install -r requirements/scripts.txt

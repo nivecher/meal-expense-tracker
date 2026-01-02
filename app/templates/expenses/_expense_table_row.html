@@ -12,8 +12,18 @@
                            data-datetime-type="date"
                            title="{{ expense.date.isoformat() }}">{{ expense.date|format_date_user_tz("%b %d %Y") }}</a>
                     </div>
-                    {% if expense.notes or expense.tags %}
+                    {% if expense.notes or expense.tags or expense.receipt_image %}
                         <div class="tags-notes-compact d-flex align-items-center">
+                            {% if expense.receipt_image %}
+                                <a href="{{ get_receipt_url(expense.receipt_image) }}"
+                                   target="_blank"
+                                   class="table-receipt-compact me-2 text-decoration-none"
+                                   data-bs-toggle="tooltip"
+                                   data-bs-placement="top"
+                                   title="View receipt">
+                                    <i class="fas fa-receipt text-info"></i>
+                                </a>
+                            {% endif %}
                             {% if expense.notes %}
                                 <div class="table-notes-compact me-2"
                                      data-bs-toggle="tooltip"

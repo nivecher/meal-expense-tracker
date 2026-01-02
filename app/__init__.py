@@ -209,7 +209,7 @@ def _set_security_headers(response: Response, content_type: str) -> None:
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
             "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
             "img-src 'self' data: https: blob: https://places.googleapis.com https://maps.googleapis.com; "
-            "connect-src 'self' https://maps.googleapis.com https://places.googleapis.com https://cdn.jsdelivr.net; "
+            "connect-src 'self' https://maps.googleapis.com https://places.googleapis.com https://cdn.jsdelivr.net https://*.s3.amazonaws.com; "
             "frame-src 'self' data: blob:; "
             "frame-ancestors 'none'; "
             "object-src 'none'; "
@@ -347,13 +347,28 @@ def _configure_cors(app: Flask) -> None:
     environment = os.getenv("ENVIRONMENT", "dev")
     is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
     if is_lambda and environment == "dev":
-        # Lambda development - use permissive settings for API Gateway
-        app.logger.info("Using permissive CORS configuration for Lambda development")
+        # Lambda development - use specific origins to allow credentials
+        # Cannot use "*" with supports_credentials=True (browser security restriction)
+        server_name = app.config.get("SERVER_NAME", "")
+        if server_name:
+            # Construct origin from SERVER_NAME
+            origin = f"https://{server_name}"
+            cors_origins = [origin, f"http://{server_name}"]  # Support both HTTP and HTTPS
+        else:
+            # Fallback: try to get from environment or use common dev origins
+            api_domain = os.getenv("API_GATEWAY_DOMAIN_NAME", "")
+            if api_domain:
+                cors_origins = [f"https://{api_domain}", f"http://{api_domain}"]
+            else:
+                # Last resort: use common patterns (less secure but functional)
+                cors_origins = ["https://meals.dev.nivecher.com", "http://localhost:5000"]
+
+        app.logger.info(f"Using CORS configuration for Lambda development with origins: {cors_origins}")
         CORS(
             app,
             resources={
                 r"/*": {
-                    "origins": "*",  # Allow all origins
+                    "origins": cors_origins,  # Specific origins required for credentials
                     "methods": [
                         "GET",
                         "POST",

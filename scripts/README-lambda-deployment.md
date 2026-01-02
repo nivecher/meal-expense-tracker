@@ -28,7 +28,7 @@ If you prefer manual control:
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
 # 2. Build the image
-docker build --platform linux/arm64 --no-cache --provenance=false --sbom=false -t meal-expense-tracker-dev-lambda:latest -f Dockerfile.lambda .
+docker build --platform linux/arm64 --no-cache --provenance=false --sbom=false -t meal-expense-tracker-dev-lambda:latest -f Dockerfile (lambda target) .
 
 # 3. Tag and push
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)

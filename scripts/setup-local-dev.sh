@@ -540,35 +540,42 @@ install_aws_cli_impl() {
   esac
 }
 
-# Tesseract OCR installation (single responsibility)
-install_tesseract_impl() {
+# Poppler installation for PDF-to-image conversion (fallback for AWS Textract)
+install_poppler_impl() {
   local -r pkg_mgr="$(detect_package_manager)"
 
   case "$pkg_mgr" in
     "apt")
-      # Check if Tesseract is already installed
-      if dpkg -l | grep -q "^ii.*tesseract-ocr"; then
-        log_info "Tesseract OCR already installed via package manager"
+      # Check if Poppler is already installed
+      if dpkg -l | grep -q "^ii.*poppler-utils"; then
+        log_info "Poppler already installed via package manager"
       else
-        # Install Tesseract OCR and Poppler (for PDF support)
+        # Install Poppler (for PDF-to-image conversion fallback)
         sudo apt-get update
-        sudo apt-get install -y tesseract-ocr poppler-utils
+        sudo apt-get install -y poppler-utils
       fi
       ;;
     "yum")
-      sudo yum install -y tesseract poppler-utils
+      sudo yum install -y poppler-utils
       ;;
     "dnf")
-      sudo dnf install -y tesseract poppler-utils
+      sudo dnf install -y poppler-utils
       ;;
     "brew")
-      brew install tesseract poppler
+      brew install poppler
       ;;
     *)
-      log_error "Unsupported package manager for Tesseract OCR: $pkg_mgr"
+      log_error "Unsupported package manager for Poppler: $pkg_mgr"
       return 1
       ;;
   esac
+}
+
+# Legacy Tesseract installation (kept for backward compatibility, but no longer needed)
+install_tesseract_impl() {
+  log_warn "Tesseract OCR is no longer required (using AWS Textract instead)"
+  log_info "Installing Poppler for PDF fallback support..."
+  install_poppler_impl
 }
 
 # =============================================================================
@@ -777,7 +784,7 @@ install_all_tools() {
   install_tool_if_missing "terraform" install_terraform_impl
   install_tool_if_missing "aws" install_aws_cli_impl
   install_tool_if_missing "act" install_act_impl
-  install_tool_if_missing "tesseract" install_tesseract_impl
+  install_tool_if_missing "pdftoppm" install_poppler_impl  # Check for pdftoppm (part of poppler-utils)
   install_arm64_toolchain_impl
 }
 
@@ -882,7 +889,7 @@ run_auto_mode() {
 
   # Check what's missing
   local missing_tools=()
-  local tools=("terraform" "trivy" "aws" "docker" "tesseract")
+  local tools=("terraform" "trivy" "aws" "docker" "pdftoppm")  # pdftoppm is part of poppler-utils
 
   for tool in "${tools[@]}"; do
     if ! command_exists "$tool"; then
@@ -961,7 +968,7 @@ run_minimal_mode() {
 
   # Check what's missing
   local missing_tools=()
-  local tools=("terraform" "trivy" "aws" "docker" "tesseract")
+  local tools=("terraform" "trivy" "aws" "docker" "pdftoppm")  # pdftoppm is part of poppler-utils
 
   for tool in "${tools[@]}"; do
     if ! command_exists "$tool"; then

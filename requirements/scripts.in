@@ -1,0 +1,12 @@
+# Scripts and development utilities
+# These are NOT needed for production deployment
+# Install with: pip install -r requirements/scripts.txt
+
+# OCR utilities (for scripts/extract_receipt.py)
+# Note: EasyOCR is only used in standalone scripts, not in the production app
+# The production app uses AWS Textract instead
+easyocr>=1.7.0,<2.0.0
+
+# PDF processing (optional fallback for unsupported PDFs)
+# Used as a fallback in app/services/ocr_service.py and scripts/extract_receipt.py
+pdf2image>=1.17.0,<2.0.0

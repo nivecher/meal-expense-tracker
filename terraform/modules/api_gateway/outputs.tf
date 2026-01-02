@@ -30,7 +30,7 @@ output "domain_zone_id" {
 
 output "domain_target_domain_name" {
   description = "The target domain name of the API Gateway domain name"
-  value       = length(aws_apigatewayv2_domain_name.main) > 0 ? one(aws_apigatewayv2_domain_name.main[*].domain_name_configuration[0].target_domain_name) : null
+  value       = try(aws_apigatewayv2_domain_name.main.domain_name_configuration[0].target_domain_name, null)
 }
 
 output "effective_api_domain_name" {

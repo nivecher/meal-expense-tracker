@@ -169,7 +169,7 @@ The application is deployed as a Docker container image to AWS Lambda via ECR:
 
 This will:
 
-1. Build Docker container image using `Dockerfile.lambda`
+1. Build Docker container image using `Dockerfile` (lambda target)
 2. Push image to ECR repository
 3. Update Lambda function with new container image
 4. Sync static files to S3
@@ -222,6 +222,39 @@ make tf-apply
 make tf-destroy
 
 ```
+
+### Versioning & Releases
+
+The project uses **Python-semantic-release** and **setuptools-scm** with
+Conventional Commits to drive semantic versioning:
+
+- `feat:` → **MINOR** bump (e.g., `0.6.1 → 0.7.0`)
+- `fix:` → **PATCH** bump (e.g., `0.6.1 → 0.6.2`)
+- `feat!` or `BREAKING CHANGE:` → **MAJOR** bump (once 1.x.y is reached)
+- Other types (`chore:`, `docs:`, etc.) → no version bump
+
+Key commands:
+
+```bash
+# Show the version that CI would tag next (and bump type)
+make version-preview
+
+# Show the current application version (uses preview dev versions on branches)
+make version
+```
+
+Behaviour:
+
+- On **main** when building from a tag (via CI/tag workflow), the Python app
+  reports the clean tag version (e.g., `0.7.0`).
+- On **branches / non-tag refs**, the Python app reports a **PEP 440 dev
+  preview** version based on the next semantic version and commit metadata,
+  e.g.:
+
+  - `0.7.0.dev5+gabc123.branch.feature-add-reports`
+
+This makes it clear what the next release version will be while still
+distinguishing unpublished branch builds from tagged releases.
 
 ### Running Tests
 

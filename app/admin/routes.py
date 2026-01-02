@@ -137,6 +137,12 @@ def list_users() -> str | Response:
         admin_only = request.args.get("admin_only", False, type=bool)
         active_only = request.args.get("active_only", False, type=bool)
 
+        # Validate pagination parameters
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 100:
+            per_page = 20
+
         # Build query
         query = User.query
 
@@ -155,8 +161,19 @@ def list_users() -> str | Response:
         if active_only:
             query = query.filter_by(is_active=True)
 
-        # Order by creation date (newest first)
-        query = query.order_by(User.created_at.desc())
+        # Order by creation date (newest first), handling NULL values
+        # Use NULLS LAST to handle cases where created_at might be NULL
+        try:
+            # Try to use nulls_last() if available (SQLAlchemy 1.4+)
+            desc_expr = User.created_at.desc()
+            if hasattr(desc_expr, "nulls_last"):
+                query = query.order_by(desc_expr.nulls_last())
+            else:
+                query = query.order_by(desc_expr)
+        except (AttributeError, TypeError) as order_error:
+            # Fallback: order by ID if created_at is not available
+            current_app.logger.warning(f"Could not order by created_at, using ID: {order_error}")
+            query = query.order_by(User.id.desc())
 
         # Paginate results
         users = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -171,8 +188,10 @@ def list_users() -> str | Response:
         )
 
     except Exception as e:
-        current_app.logger.error(f"Error loading users: {e}")
-        flash("Error loading users", "danger")
+        # Log full exception details for debugging
+        current_app.logger.exception(f"Error loading users: {e}")
+        # Show user-friendly error message
+        flash("Error loading users. Please check the logs for details.", "danger")
         return cast(Response, redirect(url_for("admin.dashboard")))
 
 
