@@ -16,7 +16,7 @@ def init_app(app: Flask) -> None:
     app.register_blueprint(bp)
 
     # Register global error handlers
-    app.register_error_handler(401, unauthorized_error)
+    # Note: 401 is handled by Flask-Login's unauthorized_handler in app/extensions.py
     app.register_error_handler(404, not_found_error)
     app.register_error_handler(500, internal_error)
     app.register_error_handler(Exception, handle_exception)
@@ -57,20 +57,6 @@ def _create_error_response(
     # Flask accepts (str, int) tuples as responses, which it converts to Response
     template_response = render_template("errors/error.html", message=message, status_code=status_code)
     return cast(tuple[Response, int], (template_response, status_code))
-
-
-@bp.app_errorhandler(401)
-def unauthorized_error(error: HTTPException) -> Response | tuple[Response, int]:
-    """Handle 401 Unauthorized errors."""
-    # Check if this is an API request - if so, return JSON
-    if _is_api_request():
-        response = jsonify({"status": "error", "message": "Authentication required", "code": 401})
-        response.status_code = 401
-        response.headers["Content-Type"] = "application/json"
-        return cast(Response, response)
-
-    # For web requests, render an error template
-    return _create_error_response("Authentication required", 401)
 
 
 @bp.app_errorhandler(404)

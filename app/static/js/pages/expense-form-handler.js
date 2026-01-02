@@ -324,6 +324,7 @@ async function submitFormToServer(form, formData) {
       'X-Requested-With': 'XMLHttpRequest',
       Accept: 'application/json',
     },
+    credentials: 'include', // Include cookies for authentication (required for CORS)
   });
 
   console.log('Response status:', response.status);

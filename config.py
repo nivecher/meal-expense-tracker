@@ -133,17 +133,14 @@ class Config:
             self.SESSION_COOKIE_SECURE = True  # HTTPS required (mandatory with SameSite=None)
             self.SESSION_COOKIE_HTTPONLY = True
             self.SESSION_COOKIE_SAMESITE = "None"  # Required for CORS to send cookies
-            # Don't set domain - let Flask use default (cookie for exact domain)
-            # Setting domain would make cookie work for subdomains but can cause issues
-            self.SESSION_COOKIE_DOMAIN = None
+            # Don't explicitly set domain - Flask default (None) works for exact domain matching
         elif is_lambda:
             # Lambda production - use secure settings
             # SameSite=None is required for CORS requests to send cookies
             self.SESSION_COOKIE_SECURE = True  # HTTPS required (mandatory with SameSite=None)
             self.SESSION_COOKIE_HTTPONLY = True
             self.SESSION_COOKIE_SAMESITE = "None"  # Required for CORS to send cookies
-            # Don't set domain - let Flask use default (cookie for exact domain)
-            self.SESSION_COOKIE_DOMAIN = None
+            # Don't explicitly set domain - Flask default (None) works for exact domain matching
         else:
             # Local development - use standard HTTP settings
             self.SESSION_COOKIE_SECURE = False  # Allow HTTP for localhost

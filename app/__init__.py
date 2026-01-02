@@ -398,6 +398,9 @@ def _configure_cors(app: Flask) -> None:
         cors_expose_headers = os.getenv("CORS_EXPOSE_HEADERS", "Content-Length,X-CSRFToken").split(",")
 
         # Configure CORS
+        # Enable credentials for local development to allow session cookies
+        # This is needed when frontend and backend are on different ports or domains
+        supports_creds = os.getenv("CORS_SUPPORTS_CREDENTIALS", "true").lower() == "true"
         CORS(
             app,
             resources={
@@ -406,7 +409,7 @@ def _configure_cors(app: Flask) -> None:
                     "methods": cors_methods,
                     "allow_headers": cors_allow_headers,
                     "expose_headers": cors_expose_headers,
-                    "supports_credentials": False,  # Standard setting for local development
+                    "supports_credentials": supports_creds,  # Allow credentials for session cookies
                 }
             },
         )

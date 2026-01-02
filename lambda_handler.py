@@ -11,11 +11,11 @@ import logging
 import os
 import sys
 import traceback
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 # Try to import AWS X-Ray SDK for tracing
 try:
-    from aws_xray_sdk.core import patch_all, xray_recorder
+    from aws_xray_sdk.core import patch_all, xray_recorder  # type: ignore[import-untyped]
 
     XRAY_AVAILABLE = True
     # Patch libraries for X-Ray tracing
@@ -201,9 +201,11 @@ def _create_error_response(
 
     # Include traceback in non-production environments
     if traceback_str and os.environ.get("ENVIRONMENT", "prod") != "prod":
-        error_body = json.loads(response["body"])
-        error_body["traceback"] = traceback_str.split("\n")
-        response["body"] = json.dumps(error_body)
+        body_str = response["body"]
+        if isinstance(body_str, str):
+            error_body = json.loads(body_str)
+            error_body["traceback"] = traceback_str.split("\n")
+            response["body"] = json.dumps(error_body)
 
     return response
 
@@ -240,11 +242,17 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         from wsgi import application
 
         # Use mangum for HTTP API v2 support (works with Flask/WSGI apps)
+        response: dict[str, Any]
         try:
-            from mangum import Mangum
+            from mangum import Mangum  # type: ignore[import-not-found]
 
             handler = Mangum(application, lifespan="off")
-            response = handler(event, context)
+            mangum_response = handler(event, context)
+            # Ensure response is a dict and type it correctly
+            if isinstance(mangum_response, dict):
+                response = cast(dict[str, Any], mangum_response)
+            else:
+                response = {"statusCode": 500, "body": "Internal error", "headers": {}, "isBase64Encoded": False}
         except ImportError:
             # Fallback: simple WSGI adapter
             import base64
@@ -258,7 +266,9 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
             # Handle cookies - HTTP API v2 may pass cookies in array or Cookie header
             cookies = event.get("cookies", [])
-            if cookies and "cookie" not in headers:
+            # Check for Cookie header (case-insensitive)
+            has_cookie_header = any(key.lower() == "cookie" for key in headers.keys())
+            if cookies and not has_cookie_header:
                 # Convert cookies array to Cookie header format
                 cookie_header = "; ".join(cookies)
                 headers["cookie"] = cookie_header
