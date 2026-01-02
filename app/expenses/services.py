@@ -2018,17 +2018,32 @@ def get_user_tags(user_id: int) -> list[Tag]:
     Returns:
         List of Tag objects for the user with expense_count populated
     """
+    from flask import current_app
+
+    # Explicitly filter by user_id to ensure security
     tags = Tag.query.filter_by(user_id=user_id).order_by(Tag.name).all()
+
+    # Defensive check: Verify all tags belong to the user (security measure)
+    invalid_tags = [tag for tag in tags if tag.user_id != user_id]
+    if invalid_tags:
+        current_app.logger.error(
+            f"SECURITY ISSUE: Found {len(invalid_tags)} tags that don't belong to user {user_id}. "
+            f"Tag IDs: {[tag.id for tag in invalid_tags]}"
+        )
+        # Filter out any tags that don't belong to the user
+        tags = [tag for tag in tags if tag.user_id == user_id]
 
     # Optimize: Get all expense counts in a single query instead of N+1 queries
     if tags:
         tag_ids = [tag.id for tag in tags]
 
         # Count expenses per tag, joining with Expense to ensure expenses exist
+        # Also filter by user_id to ensure we only count the user's expenses
         counts = (
             db.session.query(ExpenseTag.tag_id, func.count(ExpenseTag.id).label("count"))
             .join(Expense, ExpenseTag.expense_id == Expense.id)
             .filter(ExpenseTag.tag_id.in_(tag_ids))
+            .filter(Expense.user_id == user_id)  # Ensure we only count user's expenses
             .group_by(ExpenseTag.tag_id)
             .all()
         )
@@ -2257,8 +2272,15 @@ def delete_tag(user_id: int, tag_id: int) -> bool:
     Returns:
         True if tag was deleted, False if not found or unauthorized
     """
+    from flask import current_app
+
     tag = db.session.get(Tag, tag_id)
-    if not tag or tag.user_id != user_id:
+    if not tag:
+        current_app.logger.warning(f"Tag {tag_id} not found for deletion by user {user_id}")
+        return False
+
+    if tag.user_id != user_id:
+        current_app.logger.warning(f"Tag {tag_id} belongs to user {tag.user_id}, but user {user_id} attempted deletion")
         return False
 
     # Remove tag from all expenses
@@ -2268,6 +2290,7 @@ def delete_tag(user_id: int, tag_id: int) -> bool:
     db.session.delete(tag)
     db.session.commit()
 
+    current_app.logger.info(f"Tag {tag_id} deleted successfully by user {user_id}")
     return True
 
 
@@ -2393,18 +2416,38 @@ def reconcile_receipt_with_expense(expense: Expense, receipt_data: dict[str, Any
         # Exact match
         if expense_restaurant_name == ocr_restaurant_lower:
             matches["restaurant"] = True
+            # Include similarity score for exact matches (100%)
+            suggestions["restaurant"] = ocr_restaurant
+            suggestions["restaurant_similarity"] = 1.0
         else:
+            # Check if one name contains the other (substring match)
+            # This handles cases like "Cotton Patch Cafe" vs "Cotton Patch Cafe - Wylie"
+            one_contains_other = (
+                expense_restaurant_name in ocr_restaurant_lower or ocr_restaurant_lower in expense_restaurant_name
+            )
+
             # Fuzzy match using Jaro-Winkler similarity
             similarity = jellyfish.jaro_winkler_similarity(expense_restaurant_name, ocr_restaurant_lower)
 
-            if similarity >= 0.85:  # 85% similarity threshold
+            # Always include suggestion and similarity score, even for partial matches
+            suggestions["restaurant"] = ocr_restaurant
+            suggestions["restaurant_similarity"] = round(similarity, 2)
+
+            # Stricter matching: require exact match or very high similarity (>= 0.98)
+            # AND not a substring match (which indicates location suffix differences)
+            if similarity >= 0.98 and not one_contains_other:
                 matches["restaurant"] = True
             else:
+                # Partial match - show as mismatch but still allow applying
                 matches["restaurant"] = False
-                suggestions["restaurant"] = ocr_restaurant
-                warnings.append(
-                    f"Restaurant name mismatch: Form has '{expense.restaurant.name}', receipt shows '{ocr_restaurant}'"
-                )
+                if one_contains_other:
+                    warnings.append(
+                        f"Restaurant name partial match (substring): Form has '{expense.restaurant.name}', receipt shows '{ocr_restaurant}'"
+                    )
+                else:
+                    warnings.append(
+                        f"Restaurant name partial match ({similarity*100:.0f}%): Form has '{expense.restaurant.name}', receipt shows '{ocr_restaurant}'"
+                    )
 
     # Compare restaurant address (if both are available)
     if ocr_address and expense.restaurant:

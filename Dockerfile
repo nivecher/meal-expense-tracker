@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     postgresql-client \
     curl \
-    tesseract-ocr \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -44,6 +44,8 @@ WORKDIR /app
 COPY requirements.txt requirements-dev.txt ./
 
 # Install production dependencies first (smaller, cached separately)
+# Note: requirements.txt does NOT include EasyOCR/PyTorch - these are only in requirements/scripts.txt
+# for standalone utility scripts. Production app uses AWS Textract for OCR.
 RUN pip install --no-cache-dir --upgrade pip wheel && \
     pip install --no-cache-dir -r requirements.txt
 
@@ -98,38 +100,66 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-class", "gevent", "--workers", "4", "wsgi:app"]
 
 # ============================================
-# Stage 6: Lambda (Optimized)
+# Stage 6: Lambda Builder (with build tools)
 # ============================================
-FROM public.ecr.aws/lambda/python:3.13 AS lambda
+FROM public.ecr.aws/lambda/python:3.13 AS lambda-builder
 
-# Install system dependencies for building Python packages
+# Install system dependencies for building Python packages (build-time only)
 RUN dnf install -y \
     gcc \
     python3-devel \
     libffi-devel \
     openssl-devel \
     postgresql-devel \
-    postgresql-libs \
-    tesseract \
+    poppler-utils \
     && dnf clean all
 
 WORKDIR ${LAMBDA_TASK_ROOT}
 
-# Copy requirements first for better layer caching
-COPY requirements.txt ./
+# Copy requirements file
+COPY requirements.txt ${LAMBDA_TASK_ROOT}/
 
-# Install Python dependencies with proper architecture support
-RUN pip install --no-cache-dir --upgrade pip wheel && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (compiled packages will be copied to runtime stage)
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code (excluding static files served by CloudFront)
-COPY . ${LAMBDA_TASK_ROOT}
+# ============================================
+# Stage 7: Lambda (runtime only, no build tools)
+# ============================================
+FROM public.ecr.aws/lambda/python:3.13 AS lambda
+
+# Install only runtime system dependencies (no build tools)
+RUN dnf install -y \
+    postgresql-libs \
+    poppler-utils \
+    && dnf clean all
+
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Copy installed Python packages from builder stage (not build tools)
+COPY --from=lambda-builder /var/lang/lib/python3.13/site-packages /var/lang/lib/python3.13/site-packages
+
+# Copy application code
+COPY app/ ${LAMBDA_TASK_ROOT}/app/
+COPY wsgi.py ${LAMBDA_TASK_ROOT}/
+COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
+COPY lambda_init.py ${LAMBDA_TASK_ROOT}/
+COPY config.py ${LAMBDA_TASK_ROOT}/
+COPY migrations/ ${LAMBDA_TASK_ROOT}/migrations/
 
 # Create necessary directories and set permissions
 RUN mkdir -p ${LAMBDA_TASK_ROOT}/instance \
     ${LAMBDA_TASK_ROOT}/migrations/versions \
-    && chown -R 1001:0 ${LAMBDA_TASK_ROOT} \
-    && chmod -R 755 ${LAMBDA_TASK_ROOT}
+    && chown -R 1001:0 ${LAMBDA_TASK_ROOT}
+
+# Set proper permissions
+RUN chmod 755 ${LAMBDA_TASK_ROOT} && \
+    chmod 644 ${LAMBDA_TASK_ROOT}/*.py && \
+    chmod 755 ${LAMBDA_TASK_ROOT}/app && \
+    chmod 644 ${LAMBDA_TASK_ROOT}/app/*.py && \
+    chmod 755 ${LAMBDA_TASK_ROOT}/app/*/
+
+# Create necessary __init__.py files (only for modules that don't have them)
+RUN echo "" > ${LAMBDA_TASK_ROOT}/__init__.py
 
 # Copy and set up entrypoint if it exists
 RUN if [ -f "${LAMBDA_TASK_ROOT}/docker-entrypoint.sh" ]; then \
@@ -147,5 +177,5 @@ ENV PYTHONPATH=/var/task \
 # Switch to non-root user for security
 USER 1001
 
-# Set the Lambda handler
+# Command to run the Lambda function (AWS Lambda Python base image - handler in exec form)
 CMD ["wsgi.lambda_handler"]

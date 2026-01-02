@@ -14,118 +14,127 @@ Outputs to stdout:
     BUMP_NEEDED=true|false
 """
 
+import re
 import subprocess
 import sys
 
 
-def get_latest_tag():
-    """Get the latest git tag."""
+def get_latest_tag() -> str | None:
+    """Get the latest git tag (e.g., v0.6.1) or None if no tags."""
     result = subprocess.run(
         ["git", "describe", "--tags", "--abbrev=0"],
         capture_output=True,
         text=True,
     )
     tag = result.stdout.strip()
-    return tag if tag else None
+    return tag or None
 
 
-def main():
-    """Main function - determines next version using semantic-release."""
-    # Get latest tag
+def _parse_semantic_release_output(output: str) -> str | None:
+    """Extract the semantic version from semantic-release --print output."""
+    if not output:
+        return None
+
+    for line in reversed(output.strip().split("\n")):
+        candidate = line.strip()
+        if re.fullmatch(r"\d+\.\d+\.\d+", candidate):
+            return candidate
+    return None
+
+
+def _detect_bump_type(current_version: str, next_version: str) -> str:
+    """Detect bump type (MAJOR/MINOR/PATCH/NONE) for logging/debugging."""
+    try:
+        curr_major, curr_minor, curr_patch = (int(x) for x in current_version.split("."))
+        next_major, next_minor, next_patch = (int(x) for x in next_version.split("."))
+    except ValueError:
+        return "UNKNOWN"
+
+    if next_major > curr_major:
+        return "MAJOR"
+    if next_minor > curr_minor:
+        return "MINOR"
+    if next_patch > curr_patch:
+        return "PATCH"
+    return "NONE"
+
+
+def main() -> None:
+    """Determine next version using python-semantic-release.
+
+    Delegates bump logic entirely to semantic-release so that Conventional
+    Commits drive versioning. This script only:
+
+    - Determines the current version from the latest tag (or 0.1.0 if none)
+    - Asks semantic-release for the next version
+    - Compares current vs next to decide if a bump is needed
+    - Prints NEXT_VERSION/NEW_TAG/BUMP_NEEDED for CI consumption
+    """
     latest_tag = get_latest_tag()
-    if not latest_tag or latest_tag == "v0.1.0":
-        latest_tag = None
+    if not latest_tag:
         current_version = "0.1.0"
     else:
-        current_version = latest_tag.replace("v", "")
+        current_version = latest_tag.lstrip("v")
 
-    # Get commits since tag
-    if latest_tag:
-        result = subprocess.run(
-            ["git", "rev-list", "--count", f"{latest_tag}..HEAD"],
-            capture_output=True,
-            text=True,
-        )
-        commits_count = int(result.stdout.strip() or "0")
-    else:
-        result = subprocess.run(
-            ["git", "rev-list", "--count", "HEAD"],
-            capture_output=True,
-            text=True,
-        )
-        commits_count = int(result.stdout.strip() or "0")
-
-    if commits_count == 0:
-        # No commits, no version bump needed
-        print(f"NEXT_VERSION={current_version}")
-        print(f"NEW_TAG={latest_tag if latest_tag else 'v0.1.0'}")
-        print("BUMP_NEEDED=false")
-        sys.exit(0)
-
-    # Use python-semantic-release to determine next version
     try:
         result = subprocess.run(
             ["python", "-m", "semantic_release", "version", "--print"],
             capture_output=True,
             text=True,
         )
-
-        # Extract version from output (last line, remove warnings)
-        output_lines = result.stdout.strip().split("\n")
-        semantic_version = None
-
-        for line in reversed(output_lines):
-            import re
-
-            version_match = re.search(r"^(\d+\.\d+\.\d+)$", line.strip())
-            if version_match:
-                semantic_version = version_match.group(1)
-                break
-
-        # Validate semantic-release suggestion
-        if semantic_version and semantic_version != current_version:
-            curr_parts = current_version.split(".")
-            next_parts = semantic_version.split(".")
-
-            # Validate: prevent invalid jumps (e.g., 0.6.0 -> 1.0.0 unless breaking change)
-            if curr_parts[0] == "0" and next_parts[0] == "1":
-                # Invalid: jumping from 0.x.x to 1.0.0
-                print(
-                    f"⚠️  Semantic-release suggested invalid jump from {current_version} to {semantic_version}",
-                    file=sys.stderr,
-                )
-                semantic_version = None
-            elif int(next_parts[0]) > int(curr_parts[0]) + 1:
-                # Invalid: major version jumped by more than 1
-                print("⚠️  Semantic-release suggested invalid major jump", file=sys.stderr)
-                semantic_version = None
-
-        if semantic_version and semantic_version != current_version:
-            # Valid semantic-release suggestion
-            print(f"NEXT_VERSION={semantic_version}")
-            print(f"NEW_TAG=v{semantic_version}")
-            print("BUMP_NEEDED=true")
-            sys.exit(0)
-        else:
-            # No valid semantic bump detected - use fallback patch bump
-            curr_parts = current_version.split(".")
-            major = int(curr_parts[0])
-            minor = int(curr_parts[1])
-            patch = int(curr_parts[2]) + 1
-            fallback_version = f"{major}.{minor}.{patch}"
-
-            print(f"NEXT_VERSION={fallback_version}")
-            print(f"NEW_TAG=v{fallback_version}")
-            print("BUMP_NEEDED=true")
-            sys.exit(0)
-
     except FileNotFoundError:
         print("Error: python-semantic-release not found", file=sys.stderr)
         print("Install it with: pip install python-semantic-release[all]", file=sys.stderr)
         sys.exit(1)
-    except Exception as e:
-        print(f"Error running semantic-release: {e}", file=sys.stderr)
+    except Exception as exc:
+        print(f"Error running semantic-release: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    semantic_version = _parse_semantic_release_output(result.stdout)
+
+    if not semantic_version:
+        print("Error: semantic-release did not produce a version", file=sys.stderr)
+        sys.exit(1)
+
+    # Enforce 0.x semantics: do not allow bumps to 1.0.0+ while still on 0.x.
+    try:
+        curr_major_str, curr_minor_str, _ = current_version.split(".")
+        next_major_str, next_minor_str, _ = semantic_version.split(".")
+        curr_major = int(curr_major_str)
+        curr_minor = int(curr_minor_str)
+        next_major = int(next_major_str)
+    except ValueError:
+        curr_major = 0
+        curr_minor = 0
+        next_major = 0
+
+    if curr_major == 0 and next_major >= 1:
+        # Map proposed major bump to next minor within 0.x line.
+        adjusted_minor = curr_minor + 1
+        semantic_version = f"0.{adjusted_minor}.0"
+        print(
+            f"# adjusted_next_version={semantic_version} (prevented 0.x → {next_major}.x.y)",
+            file=sys.stderr,
+        )
+
+    bump_type = _detect_bump_type(current_version, semantic_version)
+    print(f"# current_version={current_version}", file=sys.stderr)
+    print(f"# semantic_release_next={semantic_version}", file=sys.stderr)
+    print(f"# bump_type={bump_type}", file=sys.stderr)
+
+    if semantic_version == current_version:
+        # No semantic bump – either no relevant commits or non-conventional messages.
+        next_version = current_version
+        new_tag = latest_tag if latest_tag else "v0.1.0"
+        bump_needed = "false"
+    else:
+        next_version = semantic_version
+        new_tag = f"v{semantic_version}"
+        bump_needed = "true"
+
+    print(f"NEXT_VERSION={next_version}")
+    print(f"NEW_TAG={new_tag}")
+    print(f"BUMP_NEEDED={bump_needed}")
 
 
 if __name__ == "__main__":

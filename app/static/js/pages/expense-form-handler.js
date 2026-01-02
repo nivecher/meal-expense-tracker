@@ -200,6 +200,22 @@ function showFormErrors(form, errors) {
 }
 
 // Utility functions - defined first
+function parseExistingTags(tagsInput) {
+  const existingTagsData = tagsInput.getAttribute('data-existing-tags');
+  if (existingTagsData) {
+    try {
+      const parsedTags = JSON.parse(existingTagsData);
+      return parsedTags.map((tag) => tag.name);
+    } catch (error) {
+      console.warn('Failed to parse existing tags data:', error);
+    }
+  }
+
+  // Fallback: parse comma-separated value
+  const existingValue = tagsInput.value;
+  return existingValue ? existingValue.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [];
+}
+
 function validateFormDataInternal(formData) {
   const errors = {};
   const requiredFields = ['amount', 'restaurant_id', 'date'];
@@ -308,6 +324,7 @@ async function submitFormToServer(form, formData) {
       'X-Requested-With': 'XMLHttpRequest',
       Accept: 'application/json',
     },
+    credentials: 'include', // Include cookies for authentication (required for CORS)
   });
 
   console.log('Response status:', response.status);
@@ -416,14 +433,27 @@ async function handleFormSubmit(event) {
   const formElements = cacheFormElements(event.target);
   const formData = new FormData(formElements.form);
 
-  // Add tags to form data if available (Tagify)
+  // Add tags to form data - ensure consistent JSON format for both add and edit
   const tagsInput = document.getElementById('tagsInput');
-  if (tagsInput && window.tagifyInstance) {
-    const selectedTags = window.tagifyInstance.value;
-    if (selectedTags && selectedTags.length > 0) {
-      const tagsJson = JSON.stringify(selectedTags.map((tag) => tag.value));
-      formData.set('tags', tagsJson); // Use set() to replace any existing value
+  if (tagsInput) {
+    let tagsToSend = [];
+
+    // First try to get tags from Tagify instance (user has interacted with the field)
+    if (window.tagifyInstance) {
+      const selectedTags = window.tagifyInstance.value;
+      if (selectedTags && selectedTags.length > 0) {
+        tagsToSend = selectedTags.map((tag) => tag.value);
+      }
     }
+
+    // If no tags from Tagify, try to parse existing tags from data attribute (for editing)
+    if (tagsToSend.length === 0) {
+      tagsToSend = parseExistingTags(tagsInput);
+    }
+
+    // Always send tags as JSON array, even if empty
+    const tagsJson = JSON.stringify(tagsToSend);
+    formData.set('tags', tagsJson);
   }
 
   clearPreviousErrors(formElements.alertContainer);
@@ -473,20 +503,43 @@ function displayRestaurantAddress(restaurant) {
   const addressDisplay = document.getElementById('restaurant-address-display');
   if (!addressDisplay) return;
 
-  const addressParts = [];
-  if (restaurant.full_address) {
-    addressParts.push(restaurant.full_address);
-  } else {
-    if (restaurant.address_line_1) addressParts.push(restaurant.address_line_1);
-    if (restaurant.address_line_2) addressParts.push(restaurant.address_line_2);
-    if (restaurant.city) addressParts.push(restaurant.city);
-    if (restaurant.state) addressParts.push(restaurant.state);
-    if (restaurant.postal_code) addressParts.push(restaurant.postal_code);
+  let addressLine1 = '';
+  let addressLine2 = '';
+
+  // Prefer individual fields over full_address for two-line display
+  const streetParts = [];
+  if (restaurant.address_line_1) streetParts.push(restaurant.address_line_1);
+  if (restaurant.address_line_2) streetParts.push(restaurant.address_line_2);
+  if (streetParts.length > 0) {
+    addressLine1 = streetParts.join(', ');
   }
 
-  if (addressParts.length > 0) {
-    const addressText = addressParts.join(', ');
-    addressDisplay.innerHTML = `<small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${escapeHtml(addressText)}</small>`;
+  const locationParts = [];
+  if (restaurant.city) locationParts.push(restaurant.city);
+  if (restaurant.state) locationParts.push(restaurant.state);
+  if (restaurant.postal_code) locationParts.push(restaurant.postal_code);
+  if (locationParts.length > 0) {
+    addressLine2 = locationParts.join(', ');
+  }
+
+  // Fallback to full_address if we don't have individual fields
+  if (!addressLine1 && !addressLine2 && restaurant.full_address) {
+    addressLine1 = restaurant.full_address;
+  }
+
+  if (addressLine1 || addressLine2) {
+    let addressHtml = '<div class="text-muted small d-flex">';
+    addressHtml += '<i class="fas fa-map-marker-alt me-1 mt-1"></i>';
+    addressHtml += '<div>';
+    if (addressLine1) {
+      addressHtml += `<div>${escapeHtml(addressLine1)}</div>`;
+    }
+    if (addressLine2) {
+      addressHtml += `<div>${escapeHtml(addressLine2)}</div>`;
+    }
+    addressHtml += '</div>';
+    addressHtml += '</div>';
+    addressDisplay.innerHTML = addressHtml;
     addressDisplay.style.display = 'block';
   } else {
     hideRestaurantAddress();
@@ -513,7 +566,10 @@ async function fetchRestaurantAddressForReconciliation(restaurantId) {
       method: 'GET',
       headers: {
         'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: 'application/json',
       },
+      credentials: 'include', // Include cookies for authentication (required for CORS)
     });
 
     if (response.ok) {
@@ -569,7 +625,10 @@ async function fetchRestaurantAddress(restaurantId) {
       method: 'GET',
       headers: {
         'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: 'application/json',
       },
+      credentials: 'include', // Include cookies for authentication (required for CORS)
     });
 
     if (response.ok) {
@@ -589,6 +648,102 @@ async function fetchRestaurantAddress(restaurantId) {
   }
 }
 
+async function fetchRestaurantDefaultCategory(restaurantId) {
+  if (!restaurantId) {
+    return null;
+  }
+
+  try {
+    // Get CSRF token
+    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (!csrfToken) {
+      const csrfInput = document.querySelector('input[name="csrf_token"]');
+      csrfToken = csrfInput ? csrfInput.value : '';
+    }
+
+    const response = await fetch(`/api/v1/restaurants/${restaurantId}/default-category`, {
+      method: 'GET',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: 'application/json',
+      },
+      credentials: 'include', // Include cookies for authentication (required for CORS)
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      if (result.status === 'success' && result.data && result.data.category_id) {
+        return result.data.category_id;
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to fetch restaurant default category:', error);
+  }
+  return null;
+}
+
+/**
+ * Map restaurant type to category name
+ */
+function mapRestaurantTypeToCategory(restaurantType) {
+  if (!restaurantType || typeof restaurantType !== 'string') {
+    return 'Other';
+  }
+
+  const typeLower = restaurantType.toLowerCase().trim();
+
+  // Fast Food Restaurant -> Fast Food (check this first before general Restaurant check)
+  if (typeLower.includes('fast food restaurant') || typeLower === 'fast food') {
+    return 'Fast Food';
+  }
+
+  // Coffee Shop -> Coffee Shops (or Drinks as fallback)
+  if (typeLower.includes('coffee shop') || typeLower === 'coffee shop' || typeLower === 'cafe') {
+    return 'Coffee Shops';
+  }
+
+  // Grocery Store -> Groceries
+  if (typeLower.includes('grocery store') || typeLower === 'grocery store' || typeLower === 'supermarket') {
+    return 'Groceries';
+  }
+
+  // Any type containing "Restaurant" -> Restaurants
+  if (typeLower.includes('restaurant')) {
+    return 'Restaurants';
+  }
+
+  // Default fallback
+  return 'Other';
+}
+
+/**
+ * Find category ID by category name, with fallback options
+ */
+function findCategoryIdByName(categorySelect, categoryName) {
+  if (!categorySelect || !categoryName) {
+    return null;
+  }
+
+  // Search through all options to find matching category name
+  for (const option of categorySelect.options) {
+    if (option.text.trim() === categoryName) {
+      return option.value;
+    }
+  }
+
+  // Fallback: If "Coffee Shops" not found, try "Drinks"
+  if (categoryName === 'Coffee Shops') {
+    for (const option of categorySelect.options) {
+      if (option.text.trim() === 'Drinks') {
+        return option.value;
+      }
+    }
+  }
+
+  return null;
+}
+
 function setupCategoryRestaurantHandling(form) {
   const categorySelect = form.querySelector('select[name="category_id"]');
   const restaurantSelect = form.querySelector('select[name="restaurant_id"]');
@@ -597,18 +752,96 @@ function setupCategoryRestaurantHandling(form) {
 
   // Track if category was manually changed
   let categoryManuallyChanged = false;
+  // Flag to track programmatic category changes (to avoid marking them as manual)
+  let isProgrammaticChange = false;
+
+  // Helper function to set category by ID
+  function setCategoryById(categoryIdValue) {
+    const optionExists = Array.from(categorySelect.options).some(
+      (option) => option.value === String(categoryIdValue),
+    );
+    if (optionExists) {
+      isProgrammaticChange = true;
+      categorySelect.value = String(categoryIdValue);
+      categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+      isProgrammaticChange = false;
+      return true;
+    }
+    return false;
+  }
+
+  // Helper function to try setting default category as fallback
+  async function trySetDefaultCategory(restaurantId) {
+    const defaultCategoryId = await fetchRestaurantDefaultCategory(restaurantId);
+    if (defaultCategoryId) {
+      return setCategoryById(defaultCategoryId);
+    }
+    return false;
+  }
 
   // Function to update category based on restaurant type
-  function updateCategory(restaurantId) {
+  async function updateCategory(restaurantId) {
     if (categoryManuallyChanged) return;
-    if (!restaurantId) return;
+    if (!restaurantId) {
+      categorySelect.value = '';
+      return;
+    }
 
-    // Reset to default selection
-    categorySelect.value = '';
+    try {
+      // Get CSRF token
+      let csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+      if (!csrfToken) {
+        const csrfInput = document.querySelector('input[name="csrf_token"]');
+        csrfToken = csrfInput ? csrfInput.value : '';
+      }
+
+      // Fetch restaurant data to get the type
+      const response = await fetch(`/api/v1/restaurants/${restaurantId}`, {
+        method: 'GET',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest',
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        await trySetDefaultCategory(restaurantId);
+        return;
+      }
+
+      const result = await response.json();
+      if (result.status !== 'success' || !result.data) {
+        await trySetDefaultCategory(restaurantId);
+        return;
+      }
+
+      const restaurant = result.data;
+      const restaurantType = restaurant.type || '';
+
+      // Map restaurant type to category name
+      const categoryName = mapRestaurantTypeToCategory(restaurantType);
+
+      // Find category ID by name
+      const categoryId = findCategoryIdByName(categorySelect, categoryName);
+
+      if (categoryId) {
+        setCategoryById(categoryId);
+      } else {
+        // Category name not found in options, try fallback to default category
+        await trySetDefaultCategory(restaurantId);
+      }
+    } catch (error) {
+      console.warn('Failed to update category based on restaurant type:', error);
+      // Fallback to default category if restaurant fetch fails
+      await trySetDefaultCategory(restaurantId);
+    }
   }
 
   // Handle restaurant change
   restaurantSelect.addEventListener('change', function() {
+    // Reset manual change flag when restaurant changes (allows auto-setting again)
+    categoryManuallyChanged = false;
     updateCategory(this.value);
     // Fetch and display restaurant address
     if (this.value) {
@@ -618,16 +851,27 @@ function setupCategoryRestaurantHandling(form) {
     }
   });
 
-  // Track manual category changes
+  // Track manual category changes (only if not programmatic)
   categorySelect.addEventListener('change', function() {
-    categoryManuallyChanged = this.value !== '';
+    if (!isProgrammaticChange) {
+      categoryManuallyChanged = this.value !== '';
+    }
   });
 
-  // Initialize restaurant address display if restaurant is pre-selected
+  // If category is already set (e.g., in edit mode), mark it as manually changed
+  if (categorySelect.value) {
+    categoryManuallyChanged = true;
+  }
+
+  // Initialize restaurant address display and category if restaurant is pre-selected
   // Note: This happens during setup, but address will also be fetched in initializeExpenseForm
   // if the restaurant value is set after this function runs
   if (restaurantSelect.value) {
     fetchRestaurantAddress(restaurantSelect.value);
+    // Only auto-set category if it's not already set (new expense, not edit)
+    if (!categorySelect.value) {
+      updateCategory(restaurantSelect.value);
+    }
   }
 }
 
@@ -908,10 +1152,12 @@ function displayReconciliationResults(ocrData) {
   /**
    * Helper function to create a table row for reconciliation
    */
-  function createReconciliationRow(fieldName, formValue, ocrValue, isMatch, ocrDataValue, fieldType) {
+  function createReconciliationRow(fieldName, formValue, ocrValue, isMatch, ocrDataValue, fieldType, options = {}) {
     const row = document.createElement('tr');
     const matchClass = isMatch ? 'text-success' : 'text-warning';
     const matchIconClass = isMatch ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle';
+    const hideApplyButton = options.hideApplyButton || false;
+    const matchPercentage = options.matchPercentage || null;
 
     // Field name cell
     const fieldCell = document.createElement('td');
@@ -938,7 +1184,16 @@ function displayReconciliationResults(ocrData) {
 
     // Action cell
     const actionCell = document.createElement('td');
-    if (!isMatch && ocrDataValue) {
+    if (hideApplyButton) {
+      // Show match percentage instead of apply button
+      if (matchPercentage !== null) {
+        actionCell.textContent = `Match (${matchPercentage}%)`;
+      } else if (isMatch) {
+        actionCell.textContent = 'Match';
+      } else {
+        actionCell.textContent = 'No match';
+      }
+    } else if (!isMatch && ocrDataValue) {
       const button = document.createElement('button');
       button.className = 'btn btn-sm btn-primary';
       button.textContent = 'Apply';
@@ -1054,15 +1309,52 @@ function displayReconciliationResults(ocrData) {
 
   // Restaurant comparison (fuzzy match)
   if (ocrData.restaurant_name) {
-    const restaurantMatch = formRestaurant.toLowerCase().includes(ocrData.restaurant_name.toLowerCase()) ||
-      ocrData.restaurant_name.toLowerCase().includes(formRestaurant.toLowerCase());
+    // Use backend similarity score if available, otherwise fall back to exact match check
+    let restaurantMatch = false;
+    let similarityScore = null;
+
+    if (ocrData.reconciliation && ocrData.reconciliation.suggestions) {
+      similarityScore = ocrData.reconciliation.suggestions.restaurant_similarity;
+      if (similarityScore !== undefined) {
+        // Use backend match status if available
+        restaurantMatch = ocrData.reconciliation.matches?.restaurant === true;
+      }
+    }
+
+    // Fallback to exact match check if no backend similarity available
+    // Only match if names are exactly the same (case-insensitive)
+    // Don't use substring check as it incorrectly matches "Cotton Patch Cafe" with "Cotton Patch Cafe - Wylie"
+    if (similarityScore === null || similarityScore === undefined) {
+      const formRestaurantLower = (formRestaurant || '').toLowerCase().trim();
+      const ocrRestaurantLower = ocrData.restaurant_name.toLowerCase().trim();
+      restaurantMatch = formRestaurantLower === ocrRestaurantLower;
+
+      // If not exact match, calculate a simple similarity for display
+      if (!restaurantMatch && formRestaurantLower && ocrRestaurantLower) {
+        similarityScore = calculateSimpleSimilarity(formRestaurantLower, ocrRestaurantLower);
+      }
+    }
+
+    // Create restaurant name row (no apply button, show match percentage)
+    const restaurantFieldName = 'Restaurant';
+    let matchPercentage = null;
+    if (similarityScore !== null && similarityScore !== undefined) {
+      matchPercentage = (similarityScore * 100).toFixed(0);
+    } else if (restaurantMatch) {
+      matchPercentage = '100';
+    }
+
     const row = createReconciliationRow(
-      'Restaurant',
+      restaurantFieldName,
       formRestaurant || 'Not set',
       ocrData.restaurant_name,
       restaurantMatch,
       ocrData.restaurant_name,
       'restaurant',
+      {
+        hideApplyButton: true,
+        matchPercentage,
+      },
     );
     tbody.appendChild(row);
   }
@@ -1431,21 +1723,47 @@ async function processReceiptOCR() {
 
     // Fetch existing receipt and convert to File
     try {
-      // Include credentials to ensure authenticated requests work
+      // Fetch from S3 presigned URL (presigned URLs don't require credentials, but including them is harmless)
       const response = await fetch(existingReceiptUrl, {
-        credentials: 'same-origin',
+        credentials: 'include', // Include cookies (harmless for presigned URLs, but needed if CORS is involved)
       });
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch receipt: ${response.status} ${response.statusText}`);
+        // Handle specific S3 error cases
+        if (response.status === 403) {
+          throw new Error('Access denied to receipt. The presigned URL may have expired.');
+        } else if (response.status === 404) {
+          throw new Error('Receipt file not found in storage.');
+        } else {
+          throw new Error(`Failed to fetch receipt: ${response.status} ${response.statusText}`);
+        }
       }
+
+      // Check if response is actually a file (not an error page)
+      const contentType = response.headers.get('content-type');
+      if (!contentType || (!contentType.startsWith('image/') && contentType !== 'application/pdf')) {
+        // Might be an error page, try to get text
+        const text = await response.text();
+        if (text.includes('Error') || text.includes('AccessDenied') || text.includes('InvalidArgument')) {
+          throw new Error('Failed to access receipt from storage. The URL may be invalid or expired.');
+        }
+      }
+
       const blob = await response.blob();
+
+      // Validate blob size (should not be empty)
+      if (blob.size === 0) {
+        throw new Error('Received empty receipt file from storage.');
+      }
+
       // Determine filename from URL or use default
       const urlParts = existingReceiptUrl.split('/');
       const filename = urlParts[urlParts.length - 1].split('?')[0] || 'receipt.pdf';
-      file = new File([blob], filename, { type: blob.type });
+      file = new File([blob], filename, { type: blob.type || contentType || 'application/octet-stream' });
     } catch (error) {
-      console.error('Error fetching existing receipt:', error);
-      showNotification(`Failed to load existing receipt: ${error.message}`, 'error');
+      console.error('Error fetching existing receipt from S3:', error);
+      const errorMessage = error.message || 'Failed to load existing receipt';
+      showNotification(errorMessage, 'error');
       return;
     }
   }
@@ -1510,8 +1828,27 @@ async function processReceiptOCR() {
       headers: {
         'X-CSRFToken': csrfToken,
       },
+      credentials: 'include', // Include cookies for authentication (required for CORS)
       body: formData,
     });
+
+    // Check for authentication errors
+    if (response.status === 401 || response.status === 403) {
+      showNotification('Authentication required. Please log in to use this feature.', 'error');
+      return;
+    }
+
+    if (!response.ok) {
+      showNotification(`Failed to process receipt: ${response.status} ${response.statusText}`, 'error');
+      return;
+    }
+
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      showNotification('Invalid response format from server', 'error');
+      return;
+    }
 
     const result = await response.json();
 

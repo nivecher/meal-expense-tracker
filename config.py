@@ -56,12 +56,11 @@ class Config:
     S3_RECEIPTS_PREFIX: str = os.getenv("S3_RECEIPTS_PREFIX", "receipts/")
     S3_URL_EXPIRY: int = int(os.getenv("S3_URL_EXPIRY", "3600"))  # 1 hour default
 
-    # OCR Configuration (Tesseract - FREE, open-source)
+    # OCR Configuration (AWS Textract)
     OCR_ENABLED: bool = os.getenv("OCR_ENABLED", "true").lower() == "true"
     OCR_CONFIDENCE_THRESHOLD: float = float(os.getenv("OCR_CONFIDENCE_THRESHOLD", "0.7"))
-    TESSERACT_CMD: str | None = os.getenv(
-        "TESSERACT_CMD"
-    )  # Optional path to tesseract binary (auto-detected if not set)
+    TEXTRACT_REGION: str = os.getenv("TEXTRACT_REGION", os.getenv("AWS_REGION", "us-east-1"))
+    TEXTRACT_ROLE_ARN: str | None = os.getenv("TEXTRACT_ROLE_ARN")  # Optional, for cross-account access
 
     # Notification configuration (AWS SNS)
     NOTIFICATIONS_ENABLED: bool = os.getenv("NOTIFICATIONS_ENABLED", "true").lower() == "true"
@@ -86,8 +85,12 @@ class Config:
         # Handle Heroku-style database URLs
         if "DATABASE_URL" in os.environ:
             uri = os.environ["DATABASE_URL"]
+            # Convert postgres:// to postgresql:// and ensure pg8000 driver is specified
             if uri.startswith("postgres://"):
-                uri = uri.replace("postgres://", "postgresql://", 1)
+                uri = uri.replace("postgres://", "postgresql+pg8000://", 1)
+            elif uri.startswith("postgresql://") and "+" not in uri:
+                # Add pg8000 driver if not already specified
+                uri = uri.replace("postgresql://", "postgresql+pg8000://", 1)
             return uri
 
         # In Lambda environment without DATABASE_URL, fetch from Secrets Manager
@@ -126,14 +129,18 @@ class Config:
         # Smart cookie configuration based on environment
         if is_lambda and environment == "dev":
             # Lambda development - use API Gateway compatible settings
-            self.SESSION_COOKIE_SECURE = True  # HTTPS required
+            # SameSite=None is required for CORS requests to send cookies
+            self.SESSION_COOKIE_SECURE = True  # HTTPS required (mandatory with SameSite=None)
             self.SESSION_COOKIE_HTTPONLY = True
-            self.SESSION_COOKIE_SAMESITE = "Lax"  # Try Lax instead of None for API Gateway
+            self.SESSION_COOKIE_SAMESITE = "None"  # Required for CORS to send cookies
+            # Don't explicitly set domain - Flask default (None) works for exact domain matching
         elif is_lambda:
             # Lambda production - use secure settings
-            self.SESSION_COOKIE_SECURE = True
+            # SameSite=None is required for CORS requests to send cookies
+            self.SESSION_COOKIE_SECURE = True  # HTTPS required (mandatory with SameSite=None)
             self.SESSION_COOKIE_HTTPONLY = True
-            self.SESSION_COOKIE_SAMESITE = "Lax"
+            self.SESSION_COOKIE_SAMESITE = "None"  # Required for CORS to send cookies
+            # Don't explicitly set domain - Flask default (None) works for exact domain matching
         else:
             # Local development - use standard HTTP settings
             self.SESSION_COOKIE_SECURE = False  # Allow HTTP for localhost

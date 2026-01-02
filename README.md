@@ -38,11 +38,11 @@ your culinary experiences.
   - No deprecation warnings
 
 - **Receipt OCR (Optical Character Recognition)**
-  - Extract expense data from receipt images/PDFs using Tesseract OCR (FREE)
+  - Extract expense data from receipt images/PDFs using AWS Textract
   - Automatic reconciliation of OCR data with form entries
   - Visual comparison of extracted vs entered data
   - One-click application of OCR suggestions
-  - **Note:** Requires Tesseract OCR binary (system dependency) - see Installation section
+  - **Note:** Requires AWS credentials configured - see Installation section
 
 ## 🛠️ Command Line Interface (CLI)
 
@@ -190,13 +190,11 @@ You can check the current version in several ways:
 ### Prerequisites
 
 - **Python 3.13+** (required)
-- **Tesseract OCR** (optional, for receipt OCR feature)
-  - Linux/WSL: `sudo apt-get install tesseract-ocr poppler-utils`
-  - macOS: `brew install tesseract poppler`
-  - Windows: 
-    - Tesseract: Download from https://github.com/UB-Mannheim/tesseract/wiki
-    - Poppler: Download from https://github.com/oschwartz10612/poppler-windows/releases
-  - **Note:** The app works without these - OCR feature will be disabled if not installed. Poppler is required for PDF receipt processing.
+- **AWS Credentials** (required for receipt OCR feature)
+  - Configure via environment variables: `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+  - Or configure `~/.aws/credentials` file
+  - Or use IAM role (for Lambda/ECS deployments)
+  - **Note:** The app works without AWS credentials - OCR feature will be disabled if not configured
 - **Docker & Docker Compose** (optional, for containerized development)
 - **Terraform** (optional, for infrastructure deployment)
 - **AWS CLI** (optional, for cloud deployment)
@@ -318,12 +316,20 @@ pip install -r requirements.txt  # Production dependencies
 pip install -r requirements-dev.txt  # Development dependencies
 ```
 
-**System Binary Dependencies:**
-- **Tesseract OCR** (optional, for receipt OCR feature)
+**Optional Script Dependencies:**
+Some utility scripts (like `scripts/extract_receipt.py`) require additional dependencies that are NOT needed for production:
+```bash
+# Install script dependencies (includes EasyOCR for local OCR processing)
+pip install -r requirements/scripts.txt
+```
+Note: The production application uses AWS Textract for OCR, not EasyOCR. EasyOCR is only needed for the standalone receipt extraction script.
+
+**AWS Configuration:**
+- **AWS Textract** (required for receipt OCR feature)
   - Required only if you want OCR functionality
-  - Cannot be installed via pip (it's a system binary, like PostgreSQL)
-  - See Prerequisites section above for installation instructions
-  - The application gracefully handles missing Tesseract - OCR simply won't be available
+  - Configure AWS credentials via environment variables, `~/.aws/credentials`, or IAM role
+  - See Prerequisites section above for configuration instructions
+  - The application gracefully handles missing AWS credentials - OCR simply won't be available
 
 ```bash
 # Requirements management
@@ -561,6 +567,7 @@ This project uses a structured approach to manage Python dependencies:
 - `requirements/dev.in` - Development-specific dependencies
 - `requirements/test.in` - Testing dependencies
 - `requirements/prod.in` - Production-specific dependencies
+- `requirements/scripts.in` - Optional dependencies for utility scripts (EasyOCR, pdf2image)
 
 To update the requirements:
 

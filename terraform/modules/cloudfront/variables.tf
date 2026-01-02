@@ -19,7 +19,7 @@ variable "api_gateway_endpoint" {
 }
 
 variable "api_gateway_custom_domain" {
-  description = "API Gateway custom domain name"
+  description = "API Gateway target domain name (AWS-provided regional domain for CloudFront origin)"
   type        = string
 }
 

@@ -336,8 +336,8 @@
                                     </div>
                                 </div>
 
-                                <!-- Middle Row: Tags + Note -->
-                                {% if expense.tags or expense.notes %}
+                                <!-- Middle Row: Tags + Note + Receipt -->
+                                {% if expense.tags or expense.notes or expense.receipt_image %}
                                     <div class="row mb-1">
                                         <div class="col-8">
                                             {% if expense.tags %}
@@ -352,15 +352,30 @@
                                             {% endif %}
                                         </div>
                                         <div class="col-4">
-                                            {% if expense.notes %}
-                                                <div class="text-muted small text-end">
-                                                    <i class="fas fa-sticky-note text-warning me-1"
-                                                       data-bs-toggle="tooltip"
-                                                       data-bs-placement="top"
-                                                       title="{{ expense.notes }}"></i>
-                                                    <span class="fst-italic">Note</span>
-                                                </div>
-                                            {% endif %}
+                                            <div class="text-muted small text-end">
+                                                {% if expense.receipt_image %}
+                                                    <div class="mb-1">
+                                                        <a href="{{ get_receipt_url(expense.receipt_image) }}"
+                                                           target="_blank"
+                                                           class="text-decoration-none"
+                                                           data-bs-toggle="tooltip"
+                                                           data-bs-placement="top"
+                                                           title="View receipt">
+                                                            <i class="fas fa-receipt text-info me-1"></i>
+                                                            <span class="fst-italic">Receipt</span>
+                                                        </a>
+                                                    </div>
+                                                {% endif %}
+                                                {% if expense.notes %}
+                                                    <div>
+                                                        <i class="fas fa-sticky-note text-warning me-1"
+                                                           data-bs-toggle="tooltip"
+                                                           data-bs-placement="top"
+                                                           title="{{ expense.notes }}"></i>
+                                                        <span class="fst-italic">Note</span>
+                                                    </div>
+                                                {% endif %}
+                                            </div>
                                         </div>
                                     </div>
                                 {% endif %}

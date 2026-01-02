@@ -17,20 +17,22 @@ import os
 import sys
 
 
-def write_version_file(version):
+def write_version_file(version, build_timestamp=None):
     """Write version file using standard template from pyproject.toml."""
+    # Get build timestamp from environment or use provided value
+    if build_timestamp is None:
+        build_timestamp = os.getenv("BUILD_TIMESTAMP", "Not set")
+
     template = '''"""Version and build information for the application."""
 
 __version__ = "{version}"
 
-# Build timestamp - set at build time via environment variable
+# Build timestamp - set at build time
 # Format: ISO 8601 (YYYY-MM-DDTHH:MM:SS+00:00)
-import os
-
-__build_timestamp__ = os.getenv("BUILD_TIMESTAMP", "Not set")
+__build_timestamp__ = "{build_timestamp}"
 '''
 
-    content = template.format(version=version)
+    content = template.format(version=version, build_timestamp=build_timestamp)
     version_file = "app/_version.py"
     os.makedirs(os.path.dirname(version_file), exist_ok=True)
 
@@ -40,10 +42,13 @@ __build_timestamp__ = os.getenv("BUILD_TIMESTAMP", "Not set")
 
 def main():
     """Main function."""
+    # Get build timestamp from environment
+    build_timestamp = os.getenv("BUILD_TIMESTAMP", "Not set")
+
     # If version provided as argument, use it directly
     if len(sys.argv) > 1:
         version = sys.argv[1]
-        write_version_file(version)
+        write_version_file(version, build_timestamp)
         print(version)
         return 0
 
@@ -51,11 +56,12 @@ def main():
     try:
         import setuptools_scm
 
-        # Use configuration from pyproject.toml
-        version = setuptools_scm.get_version(
-            write_to="app/_version.py",
-            write_to_template='"""Version and build information for the application."""\n\n__version__ = "{version}"\n\n# Build timestamp - set at build time via environment variable\n# Format: ISO 8601 (YYYY-MM-DDTHH:MM:SS+00:00)\nimport os\n\n__build_timestamp__ = os.getenv("BUILD_TIMESTAMP", "Not set")\n',
-        )
+        # Get version from setuptools-scm
+        version = setuptools_scm.get_version()
+
+        # Write version file with build timestamp
+        write_version_file(version, build_timestamp)
+
         print(version)
         return 0
 

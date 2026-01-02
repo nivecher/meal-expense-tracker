@@ -121,12 +121,24 @@ def about() -> str:
     Returns:
         Rendered about page template with version data
     """
-    from app._version import __build_timestamp__, __version__
+    try:
+        from app._version import __build_timestamp__, __version__
+
+        app_version = __version__
+        build_timestamp = __build_timestamp__
+    except ImportError as e:
+        current_app.logger.warning(f"Could not import version information: {e}")
+        app_version = "unknown"
+        build_timestamp = "Not set"
+    except Exception as e:
+        current_app.logger.error(f"Error retrieving version information: {e}")
+        app_version = "unknown"
+        build_timestamp = "Not set"
 
     return render_template(
         "main/about.html",
-        app_version=__version__,
-        build_timestamp=__build_timestamp__,
+        app_version=app_version,
+        build_timestamp=build_timestamp,
     )
 
 

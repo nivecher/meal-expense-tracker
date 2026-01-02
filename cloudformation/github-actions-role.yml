@@ -185,6 +185,12 @@ Resources:
                   - cloudfront:ListTagsForResource
                   - cloudfront:TagResource
                   - cloudfront:UntagResource
+                  # CloudFront Response Headers Policy permissions
+                  - cloudfront:GetResponseHeadersPolicy
+                  - cloudfront:ListResponseHeadersPolicies
+                  - cloudfront:CreateResponseHeadersPolicy
+                  - cloudfront:UpdateResponseHeadersPolicy
+                  - cloudfront:DeleteResponseHeadersPolicy
                   # WAFv2 permissions (required for CloudFront WAF management)
                   - wafv2:GetWebACL
                   - wafv2:ListWebACLs

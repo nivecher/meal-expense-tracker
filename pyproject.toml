@@ -193,7 +193,8 @@ exclude = [
 module = [
     "flask.*",
     "pytest.*",
-    "awsgi.*"
+    "awsgi.*",
+    "pdf2image.*",
 ]
 ignore_missing_imports = true
 

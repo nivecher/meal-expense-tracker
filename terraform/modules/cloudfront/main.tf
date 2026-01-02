@@ -55,11 +55,8 @@ resource "aws_s3_bucket_policy" "static" {
 }
 
 # S3 Bucket for CloudFront access logs
-# tfsec:ignore:AWS045 tfsec:ignore:AWS144 - CloudFront logging requires block_public_acls=false to allow ACLs
-# checkov:skip=CKV_AWS_144 - CloudFront logging requires ACLs enabled via separate public_access_block resource
-# This is secure because ignore_public_acls=true and restrict_public_buckets=true prevent public access
-# The public_access_block resource (lines 85-91) provides security controls
-resource "aws_s3_bucket" "logs" { # tfsec:ignore:AWS045 # checkov:skip=CKV_AWS_144
+# CloudFront writes logs via bucket policy (service principal), not public ACLs
+resource "aws_s3_bucket" "logs" {
   bucket = "${var.app_name}-${var.environment}-cloudfront-logs"
 
   tags = merge(var.tags, {
@@ -81,15 +78,15 @@ resource "aws_s3_bucket_versioning" "logs" {
 }
 
 # Public access block for logs bucket
-# Note: block_public_acls must be false to allow CloudFront to use ACLs for logging
-# This is secure because ignore_public_acls and restrict_public_buckets prevent public access
+# CloudFront writes logs via bucket policy (service principal), not public ACLs
+# block_public_acls=true is safe and secure - CloudFront access is via bucket policy
 resource "aws_s3_bucket_public_access_block" "logs" {
   bucket = aws_s3_bucket.logs.id
 
-  block_public_acls       = false # Allow ACLs for CloudFront logging
+  block_public_acls       = true
   block_public_policy     = true
-  ignore_public_acls      = true # Ignore public ACLs (security)
-  restrict_public_buckets = true # Restrict public buckets (security)
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 # Bucket ownership controls for CloudFront logging
@@ -191,6 +188,11 @@ locals {
   origin_request_policy_id  = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
 }
 
+# Use AWS managed origin request policy instead of custom one
+# Managed-AllViewerExceptHostHeader forwards all headers (including Authorization)
+# except Host, which is exactly what we need for API Gateway custom domains
+# This policy also forwards all cookies and query strings
+
 # WAF Web ACL for CloudFront (using free tier options)
 # Bot Control managed rule group: 10M requests/month free
 resource "aws_wafv2_web_acl" "cloudfront" {
@@ -264,6 +266,39 @@ resource "aws_wafv2_web_acl" "cloudfront" {
   tags = var.tags
 }
 
+# CloudFront Response Headers Policy for Security Headers
+# This adds defense-in-depth by setting security headers at the edge
+resource "aws_cloudfront_response_headers_policy" "security" {
+  name = "${var.app_name}-${var.environment}-security-headers"
+
+  security_headers_config {
+    content_type_options {
+      override = true
+    }
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      override                   = true
+    }
+  }
+
+  custom_headers_config {
+    items {
+      header   = "Permissions-Policy"
+      value    = "geolocation=(self), microphone=(), camera=()"
+      override = true
+    }
+  }
+}
+
 # CloudFront Distribution
 resource "aws_cloudfront_distribution" "main" {
   enabled             = true
@@ -280,6 +315,8 @@ resource "aws_cloudfront_distribution" "main" {
   }
 
   # Origin 2: API Gateway for dynamic content
+  # Use the API Gateway custom domain target domain name (AWS-provided regional domain)
+  # This avoids DNS resolution issues and works directly with CloudFront
   origin {
     domain_name = var.api_gateway_custom_domain
     origin_id   = "API-Gateway"
@@ -302,6 +339,9 @@ resource "aws_cloudfront_distribution" "main" {
     viewer_protocol_policy = "redirect-to-https"
 
     cache_policy_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingOptimized
+
+    # Add security headers policy
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 
   # Behavior 2: Default - everything else → API Gateway (no cache)
@@ -312,18 +352,10 @@ resource "aws_cloudfront_distribution" "main" {
     compress               = true
     viewer_protocol_policy = "redirect-to-https"
 
-    forwarded_values {
-      query_string = true
-      headers      = ["Accept", "Accept-Language", "Authorization", "Content-Type", "Origin", "Referer", "User-Agent"] # Forward important headers but not Host
-      cookies {
-        forward = "all"
-      }
-    }
-
-    # Disable caching for API Gateway
-    min_ttl     = 0
-    default_ttl = 0
-    max_ttl     = 0
+    # Use cache policy and origin request policy (required for HTTP API Gateway)
+    cache_policy_id            = local.cache_policy_disabled_id # Managed-CachingDisabled
+    origin_request_policy_id   = local.origin_request_policy_id # Managed-AllViewerExceptHostHeader
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.security.id
   }
 
   # Custom error responses for SPA

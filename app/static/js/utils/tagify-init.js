@@ -4,6 +4,24 @@
 
 // Comprehensive fix for tagName.toLowerCase errors from browser extensions
 // This ensures all elements have a proper tagName property that's a string
+function applyTagNameWrapper(element, currentTagName, upperTagName) {
+  // Try to create a wrapper that ensures tagName is always a string
+  const originalTagName = currentTagName || upperTagName;
+  try {
+    Object.defineProperty(element, 'tagName', {
+      get() {
+        const tagName = originalTagName || (element.localName || element.nodeName || 'UNKNOWN').toUpperCase();
+        return typeof tagName === 'string' ? tagName : String(tagName).toUpperCase();
+      },
+      configurable: true,
+      enumerable: false,
+    });
+  } catch (_wrapError) {
+    // If all else fails, just log and continue
+    console.debug('Could not fix tagName for element:', _wrapError);
+  }
+}
+
 function fixElementTagName(element) {
   if (!element || element.nodeType !== Node.ELEMENT_NODE) {
     return;
@@ -41,23 +59,9 @@ function fixElementTagName(element) {
             configurable: true,
             enumerable: false,
           });
-        } catch (defineError) {
-          // If defineProperty fails, try to wrap it
-          try {
-            // Create a wrapper that ensures tagName is always a string
-            const originalTagName = currentTagName || upperTagName;
-            Object.defineProperty(element, 'tagName', {
-              get() {
-                const tagName = originalTagName || (element.localName || element.nodeName || 'UNKNOWN').toUpperCase();
-                return typeof tagName === 'string' ? tagName : String(tagName).toUpperCase();
-              },
-              configurable: true,
-              enumerable: false,
-            });
-          } catch (wrapError) {
-            // If all else fails, just log and continue
-            console.debug('Could not fix tagName for element:', wrapError);
-          }
+        } catch (_defineError) {
+          // Try fallback wrapper approach
+          applyTagNameWrapper(element, currentTagName, upperTagName);
         }
       }
     }
@@ -240,8 +244,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Load available tags
-    fetch('/expenses/tags')
-      .then((response) => response.json())
+    fetch('/expenses/tags', {
+      credentials: 'include', // Include cookies for authentication (required for CORS)
+    })
+      .then((response) => {
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('Invalid response format from server');
+        }
+        return response.json();
+      })
       .then((data) => {
         if (data.success && data.tags) {
           tagify.settings.whitelist = data.tags.map((tag) => ({

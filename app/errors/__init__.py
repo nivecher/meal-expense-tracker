@@ -16,6 +16,7 @@ def init_app(app: Flask) -> None:
     app.register_blueprint(bp)
 
     # Register global error handlers
+    # Note: 401 is handled by Flask-Login's unauthorized_handler in app/extensions.py
     app.register_error_handler(404, not_found_error)
     app.register_error_handler(500, internal_error)
     app.register_error_handler(Exception, handle_exception)
@@ -23,7 +24,15 @@ def init_app(app: Flask) -> None:
 
 def _is_api_request() -> bool:
     """Check if the request is an API request."""
-    return request.path.startswith("/api/") or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    accept_header = request.headers.get("Accept", "")
+    x_requested_with = request.headers.get("X-Requested-With", "")
+
+    # Check multiple indicators that this is an API request
+    is_api = (
+        request.path.startswith("/api/") or x_requested_with == "XMLHttpRequest" or "application/json" in accept_header
+    )
+
+    return is_api
 
 
 def _create_error_response(
@@ -53,6 +62,16 @@ def _create_error_response(
 @bp.app_errorhandler(404)
 def not_found_error(error: HTTPException) -> Response | tuple[Response, int]:
     """Handle 404 Not Found errors."""
+    # Check if this is an API request - if so, return JSON
+    # This ensures routes that explicitly return 404 JSON responses are handled correctly
+    if _is_api_request():
+        # Return JSON response matching the format expected by frontend
+        response = jsonify({"success": False, "message": "Resource not found", "code": 404})
+        response.status_code = 404
+        response.headers["Content-Type"] = "application/json"
+        return cast(Response, response)
+
+    # For web requests, render an error template
     return _create_error_response("Page not found", 404)
 
 

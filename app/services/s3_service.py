@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import uuid
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
 from flask import current_app
 from werkzeug.datastructures import FileStorage
@@ -21,9 +22,11 @@ class S3Service:
         self.prefix: str = current_app.config.get("S3_RECEIPTS_PREFIX", "receipts/")
         self.url_expiry: int = current_app.config.get("S3_URL_EXPIRY", 3600)
 
-        # Initialize S3 client
+        # Initialize S3 client with Signature Version 4
+        # Required for KMS-encrypted objects
         try:
-            self.s3_client = boto3.client("s3", region_name=self.region)
+            s3_config = Config(signature_version="s3v4")
+            self.s3_client = boto3.client("s3", region_name=self.region, config=s3_config)
             self._verify_bucket_access()
         except NoCredentialsError:
             current_app.logger.error("AWS credentials not found")

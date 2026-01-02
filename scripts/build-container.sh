@@ -8,7 +8,8 @@ set -e
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-DOCKERFILE="${PROJECT_ROOT}/Dockerfile.lambda"
+DOCKERFILE="${PROJECT_ROOT}/Dockerfile"
+TARGET="lambda"
 IMAGE_NAME="meal-expense-tracker"
 # Get AWS region from CLI config or environment variable or use default
 AWS_REGION="${AWS_REGION:-$(aws configure get region 2>/dev/null || echo "us-east-1")}"
@@ -128,6 +129,7 @@ build_image() {
   # Build the image with Buildx for cross-platform support
   docker buildx build \
     --platform "$platform" \
+    --target "$TARGET" \
     --tag "$IMAGE_NAME:${TAG}" \
     --tag "$full_image_name" \
     --file "$DOCKERFILE" \

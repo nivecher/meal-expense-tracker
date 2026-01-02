@@ -296,12 +296,15 @@ module "cloudfront" {
   s3_bucket_name            = "${var.app_name}-${var.environment}-static"
   app_name                  = var.app_name
   environment               = var.environment
-  api_gateway_endpoint      = module.api_gateway.api_endpoint # Use full API Gateway endpoint URL
-  api_gateway_custom_domain = module.api_gateway.api_custom_domain
+  api_gateway_endpoint      = module.api_gateway.api_endpoint
+  api_gateway_custom_domain = module.api_gateway.domain_name # Use custom domain name (requires Route53 record)
   aliases                   = [local.api_domain_name]
   acm_certificate_arn       = data.aws_acm_certificate.main.arn
   domain_aliases            = [local.api_domain_name]
   route53_zone_id           = data.aws_route53_zone.main.zone_id
+
+  # Disable WAF to save costs ($16/month)
+  enable_waf = false
 
   providers = {
     aws.us-east-1 = aws.us-east-1
