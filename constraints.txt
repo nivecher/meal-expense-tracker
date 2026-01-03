@@ -19,7 +19,7 @@ bandit==1.8.6
 
 # Documentation tools
 sphinx==7.4.7
-sphinx-rtd-theme==2.0.0
+sphinx-rtd-theme==3.0.2
 
 # Type stubs - pinned to latest stable
 types-Flask==1.1.6

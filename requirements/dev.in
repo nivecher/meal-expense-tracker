@@ -87,7 +87,7 @@ safety>=3.0.0,<4.0.0                    # Checks installed dependencies for know
 
 # Documentation
 sphinx>=7.0.0,<8.0.0                    # Documentation generator
-sphinx-rtd-theme>=2.0.0,<3.0.0          # Read the Docs theme for Sphinx documentation
+sphinx-rtd-theme>=2.0.0,<4.0.0          # Read the Docs theme for Sphinx documentation
 
 # Image processing
 Pillow>=10.0.0,<11.0.0                  # Image processing library (PIL fork)
