@@ -292,12 +292,9 @@ def main() -> None:
         # Always try fallback analysis if:
         # 1. No version was produced, OR
         # 2. Branch restriction detected, OR
-        # 3. Version equals current (might be wrong, especially on non-release branches)
-        should_use_fallback = (
-            no_version_produced or has_branch_restriction or (version_equals_current and has_branch_restriction)
-        )
-
-        if should_use_fallback:
+        # 3. Version equals current (semantic-release might be wrong, especially on non-release branches)
+        # This ensures we analyze commits even when semantic-release can't run properly
+        if no_version_produced or has_branch_restriction or version_equals_current:
             if has_branch_restriction:
                 print("# Branch not in release groups, analyzing commits directly", file=sys.stderr)
             elif no_version_produced:
@@ -306,13 +303,9 @@ def main() -> None:
                 print("# semantic-release returned current version, verifying with commit analysis", file=sys.stderr)
 
             fallback_version = _analyze_commits_with_semantic_release(current_version)
-            if fallback_version and fallback_version != current_version:
-                # Fallback found a different version - use it
+            if fallback_version:
                 semantic_version = fallback_version
                 semantic_release_produced_version = True
-            elif fallback_version == current_version:
-                # Fallback confirms no bump needed
-                print("# Fallback analysis confirms no version bump needed", file=sys.stderr)
         elif has_other_error:
             # Semantic-release produced a version but also had an error - log it but use the version
             is_expected_no_bump = any(msg in error_msg.lower() for msg in EXPECTED_NO_BUMP_MESSAGES)
