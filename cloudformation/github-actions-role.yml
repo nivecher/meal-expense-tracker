@@ -105,11 +105,19 @@ Resources:
                   - kms:CreateAlias
                   - kms:DeleteAlias
                   - kms:Describe*
+                  - kms:DescribeKey
                   - kms:EnableKeyRotation
                   - kms:Get*
                   - kms:List*
                   - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:ReEncrypt*
                   - kms:GenerateDataKey
+                  - kms:GenerateDataKeyWithoutPlaintext
+                  - kms:CreateGrant
+                  - kms:ListGrants
+                  - kms:RevokeGrant
+                  - kms:RetireGrant
                   - kms:TagResource
                   - kms:UntagResource
                   # SSM Parameter Store permissions
@@ -123,6 +131,7 @@ Resources:
                   - ssm:AddTagsToResource
                   - ssm:RemoveTagsFromResource
                   - ssm:ListTagsForResource
+                  # SNS permissions
                   - sns:GetTopicAttributes
                   - sns:GetSubscriptionAttributes
                   - sns:ListTagsForResource
@@ -130,12 +139,19 @@ Resources:
                   - sns:Publish
                   - sns:SetTopicAttributes
                   - sns:DeleteTopic
+                  # Route 53 permissions
                   - route53:ListHostedZones
                   - route53:GetHostedZone
+                  - route53:ListHostedZonesByName
                   - route53:ListResourceRecordSets
-                  - route53:ChangeResourceRecordSets
                   - route53:GetChange
+                  - route53:ChangeResourceRecordSets
+                  - route53:CreateHostedZone
+                  - route53:DeleteHostedZone
+                  - route53:UpdateHostedZoneComment
                   - route53:ListTagsForResource
+                  - route53:ChangeTagsForResource
+                  # CloudWatch Logs permissions
                   - logs:CreateLogGroup
                   - logs:DeleteLogGroup
                   - logs:DescribeLogGroups
@@ -206,9 +222,6 @@ Resources:
                   - wafv2:UntagResource
                   - wafv2:AssociateWebACL
                   - wafv2:DisassociateWebACL
-                  - wafv2:CreateWebACL
-                  - wafv2:UpdateWebACL
-                  - wafv2:DeleteWebACL
                   # S3 permissions
                   - s3:GetObject
                   - s3:ListBucket
