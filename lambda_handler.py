@@ -241,101 +241,92 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         # Import the actual handler from wsgi module
         from wsgi import application
 
-        # Use mangum for HTTP API v2 support (works with Flask/WSGI apps)
+        # Use WSGI adapter directly (Mangum has compatibility issues with Flask)
+        # Mangum tries to use Flask as ASGI but Flask is WSGI-only
         response: dict[str, Any]
-        try:
-            from mangum import Mangum  # type: ignore[import-not-found]
 
-            handler = Mangum(application, lifespan="off")
-            mangum_response = handler(event, context)
-            # Ensure response is a dict and type it correctly
-            if isinstance(mangum_response, dict):
-                response = cast(dict[str, Any], mangum_response)
+        # Use WSGI adapter (Mangum incompatible with current Flask version)
+        import base64
+        from io import BytesIO
+
+        path = event.get("rawPath", "/")
+        method = event.get("requestContext", {}).get("http", {}).get("method", "GET")
+        query_string = event.get("rawQueryString", "")
+        headers = event.get("headers", {})
+        body = event.get("body", "")
+
+        # Handle cookies - HTTP API v2 may pass cookies in array or Cookie header
+        cookies = event.get("cookies", [])
+        # Check for Cookie header (case-insensitive)
+        has_cookie_header = any(key.lower() == "cookie" for key in headers.keys())
+        if cookies and not has_cookie_header:
+            # Convert cookies array to Cookie header format
+            cookie_header = "; ".join(cookies)
+            headers["cookie"] = cookie_header
+
+        # Handle body
+        if body and event.get("isBase64Encoded", False):
+            body_bytes = base64.b64decode(body)
+        elif body:
+            body_bytes = body.encode("utf-8") if isinstance(body, str) else body
+        else:
+            body_bytes = b""
+
+        # Extract host from headers for proper cookie domain handling
+        host = headers.get("host", headers.get("Host", "lambda"))
+        # Remove port if present (e.g., "example.com:443" -> "example.com")
+        if ":" in host:
+            host = host.split(":")[0]
+
+        # Create WSGI environment
+        environ = {
+            "REQUEST_METHOD": method,
+            "PATH_INFO": path,
+            "QUERY_STRING": query_string,
+            "CONTENT_TYPE": headers.get("content-type", ""),
+            "CONTENT_LENGTH": str(len(body_bytes)),
+            "SERVER_NAME": host,  # Use actual host for proper cookie domain
+            "SERVER_PORT": "443",
+            "HTTP_HOST": host,  # Also set HTTP_HOST header
+            "wsgi.version": (1, 0),
+            "wsgi.url_scheme": "https",
+            "wsgi.input": BytesIO(body_bytes),
+            "wsgi.errors": sys.stderr,
+            "wsgi.multithread": False,
+            "wsgi.multiprocess": False,
+            "wsgi.run_once": False,
+        }
+
+        # Add headers (including Cookie header)
+        for key, value in headers.items():
+            key = key.upper().replace("-", "_")
+            if key not in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+                environ[f"HTTP_{key}"] = value
+
+        # Call Flask application
+        with application.request_context(environ):
+            flask_response = application.full_dispatch_request()
+
+        # Convert to API Gateway format
+        # Extract cookies from Set-Cookie headers for HTTP API v2
+        response_headers = {}
+        cookies = []
+        for key, value in flask_response.headers:
+            if key.lower() == "set-cookie":
+                cookies.append(value)
             else:
-                response = {"statusCode": 500, "body": "Internal error", "headers": {}, "isBase64Encoded": False}
-        except ImportError:
-            # Fallback: simple WSGI adapter
-            import base64
-            from io import BytesIO
+                response_headers[key] = value
 
-            path = event.get("rawPath", "/")
-            method = event.get("requestContext", {}).get("http", {}).get("method", "GET")
-            query_string = event.get("rawQueryString", "")
-            headers = event.get("headers", {})
-            body = event.get("body", "")
+        response = {
+            "statusCode": flask_response.status_code,
+            "headers": response_headers,
+            "body": flask_response.get_data(as_text=True),
+            "isBase64Encoded": False,
+        }
 
-            # Handle cookies - HTTP API v2 may pass cookies in array or Cookie header
-            cookies = event.get("cookies", [])
-            # Check for Cookie header (case-insensitive)
-            has_cookie_header = any(key.lower() == "cookie" for key in headers.keys())
-            if cookies and not has_cookie_header:
-                # Convert cookies array to Cookie header format
-                cookie_header = "; ".join(cookies)
-                headers["cookie"] = cookie_header
-
-            # Handle body
-            if body and event.get("isBase64Encoded", False):
-                body_bytes = base64.b64decode(body)
-            elif body:
-                body_bytes = body.encode("utf-8") if isinstance(body, str) else body
-            else:
-                body_bytes = b""
-
-            # Extract host from headers for proper cookie domain handling
-            host = headers.get("host", headers.get("Host", "lambda"))
-            # Remove port if present (e.g., "example.com:443" -> "example.com")
-            if ":" in host:
-                host = host.split(":")[0]
-
-            # Create WSGI environment
-            environ = {
-                "REQUEST_METHOD": method,
-                "PATH_INFO": path,
-                "QUERY_STRING": query_string,
-                "CONTENT_TYPE": headers.get("content-type", ""),
-                "CONTENT_LENGTH": str(len(body_bytes)),
-                "SERVER_NAME": host,  # Use actual host for proper cookie domain
-                "SERVER_PORT": "443",
-                "HTTP_HOST": host,  # Also set HTTP_HOST header
-                "wsgi.version": (1, 0),
-                "wsgi.url_scheme": "https",
-                "wsgi.input": BytesIO(body_bytes),
-                "wsgi.errors": sys.stderr,
-                "wsgi.multithread": False,
-                "wsgi.multiprocess": False,
-                "wsgi.run_once": False,
-            }
-
-            # Add headers (including Cookie header)
-            for key, value in headers.items():
-                key = key.upper().replace("-", "_")
-                if key not in ("CONTENT_TYPE", "CONTENT_LENGTH"):
-                    environ[f"HTTP_{key}"] = value
-
-            # Call Flask application
-            with application.request_context(environ):
-                flask_response = application.full_dispatch_request()
-
-            # Convert to API Gateway format
-            # Extract cookies from Set-Cookie headers for HTTP API v2
-            response_headers = {}
-            cookies = []
-            for key, value in flask_response.headers:
-                if key.lower() == "set-cookie":
-                    cookies.append(value)
-                else:
-                    response_headers[key] = value
-
-            response = {
-                "statusCode": flask_response.status_code,
-                "headers": response_headers,
-                "body": flask_response.get_data(as_text=True),
-                "isBase64Encoded": False,
-            }
-
-            # HTTP API v2 uses cookies array, not Set-Cookie headers
-            if cookies:
-                response["cookies"] = cookies
+        # HTTP API v2 uses cookies array, not Set-Cookie headers
+        if cookies:
+            response["cookies"] = cookies
 
         # Calculate duration and log
         duration_ms = (time.time() - start_time) * 1000
