@@ -179,6 +179,11 @@ Resources:
                   - cloudfront:CreateResponseHeadersPolicy
                   - cloudfront:UpdateResponseHeadersPolicy
                   - cloudfront:DeleteResponseHeadersPolicy
+                  - cloudfront:GetCachePolicy
+                  - cloudfront:ListCachePolicies
+                  - cloudfront:CreateCachePolicy
+                  - cloudfront:UpdateCachePolicy
+                  - cloudfront:DeleteCachePolicy
                   - cloudfront:ListTagsForResource
                   - cloudfront:TagResource
                   - cloudfront:UntagResource
