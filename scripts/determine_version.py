@@ -279,30 +279,41 @@ def main() -> None:
 
         # Check for branch restriction errors (semantic-release exits with code 0 but prints error to stderr)
         error_msg = (result.stderr or "").strip()
-        if error_msg and "isn't in any release groups" in error_msg.lower():
-            # Branch restriction - fall back to commit analysis
-            print("# Branch not in release groups, analyzing commits directly", file=sys.stderr)
-            semantic_version = _analyze_commits_with_semantic_release(current_version)
-            if semantic_version:
+
+        # Parse semantic-release output first
+        semantic_version = _parse_semantic_release_output(result.stdout)
+
+        # Check for branch restriction or other issues
+        has_branch_restriction = error_msg and "isn't in any release groups" in error_msg.lower()
+        has_other_error = result.returncode != 0 and error_msg
+        no_version_produced = not semantic_version
+        version_equals_current = semantic_version == current_version
+
+        # Always try fallback analysis if:
+        # 1. No version was produced, OR
+        # 2. Branch restriction detected, OR
+        # 3. Version equals current (semantic-release might be wrong, especially on non-release branches)
+        # This ensures we analyze commits even when semantic-release can't run properly
+        if no_version_produced or has_branch_restriction or version_equals_current:
+            if has_branch_restriction:
+                print("# Branch not in release groups, analyzing commits directly", file=sys.stderr)
+            elif no_version_produced:
+                print("# semantic-release produced no version, analyzing commits directly", file=sys.stderr)
+            elif version_equals_current:
+                print("# semantic-release returned current version, verifying with commit analysis", file=sys.stderr)
+
+            fallback_version = _analyze_commits_with_semantic_release(current_version)
+            if fallback_version:
+                semantic_version = fallback_version
                 semantic_release_produced_version = True
-        elif result.returncode != 0 and error_msg:
-            # Other errors - check if it's a "no version change" scenario
+        elif has_other_error:
+            # Semantic-release produced a version but also had an error - log it but use the version
             is_expected_no_bump = any(msg in error_msg.lower() for msg in EXPECTED_NO_BUMP_MESSAGES)
             if not is_expected_no_bump:
-                print(f"Error: semantic-release failed: {error_msg}", file=sys.stderr)
-                if result.stdout:
-                    print(f"stdout: {result.stdout}", file=sys.stderr)
-                # Try fallback analysis before exiting
-                semantic_version = _analyze_commits_with_semantic_release(current_version)
-                if semantic_version:
-                    semantic_release_produced_version = True
-                else:
-                    sys.exit(1)
-        else:
-            # Success - parse the output
-            semantic_version = _parse_semantic_release_output(result.stdout)
-            if semantic_version:
-                semantic_release_produced_version = True
+                print(f"# Warning: semantic-release had error but produced version: {error_msg}", file=sys.stderr)
+        elif semantic_version:
+            # Success - semantic-release produced a version
+            semantic_release_produced_version = True
 
     except FileNotFoundError:
         print("Error: python-semantic-release not found", file=sys.stderr)
@@ -315,11 +326,19 @@ def main() -> None:
         if semantic_version:
             semantic_release_produced_version = True
 
-    # If semantic-release didn't produce a version, it means no bump is needed
-    # Use the current version in this case
+    # If semantic-release didn't produce a version, try fallback analysis
+    # This handles cases where semantic-release fails silently or on non-release branches
     if not semantic_version:
-        print("# semantic-release did not produce a version (no bump needed)", file=sys.stderr)
-        semantic_version = current_version
+        print("# semantic-release did not produce a version, trying fallback analysis", file=sys.stderr)
+        fallback_version = _analyze_commits_with_semantic_release(current_version)
+        if fallback_version:
+            semantic_version = fallback_version
+            semantic_release_produced_version = True
+            print("# Fallback analysis found version bump", file=sys.stderr)
+        else:
+            # No version bump needed - use current version
+            print("# No version bump needed (no conventional commits found)", file=sys.stderr)
+            semantic_version = current_version
 
     # Validate semantic version format
     if not _validate_version_format(semantic_version):
