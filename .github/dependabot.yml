@@ -6,8 +6,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    # Only allow updates to the patch version
-    versioning-strategy: increase-if-necessary
     # Group all GitHub Actions updates together
     groups:
       github-actions:
