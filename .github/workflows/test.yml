@@ -89,7 +89,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.1
 
       - name: Health check endpoint
         env:
@@ -129,7 +129,7 @@ jobs:
       checks: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.1
 
       - name: Setup Python Environment
         uses: ./.github/actions/setup-python-env
@@ -152,7 +152,7 @@ jobs:
 
       - name: Upload API test results
         if: always()
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: api-test-results
           path: api-test-results.xml
@@ -178,10 +178,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.1
 
       - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4.1.0
+        uses: actions/setup-node@v6.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -205,7 +205,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: playwright-report
           path: playwright-report/

@@ -38,7 +38,7 @@ jobs:
       checks: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.1
 
       - name: Setup Python Environment
         uses: ./.github/actions/setup-python-env
@@ -66,7 +66,7 @@ jobs:
       checks: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.1
 
       - name: Setup Python Environment
         uses: ./.github/actions/setup-python-env
@@ -75,7 +75,7 @@ jobs:
           requirements-file: requirements-dev.txt
 
       - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4.1.0
+        uses: actions/setup-node@v6.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -121,7 +121,7 @@ jobs:
         test-type: [unit, integration]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.1
 
       - name: Setup Python Environment
         uses: ./.github/actions/setup-python-env
@@ -163,7 +163,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: test-results-${{ matrix.test-type }}
           path: |
@@ -183,7 +183,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.test-type == 'unit'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage-${{ matrix.test-type }}.xml
           fail_ci_if_error: false
@@ -213,7 +213,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.1
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3.1.2
@@ -229,7 +229,7 @@ jobs:
           fi
 
       - name: Setup Terraform plugin cache
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v5.0.1
         with:
           path: ${{ runner.temp }}/.terraform.d/plugin-cache
           key: terraform-plugins-${{ hashFiles('terraform/**/*.tf') }}
@@ -250,7 +250,7 @@ jobs:
           fi
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
@@ -311,7 +311,7 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.1
 
       - name: Dependency Review
         uses: actions/dependency-review-action@v4
@@ -327,7 +327,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.1
 
       - name: Setup Python Environment
         uses: ./.github/actions/setup-python-env
@@ -346,7 +346,7 @@ jobs:
 
       - name: Upload security scan results
         if: always()
-        uses: actions/upload-artifact@v4.6.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: security-scan-results
           path: |
