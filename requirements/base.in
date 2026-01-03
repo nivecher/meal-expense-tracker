@@ -30,6 +30,7 @@ Werkzeug>=3.1.0,<4.0.0             # WSGI utility library, used internally by Fl
 
 # AWS Lambda WSGI Adapter
 aws-wsgi>=0.2.7,<1.0.0             # Adapter to run Flask apps on AWS Lambda via API Gateway
+mangum>=0.18.0,<1.0.0              # ASGI/WSGI adapter for AWS Lambda HTTP API v2 (preferred over aws-wsgi)
 marshmallow                        # Object serialization/deserialization and validation (used for API schemas)
 
 # Google Maps
