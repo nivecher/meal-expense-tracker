@@ -694,37 +694,24 @@ def process_receipt_ocr() -> tuple[Response, int]:
     try:
         # Check if OCR is enabled
         if not current_app.config.get("OCR_ENABLED", True):
-            return (
-                jsonify({"status": "error", "message": "OCR is disabled"}),
-                503,
-            )
+            return _create_api_response(message="OCR is disabled", status="error", code=503)
 
         # Get uploaded file
         if "receipt_file" not in request.files:
-            return (
-                jsonify({"status": "error", "message": "No receipt file provided"}),
-                400,
-            )
+            return _create_api_response(message="No receipt file provided", status="error", code=400)
 
         receipt_file = request.files["receipt_file"]
         if not receipt_file or not receipt_file.filename:
-            return (
-                jsonify({"status": "error", "message": "No receipt file provided"}),
-                400,
-            )
+            return _create_api_response(message="No receipt file provided", status="error", code=400)
 
         # Validate file type (AWS Textract supports PNG, JPEG, and PDF only)
         allowed_extensions = {".jpg", ".jpeg", ".png", ".pdf"}
         file_ext = "." + receipt_file.filename.rsplit(".", 1)[1].lower() if "." in receipt_file.filename else ""
         if file_ext not in allowed_extensions:
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "message": f"Invalid file type. AWS Textract supports: PNG, JPEG, and PDF only. Received: {file_ext or 'unknown'}",
-                    }
-                ),
-                400,
+            return _create_api_response(
+                message=f"Invalid file type. AWS Textract supports: PNG, JPEG, and PDF only. Received: {file_ext or 'unknown'}",
+                status="error",
+                code=400,
             )
 
         # Validate file size (5MB max)
@@ -734,9 +721,8 @@ def process_receipt_ocr() -> tuple[Response, int]:
 
         max_size = current_app.config.get("MAX_CONTENT_LENGTH", 5 * 1024 * 1024)
         if file_size > max_size:
-            return (
-                jsonify({"status": "error", "message": f"File too large. Max size: {max_size / 1024 / 1024}MB"}),
-                400,
+            return _create_api_response(
+                message=f"File too large. Max size: {max_size / 1024 / 1024}MB", status="error", code=400
             )
 
         # Get form hints from request if provided (for better matching)
@@ -771,29 +757,20 @@ def process_receipt_ocr() -> tuple[Response, int]:
 
             ocr_service = get_ocr_service()
             if not ocr_service:
-                return (
-                    jsonify(
-                        {
-                            "status": "error",
-                            "message": "OCR service not available. AWS Textract is not configured. Please configure AWS credentials.",
-                        }
-                    ),
-                    503,
+                return _create_api_response(
+                    message="OCR service not available. AWS Textract is not configured. Please configure AWS credentials.",
+                    status="error",
+                    code=503,
                 )
 
             receipt_data = ocr_service.extract_receipt_data(receipt_file, form_hints=form_hints)
         except RuntimeError as e:
             # Handle Textract not available error
             current_app.logger.error(f"OCR service error: {e}")
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "message": str(e),
-                    }
-                ),
-                503,
-            )
+            return _create_api_response(message=str(e), status="error", code=503)
+        except Exception as e:
+            current_app.logger.error(f"Unexpected OCR error: {e}", exc_info=True)
+            return _create_api_response(message=f"Failed to process receipt: {str(e)}", status="error", code=500)
 
         # If restaurant ID provided, get restaurant address for comparison
         restaurant_address_data = None
@@ -881,16 +858,10 @@ def process_receipt_ocr() -> tuple[Response, int]:
         return _create_api_response(data=data, message="Receipt processed successfully")
 
     except ValueError as e:
-        return (
-            jsonify({"status": "error", "message": str(e)}),
-            400,
-        )
+        return _create_api_response(message=str(e), status="error", code=400)
     except RuntimeError as e:
         current_app.logger.error(f"OCR processing error: {e}")
-        return (
-            jsonify({"status": "error", "message": f"OCR processing failed: {str(e)}"}),
-            500,
-        )
+        return _create_api_response(message=f"OCR processing failed: {str(e)}", status="error", code=500)
     except Exception as e:
         return _handle_service_error(e, "process receipt OCR")
 

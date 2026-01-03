@@ -129,11 +129,71 @@ def login() -> str | Response:
     return render_template("auth/login.html", form=form, title="Login", now=datetime.now(UTC))
 
 
+def _delete_auth_cookies(response: Response) -> None:
+    """Delete authentication cookies from the response.
+
+    This helper function deletes both the session cookie and the remember cookie
+    with the exact same attributes they were set with. Required for proper logout
+    in Lambda/API Gateway environments.
+
+    Args:
+        response: The Flask response object to set cookies on
+    """
+    cookie_path = current_app.config.get("SESSION_COOKIE_PATH", "/")
+    cookie_domain = current_app.config.get("SESSION_COOKIE_DOMAIN", None)
+    cookie_secure = current_app.config.get("SESSION_COOKIE_SECURE", True)
+    cookie_httponly = current_app.config.get("SESSION_COOKIE_HTTPONLY", True)
+    cookie_samesite = current_app.config.get("SESSION_COOKIE_SAMESITE", "None")
+
+    # Delete session cookie - must match exact attributes used when cookie was set
+    session_cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
+    response.set_cookie(
+        session_cookie_name,
+        "",
+        max_age=0,
+        path=cookie_path,
+        domain=cookie_domain,
+        secure=cookie_secure,
+        httponly=cookie_httponly,
+        samesite=cookie_samesite if cookie_samesite else None,
+    )
+
+    # Delete remember cookie if it exists
+    remember_cookie_name = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+    response.set_cookie(
+        remember_cookie_name,
+        "",
+        max_age=0,
+        path=cookie_path,
+        domain=cookie_domain,
+        secure=cookie_secure,
+        httponly=cookie_httponly,
+        samesite=cookie_samesite if cookie_samesite else None,
+    )
+
+
 @bp.route("/logout")
-@login_required
 def logout() -> Response:
+    """Handle user logout.
+
+    Clears the session and deletes authentication cookies to ensure proper logout
+    in Lambda/API Gateway environments where cookie deletion must be explicit.
+    """
+    from flask import session
+
+    # CRITICAL: Mark session as not modified FIRST to prevent Flask from saving it
+    # This prevents Flask's SecureCookieSessionInterface from regenerating the cookie
+    session.modified = False
+
     logout_user()
-    return cast(Response, redirect(url_for("main.index")))
+    session.clear()
+    session.permanent = False
+
+    # Explicitly delete session and remember cookies - required for Lambda/API Gateway
+    response = cast(Response, redirect(url_for("auth.login")))
+    _delete_auth_cookies(response)
+
+    return response
 
 
 @bp.route("/register", methods=["GET", "POST"])

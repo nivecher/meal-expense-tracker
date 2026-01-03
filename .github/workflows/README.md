@@ -35,7 +35,6 @@ This project follows a **minimalist approach** to GitHub Actions:
 - **lint**: Python/JavaScript/YAML/JSON/TOML linting
 - **test**: Unit and integration tests with coverage
 - **terraform**: Terraform validation and planning
-- **dependency-review**: Security scanning of dependencies (PR only)
 - **security**: Bandit and Safety security scans
 - **ci-success**: Aggregates all job statuses
 
@@ -177,24 +176,6 @@ gh workflow run release.yml -f tag=v1.2.3-beta.1
 
 ---
 
-### 6. CodeQL (`codeql.yml`)
-
-**Trigger**: 
-- Schedule (daily at 6 AM UTC)
-- Push to `main`
-- Pull requests
-
-**Jobs**:
-- **analyze**: Multi-language CodeQL analysis (Python, JavaScript)
-- **summary**: Aggregate security findings
-
-**Key Features**:
-- Security-extended query suite
-- Path filtering for accuracy
-- SARIF artifact uploading
-- Detailed finding summaries
-- Matrix strategy for multiple languages
-
 ---
 
 ## Composite Actions
@@ -252,8 +233,7 @@ gh workflow run release.yml -f tag=v1.2.3-beta.1
 - `docker/metadata-action@v5.6.1` - Image metadata generation
 
 ### Security & Quality
-- `github/codeql-action/*` - CodeQL security analysis
-- `actions/dependency-review-action@v4` - Dependency vulnerability scanning
+- `github/codeql-action/*` - CodeQL security analysis (use GitHub's built-in CodeQL setup)
 - `codecov/codecov-action@v4` - Code coverage reporting
 - `EnricoMi/publish-unit-test-result-action@v2` - Test result publishing
 

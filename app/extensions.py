@@ -216,7 +216,6 @@ def _handle_api_unauthorized() -> Response:
     """Handle unauthorized API requests."""
     response = jsonify({"status": "error", "message": "Authentication required", "code": 401})
     response.status_code = 401
-    response.headers["Content-Type"] = "application/json"
     return cast(Response, response)
 
 
@@ -246,14 +245,7 @@ def unauthorized() -> Response | str:
     For API requests, return a 401 JSON response.
     For web requests, redirect to the login page.
     """
-    # Check if this is an API request by path or headers
-    accept_header = request.headers.get("Accept", "")
-    x_requested_with = request.headers.get("X-Requested-With", "")
-    is_api = (
-        request.path.startswith("/api/") or x_requested_with == "XMLHttpRequest" or "application/json" in accept_header
-    )
-
-    if is_api:
+    if request.path.startswith("/api/"):
         return _handle_api_unauthorized()
 
     return _handle_web_unauthorized()

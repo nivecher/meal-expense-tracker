@@ -91,6 +91,19 @@ resource "aws_iam_policy" "lambda_combined" {
           "arn:aws:s3:::${var.app_name}-${var.environment}-receipts",
           "arn:aws:s3:::${var.app_name}-${var.environment}-receipts/*"
         ]
+      },
+      # AWS Textract access for OCR processing
+      {
+        Effect = "Allow"
+        Action = [
+          "textract:DetectDocumentText",
+          "textract:AnalyzeDocument",
+          "textract:StartDocumentTextDetection",
+          "textract:StartDocumentAnalysis",
+          "textract:GetDocumentTextDetection",
+          "textract:GetDocumentAnalysis"
+        ]
+        Resource = "*"
       }
     ]
   })

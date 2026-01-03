@@ -167,26 +167,38 @@ document.addEventListener('DOMContentLoaded', () => {
     // Get existing tags from input value and data attribute
     const existingTagsValue = tagsInput.value;
     const existingTagsData = tagsInput.getAttribute('data-existing-tags');
-    let existingTags = [];
 
-    if (existingTagsData) {
+    // Parse existing tags from data attribute or value
+    const parseTagsFromValue = () => {
+      return existingTagsValue ? existingTagsValue.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [];
+    };
+
+    const parseTagsFromData = (data) => {
+      const trimmedData = data.trim();
+      if (!trimmedData || trimmedData === 'null' || trimmedData === 'undefined') {
+        return null;
+      }
       try {
-        const parsedTags = JSON.parse(existingTagsData);
-        existingTags = parsedTags.map((tag) => ({
-          value: tag.name,
-          id: tag.id,
-          color: tag.color,
-          title: tag.description || tag.name,
-          description: tag.description || '',
-        }));
+        const parsedTags = JSON.parse(trimmedData);
+        if (Array.isArray(parsedTags)) {
+          return parsedTags.map((tag) => ({
+            value: tag.name,
+            id: tag.id,
+            color: tag.color,
+            title: tag.description || tag.name,
+            description: tag.description || '',
+          }));
+        }
       } catch (error) {
         console.warn('Failed to parse existing tags data:', error);
-        // Fallback to simple name parsing
-        existingTags = existingTagsValue ? existingTagsValue.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [];
+        console.warn('Raw data that failed to parse:', data);
       }
-    } else {
-      existingTags = existingTagsValue ? existingTagsValue.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [];
-    }
+      return null;
+    };
+
+    // Try to parse from data attribute first, fallback to value
+    const existingTags = existingTagsData ? parseTagsFromData(existingTagsData) : null;
+    const finalTags = existingTags || parseTagsFromValue();
 
     // Initialize Tagify
     const tagify = new Tagify(tagsInput, {
@@ -267,13 +279,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
           // Add existing tags to Tagify after whitelist is loaded
           // Only add if Tagify doesn't already have tags (prevent duplicates)
-          if (existingTags.length > 0 && tagify.value.length === 0) {
+          if (finalTags.length > 0 && tagify.value.length === 0) {
             // If we have full tag data (from data-existing-tags), use it directly
-            if (existingTags[0] && existingTags[0].id) {
-              tagify.addTags(existingTags);
+            if (finalTags[0] && finalTags[0].id) {
+              tagify.addTags(finalTags);
             } else {
               // Fallback: try to match with whitelist
-              existingTags.forEach((tagName) => {
+              finalTags.forEach((tagName) => {
                 const matchingTag = tagify.settings.whitelist.find((tag) => tag.value === tagName);
                 const tagData = matchingTag ? {
                   value: tagName,
