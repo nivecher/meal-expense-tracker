@@ -6,7 +6,7 @@ This module handles all authentication-related API endpoints including login and
 from types import SimpleNamespace
 from typing import Any, Dict, Optional, Tuple, cast
 
-from flask import current_app, jsonify, request
+from flask import Response, current_app, jsonify, request
 import flask_limiter as _flask_limiter
 from flask_limiter import RateLimitExceeded
 from flask_login import current_user, login_user, logout_user
@@ -16,6 +16,7 @@ from app.auth.models import User
 from app.extensions import limiter
 
 from . import bp
+from .routes import _delete_auth_cookies
 
 
 def _ensure_ratelimit_exception_is_test_friendly() -> None:
@@ -188,8 +189,11 @@ def api_login() -> tuple[dict[str, Any], int]:
 
 @bp.route("/auth/logout", methods=["POST"])
 @limiter.limit("10 per minute")  # Rate limiting for logout as well
-def api_logout() -> tuple[dict[str, Any], int]:
+def api_logout() -> tuple[Response, int]:
     """Handle user logout via API.
+
+    Clears the session and deletes authentication cookies to ensure proper logout
+    in Lambda/API Gateway environments.
 
     Returns:
         JSON response with status and message
@@ -205,10 +209,23 @@ def api_logout() -> tuple[dict[str, Any], int]:
         )
 
     try:
+        from flask import session
+
         username = current_user.username
+
+        # CRITICAL: Mark session as not modified FIRST to prevent Flask from saving it
+        session.modified = False
+
         logout_user()
+        session.clear()
+        session.permanent = False
+
+        # Create response and delete cookies
+        response = jsonify({"status": "success", "message": "Logged out successfully."})
+        _delete_auth_cookies(response)
+
         current_app.logger.info(f"User {username} logged out successfully")
-        return jsonify({"status": "success", "message": "Logged out successfully."}), 200
+        return response, 200
     except Exception as e:
         current_app.logger.error(f"Logout error: {str(e)}")
         return (

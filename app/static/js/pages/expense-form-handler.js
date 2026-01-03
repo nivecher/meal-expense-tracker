@@ -126,7 +126,7 @@ function showFormErrors(form, errors) {
   });
 
   // Show general errors at the top of the form
-  if (errors.errorKey || (typeof errors === 'object' && !Array.isArray(errors) && Object.keys(errors).length > 0)) {
+  if (errors.errorKey || errors.message || (typeof errors === 'object' && !Array.isArray(errors) && Object.keys(errors).length > 0)) {
     const errorContainer = form.querySelector('#formErrors') || document.createElement('div');
     if (!errorContainer.id) {
       errorContainer.id = 'formErrors';
@@ -138,16 +138,17 @@ function showFormErrors(form, errors) {
     errorContainer.innerHTML = '';
     errorContainer.classList.remove('d-none');
 
-    // Add new error messages
-    if (errors.errorKey) {
-      const errorMessages = Array.isArray(errors.errorKey) ? errors.errorKey : [errors.errorKey];
-      errorMessages.forEach((msg) => {
+    // Add new error messages - prioritize errorKey, then message
+    const messagesToShow = errors.errorKey || errors.message || [];
+    const errorMessages = Array.isArray(messagesToShow) ? messagesToShow : [messagesToShow];
+    errorMessages.forEach((msg) => {
+      if (msg) {
         const p = document.createElement('p');
         p.className = 'mb-0';
         p.textContent = msg;
         errorContainer.appendChild(p);
-      });
-    }
+      }
+    });
   }
 
   // Show field-specific errors
@@ -183,11 +184,11 @@ function showFormErrors(form, errors) {
     }
   });
 
-  // Show general error message if no field-specific errors
+  // Show general error message if no field-specific errors and no errorKey/message already shown
   const errorContainer = form.querySelector('#formErrors');
-  if (errorContainer && (!errors.fields || Object.keys(errors.fields).length === 0)) {
-    const errorMsg = errors.message || 'Please correct the errors below.';
-    errorContainer.textContent = Array.isArray(errorMsg) ? errorMsg[0] : errorMsg;
+  if (errorContainer && (!errors.fields || Object.keys(errors.fields).length === 0) && !errors.errorKey && !errors.message) {
+    const errorMsg = 'Please correct the errors below.';
+    errorContainer.textContent = errorMsg;
     errorContainer.classList.remove('d-none');
   }
 
@@ -362,7 +363,25 @@ function handleSuccessfulSubmission(result) {
 
 function handleSubmissionError(form, response, result) {
   console.error('Form submission failed with status:', response.status);
+  console.error('Response result:', result);
 
+  // Handle 401/403 authentication errors specially
+  if (response.status === 401 || response.status === 403) {
+    const authMessage = result.message || result.error || 'Authentication required. Please log in to continue.';
+    console.error('Authentication error:', authMessage);
+
+    // Show error and redirect to login
+    showFormErrors(form, { errorKey: [authMessage] });
+
+    // Redirect to login page after a short delay
+    setTimeout(() => {
+      const loginUrl = '/auth/login';
+      window.location.href = loginUrl;
+    }, 2000);
+    return;
+  }
+
+  // Handle form validation errors
   if (result.errors) {
     console.error('Form validation errors:', JSON.stringify(result.errors, null, 2));
     showFormErrors(form, result.errors);
@@ -408,7 +427,18 @@ async function processFormSubmission(formElements, formData) {
     logSubmissionDetails(form, preparedData);
 
     const response = await submitFormToServer(form, preparedData);
-    const result = await response.json();
+
+    let result;
+    try {
+      result = await response.json();
+    } catch (_e) {
+      // If response is not JSON, create error result
+      result = {
+        status: 'error',
+        message: `Server returned ${response.status}: ${response.statusText}`,
+        code: response.status,
+      };
+    }
 
     console.log('Response data:', result);
 
@@ -418,7 +448,7 @@ async function processFormSubmission(formElements, formData) {
       handleSubmissionError(form, response, result);
     }
 
-  } catch {
+  } catch (error) {
     handleSubmissionException(form, error);
   } finally {
     restoreButtonState(submitButton, originalButtonText);
@@ -1827,6 +1857,8 @@ async function processReceiptOCR() {
       method: 'POST',
       headers: {
         'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest', // Ensure API request detection
+        Accept: 'application/json', // Ensure API request detection
       },
       credentials: 'include', // Include cookies for authentication (required for CORS)
       body: formData,
@@ -1839,7 +1871,33 @@ async function processReceiptOCR() {
     }
 
     if (!response.ok) {
-      showNotification(`Failed to process receipt: ${response.status} ${response.statusText}`, 'error');
+      // Try to get error message from response
+      let errorMessage = `Failed to process receipt: ${response.status} ${response.statusText}`;
+      try {
+        const errorResult = await response.json();
+        if (errorResult.message) {
+          errorMessage = errorResult.message;
+        } else if (errorResult.error) {
+          errorMessage = errorResult.error;
+        }
+
+        // Provide helpful message for 503 (service unavailable)
+        if (response.status === 503) {
+          if (errorResult.message && errorResult.message.includes('OCR service not available')) {
+            errorMessage = 'Receipt processing is not available. AWS Textract is not configured. Please contact support.';
+          } else if (errorResult.message && errorResult.message.includes('OCR is disabled')) {
+            errorMessage = 'Receipt processing is currently disabled.';
+          } else {
+            errorMessage = 'Receipt processing service is temporarily unavailable. Please try again later.';
+          }
+        }
+      } catch (_e) {
+        // Response is not JSON, use default message
+        if (response.status === 503) {
+          errorMessage = 'Receipt processing service is temporarily unavailable. Please try again later.';
+        }
+      }
+      showNotification(errorMessage, 'error');
       return;
     }
 
@@ -1859,8 +1917,9 @@ async function processReceiptOCR() {
     } else {
       showNotification(result.message || 'Failed to process receipt', 'error');
     }
-  } catch (_error) {
-    showNotification('Failed to process receipt', 'error');
+  } catch (error) {
+    console.error('Error processing receipt:', error);
+    showNotification(`Failed to process receipt: ${error.message || 'Unknown error'}`, 'error');
   } finally {
     // Reset processing status
     if (statusDiv && statusText) {

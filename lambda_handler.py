@@ -265,8 +265,21 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             headers["cookie"] = cookie_header
 
         # Handle body
+        # API Gateway may base64 encode binary data (like multipart/form-data with files)
+        # Check both lowercase and original case for Content-Type (API Gateway may normalize headers)
+        content_type = headers.get("content-type", headers.get("Content-Type", headers.get("CONTENT-TYPE", "")))
+        is_multipart = "multipart/form-data" in content_type.lower() if content_type else False
+
         if body and event.get("isBase64Encoded", False):
             body_bytes = base64.b64decode(body)
+        elif body and is_multipart and isinstance(body, str):
+            # For multipart/form-data, API Gateway might send as base64 string even if not marked
+            # Try to decode if it looks like base64
+            try:
+                body_bytes = base64.b64decode(body)
+            except Exception:
+                # Not base64, treat as regular string
+                body_bytes = body.encode("utf-8")
         elif body:
             body_bytes = body.encode("utf-8") if isinstance(body, str) else body
         else:
@@ -279,11 +292,13 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             host = host.split(":")[0]
 
         # Create WSGI environment
+        # Preserve original Content-Type for multipart/form-data (includes boundary)
+        content_type_header = headers.get("content-type", headers.get("Content-Type", ""))
         environ = {
             "REQUEST_METHOD": method,
             "PATH_INFO": path,
             "QUERY_STRING": query_string,
-            "CONTENT_TYPE": headers.get("content-type", ""),
+            "CONTENT_TYPE": content_type_header,  # Preserve original with boundary for multipart
             "CONTENT_LENGTH": str(len(body_bytes)),
             "SERVER_NAME": host,  # Use actual host for proper cookie domain
             "SERVER_PORT": "443",
@@ -298,10 +313,12 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         }
 
         # Add headers (including Cookie header)
+        # Note: CONTENT_TYPE and CONTENT_LENGTH are already set above
         for key, value in headers.items():
-            key = key.upper().replace("-", "_")
-            if key not in ("CONTENT_TYPE", "CONTENT_LENGTH"):
-                environ[f"HTTP_{key}"] = value
+            key_upper = key.upper().replace("-", "_")
+            # Skip CONTENT_TYPE and CONTENT_LENGTH (already set in environ)
+            if key_upper not in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+                environ[f"HTTP_{key_upper}"] = value
 
         # Call Flask application
         with application.request_context(environ):
@@ -311,9 +328,13 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         # Extract cookies from Set-Cookie headers for HTTP API v2
         response_headers = {}
         cookies = []
+        cors_headers = {}
         for key, value in flask_response.headers:
             if key.lower() == "set-cookie":
                 cookies.append(value)
+            elif key.lower().startswith("access-control-"):
+                cors_headers[key] = value
+                response_headers[key] = value
             else:
                 response_headers[key] = value
 
