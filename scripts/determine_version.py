@@ -90,11 +90,32 @@ def main() -> None:
         print(f"Error running semantic-release: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    # Check for actual errors (non-zero exit code with error output)
+    # Note: semantic-release may exit with non-zero code when no version change is needed,
+    # which is expected behavior and should not be treated as an error
+    if result.returncode != 0 and result.stderr:
+        error_msg = result.stderr.strip()
+        # Ignore expected "no version change" scenarios - these indicate no bump is needed
+        expected_no_bump_messages = [
+            "no version change",
+            "nothing to commit",
+            "no release",
+            "no commits",
+        ]
+        is_expected_no_bump = any(msg in error_msg.lower() for msg in expected_no_bump_messages)
+        if not is_expected_no_bump:
+            print(f"Error: semantic-release failed: {error_msg}", file=sys.stderr)
+            if result.stdout:
+                print(f"stdout: {result.stdout}", file=sys.stderr)
+            sys.exit(1)
+
     semantic_version = _parse_semantic_release_output(result.stdout)
 
+    # If semantic-release didn't produce a version, it means no bump is needed
+    # Use the current version in this case
     if not semantic_version:
-        print("Error: semantic-release did not produce a version", file=sys.stderr)
-        sys.exit(1)
+        print("# semantic-release did not produce a version (no bump needed)", file=sys.stderr)
+        semantic_version = current_version
 
     # Enforce 0.x semantics: do not allow bumps to 1.0.0+ while still on 0.x.
     try:
