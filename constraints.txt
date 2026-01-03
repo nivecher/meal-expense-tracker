@@ -13,7 +13,7 @@ pylint==3.3.1
 pytest==8.4.2
 pytest-cov==4.0.0
 pytest-xdist==3.8.0
-coverage==7.6.9
+coverage==7.13.1
 bandit==1.8.6
 # safety - let pip resolve compatible version due to packaging conflicts
 
