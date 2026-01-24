@@ -3,7 +3,7 @@ name: Tag
 
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: [Build]
     types:
       - completed
     branches: [main]
@@ -28,8 +28,8 @@ permissions:
   id-token: write
 
 jobs:
-  check-ci:
-    name: Check CI Status
+  check-build-and-branch:
+    name: Check Build Status and Main Branch
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,36 +37,47 @@ jobs:
       ci_passed: ${{ steps.check.outputs.ci_passed }}
       commit_sha: ${{ steps.check.outputs.commit_sha }}
     steps:
-      - name: Check CI workflow status
+      - name: Check Build workflow status and main-only
         id: check
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
-              echo "❌ CI workflow did not succeed, skipping tagging"
+              echo "Build workflow did not succeed, skipping tagging"
               echo "ci_passed=false" >> $GITHUB_OUTPUT
               exit 1
             fi
-            echo "✅ CI workflow succeeded, proceeding with tagging"
+            BRANCH="${{ github.event.workflow_run.head_branch }}"
+            if [ "${BRANCH}" != "main" ]; then
+              echo "Tagging only runs on main; got branch: ${BRANCH}"
+              echo "ci_passed=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            echo "Build succeeded on main, proceeding with tagging"
             echo "ci_passed=true" >> $GITHUB_OUTPUT
             echo "commit_sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
           else
-            echo "✅ Manual trigger via workflow_dispatch, proceeding with tagging"
+            if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+              echo "Manual tagging only allowed from main branch; ref is ${{ github.ref }}"
+              echo "ci_passed=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+            echo "Manual trigger on main, proceeding with tagging"
             echo "ci_passed=true" >> $GITHUB_OUTPUT
             echo "commit_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Add check summary
         run: |
-          echo "## CI Status Check" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Status and Branch Check" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- Event: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- CI Passed: ${{ steps.check.outputs.ci_passed }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Passed: ${{ steps.check.outputs.ci_passed }}" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: ${{ steps.check.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
 
   create-tag:
     name: Create Version Tag
-    needs: check-ci
-    if: needs.check-ci.outputs.ci_passed == 'true'
+    needs: check-build-and-branch
+    if: needs.check-build-and-branch.outputs.ci_passed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -81,7 +92,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ needs.check-ci.outputs.commit_sha || github.sha }}
+          ref: ${{ needs.check-build-and-branch.outputs.commit_sha || github.sha }}
 
       - name: Setup Python Environment
         uses: ./.github/actions/setup-python-env
@@ -272,7 +283,7 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "- **Version:** ${{ steps.version_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Tag:** ${{ steps.version_tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Commit:** ${{ needs.check-ci.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Commit:** ${{ needs.check-build-and-branch.outputs.commit_sha }}" >> $GITHUB_STEP_SUMMARY
             
             if [ -n "${{ steps.changelog.outputs.changes }}" ]; then
               echo "" >> $GITHUB_STEP_SUMMARY
