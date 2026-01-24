@@ -4,6 +4,7 @@
 This script initializes the database and creates all necessary tables.
 It can be run directly or imported as a module.
 """
+
 import argparse
 import logging
 from pathlib import Path

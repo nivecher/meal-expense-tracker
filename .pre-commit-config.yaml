@@ -12,7 +12,17 @@ repos:
       - id: check-xml
       - id: check-merge-conflict
 
-  # 2. Formatting
+  # 2. Conventional commit message (commit-msg) – commitlint
+  - repo: local
+    hooks:
+      - id: commitlint
+        name: commitlint
+        entry: npx --no -- commitlint --edit
+        language: system
+        stages: [commit-msg]
+        pass_filenames: true
+
+  # 3. Formatting
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -20,14 +30,14 @@ repos:
       - id: trailing-whitespace
         exclude: .*\.(md|mdx|txt|toml|json|yaml|yml)$
 
-  # 3. Security checks
+  # 4. Security checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: detect-private-key
       - id: check-added-large-files
 
-  # 4. Debug checks
+  # 5. Debug checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -35,7 +45,7 @@ repos:
 
   # Python formatting
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 26.1.0
     hooks:
       - id: black
         language_version: python3
@@ -43,14 +53,14 @@ repos:
   # Python linting, import sorting, and unused code removal (replaces Flake8, isort, autoflake)
   # Note: Keeping Black for formatting in Phase 1, Ruff formatter will be evaluated in Phase 2
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.8 # Match installed Ruff version
+    rev: v0.14.14 # Match installed Ruff version
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
 
   # Security scanning
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.6
+    rev: 1.9.3
     hooks:
       - id: bandit
         args: [-c, .bandit, -r]
@@ -91,7 +101,7 @@ repos:
 
   # Markdown linting (pinned to v0.38.0 for Node.js 18 compatibility)
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.38.0
+    rev: v0.47.0
     hooks:
       - id: markdownlint
         args:
@@ -99,7 +109,7 @@ repos:
 
   # Prettier for Markdown/JSON/YAML (auto-formats on commit)
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
+    rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
         additional_dependencies:
@@ -164,6 +174,6 @@ repos:
 
   # Terraform formatting
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.86.0
+    rev: v1.105.0
     hooks:
       - id: terraform_fmt

@@ -357,16 +357,12 @@ class MigrationManager:
         """Create alembic_version table if it doesn't exist."""
         if "alembic_version" not in existing_tables:
             logger.info("Creating alembic_version table...")
-            db.session.execute(
-                text(
-                    """
+            db.session.execute(text("""
                 CREATE TABLE alembic_version (
                     version_num VARCHAR(32) NOT NULL,
                     CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
                 )
-            """
-                )
-            )
+            """))
 
     def _set_migration_revision(self, revision: str) -> None:
         """Set the current migration revision."""
