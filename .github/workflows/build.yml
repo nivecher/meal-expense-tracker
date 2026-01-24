@@ -3,10 +3,9 @@ name: Build
 
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: [Tag]
     types:
       - completed
-    branches: [main]
 
 concurrency:
   group: build-${{ github.sha }}
