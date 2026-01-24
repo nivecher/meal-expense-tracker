@@ -3,7 +3,7 @@ name: Deploy
 
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: [Build]
     types:
       - completed
     branches: [main]
@@ -19,7 +19,7 @@ on:
           - staging
           - prod
       image_tag:
-        description: Optional image tag/version to deploy (defaults to latest commit SHA)
+        description: Optional image tag/version to deploy (defaults to latest tag or SHA)
         required: false
         type: string
 
@@ -55,26 +55,27 @@ jobs:
       image_tag: ${{ steps.determine_tag.outputs.image_tag }}
       version: ${{ steps.determine_tag.outputs.version }}
       tag: ${{ steps.determine_tag.outputs.tag }}
+      skip_build: ${{ steps.determine_tag.outputs.skip_build }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
 
-      - name: Check CI status
+      - name: Check Build status
         id: check
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
               echo "should_deploy=false" >> $GITHUB_OUTPUT
-              echo "❌ CI workflow did not succeed, skipping deployment"
+              echo "Build workflow did not succeed, skipping deployment"
               exit 0
             fi
             echo "should_deploy=true" >> $GITHUB_OUTPUT
-            echo "✅ CI workflow succeeded, proceeding with deployment"
+            echo "Build workflow succeeded, proceeding with deployment"
           else
             echo "should_deploy=true" >> $GITHUB_OUTPUT
-            echo "✅ Manual trigger via workflow_dispatch"
+            echo "Manual trigger via workflow_dispatch"
           fi
 
       - name: Determine environment
@@ -88,18 +89,26 @@ jobs:
           echo "environment=${ENV}" >> $GITHUB_OUTPUT
           echo "Deploying to: ${ENV}"
 
-      - name: Determine image tag and version
+      - name: Determine image tag, version, and skip_build
         id: determine_tag
         run: |
-          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+          SKIP_BUILD="false"
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            RAW_SHA="${{ github.event.workflow_run.head_sha }}"
+            IMAGE_TAG=$(echo "${RAW_SHA}" | cut -c1-7)
+            VERSION="${IMAGE_TAG}"
+            TAG="${IMAGE_TAG}"
+            SKIP_BUILD="true"
+            echo "Using Build workflow head SHA: ${IMAGE_TAG}"
+          elif [ -n "${{ github.event.inputs.image_tag }}" ]; then
             IMAGE_TAG="${{ github.event.inputs.image_tag }}"
             VERSION="${{ github.event.inputs.image_tag }}"
             TAG="${{ github.event.inputs.image_tag }}"
+            SKIP_BUILD="true"
             echo "Using provided tag: ${IMAGE_TAG}"
           else
             git fetch --tags --force || true
             LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-            
             if [ -n "${LATEST_TAG}" ]; then
               VERSION=$(echo "${LATEST_TAG}" | sed 's/^v//')
               TAG="${LATEST_TAG}"
@@ -112,10 +121,10 @@ jobs:
               echo "No tag found, using SHA: ${IMAGE_TAG}"
             fi
           fi
-          
           echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "skip_build=${SKIP_BUILD}" >> $GITHUB_OUTPUT
 
       - name: Add validation summary
         run: |
@@ -125,11 +134,12 @@ jobs:
           echo "- Version: ${{ steps.determine_tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- Image Tag: ${{ steps.determine_tag.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- Should Deploy: ${{ steps.check.outputs.should_deploy }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Skip Build: ${{ steps.determine_tag.outputs.skip_build }}" >> $GITHUB_STEP_SUMMARY
 
   build:
     name: Build and Push
     needs: [validate]
-    if: needs.validate.outputs.should_deploy == 'true'
+    if: needs.validate.outputs.should_deploy == 'true' && needs.validate.outputs.skip_build != 'true'
     runs-on: ubuntu-latest
     environment: ${{ needs.validate.outputs.environment }}
     permissions:
@@ -217,7 +227,7 @@ jobs:
 
   deploy:
     name: Deploy to ${{ needs.validate.outputs.environment }}
-    needs: [validate, build]
+    needs: [validate]
     if: needs.validate.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     environment: ${{ needs.validate.outputs.environment }}

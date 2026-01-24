@@ -1,0 +1,148 @@
+---
+name: Build
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types:
+      - completed
+    branches: [main]
+
+concurrency:
+  group: build-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  APP_NAME: meal-expense-tracker
+  PYTHON_VERSION: 3.13
+  AWS_REGION: us-east-1
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    outputs:
+      image_tag: ${{ steps.version.outputs.version }}
+      image_sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup Python Environment
+        uses: ./.github/actions/setup-python-env
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          requirements-file: requirements.txt
+          skip-venv: true
+
+      - name: Install versioning tools
+        run: |
+          pip install python-semantic-release setuptools-scm[toml]
+          echo "Versioning tools installed"
+
+      - name: Determine version and set outputs
+        id: version
+        run: |
+          git fetch --tags --force
+          if [ ! -f scripts/determine_version.py ]; then
+            echo "Version determination script not found"
+            exit 1
+          fi
+          python scripts/determine_version.py | tee version_output.txt
+          if [ ! -s version_output.txt ]; then
+            echo "Version determination produced no output"
+            exit 1
+          fi
+          NEXT_VERSION=$(grep "^NEXT_VERSION=" version_output.txt | cut -d= -f2)
+          NEW_TAG=$(grep "^NEW_TAG=" version_output.txt | cut -d= -f2)
+          BUMP_NEEDED=$(grep "^BUMP_NEEDED=" version_output.txt | cut -d= -f2)
+          if [ -z "$NEXT_VERSION" ] || [ -z "$NEW_TAG" ]; then
+            echo "Failed to parse version"
+            exit 1
+          fi
+          # Use version for image tag; SHA as fallback identifier
+          echo "version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+          echo "bump_needed=${BUMP_NEEDED}" >> $GITHUB_OUTPUT
+          echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          echo "Version: ${NEXT_VERSION}, Tag: ${NEW_TAG}, SHA: ${GITHUB_SHA::7}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.8.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate version file
+        uses: ./.github/actions/generate-version
+        with:
+          explicit_version: ${{ steps.version.outputs.version }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.sha }}
+            type=raw,value=latest
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: lambda
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          build-args: |
+            BUILDPLATFORM=linux/amd64
+            TARGETPLATFORM=linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: sbom-${{ steps.version.outputs.version }}
+          path: |
+            sbom.*.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Add build summary
+        if: always()
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: \`ghcr.io/${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- SHA: \`${{ steps.version.outputs.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Target: \`lambda\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Platform: \`linux/amd64\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Pushed: yes" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ steps.build.outputs.digest }}" ]; then
+            echo "- Digest: \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
