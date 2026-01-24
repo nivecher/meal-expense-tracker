@@ -237,9 +237,35 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         segment = None
 
     try:
+        # Run initialization (including migrations) once per container
+        try:
+            from lambda_init import initialize_lambda
+
+            init_result = initialize_lambda()
+            if not init_result.get("success"):
+                logger.warning(f"Lambda initialization reported issues: {init_result.get('message')}")
+        except Exception as init_error:
+            logger.warning(f"Lambda initialization failed: {init_error}")
+
         # Use WSGI adapter directly (Mangum has compatibility issues with Flask)
         # Mangum tries to use Flask as ASGI but Flask is WSGI-only
         from wsgi import application
+
+        # Handle admin operations (invoked via Lambda payload)
+        if event.get("admin_operation"):
+            from app.admin.lambda_admin import handle_admin_request
+
+            admin_response = handle_admin_request(application, event)
+            duration_ms = (time.time() - start_time) * 1000
+            status_code = admin_response.get("statusCode", 200)
+            _log_request_end(request_context, status_code, duration_ms)
+
+            if segment:
+                segment.put_annotation("status_code", status_code)
+                segment.put_metadata("response", {"status_code": status_code, "duration_ms": duration_ms})
+                xray_recorder.end_segment()
+
+            return admin_response
 
         response: dict[str, Any]
         import base64
