@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Tag to release (e.g., v1.0.0)
-        required: true
+        description: Tag to release (e.g. v1.0.0). Omit to use latest vX.Y.Z on main.
+        required: false
         type: string
       environment:
         description: Environment to deploy to
@@ -29,7 +29,6 @@ env:
   PYTHON_VERSION: 3.13
   NODE_VERSION: 22
   AWS_REGION: us-east-1
-  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 permissions:
   contents: write
@@ -38,8 +37,7 @@ permissions:
   checks: write
   statuses: write
   security-events: write
-  packages: write
-  attestations: write
+  packages: read
 
 jobs:
   validate-tag:
@@ -50,59 +48,60 @@ jobs:
     outputs:
       version: ${{ steps.parse.outputs.version }}
       is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
-    steps:
-      - name: Parse version from tag
-        id: parse
-        run: |
-          TAG="${{ env.RELEASE_TAG }}"
-          VERSION=$(echo "$TAG" | sed 's/^v//')
-          
-          if [ -z "$VERSION" ]; then
-            echo "❌ Invalid tag format"
-            exit 1
-          fi
-          
-          if echo "$VERSION" | grep -qE '-(alpha|beta|rc)'; then
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "✅ Version: ${VERSION}, Prerelease: $(echo ${{ steps.parse.outputs.is_prerelease }})"
-
-  quality-gate:
-    name: Run CI Quality Gate
-    needs: validate-tag
-    uses: ./.github/workflows/ci.yml
-    permissions:
-      contents: read
-      checks: write
-      pull-requests: write
-      security-events: write
-      id-token: write
-
-  build-release:
-    name: Build Release Image
-    needs: [validate-tag, quality-gate]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
-    outputs:
-      image_digest: ${{ steps.build.outputs.digest }}
-      image_tag: ${{ steps.build.outputs.tag }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3.8.0
+      - name: Resolve release tag
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            RELEASE_TAG="${{ github.ref_name }}"
+            echo "Using tag from push: ${RELEASE_TAG}"
+          elif [ -n "${{ github.event.inputs.tag }}" ]; then
+            RELEASE_TAG="${{ github.event.inputs.tag }}"
+            echo "Using provided tag: ${RELEASE_TAG}"
+          else
+            git fetch --tags --force origin main
+            git checkout main
+            RELEASE_TAG=$(git tag -l 'v*.*.*' | grep -vE '-(alpha|beta|rc)' | sort -V | tail -1)
+            if [ -z "${RELEASE_TAG}" ]; then
+              echo "No vX.Y.Z tag found on main"
+              exit 1
+            fi
+            echo "Using latest semver tag on main: ${RELEASE_TAG}"
+          fi
+          echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "Resolved release_tag=${RELEASE_TAG}"
 
+      - name: Parse version from tag
+        id: parse
+        run: |
+          TAG="${{ steps.resolve.outputs.release_tag }}"
+          VERSION=$(echo "$TAG" | sed 's/^v//')
+          if [ -z "$VERSION" ]; then
+            echo "Invalid tag format"
+            exit 1
+          fi
+          if echo "$VERSION" | grep -qE '-(alpha|beta|rc)'; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+  verify-image:
+    name: Verify Image Exists
+    needs: validate-tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3.3.0
         with:
@@ -110,68 +109,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate version file
-        uses: ./.github/actions/generate-version
-        with:
-          explicit_version: ${{ needs.validate-tag.outputs.version }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=${{ needs.validate-tag.outputs.version }}
-            type=raw,value=latest,enable=${{ needs.validate-tag.outputs.is_prerelease == 'false' }}
-            type=sha,format=short
-
-      - name: Build and push
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          target: lambda
-          platforms: linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: |
-            ${{ steps.meta.outputs.labels }}
-            org.opencontainers.image.version=${{ needs.validate-tag.outputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          build-args: |
-            BUILDPLATFORM=linux/arm64
-            TARGETPLATFORM=linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: true
-          sbom: true
-
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: sbom-${{ needs.validate-tag.outputs.version }}
-          path: |
-            sbom.*.json
-          retention-days: 30
-          if-no-files-found: ignore
-
-      - name: Add build summary
-        if: always()
+      - name: Verify image exists
         run: |
-          echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Image: \`ghcr.io/${{ github.repository }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Version: \`${{ needs.validate-tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Target: \`lambda\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Platform(s): \`linux/arm64\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Pushed: ✅" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.build.outputs.digest }}" != "" ]; then
-            echo "- Digest: \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
-          fi
+          IMG="ghcr.io/${{ github.repository }}:${{ needs.validate-tag.outputs.version }}"
+          docker manifest inspect "${IMG}" || {
+            echo "Image not found: ${IMG}"
+            exit 1
+          }
+          echo "Image exists: ${IMG}"
 
   create-release:
     name: Create GitHub Release
-    needs: [validate-tag, build-release]
+    needs: [validate-tag, verify-image]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -183,116 +132,84 @@ jobs:
         uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
-
-      - name: Download SBOM artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: sbom-${{ needs.validate-tag.outputs.version }}
-          path: ./artifacts/
+          ref: ${{ needs.validate-tag.outputs.release_tag }}
 
       - name: Generate release notes
         id: release_notes
         run: |
-          TAG="${{ env.RELEASE_TAG }}"
+          TAG="${{ needs.validate-tag.outputs.release_tag }}"
           VERSION="${{ needs.validate-tag.outputs.version }}"
-          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          
+          LAST_TAG=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo "")
           NOTES_FILE=$(mktemp)
-          
           {
             echo "## Release ${VERSION}"
             echo ""
-            
             if [ -n "$LAST_TAG" ]; then
               echo "### Changes since ${LAST_TAG}"
               echo ""
-              git log ${LAST_TAG}..HEAD --pretty=format:'- %s (%h)' | head -50
+              git log "${LAST_TAG}".."${TAG}" --pretty=format:'- %s (%h)' | head -50
             else
               echo "### Initial Release"
-              git log --pretty=format:'- %s (%h)' | head -20
+              git log "${TAG}" --pretty=format:'- %s (%h)' | head -20
             fi
-            
             echo ""
             echo ""
             echo "### Artifacts"
             echo ""
             echo "- Docker Image: \`ghcr.io/${{ github.repository }}:${VERSION}\`"
-            echo "- SBOM: Attached as release asset"
-            echo ""
-            echo "### Security"
-            echo ""
-            echo "- SBOM included for supply chain security"
-            echo "- Provenance attestations generated"
-            echo "- All CI checks passed"
           } > "$NOTES_FILE"
-          
-          {
-            echo "notes<<EOF"
-            cat "$NOTES_FILE"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-          
           cp "$NOTES_FILE" release_notes.md
 
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
+          tag_name: ${{ needs.validate-tag.outputs.release_tag }}
           name: Release ${{ needs.validate-tag.outputs.version }}
           body_path: release_notes.md
           draft: false
           prerelease: ${{ needs.validate-tag.outputs.is_prerelease }}
           generate_release_notes: true
-          files: |
-            artifacts/sbom-*.json
 
       - name: Add release summary
         run: |
           echo "## GitHub Release Created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- Version: ${{ needs.validate-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tag: ${{ env.RELEASE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tag: ${{ needs.validate-tag.outputs.release_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- Prerelease: ${{ needs.validate-tag.outputs.is_prerelease }}" >> $GITHUB_STEP_SUMMARY
           echo "- Release URL: ${{ steps.create_release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
 
-  deploy-staging:
-    name: Deploy to Staging
+  trigger-staging-deploy:
+    name: Trigger Staging Deploy
     needs: [validate-tag, create-release]
-    if: github.event.inputs.environment == 'staging' || github.event.inputs.environment == ''
-    uses: ./.github/workflows/deploy.yml
+    if: github.event.inputs.environment == 'staging' || github.event.inputs.environment == '' || github.event_name == 'push'
+    runs-on: ubuntu-latest
     permissions:
-      contents: read
-      id-token: write
-      packages: write
-      issues: write
-      checks: write
-      statuses: write
-    with:
-      environment: staging
-      image_tag: ${{ needs.validate-tag.outputs.version }}
-    secrets: inherit
-
-  deploy-prod:
-    name: Deploy to Production
-    needs: [validate-tag, create-release, deploy-staging]
-    if: github.event.inputs.environment == 'prod' && needs.validate-tag.outputs.is_prerelease == 'false'
-    uses: ./.github/workflows/deploy.yml
-    permissions:
-      contents: read
-      id-token: write
-      packages: write
-      issues: write
-      checks: write
-      statuses: write
-    with:
-      environment: prod
-      image_tag: ${{ needs.validate-tag.outputs.version }}
-    secrets: inherit
+      actions: write
+    steps:
+      - name: Trigger Deploy workflow
+        uses: actions/github-script@v7
+        env:
+          VERSION: ${{ needs.validate-tag.outputs.version }}
+        with:
+          script: |
+            const version = process.env.VERSION;
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy.yml',
+              ref: 'main',
+              inputs: {
+                environment: 'staging',
+                image_tag: version,
+              },
+            });
+            console.log(`Triggered deploy.yml: environment=staging, image_tag=${version}`);
 
   notify:
     name: Notify Release Status
-    needs: [validate-tag, create-release, deploy-staging, deploy-prod]
+    needs: [validate-tag, create-release, trigger-staging-deploy]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -304,11 +221,8 @@ jobs:
           if [ "${{ needs.create-release.result }}" != "success" ]; then
             echo "status=failed" >> $GITHUB_OUTPUT
             echo "emoji=❌" >> $GITHUB_OUTPUT
-          elif [ "${{ needs.deploy-staging.result }}" != "success" ] && [ "${{ needs.deploy-staging.result }}" != "skipped" ]; then
-            echo "status=staging_failed" >> $GITHUB_OUTPUT
-            echo "emoji=⚠️" >> $GITHUB_OUTPUT
-          elif [ "${{ needs.deploy-prod.result }}" != "success" ] && [ "${{ needs.deploy-prod.result }}" != "skipped" ]; then
-            echo "status=prod_failed" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.trigger-staging-deploy.result }}" = "failure" ]; then
+            echo "status=trigger_failed" >> $GITHUB_OUTPUT
             echo "emoji=⚠️" >> $GITHUB_OUTPUT
           else
             echo "status=success" >> $GITHUB_OUTPUT
@@ -327,10 +241,8 @@ jobs:
             const repo = context.repo;
             const workflowRunId = context.runId;
             const workflowUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${workflowRunId}`;
-            
-            const conclusion = STATUS === 'success' ? 'success' : 
-                              STATUS.includes('failed') ? 'failure' : 'neutral';
-            
+            const conclusion = STATUS === 'success' ? 'success' :
+              STATUS.includes('failed') ? 'failure' : 'neutral';
             await github.rest.checks.create({
               ...repo,
               name: 'Release Status',
@@ -352,7 +264,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- Version: ${{ needs.validate-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- Release: ${{ needs.create-release.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Staging Deploy: ${{ needs.deploy-staging.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Prod Deploy: ${{ needs.deploy-prod.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Trigger Staging Deploy: ${{ needs.trigger-staging-deploy.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Status: ${{ steps.status.outputs.emoji }} ${{ steps.status.outputs.status }}" >> $GITHUB_STEP_SUMMARY
