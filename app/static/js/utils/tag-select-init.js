@@ -574,12 +574,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (existingTagsData) {
       try {
-        let jsonString = existingTagsData;
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = jsonString;
-        jsonString = tempDiv.textContent || tempDiv.innerText || jsonString;
-
-        const parsedTags = JSON.parse(jsonString);
+        // getAttribute() already decodes HTML entities, so we can parse JSON directly
+        // This is safe because the data comes from server-side JSON encoding
+        const parsedTags = JSON.parse(existingTagsData);
         existingTags = parsedTags.map((tag) => ({
           id: tag.id,
           name: tag.name,
