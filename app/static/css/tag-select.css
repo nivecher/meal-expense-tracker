@@ -1,0 +1,326 @@
+/**
+ * Tom Select tag styling with custom colors
+ * Uses CSS classes and data attributes - no inline style conflicts
+ */
+
+/* Tag items (selected tags displayed in the input) */
+.ts-control .item {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 0.625rem;
+  margin: 0.25rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  border: none;
+  background-color: #6c757d;
+  color: #fff;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.ts-control .item.active {
+  opacity: 0.8;
+}
+
+/* Tag select item badges - use data-color attribute for custom colors */
+.tag-select-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tag-select-item-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  border: none;
+  white-space: nowrap;
+}
+
+/* Apply custom colors via CSS custom properties and data attributes */
+.tag-select-item[data-color] .tag-select-item-badge {
+  background-color: var(--tag-color, #6c757d);
+}
+
+/* Calculate text color based on background brightness using CSS */
+
+/* For light backgrounds (brightness > 128), use dark text */
+.tag-select-item[data-color] .tag-select-item-badge {
+  color: #fff; /* Default to white, will be overridden by inline style for brightness calculation */
+}
+
+/* Dropdown options */
+.tag-select-option {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+.tag-select-option-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  border: none;
+  margin-right: 0.5rem;
+}
+
+.tag-select-option-desc {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Apply custom colors to dropdown options */
+.tag-select-option[data-color] .tag-select-option-badge {
+  background-color: var(--tag-color, #6c757d);
+}
+
+/* Remove button styling */
+.ts-control .item .remove {
+  margin-left: 0.5rem;
+  cursor: pointer;
+  opacity: 0.7;
+  font-weight: bold;
+  font-size: 1.2em;
+  line-height: 1;
+  padding: 0 0.25rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+}
+
+.ts-control .item .remove:hover {
+  opacity: 1;
+}
+
+/* No results message */
+.no-results {
+  padding: 0.5rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Hide original select element when Tom Select is initialized - MUST be completely invisible */
+select.ts-hidden,
+select[class*="ts-hidden"],
+select[id="filterTagsInput"],
+select[id="tagsInput"],
+select#filterTagsInput,
+select#tagsInput {
+  display: none !important;
+  visibility: hidden !important;
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  max-height: 0 !important;
+  max-width: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  line-height: 0 !important;
+  font-size: 0 !important;
+}
+
+/* Hide select element when it's followed by a Tom Select wrapper */
+select + .ts-wrapper ~ select {
+  display: none !important;
+}
+
+/* Ensure original select is hidden when wrapper is present */
+.ts-wrapper + select,
+select:has(+ .ts-wrapper) {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide Tom Select input-sizer (used for measuring text width) */
+.ts-wrapper .input-sizer,
+.ts-control .input-sizer {
+  display: none !important;
+  visibility: hidden !important;
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Hide placeholder text that might show through */
+.ts-wrapper .ts-hidden-placeholder,
+.ts-control .ts-hidden-placeholder {
+  display: none !important;
+}
+
+/* Tom Select wrapper and control styling */
+.ts-wrapper {
+  width: 100% !important;
+  display: block !important;
+  position: relative;
+  margin: 0;
+  padding: 0;
+}
+
+.ts-control {
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  min-height: 6rem;
+  width: 100% !important;
+  background-color: #fff;
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  overflow: visible !important; /* No scrollbar on control itself */
+  max-height: none !important;
+  cursor: text; /* Show text cursor when hovering */
+  position: relative;
+  transition: min-height 0.2s ease;
+}
+
+.ts-control.focus {
+  border-color: #86b7fe;
+  outline: 0;
+  box-shadow: 0 0 0 0.25rem rgb(13 110 253 / 25%);
+}
+
+.ts-control.multi .ts-control-items {
+  display: flex !important;
+  flex-flow: row wrap !important;
+  gap: 0.5rem !important;
+  width: 100% !important;
+  align-items: flex-start !important;
+  align-content: flex-start !important;
+  min-height: 4rem;
+  padding: 0.25rem 0;
+}
+
+/* Ensure input field appears after all tag items */
+.ts-control-items > input {
+  order: 9999 !important; /* Force input to appear last */
+}
+
+/* Input field inside Tom Select */
+.ts-control input {
+  border: none !important;
+  outline: none !important;
+  padding: 0.625rem 0.5rem !important;
+  margin: 0.25rem 0 !important;
+  min-width: 150px !important;
+  flex: 1 1 auto !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: text !important;
+  pointer-events: auto !important;
+  z-index: 1;
+  position: relative;
+  color: #212529 !important; /* Bootstrap default text color - ensures white text shows */
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+  align-self: flex-start;
+  min-height: 2.5rem;
+}
+
+/* Placeholder styling for input */
+.ts-control input::placeholder {
+  color: #6c757d !important;
+  opacity: 1 !important;
+}
+
+/* Hide any weird placeholder elements or hidden text */
+.ts-control .ts-hidden-placeholder,
+.ts-control input[type="hidden"],
+.ts-wrapper input[type="hidden"],
+.ts-control input.hidden {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Ensure control is clickable and focusable */
+.ts-control {
+  cursor: text;
+}
+
+.ts-control .ts-control-items {
+  pointer-events: auto;
+}
+
+.ts-control input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Dropdown styling */
+.ts-dropdown {
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 15%);
+  background: #fff;
+  max-height: 400px;
+  min-height: 100px;
+  overflow-y: auto;
+  z-index: 1050; /* Ensure dropdown appears above other elements */
+}
+
+.ts-dropdown .option {
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+.ts-dropdown .option.active {
+  background-color: #f8f9fa;
+}
+
+.ts-dropdown .option.selected {
+  background-color: #e7f3ff;
+}
+
+/* Loading state */
+.ts-control.loading {
+  opacity: 0.6;
+}
+
+.ts-control.loading::after {
+  content: "";
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #ced4da;
+  border-top-color: #0d6efd;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-left: 0.5rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ensure tags container expands vertically */
+.ts-wrapper {
+  margin-bottom: 0.5rem;
+}
+
+/* Ensure proper spacing for tags help text */
+#tags-help {
+  margin-top: 1rem !important;
+  padding-top: 0.5rem;
+  clear: both;
+}

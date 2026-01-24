@@ -307,7 +307,7 @@ def init_login_manager(login_manager: LoginManager) -> None:
         if "text/html" in request.accept_mimetypes:
             from typing import cast
 
-            return cast(ResponseReturnValue, redirect(url_for("auth.login", next=request.url)))
+            return cast(ResponseReturnValue, redirect(url_for("auth.login", next=request.full_path)))
 
         # Default to JSON response for API requests
         return jsonify({"error": "You must be logged in to access this resource"}), 401

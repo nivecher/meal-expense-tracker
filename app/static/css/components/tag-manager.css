@@ -1,0 +1,57 @@
+/**
+ * Tag Manager Styles
+ * Mobile-friendly tag management interface
+ */
+
+/* Tag Manager Grid - Mobile-first, stacks vertically */
+.tag-manager-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Tag Manager Card - Each tag displayed as a card */
+.tag-manager-card {
+  transition: all 0.2s ease;
+  border: 1px solid #dee2e6;
+}
+
+.tag-manager-card:hover {
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  border-color: #adb5bd;
+}
+
+/* Ensure tag badges in manager have rounded edges */
+.tag-manager-card .tag-badge {
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+}
+
+/* Tag Preview in modal - match card badge styling with rounded edges */
+#tagPreview.tag-badge-pretty {
+  border-radius: 20px !important;
+  padding: 4px 12px !important;
+  font-size: 0.8rem !important;
+  font-weight: 500 !important;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%) !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  margin: 2px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  border: none !important;
+}
+
+/* Mobile responsiveness */
+@media (width <= 768px) {
+  .tag-manager-card {
+    padding: 0.75rem;
+  }
+}

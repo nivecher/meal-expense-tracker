@@ -92,7 +92,7 @@ jobs:
 
       - name: Install versioning tools
         run: |
-          pip install python-semantic-release[all] setuptools-scm[toml]
+          pip install python-semantic-release setuptools-scm[toml]
           echo "✅ Versioning tools installed"
 
       - name: Configure git for tagging

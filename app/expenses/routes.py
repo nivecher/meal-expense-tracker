@@ -554,7 +554,7 @@ def _populate_expense_form(form: ExpenseForm, expense: Expense) -> None:
 
     # Don't set form.tags.data for editing - let the template handle the display
     # The template sets value="" and data-existing-tags="..." attributes
-    # Tagify will initialize with the data-existing-tags and handle the JSON conversion
+    # Tom Select will initialize with the data-existing-tags and handle the JSON conversion
 
 
 def _handle_expense_update(
@@ -767,6 +767,7 @@ def list_expenses() -> str:
         search=filters["search"],
         meal_type=filters["meal_type"],
         category=filters["category"],
+        tags=filters.get("tags", []),  # List of selected tag names
         start_date=filters["start_date"],
         end_date=filters["end_date"],
         timezone_display=timezone_display,
@@ -991,6 +992,12 @@ def list_tags() -> ResponseReturnValue:
     try:
         user_id = current_user.id
         current_app.logger.debug(f"Fetching tags for user {user_id}")
+
+        # Expire session to ensure fresh data (important after deletions)
+        from app.extensions import db
+
+        db.session.expire_all()
+
         tags = expense_services.get_user_tags(user_id)
 
         # Defensive check: Verify all tags belong to the current user
@@ -1099,70 +1106,58 @@ def update_tag(tag_id: int) -> ResponseReturnValue:
 @bp.route("/tags/<int:tag_id>", methods=["DELETE"])
 @login_required
 def delete_tag(tag_id: int) -> ResponseReturnValue:
-    """Delete a tag."""
+    """Delete a tag.
+
+    The service layer handles all validation (existence, ownership, deletion).
+    This route just calls the service and returns appropriate responses.
+    """
     from flask import make_response
 
     try:
-        # Check if tag exists and belongs to user before attempting deletion
-        tag = db.session.get(expense_models.Tag, tag_id)
-        if not tag:
-            current_app.logger.warning(
-                f"User {current_user.id} attempted to delete non-existent tag {tag_id}. "
-                f"This may indicate a race condition or stale UI state."
-            )
-            response = make_response(
-                jsonify(
-                    {
-                        "success": False,
-                        "message": f"Tag {tag_id} not found. It may have been deleted already. Please refresh the page.",
-                        "code": 404,
-                    }
-                ),
-                404,
-            )
-            response.headers["Content-Type"] = "application/json"
-            return response
-
-        if tag.user_id != current_user.id:
-            current_app.logger.warning(
-                f"User {current_user.id} attempted to delete tag {tag_id} owned by user {tag.user_id}. "
-                f"This indicates a security issue - tag should not have been visible to this user."
-            )
-            response = make_response(
-                jsonify(
-                    {
-                        "success": False,
-                        "message": "You don't have permission to delete this tag. It may belong to another user.",
-                        "code": 403,
-                    }
-                ),
-                403,
-            )
-            response.headers["Content-Type"] = "application/json"
-            return response
-
+        # Call service to delete tag (service handles all validation and ExpenseTag cleanup)
         success = expense_services.delete_tag(current_user.id, tag_id)
+
         if success:
             current_app.logger.info(f"Tag {tag_id} deleted successfully by user {current_user.id}")
             response = make_response(jsonify({"success": True, "message": "Tag deleted successfully"}), 200)
             response.headers["Content-Type"] = "application/json"
             return response
         else:
-            # This shouldn't happen if we checked above, but handle it anyway
-            current_app.logger.error(
-                f"delete_tag service returned False for tag {tag_id} and user {current_user.id}, "
-                f"but tag exists and belongs to user. This indicates a service layer issue."
-            )
-            response = make_response(
-                jsonify(
-                    {
-                        "success": False,
-                        "message": "Failed to delete tag. Please try again or refresh the page.",
-                        "code": 500,
-                    }
-                ),
-                500,
-            )
+            # Service returned False - tag not found or unauthorized
+            # Check if tag exists to determine if it's 404 or 403
+            tag = db.session.get(expense_models.Tag, tag_id)
+            if not tag:
+                # Tag doesn't exist
+                current_app.logger.warning(
+                    f"User {current_user.id} attempted to delete non-existent tag {tag_id}. "
+                    f"This may indicate a race condition or stale UI state."
+                )
+                response = make_response(
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": f"Tag {tag_id} not found. It may have been deleted already. Please refresh the page.",
+                            "code": 404,
+                        }
+                    ),
+                    404,
+                )
+            else:
+                # Tag exists but doesn't belong to user (unauthorized)
+                current_app.logger.warning(
+                    f"User {current_user.id} attempted to delete tag {tag_id} owned by user {tag.user_id}. "
+                    f"This indicates a security issue - tag should not have been visible to this user."
+                )
+                response = make_response(
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "You don't have permission to delete this tag. It may belong to another user.",
+                            "code": 403,
+                        }
+                    ),
+                    403,
+                )
             response.headers["Content-Type"] = "application/json"
             return response
     except Exception as e:

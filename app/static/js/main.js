@@ -22,8 +22,8 @@ const pageModules = {
 
 // Apply tag colors from data attributes
 function applyTagColors() {
-  // Only handle tag-badge elements, not tagify__tag (those are handled in tagify-init.js)
-  const tagBadges = document.querySelectorAll('.tag-badge[data-tag-color]:not(.tagify__tag)');
+  // Handle tag-badge elements (exclude Tom Select internal elements)
+  const tagBadges = document.querySelectorAll('.tag-badge[data-tag-color]:not(.tag-select-item-badge)');
   tagBadges.forEach((badge) => {
     const color = badge.getAttribute('data-tag-color');
     if (color) {
@@ -41,8 +41,8 @@ function initTagColorWatcher() {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            // Check if the added node is a tag badge (not Tagify tags - those are handled in tagify-init.js)
-            if (node.classList && node.classList.contains('tag-badge') && !node.classList.contains('tagify__tag') && node.hasAttribute('data-tag-color')) {
+            // Check if the added node is a tag badge (not Tom Select items - those are handled in tag-select-init.js)
+            if (node.classList && node.classList.contains('tag-badge') && !node.classList.contains('tag-select-item') && node.hasAttribute('data-tag-color')) {
               const color = node.getAttribute('data-tag-color');
               if (color) {
                 // Only set CSS variable for tag badges - CSS handles the rest
@@ -50,8 +50,8 @@ function initTagColorWatcher() {
                 node.style.setProperty('background-color', color);
               }
             }
-            // Check for tag badges within the added node (exclude tagify__tag)
-            const tagBadges = node.querySelectorAll && node.querySelectorAll('.tag-badge[data-tag-color]:not(.tagify__tag)');
+            // Check for tag badges within the added node (exclude Tom Select items)
+            const tagBadges = node.querySelectorAll && node.querySelectorAll('.tag-badge[data-tag-color]:not(.tag-select-item)');
             if (tagBadges) {
               tagBadges.forEach((badge) => {
                 const color = badge.getAttribute('data-tag-color');
@@ -77,50 +77,167 @@ function initTagColorWatcher() {
   });
 }
 
-// Refresh Tagify instance with updated tags
-async function refreshTagifyInstance() {
-  if (!window.tagifyInstance) return;
+// Helper function to calculate text color based on background brightness
+function getTextColor(backgroundColor) {
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16),
+    } : null;
+  };
+
+  const rgb = hexToRgb(backgroundColor);
+  if (!rgb) return '#000';
+  const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+  return brightness > 128 ? '#000' : '#fff';
+}
+
+// Refresh Tom Select instance with updated tags
+async function refreshTagSelectInstance() {
+  if (!window.tagSelectInstance) {
+    console.warn('Tag select instance not found, cannot refresh');
+    return;
+  }
 
   try {
-    // Update the whitelist with latest tags
-    const response = await fetch('/expenses/tags', {
+    // Preserve currently selected tags before refreshing
+    const { tagSelectInstance } = window;
+    const currentSelections = tagSelectInstance.getValue() || [];
+    const selectedTagNames = Array.isArray(currentSelections) ? currentSelections : [currentSelections];
+
+    // Add cache-busting parameter to ensure fresh data
+    const cacheBuster = `?t=${Date.now()}`;
+    const response = await fetch(`/expenses/tags${cacheBuster}`, {
+      method: 'GET',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
       credentials: 'include', // Include cookies for authentication (required for CORS)
+      cache: 'no-store', // Prevent browser caching
     });
-    if (!response.ok) return;
+
+    if (!response.ok) {
+      console.warn('Failed to fetch tags for refresh:', response.status);
+      return;
+    }
 
     // Check if response is JSON before parsing
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
+      console.warn('Non-JSON response when refreshing tags');
       return;
     }
 
     const data = await response.json();
     if (data.success && data.tags) {
-      const { tagifyInstance } = window;
-      if (tagifyInstance) {
-        tagifyInstance.settings.whitelist = data.tags.map((tag) => ({
-          value: tag.name,
-          id: tag.id,
-          title: tag.description || tag.name,
-          description: tag.description || '',
-          color: tag.color,
-        }));
-      }
-    }
+      // Map new tags to options format
+      const newOptions = data.tags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        color: tag.color || '#6c757d',
+        description: tag.description || tag.name,
+      }));
 
-    // Re-apply colors to existing tags - only set CSS variable
-    setTimeout(() => {
-      const tagElements = document.querySelectorAll('.tagify__tag[data-tag-color]');
-      tagElements.forEach((tagEl) => {
-        const tagColor = tagEl.getAttribute('data-tag-color');
-        if (tagColor) {
-          // Only set CSS variable - CSS handles the rest
-          tagEl.style.setProperty('--tag-color', tagColor);
-        }
+      // Clear existing options and add new ones
+      tagSelectInstance.clearOptions();
+      tagSelectInstance.addOptions(newOptions);
+      // Refresh options to ensure Tom Select recognizes the new data
+      tagSelectInstance.refreshOptions(false);
+
+      // Restore previously selected tags (if they still exist)
+      // Filter out any tags that were deleted
+      const validSelections = selectedTagNames.filter((tagName) => {
+        return newOptions.some((option) => option.name === tagName);
       });
-    }, 100);
-  } catch {
-    console.error('Error refreshing Tagify instance:', error);
+
+      if (validSelections.length > 0) {
+        // Remove all current items to force re-render with updated colors
+        const currentItems = [...tagSelectInstance.items];
+        currentItems.forEach((item) => {
+          tagSelectInstance.removeItem(item, true); // true = silent
+        });
+
+        // Re-add valid selections with updated data (this will trigger render.item with new colors)
+        validSelections.forEach((tagName) => {
+          const option = newOptions.find((opt) => opt.name === tagName);
+          if (option) {
+            // Ensure the option is in Tom Select's options before adding
+            if (!tagSelectInstance.options[tagName]) {
+              tagSelectInstance.addOption(option);
+            } else {
+              // Update existing option with new data
+              tagSelectInstance.options[tagName] = option;
+            }
+            tagSelectInstance.addItem(tagName, true); // true = silent (don't trigger events)
+          }
+        });
+
+        // Manually update DOM elements with new colors after a short delay
+        // This ensures the render.item function has been called and we can update any missed elements
+        setTimeout(() => {
+          validSelections.forEach((tagName) => {
+            const option = newOptions.find((opt) => opt.name === tagName);
+            if (option) {
+              // Find the DOM element for this tag by searching all tag items
+              const controlItems = tagSelectInstance.control?.querySelector('.ts-control-items');
+              if (controlItems) {
+                const allItems = controlItems.querySelectorAll('.tag-select-item');
+                allItems.forEach((item) => {
+                  const badge = item.querySelector('.tag-select-item-badge');
+                  if (badge && badge.textContent.trim() === tagName) {
+                    // Update the data-color attribute and inline styles with new color
+                    const tagColor = option.color || '#6c757d';
+                    const textColor = getTextColor(tagColor);
+                    item.setAttribute('data-color', tagColor);
+                    item.style.setProperty('--tag-color', tagColor);
+                    badge.style.backgroundColor = tagColor;
+                    badge.style.color = textColor;
+                  }
+                });
+              }
+            }
+          });
+
+          // Ensure input field appears after all tags
+          if (tagSelectInstance.control && tagSelectInstance.control_input) {
+            const controlItems = tagSelectInstance.control.querySelector('.ts-control-items');
+            if (controlItems) {
+              // Move input to the end of control-items (after all tag items)
+              controlItems.appendChild(tagSelectInstance.control_input);
+              // Also set CSS order as backup
+              tagSelectInstance.control_input.style.order = '9999';
+            }
+          }
+        }, 150);
+      }
+
+      // Initialize tooltips for all tag items after refresh
+      setTimeout(() => {
+        const tagItems = document.querySelectorAll('.tag-select-item[data-bs-toggle="tooltip"]');
+        tagItems.forEach((item) => {
+          // Dispose existing tooltip if any
+          const existingTooltip = bootstrap.Tooltip.getInstance(item);
+          if (existingTooltip) {
+            existingTooltip.dispose();
+          }
+          // Initialize new tooltip with consistent top placement
+          if (item.getAttribute('data-tag-description')) {
+            new bootstrap.Tooltip(item, { placement: 'top' }); // eslint-disable-line no-new
+          }
+        });
+      }, 200);
+
+      // Tag selector refreshed successfully
+    } else {
+      console.warn('Invalid response format when refreshing tags:', data);
+    }
+  } catch (error) {
+    console.error('Error refreshing Tom Select instance:', error);
   }
 }
 
@@ -191,16 +308,16 @@ async function init() {
     // Initialize tag color watcher for dynamically added content
     initTagColorWatcher();
 
-    // Listen for tag update events to refresh Tagify
+    // Listen for tag update events to refresh Tom Select
     document.addEventListener('tagsUpdated', () => {
-      if (window.tagifyInstance) {
-        refreshTagifyInstance();
+      if (window.tagSelectInstance) {
+        refreshTagSelectInstance();
       }
     });
 
     document.addEventListener('tagDeleted', () => {
-      if (window.tagifyInstance) {
-        refreshTagifyInstance();
+      if (window.tagSelectInstance) {
+        refreshTagSelectInstance();
       }
     });
 

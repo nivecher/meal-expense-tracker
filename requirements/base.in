@@ -29,8 +29,9 @@ gunicorn>=23.0.0,<24.0.0           # Production WSGI server for running Flask ap
 Werkzeug>=3.1.0,<4.0.0             # WSGI utility library, used internally by Flask
 
 # AWS Lambda WSGI Adapter
-aws-wsgi>=0.2.7,<1.0.0             # Adapter to run Flask apps on AWS Lambda via API Gateway
-mangum>=0.18.0,<1.0.0              # ASGI/WSGI adapter for AWS Lambda HTTP API v2 (preferred over aws-wsgi)
+aws-wsgi>=0.2.7,<1.0.0             # Adapter to run Flask apps on AWS Lambda via API Gateway (legacy, API Gateway v1 only)
+mangum>=0.18.0,<1.0.0              # ASGI adapter for AWS Lambda HTTP API v2 (modern standard, requires WSGI-to-ASGI wrapper for Flask)
+asgiref>=3.7.0,<4.0.0             # WSGI-to-ASGI adapter to enable Mangum with Flask/WSGI apps
 marshmallow                        # Object serialization/deserialization and validation (used for API schemas)
 
 # Google Maps

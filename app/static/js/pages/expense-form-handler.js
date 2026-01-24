@@ -438,15 +438,16 @@ async function handleFormSubmit(event) {
   if (tagsInput) {
     let tagsToSend = [];
 
-    // First try to get tags from Tagify instance (user has interacted with the field)
-    if (window.tagifyInstance) {
-      const selectedTags = window.tagifyInstance.value;
-      if (selectedTags && selectedTags.length > 0) {
-        tagsToSend = selectedTags.map((tag) => tag.value);
+    // First try to get tags from Tom Select instance (user has interacted with the field)
+    if (window.tagSelectInstance) {
+      const selectedValues = window.tagSelectInstance.getValue();
+      if (selectedValues && selectedValues.length > 0) {
+        // Tom Select stores tag names as values (valueField: 'name')
+        tagsToSend = Array.isArray(selectedValues) ? selectedValues : [selectedValues];
       }
     }
 
-    // If no tags from Tagify, try to parse existing tags from data attribute (for editing)
+    // If no tags from Tom Select, try to parse existing tags from data attribute (for editing)
     if (tagsToSend.length === 0) {
       tagsToSend = parseExistingTags(tagsInput);
     }
@@ -631,6 +632,13 @@ async function fetchRestaurantAddress(restaurantId) {
       credentials: 'include', // Include cookies for authentication (required for CORS)
     });
 
+    // Handle authentication errors
+    if (response.status === 401 || response.status === 403) {
+      console.warn('Authentication required for restaurant API');
+      hideRestaurantAddress();
+      return;
+    }
+
     if (response.ok) {
       const result = await response.json();
       if (result.status === 'success' && result.data) {
@@ -803,6 +811,7 @@ function setupCategoryRestaurantHandling(form) {
           'X-Requested-With': 'XMLHttpRequest',
           Accept: 'application/json',
         },
+        credentials: 'include', // Include cookies for authentication (required for CORS)
       });
 
       if (!response.ok) {

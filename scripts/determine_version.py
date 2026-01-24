@@ -317,7 +317,7 @@ def main() -> None:
 
     except FileNotFoundError:
         print("Error: python-semantic-release not found", file=sys.stderr)
-        print("Install it with: pip install python-semantic-release[all]", file=sys.stderr)
+        print("Install it with: pip install python-semantic-release", file=sys.stderr)
         sys.exit(1)
     except Exception as exc:
         print(f"Error running semantic-release: {exc}", file=sys.stderr)
