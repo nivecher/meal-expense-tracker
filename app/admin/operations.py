@@ -66,6 +66,14 @@ register_operation(
     lambda **kwargs: _execute_create_user(**kwargs),
 )
 
+register_operation(
+    "run_migrations",
+    "Run database migrations safely (optionally dry-run or fix history)",
+    True,
+    lambda **kwargs: _validate_run_migrations(**kwargs),
+    lambda **kwargs: _execute_run_migrations(**kwargs),
+)
+
 
 def _validate_list_users(**kwargs: Any) -> dict[str, Any]:
     """Validate list users parameters."""
@@ -143,6 +151,25 @@ def _validate_create_user(**kwargs: Any) -> dict[str, Any]:
     return {"valid": len(errors) == 0, "errors": errors}
 
 
+def _validate_run_migrations(**kwargs: Any) -> dict[str, Any]:
+    """Validate run migrations parameters."""
+    errors = []
+
+    dry_run = kwargs.get("dry_run", False)
+    if not isinstance(dry_run, bool):
+        errors.append("dry_run must be a boolean")
+
+    fix_history = kwargs.get("fix_history", False)
+    if not isinstance(fix_history, bool):
+        errors.append("fix_history must be a boolean")
+
+    target_revision = kwargs.get("target_revision")
+    if target_revision is not None and not isinstance(target_revision, str):
+        errors.append("target_revision must be a string")
+
+    return {"valid": len(errors) == 0, "errors": errors}
+
+
 def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
     """Execute create user operation."""
     try:
@@ -183,6 +210,31 @@ def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
         db.session.rollback()
         logger.exception(f"Error creating user: {e}")
         return {"success": False, "message": f"Failed to create user: {str(e)}"}
+
+
+def _execute_run_migrations(**kwargs: Any) -> dict[str, Any]:
+    """Execute run migrations operation."""
+    try:
+        from app.utils.migration_manager import migration_manager
+
+        dry_run = kwargs.get("dry_run", False)
+        fix_history = kwargs.get("fix_history", False)
+        target_revision = kwargs.get("target_revision")
+
+        if fix_history:
+            fix_result = migration_manager.fix_migration_history()
+            if not fix_result.get("success"):
+                return {
+                    "success": False,
+                    "message": f"Failed to fix migration history: {fix_result.get('error')}",
+                    "data": fix_result,
+                }
+
+        result = migration_manager.run_migrations(dry_run=dry_run, target_revision=target_revision)
+        return {**result, "data": result.get("data", {})}
+    except Exception as e:
+        logger.exception(f"Error running migrations: {e}")
+        return {"success": False, "message": f"Failed to run migrations: {str(e)}"}
 
 
 # Legacy compatibility - AdminOperationRegistry for backward compatibility
