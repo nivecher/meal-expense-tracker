@@ -180,12 +180,45 @@ resource "aws_s3_bucket_policy" "logs" {
   ]
 }
 
+# Custom cache policy that truly disables caching for dynamic content
+# When TTL is 0, CloudFront disables caching and forwards all headers/cookies/query strings
+resource "aws_cloudfront_cache_policy" "no_cache" {
+  name        = "${var.app_name}-${var.environment}-no-cache"
+  comment     = "No caching policy for dynamic content from API Gateway"
+  default_ttl = 0
+  max_ttl     = 0
+  min_ttl     = 0
+
+  parameters_in_cache_key_and_forwarded_to_origin {
+    # When caching is disabled (TTL=0), compression settings are not allowed
+    # CloudFront automatically forwards all requests to origin without caching
+
+    # When caching is disabled (TTL=0), use "none" to forward all cookies
+    # Cannot use "all" when TTL is 0
+    cookies_config {
+      cookie_behavior = "none"
+    }
+
+    # When caching is disabled (TTL=0), use "none" to forward all headers
+    # Cannot use whitelist when TTL is 0
+    headers_config {
+      header_behavior = "none"
+    }
+
+    # When caching is disabled (TTL=0), use "none" to forward all query strings
+    # Cannot use "all" when TTL is 0
+    query_strings_config {
+      query_string_behavior = "none"
+    }
+  }
+}
+
 # Use AWS managed cache policies directly with known IDs (more reliable)
 locals {
   # AWS managed policy IDs (stable and documented)
-  cache_policy_optimized_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingOptimized
-  cache_policy_disabled_id  = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingDisabled
-  origin_request_policy_id  = "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
+  cache_policy_optimized_id = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"  # Managed-CachingOptimized
+  cache_policy_disabled_id  = aws_cloudfront_cache_policy.no_cache.id # Custom no-cache policy
+  origin_request_policy_id  = "b689b0a8-53d0-40ab-baf2-68738e2966ac"  # Managed-AllViewerExceptHostHeader
 }
 
 # Use AWS managed origin request policy instead of custom one

@@ -237,27 +237,113 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         segment = None
 
     try:
-        # Use Mangum with WSGI-to-ASGI adapter for Flask
-        # Mangum is the modern standard for Lambda deployments (2024-2025)
-        # Flask is WSGI, so we wrap it with asgiref's WSGI-to-ASGI adapter
-        from asgiref.wsgi import WsgiToAsgi
-        from mangum import Mangum
-
+        # Use WSGI adapter directly (Mangum has compatibility issues with Flask)
+        # Mangum tries to use Flask as ASGI but Flask is WSGI-only
         from wsgi import application
 
-        # Convert Flask WSGI app to ASGI, then wrap with Mangum
-        # Type cast needed: WsgiToAsgi returns ASGI app but mypy needs explicit type
-        asgi_app = cast(Any, WsgiToAsgi(application))
-        handler = Mangum(asgi_app, lifespan="off")
-        response_raw = handler(event, context)
+        response: dict[str, Any]
+        import base64
+        from io import BytesIO
 
-        # Ensure response is a dict (defensive check for runtime safety)
-        # Type narrowing for mypy: handler may return various types
-        if isinstance(response_raw, dict):
-            response = response_raw
+        path = event.get("rawPath", "/")
+        method = event.get("requestContext", {}).get("http", {}).get("method", "GET")
+        query_string = event.get("rawQueryString", "")
+        headers = event.get("headers", {})
+        body = event.get("body", "")
+
+        # Handle cookies - HTTP API v2 may pass cookies in array or Cookie header
+        cookies = event.get("cookies", [])
+        # Check for Cookie header (case-insensitive)
+        has_cookie_header = any(key.lower() == "cookie" for key in headers.keys())
+        if cookies and not has_cookie_header:
+            # Convert cookies array to Cookie header format
+            cookie_header = "; ".join(cookies)
+            headers["cookie"] = cookie_header
+
+        # Handle body
+        # API Gateway may base64 encode binary data (like multipart/form-data with files)
+        # Check both lowercase and original case for Content-Type (API Gateway may normalize headers)
+        content_type = headers.get("content-type", headers.get("Content-Type", headers.get("CONTENT-TYPE", "")))
+        is_multipart = "multipart/form-data" in content_type.lower() if content_type else False
+
+        if body and event.get("isBase64Encoded", False):
+            body_bytes = base64.b64decode(body)
+        elif body and is_multipart and isinstance(body, str):
+            # For multipart/form-data, API Gateway might send as base64 string even if not marked
+            # Try to decode if it looks like base64
+            try:
+                body_bytes = base64.b64decode(body)
+            except Exception:
+                # Not base64, treat as regular string
+                body_bytes = body.encode("utf-8")
+        elif body:
+            body_bytes = body.encode("utf-8") if isinstance(body, str) else body
         else:
-            # Defensive check: handler should always return dict, but we check at runtime
-            response = {"statusCode": 500, "body": "Internal error", "headers": {}, "isBase64Encoded": False}  # type: ignore[unreachable]
+            body_bytes = b""
+
+        # Extract host from headers for proper cookie domain handling
+        host = headers.get("host", headers.get("Host", "lambda"))
+        # Remove port if present (e.g., "example.com:443" -> "example.com")
+        if ":" in host:
+            host = host.split(":")[0]
+
+        # Create WSGI environment
+        # Preserve original Content-Type for multipart/form-data (includes boundary)
+        content_type_header = headers.get("content-type", headers.get("Content-Type", ""))
+        environ = {
+            "REQUEST_METHOD": method,
+            "PATH_INFO": path,
+            "QUERY_STRING": query_string,
+            "CONTENT_TYPE": content_type_header,  # Preserve original with boundary for multipart
+            "CONTENT_LENGTH": str(len(body_bytes)),
+            "SERVER_NAME": host,  # Use actual host for proper cookie domain
+            "SERVER_PORT": "443",
+            "HTTP_HOST": host,  # Also set HTTP_HOST header
+            "wsgi.version": (1, 0),
+            "wsgi.url_scheme": "https",
+            "wsgi.input": BytesIO(body_bytes),
+            "wsgi.errors": sys.stderr,
+            "wsgi.multithread": False,
+            "wsgi.multiprocess": False,
+            "wsgi.run_once": False,
+        }
+
+        # Add headers (including Cookie header)
+        # Note: CONTENT_TYPE and CONTENT_LENGTH are already set above
+        for key, value in headers.items():
+            key_upper = key.upper().replace("-", "_")
+            # Skip CONTENT_TYPE and CONTENT_LENGTH (already set in environ)
+            if key_upper not in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+                environ[f"HTTP_{key_upper}"] = value
+
+        # Call Flask application
+        with application.request_context(environ):
+            flask_response = application.full_dispatch_request()
+
+        # Convert to API Gateway format
+        # Extract cookies from Set-Cookie headers for HTTP API v2
+        response_headers = {}
+        cookies = []
+        cors_headers = {}
+        for key, value in flask_response.headers:
+            if key.lower() == "set-cookie":
+                cookies.append(value)
+            elif key.lower().startswith("access-control-"):
+                cors_headers[key] = value
+                response_headers[key] = value
+            else:
+                response_headers[key] = value
+
+        response = {
+            "statusCode": flask_response.status_code,
+            "headers": response_headers,
+            "body": flask_response.get_data(as_text=True),
+            "isBase64Encoded": False,
+        }
+
+        # HTTP API v2 uses cookies array, not Set-Cookie headers
+        if cookies:
+            response["cookies"] = cookies
 
         # Calculate duration and log
         duration_ms = (time.time() - start_time) * 1000

@@ -6,13 +6,14 @@ This module contains the route handlers for the main blueprint.
 
 from datetime import UTC, datetime, timezone
 import os
-from typing import Union
+from typing import Union, cast
 
 from flask import (
     Response,
     abort,
     current_app,
     flash,
+    make_response,
     redirect,
     render_template,
     request,
@@ -115,7 +116,7 @@ def favicon() -> Response:
 
 
 @bp.route("/about")
-def about() -> str:
+def about() -> Response | str:
     """Render the about page with version information.
 
     Returns:
@@ -135,11 +136,21 @@ def about() -> str:
         app_version = "unknown"
         build_timestamp = "Not set"
 
-    return render_template(
-        "main/about.html",
-        app_version=app_version,
-        build_timestamp=build_timestamp,
+    response = cast(
+        Response,
+        make_response(
+            render_template(
+                "main/about.html",
+                app_version=app_version,
+                build_timestamp=build_timestamp,
+            )
+        ),
     )
+    # Explicitly set no-cache headers to prevent CloudFront caching
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @bp.route("/help")

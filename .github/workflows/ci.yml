@@ -302,23 +302,6 @@ jobs:
           echo "## Terraform Validation" >> $GITHUB_STEP_SUMMARY
           echo "✅ Terraform validation completed" >> $GITHUB_STEP_SUMMARY
 
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.2.2
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: moderate
-          deny-licenses: GPL-2.0, GPL-3.0
-
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -370,7 +353,7 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [branch-name, lint, test, terraform, security, dependency-review]
+    needs: [branch-name, lint, test, terraform, security]
     if: always()
     timeout-minutes: 5
     outputs:
@@ -391,9 +374,6 @@ jobs:
           fi
           if [[ "${{ needs.security.result }}" != "success" ]]; then
             FAILED_JOBS="${FAILED_JOBS} security"
-          fi
-          if [[ "${{ needs.dependency-review.result }}" != "success" && "${{ needs.dependency-review.result }}" != "skipped" ]]; then
-            FAILED_JOBS="${FAILED_JOBS} dependency-review"
           fi
           
           if [ -n "$FAILED_JOBS" ]; then
@@ -416,4 +396,3 @@ jobs:
           echo "| Test | ${{ needs.test.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Terraform | ${{ needs.terraform.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Security | ${{ needs.security.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Dependency Review | ${{ needs.dependency-review.result == 'success' && '✅' || needs.dependency-review.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY

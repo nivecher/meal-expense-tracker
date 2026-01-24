@@ -9,9 +9,12 @@ import { toast } from '../utils/notifications.js';
 function setCookie(name, value, days) {
   const expires = new Date();
   expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-  // Add Secure flag for HTTPS sessions to prevent man-in-the-middle attacks
-  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/${secureFlag}`;
+  // For CORS compatibility: use SameSite=None; Secure in HTTPS environments
+  // This ensures cookies work when CloudFront proxies to API Gateway
+  const isHttps = window.location.protocol === 'https:';
+  const sameSite = isHttps ? 'SameSite=None' : 'SameSite=Lax';
+  const secureFlag = isHttps ? '; Secure' : '';
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;${sameSite}${secureFlag}`;
 }
 
 // View toggle functionality

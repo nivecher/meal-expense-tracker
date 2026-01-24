@@ -34,9 +34,12 @@ function setTimezoneCookie(timezone, days = 365) {
   const expires = new Date();
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
   const expiresStr = expires.toUTCString();
-  // Add Secure flag for HTTPS sessions to prevent man-in-the-middle attacks
-  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `browser_timezone=${encodeURIComponent(timezone)}; expires=${expiresStr}; path=/; SameSite=Lax${secureFlag}`;
+  // For CORS compatibility: use SameSite=None; Secure in HTTPS environments
+  // This ensures cookies work when CloudFront proxies to API Gateway
+  const isHttps = window.location.protocol === 'https:';
+  const sameSite = isHttps ? 'SameSite=None' : 'SameSite=Lax';
+  const secureFlag = isHttps ? '; Secure' : '';
+  document.cookie = `browser_timezone=${encodeURIComponent(timezone)}; expires=${expiresStr}; path=/; ${sameSite}${secureFlag}`;
 }
 
 /**

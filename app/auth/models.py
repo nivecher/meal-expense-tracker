@@ -11,7 +11,7 @@ from sqlalchemy import event
 from sqlalchemy.orm import Mapped, Mapper, mapped_column, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.extensions import LoginManager, db
+from app.extensions import db
 from app.models.base import BaseModel
 
 if TYPE_CHECKING:
@@ -254,65 +254,3 @@ def validate_user(mapper: Mapper, connection: Connection, target: User) -> None:
 
     # Ensure email is lowercase (required field, always present)
     target.email = target.email.lower().strip()
-
-
-def init_login_manager(login_manager: LoginManager) -> None:
-    """Initialize the login manager with the user loader.
-
-    This function sets up the user loader callback that Flask-Login uses
-    to reload the user object from the user ID stored in the session.
-
-    Args:
-        login_manager: The Flask-Login LoginManager instance
-    """
-
-    @login_manager.user_loader
-    def load_user(user_id: str) -> User | None:
-        """Load a user by ID.
-
-        Args:
-            user_id: The user ID as a string from the session
-
-        Returns:
-            Optional[User]: The User instance if found and active, None otherwise
-
-        Note:
-            Only returns active users. Inactive users are treated as non-existent.
-        """
-        if not user_id or not user_id.isdigit():
-            return None
-
-        # Type checker limitation: doesn't recognize SQLAlchemy session.get return type
-        user = cast(User | None, db.session.get(User, int(user_id)))
-
-        # Only return the user if they exist and are active
-        # Type checker limitation: doesn't narrow Optional[User] properly
-        # After None check, user is guaranteed to be non-None within this block
-        if user is not None and user.is_active:
-            return user
-
-        return None
-
-    @login_manager.unauthorized_handler
-    def unauthorized() -> ResponseReturnValue:
-        """Handle unauthorized access attempts.
-
-        Returns:
-            Response: A redirect to the login page for HTML requests,
-                     or a JSON response for API requests
-        """
-        from flask import jsonify, redirect, request, url_for
-
-        # Check if the request accepts HTML
-        if "text/html" in request.accept_mimetypes:
-            from typing import cast
-
-            return cast(ResponseReturnValue, redirect(url_for("auth.login", next=request.full_path)))
-
-        # Default to JSON response for API requests
-        return jsonify({"error": "You must be logged in to access this resource"}), 401
-
-    @login_manager.needs_refresh_handler
-    def refresh_needed() -> tuple[dict[str, str], int]:
-        """Handle session refresh requirements."""
-        return {"error": "Session expired, please log in again"}, 401
