@@ -10,15 +10,25 @@
     <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/tags.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
+    <!-- Tom Select CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.css">
+    <!-- Custom tag styling -->
+    <link href="{{ url_for('static', filename='css/tag-select.css') }}" rel="stylesheet" />
+    <!-- Dynamic user tag colors -->
+    <link rel="stylesheet" href="{{ url_for('main.user_tag_css') }}">
     <link href="{{ url_for('static', filename='css/pages/expense-list.css') }}" rel="stylesheet" />
 {% endblock styles %}
 
 {% block scripts %}
 {{ super() }}
+    <!-- Tom Select JS (required for tag selector - must load before tag-select-init.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <!-- Tag badge styling -->
     <script src="{{ url_for('static', filename='js/components/tag-badge-styler.js') }}"></script>
     <!-- Table sorting functionality -->
     <script src="{{ url_for('static', filename='js/components/table-sorting.js') }}"></script>
+    <!-- Tag selector initialization (depends on Tom Select being loaded) -->
+    <script src="{{ url_for('static', filename='js/utils/tag-select-init.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/pages/expense-list.js') }}"></script>
 {% endblock scripts %}
 
@@ -74,7 +84,7 @@
         </div>
 
         <!-- Search & Filter + View Toggle Row -->
-        {% set active_filters_count = (1 if search else 0) + (1 if meal_type else 0) + (1 if category else 0) + (1 if start_date else 0) + (1 if end_date else 0) %}
+        {% set active_filters_count = (1 if search else 0) + (1 if meal_type else 0) + (1 if category else 0) + (1 if tags else 0) + (1 if start_date else 0) + (1 if end_date else 0) %}
         {% set show_filters = active_filters_count > 0 or request.args.get('filter_expanded') == '1' %}
 
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -149,6 +159,22 @@
                             </select>
                         </div>
                         <!-- Second Row -->
+                        <div class="col-md-12">
+                            <label for="filterTagsInput" class="form-label">Tags</label>
+                            <select id="filterTagsInput"
+                                   name="tags"
+                                   class="form-control"
+                                   multiple
+                                   placeholder="Type to search tags...">
+                            </select>
+                            <div class="form-text">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Select one or more tags to filter expenses. Expenses must have all selected tags.
+                                </small>
+                            </div>
+                        </div>
+                        <!-- Third Row -->
                         <div class="col-md-4">
                             <label for="start_date" class="form-label">From Date</label>
                             <input
@@ -217,7 +243,11 @@
                         <div class="btn-group" role="group" aria-label="Page navigation">
                             <!-- Previous page -->
                             {% if page > 1 %}
-                                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', page=page-1, per_page=per_page, q=search, meal_type=meal_type, category=category, start_date=start_date, end_date=end_date) }}" aria-label="Previous">
+                                {% set prev_params = {'page': page-1, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
+                                {% if tags %}
+                                    {% set _ = prev_params.update({'tags': tags}) %}
+                                {% endif %}
+                                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', **prev_params) }}" aria-label="Previous">
                                     <i class="fas fa-chevron-left me-1"></i><span class="d-none d-sm-inline">Previous</span>
                                 </a>
                             {% else %}
@@ -231,7 +261,11 @@
                                 {% if p == page %}
                                     <span class="btn btn-primary btn-sm" aria-label="Current page {{ p }}" role="button" tabindex="-1">{{ p }}</span>
                                 {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
-                                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', page=p, per_page=per_page, q=search, meal_type=meal_type, category=category, start_date=start_date, end_date=end_date) }}" aria-label="Go to page {{ p }}">{{ p }}</a>
+                                    {% set page_params = {'page': p, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
+                                    {% if tags %}
+                                        {% set _ = page_params.update({'tags': tags}) %}
+                                    {% endif %}
+                                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', **page_params) }}" aria-label="Go to page {{ p }}">{{ p }}</a>
                                 {% elif p == 4 and page > 5 %}
                                     <span class="btn btn-outline-secondary btn-sm" aria-label="More pages available" role="button" tabindex="-1">...</span>
                                 {% elif p == total_pages - 3 and page < total_pages - 4 %}
@@ -241,7 +275,11 @@
 
                             <!-- Next page -->
                             {% if page < total_pages %}
-                                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', page=page+1, per_page=per_page, q=search, meal_type=meal_type, category=category, start_date=start_date, end_date=end_date) }}" aria-label="Next">
+                                {% set next_params = {'page': page+1, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
+                                {% if tags %}
+                                    {% set _ = next_params.update({'tags': tags}) %}
+                                {% endif %}
+                                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', **next_params) }}" aria-label="Next">
                                     <span class="d-none d-sm-inline">Next</span><i class="fas fa-chevron-right ms-1"></i>
                                 </a>
                             {% else %}

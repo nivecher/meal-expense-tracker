@@ -27,7 +27,7 @@ class Tag(BaseModel):
     Notes:
         - Each user can have their own set of tags
         - Tags are soft-deleted when a user is deleted
-        - Tags follow Jira-style naming conventions
+        - Tags follow Jira-style naming conventions (spaces replaced with hyphens, case-sensitive)
     """
 
     __tablename__ = "tag"  # type: ignore[assignment]
@@ -95,6 +95,29 @@ class Tag(BaseModel):
         except Exception:
             return 0
 
+    @property
+    def total_amount(self) -> float:
+        """Get the total amount of expenses using this tag.
+
+        Returns:
+            Total amount as float, or 0.0 if no expenses or not calculated
+        """
+        if hasattr(self, "_total_amount"):
+            amount = getattr(self, "_total_amount", 0.0)
+            return float(amount) if amount else 0.0
+        return 0.0
+
+    @property
+    def last_visit(self) -> datetime | None:
+        """Get the date of the last expense using this tag.
+
+        Returns:
+            Last visit date as datetime, or None if no expenses or not calculated
+        """
+        if hasattr(self, "_last_visit"):
+            return getattr(self, "_last_visit", None)
+        return None
+
     def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the tag.
 
@@ -108,6 +131,8 @@ class Tag(BaseModel):
             "description": self.description,
             "user_id": self.user_id,
             "expense_count": self.expense_count,
+            "total_amount": self.total_amount,
+            "last_visit": self.last_visit.isoformat() if self.last_visit else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -436,8 +461,8 @@ def validate_tag(mapper: object, connection: object, target: Tag) -> None:
     # Clean string fields
     # Note: name is non-nullable, so no None check needed
     name_val: str = target.name
-    # Convert to lowercase and replace spaces with hyphens for Jira-style naming
-    name_val = name_val.strip().lower().replace(" ", "-")
+    # Replace spaces with hyphens (preserve case)
+    name_val = name_val.strip().replace(" ", "-")
     # Remove any non-alphanumeric characters except hyphens
     name_val = "".join(c for c in name_val if c.isalnum() or c == "-")
     # Ensure it starts with a letter or number

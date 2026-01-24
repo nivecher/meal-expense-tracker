@@ -220,21 +220,8 @@ def _handle_api_unauthorized() -> Response:
 
 
 def _handle_web_unauthorized() -> Response:
-    """Handle unauthorized web requests with fixed URLs for Lambda."""
-    next_url = request.url
-    server_name = current_app.config.get("SERVER_NAME")
-
-    # Fix URLs in Lambda environment
-    if _is_lambda_environment() and server_name:
-        next_url = _fix_api_gateway_url(next_url, server_name)
-
-    # Generate login URL with fixed next parameter
-    login_url = url_for(login_manager.login_view, next=next_url, _external=True)
-
-    # Fix login URL if needed
-    if _is_lambda_environment() and server_name:
-        login_url = _fix_api_gateway_url(login_url, server_name)
-
+    """Handle unauthorized web requests by redirecting to login with next parameter."""
+    login_url = url_for(login_manager.login_view, next=request.full_path)
     return cast(Response, redirect(login_url))
 
 

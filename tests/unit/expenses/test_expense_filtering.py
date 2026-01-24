@@ -37,6 +37,7 @@ class TestGetExpenseFilters:
             "sort": "amount",
             "order": "asc",
         }.get(key, default)
+        mock_request.args.getlist.return_value = []  # Mock getlist to return empty list
 
         filters = get_expense_filters(mock_request)
 
@@ -61,6 +62,7 @@ class TestGetExpenseFilters:
             "sort": "date",
             "order": "desc",
         }.get(key, default)
+        mock_request.args.getlist.return_value = []  # Mock getlist to return empty list
 
         filters = get_expense_filters(mock_request)
 
@@ -72,6 +74,7 @@ class TestGetExpenseFilters:
         """Test filter extraction with default values."""
         mock_request = Mock()
         mock_request.args.get.side_effect = lambda key, default="": default
+        mock_request.args.getlist.return_value = []  # Mock getlist to return empty list
 
         filters = get_expense_filters(mock_request)
 
@@ -90,6 +93,7 @@ class TestGetExpenseFilters:
             "search": "primary",
             "q": "secondary",
         }.get(key, default)
+        mock_request.args.getlist.return_value = []  # Mock getlist to return empty list
 
         filters = get_expense_filters(mock_request)
 

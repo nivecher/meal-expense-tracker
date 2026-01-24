@@ -2,7 +2,7 @@
 
 # Version management - for generating app/_version.py locally and make version command
 setuptools-scm[toml]>=8.0.0      # Generate version from git tags (not needed at runtime, version file is pre-generated)
-python-semantic-release[all]     # Automated versioning based on conventional commits (used in CI/CD and local versioning scripts)
+python-semantic-release     # Automated versioning based on conventional commits (used in CI/CD and local versioning scripts)
 
 # Core Python type stubs
 types-python-dateutil>=2.8.0           # Type stubs for python-dateutil (date/time parsing and arithmetic)
@@ -52,6 +52,7 @@ mypy-boto3-lambda>=1.40.0              # Type stubs for boto3 Lambda service
 mypy-boto3-rds>=1.40.3                 # Type stubs for boto3 RDS service
 mypy-boto3-s3>=1.40.0                  # Type stubs for boto3 S3 service
 mypy-boto3-sqs>=1.40.0                 # Type stubs for boto3 SQS service
+# Note: aws_xray_sdk type stubs not available; handled via mypy overrides in pyproject.toml
 
 # Tools
 beautifulsoup4>=4.12.0,<5.0.0          # HTML parsing library (used in tests)

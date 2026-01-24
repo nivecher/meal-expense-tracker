@@ -195,6 +195,7 @@ module = [
     "pytest.*",
     "awsgi.*",
     "pdf2image.*",
+    "aws_xray_sdk.*",
 ]
 ignore_missing_imports = true
 

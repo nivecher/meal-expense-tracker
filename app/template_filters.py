@@ -329,14 +329,38 @@ def init_app(app: Flask) -> None:
         """Convert a list of tag objects to a list of dictionaries."""
         if not tags:
             return []
-        if not isinstance(tags, list):
-            return []
+        # Handle both list and property that returns a list
+        tags_list: list = []
+        if isinstance(tags, list):
+            tags_list = tags
+        else:
+            # Try to convert to list if it's iterable
+            try:
+                # Check if it's iterable (but not a string)
+                if hasattr(tags, "__iter__") and not isinstance(tags, str):
+                    tags_list = list(tags)
+                else:
+                    return []
+            except (TypeError, AttributeError):
+                return []
         result = []
-        for tag in tags:
+        for tag in tags_list:
+            if tag is None:
+                continue
             if hasattr(tag, "to_dict"):
-                result.append(tag.to_dict())
+                tag_dict = tag.to_dict()
+                # Ensure required fields exist
+                if "id" in tag_dict and "name" in tag_dict:
+                    result.append(tag_dict)
             elif hasattr(tag, "id") and hasattr(tag, "name"):
-                result.append({"id": tag.id, "name": tag.name})
+                result.append(
+                    {
+                        "id": tag.id,
+                        "name": tag.name,
+                        "color": getattr(tag, "color", "#6c757d"),
+                        "description": getattr(tag, "description", None),
+                    }
+                )
         return result
 
     app.add_template_filter(tags_to_dict, name="tags_to_dict")

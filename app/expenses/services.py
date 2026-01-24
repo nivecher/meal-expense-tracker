@@ -37,10 +37,25 @@ def get_expense_filters(request: Request) -> dict[str, Any]:
     """
     # Support both 'search' and 'q' parameters for search functionality
     search_term = request.args.get("search", "").strip() or request.args.get("q", "").strip()
+
+    # Extract tags - can be multiple values (e.g., ?tags=tag1&tags=tag2) or comma-separated
+    tags_param = request.args.getlist("tags")  # Gets all values for 'tags' parameter
+    tags_list: list[str] = []
+    if tags_param:
+        # Handle both comma-separated strings and multiple parameters
+        for tag_value in tags_param:
+            if isinstance(tag_value, str) and tag_value.strip():
+                # Split by comma if comma-separated, otherwise use the whole value
+                if "," in tag_value:
+                    tags_list.extend([t.strip() for t in tag_value.split(",") if t.strip()])
+                else:
+                    tags_list.append(tag_value.strip())
+
     return {
         "search": search_term,
         "meal_type": request.args.get("meal_type", "").strip(),
         "category": request.args.get("category", "").strip(),
+        "tags": tags_list,  # List of tag names to filter by
         "start_date": request.args.get("start_date", "").strip(),
         "end_date": request.args.get("end_date", "").strip(),
         "sort_by": request.args.get("sort", "date"),
@@ -133,6 +148,21 @@ def apply_filters(stmt: Select, filters: dict[str, Any]) -> Select:
     # Apply category filter
     if filters["category"]:
         stmt = stmt.where(Category.name == filters["category"])
+
+    # Apply tags filter - expenses must have ALL specified tags
+    if filters.get("tags"):
+        tags_list: list[str] = filters["tags"]
+        if tags_list:
+            # For each tag, ensure the expense has that tag using EXISTS subqueries
+            # This ensures expenses have ALL tags (AND condition, not OR)
+            for tag_name in tags_list:
+                tag_subquery = (
+                    select(ExpenseTag.expense_id)
+                    .join(Tag, Tag.id == ExpenseTag.tag_id)
+                    .where(Tag.name == tag_name)
+                    .where(ExpenseTag.expense_id == Expense.id)
+                )
+                stmt = stmt.where(tag_subquery.exists())
 
     # Apply date range filters with proper error handling
     if filters["start_date"]:
@@ -401,7 +431,7 @@ def _validate_tags_list(tags_list: Any) -> tuple[list[str] | None, str | None]:
     """Validate and clean tags list.
 
     Args:
-        tags_list: List of tags to validate (can be strings or Tagify objects)
+        tags_list: List of tags to validate (can be strings or dicts with "value" key)
 
     Returns:
         A tuple of (cleaned_tags, error_message)
@@ -411,7 +441,7 @@ def _validate_tags_list(tags_list: Any) -> tuple[list[str] | None, str | None]:
 
     processed_tags = []
     for tag in tags_list:
-        # Handle Tagify format: {"value": "tag_name"}
+        # Handle dict format: {"value": "tag_name"} (for backward compatibility)
         if isinstance(tag, dict) and "value" in tag:
             tag_name = tag["value"]
         elif isinstance(tag, str):
@@ -1926,7 +1956,7 @@ def create_tag(user_id: int, name: str, color: str = "#6c757d", description: str
 
     Args:
         user_id: ID of the user creating the tag
-        name: Name of the tag (will be normalized to Jira-style)
+        name: Name of the tag (spaces will be replaced with hyphens, case preserved)
         color: Hex color code for the tag
         description: Optional description of the tag
 
@@ -1939,8 +1969,8 @@ def create_tag(user_id: int, name: str, color: str = "#6c757d", description: str
     if not name or not name.strip():
         raise ValueError("Tag name is required")
 
-    # Normalize tag name to Jira-style
-    normalized_name = name.strip().lower().replace(" ", "-")
+    # Normalize tag name (preserve case, replace spaces with hyphens)
+    normalized_name = name.strip().replace(" ", "-")
     normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
 
     if not normalized_name:
@@ -1968,7 +1998,7 @@ def update_tag(
     Args:
         user_id: ID of the user updating the tag
         tag_id: ID of the tag to update
-        name: New name of the tag (will be normalized to Jira-style)
+        name: New name of the tag (spaces will be replaced with hyphens, case preserved)
         color: New hex color code for the tag
         description: New optional description of the tag
 
@@ -1986,8 +2016,8 @@ def update_tag(
     if not tag:
         return None
 
-    # Normalize tag name to Jira-style
-    normalized_name = name.strip().lower().replace(" ", "-")
+    # Normalize tag name (preserve case, replace spaces with hyphens)
+    normalized_name = name.strip().replace(" ", "-")
     normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
 
     if not normalized_name:
@@ -2020,8 +2050,13 @@ def get_user_tags(user_id: int) -> list[Tag]:
     """
     from flask import current_app
 
+    # Expire any cached Tag queries to ensure fresh data
+    # This is important after deletions to avoid stale data
+    db.session.expire_all()
+
     # Explicitly filter by user_id to ensure security
-    tags = Tag.query.filter_by(user_id=user_id).order_by(Tag.name).all()
+    # Use fresh query to avoid session cache issues
+    tags = db.session.query(Tag).filter_by(user_id=user_id).order_by(Tag.name).all()
 
     # Defensive check: Verify all tags belong to the user (security measure)
     invalid_tags = [tag for tag in tags if tag.user_id != user_id]
@@ -2033,14 +2068,19 @@ def get_user_tags(user_id: int) -> list[Tag]:
         # Filter out any tags that don't belong to the user
         tags = [tag for tag in tags if tag.user_id == user_id]
 
-    # Optimize: Get all expense counts in a single query instead of N+1 queries
+    # Optimize: Get all expense statistics in a single query instead of N+1 queries
     if tags:
         tag_ids = [tag.id for tag in tags]
 
-        # Count expenses per tag, joining with Expense to ensure expenses exist
-        # Also filter by user_id to ensure we only count the user's expenses
-        counts = (
-            db.session.query(ExpenseTag.tag_id, func.count(ExpenseTag.id).label("count"))
+        # Get comprehensive statistics per tag: count, total amount, last visit date
+        # Joining with Expense to ensure expenses exist and filter by user_id
+        stats = (
+            db.session.query(
+                ExpenseTag.tag_id,
+                func.count(ExpenseTag.id).label("count"),
+                func.coalesce(func.sum(Expense.amount), 0).label("total_amount"),
+                func.max(Expense.date).label("last_visit"),
+            )
             .join(Expense, ExpenseTag.expense_id == Expense.id)
             .filter(ExpenseTag.tag_id.in_(tag_ids))
             .filter(Expense.user_id == user_id)  # Ensure we only count user's expenses
@@ -2048,18 +2088,27 @@ def get_user_tags(user_id: int) -> list[Tag]:
             .all()
         )
 
-        # Create a dictionary mapping tag_id to count
-        count_dict = {tag_id: count for tag_id, count in counts}
+        # Create dictionaries mapping tag_id to statistics
+        count_dict = {}
+        total_amount_dict = {}
+        last_visit_dict = {}
 
-        # Set expense_count on each tag object
+        for tag_id, count, total_amount, last_visit in stats:
+            count_dict[tag_id] = count
+            total_amount_dict[tag_id] = float(total_amount) if total_amount else 0.0
+            last_visit_dict[tag_id] = last_visit
+
+        # Set statistics on each tag object
         for tag in tags:
             tag._expense_count = count_dict.get(tag.id, 0)
+            tag._total_amount = total_amount_dict.get(tag.id, 0.0)
+            tag._last_visit = last_visit_dict.get(tag.id, None)
 
     return cast(list[Tag], tags)
 
 
 def search_tags(user_id: int, query: str, limit: int = 10) -> list[Tag]:
-    """Search tags by name for a user.
+    """Search tags by name for a user (case-insensitive for autocomplete).
 
     Args:
         user_id: ID of the user
@@ -2067,12 +2116,16 @@ def search_tags(user_id: int, query: str, limit: int = 10) -> list[Tag]:
         limit: Maximum number of results to return
 
     Returns:
-        List of matching Tag objects
+        List of matching Tag objects (with original case preserved)
+
+    Note:
+        Search is case-insensitive to match Jira-style UX, but tags are
+        stored case-sensitively. Typing "morgan" will match "Morgan".
     """
     if not query or not query.strip():
         return []
 
-    search_term = f"%{query.strip().lower()}%"
+    search_term = f"%{query.strip()}%"
     result = Tag.query.filter(Tag.user_id == user_id, Tag.name.ilike(search_term)).limit(limit).all()
     return cast(list[Tag], result)
 
@@ -2088,8 +2141,8 @@ def get_or_create_tag(user_id: int, name: str, color: str = "#6c757d") -> Tag:
     Returns:
         The Tag object (existing or newly created)
     """
-    # Normalize tag name
-    normalized_name = name.strip().lower().replace(" ", "-")
+    # Normalize tag name (preserve case, replace spaces with hyphens)
+    normalized_name = name.strip().replace(" ", "-")
     normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
 
     if not normalized_name:
@@ -2179,8 +2232,8 @@ def remove_tags_from_expense(expense_id: int, user_id: int, tag_names: list[str]
         if not tag_name or not tag_name.strip():
             continue
 
-        # Normalize tag name
-        normalized_name = tag_name.strip().lower().replace(" ", "-")
+        # Normalize tag name (preserve case, replace spaces with hyphens)
+        normalized_name = tag_name.strip().replace(" ", "-")
         normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
 
         # Find tag
@@ -2271,27 +2324,63 @@ def delete_tag(user_id: int, tag_id: int) -> bool:
 
     Returns:
         True if tag was deleted, False if not found or unauthorized
+
+    Raises:
+        Exception: If database operation fails
     """
     from flask import current_app
 
-    tag = db.session.get(Tag, tag_id)
-    if not tag:
-        current_app.logger.warning(f"Tag {tag_id} not found for deletion by user {user_id}")
-        return False
+    try:
+        # Get tag and verify it exists
+        tag = db.session.get(Tag, tag_id)
+        if not tag:
+            current_app.logger.warning(f"Tag {tag_id} not found for deletion by user {user_id}")
+            return False
 
-    if tag.user_id != user_id:
-        current_app.logger.warning(f"Tag {tag_id} belongs to user {tag.user_id}, but user {user_id} attempted deletion")
-        return False
+        # Verify ownership
+        if tag.user_id != user_id:
+            current_app.logger.warning(
+                f"Tag {tag_id} belongs to user {tag.user_id}, but user {user_id} attempted deletion"
+            )
+            return False
 
-    # Remove tag from all expenses
-    ExpenseTag.query.filter_by(tag_id=tag_id).delete()
+        # Remove tag from all expenses (bulk delete for performance)
+        # Use synchronize_session=False to avoid session state issues
+        expense_tag_count = ExpenseTag.query.filter_by(tag_id=tag_id).count()
+        if expense_tag_count > 0:
+            ExpenseTag.query.filter_by(tag_id=tag_id).delete(synchronize_session=False)
+            current_app.logger.debug(f"Removed tag {tag_id} from {expense_tag_count} expense(s)")
 
-    # Delete the tag
-    db.session.delete(tag)
-    db.session.commit()
+        # Delete the tag itself
+        db.session.delete(tag)
 
-    current_app.logger.info(f"Tag {tag_id} deleted successfully by user {user_id}")
-    return True
+        # Flush to ensure the delete is in the session before commit
+        db.session.flush()
+
+        # Commit the transaction - this actually deletes from database
+        db.session.commit()
+
+        # Force a new session query context to ensure fresh data
+        # This prevents any cached queries from returning the deleted tag
+        db.session.expire_all()
+
+        # Verify deletion by attempting to reload (should return None after commit)
+        # Use a fresh query to bypass any session cache
+        deleted_tag = db.session.query(Tag).filter_by(id=tag_id).first()
+        if deleted_tag is not None:
+            current_app.logger.error(
+                f"Tag {tag_id} still exists after deletion! This indicates a database transaction issue."
+            )
+            # Don't rollback here - the commit already happened
+            # Just log the error and return False
+            return False
+
+        current_app.logger.info(f"Tag {tag_id} deleted successfully by user {user_id}")
+        return True
+    except Exception as e:
+        current_app.logger.error(f"Error deleting tag {tag_id} for user {user_id}: {e}", exc_info=True)
+        db.session.rollback()
+        raise
 
 
 def get_popular_tags(user_id: int, limit: int = 10) -> list[dict]:

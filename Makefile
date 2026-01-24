@@ -392,14 +392,14 @@ requirements: requirements-prod requirements-dev
 .PHONY: requirements-prod
 requirements-prod: check-pip-tools
 	@echo "\n\033[1m=== Generating Production Requirements ===\033[0m"
-	@pip-compile --upgrade --constraint=constraints.txt requirements/base.in -o requirements.txt
+	@pip-compile --upgrade --no-strip-extras --constraint=constraints.txt requirements/base.in -o requirements.txt
 	@echo "\033[1;32m✅ Production requirements generated\033[0m"
 
 ## Generate development requirements (includes security tools)
 .PHONY: requirements-dev
 requirements-dev: check-pip-tools
 	@echo "\n\033[1m=== Generating Development Requirements ===\033[0m"
-	@pip-compile --upgrade --constraint=constraints.txt requirements/dev.in -o requirements-dev.txt
+	@pip-compile --upgrade --no-strip-extras --constraint=constraints.txt requirements/dev.in -o requirements-dev.txt
 	@echo "\033[1;32m✅ Development requirements generated\033[0m"
 
 ## Check if pip-tools is installed
@@ -1373,7 +1373,7 @@ version-preview: check-env
 	@# Check prerequisites
 	@if ! $(PIP) show python-semantic-release >/dev/null 2>&1; then \
 		echo "\033[1;33m⚠️  python-semantic-release not found. Installing...\033[0m"; \
-		$(PIP) install python-semantic-release[all] >/dev/null 2>&1 || { \
+		$(PIP) install python-semantic-release >/dev/null 2>&1 || { \
 			echo "\033[1;31m❌ Failed to install python-semantic-release\033[0m"; \
 			exit 1; \
 		}; \

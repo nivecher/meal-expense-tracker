@@ -87,15 +87,13 @@ def login() -> str | Response:
     Rate limiting: Only POST requests (login attempts) are rate limited to 10 per minute.
     GET requests (viewing the login page) are exempt from rate limiting.
     """
+    # Get next parameter from either query string (GET) or form data (POST)
+    next_param = request.args.get("next") or request.form.get("next")
+
     # If user is already logged in, redirect to next page or home
     if current_user.is_authenticated:
-        # Security: _get_safe_redirect_url() validates the URL and only allows
-        # internal relative URLs (starting with /) or returns url_for("main.index")
-        # This prevents open redirect vulnerabilities
-        next_page = _get_safe_redirect_url(request.args.get("next"))
-        # The URL is guaranteed safe at this point - validated or defaulted to home
-
-        return cast(Response, redirect(next_page))  # noqa: S303  # Validated by _get_safe_redirect_url()
+        next_page = _get_safe_redirect_url(next_param)
+        return cast(Response, redirect(next_page))  # noqa: S303
 
     form = LoginForm()
 
@@ -104,29 +102,22 @@ def login() -> str | Response:
 
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
-
-            # Handle redirect after login (validate to prevent open redirect)
-            next_page = _get_safe_redirect_url(request.form.get("next") or request.args.get("next"))
+            next_page = _get_safe_redirect_url(next_param)
 
             flash("Login successful!", "success")
-            # Ensure session is properly saved before redirect (important for Lambda/API Gateway)
             from flask import session
 
-            session.permanent = True
-
-            # Regenerate CSRF token after login for security (important for Lambda/API Gateway)
+            session.permanent = form.remember_me.data
             from flask_wtf.csrf import generate_csrf
 
             session["_csrf_token"] = generate_csrf()
-
-            # Security: next_page is validated by _get_safe_redirect_url() which only allows
-            # internal relative URLs (starting with /) and rejects external URLs
 
             return cast(Response, redirect(next_page))  # noqa: S303
         else:
             flash("Invalid username or password", "error")
 
-    return render_template("auth/login.html", form=form, title="Login", now=datetime.now(UTC))
+    # Pass next parameter to template so it can be included in the form
+    return render_template("auth/login.html", form=form, title="Login", now=datetime.now(UTC), next_url=next_param)
 
 
 def _delete_auth_cookies(response: Response) -> None:

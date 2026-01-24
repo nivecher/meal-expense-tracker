@@ -246,23 +246,25 @@
         <!-- Tags Section -->
         <div class="row mb-3">
             <div class="col-12">
-                {{ form.tags.label(class="form-label") }}
-                <input type="text"
-                       id="tagsInput"
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    {{ form.tags.label(class="form-label mb-0") }}
+                    <a href="#" id="manageTagsLink" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#tagEditorModal">
+                        <i class="fas fa-cog me-1"></i>Manage Tags
+                    </a>
+                </div>
+                <select id="tagsInput"
                        name="tags"
                        class="form-control"
+                       multiple
                        placeholder="Type to add tags..."
                        {% if expense and expense.tags %}
-                           value="{{ expense.tags|map(attribute='name')|join(', ') }}"
-                           data-existing-tags="{{ expense.tags|tags_to_dict|tojson }}"
+                           data-existing-tags='{{ expense.tags|tags_to_dict|tojson|safe }}'
                        {% endif %}>
-                <div class="form-text" id="tags-help">
+                </select>
+                <div class="form-text mt-3" id="tags-help">
                     <small class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
                         Click to select tags or type to create new ones. Selected tags appear as badges.
-                        <a href="#" id="manageTagsLink" class="ms-2" data-bs-toggle="modal" data-bs-target="#tagEditorModal">
-                            <i class="fas fa-cog me-1"></i>Manage Tags
-                        </a>
                     </small>
                 </div>
                 {% if form.tags.errors %}<div class="invalid-feedback">{{ form.tags.errors[0] }}</div>{% endif %}
@@ -285,10 +287,10 @@
     <!-- Expense Form CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/expense-form.css') }}">
 
-    <!-- Tagify CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.17.9/dist/tagify.css">
-    <!-- Pretty Tagify styling with rounded edges -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/tagify-pretty.css') }}">
+    <!-- Tom Select CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.css">
+    <!-- Custom tag styling -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tag-select.css') }}">
     <!-- Dynamic user tag colors -->
     <link rel="stylesheet" href="{{ url_for('main.user_tag_css') }}">
 
@@ -299,8 +301,8 @@
     <script type="module"
             src="{{ url_for('static', filename='js/pages/expense-form-handler.js') }}"></script>
 
-    <!-- Tagify JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify@4.17.9/dist/tagify.min.js"></script>
+    <!-- Tom Select JS -->
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 
     <!-- Category dropdown enhancement -->
     <script type="module" src="{{ url_for('static', filename='js/components/category-dropdown.js') }}"></script>
@@ -308,8 +310,8 @@
     <!-- Tag Manager for modal functionality -->
     <script src="{{ url_for('static', filename='js/components/tag-manager.js') }}"></script>
 
-    <!-- Tagify initialization script -->
-    <script src="{{ url_for('static', filename='js/utils/tagify-init.js') }}"></script>
+    <!-- Tom Select initialization script -->
+    <script src="{{ url_for('static', filename='js/utils/tag-select-init.js') }}"></script>
 
     <!-- Receipt deletion functionality -->
     <script>

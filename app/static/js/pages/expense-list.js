@@ -173,6 +173,168 @@ function initFaviconLoading() {
   initializeRobustFaviconHandling('.restaurant-favicon-table');
 }
 
+// Ensure proper display of Tom Select wrapper and control
+function ensureTagSelectDisplay(tagSelect) {
+  if (!tagSelect || !tagSelect.wrapper) return;
+  tagSelect.wrapper.style.width = '100%';
+  tagSelect.wrapper.style.display = 'block';
+  tagSelect.wrapper.style.position = 'relative';
+
+  if (tagSelect.control) {
+    tagSelect.control.style.width = '100%';
+    tagSelect.control.style.display = 'flex';
+    tagSelect.control.style.overflow = 'visible';
+    tagSelect.control.style.maxHeight = 'none';
+    tagSelect.control.style.cursor = 'text';
+  }
+
+  // Ensure input field is interactive
+  if (tagSelect.control_input) {
+    tagSelect.control_input.style.pointerEvents = 'auto';
+    tagSelect.control_input.style.cursor = 'text';
+    tagSelect.control_input.style.zIndex = '1';
+  }
+}
+
+// Hide original select element completely
+function hideOriginalSelect(selectElement) {
+  if (!selectElement) return;
+
+  selectElement.classList.add('ts-hidden');
+  selectElement.setAttribute('aria-hidden', 'true');
+  selectElement.setAttribute('tabindex', '-1');
+
+  const hideStyles = {
+    display: 'none',
+    visibility: 'hidden',
+    position: 'absolute',
+    opacity: '0',
+    pointerEvents: 'none',
+    height: '0',
+    width: '0',
+    maxHeight: '0',
+    maxWidth: '0',
+    overflow: 'hidden',
+    margin: '0',
+    padding: '0',
+    border: 'none',
+    lineHeight: '0',
+    fontSize: '0',
+    top: '-9999px',
+    left: '-9999px',
+  };
+  Object.assign(selectElement.style, hideStyles);
+
+  // Also hide any input-sizer elements that Tom Select creates
+  setTimeout(() => {
+    const inputSizer = selectElement.parentElement?.querySelector('.input-sizer');
+    if (inputSizer) {
+      inputSizer.style.display = 'none';
+      inputSizer.style.visibility = 'hidden';
+      inputSizer.style.position = 'absolute';
+      inputSizer.style.opacity = '0';
+      inputSizer.style.height = '0';
+      inputSizer.style.width = '0';
+    }
+  }, 0);
+}
+
+// Preload tags for tag select instance
+function preloadTagsForSelect(tagSelectInstance) {
+  setTimeout(() => {
+    if (!tagSelectInstance || !tagSelectInstance.load) return;
+    tagSelectInstance.load('', (options) => {
+      if (options && options.length > 0) {
+        tagSelectInstance.addOptions(options);
+        tagSelectInstance.refreshOptions(false);
+      }
+    });
+  }, 100);
+}
+
+// Handle already initialized tag selector
+function refreshExistingTagSelect(filterTagsInput) {
+  const { tagSelect } = filterTagsInput;
+  hideOriginalSelect(filterTagsInput);
+  ensureTagSelectDisplay(tagSelect);
+  if (typeof tagSelect.refreshOptions === 'function') {
+    tagSelect.refreshOptions(false);
+  }
+}
+
+// Initialize new tag selector
+function initializeNewTagSelect(filterTagsInput) {
+  if (typeof TomSelect === 'undefined') {
+    console.warn('TomSelect not available for filter tag selector');
+    return;
+  }
+
+  if (typeof window.initializeTagSelector !== 'function') {
+    return;
+  }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const selectedTags = urlParams.getAll('tags');
+
+  try {
+    const tagSelectInstance = window.initializeTagSelector(filterTagsInput, {
+      allowCreate: false,
+      selectedTags,
+    });
+
+    if (tagSelectInstance) {
+      hideOriginalSelect(filterTagsInput);
+      ensureTagSelectDisplay(tagSelectInstance);
+      preloadTagsForSelect(tagSelectInstance);
+    }
+  } catch (error) {
+    console.error('Failed to initialize filter tag selector:', error);
+  }
+}
+
+// Initialize tag selector when filter collapse is shown
+function initFilterTagSelector() {
+  // Initialize tag selector if filterTagsInput exists and TomSelect is available
+  function tryInitTagSelector() {
+    const filterTagsInput = document.getElementById('filterTagsInput');
+    if (!filterTagsInput) return;
+
+    // Check if already initialized - if so, just refresh options
+    if (filterTagsInput.tagSelect) {
+      refreshExistingTagSelect(filterTagsInput);
+      return;
+    }
+
+    // Initialize new tag selector
+    initializeNewTagSelect(filterTagsInput);
+  }
+
+  // Try to initialize immediately (in case collapse is already open or element exists)
+  tryInitTagSelector();
+
+  // Also initialize when collapse is shown (when it becomes visible)
+  const filterCollapse = document.getElementById('filterCollapse');
+  if (filterCollapse) {
+    filterCollapse.addEventListener('shown.bs.collapse', () => {
+      // Delay to ensure element is fully visible and DOM is ready
+      setTimeout(() => {
+        tryInitTagSelector();
+        // Force refresh of Tom Select to ensure proper rendering when visible
+        const filterTagsInput = document.getElementById('filterTagsInput');
+        if (filterTagsInput && filterTagsInput.tagSelect) {
+          const { tagSelect } = filterTagsInput;
+          if (typeof tagSelect.refreshOptions === 'function') {
+            tagSelect.refreshOptions(false);
+          }
+        }
+      }, 150);
+    });
+  }
+
+  // Also try after a short delay in case DOM isn't fully ready
+  setTimeout(tryInitTagSelector, 500);
+}
+
 // Main initialization function
 function init() {
   initTooltips();
@@ -180,6 +342,7 @@ function init() {
   initDeleteExpense();
   initPagination();
   initFaviconLoading();
+  initFilterTagSelector();
 }
 
 // Initialize when DOM is ready

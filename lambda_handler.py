@@ -5,17 +5,16 @@ with comprehensive error handling, structured logging, and CloudWatch
 integration for easier debugging.
 """
 
-from collections.abc import Callable
 import json
 import logging
 import os
 import sys
 import traceback
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 # Try to import AWS X-Ray SDK for tracing
 try:
-    from aws_xray_sdk.core import patch_all, xray_recorder  # type: ignore[import-untyped]
+    from aws_xray_sdk.core import patch_all, xray_recorder
 
     XRAY_AVAILABLE = True
     # Patch libraries for X-Ray tracing
@@ -238,14 +237,11 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         segment = None
 
     try:
-        # Import the actual handler from wsgi module
-        from wsgi import application
-
         # Use WSGI adapter directly (Mangum has compatibility issues with Flask)
         # Mangum tries to use Flask as ASGI but Flask is WSGI-only
-        response: dict[str, Any]
+        from wsgi import application
 
-        # Use WSGI adapter (Mangum incompatible with current Flask version)
+        response: dict[str, Any]
         import base64
         from io import BytesIO
 
