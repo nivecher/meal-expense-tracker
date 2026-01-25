@@ -78,14 +78,14 @@ resource "aws_s3_bucket_versioning" "logs" {
 }
 
 # Public access block for logs bucket
-# CloudFront writes logs via bucket policy (service principal), not public ACLs
-# block_public_acls=true is safe and secure - CloudFront access is via bucket policy
+# CloudFront log delivery requires ACLs to be enabled on the bucket.
+# Keep public policies blocked, but allow ACL usage for log delivery.
 resource "aws_s3_bucket_public_access_block" "logs" {
   bucket = aws_s3_bucket.logs.id
 
-  block_public_acls       = true
+  block_public_acls       = false
   block_public_policy     = true
-  ignore_public_acls      = true
+  ignore_public_acls      = false
   restrict_public_buckets = true
 }
 
