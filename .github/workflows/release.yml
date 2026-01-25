@@ -56,11 +56,10 @@ jobs:
             RELEASE_TAG="${{ github.event.inputs.tag }}"
             echo "Using provided tag: ${RELEASE_TAG}"
           else
-            git fetch --tags --force origin main
+            git fetch --tags origin main
             git checkout main
             RELEASE_TAG=$(
-              git tag --merged main --sort=-v:refname \
-                | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              git tag --merged main --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
                 | head -1
             )
             if [ -z "${RELEASE_TAG}" ]; then
@@ -81,7 +80,7 @@ jobs:
             echo "Invalid tag format"
             exit 1
           fi
-          if echo "$VERSION" | grep -qE '[-](alpha|beta|rc)'; then
+          if [[ "$VERSION" == *-alpha* || "$VERSION" == *-beta* || "$VERSION" == *-rc* ]]; then
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
           else
             echo "is_prerelease=false" >> $GITHUB_OUTPUT

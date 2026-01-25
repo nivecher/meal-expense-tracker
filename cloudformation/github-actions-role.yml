@@ -68,6 +68,15 @@ Resources:
               - Effect: Allow
                 Action:
                   # IAM permissions for Lambda execution roles and policy management
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:UpdateRole
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
                   - iam:PassRole
                   - iam:CreatePolicy
                   - iam:DeletePolicy
@@ -87,6 +96,8 @@ Resources:
                   - kms:Describe*
                   - kms:EnableKeyRotation
                   - kms:Get*
+                  - kms:PutKeyPolicy
+                  - kms:UpdateKeyDescription
                   - kms:List*
                   - kms:Decrypt
                   - kms:Encrypt
@@ -155,7 +166,10 @@ Resources:
                   - cloudwatch:ListTagsForResource
                   - cloudwatch:TagResource
                   - cloudwatch:UntagResource
-                  # ACM permissions (read-only - certificates are pre-created)
+                  # ACM permissions
+                  - acm:RequestCertificate
+                  - acm:DeleteCertificate
+                  - acm:AddTagsToCertificate
                   - acm:DescribeCertificate
                   - acm:GetCertificate
                   - acm:ListCertificates
