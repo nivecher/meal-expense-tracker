@@ -21,12 +21,15 @@ Each environment has its own `terraform.tfvars` file with environment-specific s
 - `environment`: The environment name (dev/staging/prod)
 - `aws_region`: The AWS region to deploy to
 - `app_name`: The application name
-- `instance_type`: EC2 instance type
-- `db_instance_class`: RDS instance class
-- `db_allocated_storage`: RDS storage in GB
-- `min_size`/`max_size`/`desired_size`: Auto-scaling group sizes
-- `enable_xray_tracing`: Enable AWS X-Ray tracing
+- `base_domain`: Base domain name (default: `nivecher.com`)
+- `app_subdomain`: App subdomain (default: `meals`)
+- `api_domain_prefix`: API subdomain prefix (default: `api`)
+- `lambda_architecture`: Lambda architecture (`x86_64` or `arm64`)
+- `lambda_memory_size`: Lambda memory in MB
+- `lambda_timeout`: Lambda timeout in seconds
 - `lambda_reserved_concurrency`: Reserved concurrency for Lambda
+- `run_migrations`: Whether to run DB migrations on first deployment
+- `log_level`: Application log level
 - `monthly_budget_amount`: Monthly budget in USD
 
 ## Usage

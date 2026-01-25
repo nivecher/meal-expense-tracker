@@ -51,6 +51,10 @@ major_on_zero = false  # Prevent major bumps from 0.x.x versions
 tag_commit = true
 changelog_file = "CHANGELOG.md"
 
+[tool.semantic_release.commit_parser_options]
+# Treat chore commits as patch bumps to keep version moving for infra updates.
+patch_tags = ["fix", "perf", "chore"]
+
 [tool.setuptools]
 packages = [ "app",]
 include-package-data = true

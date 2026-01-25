@@ -126,7 +126,7 @@ jobs:
         run: |
           set -e
           
-          git fetch --tags --force
+          git fetch --tags
           
           if [ ! -f scripts/determine_version.py ]; then
             echo "❌ Version determination script not found"
@@ -219,7 +219,6 @@ jobs:
           echo "Pushing tag to remote..."
           git push origin "${TAG}" || {
             echo "❌ Failed to push tag to remote"
-            git tag -d "${TAG}"
             exit 1
           }
           
