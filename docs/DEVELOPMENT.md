@@ -158,23 +158,21 @@ docker-compose -f docker-compose.yml logs -f
 The application is deployed as a Docker container image to AWS Lambda via ECR:
 
 ```bash
-
-## Build and deploy Lambda container image
-./scripts/redeploy-lambda.sh
-
-## Or use the full deployment script with migrations
-./scripts/deploy_with_migrations.sh -e dev
-
+## Redeploy dev Lambda container image
+make redeploy-dev
 ```
 
 This will:
 
 1. Build Docker container image using `Dockerfile` (lambda target)
 2. Push image to ECR repository
-3. Update Lambda function with new container image
-4. Sync static files to S3
-5. Invalidate CloudFront cache
-6. Run database migrations (if enabled)
+3. Update the dev Lambda function with the new container image
+
+To deploy Lambda and sync frontend assets in one step:
+
+```bash
+make deploy
+```
 
 ### Deploy Static Files to S3
 
@@ -183,7 +181,7 @@ Static files (CSS, JS, images) are deployed separately to S3 and served via Clou
 ```bash
 
 ## Sync static files to S3
-./scripts/sync_static_to_s3.sh
+make deploy-static
 
 ```
 

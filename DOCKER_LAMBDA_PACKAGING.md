@@ -12,9 +12,6 @@ This document describes the Docker container packaging solution for deploying th
 
 # Push to ECR
 ./scripts/package-docker-lambda.sh --push --arm64
-
-# Or use the integrated script
-./scripts/package.sh --docker --arm64
 ```
 
 ## Summary

@@ -49,7 +49,7 @@
         <link href="{{ url_for('static', filename='css/loading.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/select2-fixes.css') }}" rel="stylesheet" />
         <!-- Google Places CSS removed - not needed for direct API calls -->
-        {% if config.DEBUG %}
+        {% block styles %}{% endblock styles %} {% if config.DEBUG %}
         <script type="module" src="{{ url_for('static', filename='js/utils/debug.js') }}"></script>
         {% endif %}
         <!-- Moved to static/css/main.css -->

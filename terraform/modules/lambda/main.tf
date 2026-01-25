@@ -205,12 +205,13 @@ resource "aws_iam_role_policy_attachment" "lambda_xray" {
 
 # Lambda Function
 resource "aws_lambda_function" "main" {
-  function_name = "${var.app_name}-${var.environment}"
-  role          = aws_iam_role.lambda_role.arn
-  architectures = var.architectures
-  memory_size   = var.memory_size
-  timeout       = var.run_migrations ? max(var.timeout, 300) : var.timeout # Min 5 min for migrations
-  publish       = true
+  function_name                  = "${var.app_name}-${var.environment}"
+  role                           = aws_iam_role.lambda_role.arn
+  architectures                  = var.architectures
+  memory_size                    = var.memory_size
+  timeout                        = var.run_migrations ? max(var.timeout, 300) : var.timeout # Min 5 min for migrations
+  reserved_concurrent_executions = var.reserved_concurrency
+  publish                        = true
 
   # Package type - determines deployment method
   package_type = var.package_type

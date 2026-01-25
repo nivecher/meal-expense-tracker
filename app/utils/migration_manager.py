@@ -10,7 +10,7 @@ from enum import Enum
 import logging
 import os
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from alembic.script import ScriptDirectory
 from flask import Flask, current_app

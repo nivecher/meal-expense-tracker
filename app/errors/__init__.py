@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Tuple, Union, cast
 
 from flask import Blueprint, Flask, Response, jsonify, render_template, request
+from sqlalchemy.exc import PendingRollbackError
 from werkzeug.exceptions import HTTPException
 
 # Initialize Blueprint
@@ -35,6 +36,40 @@ def _is_api_request() -> bool:
     return is_api
 
 
+def _clean_database_session() -> None:
+    """Clean the database session to prevent PendingRollbackError during error rendering.
+
+    This ensures that when error templates are rendered, they won't fail due to
+    database session issues. The session is rolled back and all objects are expunged.
+    """
+    try:
+        from sqlalchemy.exc import InvalidRequestError
+
+        from app.extensions import db
+
+        # Check if session exists and is in a bad state
+        if hasattr(db, "session") and db.session:
+            try:
+                # Try to rollback if there's a pending rollback
+                if db.session.is_active:
+                    db.session.rollback()
+            except (PendingRollbackError, InvalidRequestError):
+                # Session is already in a bad state, force rollback
+                try:
+                    db.session.rollback()
+                except Exception:  # nosec B110
+                    pass  # Ignore errors during cleanup
+
+            # Expunge all objects to clear the session
+            try:
+                db.session.expunge_all()
+            except Exception:  # nosec B110
+                pass  # Ignore errors during cleanup
+    except Exception:  # nosec B110
+        # If we can't clean the session, that's okay - we'll try to render anyway
+        pass
+
+
 def _create_error_response(
     message: str, status_code: int, error_type: str = "error"
 ) -> Response | tuple[Response, int]:
@@ -53,10 +88,39 @@ def _create_error_response(
         response.status_code = status_code
         return cast(Response, response)
 
+    # Clean database session before rendering to prevent PendingRollbackError
+    _clean_database_session()
+
     # For web requests, render an error template
     # Flask accepts (str, int) tuples as responses, which it converts to Response
-    template_response = render_template("errors/error.html", message=message, status_code=status_code)
-    return cast(tuple[Response, int], (template_response, status_code))
+    try:
+        template_response = render_template("errors/error.html", message=message, status_code=status_code)
+        return cast(tuple[Response, int], (template_response, status_code))
+    except Exception as render_error:
+        # If template rendering fails (e.g., due to database issues), return a simple HTML response
+        from flask import current_app
+
+        current_app.logger.error(f"Failed to render error template: {str(render_error)}", exc_info=True)
+        # Return a simple HTML error page without template dependencies
+        simple_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>{status_code} - Error</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <div style="text-align: center; padding: 50px;">
+        <h1>{status_code}</h1>
+        <h2>An Error Occurred</h2>
+        <p>{message}</p>
+        <p>We're sorry, but something went wrong. Please try again later.</p>
+        <a href="/">Go to Homepage</a>
+    </div>
+</body>
+</html>"""
+        response = Response(simple_html, status=status_code, mimetype="text/html")
+        return cast(Response, response)
 
 
 @bp.app_errorhandler(404)
@@ -89,7 +153,16 @@ def handle_exception(error: Exception) -> Response | tuple[Response, int]:
 
     current_app.logger.error(f"Unhandled exception: {str(error)}", exc_info=True)
 
-    return _create_error_response("An unexpected error occurred", 500)
+    # Clean database session before creating error response
+    _clean_database_session()
+
+    # Determine error message based on exception type
+    if isinstance(error, PendingRollbackError):
+        error_message = "A database error occurred. Please try again."
+    else:
+        error_message = "An unexpected error occurred"
+
+    return _create_error_response(error_message, 500)
 
 
 @bp.app_errorhandler(HTTPException)

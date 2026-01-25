@@ -19,7 +19,10 @@ set size_class = size_classes.get(size, 'avatar-md') %} {% set size_pixels = siz
         data-email="{{ user.email }}"
         data-initials="{{ user.get_initials() }}"
         data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
-        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        onerror="
+            this.style.display = 'none';
+            this.nextElementSibling.style.display = 'flex';
+        " />
     <div
         class="avatar-initials {{ size_class }}"
         style="display: none; width: {{ size_pixels }}px; height: {{ size_pixels }}px;">
@@ -52,7 +55,10 @@ size_px = { 'sm': 24, 'md': 32, 'lg': 48, 'xl': 64 } %} {% set size_pixels = siz
         data-email="{{ user.email }}"
         data-initials="{{ user.get_initials() }}"
         data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
-        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        onerror="
+            this.style.display = 'none';
+            this.nextElementSibling.style.display = 'flex';
+        " />
     <div class="avatar-initials" style="display: none; width: {{ size_pixels }}px; height: {{ size_pixels }}px;">
         {{ user.get_initials() }}
     </div>
@@ -73,7 +79,10 @@ User object class: Additional CSS classes #}
         data-email="{{ user.email }}"
         data-initials="{{ user.get_initials() }}"
         data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
-        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        onerror="
+            this.style.display = 'none';
+            this.nextElementSibling.style.display = 'flex';
+        " />
     <div class="avatar-initials avatar-md" style="display: none; width: 36px; height: 36px">
         {{ user.get_initials() }}
     </div>
@@ -99,7 +108,10 @@ Args: user: User object class: Additional CSS classes #}
         data-email="{{ user.email }}"
         data-initials="{{ user.get_initials() }}"
         data-default-src="{{ url_for('static', filename='img/default-avatar.svg') }}"
-        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        onerror="
+            this.style.display = 'none';
+            this.nextElementSibling.style.display = 'flex';
+        " />
     <div class="avatar-initials avatar-md" style="display: none; width: 32px; height: 32px">
         {{ user.get_initials() }}
     </div>

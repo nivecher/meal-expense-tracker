@@ -132,6 +132,40 @@ def _get_database_uri_fallback() -> str:
     return "sqlite:///:memory:"
 
 
+def _get_int_env(name: str, default: int, min_value: int, max_value: int | None = None) -> int:
+    """Get a bounded integer from environment variables."""
+    raw_value = os.environ.get(name)
+    if not raw_value:
+        return default
+
+    try:
+        value = int(raw_value)
+    except ValueError:
+        logger.warning("Invalid %s value '%s', using %s", name, raw_value, default)
+        return default
+
+    if value < min_value:
+        logger.warning("%s below minimum %s, using %s", name, min_value, default)
+        return default
+
+    if max_value is not None and value > max_value:
+        logger.warning("%s above maximum %s, using %s", name, max_value, default)
+        return default
+
+    return value
+
+
+def _get_lambda_engine_options() -> dict[str, int | bool]:
+    """Get engine options tuned for Lambda and Supabase session pooling."""
+    return {
+        "pool_pre_ping": True,
+        "pool_recycle": _get_int_env("DB_POOL_RECYCLE", 300, 60, 3600),
+        "pool_size": _get_int_env("DB_POOL_SIZE", 1, 1, 10),
+        "max_overflow": _get_int_env("DB_MAX_OVERFLOW", 0, 0, 10),
+        "pool_timeout": _get_int_env("DB_POOL_TIMEOUT", 5, 1, 60),
+    }
+
+
 def _handle_lambda_with_env_url(db_url: str) -> str:
     """Handle database URI in Lambda environment when DATABASE_URL exists."""
     try:
@@ -212,12 +246,7 @@ def init_database(app: Flask) -> None:
             db_uri = _get_lambda_database_uri()
             app.config["SQLALCHEMY_DATABASE_URI"] = db_uri
             app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-                "pool_pre_ping": True,
-                "pool_recycle": 300,  # Recycle connections after 5 minutes
-                "pool_size": 2,  # Reduced for Supabase free tier limits
-                "max_overflow": 0,  # No overflow allowed on Supabase
-            }
+            app.config["SQLALCHEMY_ENGINE_OPTIONS"] = _get_lambda_engine_options()
             # Initialize SQLAlchemy with the app
             db.init_app(app)
             logger.info("Database configured for Lambda with deferred initialization")

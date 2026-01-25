@@ -8,7 +8,6 @@ This directory contains the configuration for different deployment environments 
 environments/
 ├── dev/
 │   ├── backend.hcl        # Backend configuration for dev
-│   ├── main.tf            # Main configuration for dev
 │   └── terraform.tfvars   # Variable overrides for dev
 ├── staging/               # Same structure as dev
 └── prod/                  # Same structure as dev
@@ -27,6 +26,7 @@ Each environment has its own `terraform.tfvars` file with environment-specific s
 - `db_allocated_storage`: RDS storage in GB
 - `min_size`/`max_size`/`desired_size`: Auto-scaling group sizes
 - `enable_xray_tracing`: Enable AWS X-Ray tracing
+- `lambda_reserved_concurrency`: Reserved concurrency for Lambda
 - `monthly_budget_amount`: Monthly budget in USD
 
 ## Usage

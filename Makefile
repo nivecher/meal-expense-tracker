@@ -23,7 +23,7 @@ PYTHON = ./venv/bin/python3
 PIP = ./venv/bin/pip3
 
 # Parallel execution safety for critical operations
-.NOTPARALLEL: docker-rebuild tf-apply tf-destroy deploy-prod deploy-staging
+.NOTPARALLEL: docker-rebuild tf-apply tf-destroy
 
 # Python settings
 PYTHONPATH = $(shell pwd)
@@ -148,12 +148,9 @@ help:  ## Show this help message
 	@echo "  \033[1mmake tf-validate\033[0m    Validate Terraform configuration"
 
 	@echo "\n\033[1mDeployment Pipeline:\033[0m"
-	@echo "  \033[1mmake package\033[0m         ⚡ Lambda package (app only)"
-	@echo "  \033[1mmake package-layer\033[0m   ⚡ Lambda layer (architecture-aware)"
-	@echo "  \033[1mmake package-complete\033[0m ⚡ Complete package (app + layer)"
-	@echo "  \033[1mmake deploy-dev\033[0m      Deploy to development environment"
-	@echo "  \033[1mmake deploy-staging\033[0m  Deploy to staging environment"
-	@echo "  \033[1mmake deploy-prod\033[0m     Deploy to production environment"
+	@echo "  \033[1mmake deploy\033[0m         Deploy dev (Lambda + frontend sync)"
+	@echo "  \033[1mmake deploy-static\033[0m  Sync frontend assets to S3"
+	@echo "  \033[1mmake redeploy-dev\033[0m    Redeploy dev Lambda (container)"
 	@echo "  \033[1mmake release-staging\033[0m Release to staging (tag-based)"
 	@echo "  \033[1mmake release-prod\033[0m    Release to production (tag-based)"
 
@@ -298,6 +295,12 @@ lint-toml: check-env
 	@$(PYTHON) -c "import tomllib; import glob; [tomllib.loads(open(f, 'r').read()) for f in glob.glob('**/*.toml', recursive=True) if not any(x in f for x in ['venv', 'node_modules', '.git'])]" 2>/dev/null || (echo "\033[1;31m❌ TOML validation failed\033[0m"; exit 1)
 
 ## Terraform formatter check
+.PHONY: lint-commits
+lint-commits: check-npm
+	@echo "\n\033[1m=== Validating Conventional Commit Messages ===\033[0m"
+	@git fetch origin main 2>/dev/null || true
+	@npx commitlint --from origin/main --to HEAD --verbose || (echo "\033[1;31m❌ Commit message validation failed\033[0m"; exit 1)
+
 .PHONY: lint-terraform-fmt
 lint-terraform-fmt:
 	@echo "\n\033[1m=== Running Terraform Format Check ===\033[0m"
@@ -1195,38 +1198,23 @@ validate-tf-config:
 # Deployment
 # =============================================================================
 
-## Deploy to dev environment
-.PHONY: deploy-dev
-deploy-dev: validate-env check-lambda-package
-	@echo "\033[1m🚀 Deploying to dev environment...\033[0m"
-	@./scripts/deploy_lambda.sh \
-	  --function "$(LAMBDA_FUNCTION_NAME)-dev" \
-	  --env dev \
-	  --no-package || (echo "\033[1;31m❌ Dev deployment failed\033[0m"; exit 1)
-	@echo "\033[1;32m✅ Dev deployment completed successfully\033[0m"
+## Redeploy dev Lambda (container image)
+.PHONY: redeploy-dev
+redeploy-dev:
+	@./scripts/redeploy-lambda.sh
 
-## Deploy to staging environment
-.PHONY: deploy-staging
-deploy-staging: validate-env check-lambda-package
-	@echo "\033[1m🚀 Deploying to staging environment...\033[0m"
-	@read -p "This will deploy to the staging environment. Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "\033[1;33m⚠️  Aborting...\033[0m"; exit 1)
-	@./scripts/deploy_lambda.sh \
-	  --function "$(LAMBDA_FUNCTION_NAME)-staging" \
-	  --env staging \
-	  --no-package || (echo "\033[1;31m❌ Staging deployment failed\033[0m"; exit 1)
-	@echo "\033[1;32m✅ Staging deployment completed successfully\033[0m"
+## Deploy dev Lambda + sync frontend assets to S3
+.PHONY: deploy
+deploy: redeploy-dev deploy-static
 
-## Deploy to production environment
-.PHONY: deploy-prod
-deploy-prod: validate-env check-lambda-package
-	@echo "\033[1;31m⚠️  WARNING: You are about to deploy to PRODUCTION!\033[0m"
-	@echo "\033[1;31m⚠️  This will apply all pending changes to your production environment.\033[0m"
-	@read -p "Type 'production' to continue: " confirm && [ "$$confirm" = "production" ]
-	@./scripts/deploy_lambda.sh \
-	  --function "$(LAMBDA_FUNCTION_NAME)" \
-	  --env prod \
-	  --no-package || (echo "\033[1;31m❌ Production deployment failed\033[0m"; exit 1)
-	@echo "\033[1;32m✅ Production deployment completed successfully\033[0m"
+## Sync frontend assets to S3
+.PHONY: deploy-static
+deploy-static:
+	@if [ -f scripts/sync_static_to_s3.sh ]; then \
+		./scripts/sync_static_to_s3.sh; \
+	else \
+		echo "\033[1;33m⚠️  scripts/sync_static_to_s3.sh not found, skipping frontend sync\033[0m"; \
+	fi
 
 ## Release to staging environment (tag-based)
 .PHONY: release-staging
@@ -1253,106 +1241,6 @@ release-prod: validate-env
 	@read -p "Type 'production' to continue: " confirm && [ "$$confirm" = "production" ]
 	@gh workflow run release.yml --ref $(TAG) --field environment=prod --field tag=$(TAG)
 	@echo "\033[1;32m✅ Production release workflow triggered for tag $(TAG)\033[0m"
-
-## Check Lambda package exists
-.PHONY: check-lambda-package
-check-lambda-package:
-	@ARCHITECTURE="$${LAMBDA_ARCHITECTURE:-arm64}"; \
-	if [ ! -f "dist/$$ARCHITECTURE/app/app-$$ARCHITECTURE.zip" ]; then \
-		echo "\033[1;33m⚠️  Lambda package (dist/$$ARCHITECTURE/app/app-$$ARCHITECTURE.zip) not found.\033[0m"; \
-		echo -n "Run 'make package' to create it now? [y/N] "; \
-		read -r -n 1; \
-		if [[ "$$REPLY" =~ ^[Yy]$$ ]]; then \
-			echo ""; \
-			$(MAKE) package; \
-			if [ ! -f "dist/$$ARCHITECTURE/app/app-$$ARCHITECTURE.zip" ]; then \
-				echo "\033[1;31m❌ Package creation failed. Please fix the issues and try again.\033[0m"; \
-				exit 1; \
-			fi; \
-		else \
-			echo "\n\033[1;31m❌ Aborting: Lambda package is required for deployment.\033[0m"; \
-			exit 1; \
-		fi; \
-	fi
-
-## Package Lambda deployment (architecture-aware)
-.PHONY: package
-package:
-	@echo "\033[1m⚡ Creating Lambda deployment package...\033[0m"
-	@if [ ! -x "$(shell which zip)" ]; then \
-		echo "Error: 'zip' command is required but not installed."; \
-		exit 1; \
-	fi
-	@chmod +x scripts/package.sh
-	@if ! ./scripts/package.sh; then \
-		echo "\033[1;31m❌ Failed to create Lambda package\033[0m"; \
-		exit 1; \
-	fi
-	@echo "\033[1;32m✅ Lambda package created\033[0m"
-
-## Package Lambda deployment (alias for package)
-.PHONY: package-lambda
-package-lambda: package
-
-## Lambda layer package (architecture-aware with Docker fallback)
-.PHONY: package-layer
-package-layer:
-	@echo "\033[1m⚡ Creating Lambda layer package...\033[0m"
-	@if [ ! -x "$(shell which zip)" ]; then \
-		echo "Error: 'zip' command is required but not installed."; \
-		exit 1; \
-	fi
-	@chmod +x scripts/package.sh
-	@if ! ./scripts/package.sh -l; then \
-		echo "\033[1;31m❌ Failed to create Lambda layer package\033[0m"; \
-		exit 1; \
-	fi
-	@echo "\033[1;32m✅ Lambda layer package created\033[0m"
-
-## Complete Lambda package (app + layer, architecture-aware)
-.PHONY: package-complete
-package-complete:
-	@echo "\033[1m⚡ Creating complete Lambda package (app + layer)...\033[0m"
-	@if [ ! -x "$(shell which zip)" ]; then \
-		echo "Error: 'zip' command is required but not installed."; \
-		exit 1; \
-	fi
-	@chmod +x scripts/package.sh
-	@if ! ./scripts/package.sh -b; then \
-		echo "\033[1;31m❌ Failed to create complete Lambda package\033[0m"; \
-		exit 1; \
-	fi
-	@echo "\033[1;32m✅ Complete Lambda package created\033[0m"
-
-## Layer package for x86_64 (current platform)
-.PHONY: package-layer-x86
-package-layer-x86:
-	@echo "\033[1m⚡ Creating x86_64 Lambda layer package...\033[0m"
-	@if [ ! -x "$(shell which zip)" ]; then \
-		echo "Error: 'zip' command is required but not installed."; \
-		exit 1; \
-	fi
-	@chmod +x scripts/package.sh
-	@if ! ./scripts/package.sh -l --x86_64; then \
-		echo "\033[1;31m❌ Failed to create x86_64 layer package\033[0m"; \
-		exit 1; \
-	fi
-	@echo "\033[1;32m✅ x86_64 layer package created\033[0m"
-
-## Layer package for ARM64 (with Docker fallback for cross-architecture)
-.PHONY: package-layer-arm
-package-layer-arm:
-	@echo "\033[1m⚡ Creating ARM64 Lambda layer package...\033[0m"
-	@if [ ! -x "$(shell which zip)" ]; then \
-		echo "Error: 'zip' command is required but not installed."; \
-		exit 1; \
-	fi
-	@chmod +x scripts/package.sh
-	@if ! ./scripts/package.sh -l --arm64; then \
-		echo "\033[1;31m❌ Failed to create ARM64 layer package\033[0m"; \
-		exit 1; \
-	fi
-	@echo "\033[1;32m✅ ARM64 layer package created\033[0m"
 
 # =============================================================================
 # Utilities

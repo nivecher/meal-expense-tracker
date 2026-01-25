@@ -117,10 +117,17 @@ This will:
    - For local: Copy database file
 
 4. **Check migration status regularly**
+
    ```bash
    flask db current
    python scripts/remote_admin.py run-migrations --dry-run
    ```
+
+5. **Enable RLS for new public tables**
+
+   Any new table in the `public` schema should have RLS enabled and explicit
+   policies added in the same migration. This keeps Supabase security advisors
+   clean and prevents unintended data exposure.
 
 ## Migration Files
 

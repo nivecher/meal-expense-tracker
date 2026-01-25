@@ -8,8 +8,9 @@ This project follows a **minimalist approach** to GitHub Actions:
 
 - **Prefer Native Actions**: Use official GitHub actions over custom wrappers
 - **Inline Over Abstraction**: Keep logic visible and maintainable
-- **Single Composite Action**: Only `setup-python-env` due to high reuse and project-specific logic
-- **No Reusable Workflows**: Avoid cluttering the Actions tab with internal workflows
+- **Composite Actions**: `setup-python-env`, `generate-version`, `generate-backend-hcl` for shared logic
+- **Build Once, Deploy Many**: A single build (per commit on `main`) produces the GHCR image; deploy reuses it via `image_tag` without rebuilding
+- **No Reusable Workflows**: Use `workflow_run` and `workflow_dispatch` for sequencing; no `workflow_call`
 
 ### Why This Approach?
 
@@ -54,39 +55,78 @@ gh workflow run ci.yml
 
 ---
 
-### 2. Deploy (`deploy.yml`)
+### 2. Tag (`tag.yml`)
 
-**Trigger**: 
-- `workflow_run` after successful CI on `main`
-- Manual via `workflow_dispatch`
+**Trigger**:
+- `workflow_run` after successful **CI** on `main` (main-only)
+- Manual via `workflow_dispatch` (main branch only)
 
 **Jobs**:
-- **validate**: Validate environment and version
-- **build**: Build and push Docker image
-- **deploy**: Deploy infrastructure and Lambda function
-- **notify**: Send deployment notifications
+- **check-ci-and-branch**: Ensure CI succeeded and branch is `main`
+- **create-tag**: Run `determine_version`, create and push git tag when bump needed
 
 **Key Features**:
-- Multi-environment support (dev, staging, prod)
-- AWS OIDC authentication (no long-lived credentials)
-- Terraform infrastructure management
-- Docker multi-platform builds (amd64/arm64)
-- Automatic rollback on failure
-- Health check validation
-- Deployment summaries
+- **Tag-then-build** (recommended): Tag runs after CI; Build runs after Tag. Git tag exists before image.
+- Tags only on `main`; creates tag only when `BUMP_NEEDED` (conventional commits). Use `force: true` to tag anyway.
+- Semantic version generation; duplicate tag protection; changelog preview in summary
 
 **Usage**:
 ```bash
-# Deploy to staging
-gh workflow run deploy.yml -f environment=staging
-
-# Deploy to prod
-gh workflow run deploy.yml -f environment=prod
+# Automatically runs after CI on main
+# Manual (from main only):
+gh workflow run tag.yml
+# Force tag even if no bump:
+gh workflow run tag.yml -f force=true
 ```
 
 ---
 
-### 3. Test (`test.yml`)
+### 3. Build (`build.yml`)
+
+**Trigger**: `workflow_run` after **Tag** completes (success or no-op)
+
+**Jobs**:
+- **build**: Determine version, build and push Docker image (lambda, linux/amd64) to GHCR, upload SBOM
+
+**Key Features**:
+- Runs after every Tag run (tag created or not). Image tagged with version and short SHA.
+- Uses `determine_version` (same logic as Tag); SBOM and provenance attestations
+
+---
+
+### 4. Deploy (`deploy.yml`)
+
+**Trigger**:
+- `workflow_run` after successful **Build** on `main` (deploys to **dev**, reuses built image)
+- Manual via `workflow_dispatch`
+
+**Jobs**:
+- **validate**: Resolve environment and `image_tag`; set `skip_build` when image already exists
+- **build**: Build and push Docker image (only when `skip_build` is false, e.g. manual deploy without `image_tag`)
+- **deploy**: Deploy infrastructure and Lambda; pull image from GHCR by `image_tag`
+- **notify**: Deployment status
+
+**Key Features**:
+- Deploy-only when triggered by Build or when `image_tag` is provided (build-once, deploy-many)
+- Multi-environment support (dev, staging, prod)
+- AWS OIDC authentication (no long-lived credentials)
+- Terraform infrastructure management
+- Automatic rollback on failure
+- Health check validation
+
+**Usage**:
+```bash
+# Deploy to dev (runs automatically after Build on main)
+# Deploy to staging with a specific version
+gh workflow run deploy.yml -f environment=staging -f image_tag=1.2.3
+
+# Deploy to prod
+gh workflow run deploy.yml -f environment=prod -f image_tag=1.2.3
+```
+
+---
+
+### 5. Test (`test.yml`)
 
 **Trigger**: 
 - `workflow_run` after successful deployment
@@ -117,61 +157,31 @@ gh workflow run test.yml -f test_suite=e2e
 
 ---
 
-### 4. Tag (`tag.yml`)
+### 6. Release (`release.yml`)
 
-**Trigger**: 
-- `workflow_run` after successful CI on `main`
+**Trigger**:
+- Push of version tags (`v*`)
 - Manual via `workflow_dispatch`
 
 **Jobs**:
-- **check-ci**: Validate CI passed
-- **create-tag**: Create and push version tag
+- **validate-tag**: Resolve tag (from push, input, or latest `vX.Y.Z` on main by semver)
+- **verify-image**: Ensure GHCR image exists for that version (no rebuild)
+- **create-release**: Create GitHub release and changelog
+- **trigger-staging-deploy**: Dispatch `deploy.yml` with `environment=staging` and `image_tag` (manual-only staging deploy)
+- **notify**: Release status
 
 **Key Features**:
-- Semantic version generation
-- Duplicate tag protection
-- Atomic tagging operations
-- Tag verification
-- Changelog preview in summary
+- No reusable workflows; no duplicate build (uses existing image)
+- Optional tag input; defaults to latest semver tag on main when omitted
+- Release creates the GitHub release; then triggers staging deploy via API
 
 **Usage**:
 ```bash
-# Automatically runs after CI
-# To create tag manually:
-gh workflow run tag.yml
-```
+# Use latest vX.Y.Z on main
+gh workflow run release.yml
 
----
-
-### 5. Release (`release.yml`)
-
-**Trigger**: 
-- Push of version tags (v*.*.*)
-- Manual via `workflow_dispatch`
-
-**Jobs**:
-- **validate-tag**: Validate release tag format
-- **quality-gate**: Reuse CI workflow for validation
-- **build-release**: Build and push release Docker image
-- **create-release**: Create GitHub release with SBOM
-- **deploy-staging**: Conditional staging deployment
-- **deploy-prod**: Conditional production deployment (manual approval)
-
-**Key Features**:
-- Reuses CI workflow (no duplication!)
-- SBOM generation and attachment
-- Automatic changelog generation
-- Prerelease detection
-- Multi-environment deployment support
-- Manual production deployment approval
-
-**Usage**:
-```bash
-# Create release from tag
+# Create release from specific tag
 gh workflow run release.yml -f tag=v1.2.3
-
-# Create prerelease
-gh workflow run release.yml -f tag=v1.2.3-beta.1
 ```
 
 ---
@@ -241,10 +251,10 @@ gh workflow run release.yml -f tag=v1.2.3-beta.1
 
 ## Secrets Required
 
-| Secret | Description | Usage |
-|--------|-------------|-------|
-| `AWS_ROLE_ARN` | AWS IAM role ARN for OIDC | Deploy, CI (Terraform) |
-| `GITHUB_TOKEN` | Auto-provided by GitHub | All workflows |
+| Secret             | Description                     | Usage                 |
+| ------------------ | ------------------------------- | --------------------- |
+| `AWS_ROLE_ARN`     | AWS IAM role ARN for OIDC       | Deploy, CI (Terraform)|
+| `GITHUB_TOKEN`     | Auto-provided by GitHub         | All workflows         |
 
 ---
 
@@ -298,27 +308,29 @@ act --dryrun
       │
       ▼
 ┌─────────────┐
-│   CI.yml    │◄── Lint, Test, Security, Terraform
+│   CI.yml    │  Lint, Test, Security, Terraform
 └─────┬───────┘
       │ (on main)
       ▼
 ┌─────────────┐
-│  Tag.yml    │◄── Create version tag
+│  Tag.yml    │  Create version tag (main only; bump when conventional commits)
 └─────┬───────┘
-      │ (tag push)
+      │
       ▼
-┌──────────────┐
-│ Release.yml  │◄── Build release, create GitHub release
-└─────┬────────┘
+┌─────────────┐
+│ Build.yml   │  Build image → push GHCR
+└─────┬───────┘
       │
       ▼
 ┌──────────────┐
-│  Deploy.yml  │◄── Deploy to environments
+│ Deploy.yml   │  Dev deploy (reuses image)
 └─────┬────────┘
       │
+      │  Manual: Release.yml → create release → trigger deploy (staging)
+      │          deploy.yml dispatch (staging/prod + image_tag)
       ▼
 ┌──────────────┐
-│   Test.yml   │◄── Run smoke/E2E tests
+│   Test.yml   │  Smoke/E2E
 └──────────────┘
 ```
 
@@ -390,6 +402,7 @@ When modifying workflows:
 
 ---
 
-**Last Updated**: December 15, 2025  
-**Simplified**: Reduced from 4 composite actions + 4 reusable workflows to 1 composite action + native actions  
-**Maintainability**: ⬆️ Significantly improved
+**Last Updated**: January 2026  
+**Flow**: CI → Tag (main only) → Build → Deploy (dev). Tag-then-build; tag created only when bump needed (conventional commits). Release (manual) creates release and triggers staging deploy. Build-once, deploy-many; no reusable workflows.
+
+**Standards**: Commit messages enforced via [commitlint](https://commitlint.js.org/) (pre-commit `commit-msg` hook + CI). Versioning via [Python-semantic-release](https://python-semantic-release.readthedocs.io/); `scripts/determine_version.py` is a thin wrapper that outputs `NEXT_VERSION` / `NEW_TAG` / `BUMP_NEEDED` for workflows.

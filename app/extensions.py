@@ -244,6 +244,9 @@ def load_user(user_id: str) -> Any | None:
 
     Only returns active users. Inactive users are treated as non-existent
     to prevent access after account deactivation.
+
+    Gracefully handles database errors to prevent cascading failures during
+    error page rendering (e.g., when database connection pool is exhausted).
     """
     # Lazy import to avoid circular imports
     from app.auth.models import User
@@ -252,7 +255,12 @@ def load_user(user_id: str) -> Any | None:
         if not user_id or not user_id.isdigit():
             return None
 
-        user_id_int = int(user_id)
+        # Convert user_id to int - catch conversion errors separately
+        try:
+            user_id_int = int(user_id)
+        except (ValueError, TypeError):
+            return None
+
         user = db.session.get(User, user_id_int)
 
         # Only return the user if they exist and are active
@@ -260,5 +268,21 @@ def load_user(user_id: str) -> Any | None:
             return user
 
         return None
-    except (ValueError, TypeError):
+    except Exception as db_error:
+        # Handle all database-related errors gracefully
+        # This prevents cascading failures when rendering error pages during DB outages
+        from sqlalchemy.exc import DBAPIError, OperationalError, ProgrammingError, SQLAlchemyError
+
+        if isinstance(db_error, (SQLAlchemyError, DBAPIError, OperationalError, ProgrammingError)):
+            logger.warning(
+                f"Database error while loading user {user_id}: {str(db_error)}",
+                exc_info=False,  # Don't log full traceback to avoid noise
+            )
+        else:
+            # Log unexpected errors with full traceback
+            logger.warning(
+                f"Unexpected error while loading user {user_id}: {str(db_error)}",
+                exc_info=True,
+            )
+        # Return None to allow error pages to render without user context
         return None

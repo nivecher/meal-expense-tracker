@@ -148,3 +148,66 @@ class TestExtensionsModule:
                     assert result is None
                     # Should not call db.session.get for invalid IDs
                     mock_db.session.get.assert_not_called()
+
+    def test_load_user_database_error(self, app) -> None:
+        """Test user loading gracefully handles database errors."""
+        with app.app_context():
+            with patch("app.extensions.db") as mock_db:
+                with patch("app.extensions.logger") as mock_logger:
+                    with patch("app.auth.models.User"):
+                        # Simulate a database error (e.g., connection pool exhausted)
+                        from sqlalchemy.exc import OperationalError
+
+                        mock_db.session.get.side_effect = OperationalError(
+                            "MaxClientsInSessionMode: max clients reached",
+                            None,
+                            None,
+                        )
+
+                        result = load_user("123")
+
+                        # Should return None instead of raising exception
+                        assert result is None
+                        # Should log warning without full traceback
+                        mock_logger.warning.assert_called_once()
+                        call_args = mock_logger.warning.call_args
+                        assert "Database error while loading user" in call_args[0][0]
+                        assert call_args[1]["exc_info"] is False  # No full traceback
+
+    def test_load_user_programming_error(self, app) -> None:
+        """Test user loading handles ProgrammingError (e.g., pool exhausted)."""
+        with app.app_context():
+            with patch("app.extensions.db") as mock_db:
+                with patch("app.extensions.logger") as mock_logger:
+                    with patch("app.auth.models.User"):
+                        from sqlalchemy.exc import ProgrammingError
+
+                        mock_db.session.get.side_effect = ProgrammingError(
+                            "MaxClientsInSessionMode: max clients reached",
+                            None,
+                            None,
+                        )
+
+                        result = load_user("123")
+
+                        assert result is None
+                        mock_logger.warning.assert_called_once()
+
+    def test_load_user_unexpected_error(self, app) -> None:
+        """Test user loading handles unexpected errors with full traceback."""
+        with app.app_context():
+            with patch("app.extensions.db") as mock_db:
+                with patch("app.extensions.logger") as mock_logger:
+                    with patch("app.auth.models.User"):
+                        # Simulate an unexpected error (not a database error)
+                        mock_db.session.get.side_effect = ValueError("Unexpected error")
+
+                        result = load_user("123")
+
+                        # Should return None
+                        assert result is None
+                        # Should log with full traceback for unexpected errors
+                        mock_logger.warning.assert_called_once()
+                        call_args = mock_logger.warning.call_args
+                        assert "Unexpected error while loading user" in call_args[0][0]
+                        assert call_args[1]["exc_info"] is True  # Full traceback

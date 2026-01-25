@@ -348,8 +348,8 @@ resource "aws_cloudfront_distribution" "main" {
   }
 
   # Origin 2: API Gateway for dynamic content
-  # Use the API Gateway custom domain target domain name (AWS-provided regional domain)
-  # This avoids DNS resolution issues and works directly with CloudFront
+  # Use API Gateway custom domain's target domain (AWS-provided regional domain)
+  # This is the recommended approach - stable and optimized for custom domains
   origin {
     domain_name = var.api_gateway_custom_domain
     origin_id   = "API-Gateway"
@@ -404,6 +404,33 @@ resource "aws_cloudfront_distribution" "main" {
     response_code         = 404
     response_page_path    = "/index.html"
     error_caching_min_ttl = 300
+  }
+
+  # Custom error responses for 5xx errors
+  # These pass through origin responses without caching to ensure users see
+  # the backend's error pages (HTML for web, JSON for API) rather than cached errors
+  custom_error_response {
+    error_code            = 500
+    response_code         = 500
+    error_caching_min_ttl = 0
+  }
+
+  custom_error_response {
+    error_code            = 502
+    response_code         = 502
+    error_caching_min_ttl = 0
+  }
+
+  custom_error_response {
+    error_code            = 503
+    response_code         = 503
+    error_caching_min_ttl = 0
+  }
+
+  custom_error_response {
+    error_code            = 504
+    response_code         = 504
+    error_caching_min_ttl = 0
   }
 
   restrictions {

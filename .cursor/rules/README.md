@@ -57,7 +57,7 @@
 | **Web Code**         | `web-patterns.mdc`                                             | JavaScript, HTML, Python Flask          |
 | **Business Logic**   | `project-specific.mdc`                                         | Restaurant/expense specific patterns    |
 | **Project Specs**    | `app-requirements.mdc`, `feature-specs.mdc`, `ui-ux-specs.mdc` | Requirements and design                 |
-| **Documentation**    | `markdown-generation.mdc`                                        | Markdown linting and formatting         |
+| **Documentation**    | `markdown-generation.mdc`                                      | Markdown linting and formatting         |
 
 ## ✅ Radical Simplification
 

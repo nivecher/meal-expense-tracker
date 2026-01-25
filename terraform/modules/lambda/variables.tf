@@ -60,6 +60,12 @@ variable "timeout" {
   default     = 30
 }
 
+variable "reserved_concurrency" {
+  description = "Reserved concurrency for the Lambda function (null = unreserved)"
+  type        = number
+  default     = null
+}
+
 variable "run_migrations" {
   description = "Whether to run database migrations on Lambda startup"
   type        = bool

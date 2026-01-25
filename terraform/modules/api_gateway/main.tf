@@ -1,42 +1,10 @@
 
 
-# Look up the existing Route53 zone if domain_name is provided
-data "aws_route53_zone" "main" {
-  name         = var.domain_name
-  private_zone = false
-}
-
-# Look up the existing ACM certificate in us-east-1 if cert_domain is provided
-data "aws_acm_certificate" "main" {
-  domain      = var.cert_domain
-  statuses    = ["ISSUED"]
-  key_types   = ["RSA_2048"]
-  types       = ["AMAZON_ISSUED"]
-  most_recent = true # Use the most recently issued certificate
-
-  # We need to use a provider configured for us-east-1 for ACM certificates used by API Gateway
-  provider = aws.us-east-1
-
-  lifecycle {
-    # Ensure we don't try to create the certificate if it doesn't exist
-    postcondition {
-      condition     = self.status == "ISSUED"
-      error_message = "The ACM certificate for domain ${var.cert_domain} is not in ISSUED state."
-    }
-  }
-}
-
-# API Gateway Custom Domain (only if domain_name and certificate are provided)
-locals {
-  # Construct API domain name if not explicitly provided
-  effective_api_domain_name = var.api_domain_name != null ? var.api_domain_name : "${var.api_domain_prefix}.${var.domain_name}"
-}
-
 resource "aws_apigatewayv2_domain_name" "main" {
-  domain_name = local.effective_api_domain_name
+  domain_name = var.api_domain_name
 
   domain_name_configuration {
-    certificate_arn = data.aws_acm_certificate.main.arn
+    certificate_arn = var.certificate_arn
     endpoint_type   = "REGIONAL"
     security_policy = "TLS_1_2"
   }
@@ -50,18 +18,14 @@ resource "aws_apigatewayv2_domain_name" "main" {
   lifecycle {
     # Ensure we have a valid domain name configuration
     precondition {
-      condition     = can(regex("\\.", local.effective_api_domain_name))
-      error_message = "The API domain name '${local.effective_api_domain_name}' is not a valid domain name."
+      condition     = can(regex("\\.", var.api_domain_name))
+      error_message = "The API domain name '${var.api_domain_name}' is not a valid domain name."
     }
 
-    # Ensure the domain name is within the certificate's scope
+    # Ensure certificate ARN is provided
     precondition {
-      condition = var.cert_domain == null || (var.cert_domain != null && (
-        local.effective_api_domain_name == var.cert_domain ||
-        endswith(local.effective_api_domain_name, ".${var.cert_domain}") ||
-        (startswith(var.cert_domain, "*") && endswith(local.effective_api_domain_name, substr(var.cert_domain, 1, length(var.cert_domain) - 1)))
-      ))
-      error_message = "The API domain name '${local.effective_api_domain_name}' is not covered by the certificate domain '${var.cert_domain}'."
+      condition     = var.certificate_arn != null
+      error_message = "certificate_arn must be provided for API Gateway custom domain."
     }
   }
 }
@@ -78,8 +42,8 @@ resource "aws_apigatewayv2_api_mapping" "main" {
 resource "aws_route53_record" "api" {
   count = length(aws_apigatewayv2_domain_name.main) > 0 && var.create_route53_record ? 1 : 0
 
-  zone_id = data.aws_route53_zone.main.zone_id
-  name    = local.effective_api_domain_name
+  zone_id = var.route53_zone_id
+  name    = var.api_domain_name
   type    = "A"
 
   alias {

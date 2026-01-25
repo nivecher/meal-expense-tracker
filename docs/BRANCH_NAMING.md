@@ -79,9 +79,24 @@ feat/add-expense-filtering-v2  # Avoid version numbers
 
 Branch naming is enforced through:
 
-1. **Pre-push hook**: Validates branch names before pushing to remote
-2. **CI workflow**: Checks branch names on pull requests
-3. **Manual validation**: Script available at `scripts/validate_branch.py`
+1. **CI workflow**: Validates branch names on pull requests (`scripts/validate_branch.py`)
+2. **Manual validation**: `python scripts/validate_branch.py <branch-name>`
+
+## Commit Message Enforcement
+
+Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/). We use **[commitlint](https://commitlint.js.org/)** with [@commitlint/config-conventional](https://github.com/conventional-changelog/commitlint/tree/master/@commitlint/config-conventional). Config: [.commitlintrc.cjs](../.commitlintrc.cjs).
+
+- **Format**: `type: description` or `type(scope): description`
+- **Types**: feat, fix, docs, style, refactor, perf, test, chore, ci, build, revert, wip
+- **Merge commits** (`Merge ...`) are allowed and skipped.
+
+Enforcement:
+
+1. **Pre-commit (commit-msg hook)**: Run `pre-commit install --hook-type commit-msg`. Uses commitlint to validate each commit at `git commit`.
+2. **CI**: Validates all commits in PRs and pushes to `main` / `develop` via `npx commitlint --from <base> --to <head>`.
+3. **Local**: `make lint-commits` runs `npx commitlint --from origin/main --to HEAD`.
+
+Only **feat** and **fix** trigger version bumps (via [Python semantic-release](https://python-semantic-release.readthedocs.io/) in CI).
 
 ## Override (Emergency Only)
 

@@ -12,7 +12,24 @@ repos:
       - id: check-xml
       - id: check-merge-conflict
 
-  # 2. Formatting
+  # 2. Conventional commit message (commit-msg) – commitlint
+  # Uses project node_modules so @commitlint/config-conventional is found. Run npm install first.
+  - repo: local
+    hooks:
+      - id: commitlint
+        name: commitlint
+        entry: >
+          sh -c 'if [ -f node_modules/.bin/commitlint ]; then
+            exec node_modules/.bin/commitlint --edit "$@";
+          else
+            echo "Commitlint deps missing. Run: npm install";
+            exit 1;
+          fi' sh
+        language: system
+        stages: [commit-msg]
+        pass_filenames: true
+
+  # 3. Formatting
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -20,37 +37,38 @@ repos:
       - id: trailing-whitespace
         exclude: .*\.(md|mdx|txt|toml|json|yaml|yml)$
 
-  # 3. Security checks
+  # 4. Security checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: detect-private-key
       - id: check-added-large-files
 
-  # 4. Debug checks
+  # 5. Debug checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: debug-statements
 
-  # Python formatting
-  - repo: https://github.com/psf/black
-    rev: 24.10.0
+  # Python lint + format: Ruff (fix) then Black (format). Single hook, fixed order to avoid thrashing.
+  # Matches make format-python: ruff check --fix then black. Run only when Python files change.
+  - repo: local
     hooks:
-      - id: black
-        language_version: python3
-
-  # Python linting, import sorting, and unused code removal (replaces Flake8, isort, autoflake)
-  # Note: Keeping Black for formatting in Phase 1, Ruff formatter will be evaluated in Phase 2
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.8 # Match installed Ruff version
-    hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
+      - id: python-lint
+        name: ruff + black
+        entry: >
+          bash -c 'REPO="$(git rev-parse --show-toplevel)" && cd "$REPO" &&
+          if [ -f "./venv/bin/python3" ]; then PYTHON=./venv/bin/python3;
+          elif command -v python3 >/dev/null 2>&1; then PYTHON=python3;
+          else echo "No Python found"; exit 1; fi &&
+          $PYTHON -m ruff check --fix app tests migrations &&
+          $PYTHON -m black app tests migrations'
+        language: system
+        files: \.py$
 
   # Security scanning
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.6
+    rev: 1.9.3
     hooks:
       - id: bandit
         args: [-c, .bandit, -r]
@@ -91,7 +109,7 @@ repos:
 
   # Markdown linting (pinned to v0.38.0 for Node.js 18 compatibility)
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.38.0
+    rev: v0.47.0
     hooks:
       - id: markdownlint
         args:
@@ -99,11 +117,11 @@ repos:
 
   # Prettier for Markdown/JSON/YAML (auto-formats on commit)
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
+    rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
         additional_dependencies:
-          - prettier@3.3.3
+          - prettier@3.8.1
         files: \.(md|json|ya?ml)$
 
   # HTML linting with prettier (matches make lint-html)
@@ -145,15 +163,15 @@ repos:
         files: ^app/static/css/.*\.css$
         require_serial: true
 
-  # JavaScript linting with eslint (matches make lint-js)
-  # Uses npm script to ensure consistency with make lint
+  # JavaScript linting with eslint (fix then lint; matches make lint-js)
+  # Runs format:js (--fix) then lint:js so fixable issues are resolved before verify
   - repo: local
     hooks:
       - id: eslint
         name: eslint
         entry: >
           sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then
-            npm run lint:js;
+            npm run format:js && npm run lint:js;
           else
             echo Skipping eslint;
             exit 0;
@@ -164,6 +182,6 @@ repos:
 
   # Terraform formatting
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.86.0
+    rev: v1.105.0
     hooks:
       - id: terraform_fmt

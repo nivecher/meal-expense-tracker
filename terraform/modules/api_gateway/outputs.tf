@@ -20,7 +20,7 @@ output "api_stage_arn" {
 
 output "domain_name" {
   description = "The domain name of the API Gateway"
-  value       = length(aws_apigatewayv2_domain_name.main) > 0 ? local.effective_api_domain_name : null
+  value       = length(aws_apigatewayv2_domain_name.main) > 0 ? var.api_domain_name : null
 }
 
 output "domain_zone_id" {
@@ -31,11 +31,6 @@ output "domain_zone_id" {
 output "domain_target_domain_name" {
   description = "The target domain name of the API Gateway domain name"
   value       = try(aws_apigatewayv2_domain_name.main.domain_name_configuration[0].target_domain_name, null)
-}
-
-output "effective_api_domain_name" {
-  description = "The effective API domain name (constructed or provided)"
-  value       = local.effective_api_domain_name
 }
 
 output "api_custom_domain" {
