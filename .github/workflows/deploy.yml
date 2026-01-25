@@ -262,6 +262,17 @@ jobs:
           echo "account-id=${AWS_ACCOUNT_ID}" >> $GITHUB_OUTPUT
           echo "✅ Authenticated to AWS account: ${AWS_ACCOUNT_ID}"
 
+      - name: Set ECR repository info
+        id: ecr_repo
+        run: |
+          AWS_ACCOUNT_ID="${{ steps.aws_account.outputs.account-id }}"
+          ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/meal-expense-tracker-${ENVIRONMENT}-lambda"
+          FUNCTION_NAME="meal-expense-tracker-${ENVIRONMENT}"
+          
+          echo "repository=${ECR_REPO}" >> $GITHUB_OUTPUT
+          echo "function_name=${FUNCTION_NAME}" >> $GITHUB_OUTPUT
+          echo "ECR Repository: ${ECR_REPO}"
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3.1.2
         with:
@@ -291,6 +302,19 @@ jobs:
           cd terraform
           terraform init -reconfigure -backend-config=environments/${ENVIRONMENT}/backend.hcl
           echo "✅ Terraform initialized for environment: ${ENVIRONMENT}"
+
+      - name: Bootstrap ECR repository
+        run: |
+          cd terraform
+          terraform apply -auto-approve \
+            -var-file=environments/${ENVIRONMENT}/terraform.tfvars \
+            -var="environment=${ENVIRONMENT}" \
+            -target=aws_kms_key.main \
+            -target=aws_kms_alias.main \
+            -target=module.ecr \
+            -input=false \
+            -lock=true
+          echo "✅ ECR repository ensured"
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -305,6 +329,27 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to ECR and push image
+        run: |
+          ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
+          
+          aws ecr get-login-password --region ${AWS_REGION} | \
+            docker login --username AWS --password-stdin ${ECR_REPO}
+          
+          docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}:${IMAGE_TAG} || \
+          docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} || {
+            echo "❌ Could not pull image from GHCR"
+            exit 1
+          }
+          
+          docker tag ghcr.io/${{ github.repository }}:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG} || \
+          docker tag ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} ${ECR_REPO}:${IMAGE_TAG}
+          docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_REPO}:latest
+          
+          docker push ${ECR_REPO}:${IMAGE_TAG}
+          docker push ${ECR_REPO}:latest
+          echo "✅ Images pushed to ECR"
 
       - name: Deploy Infrastructure (Terraform)
         run: |
@@ -321,9 +366,8 @@ jobs:
       - name: Get ECR repository and current Lambda config
         id: lambda_info
         run: |
-          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/meal-expense-tracker-${ENVIRONMENT}-lambda"
-          FUNCTION_NAME="meal-expense-tracker-${ENVIRONMENT}"
+          ECR_REPO="${{ steps.ecr_repo.outputs.repository }}"
+          FUNCTION_NAME="${{ steps.ecr_repo.outputs.function_name }}"
           
           echo "repository=${ECR_REPO}" >> $GITHUB_OUTPUT
           echo "function_name=${FUNCTION_NAME}" >> $GITHUB_OUTPUT
@@ -342,27 +386,6 @@ jobs:
             echo "current_image_uri=" >> $GITHUB_OUTPUT
             echo "⚠️  Function not found or first deployment"
           fi
-
-      - name: Login to ECR and push image
-        run: |
-          ECR_REPO="${{ steps.lambda_info.outputs.repository }}"
-          
-          aws ecr get-login-password --region ${AWS_REGION} | \
-            docker login --username AWS --password-stdin ${ECR_REPO}
-          
-          docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}:${IMAGE_TAG} || \
-          docker pull --platform linux/amd64 ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} || {
-            echo "❌ Could not pull image from GHCR"
-            exit 1
-          }
-          
-          docker tag ghcr.io/${{ github.repository }}:${IMAGE_TAG} ${ECR_REPO}:${IMAGE_TAG} || \
-          docker tag ghcr.io/${{ github.repository }}:${GITHUB_SHA::7} ${ECR_REPO}:${IMAGE_TAG}
-          docker tag ${ECR_REPO}:${IMAGE_TAG} ${ECR_REPO}:latest
-          
-          docker push ${ECR_REPO}:${IMAGE_TAG}
-          docker push ${ECR_REPO}:latest
-          echo "✅ Images pushed to ECR"
 
       - name: Update Lambda function
         id: update_lambda

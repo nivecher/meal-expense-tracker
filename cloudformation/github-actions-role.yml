@@ -73,6 +73,8 @@ Resources:
                   - iam:GetRole
                   - iam:UpdateRole
                   - iam:UpdateAssumeRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
                   - iam:ListRolePolicies
                   - iam:ListAttachedRolePolicies
                   - iam:PutRolePolicy
