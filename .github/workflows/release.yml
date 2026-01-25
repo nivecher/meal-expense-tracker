@@ -30,15 +30,6 @@ env:
   NODE_VERSION: 22
   AWS_REGION: us-east-1
 
-permissions:
-  contents: write
-  id-token: write
-  actions: read
-  checks: write
-  statuses: write
-  security-events: write
-  packages: read
-
 jobs:
   validate-tag:
     name: Validate Release Tag
@@ -67,7 +58,11 @@ jobs:
           else
             git fetch --tags --force origin main
             git checkout main
-            RELEASE_TAG=$(git tag -l 'v*.*.*' | grep -vE '-(alpha|beta|rc)' | sort -V | tail -1)
+            RELEASE_TAG=$(
+              git tag --merged main --sort=-v:refname \
+                | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+                | head -1
+            )
             if [ -z "${RELEASE_TAG}" ]; then
               echo "No vX.Y.Z tag found on main"
               exit 1
@@ -86,7 +81,7 @@ jobs:
             echo "Invalid tag format"
             exit 1
           fi
-          if echo "$VERSION" | grep -qE '-(alpha|beta|rc)'; then
+          if echo "$VERSION" | grep -qE '[-](alpha|beta|rc)'; then
             echo "is_prerelease=true" >> $GITHUB_OUTPUT
           else
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
@@ -169,16 +164,7 @@ jobs:
           body_path: release_notes.md
           draft: false
           prerelease: ${{ needs.validate-tag.outputs.is_prerelease }}
-          generate_release_notes: true
-
-      - name: Add release summary
-        run: |
-          echo "## GitHub Release Created" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Version: ${{ needs.validate-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tag: ${{ needs.validate-tag.outputs.release_tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Prerelease: ${{ needs.validate-tag.outputs.is_prerelease }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Release URL: ${{ steps.create_release.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          generate_release_notes: false
 
   trigger-staging-deploy:
     name: Trigger Staging Deploy
@@ -206,64 +192,3 @@ jobs:
               },
             });
             console.log(`Triggered deploy.yml: environment=staging, image_tag=${version}`);
-
-  notify:
-    name: Notify Release Status
-    needs: [validate-tag, create-release, trigger-staging-deploy]
-    if: always()
-    runs-on: ubuntu-latest
-    permissions:
-      checks: write
-    steps:
-      - name: Determine status
-        id: status
-        run: |
-          if [ "${{ needs.create-release.result }}" != "success" ]; then
-            echo "status=failed" >> $GITHUB_OUTPUT
-            echo "emoji=❌" >> $GITHUB_OUTPUT
-          elif [ "${{ needs.trigger-staging-deploy.result }}" = "failure" ]; then
-            echo "status=trigger_failed" >> $GITHUB_OUTPUT
-            echo "emoji=⚠️" >> $GITHUB_OUTPUT
-          else
-            echo "status=success" >> $GITHUB_OUTPUT
-            echo "emoji=✅" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Send notification
-        uses: actions/github-script@v7
-        env:
-          VERSION: ${{ needs.validate-tag.outputs.version }}
-          STATUS: ${{ steps.status.outputs.status }}
-          EMOJI: ${{ steps.status.outputs.emoji }}
-        with:
-          script: |
-            const { VERSION, STATUS, EMOJI } = process.env;
-            const repo = context.repo;
-            const workflowRunId = context.runId;
-            const workflowUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${workflowRunId}`;
-            const conclusion = STATUS === 'success' ? 'success' :
-              STATUS.includes('failed') ? 'failure' : 'neutral';
-            await github.rest.checks.create({
-              ...repo,
-              name: 'Release Status',
-              head_sha: context.sha,
-              status: 'completed',
-              conclusion: conclusion,
-              details_url: workflowUrl,
-              output: {
-                title: `Release ${VERSION} ${STATUS}`,
-                summary: `${EMOJI} Release ${VERSION} ${STATUS}`,
-                text: `Workflow: ${workflowUrl}\nVersion: ${VERSION}`,
-              },
-            });
-
-      - name: Add final summary
-        if: always()
-        run: |
-          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Version: ${{ needs.validate-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Release: ${{ needs.create-release.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Trigger Staging Deploy: ${{ needs.trigger-staging-deploy.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Status: ${{ steps.status.outputs.emoji }} ${{ steps.status.outputs.status }}" >> $GITHUB_STEP_SUMMARY
