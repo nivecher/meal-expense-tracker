@@ -411,25 +411,21 @@ resource "aws_cloudfront_distribution" "main" {
   # the backend's error pages (HTML for web, JSON for API) rather than cached errors
   custom_error_response {
     error_code            = 500
-    response_code         = 500
     error_caching_min_ttl = 0
   }
 
   custom_error_response {
     error_code            = 502
-    response_code         = 502
     error_caching_min_ttl = 0
   }
 
   custom_error_response {
     error_code            = 503
-    response_code         = 503
     error_caching_min_ttl = 0
   }
 
   custom_error_response {
     error_code            = 504
-    response_code         = 504
     error_caching_min_ttl = 0
   }
 
