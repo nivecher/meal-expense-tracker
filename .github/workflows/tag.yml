@@ -94,6 +94,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ needs.check-ci-and-branch.outputs.commit_sha || github.sha }}
 
+      - name: Ensure main branch context
+        run: |
+          TARGET_SHA="${{ needs.check-ci-and-branch.outputs.commit_sha || github.sha }}"
+          git checkout -B main "${TARGET_SHA}"
+
       - name: Setup Python Environment
         uses: ./.github/actions/setup-python-env
         with:

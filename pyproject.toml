@@ -46,6 +46,7 @@ upload_to_vcs_release = true
 upload_to_pypi = false
 hvcs = "github"
 commit_author = "github-actions <action@github.com>"
+allow_zero_version = true
 major_on_zero = false  # Prevent major bumps from 0.x.x versions
 tag_commit = true
 changelog_file = "CHANGELOG.md"
