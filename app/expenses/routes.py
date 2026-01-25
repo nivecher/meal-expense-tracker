@@ -851,6 +851,7 @@ def export_expenses() -> ResponseReturnValue:
                 "category_name": "Dining",
                 "meal_type": "lunch",
                 "notes": "Sample expense entry",
+                "tags": "business,lunch",
             },
             {
                 "date": "2025-01-16",
@@ -860,6 +861,7 @@ def export_expenses() -> ResponseReturnValue:
                 "category_name": "Fast Food",
                 "meal_type": "dinner",
                 "notes": "",
+                "tags": "",
             },
         ]
 
@@ -871,7 +873,16 @@ def export_expenses() -> ResponseReturnValue:
 
         # Default to CSV format
         output = io.StringIO()
-        fieldnames = ["date", "amount", "restaurant_name", "restaurant_address", "category_name", "meal_type", "notes"]
+        fieldnames = [
+            "date",
+            "amount",
+            "restaurant_name",
+            "restaurant_address",
+            "category_name",
+            "meal_type",
+            "notes",
+            "tags",
+        ]
         writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_NONNUMERIC)
         writer.writeheader()
         writer.writerows(sample_data)

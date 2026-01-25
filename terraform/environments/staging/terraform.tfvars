@@ -19,3 +19,5 @@ monthly_budget_amount = 20
 allowed_ip_ranges = ["0.0.0.0/0"] # Restrict this in production
 
 # Add any additional environment-specific variables below
+# Increased from 5 to 15 to prevent throttling during concurrent requests and testing
+lambda_reserved_concurrency = 15

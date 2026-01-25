@@ -180,16 +180,16 @@ This document serves as the single source of truth for the implementation status
 
 ### 13. Development & Deployment
 
-| Feature                   | Status | Implementation | Code Location              | Completion |
-| ------------------------- | ------ | -------------- | -------------------------- | ---------- |
-| Make Commands             | ✅     | Complete       | `Makefile`                 | 100%       |
-| Docker Support            | ✅     | Complete       | `Dockerfile`               | 100%       |
-| Terraform Infrastructure  | ✅     | Complete       | `terraform/`               | 100%       |
-| AWS Lambda Deployment     | ✅     | Complete       | `scripts/deploy_lambda.sh` | 100%       |
-| Environment Configuration | ✅     | Complete       | `config.py`                | 100%       |
-| Logging                   | ✅     | Complete       | `app/__init__.py`          | 100%       |
-| Testing Framework         | ✅     | Complete       | `tests/`                   | 100%       |
-| Code Quality Tools        | ✅     | Complete       | `Makefile`                 | 100%       |
+| Feature                   | Status | Implementation | Code Location                | Completion |
+| ------------------------- | ------ | -------------- | ---------------------------- | ---------- |
+| Make Commands             | ✅     | Complete       | `Makefile`                   | 100%       |
+| Docker Support            | ✅     | Complete       | `Dockerfile`                 | 100%       |
+| Terraform Infrastructure  | ✅     | Complete       | `terraform/`                 | 100%       |
+| AWS Lambda Deployment     | ✅     | Complete       | `scripts/redeploy-lambda.sh` | 100%       |
+| Environment Configuration | ✅     | Complete       | `config.py`                  | 100%       |
+| Logging                   | ✅     | Complete       | `app/__init__.py`            | 100%       |
+| Testing Framework         | ✅     | Complete       | `tests/`                     | 100%       |
+| Code Quality Tools        | ✅     | Complete       | `Makefile`                   | 100%       |
 
 ---
 

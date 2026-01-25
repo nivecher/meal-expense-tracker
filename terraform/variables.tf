@@ -48,7 +48,7 @@ variable "base_domain" {
   description = "Base domain name for the application"
 }
 
-variable "api_subdomain" {
+variable "app_subdomain" {
   type        = string
   default     = "meals"
   description = "Subdomain for the main application (e.g., 'meals' for meals.dev.nivecher.com)"
@@ -95,6 +95,12 @@ variable "lambda_timeout" {
     condition     = var.lambda_timeout > 0 && var.lambda_timeout <= 900
     error_message = "Lambda timeout must be between 1 and 900 seconds"
   }
+}
+
+variable "lambda_reserved_concurrency" {
+  type        = number
+  default     = null
+  description = "Reserved concurrency for the Lambda function (null = unreserved)"
 }
 
 variable "lambda_environment_vars" {

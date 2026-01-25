@@ -1,11 +1,10 @@
 # Route53 record for CloudFront distribution
-# This overwrites the API Gateway Route53 record
-
+# Creates A record pointing to CloudFront distribution
 resource "aws_route53_record" "cloudfront" {
-  count = length(var.domain_aliases) > 0 && var.route53_zone_id != "" ? 1 : 0
+  for_each = toset(var.aliases)
 
   zone_id = var.route53_zone_id
-  name    = var.domain_aliases[0]
+  name    = each.value
   type    = "A"
 
   alias {
@@ -18,6 +17,5 @@ resource "aws_route53_record" "cloudfront" {
 
   lifecycle {
     create_before_destroy = true
-    # Note: Removed ignore_changes to allow updates when CloudFront distribution changes
   }
 }

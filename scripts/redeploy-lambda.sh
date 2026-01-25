@@ -136,6 +136,15 @@ elif docker image inspect ${IMAGE_NAME}:latest >/dev/null 2>&1; then
         fi
     done
 
+    # Check migrations directory for new/updated revisions
+    if [ -d "migrations/versions" ]; then
+        latest_migration_ts=$(find migrations/versions -type f -name "*.py" -print0 | xargs -0 stat -c %Y 2>/dev/null | sort -nr | head -n 1)
+        if [ -n "${latest_migration_ts}" ] && [ "${latest_migration_ts}" -gt "${IMAGE_TIMESTAMP}" ]; then
+            NEED_REBUILD=true
+            log "   Change detected: migrations/versions"
+        fi
+    fi
+
     if [ "${NEED_REBUILD}" = "false" ]; then
         NEED_BUILD=false
         log "   Build: SKIPPED (no changes detected, image is up to date)"

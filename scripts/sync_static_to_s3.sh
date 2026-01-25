@@ -22,6 +22,9 @@ PROFILE="${AWS_PROFILE:-}"
 # S3 bucket name
 BUCKET_NAME="meal-expense-tracker-${ENVIRONMENT}-static"
 
+# CloudFront distribution ID (prefer explicit env var)
+CLOUDFRONT_DISTRIBUTION_ID="${CLOUDFRONT_DISTRIBUTION_ID:-}"
+
 # Function to log
 log() {
     echo -e "${GREEN}[*]${NC} $1"
@@ -33,6 +36,56 @@ log_error() {
 
 log_warning() {
     echo -e "${YELLOW}[!]${NC} $1"
+}
+
+get_cloudfront_distribution_id() {
+    if [ -n "${CLOUDFRONT_DISTRIBUTION_ID}" ]; then
+        echo "${CLOUDFRONT_DISTRIBUTION_ID}"
+        return 0
+    fi
+
+    local s3_origin="${BUCKET_NAME}.s3.amazonaws.com"
+    local s3_regional_origin="${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com"
+    local s3_website_origin="${BUCKET_NAME}.s3-website-${AWS_REGION}.amazonaws.com"
+    local distribution_id=""
+
+    distribution_id="$(aws cloudfront list-distributions \
+        ${PROFILE:+--profile $PROFILE} \
+        --query "DistributionList.Items[?Origins.Items[?DomainName=='${s3_origin}']].Id | [0]" \
+        --output text 2>/dev/null || true)"
+
+    if [ -z "${distribution_id}" ] || [ "${distribution_id}" = "None" ]; then
+        distribution_id="$(aws cloudfront list-distributions \
+            ${PROFILE:+--profile $PROFILE} \
+            --query "DistributionList.Items[?Origins.Items[?DomainName=='${s3_regional_origin}']].Id | [0]" \
+            --output text 2>/dev/null || true)"
+    fi
+
+    if [ -z "${distribution_id}" ] || [ "${distribution_id}" = "None" ]; then
+        distribution_id="$(aws cloudfront list-distributions \
+            ${PROFILE:+--profile $PROFILE} \
+            --query "DistributionList.Items[?Origins.Items[?DomainName=='${s3_website_origin}']].Id | [0]" \
+            --output text 2>/dev/null || true)"
+    fi
+
+    if [ "${distribution_id}" = "None" ]; then
+        distribution_id=""
+    fi
+
+    echo "${distribution_id}"
+    return 0
+}
+
+validate_cloudfront_distribution() {
+    local distribution_id="$1"
+    if [ -z "${distribution_id}" ]; then
+        return 1
+    fi
+
+    aws cloudfront get-distribution \
+        --id "${distribution_id}" \
+        ${PROFILE:+--profile $PROFILE} \
+        &> /dev/null
 }
 
 # Check if AWS CLI is installed
@@ -115,10 +168,9 @@ log "Static files uploaded successfully!"
 
 # Invalidate CloudFront cache
 log "Invalidating CloudFront cache..."
-if command -v terraform &> /dev/null && [ -d "${PROJECT_ROOT}/terraform" ]; then
-    cd "${PROJECT_ROOT}/terraform"
-    CF_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || true)
-    if [ -n "${CF_ID}" ]; then
+CF_ID="$(get_cloudfront_distribution_id)"
+if [ -n "${CF_ID}" ]; then
+    if validate_cloudfront_distribution "${CF_ID}"; then
         log "Creating CloudFront invalidation for distribution ${CF_ID}..."
         aws cloudfront create-invalidation \
             --distribution-id "${CF_ID}" \
@@ -126,10 +178,10 @@ if command -v terraform &> /dev/null && [ -d "${PROJECT_ROOT}/terraform" ]; then
             ${PROFILE:+--profile $PROFILE} || log_warning "Could not invalidate CloudFront cache"
         log "CloudFront invalidation request sent successfully"
     else
-        log_warning "Could not get CloudFront distribution ID from Terraform outputs"
+        log_warning "CloudFront distribution ${CF_ID} not found or not accessible"
     fi
 else
-    log_warning "Terraform not available, skipping CloudFront cache invalidation"
+    log_warning "CloudFront distribution ID not provided. Set CLOUDFRONT_DISTRIBUTION_ID or run Terraform."
 fi
 
 log "Done!"

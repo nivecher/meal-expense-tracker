@@ -13,11 +13,18 @@ repos:
       - id: check-merge-conflict
 
   # 2. Conventional commit message (commit-msg) – commitlint
+  # Uses project node_modules so @commitlint/config-conventional is found. Run npm install first.
   - repo: local
     hooks:
       - id: commitlint
         name: commitlint
-        entry: npx --no -- commitlint --edit
+        entry: >
+          sh -c 'if [ -f node_modules/.bin/commitlint ]; then
+            exec node_modules/.bin/commitlint --edit "$@";
+          else
+            echo "Commitlint deps missing. Run: npm install";
+            exit 1;
+          fi' sh
         language: system
         stages: [commit-msg]
         pass_filenames: true
@@ -155,15 +162,15 @@ repos:
         files: ^app/static/css/.*\.css$
         require_serial: true
 
-  # JavaScript linting with eslint (matches make lint-js)
-  # Uses npm script to ensure consistency with make lint
+  # JavaScript linting with eslint (fix then lint; matches make lint-js)
+  # Runs format:js (--fix) then lint:js so fixable issues are resolved before verify
   - repo: local
     hooks:
       - id: eslint
         name: eslint
         entry: >
           sh -c 'if [ -d node_modules ] && command -v npm >/dev/null 2>&1; then
-            npm run lint:js;
+            npm run format:js && npm run lint:js;
           else
             echo Skipping eslint;
             exit 0;

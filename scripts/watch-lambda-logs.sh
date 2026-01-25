@@ -1,43 +1,62 @@
 #!/bin/bash
-# Watch Lambda CloudWatch logs
+# Watch Lambda CloudWatch logs.
+# Usage: ./scripts/watch-lambda-logs.sh [filter-pattern]
+# Example: ./scripts/watch-lambda-logs.sh 'error|exception|Traceback'
+# Filter terms (pipe-separated) are converted to CloudWatch ?term syntax.
+# Env: LOG_GROUP, AWS_REGION (defaults: ...-dev, us-east-1).
 
-LOG_GROUP="/aws/lambda/meal-expense-tracker-dev"
+set -euo pipefail
 
-# Allow optional filter pattern as first argument
+LOG_GROUP="${LOG_GROUP:-/aws/lambda/meal-expense-tracker-dev}"
+REGION="${AWS_REGION:-us-east-1}"
 FILTER_PATTERN="${1:-}"
 
-echo "Watching CloudWatch logs for: $LOG_GROUP"
+echo "Watching CloudWatch logs for: $LOG_GROUP (region: $REGION)"
 if [ -n "$FILTER_PATTERN" ]; then
     echo "Filter pattern: $FILTER_PATTERN"
-    echo "Usage: $0 [filter-pattern]"
-    echo "Example: $0 'error|exception|receipt'"
 fi
 echo "Press Ctrl+C to stop"
 echo "=========================================="
 echo ""
 
-# Use aws logs tail with optional filter
-if [ -n "$FILTER_PATTERN" ]; then
-    aws logs tail "$LOG_GROUP" --follow --format short 2>&1 | grep --line-buffered -i -E "$FILTER_PATTERN" || {
-        echo ""
-        echo "If filtering doesn't work, try viewing all logs:"
-        echo "aws logs tail $LOG_GROUP --follow --format short"
-        echo ""
-        echo "Or view recent logs:"
-        echo "aws logs tail $LOG_GROUP --since 10m --format short"
-    }
-else
-    aws logs tail "$LOG_GROUP" --follow --format short 2>&1 || {
-        echo ""
-        echo "Error: Could not tail logs. Check that:"
-        echo "  1. AWS CLI is installed and configured"
-        echo "  2. You have permissions to read CloudWatch logs"
-        echo "  3. The log group exists: $LOG_GROUP"
-        echo ""
-        echo "To view recent logs instead:"
-        echo "aws logs tail $LOG_GROUP --since 10m --format short"
-        echo ""
-        echo "To filter logs, pass a pattern as argument:"
-        echo "$0 'error|exception|receipt'"
-    }
+# Pre-flight: verify we can reach CloudWatch and the log group exists
+if ! aws logs describe-log-groups \
+    --log-group-name-prefix "$LOG_GROUP" \
+    --region "$REGION" \
+    --query "logGroups[?logGroupName=='$LOG_GROUP'].logGroupName" \
+    --output text 2>/dev/null | grep -q "^$LOG_GROUP$"; then
+    echo "Error: Cannot reach CloudWatch or log group does not exist."
+    echo "  1. Ensure AWS CLI is installed and configured: aws sts get-caller-identity"
+    echo "  2. Set region if needed: AWS_REGION=us-east-1 $0"
+    echo "  3. Check log group exists: aws logs describe-log-groups --log-group-name-prefix /aws/lambda/meal-expense --region $REGION"
+    echo ""
+    echo "To tail a different group: LOG_GROUP=/aws/lambda/my-func $0"
+    exit 1
 fi
+
+# Build aws logs tail args
+TAIL_ARGS=(
+    "$LOG_GROUP"
+    --follow
+    --format short
+    --since 1m
+    --region "$REGION"
+    --no-cli-pager
+)
+
+# Convert pipe-separated filter (e.g. error|exception|receipt) to CloudWatch ?term ?term ...
+if [ -n "$FILTER_PATTERN" ]; then
+    CW_PATTERN=$(echo "$FILTER_PATTERN" | tr '|' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' | sed 's/^/?/' | tr '\n' ' ' | sed 's/ $//')
+    if [ -n "$CW_PATTERN" ]; then
+        TAIL_ARGS+=(--filter-pattern "$CW_PATTERN")
+    fi
+fi
+
+aws logs tail "${TAIL_ARGS[@]}" || {
+    ec=$?
+    echo ""
+    echo "Error: aws logs tail failed (exit $ec)."
+    echo "  Check AWS credentials and network connectivity."
+    echo "  Try: aws logs tail $LOG_GROUP --since 10m --format short --region $REGION"
+    exit $ec
+}

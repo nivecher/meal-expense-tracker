@@ -14,11 +14,27 @@ from typing import Any, cast
 
 # Try to import AWS X-Ray SDK for tracing
 try:
-    from aws_xray_sdk.core import patch_all, xray_recorder
+    from aws_xray_sdk.core import patch, xray_recorder
 
     XRAY_AVAILABLE = True
-    # Patch libraries for X-Ray tracing
-    patch_all()
+
+    def _should_patch_sqlalchemy() -> bool:
+        return os.environ.get("XRAY_PATCH_SQLALCHEMY", "").lower() in ("1", "true", "yes")
+
+    def _patch_xray_modules() -> None:
+        modules = [
+            "boto3",
+            "botocore",
+            "requests",
+            "pg8000",
+            "httpx",
+        ]
+        if _should_patch_sqlalchemy():
+            modules.append("sqlalchemy_core")
+        patch(tuple(modules))
+
+    # Patch libraries for X-Ray tracing (exclude sqlalchemy_core unless explicitly enabled)
+    _patch_xray_modules()
 except ImportError:
     XRAY_AVAILABLE = False
     xray_recorder = None
@@ -174,14 +190,126 @@ def _log_request_end(
         )
 
 
+def _is_api_request_from_event(event: dict[str, Any]) -> bool:
+    """Check if the request is an API request based on Lambda event.
+
+    Matches the logic in app/errors/__init__.py:_is_api_request().
+    """
+    path = event.get("rawPath", "/")
+    headers = event.get("headers", {})
+    accept_header = headers.get("accept", headers.get("Accept", ""))
+    x_requested_with = headers.get("x-requested-with", headers.get("X-Requested-With", ""))
+
+    # Check multiple indicators that this is an API request
+    is_api = path.startswith("/api/") or x_requested_with == "XMLHttpRequest" or "application/json" in accept_header
+
+    return is_api
+
+
 def _create_error_response(
     status_code: int,
     error_message: str,
     error_type: str | None = None,
     traceback_str: str | None = None,
     request_id: str | None = None,
+    event: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Create a standardized error response."""
+    """Create a standardized error response.
+
+    Args:
+        status_code: HTTP status code
+        error_message: Error message to display
+        error_type: Type of error (for JSON responses)
+        traceback_str: Optional traceback string (only included in non-prod JSON)
+        request_id: Optional request ID for tracking
+        event: Optional Lambda event to detect API vs web requests
+
+    Returns:
+        API Gateway compatible response dictionary
+    """
+    # Determine if this is an API request
+    # Default to JSON if event is not provided (safer for API contexts)
+    is_api = True  # Default to JSON/API response
+    if event:
+        is_api = _is_api_request_from_event(event)
+
+    # For web requests, return HTML error page
+    if not is_api:
+        html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>{status_code} - Error</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }}
+        .container {{
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }}
+        h1 {{
+            font-size: 72px;
+            margin: 0;
+            color: #e74c3c;
+        }}
+        h2 {{
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+        }}
+        p {{
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 20px 0;
+            color: #666;
+        }}
+        a {{
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 24px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }}
+        a:hover {{
+            background-color: #2980b9;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{status_code}</h1>
+        <h2>An Error Occurred</h2>
+        <p>{error_message}</p>
+        <p>We're sorry, but something went wrong. Please try again later.</p>
+        <a href="/">Go to Homepage</a>
+    </div>
+</body>
+</html>"""
+
+        return {
+            "statusCode": status_code,
+            "headers": {
+                "Content-Type": "text/html; charset=utf-8",
+                "X-Request-ID": request_id or "unknown",
+            },
+            "body": html_body,
+            "isBase64Encoded": False,
+        }
+
+    # For API requests, return JSON
     response = {
         "statusCode": status_code,
         "headers": {
@@ -198,7 +326,7 @@ def _create_error_response(
         "isBase64Encoded": False,
     }
 
-    # Include traceback in non-production environments
+    # Include traceback in non-production environments (only for JSON/API responses)
     if traceback_str and os.environ.get("ENVIRONMENT", "prod") != "prod":
         body_str = response["body"]
         if isinstance(body_str, str):
@@ -431,4 +559,5 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             error_type=error_type,
             traceback_str=traceback_str,
             request_id=request_id,
+            event=event,
         )

@@ -18,6 +18,7 @@ depends_on = ${repr(depends_on)}
 
 def upgrade():
     ${upgrades if upgrades else "pass"}
+    # NOTE: For any new public tables, enable RLS and add policies here.
 
 
 def downgrade():

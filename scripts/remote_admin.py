@@ -64,6 +64,7 @@ import sys
 from typing import Any, Dict, List, Optional, cast
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
 
 
@@ -79,7 +80,8 @@ class RemoteAdminClient:
     def _initialize_client(self) -> None:
         """Initialize the Lambda client."""
         try:
-            self.lambda_client = boto3.client("lambda", region_name=self.region)
+            config = Config(connect_timeout=10, read_timeout=300, retries={"max_attempts": 5})
+            self.lambda_client = boto3.client("lambda", region_name=self.region, config=config)
             # Test credentials
             self.lambda_client.get_account_settings()
         except NoCredentialsError:

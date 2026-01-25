@@ -13,11 +13,6 @@ variable "environment" {
   type        = string
 }
 
-variable "api_gateway_endpoint" {
-  description = "API Gateway endpoint URL (the actual API Gateway invoke URL)"
-  type        = string
-}
-
 variable "api_gateway_custom_domain" {
   description = "API Gateway target domain name (AWS-provided regional domain for CloudFront origin)"
   type        = string
@@ -28,17 +23,9 @@ variable "acm_certificate_arn" {
   type        = string
 }
 
-variable "domain_aliases" {
-  description = "Custom domain aliases for CloudFront"
-  type        = list(string)
-  default     = []
-}
-
-
 variable "route53_zone_id" {
   description = "Route53 zone ID for DNS record"
   type        = string
-  default     = ""
 }
 
 variable "aliases" {

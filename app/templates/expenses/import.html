@@ -22,7 +22,7 @@
                             <i class="fas fa-upload me-2"></i>
                             <strong>Upload a CSV or JSON file with expense data.</strong>
                             Required: <code>date</code> and <code>amount</code> columns. Optional: restaurant, category,
-                            meal type, notes.
+                            meal type, notes, tags.
                         </div>
 
                         <!-- Expandable Sections -->
@@ -93,6 +93,7 @@
                                             >
                                             <li><code>meal_type</code> - breakfast, lunch, dinner, snacks</li>
                                             <li><code>notes</code> - Additional details</li>
+                                            <li><code>tags</code> - Comma-separated tag names (auto-created)</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -126,7 +127,8 @@
                                                     <strong>Amount:</strong> cost, price, total, value<br />
                                                     <strong>Restaurant:</strong> payee, vendor, merchant, location<br />
                                                     <strong>Category:</strong> usage_category, type<br />
-                                                    <strong>Notes:</strong> description, memo, comment
+                                                    <strong>Notes:</strong> description, memo, comment<br />
+                                                    <strong>Tags:</strong> tags, label, labels
                                                 </small>
                                             </div>
                                             <div class="col-md-6">
@@ -136,7 +138,8 @@
                                                     • Currency symbols and thousands separators<br />
                                                     • Duplicate detection and prevention<br />
                                                     • Restaurant matching and disambiguation<br />
-                                                    • Hierarchical category mapping
+                                                    • Hierarchical category mapping<br />
+                                                    • Tag matching with auto-create
                                                 </small>
                                             </div>
                                         </div>
@@ -230,6 +233,55 @@
                                     }}
                                 </div>
                             </div>
+                        </div>
+                        {% endif %} {% if import_summary and import_summary.get('tag_summary') %}
+                        <div class="alert alert-secondary">
+                            <h5 class="alert-heading"><i class="fas fa-tags me-2"></i>Affected Tags</h5>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for tag in import_summary.get('tag_summary', []) %}
+                                <span class="badge {% if tag.is_new %}bg-success{% else %}bg-secondary{% endif %}">
+                                    {{ tag.name }} ({{ tag.count }}){% if tag.is_new %} new{% endif %}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %} {% if import_summary and import_summary.get('restaurant_summary') %}
+                        <div class="alert alert-light">
+                            <h5 class="alert-heading"> <i class="fas fa-store me-2"></i>Affected Restaurants </h5>
+                            <ul class="mb-0">
+                                {% for restaurant in import_summary.get('restaurant_summary')[:10] %}
+                                <li><small>{{ restaurant }}</small></li>
+                                {% endfor %}
+                            </ul>
+                            {% if import_summary.get('restaurant_summary')|length > 10 %}
+                            <small class="text-muted"
+                                >... and {{ import_summary.get('restaurant_summary')|length - 10 }} more</small
+                            >
+                            {% endif %}
+                        </div>
+                        {% endif %} {% if import_summary and import_summary.get('expense_summary') %}
+                        <div class="alert alert-light">
+                            <h5 class="alert-heading"> <i class="fas fa-receipt me-2"></i>Affected Expenses </h5>
+                            <ul class="mb-0">
+                                {% for expense in import_summary.get('expense_summary') %}
+                                <li>
+                                    <small>
+                                        {{ expense.date }} — {% if expense.amount is not none %}${{
+                                        "%.2f"|format(expense.amount) }}{% else %}N/A{% endif %} {% if
+                                        expense.restaurant_name %} • {{ expense.restaurant_name }}{% endif %} {% if
+                                        expense.meal_type %} • {{ expense.meal_type }}{% endif %} {% if expense.tags %}
+                                        • Tags: {{ expense.tags }}{% endif %}
+                                    </small>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% if import_summary.get('expense_summary_total', 0) >
+                            import_summary.get('expense_summary')|length %}
+                            <small class="text-muted"
+                                >... and {{ import_summary.get('expense_summary_total', 0) -
+                                import_summary.get('expense_summary')|length }} more</small
+                            >
+                            {% endif %}
                         </div>
                         {% endif %}
 

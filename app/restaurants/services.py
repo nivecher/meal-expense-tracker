@@ -607,6 +607,15 @@ def _process_form_data_for_update(form: Any) -> dict[str, Any]:
     return form_data
 
 
+def _get_form_string_value(form: Any, field_name: str) -> str:
+    """Safely extract a string value from a form field."""
+    field = getattr(form, field_name, None)
+    value = getattr(field, "data", None) if field is not None else None
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
+
+
 def _apply_form_data_to_restaurant(restaurant: Restaurant, form_data: dict[str, Any]) -> None:
     """Apply processed form data to restaurant object.
 
@@ -632,12 +641,24 @@ def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant
 
     Raises:
         ValueError: If the restaurant is not found or the user doesn't have permission
+        DuplicateGooglePlaceIdError: If Google Place ID already exists
+        DuplicateRestaurantError: If restaurant name/city combination already exists
     """
     restaurant = get_restaurant_for_user(restaurant_id, user_id)
     if not restaurant:
         raise ValueError("Restaurant not found or access denied")
 
+    # Get form data for validation (same pattern as create_restaurant)
+    google_place_id_value = _get_form_string_value(form, "google_place_id") or None
+    name = _get_form_string_value(form, "name")
+    city = _get_form_string_value(form, "city")
+
+    # Validate uniqueness constraints before applying changes
+    validate_restaurant_uniqueness(user_id, name, city, google_place_id_value, exclude_id=restaurant_id)
+
+    # Process form data for applying to restaurant
     form_data = _process_form_data_for_update(form)
+    # Apply form data to restaurant
     _apply_form_data_to_restaurant(restaurant, form_data)
 
     # Handle service level auto-detection for updates
@@ -647,8 +668,38 @@ def update_restaurant(restaurant_id: int, user_id: int, form: Any) -> Restaurant
     if hasattr(restaurant, "cuisine") and restaurant.cuisine:
         restaurant.cuisine = format_cuisine_type(restaurant.cuisine)
 
-    db.session.commit()
-    return restaurant
+    try:
+        db.session.commit()
+        return restaurant
+    except IntegrityError as e:
+        db.session.rollback()
+        # Reset session state to avoid PendingRollbackError
+        db.session.expunge_all()
+
+        # Handle database constraint violations
+        if "uix_restaurant_google_place_id_user" in str(e.orig):
+            # Re-query to get the existing restaurant for the exception
+            existing = db.session.scalar(
+                select(Restaurant).where(
+                    Restaurant.user_id == user_id,
+                    Restaurant.google_place_id == google_place_id_value,
+                )
+            )
+            if existing and google_place_id_value:
+                raise DuplicateGooglePlaceIdError(google_place_id_value, existing)
+        elif "uix_restaurant_name_city_user" in str(e.orig):
+            # Re-query to get the existing restaurant for the exception
+            stmt = select(Restaurant).where(
+                Restaurant.user_id == user_id,
+                func.lower(Restaurant.name) == func.lower(name),
+            )
+            if city:
+                stmt = stmt.where(func.lower(Restaurant.city) == func.lower(city))
+            existing = db.session.scalar(stmt)
+            if existing:
+                raise DuplicateRestaurantError(name, city, existing)
+        # Re-raise original error if we can't handle it
+        raise
 
 
 def _validate_restaurant_row(row: dict[str, Any]) -> tuple[bool, str]:

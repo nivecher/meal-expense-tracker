@@ -4,42 +4,94 @@
 # Get the current AWS account ID and region
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
-# Generate application secret key
-resource "random_password" "app_secret_key" {
-  length           = 50
-  special          = true
-  override_special = "!@#$%^&*()_+-=[]{}|;:,.<>?"
-  min_lower        = 5
-  min_numeric      = 5
-  min_special      = 5
-  min_upper        = 5
+
+# Get the base Route53 zone (e.g., dev.nivecher.com) - must already exist
+data "aws_route53_zone" "base" {
+  name         = local.domain_name
+  private_zone = false
 }
 
-# Store application secret key in SSM Parameter Store
-resource "aws_ssm_parameter" "app_secret_key" {
-  name        = "/${var.app_name}/${var.environment}/app/secret_key"
-  description = "Application secret key for ${var.app_name} in ${var.environment}"
-  type        = "SecureString"
-  value       = random_password.app_secret_key.result
-  tier        = "Standard" # Changed from Advanced to avoid issues
-  data_type   = "text"
-  overwrite   = true
+# Create Route53 hosted zone for the app subdomain (e.g., meals.dev.nivecher.com)
+resource "aws_route53_zone" "app" {
+  name = local.app_domain_name
 
-  tags = local.tags
+  tags = merge(local.tags, {
+    Name = "${var.app_name}-${var.environment}-app-zone"
+  })
+}
+
+# Delegate the app zone from the base zone
+# This creates NS records in the base zone pointing to the app zone's name servers
+resource "aws_route53_record" "app_zone_delegation" {
+  zone_id = data.aws_route53_zone.base.zone_id
+  name    = local.app_domain_name
+  type    = "NS"
+  ttl     = 172800 # 2 days
+
+  records = aws_route53_zone.app.name_servers
+
+  allow_overwrite = true
+}
+
+data "aws_acm_certificate" "main" {
+  domain      = local.main_cert_domain
+  statuses    = ["ISSUED"]
+  most_recent = true
+  provider    = aws.us-east-1
+}
+
+# Create ACM certificate for API Gateway custom domain
+# This certificate covers *.meals.dev.nivecher.com (covers api.meals.dev.nivecher.com)
+resource "aws_acm_certificate" "api" {
+  domain_name       = local.api_cert_domain
+  validation_method = "DNS"
+  provider          = aws.us-east-1
+
+  # Ensure the app zone exists before creating the certificate
+  depends_on = [aws_route53_zone.app]
 
   lifecycle {
-    ignore_changes = [value]
+    create_before_destroy = true
   }
+
+  tags = merge(local.tags, {
+    Name = "${var.app_name}-${var.environment}-api-cert"
+  })
 }
 
-# Main KMS Key for encryption
-resource "aws_kms_key" "main" {
-  description             = "Main KMS key for ${var.app_name} ${var.environment} environment"
-  deletion_window_in_days = var.environment == "prod" ? 30 : 7
-  enable_key_rotation     = true
-  policy                  = data.aws_iam_policy_document.kms_main_policy.json
+# DNS validation records for API certificate
+# These records are created in the existing Route53 zone
+resource "aws_route53_record" "api_cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.api.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
 
-  tags = local.tags
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = aws_route53_zone.app.zone_id
+
+  # Ensure the app zone is created before creating validation records
+  depends_on = [aws_route53_zone.app]
+}
+
+# Validate the certificate
+resource "aws_acm_certificate_validation" "api" {
+  certificate_arn = aws_acm_certificate.api.arn
+  validation_record_fqdns = [
+    for record in aws_route53_record.api_cert_validation : record.fqdn
+  ]
+  provider = aws.us-east-1
+
+  timeouts {
+    create = "5m"
+  }
 }
 
 # KMS Key Policy
@@ -79,6 +131,44 @@ data "aws_iam_policy_document" "kms_main_policy" {
     ]
     resources = ["*"]
   }
+}
+
+# Generate application secret key
+resource "random_password" "app_secret_key" {
+  length           = 50
+  special          = true
+  override_special = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+  min_lower        = 5
+  min_numeric      = 5
+  min_special      = 5
+  min_upper        = 5
+}
+
+# Store application secret key in SSM Parameter Store
+resource "aws_ssm_parameter" "app_secret_key" {
+  name        = "/${var.app_name}/${var.environment}/app/secret_key"
+  description = "Application secret key for ${var.app_name} in ${var.environment}"
+  type        = "SecureString"
+  value       = random_password.app_secret_key.result
+  tier        = "Standard" # Changed from Advanced to avoid issues
+  data_type   = "text"
+  overwrite   = true
+
+  tags = local.tags
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+# Main KMS Key for encryption
+resource "aws_kms_key" "main" {
+  description             = "Main KMS key for ${var.app_name} ${var.environment} environment"
+  deletion_window_in_days = var.environment == "prod" ? 30 : 7
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.kms_main_policy.json
+
+  tags = local.tags
 }
 
 # KMS Alias
@@ -121,7 +211,7 @@ module "lambda" {
 
   app_name    = var.app_name
   environment = var.environment
-  server_name = local.api_domain_name
+  server_name = local.app_domain_name
   aws_region  = var.aws_region
 
   app_secret_key_arn = aws_ssm_parameter.app_secret_key.arn
@@ -136,12 +226,15 @@ module "lambda" {
   # Note: Database configuration handled via Supabase secrets in Secrets Manager
   # Lambda reads connection details from: meal-expense-tracker/${var.environment}/supabase-connection
 
-  api_gateway_domain_name   = "" # Will be set after API Gateway is created
-  api_gateway_execution_arn = "" # Will be set after API Gateway is created
+  # API Gateway values - use computed local for domain name to avoid circular dependency
+  # Domain name is computed from the same inputs API Gateway uses, so they match
+  # Note: api_gateway_execution_arn is not actually used in the Lambda module, so we omit it
+  api_gateway_domain_name = local.api_gateway_domain_name
 
-  memory_size   = var.lambda_memory_size
-  timeout       = var.lambda_timeout
-  architectures = [var.lambda_architecture]
+  memory_size          = var.lambda_memory_size
+  timeout              = var.lambda_timeout
+  architectures        = [var.lambda_architecture]
+  reserved_concurrency = var.lambda_reserved_concurrency
 
   package_type = "Image"
 
@@ -186,10 +279,12 @@ module "api_gateway" {
   lambda_function_name = module.lambda.name
   logs_kms_key_arn     = aws_kms_key.main.arn
 
-  domain_name       = local.domain_name
-  cert_domain       = local.cert_domain
+  route53_zone_id   = aws_route53_zone.app.zone_id
+  certificate_arn   = aws_acm_certificate_validation.api.certificate_arn
   api_domain_prefix = local.api_domain_prefix
-  # Don't set api_domain_name - let it be constructed as api.{domain_name}
+  # Set explicit API domain: api.meals.dev.nivecher.com
+  # This is the custom domain that CloudFront will use
+  api_domain_name       = "api.${local.app_domain_name}"
   create_route53_record = true # API Gateway handles its own routing
 
   # CORS configuration: Allow requests from the main domain and localhost
@@ -216,7 +311,8 @@ module "api_gateway" {
 
   depends_on = [
     aws_kms_key.main,
-    module.lambda
+    module.lambda,
+    aws_acm_certificate_validation.api
   ]
 }
 
@@ -260,7 +356,7 @@ module "s3" {
       allowed_headers = ["*"]
       allowed_methods = ["GET", "PUT", "POST", "DELETE", "HEAD"]
       allowed_origins = [
-        "https://${local.api_domain_name}",
+        "https://${local.app_domain_name}",
         "http://localhost:5000",
         "https://localhost:5000"
       ]
@@ -276,32 +372,19 @@ module "s3" {
   ]
 }
 
-# Get Route53 zone and ACM certificate for CloudFront
-data "aws_route53_zone" "main" {
-  name         = local.domain_name
-  private_zone = false
-}
-
-data "aws_acm_certificate" "main" {
-  domain      = local.cert_domain
-  statuses    = ["ISSUED"]
-  most_recent = true
-  provider    = aws.us-east-1
-}
-
 # CloudFront Distribution with Smart Routing
 module "cloudfront" {
   source = "./modules/cloudfront"
 
-  s3_bucket_name            = "${var.app_name}-${var.environment}-static"
-  app_name                  = var.app_name
-  environment               = var.environment
-  api_gateway_endpoint      = module.api_gateway.api_endpoint
-  api_gateway_custom_domain = module.api_gateway.domain_name # Use custom domain name (requires Route53 record)
-  aliases                   = [local.api_domain_name]
-  acm_certificate_arn       = data.aws_acm_certificate.main.arn
-  domain_aliases            = [local.api_domain_name]
-  route53_zone_id           = data.aws_route53_zone.main.zone_id
+  s3_bucket_name = "${var.app_name}-${var.environment}-static"
+  app_name       = var.app_name
+  environment    = var.environment
+
+  api_gateway_custom_domain = module.api_gateway.api_custom_domain
+
+  aliases             = [local.app_domain_name]
+  acm_certificate_arn = data.aws_acm_certificate.main.arn
+  route53_zone_id     = aws_route53_zone.app.zone_id
 
   # Disable WAF to save costs ($16/month)
   enable_waf = false

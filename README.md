@@ -253,10 +253,13 @@ Pre-commit hooks automatically run on `git commit`:
 ```bash
 # Install hooks (one-time setup)
 pre-commit install
+pre-commit install --hook-type commit-msg   # Enforce conventional commits
 
 # Run hooks manually
 pre-commit run --all-files
 ```
+
+The **commit-msg** hook uses [commitlint](https://commitlint.js.org/) to validate conventional commit format. Merge commits are allowed. See [docs/BRANCH_NAMING.md](docs/BRANCH_NAMING.md).
 
 ### Supported Languages
 
@@ -481,8 +484,14 @@ make tf-init
 # Plan infrastructure changes
 make tf-plan
 
-# Deploy to development
-make deploy-dev
+# Deploy to development (Lambda + frontend assets)
+make deploy
+
+# Redeploy Lambda only
+make redeploy-dev
+
+# Sync frontend assets only
+make deploy-static
 ```
 
 1. **Run Browser Tests**:
@@ -612,77 +621,40 @@ make format
 make security-check
 ```
 
-## 📦 Packaging
+## 📦 Packaging (Container Image)
 
 ### Packaging Prerequisites
 
-- Python 3.13+
-- pip
-- AWS CLI (if deploying to AWS)
+- Docker
+- AWS CLI (optional, for ECR push)
 
-### Package the Application
-
-We provide a unified script to package both the application and its dependencies:
+### Build and Push the Container Image
 
 ```bash
+# Build container image
+./scripts/package-docker-lambda.sh --arm64
 
-## Package both application and dependencies layer (default)
-./scripts/package.sh
-
-## Or package just the application
-./scripts/package.sh --app
-
-## Or just the dependencies layer
-./scripts/package.sh --layer
-
+# Push to ECR
+./scripts/package-docker-lambda.sh --push --arm64
 ```
 
-This will create the following files:
-
-- `dist/app.zip` - The application package
-- `dist/layers/Python-dependencies.zip` - The dependencies layer
-
-## 🚀 AWS Lambda Deployment
+## 🚀 AWS Lambda Deployment (Containerized)
 
 ### Deployment Prerequisites
 
 - AWS Account with appropriate permissions
 - AWS CLI configured with credentials
-- AWS S3 bucket for deployment packages
-- AWS Lambda function configured
+- ECR repository and Lambda function configured for container images
 
 ### Deploying the Lambda Function
 
-1. **Package the Application**
+For ad-hoc dev deployments, use:
 
-   ```bash
-
-   ## Create the deployment package
-   make package-lambda
-
-   ```
-
-   This will create:
-
-- `dist/app.zip` - The application package
-  - `dist/layers/Python-dependencies.zip` - The dependencies layer
-
-1. **Deploy to Lambda**
-
-   ```bash
-
-   ## Deploy the ZIP package to Lambda
-   aws lambda update-function-code \
-   ```
-
+```bash
+./scripts/redeploy-lambda.sh
 ```
 
-  --function-name your-lambda-function-name \
---zip-file fileb://dist/app.zip
-
-```
-
-````
+For staging/prod, use the GitHub Actions deploy workflow (container image-based).
 
 ### Lambda Environment Variables
 
@@ -699,17 +671,15 @@ Make sure to set the following environment variables in your Lambda function:
 After deployment, you can test your Lambda function:
 
 ```bash
-
-## Invoke the function directly
+# Invoke the function directly
 aws lambda invoke \
---function-name $LAMBDA_FUNCTION_NAME \
---payload '{"httpMethod": "GET", "path": "/health"}' \
-response.json
+  --function-name "$LAMBDA_FUNCTION_NAME" \
+  --payload '{"httpMethod": "GET", "path": "/health"}' \
+  response.json
 
-## View the response
+# View the response
 cat response.json
-
-````
+```
 
 ### CI/CD Integration
 

@@ -126,7 +126,7 @@ Updated all GitHub actions to latest stable versions:
 ## Key Metrics
 
 | Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
+| ------ | ------ | ----- | ----------- |
 | Total Workflows | 6 | 10 | +4 (reusable) |
 | Composite Actions | 2 | 6 | +4 |
 | release.yml Lines | 611 | 303 | 50% reduction |

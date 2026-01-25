@@ -14,17 +14,8 @@ NC='\033[0m'
 
 echo -e "${GREEN}=== Testing Docker Lambda Packaging Script ===${NC}"
 
-# Test 1: Check if the packaging script exists and is executable
-echo -e "${BLUE}[*] Test 1: Checking packaging script...${NC}"
-if [ -f "scripts/package.sh" ] && [ -x "scripts/package.sh" ]; then
-  echo -e "${GREEN}[✓] Packaging script exists and is executable${NC}"
-else
-  echo -e "${RED}[!] Packaging script missing or not executable${NC}"
-  exit 1
-fi
-
-# Test 2: Check if the Docker packaging script exists and is executable
-echo -e "${BLUE}[*] Test 2: Checking Docker packaging script...${NC}"
+# Test 1: Check if the Docker packaging script exists and is executable
+echo -e "${BLUE}[*] Test 1: Checking Docker packaging script...${NC}"
 if [ -f "scripts/package-docker-lambda.sh" ] && [ -x "scripts/package-docker-lambda.sh" ]; then
   echo -e "${GREEN}[✓] Docker packaging script exists and is executable${NC}"
 else
@@ -32,8 +23,8 @@ else
   exit 1
 fi
 
-# Test 3: Check if Dockerfile has Lambda stage
-echo -e "${BLUE}[*] Test 3: Checking Dockerfile Lambda stage...${NC}"
+# Test 2: Check if Dockerfile has Lambda stage
+echo -e "${BLUE}[*] Test 2: Checking Dockerfile Lambda stage...${NC}"
 if grep -q "FROM public.ecr.aws/lambda/python:3.13 AS lambda" Dockerfile; then
   echo -e "${GREEN}[✓] Dockerfile has Lambda stage${NC}"
 else
@@ -41,8 +32,8 @@ else
   exit 1
 fi
 
-# Test 4: Check if requirements.txt exists and has dependencies
-echo -e "${BLUE}[*] Test 4: Checking requirements.txt...${NC}"
+# Test 3: Check if requirements.txt exists and has dependencies
+echo -e "${BLUE}[*] Test 3: Checking requirements.txt...${NC}"
 if [ -f "requirements.txt" ]; then
   dep_count=$(wc -l < requirements.txt)
   echo -e "${GREEN}[✓] requirements.txt exists with ${dep_count} dependencies${NC}"
@@ -61,8 +52,8 @@ else
   exit 1
 fi
 
-# Test 5: Check if Lambda handler exists
-echo -e "${BLUE}[*] Test 5: Checking Lambda handler...${NC}"
+# Test 4: Check if Lambda handler exists
+echo -e "${BLUE}[*] Test 4: Checking Lambda handler...${NC}"
 if [ -f "lambda_handler.py" ]; then
   echo -e "${GREEN}[✓] lambda_handler.py exists${NC}"
 
@@ -78,8 +69,8 @@ else
   exit 1
 fi
 
-# Test 6: Check if wsgi.py has Lambda handler
-echo -e "${BLUE}[*] Test 6: Checking wsgi.py Lambda handler...${NC}"
+# Test 5: Check if wsgi.py has Lambda handler
+echo -e "${BLUE}[*] Test 5: Checking wsgi.py Lambda handler...${NC}"
 if [ -f "wsgi.py" ]; then
   echo -e "${GREEN}[✓] wsgi.py exists${NC}"
 
@@ -95,8 +86,8 @@ else
   exit 1
 fi
 
-# Test 7: Check if Dockerfile installs all dependencies
-echo -e "${BLUE}[*] Test 7: Checking Dockerfile dependency installation...${NC}"
+# Test 6: Check if Dockerfile installs all dependencies
+echo -e "${BLUE}[*] Test 6: Checking Dockerfile dependency installation...${NC}"
 if grep -q "pip install --no-cache-dir -r requirements.txt" Dockerfile; then
   echo -e "${GREEN}[✓] Dockerfile installs requirements.txt${NC}"
 else
@@ -104,8 +95,8 @@ else
   exit 1
 fi
 
-# Test 8: Check if Dockerfile sets proper Lambda environment
-echo -e "${BLUE}[*] Test 8: Checking Lambda environment variables...${NC}"
+# Test 7: Check if Dockerfile sets proper Lambda environment
+echo -e "${BLUE}[*] Test 7: Checking Lambda environment variables...${NC}"
 env_vars=("LAMBDA_TASK_ROOT" "PYTHONPATH" "FLASK_APP" "FLASK_ENV")
 for env_var in "${env_vars[@]}"; do
   if grep -q "${env_var}" Dockerfile; then
@@ -115,8 +106,8 @@ for env_var in "${env_vars[@]}"; do
   fi
 done
 
-# Test 9: Check if Dockerfile sets correct CMD
-echo -e "${BLUE}[*] Test 9: Checking Lambda CMD...${NC}"
+# Test 8: Check if Dockerfile sets correct CMD
+echo -e "${BLUE}[*] Test 8: Checking Lambda CMD...${NC}"
 if grep -q 'CMD \["wsgi.lambda_handler"\]' Dockerfile; then
   echo -e "${GREEN}[✓] Dockerfile has correct Lambda CMD${NC}"
 else
@@ -124,8 +115,8 @@ else
   exit 1
 fi
 
-# Test 10: Validate Python dependencies can be imported
-echo -e "${BLUE}[*] Test 10: Validating Python dependencies...${NC}"
+# Test 9: Validate Python dependencies can be imported
+echo -e "${BLUE}[*] Test 9: Validating Python dependencies...${NC}"
 echo -e "${YELLOW}[*] Note: Some dependencies may be missing in local environment but will be installed in Docker${NC}"
 python3 -c "
 import sys
@@ -194,8 +185,8 @@ else
   exit 1
 fi
 
-# Test 11: Check if the app can be imported
-echo -e "${BLUE}[*] Test 11: Testing app import...${NC}"
+# Test 10: Check if the app can be imported
+echo -e "${BLUE}[*] Test 10: Testing app import...${NC}"
 python3 -c "
 try:
     from app import create_app
@@ -224,8 +215,8 @@ else
   exit 1
 fi
 
-# Test 12: Check Lambda handler can be imported
-echo -e "${BLUE}[*] Test 12: Testing Lambda handler import...${NC}"
+# Test 11: Check Lambda handler can be imported
+echo -e "${BLUE}[*] Test 11: Testing Lambda handler import...${NC}"
 python3 -c "
 try:
     from lambda_handler import lambda_handler
@@ -279,6 +270,5 @@ echo -e "\n${GREEN}=== All Tests Passed! ===${NC}"
 echo -e "${GREEN}The Docker Lambda packaging setup is ready for deployment.${NC}"
 echo -e "\n${YELLOW}Next steps:${NC}"
 echo "1. Start Docker: sudo systemctl start docker"
-echo "2. Build container: ./scripts/package.sh --docker --arm64"
-echo "3. Or use the dedicated script: ./scripts/package-docker-lambda.sh --arm64"
-echo "4. Push to ECR: ./scripts/package-docker-lambda.sh --push --arm64"
+echo "2. Build container: ./scripts/package-docker-lambda.sh --arm64"
+echo "3. Push to ECR: ./scripts/package-docker-lambda.sh --push --arm64"

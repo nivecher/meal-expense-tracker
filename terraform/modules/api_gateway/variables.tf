@@ -33,20 +33,9 @@ variable "tags" {
 }
 
 # Domain Configuration
-variable "domain_name" {
-  description = <<-EOT
-    The base domain name (e.g., 'example.com') used for:
-    1. Looking up the Route53 hosted zone
-    2. Creating CORS allowed origins
-    3. Deriving the subdomain for the API Gateway custom domain
-  EOT
+variable "route53_zone_id" {
+  description = "The Route53 hosted zone ID where the API Gateway custom domain record will be created"
   type        = string
-  default     = null
-
-  validation {
-    condition     = var.domain_name == null || can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\\.[a-zA-Z]{2,})+$", var.domain_name))
-    error_message = "The domain_name must be a valid domain name (e.g., 'example.com')"
-  }
 }
 
 variable "api_domain_name" {
@@ -67,14 +56,9 @@ variable "api_domain_name" {
   }
 }
 
-variable "cert_domain" {
-  description = <<-EOT
-    The domain name the SSL certificate is issued for (e.g., '*.example.com').
-    This must match the domain of the ACM certificate that will be used for the API Gateway custom domain.
-    For wildcard certificates, use the format '*.example.com'.
-  EOT
+variable "certificate_arn" {
+  description = "The ARN of the ACM certificate to use for the API Gateway custom domain (must be in us-east-1 region)"
   type        = string
-  default     = null
 }
 
 # Integration Configuration

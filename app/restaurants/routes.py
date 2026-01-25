@@ -538,6 +538,8 @@ def _map_place_to_restaurant_data(place: dict[str, Any], place_id: str, places_s
 
     Extracts fields from all tiers (Essentials, Pro, Enterprise) with tier documentation.
     """
+    from app.utils.url_utils import strip_url_query_params
+
     # ESSENTIALS TIER: Parse address - addressComponents is Essentials for Place Details
     formatted_address = place.get("formattedAddress", "")
 
@@ -576,7 +578,7 @@ def _map_place_to_restaurant_data(place: dict[str, Any], place_id: str, places_s
         "country": address_data.get("country", ""),
         # Contact Information
         "phone": place.get("nationalPhoneNumber"),  # ENTERPRISE TIER
-        "website": place.get("websiteUri"),  # PRO TIER
+        "website": strip_url_query_params(place.get("websiteUri")),  # PRO TIER
         "email": None,
         "google_place_id": place_id,
         # Business Details
@@ -953,8 +955,18 @@ def edit_restaurant(restaurant_id: int) -> str | Response:
             services.update_restaurant(restaurant.id, current_user.id, form)
             # Redirect without flash message - success feedback handled by destination page
             return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant.id))  # type: ignore[return-value]
+        except (
+            DuplicateGooglePlaceIdError,
+            DuplicateRestaurantError,
+        ) as e:
+            # Handle duplicate errors with user-friendly messages
+            flash(str(e), "danger")
+            # Rollback session to avoid PendingRollbackError
+            db.session.rollback()
         except Exception as e:
             flash(f"Error updating restaurant: {str(e)}", "danger")
+            # Rollback session to avoid PendingRollbackError
+            db.session.rollback()
     elif request.method == "GET":
         # Pre-populate form with existing data
         form = RestaurantForm(obj=restaurant)
@@ -1357,6 +1369,7 @@ def _prepare_restaurant_form(
     from flask import jsonify
 
     from app.restaurants.forms import RestaurantForm
+    from app.utils.url_utils import strip_url_query_params
 
     # Detect service level from Google Places data if available
     # PRO TIER: Uses price_level, types for service level detection
@@ -1384,7 +1397,7 @@ def _prepare_restaurant_form(
         "postal_code": data.get("postal_code", ""),
         "country": data.get("country", ""),
         "phone": data.get("formatted_phone_number") or data.get("phone", ""),
-        "website": data.get("website", ""),
+        "website": strip_url_query_params(data.get("website", "")) or "",
         "google_place_id": data.get("place_id") or data.get("google_place_id", ""),
         "service_level": service_level,
         # Note: coordinates would be looked up dynamically from Google Places API

@@ -298,8 +298,10 @@ class Restaurant(BaseModel):
         Args:
             place_data: Raw Google Places API response data
         """
+        from app.utils.url_utils import strip_url_query_params
+
         self.phone = place_data.get("formatted_phone_number", self.phone)
-        self.website = place_data.get("website", self.website)
+        self.website = strip_url_query_params(place_data.get("website")) or self.website
 
         # Update from international_phone_number if available
         if not self.phone and "international_phone_number" in place_data:
@@ -489,7 +491,9 @@ class Restaurant(BaseModel):
             place_data: Raw Google Places API response data
         """
         if not self.website and "website" in place_data:
-            self.website = place_data["website"]
+            from app.utils.url_utils import strip_url_query_params
+
+            self.website = strip_url_query_params(place_data["website"])
 
     def _store_raw_place_data(self, place_data: dict) -> None:
         """Store raw place data for reference.

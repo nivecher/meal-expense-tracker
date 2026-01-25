@@ -101,9 +101,19 @@ terraform destroy
 
 ```
 
+## Module Dependencies
+
+The infrastructure has specific dependency relationships to avoid circular dependencies. See [DEPENDENCY_ORDER.md](./DEPENDENCY_ORDER.md) for detailed information about:
+
+- Resource creation order
+- Lambda ↔ API Gateway dependency management
+- How circular dependencies are avoided
+- Troubleshooting dependency issues
+
 ## Notes
 
 - The Lambda function uses container images stored in ECR
 - Database connection string is stored in AWS Secrets Manager (Supabase external PostgreSQL)
 - All resources are tagged with the application name and environment
 - Lambda is deployed without VPC for cost efficiency (connects to Supabase via HTTPS)
+- **Important**: Lambda and API Gateway have a managed dependency to avoid circular references - see DEPENDENCY_ORDER.md

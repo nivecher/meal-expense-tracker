@@ -444,6 +444,8 @@ def _validate_tags_list(tags_list: Any) -> tuple[list[str] | None, str | None]:
         # Handle dict format: {"value": "tag_name"} (for backward compatibility)
         if isinstance(tag, dict) and "value" in tag:
             tag_name = tag["value"]
+        elif isinstance(tag, dict) and "name" in tag:
+            tag_name = tag["name"]
         elif isinstance(tag, str):
             tag_name = tag
         else:
@@ -1111,7 +1113,17 @@ def export_expenses_for_user(user_id: int) -> list[dict[str, Any]]:
     Returns:
         A list of dictionaries containing expense data
     """
-    expenses = db.session.scalars(select(Expense).where(Expense.user_id == user_id).order_by(Expense.date.desc())).all()
+    expenses = (
+        db.session.execute(
+            select(Expense)
+            .options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag))
+            .where(Expense.user_id == user_id)
+            .order_by(Expense.date.desc())
+        )
+        .unique()
+        .scalars()
+        .all()
+    )
 
     def safe_float(value: Any) -> float | None:
         """Safely convert value to float."""
@@ -1119,6 +1131,11 @@ def export_expenses_for_user(user_id: int) -> list[dict[str, Any]]:
             return float(value) if value is not None else None
         except (ValueError, TypeError):
             return None
+
+    def format_tag_names(expense: Expense) -> str:
+        """Format tag names as a comma-separated string."""
+        tag_names = [tag.name for tag in expense.tags if tag and tag.name]
+        return ", ".join(sorted(tag_names)) if tag_names else ""
 
     return [
         {
@@ -1129,6 +1146,7 @@ def export_expenses_for_user(user_id: int) -> list[dict[str, Any]]:
             "category_name": expense.category.name if expense.category else "",
             "restaurant_name": expense.restaurant.name if expense.restaurant else "",
             "restaurant_address": expense.restaurant.address if expense.restaurant else "",
+            "tags": format_tag_names(expense),
             "created_at": expense.created_at.isoformat() if expense.created_at else "",
             "updated_at": expense.updated_at.isoformat() if expense.updated_at else "",
         }
@@ -1206,6 +1224,11 @@ def _normalize_field_names(data_row: dict[str, Any]) -> dict[str, Any]:
         "note": "notes",
         "comment": "notes",
         "remarks": "notes",
+        # Tag mappings
+        "tag": "tags",
+        "tags": "tags",
+        "label": "tags",
+        "labels": "tags",
     }
 
     # Create normalized row
@@ -1261,6 +1284,89 @@ def _parse_import_file(file: FileStorage) -> list[dict[str, Any]] | None:
     except Exception as e:
         current_app.logger.error(f"Error parsing import file: {str(e)}")
         return None
+
+
+def _parse_import_tags(tags_value: Any) -> tuple[list[str] | None, str | None]:
+    """Parse tags from import data (CSV/JSON).
+
+    Accepts comma-separated strings, JSON arrays, or list values.
+    """
+    if tags_value is None:
+        return [], None
+
+    if isinstance(tags_value, str):
+        tags_str = tags_value.strip()
+        if not tags_str:
+            return [], None
+
+        if tags_str.startswith("[") or tags_str.startswith("{"):
+            parsed_tags, error = _parse_tags_json(tags_str)
+            if error:
+                return None, error
+            return _validate_tags_list(parsed_tags)
+
+        parsed = [tag.strip() for tag in tags_str.split(",") if tag.strip()]
+        return parsed, None
+
+    if isinstance(tags_value, list):
+        return _validate_tags_list(tags_value)
+
+    return None, "Tags must be a list or comma-separated string"
+
+
+def _normalize_tag_name(tag_name: str) -> str:
+    """Normalize tag name to match existing creation rules."""
+    normalized_name = tag_name.strip().replace(" ", "-")
+    normalized_name = "".join(c for c in normalized_name if c.isalnum() or c == "-")
+    return normalized_name
+
+
+def _build_tag_summary(tag_counts: dict[str, int], created_tags: set[str]) -> list[dict[str, Any]]:
+    """Build tag summary list for import results."""
+    summary = [{"name": name, "count": count, "is_new": name in created_tags} for name, count in tag_counts.items()]
+    return sorted(summary, key=lambda item: (-item["count"], item["name"].lower()))
+
+
+def _normalize_import_tag_names(tag_names: list[str]) -> list[str]:
+    """Normalize and deduplicate tag names for imports."""
+    normalized_names: list[str] = []
+    seen: set[str] = set()
+    for tag_name in tag_names:
+        normalized_name = _normalize_tag_name(tag_name)
+        if not normalized_name or normalized_name in seen:
+            continue
+        seen.add(normalized_name)
+        normalized_names.append(normalized_name)
+    return normalized_names
+
+
+def _apply_import_tags_to_expense(
+    expense: Expense,
+    user_id: int,
+    normalized_tags: list[str],
+    existing_tags: dict[str, Tag],
+    created_tags: set[str],
+    tag_counts: dict[str, int],
+) -> None:
+    """Attach tags to an imported expense without committing."""
+    if not normalized_tags:
+        return
+
+    db.session.flush()
+    expense_id = cast(int, expense.id)
+
+    for tag_name in normalized_tags:
+        tag = existing_tags.get(tag_name)
+        if not tag:
+            tag = Tag(name=tag_name, color="#6c757d", user_id=user_id)
+            db.session.add(tag)
+            db.session.flush()
+            existing_tags[tag_name] = tag
+            created_tags.add(tag_name)
+
+        expense_tag = ExpenseTag(expense_id=expense_id, tag_id=tag.id, added_by=user_id)
+        db.session.add(expense_tag)
+        tag_counts[tag_name] = tag_counts.get(tag_name, 0) + 1
 
 
 def _process_csv_file(file: FileStorage) -> tuple[bool, str | None, csv.DictReader | None]:
@@ -1674,6 +1780,7 @@ def _create_expense_from_data(data: dict[str, Any], user_id: int) -> tuple[Expen
             notes=data.get("notes", "").strip() or None,
             category_id=category.id if category else None,
             restaurant_id=restaurant.id if restaurant else None,
+            restaurant=restaurant if restaurant else None,
         )
 
         return expense, None
@@ -1682,7 +1789,9 @@ def _create_expense_from_data(data: dict[str, Any], user_id: int) -> tuple[Expen
         return None, f"Error creating expense: {str(e)}"
 
 
-def _import_expenses_from_reader(data: list[dict[str, Any]], user_id: int) -> tuple[int, list[str], list[str]]:
+def _import_expenses_from_reader(
+    data: list[dict[str, Any]], user_id: int
+) -> tuple[int, list[str], list[str], dict[str, Any]]:
     """Import expenses from parsed data.
 
     Args:
@@ -1690,14 +1799,28 @@ def _import_expenses_from_reader(data: list[dict[str, Any]], user_id: int) -> tu
         user_id: The ID of the user importing the expenses
 
     Returns:
-        Tuple of (success_count, errors, info_messages)
+        Tuple of (success_count, errors, info_messages, import_summary)
     """
     success_count = 0
     errors: list[str] = []
     info_messages: list[str] = []
     batch_size = 50  # Process in batches to avoid memory issues
+    max_summary_items = 10
+
+    existing_tags = {tag.name: tag for tag in Tag.query.filter_by(user_id=user_id).all()}
+    created_tags: set[str] = set()
+    tag_counts: dict[str, int] = {}
+    restaurant_names: set[str] = set()
+    expense_summaries: list[dict[str, Any]] = []
 
     for i, row in enumerate(data, 1):
+        tag_names, tag_error = _parse_import_tags(row.get("tags"))
+        if tag_error:
+            _handle_import_error(f"Tags error: {tag_error}", i, errors, info_messages)
+            continue
+
+        normalized_tags = _normalize_import_tag_names(tag_names or [])
+
         expense, error = _process_expense_row(row, user_id, i)
         if error:
             _handle_import_error(error, i, errors, info_messages)
@@ -1707,14 +1830,50 @@ def _import_expenses_from_reader(data: list[dict[str, Any]], user_id: int) -> tu
             db.session.add(expense)
             success_count += 1
 
+            if normalized_tags:
+                _apply_import_tags_to_expense(
+                    expense,
+                    user_id,
+                    normalized_tags,
+                    existing_tags,
+                    created_tags,
+                    tag_counts,
+                )
+
+            if expense.restaurant and expense.restaurant.name:
+                restaurant_names.add(expense.restaurant.name)
+
+            if len(expense_summaries) < max_summary_items:
+                expense_summaries.append(
+                    {
+                        "date": expense.date.isoformat() if expense.date else "",
+                        "amount": float(expense.amount) if expense.amount is not None else None,
+                        "restaurant_name": expense.restaurant.name if expense.restaurant else "",
+                        "meal_type": expense.meal_type or "",
+                        "tags": ", ".join(normalized_tags) if normalized_tags else "",
+                    }
+                )
+
             # Commit every batch_size records to avoid memory issues
             if success_count % batch_size == 0:
                 commit_success = _commit_batch(success_count, batch_size, errors)
                 if not commit_success:
-                    return success_count, errors, info_messages
+                    import_summary = {
+                        "tag_summary": _build_tag_summary(tag_counts, created_tags),
+                        "restaurant_summary": sorted(restaurant_names),
+                        "expense_summary": expense_summaries,
+                        "expense_summary_total": success_count,
+                    }
+                    return success_count, errors, info_messages, import_summary
 
     # Don't limit messages - let the frontend handle display properly
-    return success_count, errors, info_messages
+    import_summary = {
+        "tag_summary": _build_tag_summary(tag_counts, created_tags),
+        "restaurant_summary": sorted(restaurant_names),
+        "expense_summary": expense_summaries,
+        "expense_summary_total": success_count,
+    }
+    return success_count, errors, info_messages, import_summary
 
 
 def _process_expense_row(row: dict[str, Any], user_id: int, row_number: int) -> tuple[Expense | None, str | None]:
@@ -1873,7 +2032,10 @@ def _prepare_error_details(errors: list[str]) -> list[str]:
 
 
 def _generate_import_result(
-    success_count: int, errors: list[str], info_messages: list[str]
+    success_count: int,
+    errors: list[str],
+    info_messages: list[str],
+    import_summary: dict[str, Any],
 ) -> tuple[bool, dict[str, Any]]:
     """Generate the result of the import operation.
 
@@ -1905,6 +2067,10 @@ def _generate_import_result(
         "has_warnings": len(info_messages) > 0,
         "has_errors": len(errors) > 0,
         "message": _build_import_message(success_count, info_messages, errors),
+        "tag_summary": import_summary.get("tag_summary", []),
+        "restaurant_summary": import_summary.get("restaurant_summary", []),
+        "expense_summary": import_summary.get("expense_summary", []),
+        "expense_summary_total": import_summary.get("expense_summary_total", 0),
     }
 
     # Add error details if needed
@@ -1939,10 +2105,10 @@ def import_expenses_from_csv(file: FileStorage, user_id: int) -> tuple[bool, dic
             return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
 
         # Import expenses from the data
-        success_count, errors, info_messages = _import_expenses_from_reader(data, user_id)
+        success_count, errors, info_messages, import_summary = _import_expenses_from_reader(data, user_id)
 
         # Generate the result data
-        return _generate_import_result(success_count, errors, info_messages)
+        return _generate_import_result(success_count, errors, info_messages, import_summary)
 
     except Exception as e:
         db.session.rollback()

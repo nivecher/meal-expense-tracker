@@ -38,9 +38,7 @@ This document describes the new workflow structure and how to use it.
 - **security-scan**: Enhanced security scanning with CodeQL
 - **version-tag**: Automatic version generation and tagging
 - **build**: Docker image build and push
-- **deploy-dev**: Deploy to development environment
-- **deploy-staging**: Deploy to staging environment (manual)
-- **deploy-prod**: Deploy to production environment (manual)
+- **deploy**: Deploy to selected environment (dev auto, staging/prod manual)
 - **notify**: Deployment status notifications
 
 ### 3. Release Workflow (`release.yml`)
@@ -112,19 +110,17 @@ make act-release ENV=staging TAG=v1.0.0
 ### Deployment Commands
 
 ```bash
-# Deploy to development
-make deploy-dev
+# Deploy dev (Lambda + frontend assets)
+make deploy
 
-# Deploy to staging
-make deploy-staging
+# Sync frontend assets only
+make deploy-static
 
-# Deploy to production
-make deploy-prod
+# Redeploy dev Lambda only
+make redeploy-dev
 
-# Release to staging (tag-based)
+# Trigger release workflows (tag-based)
 make release-staging TAG=v1.0.0
-
-# Release to production (tag-based)
 make release-prod TAG=v1.0.0
 ```
 

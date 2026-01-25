@@ -72,6 +72,12 @@ cd /home/mtd37/workspace/meal-expense-tracker
 flask db upgrade
 ```
 
+### 4a. Keep RLS Enabled for New Tables
+
+Any new table created in the `public` schema should enable RLS and include
+policies in the same Alembic migration. This keeps Supabase security advisors
+clean and avoids accidental exposure.
+
 ### 5. Update Terraform to Remove Aurora/RDS Proxy
 
 We'll update Terraform to remove expensive components.

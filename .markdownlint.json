@@ -13,7 +13,7 @@
   "MD011": false,
   "MD012": false,
   "MD013": {
-    "line_length": 250,
+    "line_length": 500,
     "tables": false
   },
   "MD014": false,

@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "commitlint": "commitlint --edit",
     "format-html": "prettier --write \"app/templates/**/*.html\"",
     "format-html-check": "prettier --check \"app/templates/**/*.html\"",
     "lint-html": "prettier --check \"app/templates/**/*.html\"",
@@ -18,18 +19,20 @@
     "install-deps": "npm install"
   },
   "devDependencies": {
-    "eslint-formatter-compact": "8.40.0",
-    "prettier": "3.3.3",
-    "stylelint": "16.24.0",
-    "stylelint-config-standard": "39.0.0"
+    "@commitlint/cli": "^20.3.1",
+    "@commitlint/config-conventional": "^20.3.1",
+    "eslint-formatter-compact": "^9.0.1",
+    "prettier": "^3.8.1",
+    "stylelint": "^17.0.0",
+    "stylelint-config-standard": "^40.0.0"
   },
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
   },
   "dependencies": {
-    "@playwright/test": "^1.56.1",
-    "eslint": "9.34.0",
-    "snyk": "^1.1301.0"
+    "@playwright/test": "^1.58.0",
+    "eslint": "^9.39.2",
+    "snyk": "^1.1302.1"
   }
 }
