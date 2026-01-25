@@ -318,9 +318,76 @@ select:has(+ .ts-wrapper) {
   margin-bottom: 0.5rem;
 }
 
-/* Ensure proper spacing for tags help text */
-#tags-help {
+/* Ensure proper spacing for tags help text (form and filter) */
+#tags-help,
+#filter-tags-help {
   margin-top: 1rem !important;
   padding-top: 0.5rem;
   clear: both;
+}
+
+/* Shared tag-selector-widget: same layout and appearance as expense form */
+.tag-selector-widget .ts-wrapper {
+  width: 100% !important;
+  display: block !important;
+  margin-bottom: 0.5rem;
+}
+
+.tag-selector-widget .ts-control {
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  min-height: 6rem;
+  width: 100% !important;
+  background-color: #fff;
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  overflow: visible !important;
+  max-height: none !important;
+  cursor: text;
+}
+
+.tag-selector-widget .ts-control.focus {
+  border-color: #86b7fe;
+  outline: 0;
+  box-shadow: 0 0 0 0.25rem rgb(13 110 253 / 25%);
+}
+
+.tag-selector-widget .ts-control input {
+  border: none !important;
+  outline: none !important;
+  padding: 0.625rem 0.5rem !important;
+  margin: 0.25rem 0 !important;
+  min-width: 150px !important;
+  flex: 1 1 auto !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: text !important;
+  color: #212529 !important;
+  font-size: 1rem !important;
+  line-height: 1.5 !important;
+}
+
+.tag-selector-widget .ts-control input::placeholder {
+  color: #6c757d !important;
+  opacity: 1 !important;
+}
+
+/* Hide input-sizer and placeholder artifacts (fixes "Type" box in filter) */
+.tag-selector-widget .input-sizer,
+.tag-selector-widget .ts-hidden-placeholder,
+.tag-selector-widget [class*="sizer"],
+.tag-selector-widget .ts-wrapper .input-sizer,
+.tag-selector-widget .ts-control .input-sizer {
+  display: none !important;
+  visibility: hidden !important;
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
 }

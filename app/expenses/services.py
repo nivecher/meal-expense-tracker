@@ -20,6 +20,7 @@ from app.expenses.forms import ExpenseForm
 from app.expenses.models import Category, Expense, ExpenseTag, Tag
 from app.extensions import db
 from app.restaurants.models import Restaurant
+from app.utils.timezone_utils import get_timezone
 
 # =============================================================================
 # EXPENSE FILTERING AND SEARCH FUNCTIONALITY
@@ -111,6 +112,32 @@ def get_user_expenses(user_id: int, filters: dict[str, Any]) -> tuple[list[Expen
     return expenses_list, total_amount, avg_price_per_person
 
 
+def _parse_filter_date_value(date_value: str | None) -> date | None:
+    """Parse a date string from filter inputs."""
+    if not date_value or date_value == "None":
+        return None
+    try:
+        return datetime.strptime(date_value, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _get_date_filter_bounds(filters: dict[str, Any]) -> tuple[datetime | None, datetime | None]:
+    """Get UTC datetime bounds for date filters in browser timezone."""
+    start_date = _parse_filter_date_value(filters.get("start_date"))
+    end_date = _parse_filter_date_value(filters.get("end_date"))
+
+    if not start_date and not end_date:
+        return None, None
+
+    browser_timezone = get_timezone()
+    start_dt_utc = (
+        datetime.combine(start_date, time.min, tzinfo=browser_timezone).astimezone(UTC) if start_date else None
+    )
+    end_dt_utc = datetime.combine(end_date, time.max, tzinfo=browser_timezone).astimezone(UTC) if end_date else None
+    return start_dt_utc, end_dt_utc
+
+
 def apply_filters(stmt: Select, filters: dict[str, Any]) -> Select:
     """Apply filters to the query with comprehensive search across text fields.
 
@@ -164,22 +191,12 @@ def apply_filters(stmt: Select, filters: dict[str, Any]) -> Select:
                 )
                 stmt = stmt.where(tag_subquery.exists())
 
-    # Apply date range filters with proper error handling
-    if filters["start_date"]:
-        try:
-            start_date: date = datetime.strptime(filters["start_date"], "%Y-%m-%d").date()
-            stmt = stmt.where(Expense.date >= start_date)
-        except (ValueError, TypeError):
-            # Log the error but don't fail the query
-            pass
-
-    if filters["end_date"]:
-        try:
-            end_date: date = datetime.strptime(filters["end_date"], "%Y-%m-%d").date()
-            stmt = stmt.where(Expense.date <= end_date)
-        except (ValueError, TypeError):
-            # Log the error but don't fail the query
-            pass
+    # Apply date range filters in browser timezone
+    start_dt_utc, end_dt_utc = _get_date_filter_bounds(filters)
+    if start_dt_utc:
+        stmt = stmt.where(Expense.date >= start_dt_utc)
+    if end_dt_utc:
+        stmt = stmt.where(Expense.date <= end_dt_utc)
 
     return stmt
 

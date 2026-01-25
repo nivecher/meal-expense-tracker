@@ -12,10 +12,12 @@
     <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
     <!-- Tom Select CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.css">
-    <!-- Custom tag styling -->
+    <!-- Custom tag styling (shared with expense form) -->
     <link href="{{ url_for('static', filename='css/tag-select.css') }}" rel="stylesheet" />
     <!-- Dynamic user tag colors -->
     <link rel="stylesheet" href="{{ url_for('main.user_tag_css') }}">
+    <!-- Expense form CSS so filter tag selector matches form tag selector -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/expense-form.css') }}">
     <link href="{{ url_for('static', filename='css/pages/expense-list.css') }}" rel="stylesheet" />
 {% endblock styles %}
 
@@ -27,6 +29,8 @@
     <script src="{{ url_for('static', filename='js/components/tag-badge-styler.js') }}"></script>
     <!-- Table sorting functionality -->
     <script src="{{ url_for('static', filename='js/components/table-sorting.js') }}"></script>
+    <!-- Tag Manager for modal functionality -->
+    <script src="{{ url_for('static', filename='js/components/tag-manager.js') }}"></script>
     <!-- Tag selector initialization (depends on Tom Select being loaded) -->
     <script src="{{ url_for('static', filename='js/utils/tag-select-init.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/pages/expense-list.js') }}"></script>
@@ -158,16 +162,21 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <!-- Second Row -->
-                        <div class="col-md-12">
-                            <label for="filterTagsInput" class="form-label">Tags</label>
+                        <!-- Second Row: Tags (same structure as expense form tag-selector-widget) -->
+                        <div class="col-12 tag-selector-widget">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label for="filterTagsInput" class="form-label mb-0">Tags</label>
+                                <a href="#" id="manageTagsLink" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#tagEditorModal">
+                                    <i class="fas fa-cog me-1"></i>Manage Tags
+                                </a>
+                            </div>
                             <select id="filterTagsInput"
                                    name="tags"
                                    class="form-control"
                                    multiple
                                    placeholder="Type to search tags...">
                             </select>
-                            <div class="form-text">
+                            <div class="form-text mt-3" id="filter-tags-help">
                                 <small class="text-muted">
                                     <i class="fas fa-info-circle me-1"></i>
                                     Select one or more tags to filter expenses. Expenses must have all selected tags.
@@ -538,6 +547,9 @@
                 </div>
             </div>
         {% endif %}
+
+        <!-- Tag Management Modal -->
+        {% include 'components/tag_editor_modal.html' %}
 
         <!-- Delete Confirmation Modal -->
         <div class="modal fade" id="deleteExpenseModal" tabindex="-1" aria-labelledby="deleteExpenseModalLabel">

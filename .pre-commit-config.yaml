@@ -50,20 +50,21 @@ repos:
     hooks:
       - id: debug-statements
 
-  # Python formatting
-  - repo: https://github.com/psf/black
-    rev: 26.1.0
+  # Python lint + format: Ruff (fix) then Black (format). Single hook, fixed order to avoid thrashing.
+  # Matches make format-python: ruff check --fix then black. Run only when Python files change.
+  - repo: local
     hooks:
-      - id: black
-        language_version: python3
-
-  # Python linting, import sorting, and unused code removal (replaces Flake8, isort, autoflake)
-  # Note: Keeping Black for formatting in Phase 1, Ruff formatter will be evaluated in Phase 2
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.14 # Match installed Ruff version
-    hooks:
-      - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
+      - id: python-lint
+        name: ruff + black
+        entry: >
+          bash -c 'REPO="$(git rev-parse --show-toplevel)" && cd "$REPO" &&
+          if [ -f "./venv/bin/python3" ]; then PYTHON=./venv/bin/python3;
+          elif command -v python3 >/dev/null 2>&1; then PYTHON=python3;
+          else echo "No Python found"; exit 1; fi &&
+          $PYTHON -m ruff check --fix app tests migrations &&
+          $PYTHON -m black app tests migrations'
+        language: system
+        files: \.py$
 
   # Security scanning
   - repo: https://github.com/PyCQA/bandit

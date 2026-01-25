@@ -330,9 +330,14 @@ class Expense(BaseModel):
 
     @property
     def tags(self) -> list[Tag]:
-        """Get all tags associated with this expense."""
+        """Get all tags associated with this expense, in the order they were added."""
         expense_tags_list = getattr(self, "expense_tags", [])
-        return [et.tag for et in expense_tags_list if et.tag is not None]
+        # Sort by created_at to preserve the order the user added tags
+        sorted_expense_tags = sorted(
+            expense_tags_list,
+            key=lambda et: et.created_at if et.created_at else datetime(1970, 1, 1, tzinfo=UTC),
+        )
+        return [et.tag for et in sorted_expense_tags if et.tag is not None]
 
     @property
     def formatted_amount(self) -> str:

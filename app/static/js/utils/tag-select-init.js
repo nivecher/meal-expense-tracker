@@ -558,6 +558,28 @@ function initializeTagSelector(inputElement, options = {}) {
 // Make initializeTagSelector available globally for late initialization
 window.initializeTagSelector = initializeTagSelector;
 
+/**
+ * Reusable tag selector widget initializer.
+ * Same rendering and CSS as expense form; use allowCreate: false for filter (search-only, add/remove only).
+ *
+ * @param {HTMLSelectElement} inputElement - The select element (e.g. #tagsInput or #filterTagsInput)
+ * @param {Object} options - Configuration
+ * @param {boolean} [options.allowCreate=true] - Allow creating new tags (false for filter)
+ * @param {Array<{id, name, color?, description?}>} [options.existingTags=[]] - Pre-selected tags (e.g. from data-existing-tags)
+ * @param {string[]} [options.selectedTags=[]] - Tag names to select (e.g. from URL params for filter)
+ * @returns {object|null} Tom Select instance or null
+ */
+function initTagSelectorWidget(inputElement, options = {}) {
+  const opts = {
+    allowCreate: options.allowCreate !== false,
+    existingTags: options.existingTags || [],
+    selectedTags: options.selectedTags || [],
+  };
+  return initializeTagSelector(inputElement, opts);
+}
+
+window.initTagSelectorWidget = initTagSelectorWidget;
+
 document.addEventListener('DOMContentLoaded', () => {
   // Check if TomSelect is available
   if (typeof TomSelect === 'undefined') {
@@ -588,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const tagSelect = initializeTagSelector(tagsInput, {
+    const tagSelect = initTagSelectorWidget(tagsInput, {
       allowCreate: true,
       existingTags,
     });
