@@ -16,11 +16,11 @@
 ### Step 2: Add Connection to AWS Secrets Manager (2 minutes)
 
 ```bash
-# Create Supabase secret in AWS
+# Create Supabase secret in AWS (example: staging)
 aws secretsmanager create-secret \
-  --name meal-expense-tracker/dev/supabase-connection \
+  --name meal-expense-tracker/staging/supabase-connection \
   --secret-string "postgresql+pg8000://postgres:[YOUR_PASSWORD]@db.[YOUR_PROJECT].supabase.co:5432/postgres" \
-  --kms-key-id alias/meal-expense-tracker-dev-main
+  --kms-key-id alias/meal-expense-tracker-staging-main
 ```
 
 ### Step 3: Update Lambda to Use Supabase (Already Done!)
@@ -51,10 +51,10 @@ Store it as a secret:
 
 ```bash
 aws secretsmanager create-secret \
-  --name meal-expense-tracker/dev/supabase-connection \
+  --name meal-expense-tracker/<env>/supabase-connection \
   --description "Supabase PostgreSQL connection string" \
   --secret-string "postgresql+pg8000://postgres.[PROJECT]:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres" \
-  --kms-key-id alias/meal-expense-tracker-dev-main
+  --kms-key-id alias/meal-expense-tracker-<env>-main
 ```
 
 ### 3. Update Lambda Configuration
