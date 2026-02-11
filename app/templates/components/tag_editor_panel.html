@@ -1,0 +1,147 @@
+{# Shared Manage Tags UI: form + tag list. Used in modal and on /expenses/tags page. #}
+<form id="tagEditorForm">
+    <input type="hidden" id="tagId" name="tag_id" />
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-lg-5">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0" id="tagFormTitle"> <i class="fas fa-plus me-2"></i>Create New Tag </h6>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        id="newTagBtn"
+                        title="Start creating a new tag">
+                        <i class="fas fa-plus me-1"></i>New Tag
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="tagName" class="form-label">Tag Name</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="tagName"
+                            name="name"
+                            required
+                            placeholder="Enter tag name" />
+                        <div class="form-text">Tag names preserve your exact case</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="tagColor" class="form-label">Tag Color</label>
+                        <div class="d-flex flex-column flex-md-row gap-2 align-items-md-center">
+                            <input
+                                type="color"
+                                class="form-control form-control-color"
+                                id="tagColor"
+                                name="color"
+                                value="#6c757d"
+                                style="width: 60px; height: 40px" />
+                            <div class="flex-grow-1">
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                        data-color="#667eea"
+                                        title="Purple"
+                                        >Purple</button
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                        data-color="#f093fb"
+                                        title="Pink"
+                                        >Pink</button
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                        data-color="#4facfe"
+                                        title="Blue"
+                                        >Blue</button
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                        data-color="#43e97b"
+                                        title="Green"
+                                        >Green</button
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                        data-color="#fa709a"
+                                        title="Coral"
+                                        >Coral</button
+                                    >
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary color-preset"
+                                        data-color="#ff8a80"
+                                        title="Orange"
+                                        >Orange</button
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="tagDescription" class="form-label"
+                            >Description <span class="text-muted">(Optional)</span></label
+                        >
+                        <textarea
+                            class="form-control"
+                            id="tagDescription"
+                            name="description"
+                            rows="2"
+                            placeholder="Add a description for this tag"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Preview</label>
+                        <div class="p-3 border rounded bg-light d-flex align-items-center" style="min-height: 60px">
+                            <span id="tagPreview" class="tag-badge tag-badge-pretty">Tag Preview</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-primary" id="saveTagBtn">
+                            <i class="fas fa-save me-1"></i> <span id="saveBtnText">Save Tag</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" id="deleteTagBtn" style="display: none">
+                            <i class="fas fa-trash me-1"></i> Delete
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="resetFormBtn">
+                            <i class="fas fa-undo me-1"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-7">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="fas fa-tags me-2"></i>Your Tags</h6>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        id="refreshTagsBtn"
+                        title="Refresh tags list">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="allTagsContainer">
+                        <div class="text-muted small text-center py-3">
+                            <i class="fas fa-spinner fa-spin me-2"></i>Loading tags...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>

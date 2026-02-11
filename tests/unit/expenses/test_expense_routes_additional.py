@@ -102,10 +102,14 @@ class TestExpenseRoutesAdditional:
         """Test tag CRUD operations."""
         auth.login("testuser_1", "testpass")
 
-        # List tags
-        response = client.get("/expenses/tags")
+        # List tags (request JSON so route returns 200 with data; otherwise redirects to list view)
+        response = client.get(
+            "/expenses/tags",
+            headers={"Accept": "application/json"},
+        )
         assert response.status_code == 200
-        assert b"tags" in response.data or b"Tags" in response.data
+        data = response.get_json()
+        assert data is not None and "tags" in data
 
         # Search tags
         response = client.get("/expenses/tags/search", query_string={"q": "test"})

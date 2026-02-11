@@ -39,10 +39,14 @@ class TestSecurityHeaders:
         content_type = response.headers.get("Content-Type")
         assert content_type == "text/css; charset=utf-8"
 
-        # Cache control should be long-term for static assets
+        # Cache control: long-term in production, no-cache in test/dev
         cache_control = response.headers.get("Cache-Control")
-        assert "max-age=31536000" in cache_control
-        assert "immutable" in cache_control
+        assert cache_control is not None
+        assert (
+            "max-age=31536000" in cache_control
+            and "immutable" in cache_control
+            or ("no-cache" in cache_control and "max-age=0" in cache_control)
+        )
 
         # Security headers should still be present
         assert response.headers.get("X-Content-Type-Options") == "nosniff"
@@ -55,10 +59,14 @@ class TestSecurityHeaders:
         content_type = response.headers.get("Content-Type")
         assert content_type == "text/javascript; charset=utf-8"
 
-        # Cache control should be long-term for static assets
+        # Cache control: long-term in production, no-cache in test/dev
         cache_control = response.headers.get("Cache-Control")
-        assert "max-age=31536000" in cache_control
-        assert "immutable" in cache_control
+        assert cache_control is not None
+        assert (
+            "max-age=31536000" in cache_control
+            and "immutable" in cache_control
+            or ("no-cache" in cache_control and "max-age=0" in cache_control)
+        )
 
         # Security headers should still be present
         assert response.headers.get("X-Content-Type-Options") == "nosniff"

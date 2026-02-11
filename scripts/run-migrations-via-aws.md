@@ -16,8 +16,12 @@ AWS CloudShell is a browser-based terminal that has AWS CLI and network access.
 # In AWS CloudShell
 git clone <your-repo-url>
 cd meal-expense-tracker
+
+# Choose environment (dev|staging|prod)
+ENV=staging
+
 aws secretsmanager get-secret-value \
-  --secret-id meal-expense-tracker/dev/supabase-connection \
+  --secret-id meal-expense-tracker/${ENV}/supabase-connection \
   --region us-east-1 \
   --query SecretString \
   --output text | sed 's/^/export DATABASE_URL=/' | bash
@@ -37,8 +41,9 @@ The error shows Supabase is trying to connect via IPv6. To force IPv4:
 
 ```bash
 # Get the connection string
+ENV=staging
 CONN=$(aws secretsmanager get-secret-value \
-  --secret-id meal-expense-tracker/dev/supabase-connection \
+  --secret-id meal-expense-tracker/${ENV}/supabase-connection \
   --region us-east-1 \
   --query SecretString \
   --output text)

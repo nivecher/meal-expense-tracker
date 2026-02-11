@@ -107,7 +107,7 @@ block head_extra %}
                         <i class="fas fa-dollar-sign text-success"></i>
                     </div>
                     <div class="stats-content">
-                        <div class="stats-value">${{ "%.2f"|format(expense_stats.total_spent or 0) }}</div>
+                        <div class="stats-value">{{ (expense_stats.total_spent or 0)|format_currency_usd }}</div>
                         <div class="stats-label">Total Spent</div>
                     </div>
                 </div>
@@ -120,7 +120,7 @@ block head_extra %}
                         <i class="fas fa-calculator text-info"></i>
                     </div>
                     <div class="stats-content">
-                        <div class="stats-value">${{ "%.2f"|format(expense_stats.avg_expense or 0) }}</div>
+                        <div class="stats-value">{{ (expense_stats.avg_expense or 0)|format_currency_usd }}</div>
                         <div class="stats-label">Average Expense</div>
                     </div>
                 </div>
@@ -194,7 +194,7 @@ block head_extra %}
                                         %}
                                     </div>
                                 </div>
-                                <div class="expense-amount"> ${{ "%.2f"|format(expense.amount) }} </div>
+                                <div class="expense-amount"> {{ expense.amount|format_currency_usd }} </div>
                             </div>
                         </a>
                         {% endfor %}
@@ -259,7 +259,7 @@ block head_extra %}
                                         {% if restaurant[3] %} {{ cuisine_badge(restaurant[3], size='sm') }} {% endif %}
                                     </div>
                                 </div>
-                                <div class="restaurant-total"> ${{ "%.2f"|format(restaurant[5]) }} </div>
+                                <div class="restaurant-total"> {{ restaurant[5]|format_currency_usd }} </div>
                             </div>
                         </a>
                         {% endfor %}

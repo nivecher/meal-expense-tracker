@@ -1077,12 +1077,26 @@ def clear_place_id(restaurant_id: int) -> Response | tuple[Response, int]:
         return redirect(url_for("restaurants.restaurant_details", restaurant_id=restaurant_id))  # type: ignore[return-value]
 
 
+def _parse_export_ids(raw_ids: list[str]) -> list[int]:
+    """Parse and sanitize export ID list."""
+    ids: list[int] = []
+    for raw_id in raw_ids:
+        for part in raw_id.split(","):
+            value = part.strip()
+            if not value or not value.isdigit():
+                continue
+            ids.append(int(value))
+    return list(dict.fromkeys(ids))
+
+
 @bp.route("/export")
 @login_required
 def export_restaurants() -> Response:
     """Export restaurants as CSV or JSON."""
     format_type = request.args.get("format", "csv").lower()
     is_sample = request.args.get("sample", "false").lower() == "true"
+    raw_ids = request.args.getlist("ids")
+    restaurant_ids = _parse_export_ids(raw_ids)
 
     # If sample is requested, generate sample CSV with required fields
     if is_sample:
@@ -1127,8 +1141,15 @@ def export_restaurants() -> Response:
         response.headers["Content-Disposition"] = "attachment; filename=sample_restaurants.csv"
         return response
 
+    if raw_ids and not restaurant_ids:
+        flash("No valid restaurants selected for export", "warning")
+        return redirect(url_for("restaurants.list_restaurants"))  # type: ignore[return-value]
+
     # Get the data from the service
-    restaurants = services.export_restaurants_for_user(current_user.id)
+    restaurants = services.export_restaurants_for_user(
+        current_user.id,
+        restaurant_ids if raw_ids else None,
+    )
 
     if not restaurants:
         flash("No restaurants found to export", "warning")

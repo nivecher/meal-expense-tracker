@@ -45,7 +45,7 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                             <p>
                                 <strong>Amount:</strong>
                                 <span class="amount-right d-inline-block" style="min-width: 80px"
-                                    >${{ "%.2f"|format(expense.amount) }}</span
+                                    >{{ expense.amount|format_currency_usd }}</span
                                 >
                             </p>
                             {% if expense.meal_type %}

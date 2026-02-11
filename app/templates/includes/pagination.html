@@ -5,7 +5,7 @@ URL - aria_label: (string) ARIA label for the navigation element #} {% if pagina
 query_params or {} %} {% set url_kwargs = url_kwargs or {} %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/components/pagination.css') }}" />
 <nav aria-label="{{ aria_label|default('Pagination') }}" class="mt-4">
-    <ul class="pagination justify-content-center mb-0">
+    <ul class="pagination justify-content-end mb-0">
         {# Previous page link #} {% if pagination.has_prev %}
         <li class="page-item">
             <a

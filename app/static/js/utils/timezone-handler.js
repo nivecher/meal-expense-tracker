@@ -48,15 +48,16 @@ function setTimezoneCookie(timezone, days = 365) {
  * Display formatting is handled client-side by date-formatter.js.
  */
 function initializeTimezoneHandler() {
+  if (initializeTimezoneHandler.hasRun) return;
+  initializeTimezoneHandler.hasRun = true;
   const detectedTimezone = detectBrowserTimezone();
   setTimezoneCookie(detectedTimezone);
-  console.log('Browser timezone detected and stored:', detectedTimezone);
+  if (window.location.search.includes('debug=timezone')) {
+    console.warn('Browser timezone detected and stored:', detectedTimezone);
+  }
 }
 
-// Initialize on DOM load
-document.addEventListener('DOMContentLoaded', initializeTimezoneHandler);
-
-// Also initialize immediately if DOM is already loaded
+// Initialize immediately if DOM is already loaded; otherwise wait for DOMContentLoaded.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeTimezoneHandler);
 } else {

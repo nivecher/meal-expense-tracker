@@ -33,7 +33,7 @@ reports_content %}
         <div class="card text-center">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Total Spent</h6>
-                <h3 class="card-title text-success">${{ "%.2f"|format(dashboard_stats.summary.total_spent) }}</h3>
+                <h3 class="card-title text-success">{{ dashboard_stats.summary.total_spent|format_currency_usd }}</h3>
             </div>
         </div>
     </div>
@@ -41,7 +41,7 @@ reports_content %}
         <div class="card text-center">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Avg per Expense</h6>
-                <h3 class="card-title text-info">${{ "%.2f"|format(dashboard_stats.summary.avg_per_expense) }}</h3>
+                <h3 class="card-title text-info">{{ dashboard_stats.summary.avg_per_expense|format_currency_usd }}</h3>
             </div>
         </div>
     </div>
@@ -49,7 +49,7 @@ reports_content %}
         <div class="card text-center">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Avg per Day</h6>
-                <h3 class="card-title text-warning">${{ "%.2f"|format(dashboard_stats.summary.avg_per_day) }}</h3>
+                <h3 class="card-title text-warning">{{ dashboard_stats.summary.avg_per_day|format_currency_usd }}</h3>
             </div>
         </div>
     </div>
@@ -75,7 +75,7 @@ reports_content %}
                         {% for category in dashboard_stats.top_categories %}
                         <tr>
                             <td>{{ category.name }}</td>
-                            <td class="text-end">${{ "%.2f"|format(category.total) }}</td>
+                            <td class="text-end">{{ category.total|format_currency_usd }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

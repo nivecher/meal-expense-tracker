@@ -4,9 +4,9 @@
 
 {% block title %}Expenses - Meal Expense Tracker{% endblock %}
 
+{% block main_container_class %}container-fluid{% endblock %}
+
 {% block styles %}
-    <link href="{{ url_for('static', filename='css/components/navbar.css') }}" rel="stylesheet" />
-    <link href="{{ url_for('static', filename='css/components/unified-table.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/tags.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
@@ -19,6 +19,8 @@
     <!-- Expense form CSS so filter tag selector matches form tag selector -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/expense-form.css') }}">
     <link href="{{ url_for('static', filename='css/pages/expense-list.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/components/tag-manager.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/pages/expense-tags.css') }}" rel="stylesheet" />
 {% endblock styles %}
 
 {% block scripts %}
@@ -29,216 +31,213 @@
     <script src="{{ url_for('static', filename='js/components/tag-badge-styler.js') }}"></script>
     <!-- Table sorting functionality -->
     <script src="{{ url_for('static', filename='js/components/table-sorting.js') }}"></script>
-    <!-- Tag Manager for modal functionality -->
+    <!-- Tag Manager (inline on Tags tab; modal on form/profile) -->
     <script src="{{ url_for('static', filename='js/components/tag-manager.js') }}"></script>
     <!-- Tag selector initialization (depends on Tom Select being loaded) -->
     <script src="{{ url_for('static', filename='js/utils/tag-select-init.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/pages/expense-list.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/expense-tags.js') }}"></script>
 {% endblock scripts %}
 
-{% block content %}
-    <main class="container-fluid py-4">
-
-        <!-- Breadcrumb Navigation -->
-        {% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'}, {'title': 'Expenses'} ] %}
-        {% include 'includes/breadcrumb.html' %}
-
-        <!-- Header Section -->
-        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-            <h1 class="h3 mb-0">
-                <i class="fas fa-receipt text-primary me-2"></i>My Expenses
-            </h1>
-            <div class="d-flex gap-2 flex-wrap">
-                <!-- Primary Actions -->
-                <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary" data-bs-toggle="tooltip" title="Add a new expense">
-                    <i class="fas fa-plus me-2"></i>Add Expense
-                </a>
-                <!-- Data Management Dropdown -->
-                <div class="dropdown">
-                    <button
-                        class="btn btn-outline-secondary dropdown-toggle"
-                        type="button"
-                        id="dataManagementDropdown"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false">
-                        <i class="fas fa-database me-2"></i>Data Management
-                    </button>
-                    <ul class="dropdown-menu" aria-labelledby="dataManagementDropdown">
-                        <li>
-                            <a class="dropdown-item" href="{{ url_for('expenses.export_expenses', format='csv') }}">
-                                <i class="fas fa-file-csv me-2"></i> Export as CSV
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{{ url_for('expenses.export_expenses', format='json') }}">
-                                <i class="fas fa-file-code me-2"></i> Export as JSON
-                            </a>
-                        </li>
-                        <li>
-                            <hr class="dropdown-divider" />
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{{ url_for('expenses.import_expenses') }}">
-                                <i class="fas fa-file-import me-2"></i> Import Expenses
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+{% block section_header %}
+    {% set active_tab = view_mode if view_mode is defined else 'expenses' %}
+    <div class="section-header-expenses">
+        <div class="section-title">
+            <i class="fas fa-receipt text-primary"></i>
+            <h1>Expenses</h1>
         </div>
-
-        <!-- Search & Filter + View Toggle Row -->
-        {% set active_filters_count = (1 if search else 0) + (1 if meal_type else 0) + (1 if category else 0) + (1 if tags else 0) + (1 if start_date else 0) + (1 if end_date else 0) %}
-        {% set show_filters = active_filters_count > 0 or request.args.get('filter_expanded') == '1' %}
-
-        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-            <!-- Search & Filter Collapsible Button -->
-            <div class="d-flex align-items-center">
-                <button
-                    class="btn btn-outline-primary d-flex align-items-center {% if active_filters_count %}border-primary{% endif %}"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#filterCollapse"
-                    aria-expanded="{% if show_filters %}true{% else %}false{% endif %}"
-                    aria-controls="filterCollapse"
-                    data-tooltip="true"
-                    title="Show search and filter options">
-                    <i class="fas fa-filter me-2"></i>Search & Filter
-                    {% if active_filters_count %}
-                        <span class="badge bg-primary ms-2">{{ active_filters_count }}</span>
-                    {% endif %}
-                    <i class="fas {% if show_filters %}fa-chevron-up{% else %}fa-chevron-down{% endif %} ms-2"></i>
+        <ul class="nav nav-tabs section-tabs expenses-page-tabs mt-2" id="expensesTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link{% if active_tab != 'calendar' and active_tab != 'orders' and active_tab != 'tags' %} active{% endif %}" id="expenses-tab" data-bs-toggle="tab" data-bs-target="#expenses-pane" type="button" role="tab" aria-controls="expenses-pane" aria-selected="{% if active_tab != 'calendar' and active_tab != 'orders' and active_tab != 'tags' %}true{% else %}false{% endif %}">
+                    Expenses
                 </button>
-                {% if active_filters_count %}
-                    <span class="badge bg-secondary ms-2 d-none d-md-inline">{{ expenses|length }} result{{ 's' if expenses|length != 1 else '' }}</span>
-                {% endif %}
-            </div>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link{% if active_tab == 'calendar' %} active{% endif %}" id="calendar-tab" data-bs-toggle="tab" data-bs-target="#calendar-pane" type="button" role="tab" aria-controls="calendar-pane" aria-selected="{% if active_tab == 'calendar' %}true{% else %}false{% endif %}">
+                    Calendar
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link{% if active_tab == 'orders' %} active{% endif %}" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-pane" type="button" role="tab" aria-controls="orders-pane" aria-selected="{% if active_tab == 'orders' %}true{% else %}false{% endif %}">
+                    Orders
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link{% if active_tab == 'tags' %} active{% endif %}" id="tags-tab" data-bs-toggle="tab" data-bs-target="#tags-pane" type="button" role="tab" aria-controls="tags-pane" aria-selected="{% if active_tab == 'tags' %}true{% else %}false{% endif %}">
+                    Tags
+                </button>
+            </li>
+        </ul>
+    </div>
+{% endblock %}
 
-            <!-- View Toggle -->
-            <div class="btn-group" role="group" aria-label="View Toggle">
-                <input type="radio" class="btn-check" name="view-type" id="card-view" autocomplete="off" checked />
-                <label class="btn btn-outline-primary" for="card-view" id="card-view-label" data-bs-toggle="tooltip" title="Card view - shows expenses in card format">
-                    <i class="fas fa-th-large me-2"></i>Cards
-                </label>
-                <input type="radio" class="btn-check" name="view-type" id="table-view" autocomplete="off" />
-                <label class="btn btn-outline-primary" for="table-view" id="table-view-label" data-bs-toggle="tooltip" title="Table view - shows expenses in table format">
-                    <i class="fas fa-table me-2"></i>Table
-                </label>
-            </div>
-        </div>
+{% block content %}
+    <div class="px-0">
+        {% set view_preference = request.cookies.get('expense_view_preference', 'card') %}
+        {% set active_tab = view_mode if view_mode is defined else 'expenses' %}
+        {% set active_filters_count = (1 if meal_type else 0) + (1 if order_type else 0) + (1 if category else 0) + (1 if tags else 0) + (1 if start_date else 0) + (1 if end_date else 0) %}
 
-        <!-- Collapsible Filter Form -->
-        <div class="collapse {% if show_filters %}show{% endif %} mb-4" id="filterCollapse">
-            <div class="card">
-                <div class="card-body">
-                    <form method="get" class="row g-3" novalidate>
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                        <!-- First Row -->
-                        <div class="col-md-6">
-                            <label for="search" class="form-label">Search</label>
-                            <input
-                                type="text"
-                                class="form-control"
-                                id="search"
-                                name="q"
-                                value="{{ search }}"
-                                placeholder="Search restaurants, categories, notes, or meal types" />
-                        </div>
-                        <div class="col-md-3">
-                            <label for="meal_type" class="form-label">Meal Type</label>
-                            <select class="form-control" id="meal_type" name="meal_type">
-                                <option value="">All Meal Types</option>
-                                {% for type in meal_types %}
-                                    <option value="{{ type }}"{% if meal_type == type %} selected{% endif %}>{{ type.title() }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label for="category" class="form-label">Category</label>
-                            <select class="form-control" id="category" name="category">
-                                <option value="">All Categories</option>
-                                {% for cat in categories %}
-                                    <option value="{{ cat }}"{% if category == cat %} selected{% endif %}>{{ cat }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <!-- Second Row: Tags (same structure as expense form tag-selector-widget) -->
-                        <div class="col-12 tag-selector-widget">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label for="filterTagsInput" class="form-label mb-0">Tags</label>
-                                <a href="#" id="manageTagsLink" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#tagEditorModal">
-                                    <i class="fas fa-cog me-1"></i>Manage Tags
-                                </a>
+        <div class="tab-content pt-2" id="expensesTabsContent">
+            <div class="tab-pane fade{% if active_tab != 'calendar' and active_tab != 'orders' and active_tab != 'tags' %} show active{% endif %}" id="expenses-pane" role="tabpanel" aria-labelledby="expenses-tab">
+                <div class="card mb-4 activity-panel">
+                    <div class="card-header bg-white">
+                        <div class="activity-header activity-header-stacked">
+                            <div class="activity-header-row activity-header-row-1">
+                                <div class="activity-title">
+                                    <i class="fas fa-bolt text-primary"></i>
+                                    <span class="fw-semibold">Expense Activity</span>
+                                </div>
+                                <div class="btn-group btn-group-sm view-toggle-in-activity" role="group" aria-label="View Toggle">
+                                    <input type="radio" class="btn-check" name="view-type" id="card-view" autocomplete="off"{% if view_preference not in ('table', 'compact') %} checked{% endif %} />
+                                    <label class="btn btn-outline-primary view-toggle-btn" for="card-view" id="card-view-label" data-bs-toggle="tooltip" title="Card view">
+                                        <i class="fas fa-th-large"></i>
+                                        <span class="view-toggle-text d-none d-sm-inline ms-1">Cards</span>
+                                    </label>
+                                    <input type="radio" class="btn-check" name="view-type" id="table-view" autocomplete="off"{% if view_preference in ('table', 'compact') %} checked{% endif %} />
+                                    <label class="btn btn-outline-primary view-toggle-btn" for="table-view" id="table-view-label" data-bs-toggle="tooltip" title="Table view">
+                                        <i class="fas fa-table"></i>
+                                        <span class="view-toggle-text d-none d-sm-inline ms-1">Table</span>
+                                    </label>
+                                </div>
                             </div>
-                            <select id="filterTagsInput"
-                                   name="tags"
-                                   class="form-control"
-                                   multiple
-                                   placeholder="Type to search tags...">
-                            </select>
-                            <div class="form-text mt-3" id="filter-tags-help">
-                                <small class="text-muted">
-                                    <i class="fas fa-info-circle me-1"></i>
-                                    Select one or more tags to filter expenses. Expenses must have all selected tags.
-                                </small>
+                            <div class="activity-header-row activity-header-row-2">
+                                <form
+                                    id="expense-search-form"
+                                    class="expense-search-form"
+                                    method="get"
+                                    novalidate
+                                    hx-get="{{ url_for('expenses.list_expenses') }}"
+                                    hx-params="not csrf_token"
+                                    hx-target="#expense-list-results"
+                                    hx-select="#expense-list-results"
+                                    hx-swap="outerHTML"
+                                    hx-push-url="true"
+                                    hx-include="#per_page, #expense-filter-form"
+                                    hx-vals='{"page":"1"}'
+                                    hx-trigger="submit, keyup changed delay:350ms from:#expense-search-input">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-light text-muted"><i class="fas fa-search"></i></span>
+                                        <input
+                                            type="text"
+                                            class="form-control form-control-sm expense-search-input"
+                                            id="expense-search-input"
+                                            name="q"
+                                            value="{{ search }}"
+                                            placeholder="Search Expenses" />
+                                    </div>
+                                </form>
+                                <div class="d-flex align-items-center gap-2" id="expense-filter-status">
+                                    <span
+                                        id="expense-filter-status-count"
+                                        class="badge bg-primary{% if not active_filters_count %} d-none{% endif %}">
+                                        {{ active_filters_count }}
+                                    </span>
+                                    <span id="expense-filter-status-text" class="text-muted small{% if not active_filters_count %} d-none{% endif %}">
+                                        Filters active
+                                    </span>
+                                </div>
+                                <div class="activity-actions activity-actions-icons ms-auto">
+                                    <button
+                                        id="expense-filter-button"
+                                        class="btn btn-sm btn-icon-only {% if active_filters_count %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+                                        type="button"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#expenseFilterModal"
+                                        title="{% if active_filters_count %}{{ active_filters_count }} filters active{% else %}Filters{% endif %}">
+                                        <i class="fas fa-filter"></i>
+                                        <span
+                                            id="expense-filter-count"
+                                            class="badge rounded-pill activity-btn-badge bg-white text-primary{% if not active_filters_count %} d-none{% endif %}">
+                                            {{ active_filters_count }}
+                                        </span>
+                                    </button>
+                                    <a class="btn btn-sm btn-outline-secondary btn-icon-only" href="{{ url_for('expenses.import_expenses') }}" data-bs-toggle="tooltip" title="Import expenses">
+                                        <i class="fas fa-file-import"></i>
+                                    </a>
+                                    <div class="dropdown">
+                                        <button
+                                            class="btn btn-sm btn-outline-secondary btn-icon-only dropdown-toggle"
+                                            type="button"
+                                            id="expenseExportDropdown"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false"
+                                            title="Export">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="expenseExportDropdown">
+                                            <li>
+                                                <a class="dropdown-item" href="{{ url_for('expenses.export_expenses', format='csv') }}">
+                                                    <i class="fas fa-file-csv me-2"></i>Export to CSV
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="{{ url_for('expenses.export_expenses', format='json') }}">
+                                                    <i class="fas fa-file-code me-2"></i>Export to JSON
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <a href="{{ url_for('expenses.add_expense') }}" class="btn btn-primary btn-sm btn-icon-only" data-bs-toggle="tooltip" title="New expense">
+                                        <i class="fas fa-plus"></i>
+                                    </a>
+                                </div>
                             </div>
                         </div>
-                        <!-- Third Row -->
-                        <div class="col-md-4">
-                            <label for="start_date" class="form-label">From Date</label>
-                            <input
-                                type="date"
-                                class="form-control"
-                                id="start_date"
-                                name="start_date"
-                                value="{{ start_date if start_date and start_date != 'None' else '' }}" />
-                        </div>
-                        <div class="col-md-4">
-                            <label for="end_date" class="form-label">To Date</label>
-                            <input
-                                type="date"
-                                class="form-control"
-                                id="end_date"
-                                name="end_date"
-                                value="{{ end_date if end_date and end_date != 'None' else '' }}" />
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end gap-2">
-                            <button type="submit" class="btn btn-primary flex-fill" aria-label="Apply filters">
-                                <i class="fas fa-search me-2" aria-hidden="true"></i> Filter
-                            </button>
-                            <a href="{{ url_for('expenses.list_expenses') }}" class="btn btn-outline-secondary" aria-label="Clear all filters">
-                                <i class="fas fa-times me-2" aria-hidden="true"></i> Clear
-                            </a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
+                    </div>
+                    <div class="card-body py-2">
+                        <div id="expense-list-results">
+                            {# Keep calendar data inside HTMX-swapped container so it stays in sync with filters #}
+                            {% set calendar_items = namespace(items=[]) %}
+                            {% for expense in calendar_expenses %}
+                                {% set _ = calendar_items.items.append({
+                                    "id": expense.id,
+                                    "date": expense.date|format_date_user_tz('%Y-%m-%d') if expense.date else "",
+                                    "dateTimeIso": expense.date.isoformat() if expense.date else "",
+                                    "timeLabel": expense.date|format_time_with_tz if expense.date else "",
+                                    "restaurant": expense.restaurant.name if expense.restaurant else "Unknown restaurant",
+                                    "restaurantWebsite": expense.restaurant.website if expense.restaurant else "",
+                                    "mealType": expense.meal_type or "",
+                                    "mealTypeIcon": expense.meal_type|meal_type_icon if expense.meal_type else "question",
+                                    "orderType": expense.order_type or "",
+                                    "partySize": expense.party_size or "",
+                                    "amount": expense.amount|string,
+                                    "detailsUrl": url_for('expenses.expense_details', expense_id=expense.id),
+                                }) %}
+                            {% endfor %}
+                            <script type="application/json" id="expense-calendar-data">
+                                {{ calendar_items.items|tojson }}
+                            </script>
         <!-- Pagination Controls -->
         {% if total_expenses > 0 %}
-            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                <!-- Results Summary -->
-                <div class="d-flex align-items-center">
-                    <span class="text-muted">
-                        {% if per_page == -1 %}
-                            Showing all {{ total_expenses }} expense{{ 's' if total_expenses != 1 else '' }}
-                        {% else %}
-                            Showing {{ page * per_page - per_page + 1 }}-{{ (page * per_page if page * per_page <= total_expenses else total_expenses) }} of {{ total_expenses }} expense{{ 's' if total_expenses != 1 else '' }}
-                            (Page {{ page }} of {{ total_pages }})
-                        {% endif %}
-                        {% if total_amount > 0 %}
-                            (Total: ${{ "%.2f"|format(total_amount) }})
-                        {% endif %}
-                    </span>
-                </div>
-
-                <!-- Pagination Controls -->
-                <div class="d-flex align-items-center gap-3">
-                    <!-- Items per page selector -->
+            <div class="d-flex align-items-center mb-3 flex-wrap gap-2">
+                <!-- Left side: results summary + page size -->
+                <div class="d-flex align-items-center flex-wrap gap-3">
+                    <div class="d-flex align-items-center">
+                        <span class="text-muted">
+                            {% if per_page == -1 %}
+                                Showing all {{ total_expenses|format_number }} expense{{ 's' if total_expenses != 1 else '' }}
+                            {% else %}
+                                Showing {{ (page * per_page - per_page + 1)|format_number }}-{{ (page * per_page if page * per_page <= total_expenses else total_expenses)|format_number }} of {{ total_expenses|format_number }} expense{{ 's' if total_expenses != 1 else '' }}
+                                (Page {{ page }} of {{ total_pages }})
+                            {% endif %}
+                            {% if total_amount > 0 %}
+                                (Total: {{ total_amount|format_currency_usd }})
+                            {% endif %}
+                        </span>
+                    </div>
                     <div class="d-flex align-items-center">
                         <label for="per_page" class="form-label mb-0 me-2 small text-muted">Show:</label>
-                        <select id="per_page" name="per_page" class="form-select form-select-sm border-0 bg-light per-page-select">
+                        <select
+                            id="per_page"
+                            name="per_page"
+                            class="form-select form-select-sm border-0 bg-light per-page-select"
+                            hx-get="{{ url_for('expenses.list_expenses') }}"
+                            hx-target="#expense-list-results"
+                            hx-select="#expense-list-results"
+                            hx-swap="outerHTML"
+                            hx-push-url="true"
+                            hx-include="#expense-search-form, #expense-filter-form"
+                            hx-vals='{"page":"1"}'>
                             <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
                             <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
                             <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
@@ -246,13 +245,23 @@
                             <option value="-1" {% if per_page == -1 %}selected{% endif %}>All</option>
                         </select>
                     </div>
+                </div>
 
-                    <!-- Page navigation (only show if paginated) -->
-                    {% if per_page != -1 and total_pages > 1 %}
-                        <div class="btn-group" role="group" aria-label="Page navigation">
+                <!-- Right side: paging buttons only, right-justified -->
+                {% if per_page != -1 and total_pages > 1 %}
+                    <div class="d-flex align-items-center ms-auto">
+                        <div
+                            class="btn-group"
+                            role="group"
+                            aria-label="Page navigation"
+                            hx-boost="true"
+                            hx-target="#expense-list-results"
+                            hx-select="#expense-list-results"
+                            hx-swap="outerHTML"
+                            hx-push-url="true">
                             <!-- Previous page -->
                             {% if page > 1 %}
-                                {% set prev_params = {'page': page-1, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
+                                {% set prev_params = {'page': page-1, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'order_type': order_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
                                 {% if tags %}
                                     {% set _ = prev_params.update({'tags': tags}) %}
                                 {% endif %}
@@ -270,7 +279,7 @@
                                 {% if p == page %}
                                     <span class="btn btn-primary btn-sm" aria-label="Current page {{ p }}" role="button" tabindex="-1">{{ p }}</span>
                                 {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
-                                    {% set page_params = {'page': p, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
+                                    {% set page_params = {'page': p, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'order_type': order_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
                                     {% if tags %}
                                         {% set _ = page_params.update({'tags': tags}) %}
                                     {% endif %}
@@ -284,7 +293,7 @@
 
                             <!-- Next page -->
                             {% if page < total_pages %}
-                                {% set next_params = {'page': page+1, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
+                                {% set next_params = {'page': page+1, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'order_type': order_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
                                 {% if tags %}
                                     {% set _ = next_params.update({'tags': tags}) %}
                                 {% endif %}
@@ -297,21 +306,21 @@
                                 </span>
                             {% endif %}
                         </div>
-                    {% endif %}
-                </div>
+                    </div>
+                {% endif %}
             </div>
         {% endif %}
 
         {% if expenses %}
             <!-- Card View (responsive grid) -->
-            <div id="card-view-container" class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3 mb-4">
+            <div id="card-view-container" class="mb-4{% if view_preference in ('table', 'compact') %} d-none{% endif %}">
                 {% for expense in expenses %}
                     <div class="col">
                         <div class="card h-100 shadow-sm">
                             <div class="card-body">
                                 <!-- Top Row: Restaurant Info (Left 2/3) + Amount/Date (Right 1/3) -->
-                                <div class="row mb-3">
-                                    <div class="col-8">
+                                <div class="row expense-card-top-row mb-3">
+                                    <div class="col-8 expense-card-restaurant-col">
                                         <div class="d-flex align-items-start">
                                             <!-- Restaurant Icon -->
                                             <div class="restaurant-icon me-2 flex-shrink-0">
@@ -331,8 +340,8 @@
                                             </div>
 
                                             <!-- Restaurant Name and Badges -->
-                                            <div class="flex-grow-1">
-                                                <h5 class="card-title mb-2">
+                                            <div class="flex-grow-1 min-w-0">
+                                                <h5 class="card-title mb-2 expense-card-title">
                                                     <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
                                                        class="text-decoration-none text-dark">
                                                         {% if expense.restaurant %}
@@ -343,7 +352,7 @@
                                                     </a>
                                                 </h5>
                                                 <!-- Cuisine and Service Level Badges (side by side) -->
-                                                <div class="d-flex gap-2 mb-2">
+                                                <div class="d-flex flex-wrap gap-2 mb-2 expense-card-badges-row">
                                                     {% from 'macros/badge_helpers.html' import cuisine_badge %}
                                                     {{ cuisine_badge(expense.restaurant.cuisine if expense.restaurant else None, size='sm') }}
                                                     {% if expense.restaurant and expense.restaurant.service_level %}
@@ -352,7 +361,7 @@
                                                     {% endif %}
                                                 </div>
                                                 <!-- Meal and Order Type Badges (side by side) -->
-                                                <div class="d-flex gap-2 mb-2">
+                                                <div class="d-flex flex-wrap gap-2 mb-2 expense-card-badges-row">
                                                     {% if expense.meal_type %}
                                                         {% from 'macros/badge_helpers.html' import meal_type_badge %}
                                                         {{ meal_type_badge(expense.meal_type, size='sm') }}
@@ -365,19 +374,25 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-4 text-end">
-                                        <div class="fw-bold text-success fs-5 mb-2">
-                                            ${{ "%.2f"|format(expense.amount) }}
+                                    <div class="col-4 text-end expense-card-amount-col">
+                                        <div class="fw-bold text-success fs-5 mb-2 expense-card-amount">
+                                            {{ expense.amount|format_currency_usd }}
                                         </div>
-                                        <!-- Party Size and Price Per Person -->
+                                        <!-- Party Size and Price Per Person (compact: number only + tooltip) -->
                                         {% if expense.party_size and expense.party_size > 1 %}
-                                            <div class="badge bg-info text-white mb-1 d-block">
-                                                <i class="fas fa-users me-1"></i>{{ expense.party_size }} people
+                                            <div class="badge bg-info text-white expense-card-party-badge mb-1 d-inline-block"
+                                                 data-bs-toggle="tooltip"
+                                                 data-bs-placement="top"
+                                                 title="{{ expense.party_size }} people">
+                                                <i class="fas fa-users me-1"></i>{{ expense.party_size }}
                                             </div>
-                                            <div class="text-muted small">${{ "%.2f"|format(expense.price_per_person) }} / person</div>
+                                            <div class="text-muted small d-block" data-bs-toggle="tooltip" title="Price per person">{{ expense.price_per_person|format_currency_usd }} / person</div>
                                         {% elif expense.party_size and expense.party_size == 1 %}
-                                            <div class="badge bg-info text-white d-block">
-                                                <i class="fas fa-user me-1"></i>1 person
+                                            <div class="badge bg-info text-white expense-card-party-badge d-inline-block"
+                                                 data-bs-toggle="tooltip"
+                                                 data-bs-placement="top"
+                                                 title="1 person">
+                                                <i class="fas fa-user me-1"></i>1
                                             </div>
                                         {% endif %}
                                     </div>
@@ -428,27 +443,30 @@
                                 {% endif %}
 
                                 <!-- Bottom Row: Location/Date (Left) + Actions (Right) -->
-                                <div class="row pt-0 border-top">
-                                    <div class="col-8">
-                                        <div class="text-muted small">
+                                <div class="row expense-card-bottom-row pt-0 border-top">
+                                    <div class="col-8 expense-card-location-col">
+                                        <div class="text-muted small expense-card-address-line d-flex align-items-center gap-2">
                                             {% if expense.restaurant %}
-                                                <i class="fas fa-map-marker-alt me-2"></i>
-                                                {% if expense.restaurant.city and expense.restaurant.state %}
-                                                    <span class="me-2">{{ expense.restaurant.city }}, {{ expense.restaurant.state }}</span>
-                                                    {% if expense.restaurant.get_google_maps_url() %}
-                                                        <a href="{{ expense.restaurant.get_google_maps_url() }}"
-                                                           class="text-decoration-none text-primary"
-                                                           data-bs-toggle="tooltip"
-                                                           title="View on Google Maps">
-                                                            <i class="fas fa-map-marked-alt"></i>
-                                                        </a>
+                                                <i class="fas fa-map-marker-alt flex-shrink-0"></i>
+                                                <span class="expense-card-address-text text-truncate"
+                                                      title="{% if expense.restaurant.address %}{{ expense.restaurant.address }}{% elif expense.restaurant.city and expense.restaurant.state %}{{ expense.restaurant.city }}, {{ expense.restaurant.state }}{% elif expense.restaurant.city %}{{ expense.restaurant.city }}{% endif %}">
+                                                    {% if expense.restaurant.city and expense.restaurant.state %}
+                                                        {{ expense.restaurant.city }}, {{ expense.restaurant.state }}
+                                                    {% elif expense.restaurant.city %}
+                                                        {{ expense.restaurant.city }}
+                                                    {% elif expense.restaurant.address %}
+                                                        {{ expense.restaurant.address }}
+                                                    {% else %}
+                                                        Restaurant
                                                     {% endif %}
-                                                {% elif expense.restaurant.city %}
-                                                    {{ expense.restaurant.city }}
-                                                {% elif expense.restaurant.address %}
-                                                    {{ expense.restaurant.address|truncate(20, '...') }}
-                                                {% else %}
-                                                    Restaurant
+                                                </span>
+                                                {% if expense.restaurant.get_google_maps_url() %}
+                                                    <a href="{{ expense.restaurant.get_google_maps_url() }}"
+                                                       class="text-decoration-none text-primary flex-shrink-0"
+                                                       data-bs-toggle="tooltip"
+                                                       title="View on Google Maps">
+                                                        <i class="fas fa-map-marked-alt"></i>
+                                                    </a>
                                                 {% endif %}
                                             {% endif %}
                                         </div>
@@ -477,7 +495,7 @@
                                                     data-bs-target="#deleteExpenseModal"
                                                     data-expense-id="{{ expense.id }}"
                                                     data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
-                                                    data-expense-amount="{{ '%.2f'|format(expense.amount) }}"
+                                                    data-expense-amount="{{ expense.amount|format_number(2) }}"
                                                     data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}"
                                                     data-tooltip="true"
                                                     title="Delete expense">
@@ -493,47 +511,181 @@
             </div>
 
             <!-- Table View (full width - break out with negative margins) -->
-            <div id="table-view-container" class="d-none">
-                <div class="restaurant-table-fullwidth">
+            <div id="table-view-container"{% if view_preference not in ('table', 'compact') %} class="d-none"{% endif %}>
+                <div class="expense-table-fullwidth">
                     <div class="card">
                         <div class="card-body p-0">
                             <div class="table-sticky-frozen">
-                                <table id="expenseTable" class="table table-hover align-middle expense-table mb-0">
-                                    <thead class="table-light">
+                                <div class="table-scroll-inner">
+                                <div class="table-actions-toolbar d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-white">
+                                    <div id="expense-selection-status" class="text-muted small">0 selected</div>
+                                    <div class="d-flex flex-wrap gap-2" role="group" aria-label="Expense actions">
+                                        <a id="expense-action-view" class="btn btn-sm btn-outline-primary disabled" aria-disabled="true" tabindex="-1">
+                                            <i class="fas fa-eye me-1" aria-hidden="true"></i>View
+                                        </a>
+                                        <a id="expense-action-edit" class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true" tabindex="-1" title="Edit">
+                                            <i class="fas fa-pen me-1" aria-hidden="true"></i>Edit
+                                        </a>
+                                        <button
+                                            id="expense-action-delete"
+                                            type="button"
+                                            class="btn btn-sm btn-outline-danger"
+                                            disabled>
+                                            <i class="fas fa-trash me-1" aria-hidden="true"></i>Delete
+                                        </button>
+                                        <button
+                                            id="expense-bulk-export"
+                                            type="button"
+                                            class="btn btn-sm btn-outline-secondary"
+                                            data-expense-bulk-export
+                                            data-export-url="{{ url_for('expenses.export_expenses') }}"
+                                            disabled>
+                                            <i class="fas fa-file-export me-1" aria-hidden="true"></i>Export
+                                        </button>
+                                    </div>
+                                </div>
+                                <table id="expenseTable" class="table table-hover align-middle expense-table mb-0" data-resizable-columns="true" data-column-prefs-key="expenseTable_v3" aria-label="Expenses">
+                                    <thead>
                                         <tr>
-                                            <th data-sort="true" data-sort-type="date">Date / Tags</th>
-                                            <th data-sort="true" data-sort-type="text">Restaurant</th>
-                                            <th data-sort="true" data-sort-type="text">Meal</th>
-                                            <th data-sort="true" data-sort-type="text">Order</th>
-                                            <th data-sort="true" data-sort-type="number" class="text-center">Party</th>
-                                            <th data-sort="true" data-sort-type="currency" class="text-end">Price / Person</th>
-                                            <th data-sort="true" data-sort-type="currency" class="text-end">Amount</th>
-                                            <th class="text-end">Actions</th>
+                                            <th class="text-center select-col" scope="col" data-bs-toggle="tooltip" title="Select row">
+                                                <input
+                                                    id="expense-select-all"
+                                                    type="checkbox"
+                                                    class="form-check-input"
+                                                    aria-label="Select all expenses" />
+                                            </th>
+                                            <th scope="col" data-sort="true" data-sort-type="date" data-bs-toggle="tooltip" title="Date and tags">Date / Tags</th>
+                                            <th scope="col" data-sort="true" data-sort-type="text" data-bs-toggle="tooltip" title="Restaurant name">Restaurant</th>
+                                            <th scope="col" data-sort="true" data-sort-type="text" data-bs-toggle="tooltip" title="Meal type">Meal</th>
+                                            <th scope="col" data-sort="true" data-sort-type="text" data-bs-toggle="tooltip" title="Order type">Order</th>
+                                            <th scope="col" data-sort="true" data-sort-type="number" class="text-start" data-bs-toggle="tooltip" title="Party size">Party Size</th>
+                                            <th scope="col" data-sort="true" data-sort-type="currency" class="text-end" data-bs-toggle="tooltip" title="Price per person">
+                                                <span class="d-inline-flex align-items-center gap-1" aria-label="Price per person">
+                                                    <i class="fas fa-dollar-sign" aria-hidden="true"></i><span aria-hidden="true">/</span><i class="fas fa-user" aria-hidden="true"></i>
+                                                    <span class="visually-hidden">Price per person</span>
+                                                </span>
+                                            </th>
+                                            <th scope="col" data-sort="true" data-sort-type="currency" class="text-end" data-bs-toggle="tooltip" title="Total amount">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {% for expense in expenses %} {% include "expenses/_expense_table_row.html" %} {% endfor %}
+                                        {% set table_month = namespace(current=None) %}
+                                        {% for expense in expenses %}
+                                            {% set month_label = expense.date|format_date_user_tz('%B %Y') %}
+                                            {% set month_name = expense.date|format_date_user_tz('%B') %}
+                                            {% set month_year = expense.date|format_date_user_tz('%Y') %}
+                                            {% set month_key = expense.date.strftime('%Y-%m') %}
+                                            {% if month_label != table_month.current %}
+                                                {% set table_month.current = month_label %}
+                                                <tr class="table-month-divider" data-divider-row="true" data-month-key="{{ month_key }}" data-month-label="{{ month_label }}" data-month-collapsed="false">
+                                                    <td colspan="8">
+                                                        <div class="month-divider-content">
+                                                            <div class="month-divider-left">
+                                                                <button type="button" class="month-toggle" data-month-toggle="{{ month_key }}" aria-expanded="true">
+                                                                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                                                                </button>
+                                                                <span class="month-divider-month text-muted text-uppercase">{{ month_name }} {{ month_year }}</span>
+                                                            </div>
+                                                            <div class="month-divider-right">
+                                                                <a
+                                                                    class="month-divider-link"
+                                                                    href="{{ url_for('expenses.calendar_view', month=month_key) }}"
+                                                                    data-bs-toggle="tooltip"
+                                                                    title="Open calendar for {{ month_label }}">
+                                                                    <i class="far fa-calendar-alt me-1" aria-hidden="true"></i>
+                                                                    Calendar view
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            {% endif %}
+                                            {% include "expenses/_expense_table_row.html" %}
+                                        {% endfor %}
                                     </tbody>
-                                    <tfoot class="table-secondary">
-                                        <tr>
-                                            <td colspan="5" class="text-end fw-bold">Total:</td>
-                                            <td class="fw-bold text-info amount-right">
-                                                {% if avg_price_per_person %}
-                                                    ${{ "%.2f"|format(avg_price_per_person) }}
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="fw-bold text-success amount-right">${{ "%.2f"|format(total_amount) }}</td>
+                                    <tfoot class="table-totals">
+                                        <tr class="table-totals-row">
                                             <td></td>
+                                            <td></td>
+                                            <td></td>
+                                            <td></td>
+                                            <td></td>
+                                            <td class="text-end text-muted">Total:</td>
+                                            <td class="text-info amount-right" title="Average price per person">
+                                                {% if avg_price_per_person %}{{ avg_price_per_person|format_currency_usd }}{% else %}<span class="text-muted">-</span>{% endif %}
+                                            </td>
+                                            <td class="text-success amount-right">{{ total_amount|format_currency_usd }}</td>
                                         </tr>
                                     </tfoot>
                                 </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Bottom Pagination Controls (parity with top controls) -->
+            {% if per_page != -1 and total_pages > 1 %}
+                <div class="d-flex justify-content-end mt-3">
+                    <div
+                        class="btn-group"
+                        role="group"
+                        aria-label="Page navigation"
+                        hx-boost="true"
+                        hx-target="#expense-list-results"
+                        hx-select="#expense-list-results"
+                        hx-swap="outerHTML"
+                        hx-push-url="true">
+                        <!-- Previous page -->
+                        {% if page > 1 %}
+                            {% set prev_params = {'page': page-1, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'order_type': order_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
+                            {% if tags %}
+                                {% set _ = prev_params.update({'tags': tags}) %}
+                            {% endif %}
+                            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', **prev_params) }}" aria-label="Previous">
+                                <i class="fas fa-chevron-left me-1"></i><span class="d-none d-sm-inline">Previous</span>
+                            </a>
+                        {% else %}
+                            <span class="btn btn-outline-secondary btn-sm" aria-label="Previous page not available" role="button" tabindex="-1">
+                                <i class="fas fa-chevron-left me-1"></i><span class="d-none d-sm-inline">Previous</span>
+                            </span>
+                        {% endif %}
+
+                        <!-- Page numbers -->
+                        {% for p in range(1, total_pages + 1) %}
+                            {% if p == page %}
+                                <span class="btn btn-primary btn-sm" aria-label="Current page {{ p }}" role="button" tabindex="-1">{{ p }}</span>
+                            {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
+                                {% set page_params = {'page': p, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'order_type': order_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
+                                {% if tags %}
+                                    {% set _ = page_params.update({'tags': tags}) %}
+                                {% endif %}
+                                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', **page_params) }}" aria-label="Go to page {{ p }}">{{ p }}</a>
+                            {% elif p == 4 and page > 5 %}
+                                <span class="btn btn-outline-secondary btn-sm" aria-label="More pages available" role="button" tabindex="-1">...</span>
+                            {% elif p == total_pages - 3 and page < total_pages - 4 %}
+                                <span class="btn btn-outline-secondary btn-sm" aria-label="More pages available" role="button" tabindex="-1">...</span>
+                            {% endif %}
+                        {% endfor %}
+
+                        <!-- Next page -->
+                        {% if page < total_pages %}
+                            {% set next_params = {'page': page+1, 'per_page': per_page, 'q': search, 'meal_type': meal_type, 'order_type': order_type, 'category': category, 'start_date': start_date, 'end_date': end_date} %}
+                            {% if tags %}
+                                {% set _ = next_params.update({'tags': tags}) %}
+                            {% endif %}
+                            <a class="btn btn-outline-primary btn-sm" href="{{ url_for('expenses.list_expenses', **next_params) }}" aria-label="Next">
+                                <span class="d-none d-sm-inline">Next</span><i class="fas fa-chevron-right ms-1"></i>
+                            </a>
+                        {% else %}
+                            <span class="btn btn-outline-secondary btn-sm" aria-label="Next page not available" role="button" tabindex="-1">
+                                <span class="d-none d-sm-inline">Next</span><i class="fas fa-chevron-right ms-1"></i>
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
 
         {% else %}
             <div class="text-center py-5">
@@ -547,9 +699,267 @@
                 </div>
             </div>
         {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        <!-- Tag Management Modal -->
-        {% include 'components/tag_editor_modal.html' %}
+            <div class="tab-pane fade{% if active_tab == 'calendar' %} show active{% endif %}" id="calendar-pane" role="tabpanel" aria-labelledby="calendar-tab">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <h5 class="mb-0">Expense Calendar</h5>
+                                <span class="text-muted small" data-calendar-label></span>
+                                <span class="text-muted small" data-calendar-selected-label></span>
+                            </div>
+                            <div class="btn-group" role="group" aria-label="Calendar navigation">
+                                <button class="btn btn-outline-secondary btn-sm" type="button" data-calendar-prev-expense data-bs-toggle="tooltip" title="Previous expense">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" data-calendar-prev data-calendar-period-nav title="Previous Month">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" data-calendar-today>Today</button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" data-calendar-next data-calendar-period-nav title="Next Month">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" type="button" data-calendar-next-expense data-bs-toggle="tooltip" title="Next expense">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="calendar-controls">
+                            <div class="calendar-controls-main">
+                                <span class="calendar-filter-summary text-muted small" data-calendar-filter-summary></span>
+                                <div class="calendar-view-toggle btn-group btn-group-sm" role="group" aria-label="Calendar view">
+                                    <button class="btn btn-outline-secondary" type="button" data-calendar-view="month">Month</button>
+                                    <button class="btn btn-outline-secondary" type="button" data-calendar-view="week">Week</button>
+                                    <button class="btn btn-outline-secondary" type="button" data-calendar-view="day">Day</button>
+                                </div>
+                                <a class="btn btn-sm btn-outline-primary" data-calendar-add-selected data-bs-toggle="tooltip" title="Add expense">
+                                    Add expense
+                                </a>
+                            </div>
+                            <p class="calendar-legend text-muted small mb-0" aria-label="Calendar entry key">
+                                <span class="calendar-legend-label">Each entry shows:</span>
+                                <span class="calendar-legend-item" data-bs-toggle="tooltip" title="Restaurant name and favicon">
+                                    <i class="fas fa-utensils" aria-hidden="true"></i> Restaurant
+                                </span>
+                                <span class="calendar-legend-item" data-bs-toggle="tooltip" title="Breakfast, lunch, dinner, snacks, etc.">
+                                    <i class="fas fa-mug-hot" aria-hidden="true"></i> Meal type
+                                </span>
+                            </p>
+                        </div>
+                        <div class="calendar-weekdays">
+                            <span>Sun</span>
+                            <span>Mon</span>
+                            <span>Tue</span>
+                            <span>Wed</span>
+                            <span>Thu</span>
+                            <span>Fri</span>
+                            <span>Sat</span>
+                        </div>
+                        <div class="calendar-grid" data-expense-calendar data-calendar-initial-month="{{ calendar_month or '' }}" data-calendar-add-url="{{ url_for('expenses.add_expense') }}"></div>
+                        <div class="calendar-week-grid d-none" data-expense-calendar-week></div>
+                        <div class="calendar-day-grid d-none" data-expense-calendar-day></div>
+                        <div class="calendar-empty-state d-none" data-calendar-empty>
+                            No expenses match this view’s filters.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade{% if active_tab == 'orders' %} show active{% endif %}" id="orders-pane" role="tabpanel" aria-labelledby="orders-tab">
+                <div class="card">
+                    <div class="card-body text-muted">
+                        Orders view is coming soon.
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade{% if active_tab == 'tags' %} show active{% endif %}" id="tags-pane" role="tabpanel" aria-labelledby="tags-tab">
+                <div class="expense-tags-overview">
+                    <section class="tag-reports mb-4" aria-label="Tag reports">
+                        <div class="row g-3" id="tagReportsRow">
+                            <div class="col-12 col-md-6 col-lg-3">
+                                <div class="card h-100 tag-report-card">
+                                    <div class="card-header"><i class="fas fa-dollar-sign me-2"></i>Top by spend</div>
+                                    <div class="card-body" id="reportTopSpendBody">
+                                        <div class="text-muted small text-center py-3">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-3">
+                                <div class="card h-100 tag-report-card">
+                                    <div class="card-header"><i class="fas fa-chart-bar me-2"></i>Most used</div>
+                                    <div class="card-body" id="reportMostUsedBody">
+                                        <div class="text-muted small text-center py-3">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-3">
+                                <div class="card h-100 tag-report-card">
+                                    <div class="card-header"><i class="fas fa-clock me-2"></i>Recently used</div>
+                                    <div class="card-body" id="reportRecentlyUsedBody">
+                                        <div class="text-muted small text-center py-3">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-3">
+                                <div class="card h-100 tag-report-card">
+                                    <div class="card-header"><i class="fas fa-tag me-2"></i>Unused</div>
+                                    <div class="card-body" id="reportUnusedBody">
+                                        <div class="text-muted small text-center py-3">Loading...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="tag-manager-section" aria-label="Manage tags">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Manage Tags</h5>
+                            </div>
+                            <div class="card-body">
+                                {% include 'components/tag_editor_panel.html' %}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Filter Modal -->
+        <div class="modal fade" id="expenseFilterModal" tabindex="-1" aria-labelledby="expenseFilterModalLabel">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="expenseFilterModalLabel">Filter Expenses</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form
+                            id="expense-filter-form"
+                            method="get"
+                            class="row g-3"
+                            novalidate
+                            hx-get="{{ url_for('expenses.list_expenses') }}"
+                            hx-params="not csrf_token"
+                            hx-target="#expense-list-results"
+                            hx-select="#expense-list-results"
+                            hx-swap="outerHTML"
+                            hx-push-url="true"
+                            hx-include="#per_page, #expense-search-form"
+                            hx-vals='{"page":"1"}'
+                            hx-trigger="submit, change delay:250ms">
+                            <div class="col-md-4">
+                                <label for="meal_type" class="form-label">Meal Type</label>
+                                <select class="form-control" id="meal_type" name="meal_type">
+                                    <option value="">All Meal Types</option>
+                                    {% for type in meal_types %}
+                                        <option value="{{ type }}"{% if meal_type == type %} selected{% endif %}>{{ type.title() }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="order_type" class="form-label">Order Type</label>
+                                <select class="form-control" id="order_type" name="order_type">
+                                    <option value="">All Order Types</option>
+                                    {% for type in order_types %}
+                                        <option value="{{ type }}"{% if order_type == type %} selected{% endif %}>{{ type.replace('_', ' ').title() }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="category" class="form-label">Category</label>
+                                <select class="form-control" id="category" name="category">
+                                    <option value="">All Categories</option>
+                                    {% for cat in categories %}
+                                        <option value="{{ cat }}"{% if category == cat %} selected{% endif %}>{{ cat }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-12 tag-selector-widget">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label for="filterTagsInput" class="form-label mb-0">Tags</label>
+                                    <a href="{{ url_for('expenses.list_expenses') }}?view=tags" id="manageTagsLink" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-cog me-1"></i>Manage Tags
+                                    </a>
+                                </div>
+                                <select id="filterTagsInput"
+                                       name="tags"
+                                       class="form-control"
+                                       multiple
+                                       placeholder="Type to search tags...">
+                                </select>
+                                <div class="form-text mt-3" id="filter-tags-help">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Select one or more tags to filter expenses. Expenses must have all selected tags.
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="start_date" class="form-label">From Date</label>
+                                <input
+                                    type="date"
+                                    class="form-control"
+                                    id="start_date"
+                                    name="start_date"
+                                    value="{{ start_date if start_date and start_date != 'None' else '' }}" />
+                            </div>
+                            <div class="col-md-4">
+                                <label for="end_date" class="form-label">To Date</label>
+                                <input
+                                    type="date"
+                                    class="form-control"
+                                    id="end_date"
+                                    name="end_date"
+                                    value="{{ end_date if end_date and end_date != 'None' else '' }}" />
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" id="expense-filter-clear">
+                            <i class="fas fa-undo me-2" aria-hidden="true"></i>Clear All
+                        </button>
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                            <i class="fas fa-check me-2" aria-hidden="true"></i>Apply
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Delete Confirmation Modal -->
+        <div class="modal fade" id="bulkDeleteExpensesModal" tabindex="-1" aria-labelledby="bulkDeleteExpensesModalLabel">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="bulkDeleteExpensesModalLabel">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Delete Selected Expenses
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p> You are about to delete <strong data-expense-bulk-count>0</strong> expenses. </p>
+                        <p class="text-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-2"></i> Cancel
+                        </button>
+                        <button type="button" class="btn btn-danger" data-expense-bulk-confirm>
+                            <i class="fas fa-trash me-2"></i> Delete Expenses
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Delete Confirmation Modal -->
         <div class="modal fade" id="deleteExpenseModal" tabindex="-1" aria-labelledby="deleteExpenseModalLabel">
@@ -590,5 +1000,5 @@
             </div>
         </div>
 
-    </main>
+    </div>
 {% endblock content %}

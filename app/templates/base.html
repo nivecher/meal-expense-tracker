@@ -39,15 +39,7 @@
         <link rel="manifest" href="{{ url_for('static', filename='img/favicons/site.webmanifest') }}" />
         <!-- Centralized Dependencies -->
         {% include 'includes/dependencies.html' %}
-        <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet" />
         <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/components/navbar.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/components/search.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/components/badges.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/forms.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/utilities.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/loading.css') }}" rel="stylesheet" />
-        <link href="{{ url_for('static', filename='css/select2-fixes.css') }}" rel="stylesheet" />
         <!-- Google Places CSS removed - not needed for direct API calls -->
         {% block styles %}{% endblock styles %} {% if config.DEBUG %}
         <script type="module" src="{{ url_for('static', filename='js/utils/debug.js') }}"></script>
@@ -56,40 +48,62 @@
         {% block head_extra %} {% endblock head_extra %}
     </head>
     <body>
-        {% include "includes/navbar.html" %}
-        <main class="container py-4">
-            <!-- Flash Messages -->
-            {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %}
-            <div class="flash-messages mb-4">
-                {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                    <div class="alert-message">{{ message }}</div>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <div class="app-shell">
+            {% include "includes/sidebar.html" %}
+            <div class="sidebar-backdrop" data-sidebar-backdrop aria-hidden="true"></div>
+            <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary sidebar-mobile-toggle fixed-top-left"
+                data-sidebar-mobile-toggle
+                aria-label="Open menu"
+                aria-controls="appSidebar">
+                <i class="fas fa-bars" aria-hidden="true" data-sidebar-mobile-icon></i>
+            </button>
+            <div class="app-content">
+                {% if self.section_header() %}
+                <div class="section-header">
+                    <div class="section-header-inner"> {% block section_header %}{% endblock %} </div>
                 </div>
-                {% endfor %}
-            </div>
-            {% endif %} {% endwith %}
-            <!-- Toast Container -->
-            <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3"> </div>
-            {% block content %} {% endblock content %}
-        </main>
-        <footer class="footer mt-5 py-4 bg-light">
-            <div class="container">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <p class="mb-0"> 2025 Meal Expense Tracker. All rights reserved. </p>
+                {% endif %}
+                <main id="main-content" class="{% block main_container_class %}container{% endblock %} py-4">
+                    <!-- Flash Messages -->
+                    {% with messages = get_flashed_messages(with_categories=true) %} {% if messages %}
+                    <div class="flash-messages mb-4">
+                        {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            <div class="alert-message">{{ message }}</div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endfor %}
                     </div>
-                    <div class="col-md-6 text-md-end">
-                        <a href="{{ url_for('main.about') }}" class="text-muted me-3" title="About Us">About</a>
-                        <a href="{{ url_for('main.terms') }}" class="text-muted me-3" title="Terms of Service">Terms</a>
-                        <a href="{{ url_for('main.privacy') }}" class="text-muted me-3" title="Privacy Policy"
-                            >Privacy</a
-                        >
-                        <a href="{{ url_for('main.contact') }}" class="text-muted" title="Contact Us">Contact</a>
+                    {% endif %} {% endwith %}
+                    <!-- Toast Container -->
+                    <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3"> </div>
+                    {% block content %} {% endblock content %}
+                </main>
+                <footer class="footer mt-5 py-4 bg-light">
+                    <div class="container">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <p class="mb-0"> 2025 Meal Expense Tracker. All rights reserved. </p>
+                            </div>
+                            <div class="col-md-6 text-md-end">
+                                <a href="{{ url_for('main.about') }}" class="text-muted me-3" title="About Us">About</a>
+                                <a href="{{ url_for('main.terms') }}" class="text-muted me-3" title="Terms of Service"
+                                    >Terms</a
+                                >
+                                <a href="{{ url_for('main.privacy') }}" class="text-muted me-3" title="Privacy Policy"
+                                    >Privacy</a
+                                >
+                                <a href="{{ url_for('main.contact') }}" class="text-muted" title="Contact Us"
+                                    >Contact</a
+                                >
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </footer>
             </div>
-        </footer>
+        </div>
         <!-- Application Configuration -->
         <div
             id="app-config"
@@ -97,7 +111,7 @@
                 "staticBaseUrl": "{{ request.script_root or "" }}",
                 "app": {
                     "debug": {{ "true" if config.DEBUG else "false" }},
-                    "env": "{{ config.ENV or "production" }}",
+                    "env": "{{ config.get("ENVIRONMENT", "dev") }}",
                     "version": "{{ get_app_version() }}"
                 },
                 "googleMaps": {
@@ -118,16 +132,8 @@
         </div>
         <!-- Unified Error Handler already loaded above -->
 
-        <!-- Core Application Scripts -->
-        <script type="module" src="{{ url_for('static', filename='js/utils/timezone-handler.js') }}" defer></script>
-        <script type="module" src="{{ url_for('static', filename='js/utils/date-formatter.js') }}" defer></script>
-        <script type="module" src="{{ url_for('static', filename='js/main.js') }}" defer></script>
-        <script type="module" src="{{ url_for('static', filename='js/config.js') }}" defer></script>
-        <!-- Load other utility modules -->
-        <script type="module" src="{{ url_for('static', filename='js/utils/error-handler.js') }}" defer></script>
-        <script type="module" src="{{ url_for('static', filename='js/utils/logger.js') }}" defer></script>
-        <script type="module" src="{{ url_for('static', filename='js/utils/module-loader.js') }}" defer></script>
-        <script type="module" src="{{ url_for('static', filename='js/utils/select2-init.js') }}" defer></script>
+        <!-- Single Application Entrypoint -->
+        <script type="module" src="{{ url_for('static', filename='js/app.js') }}" defer></script>
         {% if config.DEBUG %}
         <script type="module" src="{{ url_for('static', filename='js/utils/debug.js') }}" defer></script>
         <script type="module" src="{{ url_for('static', filename='js/utils/console-test.js') }}" defer></script>
@@ -136,55 +142,5 @@
         {% endif %}
         <!-- Page-specific scripts -->
         {% block scripts %} {% endblock scripts %} {% block extra_js %} {% endblock extra_js %}
-
-        <!-- Initialize page modules -->
-        <!-- Load configuration utility -->
-        <!-- Table sort component -->
-        <!-- <script type="module" src="{{ url_for('static', filename='js/components/table-sort.js') }}" defer></script> -->
-        <script type="module" src="{{ url_for('static', filename='js/components/sticky-tables.js') }}" defer></script>
-        <!-- Navbar components -->
-        <script type="module" src="{{ url_for('static', filename='js/components/modern-avatar.js') }}" defer></script>
-        <script type="module" src="{{ url_for('static', filename='js/components/navbar.js') }}" defer></script>
-
-        <!-- Font Awesome fallback -->
-        <script type="module" src="{{ url_for('static', filename='js/utils/fontawesome-fallback.js') }}"></script>
-        <!-- Image fallback handling -->
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/components/image-fallback.css') }}" />
-        <script type="module" src="{{ url_for('static', filename='js/components/image-fallback.js') }}"></script>
-
-        <!-- Lazy loading optimizer -->
-        <script type="module" src="{{ url_for('static', filename='js/utils/lazy-loading-optimizer.js') }}"></script>
-
-        <!-- Robust favicon handling -->
-        <script type="module" src="{{ url_for('static', filename='js/utils/robust-favicon-handler.js') }}"></script>
-
-        <!-- Flash to Toast Converter -->
-        <script type="module">
-            import { toast } from "/static/js/utils/notifications.js";
-
-            document.addEventListener("DOMContentLoaded", function () {
-                // Convert flash messages to toasts only if they exist and no JavaScript toasts are expected
-                const flashMessages = document.querySelectorAll(".flash-messages .alert");
-                flashMessages.forEach(function (alert) {
-                    // Only convert if this is a page load (not an AJAX response)
-                    if (!alert.closest("[data-ajax-response]")) {
-                        const message = alert.querySelector(".alert-message")?.innerHTML || alert.textContent.trim();
-                        const category = alert.classList.contains("alert-success")
-                            ? "success"
-                            : alert.classList.contains("alert-danger")
-                              ? "error"
-                              : alert.classList.contains("alert-warning")
-                                ? "warning"
-                                : "info";
-
-                        // Show toast
-                        toast[category](message);
-
-                        // Hide the original flash message
-                        alert.style.display = "none";
-                    }
-                });
-            });
-        </script>
     </body>
 </html>

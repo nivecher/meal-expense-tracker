@@ -15,7 +15,6 @@ management, navigation, and accessibility.
 ### Test Suites Created
 
 1. **Authentication Flow Tests** (5 tests)
-
    - Login with valid credentials
    - Error message clarity for invalid credentials
    - Form field validation
@@ -23,7 +22,6 @@ management, navigation, and accessibility.
    - Logout functionality
 
 2. **Expense Management Flow Tests** (9 tests)
-
    - Navigation to add expense page
    - Required field validation
    - Successful expense creation
@@ -36,7 +34,6 @@ management, navigation, and accessibility.
    - Form field accessibility
 
 3. **Restaurant Management Flow Tests** (5 tests)
-
    - Navigation to add restaurant page
    - Required field validation
    - Successful restaurant creation
@@ -45,7 +42,6 @@ management, navigation, and accessibility.
    - Edit restaurant functionality
 
 4. **Navigation and UX Tests** (5 tests)
-
    - Page load performance (< 2 seconds)
    - Navigation between main sections
    - Mobile responsiveness
@@ -309,19 +305,16 @@ submitButton.addEventListener("click", () => {
 ### WCAG 2.1 Level AA Compliance
 
 1. **Color Contrast**
-
    - Ensure text meets 4.5:1 contrast ratio for normal text
    - Ensure 3:1 contrast ratio for large text
    - Don't rely solely on color to convey information
 
 2. **Keyboard Access**
-
    - All functionality available via keyboard
    - No keyboard traps
    - Logical tab order
 
 3. **Screen Reader Support**
-
    - Proper ARIA labels and roles
    - Descriptive link text (not "click here")
    - Form field associations
@@ -334,19 +327,16 @@ submitButton.addEventListener("click", () => {
 ## Mobile Usability Recommendations
 
 1. **Touch Targets**
-
    - Minimum 44x44 pixels
    - Adequate spacing between targets
    - Larger targets for primary actions
 
 2. **Form Input**
-
    - Use appropriate input types (`tel`, `email`, `number`)
    - Prevent zoom on iOS (font-size >= 16px)
    - Use native date/time pickers on mobile
 
 3. **Navigation**
-
    - Hamburger menu for mobile
    - Sticky navigation for long pages
    - Breadcrumbs for deep navigation

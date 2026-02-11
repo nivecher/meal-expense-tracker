@@ -136,13 +136,11 @@ app/
 ### Template Hierarchy
 
 1. **Base Templates**
-
    - `base.html` - Core layout with navigation, scripts, and global styles
    - `base_auth.html` - Authentication-specific layout for login/register pages
    - Shared meta tags, CDN includes, and global configuration
 
 2. **Template Includes**
-
    - `includes/navbar.html` - Navigation component with user menu
    - `includes/breadcrumb.html` - Breadcrumb navigation component
    - Reusable template fragments for consistent UI elements
@@ -157,13 +155,11 @@ app/
 ### CSS Architecture
 
 1. **Global Styles** (`main.css`)
-
    - CSS custom properties for theming
    - Utility classes following Bootstrap conventions
    - Global component overrides
 
 2. **Component Styles** (`css/components/`)
-
    - **BEM methodology** for naming conventions
    - Scoped styles for specific components
    - Mobile-responsive design patterns
@@ -178,19 +174,16 @@ app/
 ### Module Organization
 
 1. **Page Controllers** (`js/pages/`)
-
    - Initialize page-specific functionality
    - Coordinate multiple components
    - Handle page-level event delegation
 
 2. **Utility Modules** (`js/utils/`)
-
    - Pure functions for common operations
    - DOM manipulation helpers
    - Form validation utilities
 
 3. **Service Modules** (`js/services/`)
-
    - API communication layer
    - External service integration (Google Maps)
    - Data transformation and caching

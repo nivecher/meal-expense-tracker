@@ -26,89 +26,16 @@ class ResponsiveNavbarManager {
   init() {
     if (!this.navbar) return;
 
-    this.setupDropdowns();
+    this.collectDropdownToggles();
     this.setupResizeObserver();
     this.setupMobileMenuToggle();
-    this.setupKeyboardNavigation();
     this.setupAccessibility();
     this.updateResponsiveState();
   }
 
-  setupDropdowns() {
-    // Find all dropdown toggles
+  collectDropdownToggles() {
+    // Find all dropdown toggles for accessibility labeling
     this.dropdownToggles = this.navbar.querySelectorAll('[data-bs-toggle="dropdown"], .dropdown-toggle');
-
-    this.dropdownToggles.forEach((toggle) => {
-      toggle.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.handleDropdownToggle(toggle);
-      });
-
-      // Close dropdown when clicking outside
-      document.addEventListener('click', (e) => {
-        if (!toggle.contains(e.target) && !toggle.nextElementSibling?.contains(e.target)) {
-          this.closeDropdown(toggle);
-        }
-      });
-    });
-  }
-
-  handleDropdownToggle(toggle) {
-    const isOpen = toggle.getAttribute('aria-expanded') === 'true';
-
-    // Close all other dropdowns first
-    this.dropdownToggles.forEach((otherToggle) => {
-      if (otherToggle !== toggle) {
-        this.closeDropdown(otherToggle);
-      }
-    });
-
-    if (isOpen) {
-      this.closeDropdown(toggle);
-    } else {
-      this.openDropdown(toggle);
-    }
-  }
-
-  openDropdown(toggle) {
-    const dropdown = toggle.nextElementSibling;
-    if (!dropdown) return;
-
-    toggle.setAttribute('aria-expanded', 'true');
-    dropdown.classList.add('show');
-
-    // Add animation class
-    dropdown.style.animation = 'dropdownFadeIn 0.2s ease-out';
-
-    // Position dropdown correctly
-    this.positionDropdown(dropdown, toggle);
-  }
-
-  closeDropdown(toggle) {
-    const dropdown = toggle.nextElementSibling;
-    if (!dropdown) return;
-
-    toggle.setAttribute('aria-expanded', 'false');
-    dropdown.classList.remove('show');
-    dropdown.style.animation = '';
-  }
-
-  positionDropdown(dropdown, toggle) {
-    // Use requestAnimationFrame to batch DOM reads and writes
-    requestAnimationFrame(() => {
-      const rect = toggle.getBoundingClientRect();
-      const dropdownRect = dropdown.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-
-      // Check if dropdown would overflow on the right
-      if (rect.left + dropdownRect.width > viewportWidth - 20) {
-        dropdown.style.left = 'auto';
-        dropdown.style.right = '0';
-      } else {
-        dropdown.style.left = '0';
-        dropdown.style.right = 'auto';
-      }
-    });
   }
 
   setupResizeObserver() {
@@ -125,10 +52,7 @@ class ResponsiveNavbarManager {
       // Reset mobile menu state when switching between mobile and desktop
       if (wasMobile !== this.isMobile) {
         if (!this.isMobile) {
-          // Reset all dropdowns when switching to desktop
-          this.dropdownToggles.forEach((toggle) => {
-            this.closeDropdown(toggle);
-          });
+          // Let Bootstrap manage dropdown state; nothing to reset here.
         }
       }
 
@@ -144,30 +68,6 @@ class ResponsiveNavbarManager {
   setupMobileMenuToggle() {
     // Mobile menu toggle is no longer needed since we use icon-only navigation
     // This method is kept for compatibility but does nothing
-  }
-
-  setupKeyboardNavigation() {
-    // Handle keyboard navigation for dropdowns
-    this.dropdownToggles.forEach((toggle) => {
-      toggle.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          this.handleDropdownToggle(toggle);
-        } else if (e.key === 'Escape') {
-          this.closeDropdown(toggle);
-        }
-      });
-    });
-
-    // Handle keyboard navigation for mobile menu
-    if (this.navbarToggler) {
-      this.navbarToggler.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          // Mobile menu toggle functionality removed - using icon-only navigation
-        }
-      });
-    }
   }
 
   setupAccessibility() {
@@ -187,7 +87,7 @@ class ResponsiveNavbarManager {
     const skipLink = document.createElement('a');
     skipLink.href = '#main-content';
     skipLink.textContent = 'Skip to main content';
-    skipLink.className = 'skip-link sr-only sr-only-focusable';
+    skipLink.className = 'skip-link visually-hidden visually-hidden-focusable';
     skipLink.style.cssText = `
       position: absolute;
       top: -40px;
@@ -246,16 +146,11 @@ class ResponsiveNavbarManager {
 
   // Public methods for external use
   refresh() {
-    this.setupDropdowns();
+    this.collectDropdownToggles();
     this.updateResponsiveState();
   }
 
   destroy() {
-    // Clean up event listeners
-    this.dropdownToggles.forEach((toggle) => {
-      toggle.removeEventListener('click', this.handleDropdownToggle);
-    });
-
     // Mobile menu toggle functionality removed - no cleanup needed
   }
 }

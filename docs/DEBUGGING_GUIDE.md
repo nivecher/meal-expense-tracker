@@ -204,24 +204,20 @@ Alarms send notifications to the SNS topic: `{app-name}-{environment}-notificati
 ### When an Error Occurs
 
 1. **Check the Dashboard**
-
    - Look at the "Recent Lambda Errors" widget
    - Note the request ID and timestamp
 
 2. **View Detailed Logs**
-
    - Go to CloudWatch Logs
    - Search for the request ID
    - Review the full error traceback
 
 3. **Check API Gateway Logs**
-
    - Look at "Recent API Gateway Errors"
    - Check integration status and error messages
    - Verify request reached Lambda
 
 4. **Use X-Ray (if enabled)**
-
    - Click the X-Ray trace ID from logs
    - View the service map
    - See timing breakdown
@@ -254,13 +250,11 @@ Alarms send notifications to the SNS topic: `{app-name}-{environment}-notificati
    ```
 
 3. **Check what the Lambda actually returned:**
-
    - The API Gateway log shows `responseLength: 33305`, meaning Lambda responded
    - This suggests Lambda returned an error response (likely HTML error page)
    - Look for the Lambda log entry with the actual exception
 
 4. **Common causes for 500 errors:**
-
    - **Unhandled exception in Lambda**: Check Lambda logs for stack trace
    - **Timeout**: Check if duration_ms is near your Lambda timeout
    - **Memory limit**: Check if Lambda ran out of memory
@@ -268,7 +262,6 @@ Alarms send notifications to the SNS topic: `{app-name}-{environment}-notificati
    - **Import error**: Check for missing dependencies or import failures
 
 5. **If integrationError is "-" in API Gateway:**
-
    - This means API Gateway successfully called Lambda
    - The error is coming from Lambda's response
    - Focus on Lambda logs, not API Gateway logs

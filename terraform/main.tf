@@ -184,7 +184,7 @@ module "ecr" {
   repository_name      = "${var.app_name}-${var.environment}-lambda"
   environment          = var.environment
   kms_key_arn          = aws_kms_key.main.arn
-  force_delete         = true
+  force_delete         = false
   image_tag_mutability = "MUTABLE" # Allow overwriting 'latest' tag for easier iteration
 
   tags = local.tags

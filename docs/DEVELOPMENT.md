@@ -248,7 +248,6 @@ Behaviour:
 - On **branches / non-tag refs**, the Python app reports a **PEP 440 dev
   preview** version based on the next semantic version and commit metadata,
   e.g.:
-
   - `0.7.0.dev5+gabc123.branch.feature-add-reports`
 
 This makes it clear what the next release version will be while still

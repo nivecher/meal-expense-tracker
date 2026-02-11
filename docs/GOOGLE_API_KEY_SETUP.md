@@ -48,14 +48,12 @@ Error: 403 Client Error: Forbidden
 **Solutions:**
 
 1. **Remove referrer restrictions** (for server-side testing):
-
    - Go to Google Cloud Console → APIs & Services → Credentials
    - Edit your API key
    - Under "Application restrictions", select "None" or "IP addresses"
    - Save
 
 2. **Add allowed referrer** (if you want to keep referrer restrictions):
-
    - Edit your API key
    - Under "Application restrictions", select "HTTP referrers"
    - Add: `localhost:5000/*` (for local testing)

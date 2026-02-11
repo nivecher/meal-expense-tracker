@@ -1,0 +1,167 @@
+{% from 'macros/avatar_helpers.html' import user_avatar_navbar, user_avatar_dropdown %}
+<aside class="app-sidebar" id="appSidebar" data-sidebar>
+    <div class="sidebar-header">
+        <a class="sidebar-brand" href="{{ url_for('main.index') }}" aria-label="Meal Expense Tracker Home">
+            <i class="fas fa-utensils" aria-hidden="true"></i>
+            <span class="nav-text">Meal Expense Tracker</span>
+        </a>
+        <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary sidebar-toggle sidebar-toggle-desktop"
+            data-sidebar-toggle
+            aria-label="Collapse sidebar">
+            <i class="fas fa-angle-left" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <nav class="sidebar-nav" role="navigation" aria-label="Primary">
+        <div class="sidebar-section">
+            <a
+                class="sidebar-link {% if request.endpoint == 'main.index' %}active{% endif %}"
+                href="{{ url_for('main.index') }}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="right"
+                title="Dashboard">
+                <i class="fas fa-home" aria-hidden="true"></i>
+                <span class="nav-text">Dashboard</span>
+            </a>
+        </div>
+
+        <div class="sidebar-section">
+            <a
+                class="sidebar-link {% if request.endpoint and 'expenses' in request.endpoint %}active{% endif %}"
+                href="{{ url_for('expenses.list_expenses') }}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="right"
+                title="Expenses">
+                <i class="fas fa-receipt" aria-hidden="true"></i>
+                <span class="nav-text">Expenses</span>
+            </a>
+        </div>
+
+        <div class="sidebar-section">
+            <a
+                class="sidebar-link {% if request.endpoint and 'restaurants' in request.endpoint %}active{% endif %}"
+                href="{{ url_for('restaurants.list_restaurants') }}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="right"
+                title="Restaurants">
+                <i class="fas fa-utensils" aria-hidden="true"></i>
+                <span class="nav-text">Restaurants</span>
+            </a>
+        </div>
+
+        <div class="sidebar-section">
+            <a
+                class="sidebar-link {% if request.endpoint and 'reports' in request.endpoint %}active{% endif %}"
+                href="{{ url_for('reports.index') }}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="right"
+                title="Reports">
+                <i class="fas fa-chart-line" aria-hidden="true"></i>
+                <span class="nav-text">Reports</span>
+            </a>
+        </div>
+
+        {% if current_user.is_authenticated and current_user.is_admin %}
+        <div class="sidebar-section">
+            <a
+                class="sidebar-link {% if request.endpoint and 'admin' in request.endpoint %}active{% endif %}"
+                href="{{ url_for('admin.dashboard') }}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="right"
+                title="Admin">
+                <i class="fas fa-cog" aria-hidden="true"></i>
+                <span class="nav-text">Admin</span>
+            </a>
+        </div>
+        {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+        {% if current_user.is_authenticated %}
+        <div class="sidebar-user">
+            <a href="{{ url_for('main.help_page') }}" class="sidebar-link sidebar-link-help">
+                <i class="fas fa-question-circle" aria-hidden="true"></i>
+                <span class="nav-text">Help Center</span>
+            </a>
+            <div class="dropdown sidebar-user-dropdown-collapsed" id="sidebar-user-dropdown-collapsed">
+                <button
+                    type="button"
+                    class="btn btn-link sidebar-link sidebar-avatar-dropdown-toggle p-0"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="User menu"
+                    id="sidebarUserDropdownCollapsed">
+                    <span class="sidebar-avatar">{{ user_avatar_navbar(current_user) }}</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="sidebarUserDropdownCollapsed">
+                    <li><span class="dropdown-item-text text-muted small">@{{ current_user.username }}</span></li>
+                    <li><hr class="dropdown-divider" /></li>
+                    <li
+                        ><a class="dropdown-item" href="{{ url_for('main.help_page') }}"
+                            ><i class="fas fa-question-circle me-2" aria-hidden="true"></i>Help Center</a
+                        ></li
+                    >
+                    <li
+                        ><a class="dropdown-item" href="{{ url_for('auth.profile') }}"
+                            ><i class="fas fa-user me-2" aria-hidden="true"></i>Profile</a
+                        ></li
+                    >
+                    <li
+                        ><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"
+                            ><i class="fas fa-lock me-2" aria-hidden="true"></i>Change Password</a
+                        ></li
+                    >
+                    <li><hr class="dropdown-divider" /></li>
+                    <li
+                        ><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"
+                            ><i class="fas fa-sign-out-alt me-2" aria-hidden="true"></i>Logout</a
+                        ></li
+                    >
+                </ul>
+            </div>
+            <button
+                class="sidebar-link sidebar-toggle-link sidebar-user-toggle-expanded"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#sidebar-profile"
+                aria-expanded="false"
+                aria-controls="sidebar-profile">
+                <span class="sidebar-user-summary">
+                    <span class="sidebar-avatar">{{ user_avatar_navbar(current_user) }}</span>
+                    <span class="nav-text sidebar-user-handle" title="@{{ current_user.username }}"
+                        >@{{ current_user.username }}</span
+                    >
+                </span>
+                <i class="fas fa-chevron-down sidebar-caret" aria-hidden="true"></i>
+            </button>
+            <div class="collapse sidebar-subnav" id="sidebar-profile">
+                <a href="{{ url_for('auth.profile') }}" class="sidebar-sublink">
+                    <i class="fas fa-user" aria-hidden="true"></i>
+                    <span class="nav-text">Profile</span>
+                </a>
+                <a href="{{ url_for('auth.change_password') }}" class="sidebar-sublink">
+                    <i class="fas fa-lock" aria-hidden="true"></i>
+                    <span class="nav-text">Change Password</span>
+                </a>
+                <a href="{{ url_for('auth.logout') }}" class="sidebar-sublink text-danger">
+                    <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+                    <span class="nav-text">Logout</span>
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div class="sidebar-auth">
+            <a class="btn btn-outline-primary btn-sm w-100 mb-2" href="{{ url_for('auth.login') }}">
+                <i class="fas fa-sign-in-alt me-2"></i>
+                <span class="nav-text">Login</span>
+            </a>
+            <a class="btn btn-primary btn-sm w-100" href="{{ url_for('auth.register') }}">
+                <i class="fas fa-user-plus me-2"></i>
+                <span class="nav-text">Register</span>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</aside>

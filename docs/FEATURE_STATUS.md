@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD060 -->
+
 # Feature Implementation Status
 
 This document serves as the single source of truth for the implementation status of all features in the Meal Expense Tracker application.
@@ -34,23 +36,24 @@ This document serves as the single source of truth for the implementation status
 
 ### 2. Expense Management
 
-| Feature                 | Status | Implementation                          | Code Location                      | Completion |
-| ----------------------- | ------ | --------------------------------------- | ---------------------------------- | ---------- |
-| Add Expense             | ✅     | Complete                                | `app/expenses/routes.py:218`       | 100%       |
-| Edit Expense            | ✅     | Complete                                | `app/expenses/routes.py:312`       | 100%       |
-| Delete Expense          | ✅     | Complete                                | `app/expenses/routes.py:586`       | 100%       |
-| List Expenses           | ✅     | Complete                                | `app/expenses/routes.py:504`       | 100%       |
-| Expense Details         | ✅     | Complete                                | `app/expenses/routes.py:567`       | 100%       |
-| Expense Filtering       | ✅     | Complete                                | `app/expenses/services.py`         | 100%       |
-| Expense Search          | ✅     | Complete                                | `app/expenses/services.py`         | 100%       |
-| CSV Export              | ✅     | Complete                                | `app/expenses/routes.py:612`       | 100%       |
-| CSV Import              | ✅     | Complete                                | `app/expenses/routes.py:643`       | 100%       |
-| JSON Export             | ✅     | Complete                                | `app/expenses/routes.py:612`       | 100%       |
-| Receipt Image Upload    | ✅     | Complete                                | `app/expenses/models.py:248`       | 100%       |
-| Receipt OCR             | ✅     | Complete (AWS Textract)                 | `app/services/ocr_service.py`      | 100%       |
-| Receipt OCR Alternative | ✅     | Production Ready (receipt-ocr + Gemini) | `lambda-receipt-ocr/`              | 100%       |
-| Receipt Reconciliation  | ✅     | Complete                                | `app/expenses/services.py:2255`    | 100%       |
-| Auto-save Draft         | ✅     | Complete                                | `app/static/js/utils/auto-save.js` | 100%       |
+| Feature                 | Status | Implementation                                   | Code Location                                                             | Completion |
+| ----------------------- | ------ | ------------------------------------------------ | ------------------------------------------------------------------------- | ---------- |
+| Add Expense             | ✅     | Complete                                         | `app/expenses/routes.py:218`                                              | 100%       |
+| Edit Expense            | ✅     | Complete                                         | `app/expenses/routes.py:312`                                              | 100%       |
+| Delete Expense          | ✅     | Complete                                         | `app/expenses/routes.py:586`                                              | 100%       |
+| List Expenses           | ✅     | Complete                                         | `app/expenses/routes.py:504`                                              | 100%       |
+| Expense Calendar View   | ✅     | Calendar tab, month/week/day, tooltips, timezone | `app/templates/expenses/list.html`, `app/static/js/pages/expense-list.js` | 100%       |
+| Expense Details         | ✅     | Complete                                         | `app/expenses/routes.py:567`                                              | 100%       |
+| Expense Filtering       | ✅     | Complete                                         | `app/expenses/services.py`                                                | 100%       |
+| Expense Search          | ✅     | Complete                                         | `app/expenses/services.py`                                                | 100%       |
+| CSV Export              | ✅     | Complete (restore-friendly fields)               | `app/expenses/routes.py:850`                                              | 100%       |
+| CSV Import              | ✅     | Complete (supports restore fields)               | `app/expenses/routes.py:970`                                              | 100%       |
+| JSON Export             | ✅     | Complete                                         | `app/expenses/routes.py:850`                                              | 100%       |
+| Receipt Image Upload    | ✅     | Complete                                         | `app/expenses/models.py:248`                                              | 100%       |
+| Receipt OCR             | ✅     | Complete (AWS Textract)                          | `app/services/ocr_service.py`                                             | 100%       |
+| Receipt OCR Alternative | ✅     | Production Ready (receipt-ocr + Gemini)          | `lambda-receipt-ocr/`                                                     | 100%       |
+| Receipt Reconciliation  | ✅     | Complete                                         | `app/expenses/services.py:2255`                                           | 100%       |
+| Auto-save Draft         | ✅     | Complete                                         | `app/static/js/utils/auto-save.js`                                        | 100%       |
 
 ### 3. Expense Categorization
 
@@ -64,15 +67,16 @@ This document serves as the single source of truth for the implementation status
 
 ### 4. Tag System
 
-| Feature                   | Status | Implementation | Code Location                | Completion |
-| ------------------------- | ------ | -------------- | ---------------------------- | ---------- |
-| Create Tags               | ✅     | Complete       | `app/expenses/routes.py:738` | 100%       |
-| Delete Tags               | ✅     | Complete       | `app/expenses/routes.py:763` | 100%       |
-| Tag Search                | ✅     | Complete       | `app/expenses/routes.py:723` | 100%       |
-| Add Tags to Expenses      | ✅     | Complete       | `app/expenses/routes.py:790` | 100%       |
-| Remove Tags from Expenses | ✅     | Complete       | `app/expenses/routes.py:844` | 100%       |
-| Update Expense Tags       | ✅     | Complete       | `app/expenses/routes.py:818` | 100%       |
-| Popular Tags              | ✅     | Complete       | `app/expenses/routes.py:872` | 100%       |
+| Feature                    | Status | Implementation                                       | Code Location                                                     | Completion |
+| -------------------------- | ------ | ---------------------------------------------------- | ----------------------------------------------------------------- | ---------- |
+| Create Tags                | ✅     | Complete                                             | `app/expenses/routes.py:738`                                      | 100%       |
+| Delete Tags                | ✅     | Complete                                             | `app/expenses/routes.py:763`                                      | 100%       |
+| Tag Search                 | ✅     | Complete                                             | `app/expenses/routes.py:723`                                      | 100%       |
+| Add Tags to Expenses       | ✅     | Complete                                             | `app/expenses/routes.py:790`                                      | 100%       |
+| Remove Tags from Expenses  | ✅     | Complete                                             | `app/expenses/routes.py:844`                                      | 100%       |
+| Update Expense Tags        | ✅     | Complete                                             | `app/expenses/routes.py:818`                                      | 100%       |
+| Popular Tags               | ✅     | Complete                                             | `app/expenses/routes.py:872`                                      | 100%       |
+| Tag Overview / Tag Reports | ✅     | Tags tab; routes.py:1097, list.html, expense-tags.js | `app/expenses/routes.py:1097`, `app/templates/expenses/list.html` | 100%       |
 
 ### 5. Restaurant Management
 
@@ -89,6 +93,7 @@ This document serves as the single source of truth for the implementation status
 | CSV Import            | ✅     | Complete       | `app/restaurants/routes.py:458` | 100%       |
 | Restaurant Statistics | ✅     | Complete       | `app/restaurants/services.py`   | 100%       |
 | Duplicate Detection   | ✅     | Complete       | `app/restaurants/routes.py:663` | 100%       |
+| Rewards Programs      | ⏳     | Planned        | TBD                             | 0%         |
 
 ### 6. Google Maps Integration
 
@@ -180,16 +185,17 @@ This document serves as the single source of truth for the implementation status
 
 ### 13. Development & Deployment
 
-| Feature                   | Status | Implementation | Code Location                | Completion |
-| ------------------------- | ------ | -------------- | ---------------------------- | ---------- |
-| Make Commands             | ✅     | Complete       | `Makefile`                   | 100%       |
-| Docker Support            | ✅     | Complete       | `Dockerfile`                 | 100%       |
-| Terraform Infrastructure  | ✅     | Complete       | `terraform/`                 | 100%       |
-| AWS Lambda Deployment     | ✅     | Complete       | `scripts/redeploy-lambda.sh` | 100%       |
-| Environment Configuration | ✅     | Complete       | `config.py`                  | 100%       |
-| Logging                   | ✅     | Complete       | `app/__init__.py`            | 100%       |
-| Testing Framework         | ✅     | Complete       | `tests/`                     | 100%       |
-| Code Quality Tools        | ✅     | Complete       | `Makefile`                   | 100%       |
+| Feature                   | Status | Implementation                                      | Code Location                                                                     | Completion |
+| ------------------------- | ------ | --------------------------------------------------- | --------------------------------------------------------------------------------- | ---------- |
+| Make Commands             | ✅     | Complete                                            | `Makefile`                                                                        | 100%       |
+| Docker Support            | ✅     | Complete                                            | `Dockerfile`                                                                      | 100%       |
+| Terraform Infrastructure  | ✅     | Complete                                            | `terraform/`                                                                      | 100%       |
+| AWS Lambda Deployment     | ✅     | Complete                                            | `scripts/redeploy-lambda.sh`                                                      | 100%       |
+| Remote Admin (Lambda CLI) | ✅     | create-user/update-user; admin, active, credentials | `scripts/remote_admin.py`, `app/admin/operations.py`, `app/admin/lambda_admin.py` | 100%       |
+| Environment Configuration | ✅     | Complete                                            | `config.py`                                                                       | 100%       |
+| Logging                   | ✅     | Complete                                            | `app/__init__.py`                                                                 | 100%       |
+| Testing Framework         | ✅     | Complete                                            | `tests/`                                                                          | 100%       |
+| Code Quality Tools        | ✅     | Complete                                            | `Makefile`                                                                        | 100%       |
 
 ---
 

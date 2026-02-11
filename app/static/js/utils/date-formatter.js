@@ -5,6 +5,26 @@
  * This is more efficient than server-side timezone conversion.
  */
 
+const DEFAULT_LOCALE = 'en-US';
+const browserTimeZone = (() => {
+  try {
+    return new Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return 'UTC';
+  }
+})();
+
+const intlFormatterCache = new Map();
+
+function getIntlFormatter(options) {
+  const cacheKey = JSON.stringify(options);
+  const cached = intlFormatterCache.get(cacheKey);
+  if (cached) return cached;
+  const formatter = new Intl.DateTimeFormat(DEFAULT_LOCALE, options);
+  intlFormatterCache.set(cacheKey, formatter);
+  return formatter;
+}
+
 /**
  * Format a date with a custom format string (Python strftime-like).
  * @param {Date} date - JavaScript Date object
@@ -67,11 +87,11 @@ function formatDateTime(isoString, options = {}) {
     const defaultOptions = {
       dateStyle: 'medium',
       timeStyle: 'short',
-      timeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone: browserTimeZone,
     };
 
     const formatOptions = { ...defaultOptions, ...options };
-    return new Intl.DateTimeFormat('en-US', formatOptions).format(date);
+    return getIntlFormatter(formatOptions).format(date);
   } catch (error) {
     console.warn('Date formatting failed:', error);
     return 'Invalid date';
@@ -108,7 +128,7 @@ function formatDate(isoString, format = 'medium') {
     }
 
     const options = formatMap[format] || formatMap.medium;
-    return new Intl.DateTimeFormat('en-US', options).format(date);
+    return getIntlFormatter({ ...options, timeZone: browserTimeZone }).format(date);
   } catch (error) {
     console.warn('Date formatting failed:', error);
     return 'Invalid date';
@@ -162,16 +182,47 @@ function formatTimeAgo(isoString) {
   }
 }
 
+function formatAmericanFullDateTimeParts(date) {
+  const datePart = getIntlFormatter({
+    timeZone: browserTimeZone,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(date);
+
+  const timePart = getIntlFormatter({
+    timeZone: browserTimeZone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short',
+  }).format(date);
+
+  return { datePart, timePart };
+}
+
+function setBootstrapTooltipHtml(el, html) {
+  el.setAttribute('data-bs-html', 'true');
+  el.setAttribute('data-bs-title', html);
+  el.setAttribute('data-bs-toggle', 'tooltip');
+  // Clear the native title to avoid double-tooltips.
+  el.setAttribute('title', '');
+}
+
 /**
  * Initialize date formatting for all elements with data-datetime attributes.
  * This should be called on page load.
  */
-function initializeDateFormatting() {
-  // Format all elements with data-datetime attribute
-  document.querySelectorAll('[data-datetime]').forEach((el) => {
+function initializeDateFormatting(root = document) {
+  const elements = root.querySelectorAll?.('[data-datetime]') || [];
+  if (!elements.length) return;
+
+  elements.forEach((el) => {
     const isoString = el.dataset.datetime;
     const format = el.dataset.datetimeFormat || 'medium';
     const formatType = el.dataset.datetimeType || 'date'; // 'date', 'datetime', or 'timeago'
+    const tooltipMode = el.dataset.datetimeTooltip || '';
 
     let formatted;
     if (formatType === 'timeago') {
@@ -183,18 +234,35 @@ function initializeDateFormatting() {
     }
 
     el.textContent = formatted;
+
+    // Optional: richer tooltip in user's local timezone.
+    if (tooltipMode === 'full' && isoString) {
+      const date = new Date(isoString);
+      if (!Number.isNaN(date.getTime())) {
+        const { datePart, timePart } = formatAmericanFullDateTimeParts(date);
+        const tooltipHtml = `<div>${datePart}</div><div>${timePart}</div>`;
+        setBootstrapTooltipHtml(el, tooltipHtml);
+      }
+    }
   });
 }
 
-// Initialize on DOM load
-document.addEventListener('DOMContentLoaded', initializeDateFormatting);
-
-// Also initialize immediately if DOM is already loaded
+// Initialize immediately if DOM is already loaded; otherwise wait for DOMContentLoaded.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeDateFormatting);
 } else {
   initializeDateFormatting();
 }
+
+// Re-run after HTMX updates (new nodes may include data-datetime elements).
+document.addEventListener('htmx:afterSettle', (event) => {
+  const target = event.detail?.target;
+  if (target instanceof HTMLElement) {
+    initializeDateFormatting(target);
+    return;
+  }
+  initializeDateFormatting(document);
+});
 
 // Export for use in other modules
 export { formatDateTime, formatDate, formatTimeAgo, formatCustomDate, initializeDateFormatting };

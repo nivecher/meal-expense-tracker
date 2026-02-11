@@ -26,14 +26,38 @@
   transition: background-color 0.15s ease;
 }
 
-.restaurant-table tbody tr:hover {
-  background-color: rgb(var(--bs-primary-rgb), 0.05);
+.restaurant-table tbody tr:hover td {
+  background-color: var(--gray-50, #f8fafc);
 }
 
 /* Cuisine badge styles now handled by unified badge system */
 
 .restaurant-table .actions {
   white-space: nowrap;
+}
+
+.restaurant-table .form-check-input {
+  width: 14px;
+  height: 14px;
+  border-radius: 0;
+  padding: 0;
+  margin: 0 auto;
+  box-shadow: none;
+}
+
+.restaurant-table-fullwidth .table-sticky-frozen {
+  --sticky-actions-width: 0px;
+  --sticky-right-gutter: 0px;
+}
+
+/* Table card: Simplifi-style flat, minimal shadow */
+#table-view-container .card {
+  border: 1px solid var(--gray-200, #e2e8f0);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+#table-view-container .card-body {
+  padding: 0;
 }
 
 .restaurant-table .last-visited {
@@ -51,24 +75,29 @@
   border: 1px solid var(--bs-border-color);
 }
 
-/* Set minimum width for restaurant cards */
+/* Card view: wide cards; multiple per row only when there’s enough space (high min) */
+
+#card-view-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 0.75rem;
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+}
+
+@media (width >= 992px) {
+  #card-view-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
 
 #card-view-container .col {
-  min-width: 320px; /* Increased from 280px */
-}
-
-/* Ensure cards don't get too narrow on very wide screens */
-
-@media (width >= 1400px) {
-  #card-view-container .col {
-    min-width: 380px; /* Increased from 320px */
-  }
-}
-
-@media (width >= 1800px) {
-  #card-view-container .col {
-    min-width: 420px; /* Increased from 350px */
-  }
+  min-width: 0;
+  max-width: none;
+  flex: none;
+  padding: 0;
+  width: 100%;
 }
 
 .restaurant-card:hover {
@@ -122,6 +151,123 @@
   font-size: 0.8rem;
   color: var(--bs-gray-600);
   margin-top: 0.5rem;
+}
+
+/* Restaurant list cards: full-width card, horizontal layout so nothing is squished */
+
+.restaurant-list-card {
+  min-width: 0;
+  overflow: visible;
+}
+
+.restaurant-list-card .card-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+/* One main row: identity | details | meta – uses full width */
+.restaurant-list-card .restaurant-list-card-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem 1.5rem;
+  min-width: 0;
+  overflow: visible;
+}
+
+.restaurant-list-card .restaurant-list-card-identity {
+  flex: 0 1 auto;
+  min-width: 140px;
+  max-width: 100%;
+}
+
+.restaurant-list-card .restaurant-list-card-details {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.restaurant-list-card .restaurant-list-card-meta {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.restaurant-list-card .restaurant-list-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem 0;
+  margin-bottom: 0.25rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.restaurant-list-card .restaurant-list-card-title-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.restaurant-list-card .restaurant-list-card-title-block .card-title {
+  min-width: 0;
+  margin-bottom: 0;
+  overflow: visible;
+}
+
+.restaurant-list-card .restaurant-list-card-title-block .card-title a {
+  text-decoration: none;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  display: block;
+}
+
+.restaurant-list-card .restaurant-list-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.restaurant-list-card .restaurant-list-card-badges .badge-unified,
+.restaurant-list-card .restaurant-list-card-badges .badge {
+  flex-shrink: 0;
+}
+
+.restaurant-list-card .restaurant-address-block {
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.restaurant-list-card .restaurant-website-link {
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.restaurant-list-card .restaurant-list-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.restaurant-list-card .restaurant-list-card-footer .restaurant-list-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .no-restaurants {
@@ -209,3 +355,155 @@
 }
 
 /* Table sorting styles now handled by unified-table.css */
+
+/* Activity panel – compact, same structure as Expenses list */
+
+.activity-panel {
+  margin-bottom: 1rem !important;
+}
+
+.activity-panel .card-header {
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+  padding: 0.25rem 1rem;
+}
+
+/* Single-row header: title + search + actions, less vertical space */
+.activity-panel .card-header.activity-header-single {
+  padding: 0.25rem 1rem;
+}
+
+.activity-header-row-single {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.activity-header-row-single .restaurant-search-form {
+  min-width: 180px;
+  flex: 1 1 240px;
+  max-width: 320px;
+}
+
+.activity-header-row-single .activity-actions.ms-auto {
+  flex-shrink: 0;
+}
+
+.view-toggle-row-below-header {
+  padding: 0.15rem 0;
+}
+
+.activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Stacked layout: row 1 = title + view toggle, row 2 = search, row 3 = icon buttons */
+.activity-header-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+}
+
+.activity-header-stacked .activity-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.activity-header-stacked .activity-header-row-1 {
+  justify-content: space-between;
+}
+
+.activity-header-stacked .activity-header-row-2 {
+  justify-content: flex-start;
+}
+
+.activity-header-stacked .activity-header-row-2 .restaurant-search-form {
+  min-width: 200px;
+  flex: 1 1 280px;
+  max-width: 380px;
+}
+
+.activity-header-stacked .activity-header-row-2 .activity-actions.ms-auto {
+  flex-shrink: 0;
+}
+
+.activity-header-stacked .activity-actions-icons {
+  gap: 0.25rem;
+}
+
+.activity-actions-icons .dropdown .btn-icon-only.dropdown-toggle::after {
+  margin-left: 0.15rem;
+}
+
+.activity-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.activity-title .fw-semibold {
+  font-size: inherit;
+}
+
+.activity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.activity-actions .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.activity-actions .btn .me-1 {
+  margin-right: 0.35rem !important;
+}
+
+/* Icon-only buttons: compact, tooltip for label */
+.activity-actions-icons .btn-icon-only {
+  padding: 0.35rem 0.5rem;
+  width: 2rem;
+  min-width: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activity-actions-icons .btn-icon-only .activity-btn-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.35rem;
+}
+
+.activity-actions-icons .btn-icon-only {
+  position: relative;
+}
+
+.view-toggle-in-activity .view-toggle-btn {
+  padding: 0.35rem 0.6rem;
+  width: auto;
+  min-width: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+.restaurant-search-form {
+  min-width: 200px;
+  flex: 1 1 280px;
+  max-width: 380px;
+}
+
+.restaurant-search-input {
+  min-width: 180px;
+}

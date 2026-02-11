@@ -57,19 +57,16 @@ GOOGLE_MAPS_MAP_ID=your-map-id-here
 ### API Key Setup Steps
 
 1. **Create API Key**:
-
    - Go to [Google Cloud Console](https://console.cloud.google.com/)
    - Navigate to **APIs & Services** → **Credentials**
    - Click **Create Credentials** → **API Key**
 
 2. **Enable Required APIs**:
-
    - **Maps JavaScript API**
    - **Places API** (enables restaurant search and photo access)
    - **Geocoding API**
 
 3. **Configure Referrer Restrictions**:
-
    - Click on your API key
    - Under **Application restrictions**, select **HTTP referrers (web sites)**
    - Add your development URLs:
@@ -114,17 +111,14 @@ If you still get referrer errors:
 If restaurant photos fail to load:
 
 1. **Check API Permissions**:
-
    - In Google Cloud Console, ensure your API key has **Places API** enabled
    - Verify that photo access is included in your API restrictions
 
 2. **Check Browser Console**:
-
    - Look for specific error messages about failed image loads
    - The application will show fallback icons when images can't be loaded
 
 3. **Network Issues**:
-
    - Ensure your development environment can access `https://places.googleapis.com`
    - Check for firewall or proxy issues blocking Google APIs
 

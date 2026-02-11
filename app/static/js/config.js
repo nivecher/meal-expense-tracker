@@ -24,7 +24,7 @@ function loadConfig() {
         app: { ...defaults.app, ...(userConfig.app || {}) },
       };
     }
-  } catch {
+  } catch (error) {
     console.error('Config load error:', error);
   }
   return defaults;

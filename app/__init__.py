@@ -1,18 +1,23 @@
 from collections.abc import Callable
 import logging
+import os
 from typing import Any, Optional, cast
 
 from dotenv import load_dotenv
-from flask import Flask, Response, request
+from flask import Flask, Response, current_app, request
 from flask_cors import CORS
 
 from config import get_config
 
-# Load environment variables from .env file
-load_dotenv()
-
 # Initialize logger
 logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file (best-effort).
+# In some restricted environments (e.g., sandboxed test runners), reading `.env` may be blocked.
+try:
+    load_dotenv()
+except PermissionError:
+    logger.warning("Skipping .env load due to permission error")
 
 __all__ = ["create_app"]
 
@@ -178,7 +183,14 @@ def _set_cache_control_headers(response: Response, content_type: str) -> None:
     """Set appropriate cache control headers based on content type."""
     # Static assets that rarely change - cache for 1 year
     if any(ext in content_type for ext in ["css", "javascript", "image", "font/"]):
-        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        # In development/debug, avoid immutable caching so frontend changes show up immediately.
+        environment = str(current_app.config.get("ENVIRONMENT") or "").lower()
+        flask_env = str(os.getenv("FLASK_ENV") or "").lower()
+        is_dev = environment in {"dev", "development"} or flask_env == "development"
+        if is_dev or current_app.debug or current_app.testing:
+            response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
+        else:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     # HTML pages - short cache to ensure updates are seen
     elif "html" in content_type:
         response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"

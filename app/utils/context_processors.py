@@ -4,6 +4,7 @@ This module provides context processors that make data available
 to all templates globally.
 """
 
+from datetime import UTC, datetime
 from typing import Dict
 
 from flask_login import current_user
@@ -21,6 +22,7 @@ def inject_user_context() -> dict[str, object]:
         "current_user": current_user,
         "user": current_user,  # Alternative name for compatibility
         "browser_timezone": get_browser_timezone(),  # Browser timezone for display
+        "now": datetime.now(UTC),
     }
 
 

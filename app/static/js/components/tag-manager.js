@@ -32,38 +32,40 @@ class TagManager {
   }
 
   /**
-     * Initialize the tag manager
-     */
+   * Initialize the tag manager (modal mode or page mode when form exists without modal).
+   */
   init() {
-    if (this.isInitialized) {
-      // Re-check modal and form elements in case DOM changed
-      this.modal = document.getElementById('tagEditorModal');
-      this.form = document.getElementById('tagEditorForm');
-      if (this.modal && this.form) {
-        return;
-      }
-    }
-
     this.modal = document.getElementById('tagEditorModal');
     this.form = document.getElementById('tagEditorForm');
 
-    if (!this.modal || !this.form) {
-      console.warn('Tag manager modal not found in DOM. Will retry when modal is opened.');
-      // Set up a listener for when modal might be added to DOM
-      const checkModal = () => {
+    if (this.isInitialized && this.form && document.contains(this.form)) {
+      return;
+    }
+    if (this.form && !document.contains(this.form)) {
+      this.isInitialized = false;
+      this.listenersSetup = false;
+    }
+
+    if (!this.form) {
+      if (!this.modal) {
+        console.warn('Tag manager form not found in DOM. Will retry when modal is opened.');
+      }
+      const checkForm = () => {
         this.modal = document.getElementById('tagEditorModal');
         this.form = document.getElementById('tagEditorForm');
-        if (this.modal && this.form && !this.isInitialized) {
+        if (this.form && !this.listenersSetup) {
           this.setupEventListeners();
           this.isInitialized = true;
+          if (!this.modal) {
+            this.loadAllTags();
+          }
         }
       };
-      // Check periodically for a short time
       let attempts = 0;
       const interval = setInterval(() => {
         attempts++;
-        checkModal();
-        if (this.isInitialized || attempts > 10) {
+        checkForm();
+        if ((this.form && this.isInitialized) || attempts > 10) {
           clearInterval(interval);
         }
       }, 100);
@@ -72,6 +74,9 @@ class TagManager {
 
     this.setupEventListeners();
     this.isInitialized = true;
+    if (!this.modal) {
+      this.loadAllTags();
+    }
   }
 
   /**
@@ -149,6 +154,11 @@ class TagManager {
         e.preventDefault();
         this.saveTag();
       });
+    }
+
+    if (!this.modal) {
+      this.listenersSetup = true;
+      return;
     }
 
     // Reset modal when hidden and restore focus
@@ -351,6 +361,7 @@ class TagManager {
           noTagsDiv.className = 'text-muted text-center py-4';
           noTagsDiv.innerHTML = '<i class="fas fa-tags fa-2x mb-2 d-block"></i><div>No tags created yet. Create your first tag above!</div>';
           container.replaceChildren(noTagsDiv);
+          document.dispatchEvent(new CustomEvent('tagsLoaded', { detail: { tags: [] } }));
           return;
         }
 
@@ -545,6 +556,8 @@ class TagManager {
         });
 
         container.appendChild(tagGrid);
+
+        document.dispatchEvent(new CustomEvent('tagsLoaded', { detail: { tags } }));
 
         // Restore form state if we were editing a tag
         if (currentFormData && currentTagId) {

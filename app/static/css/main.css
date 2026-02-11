@@ -1,8 +1,20 @@
 /* Main CSS file for Meal Expense Tracker */
 
-@import url("../css/components/table.css");
-@import url("../css/components/avatar.css");
-@import url("../css/components/inline-styles-replacement.css");
+@import url("./components/sidebar.css");
+@import url("./components/search.css");
+@import url("./components/badges.css");
+@import url("./components/toasts.css");
+@import url("./components/error-modals.css");
+@import url("./components/cards.css");
+@import url("./components/unified-table.css");
+@import url("./components/table.css");
+@import url("./components/avatar.css");
+@import url("./components/image-fallback.css");
+@import url("./components/inline-styles-replacement.css");
+@import url("./forms.css");
+@import url("./utilities.css");
+@import url("./loading.css");
+@import url("./select2-fixes.css");
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 /* Category Badge Classes */
@@ -149,10 +161,6 @@
   --form-control-radius: var(--border-radius);
   --form-control-padding-y: 0.5rem;
   --form-control-padding-x: 0.75rem;
-  --spacing: 1rem;
-  --spacing-md: 1.5rem;
-  --spacing-lg: 2rem;
-  --spacing-xl: 3rem;
 }
 
 *,
@@ -576,69 +584,6 @@ p {
   }
 }
 
-:root {
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-  --black: #000;
-
-  /* UI Elements - Light Theme (Default) */
-  --body-bg: #f8fafc;
-  --card-bg: var(--white);
-  --header-bg: var(--white);
-  --footer-bg: var(--white);
-  --sidebar-bg: var(--white);
-  --text-color: var(--gray-800);
-  --text-muted: var(--gray-600);
-  --border-color: var(--gray-200);
-  --input-bg: var(--white);
-  --input-border: var(--gray-300);
-  --input-text: var(--gray-900);
-  --hover-bg: var(--gray-50);
-  --active-bg: var(--gray-100);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 5%);
-  --shadow: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -1px rgb(0 0 0 / 6%);
-  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 10%), 0 4px 6px -2px rgb(0 0 0 / 5%);
-  --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 10%), 0 10px 10px -5px rgb(0 0 0 / 4%);
-  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 6%);
-
-  /* Spacing & Sizing */
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-
-  /* Shadows */
-
-  /* Border Radius */
-  --border-radius-sm: 0.25rem;
-  --border-radius: 0.5rem;
-  --border-radius-lg: 0.75rem;
-  --border-radius-xl: 1rem;
-
-  /* Transitions */
-  --transition-speed: 0.2s;
-  --transition: all var(--transition-speed) ease-in-out;
-}
-
-body {
-  background-color: #f0f2f5;
-  color: var(--text-color);
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    "Open Sans",
-    "Helvetica Neue",
-    sans-serif;
-  line-height: 1.6;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
 /* Focus styles for accessibility */
 
 :focus-visible {
@@ -941,7 +886,7 @@ footer {
   cursor: pointer;
   padding: 0.25rem 0.5rem;
   border-radius: 50px;
-  transition: all var(--transition-speed) ease;
+  transition: var(--transition-default);
 }
 
 .theme-toggle .form-check-input {

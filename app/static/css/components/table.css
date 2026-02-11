@@ -6,6 +6,7 @@
   position: relative;
   max-height: 70vh; /* Limit table height to enable scrolling */
   overflow-y: auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--border-color, #dee2e6);
   border-radius: 0.375rem;
 }
@@ -51,27 +52,88 @@
 
 /* Enhanced sticky table with both vertical and horizontal freezing */
 
+/* Simplifi-style: clean, minimal table container */
 .table-sticky-frozen {
   position: relative;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 0.375rem;
+  background: var(--white, #fff);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+
+  --sticky-actions-width: 200px;
+  --sticky-right-gutter: calc(var(--sticky-actions-width) + 16px);
+  --sticky-header-top: 0px;
+}
+
+.table-sticky-frozen .table-scroll-inner {
+  display: block;
+  width: 100%;
   max-height: 70vh;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  border: 1px solid var(--border-color, #dee2e6);
-  border-radius: 0.375rem;
+  scrollbar-gutter: stable;
+  padding-right: var(--sticky-right-gutter);
+
+  /* Enough bottom padding so the sticky total row is never clipped when scrolled to end */
+  padding-bottom: 2.5rem;
+  box-sizing: content-box;
+}
+
+.table-sticky-frozen .table-actions-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--white, #fff);
+  border-bottom: 1px solid var(--gray-200, #e2e8f0);
+  padding: 0.5rem 1rem;
 }
 
 .table-sticky-frozen .table {
   margin-bottom: 0;
-  min-width: 100%;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .table-sticky-frozen thead th {
   position: sticky;
-  top: 0;
+  top: var(--sticky-header-top);
   z-index: 10;
-  background-color: var(--gray-100, #f8f9fa);
-  border-bottom: 2px solid var(--border-color, #dee2e6);
-  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  background: var(--gray-50, #f8fafc);
+  color: var(--gray-700, #334155);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid var(--gray-200, #e2e8f0);
+  padding: 0.5rem 0.75rem;
+
+  /* Single-line header: prevent wrap so row height stays normal; cap height */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+  vertical-align: middle;
+  max-height: 2.5rem;
+}
+
+/*
+ * Keep header row above body when scrolling (tbody cells must not stack over thead).
+ * Simplifi-style: single bottom border per row, no cell borders; comfortable padding.
+ */
+.table-sticky-frozen tbody td {
+  position: relative;
+  z-index: 0;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid var(--gray-100, #f1f5f9);
+  border-left: none;
+  border-right: none;
+}
+
+/* Ensure sortable headers stay sticky (sorting/resizing styles can set position) */
+.table-sticky-header thead th[data-sort="true"],
+.table-sticky-frozen thead th[data-sort="true"] {
+  position: sticky;
+  top: var(--sticky-header-top);
 }
 
 .table-sticky-frozen .table th:first-child,
@@ -79,55 +141,494 @@
   position: sticky;
   left: 0;
   z-index: 5;
-  background-color: inherit;
-  border-right: 2px solid var(--border-color, #dee2e6);
+  background: var(--white, #fff);
+  border-right: 1px solid var(--gray-200, #e2e8f0);
 }
 
 .table-sticky-frozen .table thead th:first-child {
   z-index: 15;
+  background: var(--gray-50, #f8fafc);
+}
+
+/* First column body cells: stay below header row when scrolling vertically */
+.table-sticky-frozen tbody td:first-child {
+  z-index: 1;
+}
+
+/* Sticky footer totals – single-line compact row */
+.table-sticky-header tfoot td,
+.table-sticky-header tfoot th,
+.table-sticky-frozen tfoot td,
+.table-sticky-frozen tfoot th {
+  position: sticky;
+  bottom: 0;
+  z-index: 9;
+  background: var(--gray-50, #f8fafc);
+  border-top: 1px solid var(--gray-200, #e2e8f0);
+  line-height: 1.25;
+  vertical-align: middle;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8125rem;
+}
+
+.table-sticky-frozen tfoot.table-totals td,
+.table-sticky-frozen tfoot.table-totals th {
+  background: var(--gray-50, #f8fafc);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.3rem 0.6rem;
+  line-height: 1.25;
+  vertical-align: middle;
+}
+
+.table-sticky-frozen tfoot.table-totals td[colspan] {
+  color: var(--gray-700, #374151);
+}
+
+.table-sticky-frozen tfoot.table-totals td.actions,
+.table-sticky-frozen tfoot.table-totals th.actions {
   background-color: var(--gray-100, #f8f9fa);
 }
 
-/* Hover effects for frozen tables */
+/* Compact total row: one line, aligned with columns (expenses + restaurants) */
+.expense-table tfoot.table-totals .table-totals-row td,
+.restaurant-table tfoot.table-totals .table-totals-row td {
+  padding: 0.15rem 0.6rem;
+  line-height: 1.15;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+  border-bottom: none;
+  background: var(--gray-50, #f8fafc);
+  border-top: 1px solid var(--gray-200, #e2e8f0);
+}
 
-.table-sticky-frozen tbody tr:hover td:first-child,
-.table-frozen-columns tbody tr:hover td:first-child {
+/* Total row amount cells: ensure no wrap (expenses col 8, restaurants col 9) */
+.expense-table tfoot.table-totals .table-totals-row td:nth-child(8),
+.restaurant-table tfoot.table-totals .table-totals-row td:nth-child(9) {
+  min-width: 5.5rem;
+  white-space: nowrap;
+}
+
+/* Numeric alignment without switching fonts */
+.amount-right {
+  text-align: right !important;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Sticky actions column (right) for frozen tables */
+.table-sticky-frozen th.actions,
+.table-sticky-frozen td.actions {
+  position: sticky;
+  right: var(--vertical-scrollbar-width, 0);
+  z-index: 6;
+  background-color: var(--white, #fff);
+  border-left: 2px solid var(--border-color, #dee2e6);
+  min-width: var(--sticky-actions-width);
+  width: var(--sticky-actions-width);
+  white-space: nowrap;
+}
+
+.table-sticky-frozen tbody tr:hover td.actions {
   background-color: var(--gray-50, #f8f9fa);
 }
 
-/* Custom scrollbar styling for better UX */
+.table-sticky-frozen thead th.actions {
+  position: sticky;
+  top: var(--sticky-header-top);
+  right: var(--vertical-scrollbar-width, 0);
+  z-index: 16;
+  background-color: var(--gray-100, #f8f9fa);
+}
 
+.table-sticky-frozen tfoot td.actions,
+.table-sticky-frozen tfoot th.actions {
+  z-index: 12;
+  background-color: var(--gray-200, #e9ecef);
+}
+
+/* Consistent column sizing: auto-fit so columns size to content with min-widths */
+
+/* Expense table: fixed columns, min-width so horizontal scroll appears when viewport is narrow */
+.expense-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 760px;
+}
+
+.expense-table th:nth-child(1),
+.expense-table td:nth-child(1) {
+  width: 4%;
+  min-width: 44px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.expense-table th:nth-child(2),
+.expense-table td:nth-child(2) {
+  width: 12%;
+}
+
+.expense-table th:nth-child(3),
+.expense-table td:nth-child(3) {
+  width: 22%;
+}
+
+.expense-table th:nth-child(4),
+.expense-table td:nth-child(4),
+.expense-table th:nth-child(5),
+.expense-table td:nth-child(5) {
+  width: 11%;
+}
+
+.expense-table th:nth-child(6),
+.expense-table td:nth-child(6) {
+  width: 10%;
+}
+
+.expense-table th:nth-child(7),
+.expense-table td:nth-child(7) {
+  width: 9%;
+}
+
+.expense-table th:nth-child(8),
+.expense-table td:nth-child(8) {
+  width: 12%;
+  min-width: 5.5rem; /* Prevent total amount wrapping (e.g. $1,221.37) */
+}
+
+/* Keep currency and numeric values on one line */
+.expense-table td:nth-child(7),
+.expense-table td:nth-child(8) {
+  white-space: nowrap;
+}
+
+/* Expense table: compact row height (header + body) */
+.expense-table thead th {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+.expense-table tbody td {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+/* Standard: numeric column headers should align with numeric values */
+.table th[data-sort-type="number"],
+.table th[data-sort-type="currency"] {
+  text-align: right !important;
+}
+
+/* Party Size: left-aligned like Meal/Order (override numeric rule for this column) */
+.expense-table thead th:nth-child(6),
+.expense-table tbody td:nth-child(6) {
+  text-align: left !important;
+}
+
+/* $/person and Amount: right-aligned with extra padding */
+.expense-table thead th:nth-child(7),
+.expense-table thead th:nth-child(8),
+.expense-table tbody td:nth-child(7),
+.expense-table tbody td:nth-child(8),
+.expense-table tfoot td:nth-child(7),
+.expense-table tfoot td:nth-child(8) {
+  padding-right: 0.75rem;
+  text-align: right !important;
+}
+
+
+/* Restaurant table: fixed columns, min-width so horizontal scroll appears when viewport is narrow */
+.restaurant-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 800px;
+}
+
+/* Restaurant table: font size and padding match expense table */
+.restaurant-table thead th {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+.restaurant-table tbody td {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+.restaurant-table th:nth-child(1),
+.restaurant-table td:nth-child(1) {
+  width: 4%;
+  min-width: 44px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.restaurant-table th:nth-child(2),
+.restaurant-table td:nth-child(2) {
+  width: 21%;
+}
+
+.restaurant-table th:nth-child(3),
+.restaurant-table td:nth-child(3) {
+  width: 22%;
+}
+
+.restaurant-table th:nth-child(4),
+.restaurant-table td:nth-child(4) {
+  width: 5%;
+  min-width: 2.5rem;
+  white-space: nowrap;
+}
+
+.restaurant-table th:nth-child(5),
+.restaurant-table td:nth-child(5) {
+  width: 9%;
+}
+
+.restaurant-table th:nth-child(6),
+.restaurant-table td:nth-child(6) {
+  width: 9%;
+}
+
+.restaurant-table th:nth-child(7),
+.restaurant-table td:nth-child(7) {
+  width: 12%;
+}
+
+.restaurant-table th:nth-child(8),
+.restaurant-table td:nth-child(8),
+.restaurant-table th:nth-child(9),
+.restaurant-table td:nth-child(9) {
+  width: 9%;
+  white-space: nowrap;
+}
+
+.restaurant-table th:nth-child(9),
+.restaurant-table td:nth-child(9) {
+  min-width: 5.5rem; /* Prevent total amount wrapping (e.g. $1,221.37) */
+}
+
+/* Table checkboxes: standard checkbox look, hand cursor on hover */
+.expense-table .form-check-input,
+.restaurant-table .form-check-input {
+  cursor: pointer;
+}
+
+.expense-table .form-check-input:checked,
+.restaurant-table .form-check-input:checked {
+  background-image: var(--bs-form-check-bg-image);
+  background-size: 0.65rem 0.65rem;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* No actions column for restaurant table (actions live in toolbar) */
+
+/* Month divider rows: Simplifi-style minimal */
+.table-month-divider td {
+  background: var(--gray-50, #f8fafc);
+  border-top: 1px solid var(--gray-200, #e2e8f0);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 0.5rem 0.75rem;
+  position: static !important;
+  left: auto !important;
+  text-align: left;
+  font-weight: 600;
+  color: var(--gray-600, #475569);
+  border-right: none !important;
+}
+
+.expense-table .table-month-divider td {
+  width: auto !important;
+  min-width: 0 !important;
+  text-align: left !important;
+}
+
+.table-city-divider td {
+  background-color: var(--gray-50, #f8fafc);
+  border-top: 1px solid var(--gray-200, #e2e8f0);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  padding: 0.5rem 0.75rem;
+  position: static !important;
+  left: auto !important;
+  text-align: left;
+  font-weight: 700;
+  border-right: none !important;
+}
+
+.table-alpha-divider td {
+  background-color: var(--gray-50, #f8fafc);
+  border-top: 1px solid var(--gray-200, #e2e8f0);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  padding: 0.5rem 0.75rem;
+  position: static !important;
+  left: auto !important;
+  text-align: left;
+  font-weight: 700;
+  border-right: none !important;
+}
+
+.table-alpha-divider .alpha-divider-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.table-alpha-divider .alpha-divider-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.table-alpha-divider .alpha-toggle {
+  border: none;
+  background: transparent;
+  color: var(--gray-600, #4b5563);
+  margin-right: 0.1rem;
+  padding: 0.1rem 0.25rem;
+}
+
+.table-alpha-divider.alpha-collapsed .alpha-toggle {
+  color: var(--gray-500, #6b7280);
+}
+
+.alpha-hidden {
+  display: none;
+}
+
+.table-alpha-divider .alpha-divider-label {
+  font-weight: 800;
+}
+
+.table-city-divider .city-divider-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.table-city-divider .city-divider-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.table-city-divider .city-toggle {
+  border: none;
+  background: transparent;
+  color: var(--gray-600, #4b5563);
+  margin-right: 0.1rem;
+  padding: 0.1rem 0.25rem;
+}
+
+.table-city-divider.city-collapsed .city-toggle {
+  color: var(--gray-500, #6b7280);
+}
+
+.city-hidden {
+  display: none;
+}
+
+.table-month-divider .month-divider-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.table-month-divider .month-divider-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.table-month-divider .month-divider-month,
+.table-month-divider .month-divider-year {
+  font-weight: 800;
+}
+
+.table-month-divider .month-toggle {
+  border: none;
+  background: transparent;
+  color: var(--gray-600, #4b5563);
+  margin-right: 0.35rem;
+  padding: 0.1rem 0.25rem;
+}
+
+.table-month-divider.month-collapsed .month-toggle {
+  color: var(--gray-500, #6b7280);
+}
+
+.month-hidden {
+  display: none;
+}
+
+/* Row hover: Simplifi-style subtle */
+.table-sticky-frozen tbody tr:hover td,
+.table-sticky-frozen tbody tr:hover td:first-child,
+.table-frozen-columns tbody tr:hover td:first-child {
+  background: var(--gray-50, #f8fafc);
+}
+
+/* Selected row: soft blue highlight (Simplifi-style) */
+.table-sticky-frozen tbody tr.is-selected td,
+.table-sticky-frozen tbody tr.is-selected td:first-child {
+  background: rgb(59 130 246 / 8%) !important;
+}
+
+/* Custom scrollbar: slim, neutral */
 .table-sticky-header::-webkit-scrollbar,
 .table-frozen-columns::-webkit-scrollbar,
-.table-sticky-frozen::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+.table-sticky-frozen::-webkit-scrollbar,
+.table-sticky-frozen .table-scroll-inner::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
 .table-sticky-header::-webkit-scrollbar-track,
 .table-frozen-columns::-webkit-scrollbar-track,
-.table-sticky-frozen::-webkit-scrollbar-track {
-  background: var(--gray-100, #f1f3f4);
-  border-radius: 4px;
+.table-sticky-frozen::-webkit-scrollbar-track,
+.table-sticky-frozen .table-scroll-inner::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .table-sticky-header::-webkit-scrollbar-thumb,
 .table-frozen-columns::-webkit-scrollbar-thumb,
-.table-sticky-frozen::-webkit-scrollbar-thumb {
-  background: var(--gray-400, #9ca3af);
-  border-radius: 4px;
+.table-sticky-frozen::-webkit-scrollbar-thumb,
+.table-sticky-frozen .table-scroll-inner::-webkit-scrollbar-thumb {
+  background: var(--gray-300, #d1d5db);
+  border-radius: 3px;
 }
 
 .table-sticky-header::-webkit-scrollbar-thumb:hover,
 .table-frozen-columns::-webkit-scrollbar-thumb:hover,
-.table-sticky-frozen::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-500, #6b7280);
+.table-sticky-frozen::-webkit-scrollbar-thumb:hover,
+.table-sticky-frozen .table-scroll-inner::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400, #9ca3af);
 }
 
 /* Responsive adjustments */
 @media (width <= 768px) {
-  .table-sticky-header,
-  .table-sticky-frozen {
+  .table-sticky-header {
+    max-height: 60vh;
+  }
+
+  .table-sticky-frozen .table-scroll-inner {
     max-height: 60vh;
   }
 
@@ -142,14 +643,13 @@
 /* Sortable table headers */
 
 th[data-sort="true"] {
-  position: relative;
   user-select: none;
   transition: background-color 0.2s ease;
 }
 
 th[data-sort="true"]:hover,
 th[data-sort="true"]:focus {
-  background-color: #f1f3f5;
+  background-color: var(--gray-100, #f1f5f9);
   outline: none;
 }
 

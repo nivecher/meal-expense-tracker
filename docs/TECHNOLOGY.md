@@ -17,29 +17,24 @@ This document outlines the technology choices and architecture decisions for the
 ### Backend
 
 - **Language**: [Python 3.13](https://www.python.org/)
-
   - Type hints and modern Python features
   - Strict typing with Mypy for better code quality
 
 - **Web Framework**: [Flask 3.1.1](https://flask.palletsprojects.com/)
-
   - Blueprints for modular application structure
   - AWS Lambda WSGI adapter for serverless deployment
 
 - **Database**: [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
-
   - Modern SQLAlchemy with improved type hints
   - PostgreSQL for production, SQLite for development
   - Flask-Migrate for schema management
 
 - **Data & Validation**:
-
   - [Marshmallow](https://marshmallow.readthedocs.io/) for API serialization/validation
   - [msgspec](https://jcristharif.com/msgspec/) for high-performance JSON serialization
   - [WTForms](https://wtforms.readthedocs.io/) for form validation
 
 - **Authentication & Security**:
-
   - Flask-Login for session-based authentication
   - Signed cookie sessions for all environments (no external storage required)
   - Flask-Limiter for rate limiting
@@ -51,21 +46,18 @@ This document outlines the technology choices and architecture decisions for the
 ### Frontend
 
 - **Framework Strategy**: Server-side rendered templates with progressive enhancement
-
   - [Jinja2](https://jinja.palletsprojects.com/) templates for server-side rendering
   - [Bootstrap 5.3.3](https://getbootstrap.com/) for responsive UI components
   - [jQuery 3.7.1](https://jquery.com/) for DOM manipulation and AJAX
   - Vanilla JavaScript ES6+ for modern features and custom components
 
 - **UI Components & Styling**:
-
   - Bootstrap Icons for consistent iconography
   - Select2 with Bootstrap 5 theme for enhanced form controls
   - Custom CSS following BEM methodology
   - Responsive design with mobile-first approach
 
 - **JavaScript Architecture**:
-
   - ES6 modules for code organization
   - Service classes for API interaction
   - Utils for common functionality
@@ -156,14 +148,12 @@ This document outlines the technology choices and architecture decisions for the
 ### Local Development (Tools)
 
 - **Development Environment**: Make-based workflow with comprehensive targets
-
   - `make setup` - Automated development environment setup
   - `make run` - Start Flask development server
   - `make test` - Run test suite with coverage
   - `make lint` - Run all linters and formatters
 
 - **Containerization**: Docker Compose for local services
-
   - PostgreSQL container for local database
   - LocalStack for AWS service emulation (when needed)
   - Development-focused container setup
@@ -177,20 +167,17 @@ This document outlines the technology choices and architecture decisions for the
 ### Code Quality & Linting
 
 - **Python**:
-
   - [Ruff](https://docs.astral.sh/ruff/) - Fast Python linter (replaces Flake8, isort, autoflake)
   - [Black](https://black.readthedocs.io/) - Code formatting (120 char line length)
   - [Mypy](https://mypy.readthedocs.io/) - Static type checking
   - [Bandit](https://bandit.readthedocs.io/) - Security vulnerability scanning
 
 - **Frontend**:
-
   - [ESLint 9.34.0](https://eslint.org/) - JavaScript linting with flat config
   - [Prettier 3.2.4](https://prettier.io/) - HTML template formatting
   - Environment-specific rules (development vs production)
 
 - **Infrastructure**:
-
   - [TFLint](https://github.com/terraform-linters/tflint) - Terraform linting
   - [ShellCheck](https://www.shellcheck.net/) - Shell script analysis
   - [yamllint](https://yamllint.readthedocs.io/) - YAML file validation
@@ -225,7 +212,6 @@ This document outlines the technology choices and architecture decisions for the
 - Request/response examples
 
 - **Architecture**:
-
   - C4 Model
   - System context diagrams
   - Component diagrams
@@ -243,7 +229,6 @@ This document outlines the technology choices and architecture decisions for the
 - Project management
 
 - **Branching Strategy**:
-
   - GitHub Flow
   - Feature branches
   - Protected main branch
@@ -264,7 +249,6 @@ This document outlines the technology choices and architecture decisions for the
 - Cloud-based development
 
 - **Staging**
-
   - Mirrors production
   - Integration testing
   - Performance testing
@@ -337,7 +321,6 @@ This document outlines the technology choices and architecture decisions for the
 - Custom CloudWatch metrics
 
 - **Infrastructure Metrics**
-
   - CPU/Memory usage
   - Disk I/O
   - Network throughput
@@ -356,7 +339,6 @@ This document outlines the technology choices and architecture decisions for the
 - Escalation policies
 
 - **Non-critical Alerts**
-
   - Email notifications
   - Slack channels
   - Daily digest
@@ -377,7 +359,6 @@ This document outlines the technology choices and architecture decisions for the
 - RDS encryption
 
 - **Encryption in Transit**
-
   - TLS 1.2+ required
   - HSTS headers
   - Certificate management
@@ -427,7 +408,6 @@ This document outlines the technology choices and architecture decisions for the
 - Service mesh (Linkerd/Istio)
 
 - **Multi-region**
-
   - Active-active deployment
   - Global database strategy
   - Data replication

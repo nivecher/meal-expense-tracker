@@ -25,7 +25,6 @@ This document explains the AWS WAF (Web Application Firewall) configuration for 
 The WAF is configured with:
 
 1. **Bot Control Rule Set** (FREE)
-
    - Priority: 1
    - Action: Block detected bots
    - Free for up to 10M requests/month

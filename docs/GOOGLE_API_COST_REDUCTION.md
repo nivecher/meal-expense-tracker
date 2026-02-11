@@ -15,7 +15,6 @@ This document outlines the comprehensive cost reduction strategies implemented t
 **Implementation**: `app/services/google_places_service.py`
 
 - **Disabled Pro/Enterprise Features**:
-
   - Photos (requires separate API calls - $0.007 each)
   - Reviews (Pro+ tier)
   - Editorial summaries (Pro+ tier)
