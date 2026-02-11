@@ -1102,7 +1102,7 @@ def list_tags() -> ResponseReturnValue:
         request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.accept_mimetypes
     )
     if not wants_json:
-        return redirect(url_for("expenses.list_expenses", view="tags"))
+        return redirect(url_for("expenses.list_expenses", view="tags"))  # type: ignore[return-value]
 
     try:
         user_id = current_user.id
