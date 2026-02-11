@@ -3,8 +3,8 @@
 /* Welcome Section */
 
 .welcome-section {
-  background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
-  border: 1px solid #e9ecef;
+  background: linear-gradient(135deg, var(--white) 0%, var(--gray-50) 100%);
+  border: 1px solid var(--border-color);
   border-radius: 1.25rem;
   padding: 2rem;
   margin: 0 -15px 1rem;
@@ -19,7 +19,7 @@
 
 .quick-actions-label {
   font-weight: 600;
-  color: #495057;
+  color: var(--gray-600);
   font-size: 1rem;
   margin-bottom: 1rem;
 }
@@ -36,8 +36,8 @@
   text-align: center;
   height: 100%;
   min-height: 50px;
-  border: 1px solid #dee2e6;
-  background: #fff;
+  border: 1px solid var(--gray-300);
+  background: var(--white);
   box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
 }
 
@@ -67,47 +67,47 @@
 
 .welcome-action-blue {
   color: #fff;
-  background: #0d6efd;
-  border-color: #0d6efd;
+  background: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .welcome-action-blue:hover {
   color: #fff;
-  background: #0b5ed7;
-  border-color: #0a58ca;
-  box-shadow: 0 4px 15px rgb(13 110 253 / 25%);
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  box-shadow: 0 4px 15px rgb(37 99 235 / 25%);
 }
 
 .welcome-action-orange {
   color: #fff;
-  background: #fd7e14;
-  border-color: #fd7e14;
+  background: var(--warning-color);
+  border-color: var(--warning-color);
 }
 
 .welcome-action-orange:hover {
   color: #fff;
-  background: #0d6efd;
-  border-color: #0d6efd;
-  box-shadow: 0 4px 15px rgb(13 110 253 / 25%);
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 15px rgb(37 99 235 / 25%);
 }
 
 .welcome-action-gray {
-  color: #495057;
-  background: #fff;
-  border-color: #dee2e6;
+  color: var(--gray-600);
+  background: var(--white);
+  border-color: var(--gray-300);
 }
 
 .welcome-action-gray:hover {
   color: #fff;
-  background: #0d6efd;
-  border-color: #0d6efd;
-  box-shadow: 0 4px 15px rgb(13 110 253 / 25%);
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 15px rgb(37 99 235 / 25%);
 }
 
 /* Help Link */
 
 .help-link {
-  color: #6c757d;
+  color: var(--text-muted);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;
@@ -116,22 +116,22 @@
   align-items: center;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
+  background: var(--gray-50);
+  border: 1px solid var(--border-color);
 }
 
 .help-link:hover {
-  color: #0d6efd;
-  background: #e3f2fd;
-  border-color: #0d6efd;
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+  border-color: var(--primary-color);
   text-decoration: none;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgb(13 110 253 / 15%);
+  box-shadow: 0 2px 8px rgb(37 99 235 / 15%);
 }
 
 .welcome-content h1 {
   font-weight: 700;
-  color: #0d6efd;
+  color: var(--primary-color);
 }
 
 .welcome-content .lead {

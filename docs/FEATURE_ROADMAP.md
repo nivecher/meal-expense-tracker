@@ -196,6 +196,29 @@ This document outlines planned features and enhancements for the Meal Expense Tr
 
 ---
 
+### 7a. Restaurant Rewards Programs 💡
+
+**Description:**
+
+- Track loyalty memberships per restaurant
+- Store rewards program IDs, tiers, and notes
+- Quick view of eligible benefits and offers
+- Optional reminders for expiring rewards
+
+**User Value:** Helps users maximize dining rewards and manage memberships
+
+**Technical Considerations:**
+
+- New `RestaurantReward` model linked to restaurants
+- UI tab for Rewards management within Restaurants
+- Optional notification system for expiring benefits
+
+**Estimated Effort:** Low-Medium (1-2 weeks)
+
+**Dependencies:** Restaurant Management (✅ Complete)
+
+---
+
 ### 8. Expense Templates / Quick Add ⚡
 
 **Description:**
@@ -683,13 +706,11 @@ This document outlines planned features and enhancements for the Meal Expense Tr
 ### Top 3 Priority Features
 
 1. **Budget Tracking and Alerts** 🔥
-
    - High user value
    - Core financial management feature
    - Medium effort
 
 2. **Receipt OCR and Auto-Fill** 🔥
-
    - High user value
    - Leverages existing receipt upload
    - High effort but transformative
@@ -702,12 +723,10 @@ This document outlines planned features and enhancements for the Meal Expense Tr
 ### Next 3 Priority Features
 
 1. **Recurring Expenses** ⚡
-
    - Time-saving feature
    - Medium effort
 
 2. **Split Expenses** ⚡
-
    - Common use case
    - Medium-high effort
 

@@ -31,12 +31,38 @@ class StickyTable {
     if (!this.table) return;
 
     this.setupHeaders();
+    this.syncStickyActionWidths();
     this.setupScrollHandlers();
     this.setupResizeHandler();
     this.addMobileOptimizations();
 
     // Performance optimization: Use passive listeners for scroll events
     this.setupPassiveScrolling();
+  }
+
+  syncStickyActionWidths() {
+    // Ensure the sticky "Actions" column does not overlap adjacent columns
+    const actionCells = this.container.querySelectorAll('th.actions, td.actions');
+    if (!actionCells.length) return;
+
+    requestAnimationFrame(() => {
+      let requiredWidthPx = 0;
+      actionCells.forEach((cell) => {
+        const rectWidth = Math.ceil(cell.getBoundingClientRect().width);
+        const scrollWidth = Math.ceil(cell.scrollWidth || 0);
+        requiredWidthPx = Math.max(requiredWidthPx, rectWidth, scrollWidth);
+      });
+
+      // Clamp to sane bounds to avoid accidental huge widths
+      const clampedWidthPx = Math.min(Math.max(requiredWidthPx, 160), 360);
+      const verticalScrollbarWidthPx = Math.max(this.container.offsetWidth - this.container.clientWidth, 0);
+      const needsHorizontalScroll = this.table.scrollWidth > this.container.clientWidth + 1;
+      const gutterPx = needsHorizontalScroll ? clampedWidthPx + 16 + verticalScrollbarWidthPx : 0; // border/shadow safety
+
+      this.container.style.setProperty('--sticky-actions-width', `${clampedWidthPx}px`);
+      this.container.style.setProperty('--sticky-right-gutter', `${gutterPx}px`);
+      this.container.style.setProperty('--vertical-scrollbar-width', `${verticalScrollbarWidthPx}px`);
+    });
   }
 
   setupHeaders() {
@@ -115,6 +141,7 @@ class StickyTable {
   handleResize() {
     // Recalculate header heights on resize
     this.setupHeaders();
+    this.syncStickyActionWidths();
 
     // Update mobile optimizations
     this.addMobileOptimizations();

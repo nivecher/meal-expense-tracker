@@ -140,12 +140,13 @@ help:  ## Show this help message
 	@echo "  \033[1mmake test-report\033[0m      Generate HTML test report"
 	@echo "  \033[1mmake install-playwright\033[0m Install Playwright dependencies"
 
-	@echo "\n\033[1mTerraform (TF_ENV=env, default: dev):\033[0m"
+	@echo "\n\033[1mTerraform (ENV=dev|staging|prod, default: dev):\033[0m"
 	@echo "  \033[1mmake tf-init\033[0m        Initialize Terraform with backend config"
 	@echo "  \033[1mmake tf-plan\033[0m        Generate and show execution plan"
 	@echo "  \033[1mmake tf-apply\033[0m       Apply changes to infrastructure"
 	@echo "  \033[1mmake tf-destroy\033[0m     Destroy infrastructure"
 	@echo "  \033[1mmake tf-validate\033[0m    Validate Terraform configuration"
+	@echo "  \033[1m  e.g. make tf-plan ENV=staging\033[0m"
 
 	@echo "\n\033[1mDeployment Pipeline:\033[0m"
 	@echo "  \033[1mmake deploy\033[0m         Deploy dev (Lambda + frontend sync)"
@@ -1171,9 +1172,9 @@ tf-destroy: validate-tf-config
 
 ## Validate Terraform configuration
 .PHONY: tf-validate
-tf-validate:
+tf-validate: validate-tf-config
 	@echo "Validating Terraform configuration for $(TF_ENV)..."
-	@cd terraform && \
+	@cd $(TF_ROOT) && \
 	terraform validate
 
 ## Validate Terraform configuration and environment

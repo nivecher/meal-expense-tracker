@@ -73,7 +73,6 @@ If the standard socket path doesn't work, you can try:
    ```
 
 3. **Copy Configuration**
-
    - The configuration file is located at `~/.cursor/mcp.json`
    - A reference example is available at `mcp.json.example` in the project root
 

@@ -1,5 +1,5 @@
 {% from 'macros/badge_helpers.html' import cuisine_badge %}
-<tr>
+<tr aria-selected="false">
     <td>
         <div class="d-flex align-items-start">
             <!-- Restaurant Icon (small for table view) -->
@@ -93,13 +93,13 @@
         {% endif %}
     </td>
     <td class="fw-bold text-info amount-right">
-        {% if restaurant.avg_price_per_person and restaurant.avg_price_per_person > 0 %} ${{
-        "%.2f"|format(restaurant.avg_price_per_person) }} {% else %}
+        {% if restaurant.avg_price_per_person and restaurant.avg_price_per_person > 0 %} ${{ {{
+        restaurant.avg_price_per_person|format_currency_usd }} {% else %}
         <span class="text-muted">-</span>
         {% endif %}
     </td>
     <td class="fw-bold text-success amount-right"
-        >${{ "%.2f"|format(restaurant.total_spent) if restaurant.total_spent is defined else '0.00' }}</td
+        >{{ (restaurant.total_spent if restaurant.total_spent is defined else 0)|format_currency_usd }}</td
     >
     <td class="actions text-center">
         <a

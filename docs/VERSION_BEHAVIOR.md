@@ -99,7 +99,6 @@ fi
 ### ✅ Aligned Behaviors
 
 1. **Main Branch**:
-
    - `make version` → Tag version
    - Deploy workflow → Tag version
    - Docker build → Tag version
@@ -130,7 +129,6 @@ cat app/_version.py | grep __version__
 ### Scripts
 
 - **`scripts/get_version.py`**:
-
   - Checks if on `main` branch
   - If yes: Uses latest tag version
   - If no: Uses setuptools-scm

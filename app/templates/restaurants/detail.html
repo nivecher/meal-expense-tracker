@@ -333,7 +333,7 @@ Restaurant Details - Meal Expense Tracker
                                     <div class="text-center">
                                         {% set total_spent = restaurant.expenses|sum(attribute='amount') if
                                         restaurant.expenses else 0 %}
-                                        <div class="h4 mb-1 text-success">${{ "%.2f"|format(total_spent) }}</div>
+                                        <div class="h4 mb-1 text-success">{{ total_spent|format_currency_usd }}</div>
                                         <small class="text-muted">Total Spent</small>
                                     </div>
                                 </div>
@@ -342,7 +342,7 @@ Restaurant Details - Meal Expense Tracker
                                     <div class="text-center">
                                         {% set avg_expense = (restaurant.expenses|sum(attribute='amount') /
                                         restaurant.expenses|length) %}
-                                        <div class="h4 mb-1 text-info">${{ "%.2f"|format(avg_expense) }}</div>
+                                        <div class="h4 mb-1 text-info">{{ avg_expense|format_currency_usd }}</div>
                                         <small class="text-muted">Avg per Visit</small>
                                     </div>
                                 </div>
@@ -371,14 +371,15 @@ Restaurant Details - Meal Expense Tracker
                                 <div class="list-group-item">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span>Total Spent</span>
-                                        <span class="fw-bold amount-right d-inline-block amount-min-width">${{
-                                            "%.2f"|format(expense_stats.total_amount) }}</span>
+                                        <span class="fw-bold amount-right d-inline-block amount-min-width">
+                                            {{ expense_stats.total_amount|format_currency_usd }}
+                                        </span>
                                     </div>
                                 </div>
                                 <div class="list-group-item">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span>Avg. per Visit</span>
-                                        <span class="fw-bold">${{ "%.2f"|format(expense_stats.avg_per_visit) }}</span>
+                                        <span class="fw-bold">{{ expense_stats.avg_per_visit|format_currency_usd }}</span>
                                     </div>
                                 </div>
                                 <div class="list-group-item">
@@ -419,7 +420,7 @@ Restaurant Details - Meal Expense Tracker
                                 <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
                                     class="list-group-item list-group-item-action border-0">
                                     <div class="d-flex w-100 justify-content-between">
-                                        <h6 class="mb-1 amount-right">${{ "%.2f"|format(expense.amount) }}</h6>
+                                        <h6 class="mb-1 amount-right">{{ expense.amount|format_currency_usd }}</h6>
                                         <small class="text-muted">{{ expense.date|format_date_user_tz("%b %d")
                                             }}</small>
                                     </div>
@@ -568,8 +569,9 @@ Restaurant Details - Meal Expense Tracker
                     <div class="col-md-4">
                         <div class="p-2 bg-white rounded border text-center">
                             <div class="text-muted small mb-1">Total Expenses</div>
-                            <div class="h5 mb-0 fw-bold text-primary amount-right">${{
-                                "%.2f"|format(expenses|sum(attribute='amount') ) }}</div>
+                            <div class="h5 mb-0 fw-bold text-primary amount-right">
+                                {{ (expenses|sum(attribute='amount'))|format_currency_usd }}
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -582,8 +584,9 @@ Restaurant Details - Meal Expense Tracker
                         <div class="p-2 bg-white rounded border text-center">
                             <div class="text-muted small mb-1">Average per Visit</div>
                             <div class="h5 mb-0 fw-bold text-primary">
-                                <span class="amount-right d-inline-block amount-min-width">${{
-                                    "%.2f"|format(expenses|sum(attribute='amount') / (expenses|length or 1)) }}</span>
+                                <span class="amount-right d-inline-block amount-min-width">
+                                    {{ ((expenses|sum(attribute='amount')) / (expenses|length or 1))|format_currency_usd }}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -617,7 +620,7 @@ Restaurant Details - Meal Expense Tracker
                             <td class="fw-bold">
                                 <div class="d-flex align-items-center">
                                     <i class="fas fa-dollar-sign text-muted me-1"></i>
-                                    <span class="amount-right">{{ "%.2f"|format(expense.amount) }}</span>
+                                    <span class="amount-right">{{ expense.amount|format_currency_usd }}</span>
                                 </div>
                             </td>
                             <td>
@@ -755,8 +758,8 @@ Restaurant Details - Meal Expense Tracker
                 <p>Are you sure you want to delete the expense from {{ expense.date|format_date_user_tz("%b %d, %Y") }}?
                 </p>
                 <p class="mb-0">
-                    <strong>Amount:</strong> <span class="amount-right d-inline-block amount-min-width">${{
-                        "%.2f"|format(expense.amount) }}</span>
+                    <strong>Amount:</strong>
+                    <span class="amount-right d-inline-block amount-min-width">{{ expense.amount|format_currency_usd }}</span>
                 </p>
                 {% if expense.notes %}
                 <p class="mb-0">
@@ -835,7 +838,7 @@ Restaurant Details - Meal Expense Tracker
                 <p class="text-danger">
                     <strong>Note:</strong> This restaurant has {{ expenses|length }} expense{{ 's' if expenses|length !=
                     1 else '' }}
-                    totaling ${{ "%.2f"|format(expenses|sum(attribute='amount')) }}.
+                    totaling {{ (expenses|sum(attribute='amount'))|format_currency_usd }}.
                     All associated expenses will also be deleted.
                 </p>
                 {% endif %}

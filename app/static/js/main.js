@@ -13,6 +13,39 @@ import {
   initializeRobustFaviconHandling,
 } from './utils/robust-favicon-handler.js';
 
+function runWhenIdle(callback, timeoutMs = 1200) {
+  if (typeof callback !== 'function') return;
+  if (window.requestIdleCallback) {
+    window.requestIdleCallback(callback, { timeout: timeoutMs });
+    return;
+  }
+  setTimeout(callback, 0);
+}
+
+function safeSessionGet(key) {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSessionSet(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // ignore (tracking prevention / blocked storage)
+  }
+}
+
+function safeLocalGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 // Enhanced page module loading with error handling
 const pageModules = {
   '/restaurants/search': () => import('./pages/restaurant-search.js'),
@@ -246,23 +279,6 @@ function initUI() {
   // Apply tag colors
   applyTagColors();
 
-  // Bootstrap tooltips - check if bootstrap is available
-  if (typeof bootstrap !== 'undefined') {
-    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
-      new bootstrap.Tooltip(el); // eslint-disable-line no-new
-    });
-
-    // Bootstrap popovers
-    document.querySelectorAll('[data-bs-toggle="popover"]').forEach((el) => {
-      new bootstrap.Popover(el, { html: true }); // eslint-disable-line no-new
-    });
-
-    // Bootstrap dropdowns - Initialize manually for reliability
-    document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach((el) => {
-      new bootstrap.Dropdown(el); // eslint-disable-line no-new
-    });
-  }
-
   // Smooth scrolling for anchor links
   document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     anchor.addEventListener('click', (e) => {
@@ -279,13 +295,14 @@ function initUI() {
 
 // Load page-specific module if it exists
 async function loadPageModule() {
-  const moduleLoader = pageModules[window.location.pathname];
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  const moduleLoader = pageModules[path];
   if (!moduleLoader) return;
 
   try {
     const module = await moduleLoader();
     module.init?.();
-  } catch {
+  } catch (error) {
     console.error('Failed to load page module:', error);
   }
 }
@@ -293,20 +310,16 @@ async function loadPageModule() {
 // Enhanced app initialization with toast notifications
 async function init() {
   try {
-    // Initialize core UI components
-    initUI();
-
-    // Toast system is ready (no initialization needed)
-
-    // Initialize event handlers (replaces inline onclick handlers)
+    // Initialize event handlers early (critical)
     new EventHandlers(); // eslint-disable-line no-new
 
-    // Initialize robust favicon system
-    initializeRobustFaviconHandling('.restaurant-favicon');
-    initializeRobustFaviconHandling('.restaurant-favicon-table');
-
-    // Initialize tag color watcher for dynamically added content
-    initTagColorWatcher();
+    // Defer non-critical UI polish work so DOMContentLoaded isn't blocked
+    runWhenIdle(() => initUI(), 800);
+    runWhenIdle(() => {
+      initializeRobustFaviconHandling('.restaurant-favicon');
+      initializeRobustFaviconHandling('.restaurant-favicon-table');
+    }, 1500);
+    runWhenIdle(() => initTagColorWatcher(), 1500);
 
     // Listen for tag update events to refresh Tom Select
     document.addEventListener('tagsUpdated', () => {
@@ -392,19 +405,19 @@ async function init() {
     }));
 
     // Show welcome message if this is a fresh page load
-    if (!sessionStorage.getItem('app-initialized')) {
-      sessionStorage.setItem('app-initialized', 'true');
+    if (!safeSessionGet('app-initialized')) {
+      safeSessionSet('app-initialized', 'true');
       setTimeout(() => {
-        toast.info('Application ready! 🎉');
+        toast.info('Application ready!');
       }, 500);
     }
 
     // Only show debug messages if debug mode is enabled
-    if (window.location.search.includes('debug=true') || localStorage.getItem('debugMode') === 'true') {
+    if (window.location.search.includes('debug=true') || safeLocalGet('debugMode') === 'true') {
       console.warn('✅ Application initialized successfully');
     }
 
-  } catch {
+  } catch (error) {
     console.error('❌ Failed to initialize application:', error);
 
     // Show error feedback
@@ -419,7 +432,7 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
   };
 
   // Only show debug messages if debug mode is enabled
-  if (window.location.search.includes('debug=true') || localStorage.getItem('debugMode') === 'true') {
+  if (window.location.search.includes('debug=true') || safeLocalGet('debugMode') === 'true') {
     console.warn('🔧 Favicon debug commands available: window.faviconDebug.clearCache()');
   }
 }

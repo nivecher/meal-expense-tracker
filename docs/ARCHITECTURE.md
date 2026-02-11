@@ -30,20 +30,17 @@ graph TD
 - Request/response handling
 
 - **AWS Lambda Integration**
-
   - Serverless execution environment
   - WSGI adapter for Flask
   - Environment-based configuration
   - Container image deployment via ECR
 
 - **API Gateway**
-
   - HTTP API configuration
   - Request routing
   - Authentication/Authorization
 
 - **CloudFront CDN**
-
   - Smart routing: static files from S3, dynamic content to API Gateway
   - Edge caching for static assets
   - HTTPS termination

@@ -64,7 +64,6 @@ The Lambda image now excludes `/app/static/` directory, making it smaller and fa
 ### Request Flow
 
 1. **User visits**: `https://meals.dev.nivecher.com/restaurants`
-
    - Route53 resolves to CloudFront
    - CloudFront checks path: `/restaurants` doesn't match `/static/*`
    - Routes to API Gateway origin

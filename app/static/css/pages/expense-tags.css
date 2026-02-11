@@ -1,0 +1,57 @@
+/**
+ * Expense Tags overview page
+ * Report cards and layout
+ */
+
+.expense-tags-overview .tag-report-card .card-header {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.expense-tags-overview .tag-report-card .card-body {
+  min-height: 80px;
+}
+
+.tag-report-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tag-report-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgb(0 0 0 / 6%);
+  font-size: 0.875rem;
+}
+
+.tag-report-list li:last-child {
+  border-bottom: none;
+}
+
+.tag-report-list .tag-badge-mini {
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: inline-block;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-report-list .tag-meta {
+  color: var(--bs-secondary-color);
+  font-size: 0.8rem;
+  margin-left: 0.5rem;
+}
+
+.tag-reports-empty {
+  color: var(--bs-secondary-color);
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 0.5rem 0;
+}

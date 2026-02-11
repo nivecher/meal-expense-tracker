@@ -80,7 +80,7 @@ price_per_person=None, size='sm') -%} {%- if party_size and party_size > 0 -%} {
     class="badge {{ bg_class }} {{ size_class }}"
     data-bs-toggle="tooltip"
     data-bs-placement="top"
-    title="Price per person: ${{ '%.2f'|format(price_per_person) }}">
+    title="Price per person: {{ price_per_person|format_currency_usd }}">
     <i class="fas fa-user me-1"></i>{{ party_size }} people
 </span>
 {%- else -%}
@@ -146,6 +146,22 @@ price_level_int >= 0 -%} {%- set size_class = 'badge-sm' if size == 'sm' else 'b
 <span class="badge bg-secondary {{ size_class }}" data-bs-toggle="tooltip" title="Price level unknown">
     <i class="fas fa-question me-1"></i>?
 </span>
+{%- endif -%} {%- else -%}
+<span class="text-muted">-</span>
+{%- endif -%} {%- endmacro %} {# Price level: dollars only for table (compact) #} {% macro
+price_level_dollars(price_level) -%} {%- set price_level_int = price_level|int if price_level is not none else none -%}
+{%- if price_level_int is not none and price_level_int >= 0 -%} {%- if price_level_int == 0 -%}
+<span class="badge bg-success badge-sm" data-bs-toggle="tooltip" title="Free">Free</span>
+{%- elif price_level_int == 1 -%}
+<span class="badge bg-success badge-sm" data-bs-toggle="tooltip" title="Budget ($1-10 / person)">$</span>
+{%- elif price_level_int == 2 -%}
+<span class="badge bg-success badge-sm" data-bs-toggle="tooltip" title="Moderate ($11-30 / person)">$$</span>
+{%- elif price_level_int == 3 -%}
+<span class="badge bg-success badge-sm" data-bs-toggle="tooltip" title="Expensive ($31-60 / person)">$$$</span>
+{%- elif price_level_int == 4 -%}
+<span class="badge bg-success badge-sm" data-bs-toggle="tooltip" title="Very Expensive ($61+ / person)">$$$$</span>
+{%- else -%}
+<span class="badge bg-secondary badge-sm" data-bs-toggle="tooltip" title="Price level unknown">?</span>
 {%- endif -%} {%- else -%}
 <span class="text-muted">-</span>
 {%- endif -%} {%- endmacro %} {# Price Level Detail Macro for detailed display with price per person #} {% macro

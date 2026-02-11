@@ -379,16 +379,26 @@ def get_unique_cuisines(user_id: int) -> list[str]:
 
 def get_unique_cities(user_id: int) -> list[str]:
     """Get a list of unique cities for a user."""
-    return [
-        city
-        for city in db.session.scalars(
-            select(Restaurant.city)
-            .where(Restaurant.user_id == user_id, Restaurant.city.isnot(None))
-            .distinct()
-            .order_by(Restaurant.city)
-        ).all()
-        if city is not None
-    ]
+    cities = db.session.scalars(
+        select(Restaurant.city)
+        .where(Restaurant.user_id == user_id, Restaurant.city.isnot(None))
+        .order_by(Restaurant.city)
+    ).all()
+
+    seen: set[str] = set()
+    results: list[str] = []
+    for city in cities:
+        if city is None:
+            continue
+        cleaned = city.strip()
+        if not cleaned:
+            continue
+        key = cleaned.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(cleaned)
+    return results
 
 
 def get_unique_service_levels(user_id: int) -> list[str]:
@@ -1119,18 +1129,27 @@ def import_restaurants_from_csv(file: FileStorage, user_id: int) -> tuple[bool, 
         return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
 
 
-def export_restaurants_for_user(user_id: int) -> list[dict[str, Any]]:
+def export_restaurants_for_user(
+    user_id: int,
+    restaurant_ids: list[int] | None = None,
+) -> list[dict[str, Any]]:
     """Get all restaurants for a user in a format suitable for export.
 
     Args:
         user_id: The ID of the user whose restaurants to export
+        restaurant_ids: Optional list of restaurant IDs to export
 
     Returns:
         A list of dictionaries containing restaurant data
     """
-    restaurants = db.session.scalars(
-        select(Restaurant).where(Restaurant.user_id == user_id).order_by(Restaurant.name)
-    ).all()
+    if restaurant_ids is not None and not restaurant_ids:
+        return []
+
+    query = select(Restaurant).where(Restaurant.user_id == user_id).order_by(Restaurant.name)
+    if restaurant_ids:
+        query = query.where(Restaurant.id.in_(restaurant_ids))
+
+    restaurants = db.session.scalars(query).all()
 
     def safe_float(value: Any) -> float | None:
         try:

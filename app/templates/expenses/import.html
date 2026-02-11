@@ -87,11 +87,18 @@
                                                 new)</li
                                             >
                                             <li><code>restaurant_address</code> - Address (prevents duplicates)</li>
+                                            <li><code>time_utc</code> - Time (HH:MM or HH:MM:SS, stored as UTC)</li>
+                                            <li
+                                                ><code>datetime_utc</code> - Full UTC timestamp (ISO 8601, e.g.
+                                                2025-01-15T12:00:00Z)</li
+                                            >
                                             <li
                                                 ><code>category_name</code> - Category ("Parent:Child" format
                                                 supported)</li
                                             >
                                             <li><code>meal_type</code> - breakfast, lunch, dinner, snacks</li>
+                                            <li><code>order_type</code> - dine_in, takeout, delivery, etc.</li>
+                                            <li><code>party_size</code> - Number of people (1-50)</li>
                                             <li><code>notes</code> - Additional details</li>
                                             <li><code>tags</code> - Comma-separated tag names (auto-created)</li>
                                         </ul>
@@ -197,8 +204,29 @@
                             <label for="file" class="form-label">Select CSV or JSON file</label>
                             {{ form.file(class_="form-control", accept=".csv,.json", id="file") }}
                             <div class="invalid-feedback">Please select a CSV or JSON file to upload.</div>
-                            <div class="form-text">Maximum file size: 5MB. CSV and JSON files are supported.</div>
+                            <div class="form-text">
+                                Maximum file size: 5MB. Maximum rows: 2,000. CSV and JSON files are supported.
+                            </div>
                         </div>
+
+                        <!-- Upload progress (shown during file upload) -->
+                        <div id="import-upload-progress" class="d-none mt-3" aria-live="polite">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <small class="text-muted" id="import-upload-status">Uploading…</small>
+                                <small class="text-muted" id="import-upload-percent">0%</small>
+                            </div>
+                            <div class="progress" role="progressbar" aria-label="Upload progress">
+                                <div
+                                    id="import-upload-bar"
+                                    class="progress-bar progress-bar-striped progress-bar-animated"
+                                    style="width: 0%"
+                                    aria-valuenow="0"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                        <div id="import-upload-error" class="alert alert-danger d-none mt-3" role="alert"></div>
+
                         <!-- Show form validation errors -->
                         {% if form.errors %}
                         <div class="alert alert-danger">
@@ -267,7 +295,7 @@
                                 <li>
                                     <small>
                                         {{ expense.date }} — {% if expense.amount is not none %}${{
-                                        "%.2f"|format(expense.amount) }}{% else %}N/A{% endif %} {% if
+                                        expense.amount|format_number(2) }}{% else %}N/A{% endif %} {% if
                                         expense.restaurant_name %} • {{ expense.restaurant_name }}{% endif %} {% if
                                         expense.meal_type %} • {{ expense.meal_type }}{% endif %} {% if expense.tags %}
                                         • Tags: {{ expense.tags }}{% endif %}

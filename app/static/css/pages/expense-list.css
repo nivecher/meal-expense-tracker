@@ -1,9 +1,24 @@
 /* Expense List Page Styles */
 
-/* Table sorting styles */
+/* Table view: don't reserve space for a non-existent sticky actions column */
+.expense-table-fullwidth .table-sticky-frozen {
+  --sticky-actions-width: 0px;
+  --sticky-right-gutter: 0px;
+}
 
+/* Table card: Simplifi-style flat, minimal shadow */
+#table-view-container .card {
+  border: 1px solid var(--gray-200, #e2e8f0);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+#table-view-container .card-body {
+  padding: 0;
+}
+
+/* Sortable header: Simplifi-style subtle hover */
 .expense-table th[data-sort="true"]:hover {
-  background-color: #e9ecef;
+  background: var(--gray-100, #f1f5f9);
 }
 
 /* Badge styles now handled by unified badge system */
@@ -20,6 +35,24 @@
   font-size: 0.9rem;
   line-height: 1.2;
 }
+
+/* Cap row height at 2 lines: clip Date/Tags and Restaurant cells */
+.expense-table tbody td:nth-child(2),
+.expense-table tbody td:nth-child(3) {
+  max-height: 3.25rem;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+/* Table badges: flatter, smaller (modern look) */
+.expense-table .badge-unified,
+.expense-table .badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+}
+
 
 /* Stacked meal/order layout */
 
@@ -43,14 +76,6 @@
   flex-direction: column;
   gap: 2px;
   align-items: center;
-}
-
-/* Ensure amounts are right-aligned and compact */
-
-.amount-right {
-  text-align: right !important;
-  font-family: "Courier New", monospace;
-  font-weight: 600;
 }
 
 /* Compact table indicators for tags and notes */
@@ -117,8 +142,93 @@
 
 /* Expense Card Layout Improvements */
 
+/* Card view: multiple cards per row when space allows, cap at 3 (like restaurants) */
+#card-view-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 0.75rem;
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+}
+
+@media (width >= 992px) {
+  #card-view-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+#card-view-container .col {
+  min-width: 0;
+  max-width: none;
+  flex: none;
+  padding: 0;
+  width: 100%;
+}
+
 .card-body {
   padding: 1rem;
+}
+
+/* Expense card top row: preserve 2/3 + 1/3 split – amount always top-right, never stacks below */
+
+#card-view-container .expense-card-top-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0 1rem;
+}
+
+#card-view-container .expense-card-restaurant-col {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+#card-view-container .expense-card-title a {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+#card-view-container .expense-card-amount-col {
+  flex: 0 0 33.3333%;
+  padding-left: 1rem;
+  min-width: 5.5rem;
+}
+
+#card-view-container .expense-card-amount {
+  white-space: nowrap;
+}
+
+#card-view-container .expense-card-party-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  margin-top: 0.25rem;
+}
+
+#card-view-container .expense-card-badges-row {
+  min-width: 0;
+}
+
+/* Bottom row: give address section room; Maps icon always visible; tooltip shows full address */
+
+#card-view-container .expense-card-bottom-row {
+  min-width: 0;
+}
+
+#card-view-container .expense-card-location-col {
+  min-width: 0;
+}
+
+#card-view-container .expense-card-address-line {
+  min-width: 0;
+}
+
+#card-view-container .expense-card-address-text {
+  min-width: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Consistent badge spacing in cards */
@@ -189,4 +299,568 @@
   .card-body .row .col-4:last-child {
     margin-bottom: 0;
   }
+}
+
+/* Banner header: stays frozen when scrolling (position: sticky in sidebar.css) */
+.section-header .section-header-expenses {
+  padding-bottom: 0.25rem;
+}
+
+.section-header-expenses .section-tabs {
+  margin-top: 0.5rem;
+}
+
+/* Expense activity panel – compact vertically */
+.activity-panel {
+  margin-bottom: 1rem !important;
+}
+
+.activity-panel .card-header {
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+  padding: 0.25rem 1rem;
+}
+
+/* Single-row header: title + search + actions, less vertical space */
+.activity-panel .card-header.activity-header-single {
+  padding: 0.25rem 1rem;
+}
+
+.activity-header-row-single {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.activity-header-row-single .expense-search-form {
+  min-width: 180px;
+  flex: 1 1 240px;
+  max-width: 320px;
+}
+
+.activity-header-row-single .activity-actions.ms-auto {
+  flex-shrink: 0;
+}
+
+.view-toggle-row-below-header {
+  padding: 0.15rem 0;
+}
+
+.activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Stacked layout: row 1 = title + view toggle, row 2 = search, row 3 = icon buttons */
+.activity-header-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+}
+
+.activity-header-stacked .activity-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.activity-header-stacked .activity-header-row-1 {
+  justify-content: space-between;
+}
+
+.activity-header-stacked .activity-header-row-2 {
+  justify-content: flex-start;
+}
+
+.activity-header-stacked .activity-header-row-2 .expense-search-form {
+  min-width: 200px;
+  flex: 1 1 280px;
+  max-width: 380px;
+}
+
+.activity-header-stacked .activity-header-row-2 .activity-actions.ms-auto {
+  flex-shrink: 0;
+}
+
+.activity-header-stacked .activity-actions-icons {
+  gap: 0.25rem;
+}
+
+.activity-actions-icons .dropdown .btn-icon-only.dropdown-toggle::after {
+  margin-left: 0.15rem;
+}
+
+.activity-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.activity-title .fw-semibold {
+  font-size: inherit;
+}
+
+.activity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.activity-actions .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.activity-actions .btn .me-2 {
+  margin-right: 0.35rem !important;
+}
+
+/* Icon-only buttons: compact, tooltip for label */
+.activity-actions-icons .btn-icon-only {
+  padding: 0.35rem 0.5rem;
+  width: 2rem;
+  min-width: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activity-actions-icons .btn-icon-only .activity-btn-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.35rem;
+}
+
+.activity-actions-icons .btn-icon-only {
+  position: relative;
+}
+
+.view-toggle-in-activity .view-toggle-btn {
+  padding: 0.35rem 0.6rem;
+  width: auto;
+  min-width: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Month divider for card view */
+
+/* Expenses tabs - now in content area alongside tab panes */
+.expenses-page-tabs {
+  margin-top: 0.75rem;
+}
+
+/* Tab content area - ensure visible height for calendar and other panes */
+#expensesTabsContent {
+  min-height: 300px;
+}
+
+/* Calendar view */
+.calendar-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.calendar-controls-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.calendar-view-toggle .btn.active {
+  background-color: var(--primary-bg, #eff6ff);
+  color: var(--primary-color, #2563eb);
+  border-color: var(--primary-color, #2563eb);
+}
+
+.calendar-controls .btn[disabled] {
+  opacity: 0.55;
+}
+
+.calendar-legend {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.calendar-legend-label {
+  font-weight: 500;
+  color: var(--gray-600, #4b5563);
+}
+
+.calendar-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--gray-500, #6b7280);
+}
+
+.calendar-legend-item i {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray-500, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-weekdays span {
+  text-align: center;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  min-height: 320px;
+}
+
+.calendar-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+}
+
+.calendar-week-day {
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  background-color: var(--white, #fff);
+  min-height: 140px;
+  cursor: pointer;
+}
+
+.calendar-week-day.is-selected {
+  border-color: var(--primary-color, #2563eb);
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 12%);
+  background-color: var(--primary-bg, #eff6ff);
+}
+
+.calendar-week-day.is-today {
+  border-color: var(--success-color, #10b981);
+  box-shadow: 0 0 0 2px rgb(16 185 129 / 18%);
+}
+
+.calendar-week-day.is-today.is-selected {
+  border-color: var(--primary-color, #2563eb);
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 15%);
+  background-color: var(--primary-bg, #eff6ff);
+}
+
+.calendar-week-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gray-700, #374151);
+}
+
+.calendar-week-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.calendar-day-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.calendar-day-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background-color: var(--primary-bg, #eff6ff);
+  color: var(--primary-color, #2563eb);
+  font-weight: 600;
+}
+
+.calendar-day-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  background-color: var(--white, #fff);
+}
+
+.calendar-day-time {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--gray-600, #4b5563);
+}
+
+.calendar-entry-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.calendar-entry-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.calendar-day-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.calendar-day-restaurant {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-900, #111827);
+}
+
+.calendar-day-meta {
+  font-size: 0.75rem;
+  color: var(--gray-500, #6b7280);
+}
+
+.calendar-day-amount {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--success-color, #10b981);
+}
+
+.calendar-day {
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  min-height: 110px;
+  background-color: var(--white, #fff);
+  cursor: pointer;
+}
+
+.calendar-day.is-today {
+  border-color: var(--success-color, #10b981);
+  box-shadow: 0 0 0 2px rgb(16 185 129 / 18%);
+}
+
+.calendar-day.is-selected {
+  border-color: var(--primary-color, #2563eb);
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 12%);
+}
+
+.calendar-day.is-today.is-selected {
+  border-color: var(--primary-color, #2563eb);
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 15%);
+}
+
+.calendar-today-active {
+  background-color: rgb(16 185 129 / 12%);
+  color: var(--success-color, #10b981);
+  border-color: var(--success-color, #10b981);
+}
+
+.calendar-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.calendar-day-header-select {
+  cursor: pointer;
+}
+
+.calendar-day-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  color: var(--gray-600, #4b5563);
+  text-decoration: none;
+  background-color: var(--white, #fff);
+  font-size: 0.75rem;
+}
+
+.calendar-day-action:hover {
+  border-color: var(--primary-color, #2563eb);
+  color: var(--primary-color, #2563eb);
+}
+
+.calendar-day.is-outside {
+  background-color: var(--gray-50, #f9fafb);
+  color: var(--gray-400, #9ca3af);
+}
+
+.calendar-day-number {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.calendar-day-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background-color: var(--primary-bg, #eff6ff);
+  color: var(--primary-color, #2563eb);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.calendar-day-total {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--success-color, #10b981);
+  white-space: nowrap;
+}
+
+.calendar-day-entries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.calendar-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  color: var(--gray-700, #374151);
+  text-decoration: none;
+  font-size: 0.7rem;
+  background-color: var(--gray-50, #f9fafb);
+}
+
+.calendar-entry i {
+  font-size: 0.75rem;
+}
+
+.month-divider-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.month-divider-right {
+  display: inline-flex;
+  align-items: center;
+}
+
+.month-divider-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--primary-color, #2563eb);
+  text-decoration: none;
+}
+
+.month-divider-link:hover {
+  text-decoration: underline;
+}
+
+.calendar-entry-favicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.calendar-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: contain;
+  opacity: 0;
+}
+
+.calendar-fallback-icon {
+  font-size: 0.75rem;
+}
+
+.calendar-empty-state {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background-color: var(--gray-50, #f9fafb);
+  color: var(--gray-500, #6b7280);
+  font-size: 0.85rem;
+}
+
+.expense-search-form {
+  min-width: 240px;
+  flex: 1 1 320px;
+  max-width: 420px;
+}
+
+.expense-search-input {
+  min-width: 220px;
+}
+
+.expense-table th,
+.expense-table td {
+  border-left: none;
+  border-right: none;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+.expense-table thead th {
+  padding: 0.625rem 0.75rem;
+}
+
+.expense-table tbody td {
+  border-bottom: 1px solid var(--gray-100, #f3f4f6);
+}
+
+.expense-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.expense-table .form-check-input {
+  width: 14px;
+  height: 14px;
+  border-radius: 0;
+  padding: 0;
+  margin: 0 auto;
+  box-shadow: none;
 }

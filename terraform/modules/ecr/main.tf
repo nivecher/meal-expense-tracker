@@ -6,7 +6,7 @@ resource "aws_ecr_repository" "main" {
 
   # Enable encryption using KMS
   encryption_configuration {
-    encryption_type = "KMS"
+    encryption_type = var.kms_key_arn == null ? "AES256" : "KMS"
     kms_key         = var.kms_key_arn
   }
 
@@ -21,4 +21,9 @@ resource "aws_ecr_repository" "main" {
     ManagedBy   = "terraform"
     Repository  = var.repository_name
   }, var.tags)
+
+  # Prevent replace/destroy when encryption differs from state (e.g. after import or provider change)
+  lifecycle {
+    ignore_changes = [encryption_configuration]
+  }
 }

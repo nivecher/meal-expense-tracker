@@ -43,7 +43,7 @@
                     <div class="stat-label">Visits</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value">${{ "%.2f"|format(total_spent) }}</div>
+                    <div class="stat-value">{{ total_spent|format_currency_usd }}</div>
                     <div class="stat-label">Spent</div>
                 </div>
                 {% if restaurant.rating %}

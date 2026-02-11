@@ -2,6 +2,7 @@
 
 # Standard library imports
 import csv
+from datetime import date, datetime, time
 import io
 import json
 from math import ceil
@@ -29,6 +30,7 @@ from flask_wtf import FlaskForm
 ResponseReturnValue = Union[str, Response, tuple]
 
 from app.constants.categories import get_default_categories
+from app.constants.order_types import get_order_type_names
 
 # Local application imports
 from app.expenses import bp, models as expense_models, services as expense_services
@@ -163,6 +165,13 @@ def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
     current_date_browser_tz = current_datetime_browser_tz.date()
     current_time_browser_tz = current_datetime_browser_tz.time()
 
+    requested_date = _parse_request_date()
+    requested_time = _parse_request_time()
+    if requested_date:
+        current_date_browser_tz = requested_date
+    if requested_time:
+        current_time_browser_tz = requested_time
+
     form = ExpenseForm(
         category_choices=[(None, "Select a category (optional)")] + [(c[0], c[1]) for c in categories],
         restaurant_choices=[(None, "Select a restaurant")] + restaurants,
@@ -171,6 +180,28 @@ def _initialize_expense_form() -> tuple[ExpenseForm, bool]:
         time=current_time_browser_tz,
     )
     return form, is_ajax
+
+
+def _parse_request_date() -> date | None:
+    """Parse date from request args (YYYY-MM-DD) for prefill."""
+    raw_date = request.args.get("date", "").strip()
+    if not raw_date:
+        return None
+    try:
+        return datetime.strptime(raw_date, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _parse_request_time() -> time | None:
+    """Parse time from request args (HH:MM) for prefill."""
+    raw_time = request.args.get("time", "").strip()
+    if not raw_time:
+        return None
+    try:
+        return datetime.strptime(raw_time, "%H:%M").time()
+    except ValueError:
+        return None
 
 
 def _handle_expense_creation(form: ExpenseForm, is_ajax: bool) -> ResponseReturnValue:
@@ -708,6 +739,8 @@ def list_expenses() -> str:
     Returns:
         Rendered template with paginated expenses and filter options
     """
+    view_mode = request.args.get("view", "expenses")
+    calendar_month = request.args.get("month")
     # Get pagination parameters with type hints
     page = request.args.get("page", 1, type=int)
     # Check for per_page in URL params first, then cookie, then default
@@ -729,6 +762,7 @@ def list_expenses() -> str:
         current_app.logger.error(f"Error filtering expenses: {str(e)}")
 
     # Handle pagination or show all
+    calendar_expenses = expenses
     total_expenses = len(expenses)
     if per_page == SHOW_ALL:
         # Show all expenses without pagination
@@ -752,12 +786,15 @@ def list_expenses() -> str:
     except Exception as e:
         current_app.logger.error(f"Error getting filter options: {str(e)}")
 
+    filter_options["order_types"] = get_order_type_names()
+
     # Get browser timezone for display
     _, timezone_display = get_browser_timezone_info()
 
     return render_template(
         "expenses/list.html",
         expenses=paginated_expenses,
+        calendar_expenses=calendar_expenses,
         total_amount=total_amount,
         avg_price_per_person=avg_price_per_person,
         page=page,
@@ -766,13 +803,26 @@ def list_expenses() -> str:
         total_expenses=total_expenses,
         search=filters["search"],
         meal_type=filters["meal_type"],
+        order_type=filters.get("order_type", ""),
         category=filters["category"],
         tags=filters.get("tags", []),  # List of selected tag names
         start_date=filters["start_date"],
         end_date=filters["end_date"],
         timezone_display=timezone_display,
+        view_mode=view_mode,
+        calendar_month=calendar_month,
         **filter_options,
     )
+
+
+@bp.route("/calendar")
+@login_required
+def calendar_view() -> ResponseReturnValue:
+    """Redirect to expenses list with calendar tab selected."""
+    month = request.args.get("month")
+    if month:
+        return redirect(url_for("expenses.list_expenses", view="calendar", month=month))  # type: ignore[return-value]
+    return redirect(url_for("expenses.list_expenses", view="calendar"))  # type: ignore[return-value]
 
 
 @bp.route("/<int:expense_id>")
@@ -833,33 +883,65 @@ def delete_expense(expense_id: int) -> Response:
     return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]
 
 
+def _parse_export_ids(raw_ids: list[str]) -> list[int]:
+    """Parse and sanitize export ID list."""
+    ids: list[int] = []
+    for raw_id in raw_ids:
+        for part in raw_id.split(","):
+            value = part.strip()
+            if not value or not value.isdigit():
+                continue
+            ids.append(int(value))
+    return list(dict.fromkeys(ids))
+
+
 @bp.route("/export")
 @login_required
 def export_expenses() -> ResponseReturnValue:
     """Export expenses as CSV or JSON."""
     format_type = request.args.get("format", "csv").lower()
     is_sample = request.args.get("sample", "false").lower() == "true"
+    raw_ids = request.args.getlist("ids")
+    expense_ids = _parse_export_ids(raw_ids)
 
     # If sample is requested, generate sample CSV with required fields
     if is_sample:
         sample_data = [
             {
                 "date": "2025-01-15",
+                "time_utc": "12:00:00",
+                "datetime_utc": "2025-01-15T12:00:00Z",
                 "amount": 24.77,
                 "restaurant_name": "Sample Restaurant",
                 "restaurant_address": "123 Main St, City, ST 12345",
+                "restaurant_city": "City",
+                "restaurant_state": "ST",
+                "restaurant_postal_code": "12345",
+                "restaurant_country": "United States",
+                "restaurant_google_place_id": "",
                 "category_name": "Dining",
                 "meal_type": "lunch",
+                "order_type": "dine_in",
+                "party_size": 2,
                 "notes": "Sample expense entry",
                 "tags": "business,lunch",
             },
             {
                 "date": "2025-01-16",
+                "time_utc": "19:15:00",
+                "datetime_utc": "2025-01-16T19:15:00Z",
                 "amount": 15.50,
                 "restaurant_name": "Another Restaurant",
                 "restaurant_address": "",
+                "restaurant_city": "",
+                "restaurant_state": "",
+                "restaurant_postal_code": "",
+                "restaurant_country": "",
+                "restaurant_google_place_id": "",
                 "category_name": "Fast Food",
                 "meal_type": "dinner",
+                "order_type": "takeout",
+                "party_size": 1,
                 "notes": "",
                 "tags": "",
             },
@@ -875,12 +957,21 @@ def export_expenses() -> ResponseReturnValue:
         output = io.StringIO()
         fieldnames = [
             "date",
+            "time_utc",
+            "datetime_utc",
             "amount",
+            "meal_type",
+            "order_type",
+            "party_size",
+            "notes",
+            "category_name",
             "restaurant_name",
             "restaurant_address",
-            "category_name",
-            "meal_type",
-            "notes",
+            "restaurant_city",
+            "restaurant_state",
+            "restaurant_postal_code",
+            "restaurant_country",
+            "restaurant_google_place_id",
             "tags",
         ]
         writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_NONNUMERIC)
@@ -892,8 +983,15 @@ def export_expenses() -> ResponseReturnValue:
         response.headers["Content-Disposition"] = "attachment; filename=sample_expenses.csv"
         return response
 
+    if raw_ids and not expense_ids:
+        flash("No valid expenses selected for export.", "warning")
+        return redirect(url_for("expenses.list_expenses"))  # type: ignore[return-value]
+
     # Get the data from the service
-    expenses = expense_services.export_expenses_for_user(current_user.id)
+    expenses = expense_services.export_expenses_for_user(
+        current_user.id,
+        expense_ids if raw_ids else None,
+    )
 
     if not expenses:
         flash("No expenses found to export", "warning")
@@ -999,32 +1097,35 @@ def import_expenses() -> ResponseReturnValue:
 @bp.route("/tags", methods=["GET"])
 @login_required
 def list_tags() -> ResponseReturnValue:
-    """Get all tags for the current user."""
+    """Get all tags for the current user. JSON for XHR; redirect full page to Tags tab."""
+    wants_json = (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest" or "application/json" in request.accept_mimetypes
+    )
+    if not wants_json:
+        return redirect(url_for("expenses.list_expenses", view="tags"))
+
     try:
         user_id = current_user.id
-        current_app.logger.debug(f"Fetching tags for user {user_id}")
-
-        # Expire session to ensure fresh data (important after deletions)
+        current_app.logger.debug("Fetching tags for user %s", user_id)
         from app.extensions import db
 
         db.session.expire_all()
-
         tags = expense_services.get_user_tags(user_id)
 
-        # Defensive check: Verify all tags belong to the current user
         invalid_tags = [tag for tag in tags if tag.user_id != user_id]
         if invalid_tags:
             current_app.logger.error(
-                f"SECURITY ISSUE: User {user_id} received {len(invalid_tags)} tags that don't belong to them. "
-                f"Tag IDs: {[tag.id for tag in invalid_tags]}"
+                "SECURITY ISSUE: User %s received %s tags that don't belong to them. Tag IDs: %s",
+                user_id,
+                len(invalid_tags),
+                [tag.id for tag in invalid_tags],
             )
-            # Filter out any tags that don't belong to the user
             tags = [tag for tag in tags if tag.user_id == user_id]
 
-        current_app.logger.debug(f"Returning {len(tags)} tags for user {user_id}")
+        current_app.logger.debug("Returning %s tags for user %s", len(tags), user_id)
         return jsonify({"success": True, "tags": [tag.to_dict() for tag in tags]})  # type: ignore[no-any-return]
     except Exception as e:
-        current_app.logger.error(f"Error fetching tags for user {current_user.id}: {e}", exc_info=True)
+        current_app.logger.error("Error fetching tags for user %s: %s", current_user.id, e, exc_info=True)
         return jsonify({"success": False, "message": "Failed to fetch tags"}), 500
 
 

@@ -36,7 +36,7 @@
         <!-- Centralized Dependencies -->
         {% include 'includes/dependencies.html' %}
         <!-- Custom CSS -->
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
         {% block styles %} {% endblock styles %}
     </head>
     <body class="d-flex flex-column min-vh-100">
@@ -59,9 +59,7 @@
             </div>
         </footer>
         <!-- Custom JS -->
-        <script src="{{ url_for('static', filename='js/main.js') }}" type="module"></script>
-        <!-- Auth form handler -->
-        <script src="{{ url_for('static', filename='js/pages/auth-forms.js') }}"></script>
+        <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
         {% block scripts %} {% endblock scripts %}
     </body>
 </html>

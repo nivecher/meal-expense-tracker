@@ -1,6 +1,8 @@
 """Custom template filters for the application."""
 
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
+from typing import Any
 
 from flask import Flask
 
@@ -294,6 +296,49 @@ def timezone_display_name(timezone_str: str) -> str:
     return get_timezone_display_name(timezone_str)
 
 
+def format_number(value: Any, decimals: int = 0) -> str:
+    """Format a number with thousands separators (e.g., 1,234.56).
+
+    Args:
+        value: Numeric value (int/float/Decimal/str) to format
+        decimals: Number of decimal places (default: 0)
+
+    Returns:
+        Comma-separated number string. Returns empty string for None/empty input.
+    """
+    if value is None:
+        return ""
+
+    if isinstance(value, str) and not value.strip():
+        return ""
+
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return str(value)
+
+    if number.is_nan() or number.is_infinite():
+        return str(value)
+
+    try:
+        decimals_int = int(decimals)
+    except (ValueError, TypeError):
+        decimals_int = 0
+
+    decimals_int = max(0, min(decimals_int, 6))
+    return format(number, f",.{decimals_int}f")
+
+
+def format_currency_usd(value: Any) -> str:
+    """Format a numeric value as USD with commas (e.g., $1,234.56)."""
+    formatted = format_number(value, 2)
+    if not formatted:
+        return "$0.00"
+    if formatted.startswith("-"):
+        return "-$" + formatted[1:]
+    return f"${formatted}"
+
+
 def get_app_version() -> str:
     """Get the application version from git tags.
 
@@ -318,6 +363,8 @@ def init_app(app: Flask) -> None:
     app.add_template_filter(time_ago, name="time_ago")
     app.add_template_filter(format_datetime_user_tz, name="format_datetime_user_tz")
     app.add_template_filter(format_date_user_tz, name="format_date_user_tz")
+    app.add_template_filter(format_number, name="format_number")
+    app.add_template_filter(format_currency_usd, name="format_currency_usd")
 
     def format_time_with_tz(value: datetime) -> str:
         """Format time with timezone abbreviation in RFC format."""

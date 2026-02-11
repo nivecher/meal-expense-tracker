@@ -311,7 +311,7 @@ def test_expense_export(client, app, auth, test_user) -> None:
     # Verify CSV content
     csv_data = response.data.decode("utf-8").split("\n")
     assert len(csv_data) >= 2  # Header + at least one row
-    header = '"date","amount","meal_type","notes","category_name","restaurant_name","restaurant_address","tags","created_at","updated_at"'
+    header = '"date","time_utc","datetime_utc","amount","meal_type","order_type","party_size","notes","category_name","restaurant_name","restaurant_address","restaurant_city","restaurant_state","restaurant_postal_code","restaurant_country","restaurant_google_place_id","tags","created_at","updated_at"'
     assert header in csv_data[0]
     assert "Test Restaurant" in csv_data[1]
     assert "lunch" in csv_data[1]

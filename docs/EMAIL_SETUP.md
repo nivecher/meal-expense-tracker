@@ -50,12 +50,10 @@ The application automatically uses IAM roles for AWS SES authentication - no acc
 Since you own the nivecher.com domain and Route 53 DNS zones, you can easily set up domain verification:
 
 1. **In AWS SES Console**:
-
    - After creating the domain identity, you'll see DNS records to add
    - Copy the DKIM CNAME records (usually 3 records)
 
 2. **In Route 53 Console**:
-
    - Go to your nivecher.com hosted zone
    - Create the DKIM CNAME records provided by SES
    - Wait for DNS propagation (usually 5-10 minutes)
@@ -149,17 +147,14 @@ print(f"Email enabled: {is_email_enabled()}")
 ### Common Issues
 
 1. **"Email is disabled" message**
-
    - Set `MAIL_ENABLED=true` in environment variables
 
 2. **AWS SES "Access Denied"**
-
    - Check IAM role permissions
    - Ensure SES is available in your region
    - Verify the IAM role is attached to your service
 
 3. **SES Configuration Issues**
-
    - Verify IAM role has SES permissions
    - Check AWS region configuration
    - Ensure domain is verified in SES

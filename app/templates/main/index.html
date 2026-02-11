@@ -222,7 +222,7 @@
                                 {% from 'macros/category_helpers.html' import category_badge %} {{
                                 category_badge(expense.category, compact=true) }}
                             </td>
-                            <td class="fw-bold amount-right">${{ "%.2f"|format(expense.amount) }}</td>
+                            <td class="fw-bold amount-right">{{ expense.amount|format_currency_usd }}</td>
                             <td>
                                 <div class="btn-group">
                                     <a
@@ -248,7 +248,7 @@
                                 <strong>Total</strong>
                             </td>
                             <td colspan="2" class="amount-right">
-                                <strong>${{ "%.2f"|format(expense_stats.total_spent) }}</strong>
+                                <strong>{{ expense_stats.total_spent|format_currency_usd }}</strong>
                             </td>
                         </tr>
                     </tfoot>

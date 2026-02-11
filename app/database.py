@@ -21,6 +21,13 @@ from .extensions import db
 # Configure logger
 logger = logging.getLogger(__name__)
 
+DEFAULT_DATABASE_SECRET_NAME = "meal-expense-tracker/dev/supabase-connection"
+
+
+def _get_database_secret_name() -> str:
+    """Get the configured Secrets Manager name for the database connection."""
+    return os.environ.get("DATABASE_SECRET_NAME", DEFAULT_DATABASE_SECRET_NAME)
+
 
 def _get_database_uri_from_secrets_manager(secret_name: str) -> str:
     """Get database URI directly from AWS Secrets Manager.
@@ -101,7 +108,7 @@ def _get_database_uri_from_lambda(db_url: str) -> str:
     """Get database URI for Lambda environment with Secrets Manager."""
     if "placeholder" in db_url:
         # Get Supabase connection from Secrets Manager
-        db_url = _get_database_uri_from_secrets_manager("meal-expense-tracker/dev/supabase-connection")
+        db_url = _get_database_uri_from_secrets_manager(_get_database_secret_name())
         logger.info("Successfully retrieved Supabase connection for Lambda")
         return db_url
 
@@ -175,7 +182,7 @@ def _handle_lambda_with_env_url(db_url: str) -> str:
         logger.error(f"Failed to get database URI from Secrets Manager: {e}")
         # Try Supabase secret as fallback
         try:
-            db_url = _get_database_uri_from_secrets_manager("meal-expense-tracker/dev/supabase-connection")
+            db_url = _get_database_uri_from_secrets_manager(_get_database_secret_name())
             logger.info("Successfully retrieved Supabase connection from Secrets Manager")
             return db_url
         except Exception as supabase_error:
@@ -186,7 +193,7 @@ def _handle_lambda_with_env_url(db_url: str) -> str:
 def _get_lambda_database_uri() -> str:
     """Get database URI from Secrets Manager in Lambda environment."""
     # Get the secret name from environment variable
-    secret_name = os.environ.get("DATABASE_SECRET_NAME", "meal-expense-tracker/dev/supabase-connection")
+    secret_name = _get_database_secret_name()
 
     try:
         db_url = _get_database_uri_from_secrets_manager(secret_name)

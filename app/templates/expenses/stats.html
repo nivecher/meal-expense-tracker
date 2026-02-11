@@ -106,7 +106,7 @@ head_extra %} {{ super() }}
         <div class="col-md-4">
             <div class="stat-card text-center">
                 <div class="stat-label">Total Spent</div>
-                <div class="stat-value">${{ "%.2f"|format(total_spent|float) }}</div>
+                <div class="stat-value">{{ (total_spent|float)|format_currency_usd }}</div>
                 <div class="text-muted small">Last {{ days }} days</div>
             </div>
         </div>
@@ -114,7 +114,7 @@ head_extra %} {{ super() }}
             <div class="stat-card text-center">
                 <div class="stat-label">Daily Average</div>
                 <div class="stat-value"
-                    >${{ "%.2f"|format((total_spent|float) / (days|int) if (days|int) > 0 else 0) }}</div
+                    >{{ ((total_spent|float) / (days|int) if (days|int) > 0 else 0)|format_currency_usd }}</div
                 >
                 <div class="text-muted small">Over {{ days }} days</div>
             </div>
@@ -126,7 +126,7 @@ head_extra %} {{ super() }}
                     {% if category_spending %} {{ category_spending[0][0] }} {% else %} N/A {% endif %}
                 </div>
                 <div class="text-muted small">
-                    {% if category_spending %} ${{ "%.2f"|format(category_spending[0][1]) }} {% endif %}
+                    {% if category_spending %} {{ category_spending[0][1]|format_currency_usd }} {% endif %}
                 </div>
             </div>
         </div>
@@ -162,7 +162,7 @@ head_extra %} {{ super() }}
                                 <span>{{ category.name }}</span>
                             </div>
                             <span class="fw-medium amount-right d-inline-block" style="min-width: 80px"
-                                >${{ "%.2f"|format(amount) }}</span
+                                >{{ amount|format_currency_usd }}</span
                             >
                         </div>
                         <div class="progress mb-3 progress-sm">
@@ -205,7 +205,7 @@ head_extra %} {{ super() }}
                                 </div>
                                 <span
                                     class="fw-bold text- {% if expense.amount < 0 %} danger {% else %} success {% endif %} amount-right"
-                                    >${{ "%.2f"|format(expense.amount|abs) }}</span
+                                    >{{ (expense.amount|abs)|format_currency_usd }}</span
                                 >
                             </div>
                         </div>

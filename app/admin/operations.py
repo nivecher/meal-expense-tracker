@@ -6,12 +6,12 @@ Each operation returns a consistent interface for easy remote invocation.
 
 from collections.abc import Callable
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     pass
 
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.auth.models import User
 from app.extensions import db
@@ -64,6 +64,14 @@ register_operation(
     True,
     lambda **kwargs: _validate_create_user(**kwargs),
     lambda **kwargs: _execute_create_user(**kwargs),
+)
+
+register_operation(
+    "update_user",
+    "Update an existing user (email/username/password/admin/active)",
+    True,
+    lambda **kwargs: _validate_update_user(**kwargs),
+    lambda **kwargs: _execute_update_user(**kwargs),
 )
 
 register_operation(
@@ -145,8 +153,65 @@ def _validate_create_user(**kwargs: Any) -> dict[str, Any]:
         errors.append("email must be a valid email address")
 
     password = kwargs.get("password", "")
-    if not password or len(password) < 6:
-        errors.append("password must be at least 6 characters")
+    if not password or len(password) < 8:
+        errors.append("password must be at least 8 characters")
+
+    admin = kwargs.get("admin", False)
+    if not isinstance(admin, bool):
+        errors.append("admin must be a boolean")
+
+    active = kwargs.get("active", True)
+    if not isinstance(active, bool):
+        errors.append("active must be a boolean")
+
+    return {"valid": len(errors) == 0, "errors": errors}
+
+
+def _validate_update_user(**kwargs: Any) -> dict[str, Any]:
+    """Validate update user parameters."""
+    errors: list[str] = []
+
+    user_id = kwargs.get("user_id")
+    if user_id is not None and (not isinstance(user_id, int) or user_id < 1):
+        errors.append("user_id must be a positive integer")
+
+    email = kwargs.get("email")
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        errors.append("email must be a non-empty string")
+
+    username = kwargs.get("username")
+    if username is not None and (not isinstance(username, str) or not username.strip()):
+        errors.append("username must be a non-empty string")
+
+    if user_id is None and not email and not username:
+        errors.append("Must provide one identifier: user_id, email, or username")
+
+    new_email = kwargs.get("new_email")
+    if new_email is not None and (not isinstance(new_email, str) or not new_email.strip()):
+        errors.append("new_email must be a non-empty string")
+    elif isinstance(new_email, str) and new_email and "@" not in new_email:
+        errors.append("new_email must be a valid email address")
+
+    new_username = kwargs.get("new_username")
+    if new_username is not None and (not isinstance(new_username, str) or not new_username.strip()):
+        errors.append("new_username must be a non-empty string")
+    elif isinstance(new_username, str) and new_username and len(new_username.strip()) < 3:
+        errors.append("new_username must be at least 3 characters")
+
+    password = kwargs.get("password")
+    if password is not None and (not isinstance(password, str) or len(password) < 8):
+        errors.append("password must be a string at least 8 characters long")
+
+    admin = kwargs.get("admin")
+    if admin is not None and not isinstance(admin, bool):
+        errors.append("admin must be a boolean")
+
+    active = kwargs.get("active")
+    if active is not None and not isinstance(active, bool):
+        errors.append("active must be a boolean")
+
+    if not any([new_email, new_username, password, admin is not None, active is not None]):
+        errors.append("No updates specified (provide at least one field to change)")
 
     return {"valid": len(errors) == 0, "errors": errors}
 
@@ -176,6 +241,8 @@ def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
         username = kwargs.get("username", "").strip()
         email = kwargs.get("email", "").strip()
         password = kwargs.get("password", "")
+        admin = kwargs.get("admin", False)
+        active = kwargs.get("active", True)
 
         # Check if user already exists
         existing_user = User.query.filter((User.username == username) | (User.email == email)).first()
@@ -186,7 +253,7 @@ def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
             }
 
         # Create new user
-        user = User(username=username, email=email)
+        user = User(username=username, email=email, is_admin=bool(admin), is_active=bool(active))
         user.set_password(password)
 
         db.session.add(user)
@@ -199,9 +266,15 @@ def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
                 "user_id": user.id,
                 "username": user.username,
                 "email": user.email,
+                "is_admin": user.is_admin,
+                "is_active": user.is_active,
             },
         }
 
+    except IntegrityError as e:
+        db.session.rollback()
+        logger.exception(f"Integrity error creating user: {e}")
+        return {"success": False, "message": f"Integrity error: {str(e)}"}
     except SQLAlchemyError as e:
         db.session.rollback()
         logger.exception(f"Database error creating user: {e}")
@@ -210,6 +283,130 @@ def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
         db.session.rollback()
         logger.exception(f"Error creating user: {e}")
         return {"success": False, "message": f"Failed to create user: {str(e)}"}
+
+
+def _find_user_for_update(user_id: int | None, email: str | None, username: str | None) -> User | None:
+    """Find a user by id/email/username, optionally cross-checking identifiers."""
+    if user_id is not None:
+        user = db.session.get(User, user_id)
+        if user is None:
+            return None
+        if email and user.email != email:
+            return None
+        if username and user.username != username:
+            return None
+        return user
+
+    if email:
+        user = User.query.filter_by(email=email).first()
+        if user and username and user.username != username:
+            return None
+        return user
+
+    if username:
+        user = User.query.filter_by(username=username).first()
+        return user
+
+    return None
+
+
+def _username_available(new_username: str, user_id: int) -> bool:
+    """Check if username is available (excluding the current user)."""
+    return User.query.filter(User.username == new_username, User.id != user_id).first() is None
+
+
+def _email_available(new_email: str, user_id: int) -> bool:
+    """Check if email is available (excluding the current user)."""
+    return User.query.filter(User.email == new_email, User.id != user_id).first() is None
+
+
+def _execute_update_user(**kwargs: Any) -> dict[str, Any]:
+    """Execute update user operation."""
+    try:
+        user_id = kwargs.get("user_id")
+        email = kwargs.get("email")
+        username = kwargs.get("username")
+        new_email = kwargs.get("new_email")
+        new_username = kwargs.get("new_username")
+        password = kwargs.get("password")
+        admin = kwargs.get("admin")
+        active = kwargs.get("active")
+
+        user = _find_user_for_update(user_id, email, username)
+        if user is None:
+            return {"success": False, "message": "User not found (or identifiers do not match the same user)"}
+
+        changes: list[str] = []
+
+        if isinstance(new_username, str):
+            new_username = new_username.strip()
+            if new_username and new_username != user.username:
+                if not _username_available(new_username, user.id):
+                    return {"success": False, "message": f"Username '{new_username}' is already taken"}
+                user.username = new_username
+                changes.append("username")
+
+        if isinstance(new_email, str):
+            new_email = new_email.strip()
+            if new_email and new_email != user.email:
+                if not _email_available(new_email, user.id):
+                    return {"success": False, "message": f"Email '{new_email}' is already in use"}
+                user.email = new_email
+                changes.append("email")
+
+        if isinstance(password, str) and password:
+            user.set_password(password)
+            changes.append("password")
+
+        if isinstance(admin, bool) and admin != user.is_admin:
+            user.is_admin = admin
+            changes.append("is_admin")
+
+        if isinstance(active, bool) and active != user.is_active:
+            user.is_active = active
+            changes.append("is_active")
+
+        if not changes:
+            return {
+                "success": True,
+                "message": f"No changes applied to user '{user.username}'",
+                "data": {
+                    "user_id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "is_admin": user.is_admin,
+                    "is_active": user.is_active,
+                    "changed_fields": [],
+                },
+            }
+
+        db.session.commit()
+
+        return {
+            "success": True,
+            "message": f"Successfully updated user '{user.username}' ({user.email})",
+            "data": {
+                "user_id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "is_admin": user.is_admin,
+                "is_active": user.is_active,
+                "changed_fields": changes,
+            },
+        }
+
+    except IntegrityError as e:
+        db.session.rollback()
+        logger.exception(f"Integrity error updating user: {e}")
+        return {"success": False, "message": f"Integrity error: {str(e)}"}
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.exception(f"Database error updating user: {e}")
+        return {"success": False, "message": f"Database error: {str(e)}"}
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f"Error updating user: {e}")
+        return {"success": False, "message": f"Failed to update user: {str(e)}"}
 
 
 def _execute_run_migrations(**kwargs: Any) -> dict[str, Any]:

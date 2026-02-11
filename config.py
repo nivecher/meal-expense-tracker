@@ -49,6 +49,11 @@ class Config:
     UPLOAD_FOLDER: str = os.path.join(os.path.dirname(__file__), "app", "static", "uploads")
     MAX_CONTENT_LENGTH: int = 5 * 1024 * 1024  # 5MB max file size
 
+    # Import settings (serverless-safe defaults)
+    # API Gateway/Lambda requests are time-bounded, so keep imports reasonably sized.
+    IMPORT_MAX_ROWS: int = int(os.getenv("IMPORT_MAX_ROWS", "2000"))
+    IMPORT_BATCH_SIZE: int = int(os.getenv("IMPORT_BATCH_SIZE", "200"))
+
     # S3 settings for receipt storage
     # If S3_RECEIPTS_BUCKET is set, S3 is enabled; otherwise use local storage
     S3_RECEIPTS_BUCKET: str | None = os.getenv("S3_RECEIPTS_BUCKET")

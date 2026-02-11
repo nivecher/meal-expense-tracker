@@ -1,6 +1,7 @@
 """Service functions for the expenses blueprint."""
 
 import csv
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 import io
@@ -55,6 +56,7 @@ def get_expense_filters(request: Request) -> dict[str, Any]:
     return {
         "search": search_term,
         "meal_type": request.args.get("meal_type", "").strip(),
+        "order_type": request.args.get("order_type", "").strip(),
         "category": request.args.get("category", "").strip(),
         "tags": tags_list,  # List of tag names to filter by
         "start_date": request.args.get("start_date", "").strip(),
@@ -163,6 +165,7 @@ def apply_filters(stmt: Select, filters: dict[str, Any]) -> Select:
                 # Expense fields
                 func.coalesce(Expense.notes, "").ilike(search_term),
                 func.coalesce(Expense.meal_type, "").ilike(search_term),
+                func.coalesce(Expense.order_type, "").ilike(search_term),
                 # Category fields (handle NULL values from outer join)
                 func.coalesce(Category.name, "").ilike(search_term),
             )
@@ -171,6 +174,10 @@ def apply_filters(stmt: Select, filters: dict[str, Any]) -> Select:
     # Apply meal type filter
     if filters["meal_type"]:
         stmt = stmt.where(Expense.meal_type == filters["meal_type"])
+
+    # Apply order type filter
+    if filters.get("order_type"):
+        stmt = stmt.where(Expense.order_type == filters["order_type"])
 
     # Apply category filter
     if filters["category"]:
@@ -1121,26 +1128,34 @@ def get_filter_options(user_id: int) -> dict[str, Any]:
     }
 
 
-def export_expenses_for_user(user_id: int) -> list[dict[str, Any]]:
+def export_expenses_for_user(user_id: int, expense_ids: list[int] | None = None) -> list[dict[str, Any]]:
     """Get all expenses for a user in a format suitable for export.
 
     Args:
         user_id: The ID of the user whose expenses to export
+        expense_ids: Optional list of expense IDs to export
 
     Returns:
         A list of dictionaries containing expense data
     """
-    expenses = (
-        db.session.execute(
-            select(Expense)
-            .options(joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag))
-            .where(Expense.user_id == user_id)
-            .order_by(Expense.date.desc())
+    if expense_ids is not None and not expense_ids:
+        return []
+
+    query = (
+        select(Expense)
+        .options(
+            joinedload(Expense.restaurant),
+            joinedload(Expense.category),
+            joinedload(Expense.expense_tags).joinedload(ExpenseTag.tag),
         )
-        .unique()
-        .scalars()
-        .all()
+        .where(Expense.user_id == user_id)
+        .order_by(Expense.date.desc())
     )
+
+    if expense_ids:
+        query = query.where(Expense.id.in_(expense_ids))
+
+    expenses = db.session.execute(query).unique().scalars().all()
 
     def safe_float(value: Any) -> float | None:
         """Safely convert value to float."""
@@ -1154,21 +1169,53 @@ def export_expenses_for_user(user_id: int) -> list[dict[str, Any]]:
         tag_names = [tag.name for tag in expense.tags if tag and tag.name]
         return ", ".join(sorted(tag_names)) if tag_names else ""
 
-    return [
-        {
-            "date": expense.date.isoformat() if expense.date else "",
-            "amount": safe_float(expense.amount) if expense.amount is not None else "",
-            "meal_type": expense.meal_type or "",
-            "notes": expense.notes or "",
-            "category_name": expense.category.name if expense.category else "",
-            "restaurant_name": expense.restaurant.name if expense.restaurant else "",
-            "restaurant_address": expense.restaurant.address if expense.restaurant else "",
-            "tags": format_tag_names(expense),
-            "created_at": expense.created_at.isoformat() if expense.created_at else "",
-            "updated_at": expense.updated_at.isoformat() if expense.updated_at else "",
-        }
-        for expense in expenses
-    ]
+    def to_utc_datetime_string(expense: Expense) -> tuple[str, str, str]:
+        """Return (date, time_utc, datetime_utc) strings for export."""
+        expense_dt = expense.date
+        if not expense_dt:
+            return "", "", ""
+
+        # Expense.date is expected to be a datetime; keep a single code path for type-checkers.
+        dt_val = expense_dt
+
+        if dt_val.tzinfo is None:
+            dt_val = dt_val.replace(tzinfo=UTC)
+
+        dt_utc = dt_val.astimezone(UTC).replace(microsecond=0)
+        date_str = dt_utc.date().isoformat()
+        time_str = dt_utc.time().isoformat()
+        datetime_str = dt_utc.isoformat().replace("+00:00", "Z")
+        return date_str, time_str, datetime_str
+
+    export_rows: list[dict[str, Any]] = []
+    for expense in expenses:
+        date_str, time_str, datetime_str = to_utc_datetime_string(expense)
+        export_rows.append(
+            {
+                # Backup-friendly: include both a human-friendly date and full UTC timestamp.
+                "date": date_str,
+                "time_utc": time_str,
+                "datetime_utc": datetime_str,
+                "amount": safe_float(expense.amount) if expense.amount is not None else "",
+                "meal_type": expense.meal_type or "",
+                "order_type": expense.order_type or "",
+                "party_size": expense.party_size if expense.party_size is not None else "",
+                "notes": expense.notes or "",
+                "category_name": expense.category.name if expense.category else "",
+                "restaurant_name": expense.restaurant.name if expense.restaurant else "",
+                "restaurant_address": expense.restaurant.address if expense.restaurant else "",
+                "restaurant_city": expense.restaurant.city if expense.restaurant else "",
+                "restaurant_state": expense.restaurant.state if expense.restaurant else "",
+                "restaurant_postal_code": expense.restaurant.postal_code if expense.restaurant else "",
+                "restaurant_country": expense.restaurant.country if expense.restaurant else "",
+                "restaurant_google_place_id": expense.restaurant.google_place_id if expense.restaurant else "",
+                "tags": format_tag_names(expense),
+                "created_at": expense.created_at.isoformat() if expense.created_at else "",
+                "updated_at": expense.updated_at.isoformat() if expense.updated_at else "",
+            }
+        )
+
+    return export_rows
 
 
 def _validate_import_file(file: FileStorage) -> bool:
@@ -1210,6 +1257,14 @@ def _normalize_field_names(data_row: dict[str, Any]) -> dict[str, Any]:
         "transaction_date": "date",
         "expense_date": "date",
         "when": "date",
+        "datetime": "datetime_utc",
+        "date_time": "datetime_utc",
+        "datetime_utc": "datetime_utc",
+        "timestamp": "datetime_utc",
+        # Time field mappings
+        "time": "time_utc",
+        "time_utc": "time_utc",
+        "transaction_time": "time_utc",
         # Amount field mappings
         "cost": "amount",
         "price": "amount",
@@ -1232,9 +1287,29 @@ def _normalize_field_names(data_row: dict[str, Any]) -> dict[str, Any]:
         "address": "restaurant_address",
         "location_address": "restaurant_address",
         "vendor_address": "restaurant_address",
+        "restaurant_city": "restaurant_city",
+        "city": "restaurant_city",
+        "restaurant_state": "restaurant_state",
+        "state": "restaurant_state",
+        "restaurant_postal_code": "restaurant_postal_code",
+        "postal_code": "restaurant_postal_code",
+        "zip": "restaurant_postal_code",
+        "zip_code": "restaurant_postal_code",
+        "restaurant_country": "restaurant_country",
+        "country": "restaurant_country",
+        "restaurant_google_place_id": "restaurant_google_place_id",
+        "google_place_id": "restaurant_google_place_id",
         # Meal type mappings
         "meal": "meal_type",
         "meal_category": "meal_type",
+        # Order / party mappings
+        "order_type": "order_type",
+        "order": "order_type",
+        "service_type": "order_type",
+        "party_size": "party_size",
+        "party": "party_size",
+        "people": "party_size",
+        "guests": "party_size",
         # Notes mappings
         "description": "notes",
         "memo": "notes",
@@ -1264,23 +1339,25 @@ def _normalize_field_names(data_row: dict[str, Any]) -> dict[str, Any]:
     return normalized_row
 
 
-def _parse_import_file(file: FileStorage) -> list[dict[str, Any]] | None:
+def _parse_import_file(file: FileStorage) -> tuple[list[dict[str, Any]] | None, str | None]:
     """Parse the uploaded file and return normalized data.
 
     Args:
         file: The uploaded file
 
     Returns:
-        List of normalized expense data dictionaries or None if error
+        Tuple of (normalized_data, error_message)
     """
     try:
+        max_rows = int(current_app.config.get("IMPORT_MAX_ROWS", 2000))
+
         if file.filename and file.filename.lower().endswith(".json"):
             # Reset file pointer to beginning
             file.seek(0)
             data = json.load(file)
             if not isinstance(data, list):
                 current_app.logger.error("Invalid JSON format. Expected an array of expenses.")
-                return None
+                return None, "Invalid JSON format. Expected an array of expenses."
         else:
             # Parse CSV file
             file.seek(0)
@@ -1288,19 +1365,26 @@ def _parse_import_file(file: FileStorage) -> list[dict[str, Any]] | None:
             reader = csv.DictReader(io.StringIO(csv_data))
             data = list(reader)
 
+        if len(data) > max_rows:
+            return (
+                None,
+                f"File contains {len(data)} rows, which exceeds the maximum supported ({max_rows}). "
+                "Please split the file into smaller imports and try again.",
+            )
+
         # Normalize field names for all rows
         normalized_data = []
         for row in data:
             normalized_row = _normalize_field_names(row)
             normalized_data.append(normalized_row)
 
-        return normalized_data
+        return normalized_data, None
     except UnicodeDecodeError:
         current_app.logger.error("Error decoding the file. Please ensure it's a valid CSV or JSON file.")
-        return None
+        return None, "Error decoding the file. Please ensure it's a valid CSV or JSON file."
     except Exception as e:
         current_app.logger.error(f"Error parsing import file: {str(e)}")
-        return None
+        return None, f"Error parsing import file: {str(e)}"
 
 
 def _parse_import_tags(tags_value: Any) -> tuple[list[str] | None, str | None]:
@@ -1369,19 +1453,15 @@ def _apply_import_tags_to_expense(
     if not normalized_tags:
         return
 
-    db.session.flush()
-    expense_id = cast(int, expense.id)
-
     for tag_name in normalized_tags:
         tag = existing_tags.get(tag_name)
         if not tag:
             tag = Tag(name=tag_name, color="#6c757d", user_id=user_id)
             db.session.add(tag)
-            db.session.flush()
             existing_tags[tag_name] = tag
             created_tags.add(tag_name)
 
-        expense_tag = ExpenseTag(expense_id=expense_id, tag_id=tag.id, added_by=user_id)
+        expense_tag = ExpenseTag(expense=expense, tag=tag, added_by=user_id)
         db.session.add(expense_tag)
         tag_counts[tag_name] = tag_counts.get(tag_name, 0) + 1
 
@@ -1524,6 +1604,102 @@ def _parse_expense_date(date_value: str | int | float | None) -> tuple[date | No
 
     # Try standard date formats
     return _parse_standard_date_formats(date_str)
+
+
+def _parse_expense_time(time_value: Any) -> tuple[time | None, str | None]:
+    """Parse an optional time value for imports (UTC)."""
+    if time_value is None:
+        return None, None
+
+    time_str = str(time_value).strip()
+    if not time_str:
+        return None, None
+
+    time_formats = [
+        "%H:%M:%S",
+        "%H:%M",
+    ]
+
+    for time_format in time_formats:
+        try:
+            parsed = datetime.strptime(time_str, time_format).time()
+            return parsed.replace(microsecond=0), None
+        except ValueError:
+            continue
+
+    return None, f"Invalid time format: {time_str}. Supported formats: HH:MM or HH:MM:SS (UTC)"
+
+
+def _parse_expense_datetime_utc(data: dict[str, Any]) -> tuple[datetime | None, date | None, str | None]:
+    """Parse expense datetime for imports, prioritizing full UTC timestamp.
+
+    Supported inputs (in priority order):
+    - datetime_utc: ISO datetime string (with Z or offset)
+    - date + time_utc: date + optional time (assumed UTC)
+    - date only: interpreted as noon UTC (preserves intended date across timezones)
+    """
+    raw_datetime = data.get("datetime_utc")
+    if raw_datetime is not None:
+        dt_str = str(raw_datetime).strip()
+        if dt_str:
+            normalized = dt_str.replace("Z", "+00:00")
+            try:
+                parsed_dt = datetime.fromisoformat(normalized)
+                if parsed_dt.tzinfo is None:
+                    parsed_dt = parsed_dt.replace(tzinfo=UTC)
+                dt_utc = parsed_dt.astimezone(UTC).replace(microsecond=0)
+                return dt_utc, dt_utc.date(), None
+            except ValueError:
+                # Fall through to date/time parsing
+                pass
+
+    # Date is still required for imports
+    raw_date = data.get("date")
+    if isinstance(raw_date, str):
+        raw_date = raw_date.strip()
+    parsed_date, date_error = _parse_expense_date(raw_date)
+    if date_error:
+        return None, None, date_error
+
+    raw_time = data.get("time_utc")
+    parsed_time, time_error = _parse_expense_time(raw_time)
+    if time_error:
+        return None, None, time_error
+
+    if parsed_date is None:
+        return None, None, "Date is required"
+
+    # If no time is provided, use noon UTC (matches model validation intent).
+    final_time = parsed_time if parsed_time is not None else time.min.replace(hour=12)
+    dt_utc = datetime.combine(parsed_date, final_time, tzinfo=UTC).replace(microsecond=0)
+    return dt_utc, parsed_date, None
+
+
+def _parse_import_party_size(party_size_value: Any) -> tuple[int | None, str | None]:
+    """Parse optional party size for imports."""
+    if party_size_value is None:
+        return None, None
+
+    raw = str(party_size_value).strip()
+    if not raw:
+        return None, None
+
+    if not raw.isdigit():
+        return None, f"Invalid party size: {raw}. Must be an integer."
+
+    value = int(raw)
+    if value < 1 or value > 50:
+        return None, f"Invalid party size: {value}. Must be between 1 and 50."
+
+    return value, None
+
+
+def _parse_import_order_type(order_type_value: Any) -> str | None:
+    """Parse optional order type for imports."""
+    if order_type_value is None:
+        return None
+    value = str(order_type_value).strip()
+    return value.lower() if value else None
 
 
 def _parse_expense_amount(amount_str: str) -> tuple[Decimal | None, str | None]:
@@ -1738,65 +1914,437 @@ def _find_restaurant_by_name(restaurant_name: str, user_id: int) -> Restaurant |
     return cast(Restaurant | None, result)
 
 
-def _create_expense_from_data(data: dict[str, Any], user_id: int) -> tuple[Expense | None, str | None]:
+@dataclass
+class ExpenseImportContext:
+    user_id: int
+    categories_by_name: dict[str, Category]
+    categories_by_lower_name: dict[str, Category]
+    categories_all: list[Category]
+    restaurants_by_name: dict[str, list[Restaurant]]
+    restaurants_by_name_address: dict[tuple[str, str], Restaurant]
+    existing_duplicate_keys: set[tuple[int | None, Decimal, date, str | None]]
+    seen_import_keys: set[tuple[int | tuple[str, str] | None, Decimal, date, str | None]]
+
+
+def _build_category_cache_for_import(user_id: int) -> tuple[dict[str, Category], dict[str, Category], list[Category]]:
+    """Build category caches for import processing (avoid per-row queries)."""
+    categories = Category.query.filter_by(user_id=user_id).all()
+    categories_by_name: dict[str, Category] = {}
+    categories_by_lower_name: dict[str, Category] = {}
+
+    for category in categories:
+        name = category.name.strip() if category.name else ""
+        if not name:
+            continue
+        categories_by_name[name] = category
+        categories_by_lower_name[name.lower()] = category
+
+    return categories_by_name, categories_by_lower_name, categories
+
+
+def _find_category_for_import(category_name: str, ctx: ExpenseImportContext) -> Category | None:
+    """Find category by name using in-memory caches (supports hierarchical + fuzzy match)."""
+    if not category_name:
+        return None
+
+    raw_name = category_name.strip()
+    if not raw_name:
+        return None
+
+    # Exact match (fast path)
+    category = ctx.categories_by_name.get(raw_name)
+    if category:
+        return category
+
+    # Case-insensitive exact match
+    category = ctx.categories_by_lower_name.get(raw_name.lower())
+    if category:
+        return category
+
+    # Hierarchical category format (e.g., "Parent:Child")
+    if ":" in raw_name:
+        parent, child = raw_name.split(":", 1)
+        child_name = child.strip()
+        parent_name = parent.strip()
+
+        if child_name:
+            category = ctx.categories_by_name.get(child_name) or ctx.categories_by_lower_name.get(child_name.lower())
+            if category:
+                return category
+
+        if parent_name:
+            category = ctx.categories_by_name.get(parent_name) or ctx.categories_by_lower_name.get(parent_name.lower())
+            if category:
+                return category
+
+    # Fuzzy "contains" match to mirror the previous DB ilike fallback
+    needle = raw_name.lower()
+    for cat in ctx.categories_all:
+        name = cat.name.strip() if cat.name else ""
+        if name and needle in name.lower():
+            return cat
+
+    # Restore-friendly: create missing categories on import.
+    new_category = Category(
+        user_id=ctx.user_id,
+        name=raw_name,
+        description=None,
+        color="#6c757d",
+        icon=None,
+        is_default=False,
+    )
+    db.session.add(new_category)
+    ctx.categories_by_name[raw_name] = new_category
+    ctx.categories_by_lower_name[raw_name.lower()] = new_category
+    ctx.categories_all.append(new_category)
+    return new_category
+
+
+def _build_restaurant_cache_for_import(
+    user_id: int,
+) -> tuple[dict[str, list[Restaurant]], dict[tuple[str, str], Restaurant]]:
+    """Build restaurant caches for import processing (avoid per-row queries)."""
+    restaurants = Restaurant.query.filter_by(user_id=user_id).all()
+    restaurants_by_name: dict[str, list[Restaurant]] = {}
+    restaurants_by_name_address: dict[tuple[str, str], Restaurant] = {}
+
+    for restaurant in restaurants:
+        name = restaurant.name.strip() if restaurant.name else ""
+        if not name:
+            continue
+        restaurants_by_name.setdefault(name, []).append(restaurant)
+
+        address = restaurant.address_line_1.strip() if restaurant.address_line_1 else ""
+        if address:
+            restaurants_by_name_address[(name, address)] = restaurant
+
+    return restaurants_by_name, restaurants_by_name_address
+
+
+def _find_existing_restaurant_for_import(
+    restaurant_name: str,
+    restaurant_address: str,
+    ctx: ExpenseImportContext,
+    restaurant_city: str | None = None,
+) -> Restaurant | None:
+    """Find an existing restaurant for import duplicate prefetch (no creation, no warnings)."""
+    name = restaurant_name.strip()
+    if not name:
+        return None
+
+    address = restaurant_address.strip() if restaurant_address else ""
+    if address:
+        return ctx.restaurants_by_name_address.get((name, address))
+
+    matches = ctx.restaurants_by_name.get(name, [])
+    if len(matches) == 1:
+        return matches[0]
+
+    if restaurant_city:
+        city_norm = restaurant_city.strip().lower()
+        if city_norm:
+            city_matches = [r for r in matches if (r.city or "").strip().lower() == city_norm]
+            if len(city_matches) == 1:
+                return city_matches[0]
+
+    return None
+
+
+def _find_or_create_restaurant_for_import(
+    restaurant_name: str,
+    restaurant_address: str,
+    ctx: ExpenseImportContext,
+    restaurant_details: dict[str, Any] | None = None,
+) -> tuple[Restaurant | None, str | None]:
+    """Import-specific restaurant resolution using caches (creates without per-row DB lookups)."""
+
+    def merge_details(restaurant: Restaurant) -> None:
+        if not restaurant_details:
+            return
+
+        def set_if_empty(attr: str, value: Any) -> None:
+            if value is None:
+                return
+            value_str = str(value).strip()
+            if not value_str:
+                return
+            current = getattr(restaurant, attr, None)
+            if current is None:
+                setattr(restaurant, attr, value_str)
+                return
+            if isinstance(current, str) and not current.strip():
+                setattr(restaurant, attr, value_str)
+
+        set_if_empty("city", restaurant_details.get("restaurant_city"))
+        set_if_empty("state", restaurant_details.get("restaurant_state"))
+        set_if_empty("postal_code", restaurant_details.get("restaurant_postal_code"))
+        set_if_empty("country", restaurant_details.get("restaurant_country"))
+        set_if_empty("google_place_id", restaurant_details.get("restaurant_google_place_id"))
+
+    if not restaurant_name:
+        return None, None
+
+    name = restaurant_name.strip()
+    if not name:
+        return None, None
+
+    address = restaurant_address.strip() if restaurant_address else ""
+    if address:
+        existing = ctx.restaurants_by_name_address.get((name, address))
+        if existing:
+            merge_details(existing)
+            return existing, None
+
+        new_restaurant = Restaurant(
+            user_id=ctx.user_id,
+            name=name,
+            address_line_1=address,
+            city=str((restaurant_details or {}).get("restaurant_city") or "").strip() or None,
+            state=str((restaurant_details or {}).get("restaurant_state") or "").strip() or None,
+            postal_code=str((restaurant_details or {}).get("restaurant_postal_code") or "").strip() or None,
+            country=str((restaurant_details or {}).get("restaurant_country") or "").strip() or None,
+            google_place_id=str((restaurant_details or {}).get("restaurant_google_place_id") or "").strip() or None,
+        )
+        db.session.add(new_restaurant)
+
+        ctx.restaurants_by_name.setdefault(name, []).append(new_restaurant)
+        ctx.restaurants_by_name_address[(name, address)] = new_restaurant
+        return new_restaurant, None
+
+    name_matches = ctx.restaurants_by_name.get(name, [])
+    if len(name_matches) == 1:
+        merge_details(name_matches[0])
+        return name_matches[0], None
+    if len(name_matches) > 1:
+        # If city is provided, try to disambiguate by city
+        city_norm = str((restaurant_details or {}).get("restaurant_city") or "").strip().lower()
+        if city_norm:
+            city_matches = [r for r in name_matches if (r.city or "").strip().lower() == city_norm]
+            if len(city_matches) == 1:
+                merge_details(city_matches[0])
+                return city_matches[0], None
+
+        return (
+            None,
+            f"Restaurant '{name}' matches multiple existing restaurants. Please provide an address to disambiguate.",
+        )
+
+    # No matches and no address: create a restaurant so CSV backups can be restored.
+    new_restaurant = Restaurant(
+        user_id=ctx.user_id,
+        name=name,
+        address_line_1=None,
+        city=str((restaurant_details or {}).get("restaurant_city") or "").strip() or None,
+        state=str((restaurant_details or {}).get("restaurant_state") or "").strip() or None,
+        postal_code=str((restaurant_details or {}).get("restaurant_postal_code") or "").strip() or None,
+        country=str((restaurant_details or {}).get("restaurant_country") or "").strip() or None,
+        google_place_id=str((restaurant_details or {}).get("restaurant_google_place_id") or "").strip() or None,
+    )
+    db.session.add(new_restaurant)
+    ctx.restaurants_by_name.setdefault(name, []).append(new_restaurant)
+    return new_restaurant, None
+
+
+def _compute_import_duplicate_prefetch_scope(
+    data: list[dict[str, Any]],
+    ctx: ExpenseImportContext,
+) -> tuple[date | None, date | None, set[int], bool]:
+    """Compute date range + restaurant scope to prefetch duplicates efficiently."""
+    min_date: date | None = None
+    max_date: date | None = None
+    restaurant_ids: set[int] = set()
+    includes_null_restaurant = False
+
+    for row in data:
+        _dt_utc, parsed_date, _dt_error = _parse_expense_datetime_utc(row)
+        if parsed_date:
+            min_date = parsed_date if min_date is None else min(min_date, parsed_date)
+            max_date = parsed_date if max_date is None else max(max_date, parsed_date)
+
+        restaurant_name = str(row.get("restaurant_name", "") or "").strip()
+        restaurant_address = str(row.get("restaurant_address", "") or "").strip()
+        restaurant_city = str(row.get("restaurant_city", "") or "").strip()
+        if not restaurant_name:
+            includes_null_restaurant = True
+            continue
+
+        existing_restaurant = _find_existing_restaurant_for_import(
+            restaurant_name,
+            restaurant_address,
+            ctx,
+            restaurant_city=restaurant_city,
+        )
+        if existing_restaurant and existing_restaurant.id is not None:
+            restaurant_ids.add(int(existing_restaurant.id))
+
+    return min_date, max_date, restaurant_ids, includes_null_restaurant
+
+
+def _prefetch_existing_duplicate_keys_for_import(
+    user_id: int,
+    min_date: date | None,
+    max_date: date | None,
+    restaurant_ids: set[int],
+    includes_null_restaurant: bool,
+) -> set[tuple[int | None, Decimal, date, str | None]]:
+    """Prefetch existing expenses for duplicate checks (massively reduces per-row queries)."""
+    if min_date is None or max_date is None:
+        return set()
+
+    if not restaurant_ids and not includes_null_restaurant:
+        return set()
+
+    start_dt = datetime.combine(min_date, time.min, tzinfo=UTC)
+    end_dt_exclusive = datetime.combine(max_date + timedelta(days=1), time.min, tzinfo=UTC)
+
+    query = (
+        db.session.query(Expense.restaurant_id, Expense.amount, Expense.meal_type, Expense.date)
+        .filter(Expense.user_id == user_id)
+        .filter(Expense.date >= start_dt)
+        .filter(Expense.date < end_dt_exclusive)
+    )
+
+    if restaurant_ids and includes_null_restaurant:
+        query = query.filter(or_(Expense.restaurant_id.in_(restaurant_ids), Expense.restaurant_id.is_(None)))
+    elif restaurant_ids:
+        query = query.filter(Expense.restaurant_id.in_(restaurant_ids))
+    else:
+        query = query.filter(Expense.restaurant_id.is_(None))
+
+    existing_keys: set[tuple[int | None, Decimal, date, str | None]] = set()
+    for restaurant_id, amount, meal_type, expense_dt in query.all():
+        expense_date = expense_dt.date() if isinstance(expense_dt, datetime) else expense_dt
+        existing_keys.add((restaurant_id, amount, expense_date, meal_type))
+
+    return existing_keys
+
+
+def _build_expense_import_context(user_id: int, data: list[dict[str, Any]]) -> ExpenseImportContext:
+    """Build a full import context with in-memory caches and prefetched duplicates."""
+    categories_by_name, categories_by_lower_name, categories_all = _build_category_cache_for_import(user_id)
+    restaurants_by_name, restaurants_by_name_address = _build_restaurant_cache_for_import(user_id)
+
+    ctx = ExpenseImportContext(
+        user_id=user_id,
+        categories_by_name=categories_by_name,
+        categories_by_lower_name=categories_by_lower_name,
+        categories_all=categories_all,
+        restaurants_by_name=restaurants_by_name,
+        restaurants_by_name_address=restaurants_by_name_address,
+        existing_duplicate_keys=set(),
+        seen_import_keys=set(),
+    )
+
+    scope_min_date, scope_max_date, restaurant_ids, includes_null_restaurant = _compute_import_duplicate_prefetch_scope(
+        data,
+        ctx,
+    )
+    ctx.existing_duplicate_keys = _prefetch_existing_duplicate_keys_for_import(
+        user_id=user_id,
+        min_date=scope_min_date,
+        max_date=scope_max_date,
+        restaurant_ids=restaurant_ids,
+        includes_null_restaurant=includes_null_restaurant,
+    )
+
+    return ctx
+
+
+def _create_expense_from_data(data: dict[str, Any], ctx: ExpenseImportContext) -> tuple[Expense | None, str | None]:
     """Create an expense from import data with smart restaurant handling and duplicate detection.
 
     Args:
         data: The expense data dictionary
-        user_id: The ID of the user creating the expense
+        ctx: Import context (caches + duplicate tracking)
 
     Returns:
         Tuple of (expense, error_message)
     """
     try:
-        # Parse date - handle both string and numeric values (Excel dates)
-        date_value = data.get("date")
-        if date_value is not None and isinstance(date_value, str):
-            date_value = date_value.strip()
-        expense_date, date_error = _parse_expense_date(date_value)
-        if date_error:
-            return None, date_error
+        # Parse datetime (UTC) with restore-friendly support for full timestamps
+        expense_dt_utc, expense_date, datetime_error = _parse_expense_datetime_utc(data)
+        if datetime_error:
+            return None, datetime_error
+        if expense_dt_utc is None or expense_date is None:
+            return None, "Date is required"
 
         # Parse amount
         amount, amount_error = _parse_expense_amount(str(data.get("amount", "")).strip())
         if amount_error:
             return None, amount_error
+        if amount is None:
+            return None, "Amount is required"
+
+        # Parse optional order details
+        order_type = _parse_import_order_type(data.get("order_type"))
+        party_size, party_size_error = _parse_import_party_size(data.get("party_size"))
+        if party_size_error:
+            return None, party_size_error
 
         # Find category
-        category = _find_category_by_name(data.get("category_name", "").strip(), user_id)
+        category = _find_category_for_import(str(data.get("category_name", "") or ""), ctx)
 
         # Find or create restaurant with smart logic
-        restaurant_name = data.get("restaurant_name", "").strip()
-        restaurant_address = data.get("restaurant_address", "").strip()
-        restaurant, restaurant_warning = _find_or_create_restaurant(restaurant_name, restaurant_address, user_id)
+        restaurant_name = str(data.get("restaurant_name") or "").strip()
+        restaurant_address = str(data.get("restaurant_address") or "").strip()
+        restaurant_details = {
+            "restaurant_city": str(data.get("restaurant_city") or "").strip(),
+            "restaurant_state": str(data.get("restaurant_state") or "").strip(),
+            "restaurant_postal_code": str(data.get("restaurant_postal_code") or "").strip(),
+            "restaurant_country": str(data.get("restaurant_country") or "").strip(),
+            "restaurant_google_place_id": str(data.get("restaurant_google_place_id") or "").strip(),
+        }
+        restaurant, restaurant_warning = _find_or_create_restaurant_for_import(
+            restaurant_name,
+            restaurant_address,
+            ctx,
+            restaurant_details=restaurant_details,
+        )
 
         # If restaurant matching failed due to ambiguity, return warning
         if restaurant_warning:
             return None, restaurant_warning
 
         # Extract meal type
-        meal_type = data.get("meal_type", "").strip() or None
+        meal_type = str(data.get("meal_type") or "").strip() or None
 
-        # Check for duplicate expense
-        if amount is not None and expense_date is not None:
-            if _check_expense_duplicate(
-                user_id, restaurant.id if restaurant else None, amount, expense_date, meal_type
-            ):
-                restaurant_name_display = restaurant.name if restaurant else "Unknown"
-                return (
-                    None,
-                    f"Duplicate expense: ${amount} at {restaurant_name_display} on {expense_date} for {meal_type or 'unspecified meal'}",
-                )
+        # Check for duplicate expense (prefetched DB keys + duplicates within this import)
+        restaurant_id = restaurant.id if restaurant else None
+        db_key = (restaurant_id, amount, expense_date, meal_type)
+        if restaurant_id is not None and db_key in ctx.existing_duplicate_keys:
+            restaurant_name_display = restaurant.name if restaurant else "Unknown"
+            return (
+                None,
+                f"Duplicate expense: ${amount} at {restaurant_name_display} on {expense_date} for {meal_type or 'unspecified meal'}",
+            )
+
+        import_restaurant_identity: int | tuple[str, str] | None
+        if restaurant_id is not None:
+            import_restaurant_identity = int(restaurant_id)
+        elif restaurant and restaurant.name:
+            import_restaurant_identity = (restaurant.name, restaurant.address_line_1 or "")
+        else:
+            import_restaurant_identity = None
+
+        import_key = (import_restaurant_identity, amount, expense_date, meal_type)
+        if import_key in ctx.seen_import_keys:
+            restaurant_name_display = restaurant.name if restaurant else "Unknown"
+            return (
+                None,
+                f"Duplicate expense: ${amount} at {restaurant_name_display} on {expense_date} for {meal_type or 'unspecified meal'}",
+            )
+        ctx.seen_import_keys.add(import_key)
 
         # Create expense
         expense = Expense(
-            user_id=user_id,
-            date=expense_date,
+            user_id=ctx.user_id,
+            date=expense_dt_utc,
             amount=amount,
             meal_type=meal_type,
-            notes=data.get("notes", "").strip() or None,
-            category_id=category.id if category else None,
-            restaurant_id=restaurant.id if restaurant else None,
+            order_type=order_type,
+            party_size=party_size,
+            notes=str(data.get("notes") or "").strip() or None,
+            category=category if category else None,
             restaurant=restaurant if restaurant else None,
         )
 
@@ -1821,8 +2369,11 @@ def _import_expenses_from_reader(
     success_count = 0
     errors: list[str] = []
     info_messages: list[str] = []
-    batch_size = 50  # Process in batches to avoid memory issues
+    batch_size = int(current_app.config.get("IMPORT_BATCH_SIZE", 200))
+    batch_size = max(10, min(batch_size, 1000))  # Safety bounds
     max_summary_items = 10
+
+    import_ctx = _build_expense_import_context(user_id, data)
 
     existing_tags = {tag.name: tag for tag in Tag.query.filter_by(user_id=user_id).all()}
     created_tags: set[str] = set()
@@ -1838,7 +2389,7 @@ def _import_expenses_from_reader(
 
         normalized_tags = _normalize_import_tag_names(tag_names or [])
 
-        expense, error = _process_expense_row(row, user_id, i)
+        expense, error = _process_expense_row(row, import_ctx, i)
         if error:
             _handle_import_error(error, i, errors, info_messages)
             continue
@@ -1893,19 +2444,23 @@ def _import_expenses_from_reader(
     return success_count, errors, info_messages, import_summary
 
 
-def _process_expense_row(row: dict[str, Any], user_id: int, row_number: int) -> tuple[Expense | None, str | None]:
+def _process_expense_row(
+    row: dict[str, Any],
+    ctx: ExpenseImportContext,
+    row_number: int,
+) -> tuple[Expense | None, str | None]:
     """Process a single expense row and return expense or error.
 
     Args:
         row: The expense data dictionary
-        user_id: The ID of the user importing the expenses
+        ctx: Import context (caches + duplicate tracking)
         row_number: The row number for error reporting
 
     Returns:
         Tuple of (expense, error_message)
     """
     try:
-        return _create_expense_from_data(row, user_id)
+        return _create_expense_from_data(row, ctx)
     except Exception as e:
         return None, f"Row {row_number}: Unexpected error - {str(e)}"
 
@@ -2116,9 +2671,9 @@ def import_expenses_from_csv(file: FileStorage, user_id: int) -> tuple[bool, dic
             return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
 
         # Parse file
-        data = _parse_import_file(file)
+        data, parse_error = _parse_import_file(file)
         if data is None:
-            error_msg = "Error parsing file. Please check the file format."
+            error_msg = parse_error or "Error parsing file. Please check the file format."
             return False, {"message": error_msg, "has_errors": True, "error_details": [error_msg]}
 
         # Import expenses from the data

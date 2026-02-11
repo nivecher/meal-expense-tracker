@@ -6,7 +6,10 @@
           action="{% if is_edit %}{{ url_for('expenses.edit_expense', expense_id=expense.id) }}{% else %}{{ url_for('expenses.add_expense', restaurant_id=request.view_args.get('restaurant_id') ) if request.view_args and request.view_args.get('restaurant_id') else url_for('expenses.add_expense') }}{% endif %}"
           data-ajax
           data-validate
-          data-extension-safe="true">
+          data-extension-safe="true"
+          data-amount="{{ form.amount.data|string if form.amount.data is not none else '' }}"
+          data-party-size="{{ form.party_size.data|string if form.party_size.data is not none else '' }}"
+          x-data="expenseFormState">
         {% if form %}
             {{ form.hidden_tag() }}
         {% else %}
@@ -92,7 +95,8 @@
                     placeholder="0.00",
                     step="0.01",
                     min="0.01",
-                    value=form.amount.data|string if form.amount.data is not none else ''
+                    value=form.amount.data|string if form.amount.data is not none else '',
+                    **{'x-model': 'amount'}
                     ) }}
                 </div>
                 <div class="form-text">
@@ -117,12 +121,22 @@
             </div>
             <div class="col-md-6">
                 {{ form.party_size.label(class="form-label") }}
-                {{ form.party_size(class="form-control" + (' is-invalid' if form.party_size.errors else '') ) }}
+                {{ form.party_size(class="form-control" + (' is-invalid' if form.party_size.errors else ''),
+                **{'x-model': 'partySize'}
+                ) }}
                 {% if form.party_size.errors %}<div class="invalid-feedback">{{ form.party_size.errors[0] }}</div>{% endif %}
                 <div class="form-text">
                     <small class="text-muted">
                         <i class="fas fa-info-circle me-1"></i>
                         Number of people for this meal (optional - used to calculate price per person)
+                    </small>
+                </div>
+                <div
+                    class="form-text"
+                    x-show="shouldShowPerPerson">
+                    <small class="text-muted">
+                        <i class="fas fa-calculator me-1"></i>
+                        Estimated: $<span x-text="formattedPerPerson"></span> per person
                     </small>
                 </div>
             </div>
@@ -300,6 +314,39 @@
     <!-- Expense form handler (handles form submission via Fetch API) -->
     <script type="module"
             src="{{ url_for('static', filename='js/pages/expense-form-handler.js') }}"></script>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('expenseFormState', () => {
+                const form = document.getElementById('expenseForm');
+                const amountValue = form?.dataset.amount || '';
+                const partySizeValue = form?.dataset.partySize || '';
+                return {
+                    amount: amountValue,
+                    partySize: partySizeValue,
+                    get amountNumber() {
+                        const parsed = parseFloat(this.amount);
+                        return Number.isFinite(parsed) ? parsed : 0;
+                    },
+                    get partySizeNumber() {
+                        const parsed = parseInt(this.partySize, 10);
+                        return Number.isFinite(parsed) ? parsed : 0;
+                    },
+                    get shouldShowPerPerson() {
+                        return this.amountNumber > 0 && this.partySizeNumber > 0;
+                    },
+                    get formattedPerPerson() {
+                        if (!this.shouldShowPerPerson) return '';
+                        const perPerson = this.amountNumber / this.partySizeNumber;
+                        return new Intl.NumberFormat('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        }).format(perPerson);
+                    },
+                };
+            });
+        });
+    </script>
 
     <!-- Tom Select JS -->
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>

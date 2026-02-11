@@ -1,6 +1,23 @@
 {% from 'macros/tag_helpers.html' import tag_badge %}
-<tr>
-            <td data-sort-value="{{ expense.date.isoformat() }}">
+<tr
+    data-expense-date="{{ expense.date.isoformat() if expense.date else '' }}"
+    data-expense-month="{{ expense.date.strftime('%Y-%m') if expense.date else '' }}"
+    data-expense-month-label="{{ expense.date|format_date_user_tz('%B %Y') if expense.date else '' }}"
+    aria-selected="false">
+    <td class="text-center select-col">
+        <input
+            type="checkbox"
+            name="expense-select"
+            class="form-check-input expense-select"
+            value="{{ expense.id }}"
+            data-expense-id="{{ expense.id }}"
+            data-expense-description="{{ expense.meal_type.title() if expense.meal_type else 'Expense' }}"
+            data-expense-amount="{{ expense.amount|format_number(2) }}"
+            data-expense-date="{{ expense.date|format_date_user_tz('%b %d, %Y') }}"
+            data-view-url="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
+            data-edit-url="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}" />
+    </td>
+    <td data-sort-value="{{ expense.date.isoformat() }}">
                 <div class="date-tags-combined">
                     <div class="mb-1">
                         <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
@@ -10,6 +27,7 @@
                            data-datetime="{{ expense.date.isoformat() }}"
                            data-datetime-format="%b %d %Y"
                            data-datetime-type="date"
+                           data-datetime-tooltip="full"
                            title="{{ expense.date.isoformat() }}">{{ expense.date|format_date_user_tz("%b %d %Y") }}</a>
                     </div>
                     {% if expense.notes or expense.tags or expense.receipt_image %}
@@ -70,10 +88,14 @@
                     <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
                        class="text-decoration-none fw-medium">{{ expense.restaurant.name }}</a>
                 </div>
-                <!-- Cuisine Badge -->
-                <div>
+                <!-- Cuisine and Service Level (side by side) -->
+                <div class="d-flex gap-2 flex-wrap align-items-center">
                     {% from 'macros/badge_helpers.html' import cuisine_badge %}
                     {{ cuisine_badge(expense.restaurant.cuisine, size='sm') }}
+                    {% if expense.restaurant.service_level %}
+                        {% from 'macros/badge_helpers.html' import service_level_badge %}
+                        {{ service_level_badge(expense.restaurant.service_level, size='sm') }}
+                    {% endif %}
                 </div>
             </div>
         {% else %}
@@ -102,38 +124,10 @@
     </td>
     <td class="fw-bold text-info amount-right" data-sort-value="{{ expense.price_per_person or 0 }}">
         {% if expense.party_size and expense.party_size > 0 %}
-            ${{ "%.2f"|format(expense.price_per_person) }}
+            {{ expense.price_per_person|format_currency_usd }}
         {% else %}
             <span class="text-muted">-</span>
         {% endif %}
     </td>
-    <td class="fw-bold text-success amount-right" data-sort-value="{{ expense.amount }}">${{ "%.2f"|format(expense.amount) }}</td>
-    <td class="text-end">
-        <div class="btn-group" role="group">
-            <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
-               class="btn btn-sm btn-outline-primary"
-               data-bs-toggle="tooltip"
-               title="View Details">
-                <i class="fas fa-eye"></i>
-            </a>
-            <a href="{{ url_for('expenses.edit_expense', expense_id=expense.id) }}"
-               class="btn btn-sm btn-outline-secondary"
-               data-bs-toggle="tooltip"
-               title="Edit">
-                <i class="fas fa-edit"></i>
-            </a>
-            <button type="button"
-                    class="btn btn-sm btn-outline-danger"
-                    data-bs-toggle="modal"
-                    data-bs-target="#deleteExpenseModal"
-                    data-expense-id="{{ expense.id }}"
-                    data-expense-description="{{ expense.meal_type.title() if expense.meal_type else 'Expense' }}"
-                    data-expense-amount="{{ "%.2f"|format(expense.amount) }}"
-                    data-expense-date="{{ expense.date|format_date_user_tz('%b %d, %Y') }}"
-                    data-tooltip="true"
-                    title="Delete">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
-    </td>
+    <td class="fw-bold text-success amount-right" data-sort-value="{{ expense.amount }}">{{ expense.amount|format_currency_usd }}</td>
 </tr>

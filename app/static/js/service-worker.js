@@ -6,17 +6,16 @@
  * @author Meal Expense Tracker Team
  */
 
-const CACHE_NAME = 'meal-tracker-v3';
+const CACHE_NAME = 'meal-tracker-v4';
 const OFFLINE_URL = '/static/offline.html';
+
+const IS_DEV_HOST = ['localhost', '127.0.0.1'].includes(self.location.hostname);
 
 // Essential files to cache
 const STATIC_FILES = [
   '/',
   '/static/css/main.css',
-  '/static/js/main.js',
-  '/static/js/utils/core-utils.js',
-  '/static/js/utils/ui-utils.js',
-  '/static/js/utils/api-utils.js',
+  '/static/js/app.js',
   OFFLINE_URL,
 ];
 
@@ -58,6 +57,16 @@ function isAPIRequest(url) {
  */
 async function handleStaticAsset(request) {
   try {
+    // In development, prefer fresh assets to avoid stale UI/JS during rapid iteration.
+    if (IS_DEV_HOST) {
+      const networkResponse = await fetch(request);
+      if (networkResponse.ok) {
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(request, networkResponse.clone());
+      }
+      return networkResponse;
+    }
+
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
       return cachedResponse;
@@ -71,7 +80,7 @@ async function handleStaticAsset(request) {
     }
 
     return networkResponse;
-  } catch {
+  } catch (error) {
     console.warn('Static asset request failed:', error);
 
     // Return cached version if available
@@ -97,7 +106,7 @@ async function handleNavigation(request) {
     }
 
     return networkResponse;
-  } catch {
+  } catch (error) {
     console.warn('Navigation request failed, trying cache:', error);
 
     // Try cache first
@@ -122,7 +131,7 @@ async function handleNavigation(request) {
 async function handleAPI(request) {
   try {
     return await fetch(request);
-  } catch {
+  } catch (error) {
     console.warn('API request failed:', error);
 
     // Return a meaningful offline response
