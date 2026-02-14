@@ -749,6 +749,8 @@ class RestaurantAutocomplete {
         types: place.types || [],
         address_components: place.address_components || [],
         place_id: placeId,
+        latitude: place.latitude ?? null,
+        longitude: place.longitude ?? null,
       };
 
       return result;

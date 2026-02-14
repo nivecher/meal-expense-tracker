@@ -62,6 +62,8 @@ window.addToMyRestaurants = async function(placeId) {
       is_chain: restaurantData.is_chain ? true : false,
       rating: restaurantData.rating || '',
       notes: restaurantData.notes || '',
+      latitude: restaurantData.latitude ?? null,
+      longitude: restaurantData.longitude ?? null,
     };
 
     // Submit the form
