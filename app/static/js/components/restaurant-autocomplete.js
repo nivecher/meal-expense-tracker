@@ -289,7 +289,7 @@ class RestaurantAutocomplete {
         return {
           placeId: place.google_place_id || place.place_id || place.placeId || '',
           title: place.name || place.title || '',
-          description: place.address || place.formatted_address || place.vicinity || place.address_line_1 || '',
+          description: place.formatted_address || place.address_line_1 || '',
           distance,
           distanceMiles: distance ? this.formatDistance(distance) : null,
           // Include additional restaurant data for form population
@@ -446,7 +446,7 @@ class RestaurantAutocomplete {
         return {
           placeId: place.google_place_id || place.place_id || place.placeId || '',
           title: place.name || place.title || '',
-          description: place.address || place.formatted_address || place.vicinity || place.address_line_1 || '',
+          description: place.formatted_address || place.address_line_1 || '',
           distance,
           distanceMiles: distance ? this.formatDistance(distance) : null,
           // Include additional restaurant data for form population
@@ -522,7 +522,7 @@ class RestaurantAutocomplete {
         return {
           placeId,
           title,
-          description: place.address || place.formatted_address || place.vicinity || place.address_line_1 || '',
+          description: place.formatted_address || place.address_line_1 || '',
           distance: null, // No distance for text-only search
         };
       }).filter((s) => s.title); // Only require title for autocomplete display
@@ -744,13 +744,13 @@ class RestaurantAutocomplete {
         is_chain: place.is_chain || false,
         rating: place.rating || null,
         notes: place.notes || '',
-        // Keep the original fields for backward compatibility
-        address: place.address_line_1 || '', // Map to legacy field
         formatted_address: place.formatted_address || place.address_line_1 || '',
-        formatted_phone_number: place.phone || '',
+        located_within: place.located_within || '',
         types: place.types || [],
         address_components: place.address_components || [],
         place_id: placeId,
+        latitude: place.latitude ?? null,
+        longitude: place.longitude ?? null,
       };
 
       return result;
@@ -839,6 +839,7 @@ class RestaurantAutocomplete {
       'restaurant-description': restaurantData.description,
       'restaurant-address_line_1': restaurantData.address_line_1,
       'restaurant-address_line_2': restaurantData.address_line_2,
+      'restaurant-located_within': restaurantData.located_within,
       'restaurant-city': restaurantData.city,
       'restaurant-state': restaurantData.state,
       'restaurant-postal-code': restaurantData.postal_code,
@@ -854,12 +855,17 @@ class RestaurantAutocomplete {
       'restaurant-rating': restaurantData.rating,
       'restaurant-notes': restaurantData.notes,
 
+      // Coordinates (hidden fields, populated when selecting from Google)
+      latitude: restaurantData.latitude,
+      longitude: restaurantData.longitude,
+
       // Restaurant form field IDs (without prefix)
       name: restaurantData.name,
       type: restaurantData.type,
       description: restaurantData.description,
       address_line_1: restaurantData.address_line_1,
       address_line_2: restaurantData.address_line_2,
+      located_within: restaurantData.located_within,
       city: restaurantData.city,
       state: restaurantData.state,
       postal_code: restaurantData.postal_code,
@@ -874,6 +880,8 @@ class RestaurantAutocomplete {
       is_chain: restaurantData.is_chain,
       rating: restaurantData.rating,
       notes: restaurantData.notes,
+      latitude: restaurantData.latitude,
+      longitude: restaurantData.longitude,
     };
 
     console.log('Field mappings:', fieldMappings);
@@ -925,10 +933,20 @@ class RestaurantAutocomplete {
 
     this.input.value = restaurantData.name || '';
 
+    // Notify form that place ID was populated (enables Validate button, shows Clear/View actions)
+    const placeIdField = document.getElementById('google_place_id');
+    if (placeIdField && restaurantData.google_place_id) {
+      placeIdField.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Update coordinates display when available
+    this.updateCoordinatesDisplay(restaurantData.latitude, restaurantData.longitude);
+
+    // Update map embed when coordinates available
+    this.updateMapEmbed(restaurantData.latitude, restaurantData.longitude, restaurantData.google_place_id);
+
     // Show success message with details
-    // Escape cuisine to prevent XSS
-    const cuisineText = restaurantData.cuisine ? `(${this.safeHtmlEscape(restaurantData.cuisine)})` : '';
-    const message = `Restaurant data loaded from Google Places! ${cuisineText}`;
+    const message = 'Restaurant data loaded from Google Places!';
     this.showSuccess(message);
   }
 
@@ -984,6 +1002,39 @@ class RestaurantAutocomplete {
     this.suggestionsContainer.appendChild(container);
     this.suggestionsContainer.style.display = 'block';
     setTimeout(() => this.hideSuggestions(), 3000);
+  }
+
+  updateCoordinatesDisplay(latitude, longitude) {
+    const displayEl = document.getElementById('restaurant-coordinates-display');
+    const textEl = document.getElementById('coordinates-text');
+    if (!displayEl || !textEl) return;
+
+    if (latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined && !Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+      textEl.textContent = `${Number(latitude).toFixed(6)}°, ${Number(longitude).toFixed(6)}°`;
+      displayEl.classList.remove('d-none');
+    } else {
+      displayEl.classList.add('d-none');
+    }
+  }
+
+  updateMapEmbed(latitude, longitude, googlePlaceId) {
+    const container = document.getElementById('restaurant-map-container');
+    const iframe = document.getElementById('restaurant-map-iframe');
+    if (!container || !iframe) return;
+
+    const apiKey = container.dataset.apiKey || window.GOOGLE_MAPS_API_KEY || '';
+    if (!apiKey) return;
+
+    const hasCoords = latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined &&
+      !Number.isNaN(latitude) && !Number.isNaN(longitude);
+
+    if (hasCoords) {
+      const q = googlePlaceId ? `place_id:${googlePlaceId}` : `${Number(latitude)},${Number(longitude)}`;
+      iframe.src = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(q)}&zoom=16`;
+      container.classList.remove('d-none');
+    } else {
+      container.classList.add('d-none');
+    }
   }
 
   showSuccess(message) {

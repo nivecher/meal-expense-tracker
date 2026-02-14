@@ -63,6 +63,7 @@ GOOGLE_MAPS_MAP_ID=your-map-id-here
 
 2. **Enable Required APIs**:
    - **Maps JavaScript API**
+   - **Maps Embed API** (free, for restaurant detail map with pin)
    - **Places API** (enables restaurant search and photo access)
    - **Geocoding API**
 

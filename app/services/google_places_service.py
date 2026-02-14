@@ -19,6 +19,8 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 from flask import current_app
 import requests
 
+from app.utils.address_utils import normalize_country_to_iso2, normalize_state_to_usps
+
 logger = logging.getLogger(__name__)
 
 # Google Places API configuration
@@ -32,28 +34,46 @@ PLACES_API_BASE = "https://places.googleapis.com/v1/places"
 # FIELD TIERS (for cost tracking):
 # ESSENTIALS: id, formattedAddress, location, addressComponents (Place Details only), types (Place Details only), viewport (Place Details only)
 # PRO: displayName, primaryType, businessStatus, types (for Search), addressComponents (for Search), viewport (for Search), websiteUri, userRatingCount
-# ENTERPRISE: rating, nationalPhoneNumber
+# ENTERPRISE: rating, nationalPhoneNumber, priceLevel
 # NOTE: Some fields have different tiers depending on endpoint (Place Details vs Search)
 FIELD_MASKS = {
     # Basic mask - Essentials only (id, formattedAddress, location)
     # TIER: All Essentials
     "basic": "id,formattedAddress,location",
     # Search mask - includes Pro tier fields needed for restaurant matching
-    # TIER NOTES:
-    # - ESSENTIALS: places.id, places.formattedAddress, places.location
-    # - PRO: places.displayName, places.primaryType, places.businessStatus, places.types
+    # TIER: ESSENTIALS + PRO (places.id, formattedAddress, location, displayName, primaryType, types)
     "search": "places.id,places.formattedAddress,places.location,places.displayName,places.primaryType,places.businessStatus,places.types",
-    # Comprehensive - all fields for Place Details
-    # TIER NOTES:
-    # - ESSENTIALS: id, formattedAddress, location, addressComponents, types, viewport
-    # - PRO: displayName, primaryType, businessStatus, websiteUri, userRatingCount
-    # - ENTERPRISE: rating, nationalPhoneNumber
-    # NOTE: priceLevel field may be deprecated in new API - including it but it may not be returned
-    "comprehensive": "id,formattedAddress,location,addressComponents,displayName,primaryType,businessStatus,types,rating,nationalPhoneNumber,websiteUri,userRatingCount,viewport",
-    # CLI validation - comprehensive for validation checks
-    # TIER NOTES: Same as comprehensive above (includes all tiers for full validation)
-    "cli_validation": "id,formattedAddress,location,addressComponents,displayName,primaryType,businessStatus,types,rating,nationalPhoneNumber,websiteUri,userRatingCount,viewport",
+    # Place Details: address, name, cuisine, phone, website, priceLevel. One request per selection (no extra calls).
+    # websiteUri = Pro. nationalPhoneNumber = Enterprise. priceLevel = Enterprise (same tier, no extra cost).
+    "place_details": (
+        "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
+        "displayName,primaryType,types,websiteUri,nationalPhoneNumber,priceLevel"
+    ),
+    # Legacy comprehensive - kept for CLI/validation if needed
+    "comprehensive": (
+        "id,formattedAddress,location,addressComponents,displayName,primaryType,businessStatus,"
+        "types,rating,nationalPhoneNumber,websiteUri,userRatingCount,viewport"
+    ),
+    # Same as place_details so CLI validate gets phone, website, address, and price level
+    "cli_validation": (
+        "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
+        "displayName,primaryType,types,websiteUri,nationalPhoneNumber,priceLevel"
+    ),
 }
+
+# Unit/suite suffix patterns for splitting combined address lines (postalAddress fallback)
+_ADDRESS_LINE2_SUFFIX_RE = re.compile(r"\s+((?:#|Suite|Unit|Apt\.?|Ste\.?|Bldg\.?|RM\.?)\s*\S+)\s*$")
+
+
+def _has_address_street_or_locality(components: list[dict[str, Any]]) -> bool:
+    """Return True if addressComponents has street or locality data for parsing."""
+    street_or_locality = {"street_number", "route", "locality"}
+    for comp in components:
+        types_list = comp.get("types", [])
+        if street_or_locality & set(types_list):
+            return True
+    return False
+
 
 # Food business types for restaurant searches
 FOOD_TYPES = [
@@ -263,7 +283,7 @@ class GooglePlacesService:
 
         Args:
             place_id: Google Place ID
-            field_mask: Optional field mask string. If not provided, uses "comprehensive" mask.
+            field_mask: Optional field mask string. If not provided, uses "place_details" mask.
                        Use "cli_validation" for CLI operations to minimize costs.
 
         Returns:
@@ -272,8 +292,7 @@ class GooglePlacesService:
         if not place_id:
             return None
 
-        # Use provided field mask or default to comprehensive
-        mask = field_mask or FIELD_MASKS["comprehensive"]
+        mask = field_mask or FIELD_MASKS["place_details"]
 
         # Use field mask in cache key to avoid cache collisions
         cache_key = f"details:{place_id}:{mask}"
@@ -311,14 +330,20 @@ class GooglePlacesService:
         latitude = location.get("latitude")
         longitude = location.get("longitude")
 
-        # ESSENTIALS TIER (Place Details) / PRO TIER (Search): Parse address components
+        # Address: prefer addressComponents for proper line 1/2 split (street vs unit/suite)
+        # postalAddress often combines them in addressLines[0], e.g. "499 S State Hwy #200"
         address_components = place_data.get("addressComponents", [])
-        parsed_address = {}
-        if address_components:
+        postal_address = place_data.get("postalAddress")
+        if address_components and _has_address_street_or_locality(address_components):
             parsed_address = self.parse_address_components(address_components)
+        elif isinstance(postal_address, dict) and postal_address.get("addressLines"):
+            parsed_address = self._parse_postal_address_with_line_split(postal_address)
+        elif postal_address:
+            parsed_address = self.parse_postal_address(postal_address)
         else:
-            # Fallback to parsing formattedAddress
             parsed_address = self.parse_formatted_address(address)
+
+        located_within = self.extract_located_within(place_data)
 
         # ENTERPRISE TIER: Extract rating
         rating = place_data.get("rating")
@@ -327,14 +352,21 @@ class GooglePlacesService:
         phone = place_data.get("nationalPhoneNumber", "")
 
         # PRO TIER: Extract types and primaryType for categorization
-        types: list[str] = place_data.get("types", [])
+        # Preserve Google's order; ensure primary_type is first (it is always in types when present)
+        types: list[str] = list(place_data.get("types", []))
         primary_type = place_data.get("primaryType", "")
+        if primary_type and types:
+            types = [primary_type] + [t for t in types if t != primary_type]
 
         # PRO TIER: Extract business status
         business_status = place_data.get("businessStatus", "")
 
-        # PRO TIER: Extract website
+        # PRO TIER: Extract website (strip UTM/attribution params for canonical URL)
+        from app.utils.url_utils import strip_url_query_params
+
         website = place_data.get("websiteUri", "")
+        if website:
+            website = strip_url_query_params(website) or website
 
         # PRO TIER: Extract user rating count
         user_rating_count = place_data.get("userRatingCount")
@@ -347,7 +379,7 @@ class GooglePlacesService:
 
         return {
             "name": name,
-            "formatted_address": address,  # Keep original formatted address
+            "formatted_address": address,
             "address_line_1": parsed_address.get("address_line_1", ""),
             "address_line_2": parsed_address.get("address_line_2", ""),
             "city": parsed_address.get("city", ""),
@@ -355,7 +387,8 @@ class GooglePlacesService:
             "state_long": parsed_address.get("state_long", ""),
             "state_short": parsed_address.get("state_short", ""),
             "postal_code": parsed_address.get("postal_code", ""),
-            "country": parsed_address.get("country", ""),
+            "country": normalize_country_to_iso2(parsed_address.get("country", "")),
+            "located_within": located_within,
             "latitude": latitude,
             "longitude": longitude,
             "rating": rating,
@@ -544,8 +577,7 @@ class GooglePlacesService:
         return any(pattern in name_lower for pattern in chain_patterns)
 
     def parse_address_components(self, address_components: list[dict[str, Any]]) -> dict[str, str]:
-        """Parse Google Places address components into standardized format."""
-        # Parse components storing state separately for long/short names
+        """Parse Google Places address components (Places API New: longText/shortText)."""
         raw_components: dict[str, Any] = {
             "street_number": "",
             "route": "",
@@ -555,26 +587,36 @@ class GooglePlacesService:
         }
         state_long_name = ""
         state_short_name = ""
+        # Line 2: premise, subpremise, sublocality, floor (e.g. suite, building, airport terminal)
+        line_2_parts: list[str] = []
 
         for component in address_components:
             types = component.get("types", [])
-            long_name = component.get("longName", "")
-            short_name = component.get("shortName", "")
-            long_name_str = str(long_name) if long_name else ""
-            short_name_str = str(short_name) if short_name else ""
+            # Places API New uses longText/shortText
+            long_text = component.get("longText") or component.get("longName")
+            short_text = component.get("shortText") or component.get("shortName")
+            long_name_str = str(long_text).strip() if long_text else ""
+            short_name_str = str(short_text).strip() if short_text else ""
 
             for component_type in types:
                 if component_type == "administrative_area_level_1":
-                    # Store state names separately
                     state_long_name = long_name_str
                     state_short_name = short_name_str
                     break
-                elif component_type in raw_components:
+                if component_type in raw_components:
                     raw_components[component_type] = long_name_str
                     break
+                if component_type in (
+                    "premise",
+                    "subpremise",
+                    "sublocality",
+                    "sublocality_level_1",
+                    "floor",
+                ):
+                    if long_name_str and long_name_str not in line_2_parts:
+                        line_2_parts.append(long_name_str)
+                    break
 
-        # Convert to the expected format for restaurant forms
-        address_line_1 = ""
         street_number = raw_components.get("street_number", "")
         route = raw_components.get("route", "")
         if street_number and route:
@@ -583,17 +625,96 @@ class GooglePlacesService:
             address_line_1 = route
         elif street_number:
             address_line_1 = street_number
+        else:
+            address_line_1 = ""
+
+        address_line_2 = ", ".join(line_2_parts).strip()
 
         return {
             "address_line_1": address_line_1.strip(),
-            "address_line_2": "",  # Not typically available from Google Places
+            "address_line_2": address_line_2,
             "city": raw_components.get("locality", ""),
-            "state": state_long_name or state_short_name,  # Use long name, fallback to short
+            "state": state_short_name or state_long_name,
             "state_long": state_long_name,
             "state_short": state_short_name,
             "postal_code": raw_components.get("postal_code", ""),
             "country": raw_components.get("country", ""),
         }
+
+    def parse_postal_address(self, postal_address: dict[str, Any] | None) -> dict[str, str]:
+        """Parse postalAddress (Essentials tier) into same structure as parse_address_components."""
+        result = self._get_empty_address_result()
+        if not postal_address or not isinstance(postal_address, dict):
+            return result
+
+        address_lines = postal_address.get("addressLines", [])
+        if isinstance(address_lines, list) and len(address_lines) > 0:
+            result["address_line_1"] = str(address_lines[0]).strip() if address_lines[0] else ""
+        if isinstance(address_lines, list) and len(address_lines) > 1 and address_lines[1]:
+            result["address_line_2"] = str(address_lines[1]).strip()
+
+        locality = postal_address.get("locality")
+        if locality:
+            result["city"] = str(locality).strip()
+        administrative_area = postal_address.get("administrativeArea")
+        if administrative_area:
+            raw_state = str(administrative_area).strip()
+            state_abbr = normalize_state_to_usps(raw_state)
+            result["state"] = state_abbr
+            result["state_long"] = raw_state
+            result["state_short"] = state_abbr
+        postal_code = postal_address.get("postalCode")
+        if postal_code:
+            result["postal_code"] = str(postal_code).strip()
+        region_code = postal_address.get("regionCode")
+        if region_code:
+            result["country"] = str(region_code).strip()
+
+        return result
+
+    def _parse_postal_address_with_line_split(self, postal_address: dict[str, Any]) -> dict[str, str]:
+        """Parse postalAddress, splitting combined line 1+2 when unit/suite is at end (e.g. '499 S State Hwy #200')."""
+        result = self.parse_postal_address(postal_address)
+        line1 = result.get("address_line_1", "")
+        line2 = result.get("address_line_2", "")
+        if line1 and not line2:
+            match = _ADDRESS_LINE2_SUFFIX_RE.search(line1)
+            if match:
+                unit_part = match.group(1).strip()
+                street_part = line1[: match.start()].strip()
+                if street_part:
+                    result["address_line_1"] = street_part
+                    result["address_line_2"] = unit_part
+        return result
+
+    def extract_located_within(self, place_data: dict[str, Any]) -> str:
+        """Extract located_within from addressDescriptor or addressComponents (Essentials)."""
+        if not place_data:
+            return ""
+
+        # addressDescriptor: landmarks/areas (e.g. "inside Mall of America")
+        address_descriptor = place_data.get("addressDescriptor")
+        if isinstance(address_descriptor, dict) and address_descriptor:
+            text = address_descriptor.get("text") or address_descriptor.get("description")
+            if text and isinstance(text, str):
+                return str(text.strip())
+        if isinstance(address_descriptor, str) and address_descriptor.strip():
+            return str(address_descriptor.strip())
+
+        # Fallback: sublocality or premise from addressComponents
+        components = place_data.get("addressComponents", [])
+        if not components:
+            return ""
+
+        parts: list[str] = []
+        for component in components:
+            types = component.get("types", [])
+            if not any(t in types for t in ("sublocality", "sublocality_level_1", "premise")):
+                continue
+            long_text = component.get("longText") or component.get("longName")
+            if long_text and str(long_text).strip():
+                parts.append(str(long_text).strip())
+        return ", ".join(parts) if parts else ""
 
     def parse_formatted_address(self, formatted_address: str) -> dict[str, str]:
         """Parse a formatted address string into structured components.
@@ -627,6 +748,8 @@ class GooglePlacesService:
             "address_line_2": "",
             "city": "",
             "state": "",
+            "state_long": "",
+            "state_short": "",
             "postal_code": "",
             "country": "",
         }

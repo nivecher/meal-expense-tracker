@@ -14,7 +14,7 @@ from app.expenses.models import Category
 from app.extensions import db
 
 
-@click.group("category")
+@click.group("category", context_settings={"help_option_names": ["-h", "--help"]})
 def category_cli() -> None:
     """Category management commands."""
 

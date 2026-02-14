@@ -233,10 +233,9 @@ class Restaurant(BaseModel):
             restaurant_name = quote_plus(self.name)
             return f"https://www.google.com/maps/search/?api=1&query={restaurant_name}&query_place_id={self.google_place_id}"
 
-        # Second preference: Use coordinates if available (would need to be stored or fetched)
-        # Note: Coordinates would need to be added to the model or fetched dynamically
-        # if hasattr(self, 'latitude') and hasattr(self, 'longitude') and self.latitude and self.longitude:
-        #     return f"https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}"
+        # Second preference: Use stored coordinates (from Google Places, no extra API cost)
+        if self.latitude is not None and self.longitude is not None:
+            return f"https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}"
 
         # Third preference: Use search-based URL with detailed address
         search_query = self._build_optimized_search_query()
@@ -300,12 +299,9 @@ class Restaurant(BaseModel):
         """
         from app.utils.url_utils import strip_url_query_params
 
-        self.phone = place_data.get("formatted_phone_number", self.phone)
-        self.website = strip_url_query_params(place_data.get("website")) or self.website
-
-        # Update from international_phone_number if available
-        if not self.phone and "international_phone_number" in place_data:
-            self.phone = place_data["international_phone_number"]
+        self.phone = place_data.get("nationalPhoneNumber", self.phone) or place_data.get("phone", self.phone)
+        website_uri = place_data.get("websiteUri") or place_data.get("website")
+        self.website = strip_url_query_params(website_uri) or self.website
 
     def _update_location_data(self, place_data: dict) -> None:
         """Update geographic location data.
@@ -319,45 +315,18 @@ class Restaurant(BaseModel):
         """Update restaurant data from Google Places API response.
 
         Args:
-            place_data: Dictionary containing Google Places API response data with structure:
-                {
-                    'place_id': str,
-                    'name': str,
-                    'formatted_address': str,
-                    'address_components': List[Dict],
-                    'formatted_phone_number': str,
-                    'international_phone_number': str,
-                    'website': str,
-                    'geometry': {'location': {'lat': float, 'lng': float}},
-                    'business_status': str,
-
-                    'rating': float,
-                    'opening_hours': dict,
-                    'photos': list,
-                    'url': str
-                }
-
-        Example:
-            place_data = {
-                'place_id': 'ChIJN1t_tDeuEmsRUsoyG83frY4',
-                'name': 'Google',
-                'formatted_address': '1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA',
-                'address_components': [...],
-                'formatted_phone_number': '(650) 253-0000',
-                'website': 'https://about.google/',
-                'geometry': {'location': {'lat': 37.422, 'lng': -122.084}},
-                'business_status': 'OPERATIONAL',
-
-                'rating': 4.5
-            }
+            place_data: Dictionary containing Google Places API (New) response or our
+                mapped payload: id/google_place_id, name, formatted_address,
+                addressComponents, location (latitude/longitude), nationalPhoneNumber,
+                websiteUri, etc.
         """
         if not place_data or not isinstance(place_data, dict):
             current_app.logger.warning("Invalid place_data provided to update_from_google_places")
             return
 
         try:
-            # Update basic information
-            self.google_place_id = place_data.get("place_id", self.google_place_id)
+            # Update basic information (Places API New uses id; our mapped data uses google_place_id)
+            self.google_place_id = place_data.get("id") or place_data.get("place_id", self.google_place_id)
             self.name = place_data.get("name", self.name)
 
             # Update address components using centralized service
@@ -380,6 +349,9 @@ class Restaurant(BaseModel):
             # Update from formatted address if available and no address was set
             if "formatted_address" in place_data and not self.address_line_1:
                 self.address_line_1 = place_data["formatted_address"]
+
+            if "located_within" in place_data and place_data["located_within"]:
+                self.located_within = place_data["located_within"]
 
             # Update contact information
             self._update_contact_info(place_data)
@@ -450,39 +422,30 @@ class Restaurant(BaseModel):
     def _update_coordinates(self, place_data: dict) -> None:
         """Update coordinates from Google Places data.
 
+        Accepts both raw API format (location.latitude/longitude) and mapped format
+        (top-level latitude/longitude). No extra API calls - location is Essentials tier.
+
         Args:
-            place_data: Raw Google Places API response data
+            place_data: Google Places API response or our mapped restaurant data
         """
-        # Try legacy API geometry format first
-        if "geometry" in place_data and place_data["geometry"]:
-            self._update_coordinates_from_geometry(place_data["geometry"])
-        # Try new API location format
-        elif "location" in place_data and place_data["location"]:
+        if "location" in place_data and place_data["location"]:
             self._update_coordinates_from_location(place_data["location"])
-
-    def _update_coordinates_from_geometry(self, geometry: dict) -> None:
-        """Update coordinates from legacy API geometry format.
-
-        Args:
-            geometry: Geometry data from Google Places API
-        """
-        if "location" in geometry:
-            location = geometry["location"]
-            if "lat" in location:
-                self.latitude = location["lat"]
-            if "lng" in location:
-                self.longitude = location["lng"]
+        elif place_data.get("latitude") is not None or place_data.get("longitude") is not None:
+            loc = {"latitude": place_data.get("latitude"), "longitude": place_data.get("longitude")}
+            self._update_coordinates_from_location(loc)
 
     def _update_coordinates_from_location(self, location: dict) -> None:
-        """Update coordinates from new API location format.
+        """Update coordinates from location dict (latitude/longitude keys).
 
         Args:
-            location: Location data from Google Places API
+            location: Location data with latitude and/or longitude
         """
-        if "latitude" in location:
-            self.latitude = location["latitude"]
-        if "longitude" in location:
-            self.longitude = location["longitude"]
+        lat = location.get("latitude")
+        lng = location.get("longitude")
+        if lat is not None:
+            self.latitude = float(lat)
+        if lng is not None:
+            self.longitude = float(lng)
 
     def _update_website_fallback(self, place_data: dict) -> None:
         """Update website as fallback if not already set.
@@ -490,10 +453,11 @@ class Restaurant(BaseModel):
         Args:
             place_data: Raw Google Places API response data
         """
-        if not self.website and "website" in place_data:
+        if not self.website:
             from app.utils.url_utils import strip_url_query_params
 
-            self.website = strip_url_query_params(place_data["website"])
+            website_uri = place_data.get("websiteUri") or place_data.get("website")
+            self.website = strip_url_query_params(website_uri) or self.website
 
     def _store_raw_place_data(self, place_data: dict) -> None:
         """Store raw place data for reference.

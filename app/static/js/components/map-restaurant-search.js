@@ -688,8 +688,8 @@ export class MapRestaurantSearch {
       const distance = this.calculateDistance(
         this.currentLocation.lat,
         this.currentLocation.lng,
-        restaurant.latitude || (restaurant.geometry && restaurant.geometry.location ? restaurant.geometry.location.lat : null),
-        restaurant.longitude || (restaurant.geometry && restaurant.geometry.location ? restaurant.geometry.location.lng : null),
+        restaurant.latitude ?? null,
+        restaurant.longitude ?? null,
       );
 
       return {
@@ -811,22 +811,10 @@ export class MapRestaurantSearch {
   }
 
   createMarker(restaurant, index) {
-    // Handle both old and new Google Places API formats
-    let position = null;
-
-    if (restaurant.geometry && restaurant.geometry.location) {
-      // Old format: restaurant.geometry.location.lat/lng
-      position = {
-        lat: restaurant.geometry.location.lat,
-        lng: restaurant.geometry.location.lng,
-      };
-    } else if (restaurant.latitude && restaurant.longitude) {
-      // New format: restaurant.latitude/longitude
-      position = {
-        lat: restaurant.latitude,
-        lng: restaurant.longitude,
-      };
-    }
+    const position =
+      restaurant.latitude !== null && restaurant.longitude !== null
+        ? { lat: restaurant.latitude, lng: restaurant.longitude }
+        : null;
 
     if (!position) {
       console.warn('No location data found for restaurant:', restaurant.name);
@@ -936,8 +924,8 @@ export class MapRestaurantSearch {
     // Check opening hours
     const openingStatus = this.getOpeningStatus(restaurant.opening_hours);
 
-    // Contact information
-    const phone = restaurant.formatted_phone_number;
+    // Contact information (Places API New uses nationalPhoneNumber; we map to phone)
+    const phone = restaurant.phone ?? restaurant.nationalPhoneNumber;
     const { website } = restaurant;
 
     // Escape all user-controlled data to prevent XSS
@@ -1091,19 +1079,17 @@ export class MapRestaurantSearch {
   parseAddress(restaurant) {
     console.log('Parsing address for:', restaurant.name);
     console.log('Restaurant address data:', {
-      address: restaurant.address,
       address_line_1: restaurant.address_line_1,
       address_line_2: restaurant.address_line_2,
       city: restaurant.city,
       state: restaurant.state,
       postal_code: restaurant.postal_code,
       formatted_address: restaurant.formatted_address,
-      vicinity: restaurant.vicinity,
     });
 
     // First, try to use structured address data if available (from details API)
-    if ((restaurant.address_line_1 || restaurant.address) && restaurant.city && restaurant.state) {
-      const street = restaurant.address_line_1 || restaurant.address;
+    if (restaurant.address_line_1 && restaurant.city && restaurant.state) {
+      const street = restaurant.address_line_1;
       const cityState = restaurant.postal_code
         ? `${restaurant.city}, ${restaurant.state} ${restaurant.postal_code}`
         : `${restaurant.city}, ${restaurant.state}`;
@@ -1119,15 +1105,14 @@ export class MapRestaurantSearch {
     if (restaurant.city || restaurant.state || restaurant.postal_code) {
       console.log('Partial structured data available:', {
         address_line_1: restaurant.address_line_1,
-        address: restaurant.address,
         city: restaurant.city,
         state: restaurant.state,
         postal_code: restaurant.postal_code,
       });
     }
 
-    // Fallback to parsing formatted_address or vicinity from search results
-    const formatted = restaurant.formatted_address || restaurant.vicinity || '';
+    // Fallback to parsing formatted_address from search results
+    const formatted = restaurant.formatted_address || '';
 
     console.log('Using formatted address fallback:', formatted);
 
@@ -1307,10 +1292,13 @@ export class MapRestaurantSearch {
     }
 
     // Center map on selected restaurant
-    if (restaurant.geometry && restaurant.geometry.location) {
+    if (
+      restaurant.latitude !== null &&
+      restaurant.longitude !== null
+    ) {
       this.map.setCenter({
-        lat: restaurant.geometry.location.lat,
-        lng: restaurant.geometry.location.lng,
+        lat: restaurant.latitude,
+        lng: restaurant.longitude,
       });
       this.map.setZoom(16);
     }

@@ -46,6 +46,7 @@ FOOD_BUSINESS_TYPES = [
     "pub",
     "tea_house",
 ]
+from app.constants.restaurant_types import get_restaurant_type_form_choices_grouped
 from app.restaurants import bp, services
 from app.restaurants.exceptions import (
     DuplicateGooglePlaceIdError,
@@ -226,43 +227,34 @@ def _process_search_result_place(place: dict[str, Any], api_key: str | None) -> 
 
 
 def _enhance_place_with_details(processed_place: dict[str, Any], places_service: Any) -> dict[str, Any]:
-    """Enhance a processed place with detailed address components."""
-    place_id = processed_place.get("place_id")
+    """Enhance a processed place with detailed address and price level via extract_restaurant_data (lock-step with CLI/form)."""
+    place_id = processed_place.get("place_id") or processed_place.get("google_place_id")
     if not place_id:
         return processed_place
 
     try:
         detailed_place = places_service.get_place_details(place_id)
-        if detailed_place and detailed_place.get("addressComponents"):
-            # Debug: Log the raw address components
-            current_app.logger.info(f"Raw address components for {place_id}: {detailed_place['addressComponents']}")
+        if not detailed_place:
+            return processed_place
 
-            # Parse address components into structured format
-            address_data = places_service.parse_address_components(detailed_place["addressComponents"])
+        google_data = places_service.extract_restaurant_data(detailed_place)
+        price_level = google_data.get("price_level")
+        price_level_int = _convert_price_level_to_int(price_level) if price_level is not None else None
 
-            # Debug: Log the parsed address data
-            current_app.logger.info(f"Parsed address data for {place_id}: {address_data}")
-
-            # Add structured address data to the result
-            processed_place.update(
-                {
-                    "address_line_1": address_data.get("address_line_1", ""),
-                    "address_line_2": address_data.get("address_line_2", ""),
-                    "city": address_data.get("city", ""),
-                    "state": address_data.get("state", ""),
-                    "postal_code": address_data.get("postal_code", ""),
-                    "country": address_data.get("country", ""),
-                    "address": address_data.get("address_line_1", ""),  # Legacy field
-                }
-            )
-
-            # Debug: Log the final processed place address fields
-            current_app.logger.info(
-                f"Final processed place address fields for {place_id}: address_line_1='{processed_place.get('address_line_1')}', city='{processed_place.get('city')}', state='{processed_place.get('state')}', postal_code='{processed_place.get('postal_code')}'"
-            )
+        processed_place.update(
+            {
+                "address_line_1": google_data.get("address_line_1", ""),
+                "address_line_2": google_data.get("address_line_2", ""),
+                "city": google_data.get("city", ""),
+                "state": google_data.get("state", ""),
+                "postal_code": google_data.get("postal_code", ""),
+                "country": google_data.get("country", ""),
+                "address": google_data.get("address_line_1", ""),  # Legacy field
+                "price_level": price_level_int,
+            }
+        )
     except Exception as e:
         current_app.logger.warning(f"Failed to get detailed address for {place_id}: {e}")
-        # Continue with basic data if details fail
 
     return processed_place
 
@@ -472,32 +464,10 @@ def search_places() -> Response | tuple[Response, int]:
 
 
 def _map_google_primary_type_to_form_type(primary_type: str | None) -> str:
-    """Map Google Places API primaryType to restaurant form type choices.
+    """Map Google Places API primaryType to restaurant form type choices."""
+    from app.constants.restaurant_types import map_google_primary_type_to_form_type
 
-    Args:
-        primary_type: The primaryType from Google Places API
-
-    Returns:
-        Form type choice that matches the primaryType, defaults to 'other' for non-restaurant types
-    """
-    if not primary_type:
-        return "other"
-
-    # Check if the Google type directly maps to a form field value
-    from app.constants.restaurant_types import GOOGLE_RESTAURANT_TYPE_MAPPING
-
-    primary_type_lower = primary_type.strip().lower()
-    if primary_type_lower in GOOGLE_RESTAURANT_TYPE_MAPPING:
-        return primary_type_lower
-
-    # For unmapped types, check if it's a food establishment
-    from app.constants.restaurant_types import is_food_establishment
-
-    if is_food_establishment(primary_type):
-        return "restaurant"  # Default for food establishments
-
-    # Default to "other" for non-food establishments
-    return "other"
+    return map_google_primary_type_to_form_type(primary_type)
 
 
 def _log_place_debug_info(
@@ -536,67 +506,58 @@ def _extract_restaurant_name(place: dict[str, Any]) -> str:
 def _map_place_to_restaurant_data(place: dict[str, Any], place_id: str, places_service: Any) -> dict[str, Any]:
     """Map Google Places data to restaurant form data.
 
-    Extracts fields from all tiers (Essentials, Pro, Enterprise) with tier documentation.
+    Uses places_service.extract_restaurant_data(place) as the single source for address,
+    name, phone, website, state, country, cuisine so CLI validate, UI validate, and
+    add-from-search all see the same normalized data.
     """
     from app.utils.url_utils import strip_url_query_params
 
-    # ESSENTIALS TIER: Parse address - addressComponents is Essentials for Place Details
-    formatted_address = place.get("formattedAddress", "")
+    # Single source of truth: same extraction as CLI and API validate
+    google_data = places_service.extract_restaurant_data(place)
 
-    # Parse the formatted address into components
-    address_data = places_service.parse_formatted_address(formatted_address)
-
-    # PRO TIER: Extract displayName for restaurant name
-    restaurant_name = _extract_restaurant_name(place)
-
-    # PRO TIER: Extract priceLevel (may be deprecated in new API)
-    price_level_value = _convert_price_level_to_int(place.get("priceLevel"))
-
-    # PRO TIER: Analyze restaurant types using primaryType and types
+    # Form-only: type mapping, description, notes, service_level, is_chain, raw place extras
     analysis_result = places_service.analyze_restaurant_types(place)
-    cuisine = analysis_result.get("cuisine_type", "american")
     service_level = analysis_result.get("service_level", "casual_dining")
+    mapped_type = _map_google_primary_type_to_form_type(google_data.get("primary_type", ""))
 
-    # PRO TIER: Map primary type
-    primary_type = place.get("primaryType", "")
-    mapped_type = _map_google_primary_type_to_form_type(primary_type)
-
-    # Log debug info
-    _log_place_debug_info(place_id, place, restaurant_name, address_data, price_level_value)
+    _log_place_debug_info(
+        place_id,
+        place,
+        google_data.get("name"),
+        google_data,
+        _convert_price_level_to_int(google_data.get("price_level")),
+    )
 
     return {
-        # Basic Information
-        "name": restaurant_name,
+        # From extract_restaurant_data (lock-step with CLI/validate)
+        "name": google_data.get("name", ""),
+        "address_line_1": google_data.get("address_line_1", ""),
+        "address_line_2": google_data.get("address_line_2", ""),
+        "city": google_data.get("city", ""),
+        "state": google_data.get("state", ""),
+        "postal_code": google_data.get("postal_code", ""),
+        "country": google_data.get("country", ""),
+        "located_within": google_data.get("located_within", ""),
+        "phone": google_data.get("phone_number"),
+        "website": strip_url_query_params(google_data.get("website", "") or ""),
+        "cuisine": google_data.get("cuisine_type", "american"),
+        "rating": google_data.get("rating"),
+        "formatted_address": google_data.get("formatted_address"),
+        "types": google_data.get("types", []),
+        "primary_type": google_data.get("primary_type", ""),
+        "price_level": _convert_price_level_to_int(google_data.get("price_level")),
+        "latitude": google_data.get("latitude"),
+        "longitude": google_data.get("longitude"),
+        "user_ratings_total": google_data.get("user_rating_count"),
+        "google_place_id": google_data.get("google_place_id") or place_id,
+        # Form-only fields
         "type": mapped_type,
         "description": generate_description(place),
-        # Location Information
-        "address_line_1": address_data.get("address_line_1", ""),
-        "address_line_2": address_data.get("address_line_2", ""),
-        "city": address_data.get("city", ""),
-        "state": address_data.get("state", ""),
-        "postal_code": address_data.get("postal_code", ""),
-        "country": address_data.get("country", ""),
-        # Contact Information
-        "phone": place.get("nationalPhoneNumber"),  # ENTERPRISE TIER
-        "website": strip_url_query_params(place.get("websiteUri")),  # PRO TIER
-        "email": None,
-        "google_place_id": place_id,
-        # Business Details
-        "cuisine": cuisine,
-        "service_level": service_level,
-        "is_chain": places_service.detect_chain_restaurant(restaurant_name, place),
-        "rating": place.get("rating"),  # ENTERPRISE TIER
         "notes": generate_notes(place),
-        # Additional Google Data
-        "formatted_address": place.get("formattedAddress"),  # ESSENTIALS TIER
-        "types": place.get("types", []),  # PRO TIER
-        "primary_type": place.get("primaryType"),  # PRO TIER
-        "address_components": place.get("addressComponents", []),  # ESSENTIALS TIER (Place Details)
-        "price_level": price_level_value,  # PRO TIER: priceLevel (may be deprecated)
-        "latitude": place.get("location", {}).get("latitude"),  # ESSENTIALS TIER
-        "longitude": place.get("location", {}).get("longitude"),  # ESSENTIALS TIER
-        "user_ratings_total": place.get("userRatingCount"),  # PRO TIER
-        # Service options
+        "email": None,
+        "service_level": service_level,
+        "is_chain": places_service.detect_chain_restaurant(google_data.get("name", ""), place),
+        "address_components": place.get("addressComponents", []),
         "takeout": place.get("takeout"),
         "delivery": place.get("delivery"),
         "dine_in": place.get("dineIn"),
@@ -862,7 +823,12 @@ def add_restaurant() -> str | Response | tuple[Response, int]:
             400,
         )
 
-    return render_template("restaurants/form.html", form=form, is_edit=False)
+    return render_template(
+        "restaurants/form.html",
+        form=form,
+        is_edit=False,
+        type_choices_grouped=get_restaurant_type_form_choices_grouped(),
+    )
 
 
 @bp.route("/<int:restaurant_id>", methods=["GET", "POST"])
@@ -914,6 +880,7 @@ def restaurant_details(restaurant_id: int) -> str | Response:
                 expenses=sorted(restaurant.expenses, key=lambda x: x.date, reverse=True),
                 form=form,
                 is_edit=True,
+                type_choices_grouped=get_restaurant_type_form_choices_grouped(),
             )
 
     # Load expenses for the restaurant
@@ -928,6 +895,7 @@ def restaurant_details(restaurant_id: int) -> str | Response:
         expenses=expenses,
         expense_stats=expense_stats,
         form=RestaurantForm(obj=restaurant),
+        type_choices_grouped=get_restaurant_type_form_choices_grouped(),
     )
 
 
@@ -971,7 +939,13 @@ def edit_restaurant(restaurant_id: int) -> str | Response:
         # Pre-populate form with existing data
         form = RestaurantForm(obj=restaurant)
 
-    return render_template("restaurants/form.html", form=form, is_edit=True, restaurant=restaurant)
+    return render_template(
+        "restaurants/form.html",
+        form=form,
+        is_edit=True,
+        restaurant=restaurant,
+        type_choices_grouped=get_restaurant_type_form_choices_grouped(),
+    )
 
 
 @bp.route("/delete/<int:restaurant_id>", methods=["POST"])
@@ -1417,9 +1391,9 @@ def _prepare_restaurant_form(
         "state": data.get("state", ""),
         "postal_code": data.get("postal_code", ""),
         "country": data.get("country", ""),
-        "phone": data.get("formatted_phone_number") or data.get("phone", ""),
-        "website": strip_url_query_params(data.get("website", "")) or "",
-        "google_place_id": data.get("place_id") or data.get("google_place_id", ""),
+        "phone": data.get("nationalPhoneNumber") or data.get("phone", ""),
+        "website": strip_url_query_params(data.get("websiteUri") or data.get("website", "")) or "",
+        "google_place_id": data.get("id") or data.get("google_place_id", ""),
         "service_level": service_level,
         # Note: coordinates would be looked up dynamically from Google Places API
         "csrf_token": csrf_token,

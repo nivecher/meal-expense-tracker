@@ -413,6 +413,14 @@
                                             ><i class="fas fa-map me-1"></i>Automatic address population</li
                                         >
                                         <li class="mb-2"
+                                            ><i class="fas fa-map-pin me-1"></i>Location coordinates (lat/long) stored
+                                            and shown on View/Edit restaurant</li
+                                        >
+                                        <li class="mb-2"
+                                            ><i class="fas fa-map me-1"></i>Embedded map with pin on restaurant View,
+                                            Edit, and Add forms (Maps Embed API, free)</li
+                                        >
+                                        <li class="mb-2"
                                             ><i class="fas fa-info-circle me-1"></i>Restaurant details from Google
                                             Places</li
                                         >
@@ -440,6 +448,13 @@
                                                 and other Pro+ features are not available</li
                                             >
                                         </ul>
+                                        <p class="mb-0 mt-2 small">
+                                            <strong>Address &amp; cuisine:</strong> Addresses are filled from Google's
+                                            structured address components (street, city, state, postal code) for
+                                            accuracy. Cuisine and service level are inferred from the place name and
+                                            type when you add a restaurant from Google Places; you can edit them in the
+                                            form.
+                                        </p>
                                     </div>
 
                                     <h6><i class="fas fa-edit me-2"></i>Managing Restaurants</h6>
@@ -569,104 +584,24 @@
 
                             <!-- Restaurant Types -->
                             <div class="help-section">
-                                <h5><i class="fas fa-utensils me-2"></i>Restaurant Types (29 Available)</h5>
+                                <h5><i class="fas fa-utensils me-2"></i>Restaurant Types</h5>
                                 <p class="text-muted"
-                                    >Categorize restaurants by their primary business type for better organization:</p
+                                    >The Type picklist includes all Google Places API food and drink establishment
+                                    types. The top 10 popular options (Restaurant, Cafe, Bar, Bakery, Fast Food
+                                    Restaurant, Pizza Restaurant, Coffee Shop, Mexican Restaurant, Chinese Restaurant,
+                                    Italian Restaurant) appear at the top for quick selection. The remaining types are
+                                    listed alphabetically.</p
                                 >
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <ul class="list-unstyled">
-                                            <li class="mb-2"
-                                                ><strong>🍽️ Restaurant:</strong> General dining establishments</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>☕ Cafe:</strong> Coffee shops and casual cafes</li
-                                            >
-                                            <li class="mb-2"><strong>🍺 Bar:</strong> Bars and pubs serving alcohol</li>
-                                            <li class="mb-2"><strong>🥖 Bakery:</strong> Bakeries and pastry shops</li>
-                                            <li class="mb-2"
-                                                ><strong>🍰 Dessert Shop:</strong> Specialty dessert and sweet shops</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🍨 Ice Cream Shop:</strong> Ice cream and frozen dessert
-                                                shops</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🥪 Deli:</strong> Delicatessens and sandwich shops</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🏪 Food Court:</strong> Mall food courts and food halls</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🥡 Takeaway:</strong> Takeout and pickup-only
-                                                establishments</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🚚 Delivery Service:</strong> Food delivery services</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🍔 Fast Food Restaurant:</strong> Quick-service fast food
-                                                chains</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🥩 Fine Dining Restaurant:</strong> Upscale dining
-                                                establishments</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🥩 Steak House:</strong> Steak and grill restaurants</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🦞 Seafood Restaurant:</strong> Seafood and fish
-                                                restaurants</li
-                                            >
-                                        </ul>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <ul class="list-unstyled">
-                                            <li class="mb-2"
-                                                ><strong>🍕 Pizza Restaurant:</strong> Pizza-focused restaurants</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🍣 Sushi Restaurant:</strong> Sushi and Japanese
-                                                restaurants</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🥞 Breakfast Restaurant:</strong> Breakfast and brunch
-                                                spots</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>☕ Coffee Shop:</strong> Specialty coffee shops</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🥖 Sandwich Shop:</strong> Sandwich and sub shops</li
-                                            >
-                                            <li class="mb-2"><strong>🍩 Donut Shop:</strong> Donut and pastry shops</li>
-                                            <li class="mb-2"
-                                                ><strong>🥤 Juice Shop:</strong> Juice and smoothie bars</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🍷 Wine Bar:</strong> Wine bars and wine-focused venues</li
-                                            >
-                                            <li class="mb-2"><strong>🍻 Pub:</strong> Traditional pubs and taverns</li>
-                                            <li class="mb-2"
-                                                ><strong>☕ Tea House:</strong> Tea houses and tea rooms</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🏪 Convenience Store:</strong> Convenience stores and corner
-                                                shops</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>🛒 Grocery Store:</strong> Grocery stores and supermarkets</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>⛽ Gas Station:</strong> Gas stations with food service</li
-                                            >
-                                            <li class="mb-2"
-                                                ><strong>❓ Other:</strong> Other food service establishments</li
-                                            >
-                                        </ul>
-                                    </div>
-                                </div>
+                                <p class="text-muted"
+                                    >Examples: Restaurant, Cafe, Bar, Bakery, Fast Food Restaurant, Pizza Restaurant,
+                                    Coffee Shop, Mexican Restaurant, Chinese Restaurant, Italian Restaurant, Japanese
+                                    Restaurant, Thai Restaurant, Indian Restaurant, Sandwich Shop, Breakfast Restaurant,
+                                    Ice Cream Shop, Deli, Dessert Shop, Steak House, Seafood Restaurant, Sushi
+                                    Restaurant, Food Court, Takeaway, Delivery, Fine Dining, Pub, Wine Bar, Donut Shop,
+                                    Juice Shop, Tea House, Convenience Store, Grocery Store, Supermarket, Gas Station,
+                                    and many more cuisine-specific types (e.g., Vietnamese Restaurant, Ramen Restaurant,
+                                    Vegan Restaurant).</p
+                                >
                                 <div class="alert alert-primary mt-3">
                                     <strong>Auto-detection:</strong> Restaurant types are automatically detected from
                                     Google Places data when searching for restaurants. Non-restaurant food
@@ -933,8 +868,10 @@
 
                                     <h6>Q: How accurate is the Google Maps integration?</h6>
                                     <p
-                                        >Very accurate! We use Google Places API to provide real restaurant data
-                                        including names, addresses, and locations.</p
+                                        >We use Google Places API to provide real restaurant data. Addresses are parsed
+                                        from structured address components for accuracy. Cuisine and service level are
+                                        auto-detected from the place name and type; you can correct them when adding or
+                                        editing a restaurant.</p
                                     >
 
                                     <h6>Q: How do custom tags work?</h6>
