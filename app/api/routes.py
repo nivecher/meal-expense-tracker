@@ -11,6 +11,13 @@ from app.categories import services as category_services
 from app.expenses import services as expense_services
 from app.restaurants import services as restaurant_services
 from app.restaurants.models import Restaurant
+from app.utils.address_utils import (
+    compare_addresses_semantic,
+    normalize_country_to_iso2,
+    normalize_state_to_usps,
+)
+from app.utils.phone_utils import normalize_phone_for_comparison
+from app.utils.url_utils import normalize_website_for_comparison
 
 from . import bp, validate_api_csrf
 from .schemas import CategorySchema, ExpenseSchema, RestaurantSchema
@@ -533,6 +540,12 @@ def _check_restaurant_mismatches_api(
     # Check state mismatch
     _check_state_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
 
+    # Check website, phone, cuisine, type
+    _check_website_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
+    _check_phone_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
+    _check_cuisine_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
+    _check_type_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
+
     return mismatches, fixes_to_apply
 
 
@@ -567,10 +580,19 @@ def _check_state_mismatch_api(
     google_state_short = validation_result.get("google_state_short")
     current_state = current_data.get("state")
 
-    if not ((google_state or google_state_long or google_state_short) and current_state):
+    if not (google_state or google_state_long or google_state_short):
         return
 
-    # Ensure current_state is a string before calling functions
+    # Stored is empty but Google has state - suggest fix (same as city/postal_code)
+    if not current_state or not str(current_state).strip():
+        google_display = google_state_long or google_state or google_state_short
+        mismatches.append(f"State: 'N/A' vs Google: '{google_display}'")
+        two_letter = validation_result.get("google_state_short") or normalize_state_to_usps(
+            validation_result.get("google_state") or validation_result.get("google_state_long") or ""
+        )
+        fixes_to_apply["state"] = two_letter or google_state_long or google_state or google_state_short
+        return
+
     if not isinstance(current_state, str):
         return
 
@@ -592,12 +614,18 @@ def _check_state_mismatch_api(
     ):
         return
 
-    # If no matches found, report mismatch
+    # If no matches found, report mismatch; suggest USPS 2-letter state for fix
     google_display = google_state_long or google_state or google_state_short or "Unknown"
     mismatches.append(f"State: '{current_state}' vs Google: '{google_display}'")
-    state_fix = google_state_long or google_state or google_state_short
-    if state_fix and isinstance(state_fix, str):
-        fixes_to_apply["state"] = state_fix
+    two_letter = validation_result.get("google_state_short") or normalize_state_to_usps(
+        validation_result.get("google_state") or validation_result.get("google_state_long") or ""
+    )
+    if two_letter:
+        fixes_to_apply["state"] = two_letter
+    else:
+        state_fix = google_state_long or google_state or google_state_short
+        if state_fix and isinstance(state_fix, str):
+            fixes_to_apply["state"] = state_fix
 
 
 def _check_address_mismatches_api(
@@ -606,23 +634,55 @@ def _check_address_mismatches_api(
     mismatches: list[str],
     fixes_to_apply: dict[str, str],
 ) -> None:
-    """Check for address field mismatches."""
-    address_fields = [
+    """Check for address field mismatches (semantic for address lines, normalized for country)."""
+    # Address lines: semantic comparison
+    for google_field, current_field, display_name in [
         ("google_address_line_1", "address_line_1", "Address Line 1"),
         ("google_address_line_2", "address_line_2", "Address Line 2"),
-        ("google_city", "city", "City"),
-        ("google_state", "state", "State"),
-        ("google_postal_code", "postal_code", "Postal Code"),
-        ("google_country", "country", "Country"),
-    ]
-
-    for google_field, current_field, display_name in address_fields:
+    ]:
         google_value = validation_result.get(google_field)
         current_value = current_data.get(current_field)
-
-        if google_value and current_value and google_value.lower() != current_value.lower():
+        if not google_value and not current_value:
+            continue
+        if not google_value:
+            continue
+        is_match, _ = compare_addresses_semantic(current_value or "", google_value or "")
+        if is_match:
+            continue
+        if current_value:
             mismatches.append(f"{display_name}: '{current_value}' vs Google: '{google_value}'")
             fixes_to_apply[current_field] = google_value
+        else:
+            mismatches.append(f"{display_name}: '{current_value or 'N/A'}' vs Google: '{google_value}'")
+            fixes_to_apply[current_field] = google_value
+
+    # City and postal code: suggest Google value when stored is empty
+    for google_field, current_field, display_name in [
+        ("google_city", "city", "City"),
+        ("google_postal_code", "postal_code", "Postal Code"),
+    ]:
+        google_value = validation_result.get(google_field)
+        current_value = current_data.get(current_field)
+        if not google_value:
+            continue
+        if not current_value:
+            mismatches.append(f"{display_name}: 'N/A' vs Google: '{google_value}'")
+            fixes_to_apply[current_field] = google_value
+        elif google_value.lower() != current_value.lower():
+            mismatches.append(f"{display_name}: '{current_value}' vs Google: '{google_value}'")
+            fixes_to_apply[current_field] = google_value
+
+    # Country: normalize to ISO 2-letter for comparison and fix (state handled by _check_state_mismatch_api)
+    google_country = validation_result.get("google_country")
+    current_country = current_data.get("country")
+    norm_google = normalize_country_to_iso2(google_country or "")
+    norm_current = normalize_country_to_iso2(current_country or "")
+    if norm_google and norm_current and norm_google != norm_current:
+        mismatches.append(f"Country: '{current_country}' vs Google: '{google_country}'")
+        fixes_to_apply["country"] = norm_google
+    elif norm_google and not norm_current:
+        mismatches.append(f"Country: 'N/A' vs Google: '{google_country}'")
+        fixes_to_apply["country"] = norm_google
 
 
 def _check_service_level_mismatch_api(
@@ -645,6 +705,74 @@ def _check_service_level_mismatch_api(
             mismatches.append(mismatch_message)
             if suggested_fix:
                 fixes_to_apply["service_level"] = suggested_fix
+
+
+def _check_website_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
+    """Check for website mismatches (normalized: strip params, trailing slash)."""
+    google_website = validation_result.get("google_website")
+    if google_website is None:
+        return
+    current_website = current_data.get("website")
+    norm_current = normalize_website_for_comparison(current_website)
+    norm_google = normalize_website_for_comparison(google_website)
+    if norm_google and norm_current != norm_google:
+        mismatches.append(f"Website: '{current_website or 'Not set'}' vs Google: '{google_website}'")
+        fixes_to_apply["website"] = google_website
+
+
+def _check_phone_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
+    """Check for phone mismatches (normalized: digits-only comparison)."""
+    google_phone = validation_result.get("google_phone")
+    if google_phone is None:
+        return
+    current_phone = current_data.get("phone")
+    norm_current = normalize_phone_for_comparison(current_phone)
+    norm_google = normalize_phone_for_comparison(google_phone)
+    if norm_google and norm_current != norm_google:
+        mismatches.append(f"Phone: '{current_phone or 'Not set'}' vs Google: '{google_phone}'")
+        fixes_to_apply["phone"] = google_phone
+
+
+def _check_cuisine_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
+    """Check for cuisine mismatches (case-insensitive)."""
+    google_cuisine = validation_result.get("google_cuisine")
+    if google_cuisine is None:
+        return
+    current_cuisine = current_data.get("cuisine")
+    if not current_cuisine or current_cuisine.strip().lower() != google_cuisine.strip().lower():
+        mismatches.append(f"Cuisine: '{current_cuisine or 'Not set'}' vs Google: '{google_cuisine}'")
+        fixes_to_apply["cuisine"] = google_cuisine
+
+
+def _check_type_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
+    """Check for type mismatches (direct comparison with Google primary_type)."""
+    google_primary_type = validation_result.get("primary_type")
+    if google_primary_type is None:
+        return
+    current_type = current_data.get("type")
+    if current_type != google_primary_type:
+        mismatches.append(f"Type: '{current_type or 'Not set'}' vs Google: '{google_primary_type}'")
+        fixes_to_apply["type"] = google_primary_type
 
 
 def _apply_restaurant_fixes_api(restaurant: Restaurant, fixes_to_apply: dict[str, str]) -> bool:
@@ -674,6 +802,10 @@ def _apply_restaurant_field_fixes_api(restaurant: Restaurant, fixes_to_apply: di
         "postal_code": "postal_code",
         "country": "country",
         "service_level": "service_level",
+        "website": "website",
+        "phone": "phone",
+        "cuisine": "cuisine",
+        "type": "type",
     }
 
     for fix_key, restaurant_field in field_mapping.items():

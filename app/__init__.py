@@ -298,6 +298,9 @@ def _initialize_components(app: Flask) -> None:
 
 def _initialize_admin_and_cli(app: Flask) -> None:
     """Initialize admin module and CLI commands."""
+    # Enable -h as alias for --help on all CLI commands
+    app.cli.context_settings["help_option_names"] = ["-h", "--help"]
+
     # Initialize admin module if available
     try:
         from . import admin

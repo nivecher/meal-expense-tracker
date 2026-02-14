@@ -10,6 +10,7 @@ from app.auth.models import User
 from app.restaurants.cli import (
     _apply_restaurant_fixes,
     _check_restaurant_mismatches,
+    _display_address_comparison,
     _display_google_info,
     _display_summary,
     _display_user_restaurants,
@@ -520,6 +521,38 @@ class TestRestaurantCLI:
         assert restaurants == []
         assert counts["total_restaurants"] == 0
 
+    def test_check_restaurant_mismatches_sections_address_only(self, mock_restaurant) -> None:
+        """Test that --address option only checks address fields."""
+        validation_result = {
+            "google_name": "Different Name",
+            "google_address_line_1": "456 Different St",
+            "google_service_level": None,
+        }
+        sections = frozenset({"address"})
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result, sections=sections)
+        # Name mismatch should be skipped (not in sections)
+        assert not any("Name" in m for m in mismatches)
+        # Address mismatch should be reported
+        assert any("Address Line 1" in m for m in mismatches)
+        assert fixes["address_line_1"] == "456 Different St"
+
+    def test_check_restaurant_mismatches_sections_type_only(self, mock_restaurant) -> None:
+        """Test that --type option only checks type field."""
+        mock_restaurant.type = "cafe"
+        validation_result = {
+            "google_name": "Different Name",
+            "primary_type": "restaurant",
+        }
+        sections = frozenset({"type"})
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result, sections=sections)
+        # Name mismatch should be skipped
+        assert not any("Name" in m for m in mismatches)
+        # Type mismatch should be reported
+        assert any("Type" in m for m in mismatches)
+        assert fixes["type"] == "restaurant"
+
     def test_check_restaurant_mismatches_name(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for name."""
         validation_result = {
@@ -545,6 +578,104 @@ class TestRestaurantCLI:
         assert len(mismatches) == 1
         assert "Address Line 1: '123 Main St' vs Google: '456 Different St'" in mismatches[0]
         assert fixes["address_line_1"] == "456 Different St"
+
+    def test_check_restaurant_mismatches_address_semantic_match(self, mock_restaurant) -> None:
+        """Semantically same address (South State Highway vs S State Hwy) should not mismatch."""
+        mock_restaurant.address_line_1 = "400 South State Highway 78"
+        validation_result = {
+            "google_name": "Test Restaurant",
+            "google_address_line_1": "400 S State Hwy 78",
+            "google_service_level": None,
+        }
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        address_mismatches = [m for m in mismatches if "Address Line 1" in m]
+        assert len(address_mismatches) == 0
+        assert "address_line_1" not in fixes
+
+    def test_display_address_comparison_field_by_field(self, mock_restaurant, capsys) -> None:
+        """Address comparison shows separate Address Line 1, Address Line 2 with field-level comparison."""
+        mock_restaurant.address_line_1 = "123 Main St"
+        mock_restaurant.address_line_2 = "#200"
+        mock_restaurant.city = "Wylie"
+        mock_restaurant.state = "TX"
+        mock_restaurant.postal_code = "75098"
+        mock_restaurant.country = "US"
+        validation_result = {
+            "google_address_line_1": "456 Different St",
+            "google_address_line_2": "#300",
+            "google_city": "Garland",
+            "google_state": "TX",
+            "google_postal_code": "75040",
+            "google_country": "US",
+        }
+        _display_address_comparison(mock_restaurant, validation_result)
+        captured = capsys.readouterr()
+        assert "Address Comparison (by field)" in captured.out
+        assert "Address Line 1:" in captured.out
+        assert "Address Line 2:" in captured.out
+        assert "City:" in captured.out
+        assert "Stored:" in captured.out
+        assert "Google:" in captured.out
+
+    def test_display_address_comparison_quiet_only_mismatches(self, mock_restaurant, capsys) -> None:
+        """In quiet mode, only show address fields that differ."""
+        mock_restaurant.address_line_1 = "123 Main St"
+        mock_restaurant.address_line_2 = "#200"
+        mock_restaurant.city = "Wylie"
+        mock_restaurant.state = "TX"
+        mock_restaurant.postal_code = "75098"
+        mock_restaurant.country = "US"
+        validation_result = {
+            "google_address_line_1": "456 Different St",
+            "google_address_line_2": "#200",
+            "google_city": "Wylie",
+            "google_state": "TX",
+            "google_postal_code": "75040",
+            "google_country": "US",
+        }
+        _display_address_comparison(mock_restaurant, validation_result, quiet=True)
+        captured = capsys.readouterr()
+        assert "Address Comparison (by field)" in captured.out
+        assert "Address Line 1:" in captured.out
+        assert "456 Different St" in captured.out
+        assert "Postal Code:" in captured.out
+        assert "75040" in captured.out
+        # Matching fields should not appear in quiet mode
+        assert "Address Line 2:" not in captured.out
+        assert "City:" not in captured.out
+        assert "State:" not in captured.out
+        assert "Country:" not in captured.out
+
+    def test_check_restaurant_mismatches_country_normalized(self, mock_restaurant) -> None:
+        """USA vs US should not mismatch (normalized to US)."""
+        mock_restaurant.country = "USA"
+        validation_result = {
+            "google_name": "Test Restaurant",
+            "google_country": "US",
+            "google_service_level": None,
+        }
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        country_mismatches = [m for m in mismatches if "Country" in m]
+        assert len(country_mismatches) == 0
+        assert "country" not in fixes
+
+    def test_check_restaurant_mismatches_state_tx_vs_texas(self, mock_restaurant) -> None:
+        """State TX vs Google Texas should not mismatch (us.states match)."""
+        mock_restaurant.state = "TX"
+        validation_result = {
+            "google_name": "Test Restaurant",
+            "google_state": "Texas",
+            "google_state_long": "Texas",
+            "google_state_short": "",
+            "google_service_level": None,
+        }
+
+        mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
+        state_mismatches = [m for m in mismatches if "State" in m]
+        assert len(state_mismatches) == 0
+        assert "state" not in fixes
 
     def test_check_restaurant_mismatches_service_level(self, mock_restaurant) -> None:
         """Test checking restaurant mismatches for service level."""
@@ -950,6 +1081,56 @@ class TestRestaurantCLI:
         status, fixed = _process_restaurant_validation(mock_restaurant, False, False)
         assert status == "error"
         assert fixed is False
+
+    @patch("app.restaurants.cli._validate_restaurant_with_google")
+    def test_process_restaurant_validation_show_mismatches_only_suppresses_valid(
+        self, mock_validate, mock_restaurant, capsys
+    ) -> None:
+        """Test show_mismatches_only suppresses output when valid with no mismatches."""
+        mock_validate.return_value = {
+            "valid": True,
+            "google_name": "Test Restaurant",
+            "google_service_level": None,
+            "errors": [],
+        }
+
+        with patch("app.restaurants.cli._check_restaurant_mismatches") as mock_check:
+            mock_check.return_value = ([], {})
+
+            status, fixed = _process_restaurant_validation(mock_restaurant, False, False, show_mismatches_only=True)
+            assert status == "valid"
+            assert fixed is False
+
+            captured = capsys.readouterr()
+            assert "Test Restaurant" not in captured.out
+            assert "Valid" not in captured.out
+
+    @patch("app.restaurants.cli._validate_restaurant_with_google")
+    def test_process_restaurant_validation_quiet_with_mismatches(self, mock_validate, mock_restaurant, capsys) -> None:
+        """Test quiet mode shows mismatches when present."""
+        mock_validate.return_value = {
+            "valid": True,
+            "google_name": "Different Name",
+            "google_service_level": None,
+            "errors": [],
+        }
+
+        with patch("app.restaurants.cli._check_restaurant_mismatches") as mock_check:
+            with patch("app.restaurants.cli._display_address_comparison"):
+                with patch("app.restaurants.cli._display_google_info"):
+                    mock_check.return_value = (
+                        ["Name: 'Test Restaurant' vs Google: 'Different Name'"],
+                        {"name": "Different Name"},
+                    )
+
+                    status, fixed = _process_restaurant_validation(mock_restaurant, False, False, quiet=True)
+                    assert status == "valid"
+                    assert fixed is False
+
+                    captured = capsys.readouterr()
+                    assert "Test Restaurant" in captured.out
+                    assert "Has mismatches" in captured.out
+                    assert "Different Name" in captured.out
 
     def test_handle_service_level_updates_disabled(self) -> None:
         """Test handling service level updates when disabled."""

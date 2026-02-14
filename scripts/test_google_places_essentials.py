@@ -57,8 +57,8 @@ def parse_address_components(address_data: dict) -> dict[str, str]:
     if address_components:
         for component in address_components:
             types = component.get("types", [])
-            long_name = component.get("longName", "")
-            short_name = component.get("shortName", "")
+            long_name = component.get("longText", "") or component.get("longName", "")
+            short_name = component.get("shortText", "") or component.get("shortName", "")
 
             if "street_number" in types:
                 parsed["street_number"] = long_name or ""

@@ -374,7 +374,7 @@ class TestDetectServiceLevelFromGooglePlaces:
         result = detect_service_level_from_google_places(place_data_fast_food)
         assert result == ServiceLevel.QUICK_SERVICE
 
-        # Test with fast_food_restaurant type
+        # Test with fast_food_restaurant type (no known fast casual name)
         place_data_fast_food_restaurant = {
             "priceLevel": 1,
             "types": ["fast_food_restaurant", "meal_takeaway"],
@@ -382,6 +382,52 @@ class TestDetectServiceLevelFromGooglePlaces:
         }
         result = detect_service_level_from_google_places(place_data_fast_food_restaurant)
         assert result == ServiceLevel.QUICK_SERVICE
+
+    def test_detect_service_level_from_google_places_cafe_fast_casual_shop_types_quick_service(
+        self,
+    ) -> None:
+        """Cafe classifies as fast casual; store/shop types (sandwich_shop, bakery) as quick service."""
+        place_data_cafe = {"types": ["cafe", "restaurant"], "displayName": {"text": "Local Coffee Spot"}}
+        result = detect_service_level_from_google_places(place_data_cafe)
+        assert result == ServiceLevel.FAST_CASUAL
+
+        place_data_sandwich = {"types": ["sandwich_shop", "restaurant"], "displayName": {"text": "Sub Place"}}
+        result = detect_service_level_from_google_places(place_data_sandwich)
+        assert result == ServiceLevel.QUICK_SERVICE
+
+        place_data_bakery = {"primaryType": "bakery", "types": ["bakery", "restaurant"]}
+        result = detect_service_level_from_google_places(place_data_bakery)
+        assert result == ServiceLevel.QUICK_SERVICE
+
+    def test_detect_service_level_from_google_places_primary_overrides_secondary_types(
+        self,
+    ) -> None:
+        """Secondary types like meal_takeaway must not override primary (e.g. Olive Garden)."""
+        # Sit-down Italian with takeout - should be casual, not quick_service
+        place_data = {
+            "primaryType": "italian_restaurant",
+            "types": ["italian_restaurant", "meal_takeaway", "restaurant"],
+        }
+        result = detect_service_level_from_google_places(place_data)
+        assert result == ServiceLevel.CASUAL_DINING
+
+        # Sit-down Tex-Mex with takeout - should be casual, not quick_service
+        place_data_texmex = {
+            "primaryType": "restaurant",
+            "types": ["restaurant", "tex_mex_restaurant", "meal_takeaway"],
+        }
+        result = detect_service_level_from_google_places(place_data_texmex)
+        assert result == ServiceLevel.CASUAL_DINING
+
+    def test_detect_service_level_from_google_places_primary_type_only(self) -> None:
+        """primaryType alone (without types array) should be used for classification."""
+        place_data = {"primaryType": "fast_casual_restaurant"}
+        result = detect_service_level_from_google_places(place_data)
+        assert result == ServiceLevel.FAST_CASUAL
+
+        place_data_restaurant = {"primaryType": "mexican_restaurant"}
+        result = detect_service_level_from_google_places(place_data_restaurant)
+        assert result == ServiceLevel.CASUAL_DINING
 
     def test_detect_service_level_from_google_places_unknown(self) -> None:
         """Test detection when service level cannot be determined."""

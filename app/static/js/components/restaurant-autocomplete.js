@@ -289,7 +289,7 @@ class RestaurantAutocomplete {
         return {
           placeId: place.google_place_id || place.place_id || place.placeId || '',
           title: place.name || place.title || '',
-          description: place.address || place.formatted_address || place.vicinity || place.address_line_1 || '',
+          description: place.formatted_address || place.address_line_1 || '',
           distance,
           distanceMiles: distance ? this.formatDistance(distance) : null,
           // Include additional restaurant data for form population
@@ -446,7 +446,7 @@ class RestaurantAutocomplete {
         return {
           placeId: place.google_place_id || place.place_id || place.placeId || '',
           title: place.name || place.title || '',
-          description: place.address || place.formatted_address || place.vicinity || place.address_line_1 || '',
+          description: place.formatted_address || place.address_line_1 || '',
           distance,
           distanceMiles: distance ? this.formatDistance(distance) : null,
           // Include additional restaurant data for form population
@@ -522,7 +522,7 @@ class RestaurantAutocomplete {
         return {
           placeId,
           title,
-          description: place.address || place.formatted_address || place.vicinity || place.address_line_1 || '',
+          description: place.formatted_address || place.address_line_1 || '',
           distance: null, // No distance for text-only search
         };
       }).filter((s) => s.title); // Only require title for autocomplete display
@@ -744,10 +744,8 @@ class RestaurantAutocomplete {
         is_chain: place.is_chain || false,
         rating: place.rating || null,
         notes: place.notes || '',
-        // Keep the original fields for backward compatibility
-        address: place.address_line_1 || '', // Map to legacy field
         formatted_address: place.formatted_address || place.address_line_1 || '',
-        formatted_phone_number: place.phone || '',
+        located_within: place.located_within || '',
         types: place.types || [],
         address_components: place.address_components || [],
         place_id: placeId,
@@ -839,6 +837,7 @@ class RestaurantAutocomplete {
       'restaurant-description': restaurantData.description,
       'restaurant-address_line_1': restaurantData.address_line_1,
       'restaurant-address_line_2': restaurantData.address_line_2,
+      'restaurant-located_within': restaurantData.located_within,
       'restaurant-city': restaurantData.city,
       'restaurant-state': restaurantData.state,
       'restaurant-postal-code': restaurantData.postal_code,
@@ -860,6 +859,7 @@ class RestaurantAutocomplete {
       description: restaurantData.description,
       address_line_1: restaurantData.address_line_1,
       address_line_2: restaurantData.address_line_2,
+      located_within: restaurantData.located_within,
       city: restaurantData.city,
       state: restaurantData.state,
       postal_code: restaurantData.postal_code,

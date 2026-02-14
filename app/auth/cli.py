@@ -11,7 +11,7 @@ from app.auth.models import User
 from app.extensions import db
 
 
-@click.group("user")
+@click.group("user", context_settings={"help_option_names": ["-h", "--help"]})
 def user_cli() -> None:
     """User management commands."""
 

@@ -198,6 +198,21 @@ def is_food_establishment(primary_type: str) -> bool:
     return primary_type in get_food_establishment_types()
 
 
+def map_google_primary_type_to_form_type(primary_type: str | None) -> str:
+    """Map Google Places primaryType to restaurant form type choice value.
+
+    Returns form field value (e.g. 'cafe', 'restaurant', 'other') for comparison.
+    """
+    if not primary_type or not isinstance(primary_type, str):
+        return "other"
+    primary_type_lower = primary_type.strip().lower()
+    if primary_type_lower in GOOGLE_RESTAURANT_TYPE_MAPPING:
+        return primary_type_lower
+    if is_food_establishment(primary_type):
+        return "restaurant"
+    return "other"
+
+
 def map_google_primary_type_to_display_type(primary_type: str) -> str:
     """Map Google Places primary type to display type, defaulting to 'Other' for non-restaurant types."""
     if not primary_type:
