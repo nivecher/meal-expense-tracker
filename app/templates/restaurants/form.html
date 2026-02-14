@@ -35,78 +35,134 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <!-- Search for Restaurant Section -->
-                        <div class="form-section">
-                            <div class="section-header">
-                                <h5>
-                                    <i class="fas fa-search me-2 text-primary"></i>Search for Restaurant
-                                </h5>
-                            </div>
-                            <div class="alert alert-info mb-3 alert-dismissible" id="location-search-tip">
-                                <i class="fas fa-info-circle me-2"></i>
-                                <strong>Smart location search:</strong> We'll use your location with dynamic search radius -
-                                chains (25 mi), fine dining (50 mi), specific restaurants (20 mi).
-                                Results are ordered by distance (nearest first) with distance shown.
-                                If no nearby results, we'll search wider automatically.
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" id="dismiss-tip-btn"></button>
-                            </div>
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <label for="restaurant-search" class="form-label">Restaurant Search</label>
-                                    <input type="text"
-                                           class="form-control"
-                                           id="restaurant-search"
-                                           data-restaurant-autocomplete
-                                           placeholder="Search restaurants (e.g., McDonald's or McDonald's Dallas, TX)..."
-                                           autocomplete="off">
-                                    <div id="restaurant-suggestions" class="mt-2"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr class="section-divider">
                         <form method="post"
                               action="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) if is_edit and restaurant else url_for('restaurants.add_restaurant') }}"
                               enctype="multipart/form-data"
                               novalidate
                               id="restaurantForm">
                             {{ form.hidden_tag() }}
-                            <!-- Hidden fields for Google Places data -->
-                            <input type="hidden"
-                                   id="google_place_id"
-                                   name="google_place_id"
-                                   value="{{ form.google_place_id.data or '' }}">
-                            <!-- Coordinates removed - would be looked up dynamically from Google Places API -->
-                            <!-- Restaurant Information Section -->
+                            {{ form.latitude() }}
+                            {{ form.longitude() }}
+                            <!-- Search for Restaurant Section -->
                             <div class="form-section">
                                 <div class="section-header">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h5>
-                                            <i class="fas fa-info-circle me-2 text-primary"></i>Restaurant Information
-                                        </h5>
-                                        <div class="d-flex gap-2">
+                                    <h5>
+                                        <i class="fas fa-search me-2 text-primary"></i>Search for Restaurant
+                                    </h5>
+                                </div>
+                                <div class="alert alert-info mb-3 alert-dismissible" id="location-search-tip">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Smart location search:</strong> We'll use your location with dynamic search radius -
+                                    chains (25 mi), fine dining (50 mi), specific restaurants (20 mi).
+                                    Results are ordered by distance (nearest first) with distance shown.
+                                    If no nearby results, we'll search wider automatically.
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" id="dismiss-tip-btn"></button>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label for="restaurant-search" class="form-label">Restaurant Search</label>
+                                        <input type="text"
+                                               class="form-control"
+                                               id="restaurant-search"
+                                               data-restaurant-autocomplete
+                                               placeholder="Search restaurants (e.g., McDonald's or McDonald's Dallas, TX)..."
+                                               autocomplete="off">
+                                        <div id="restaurant-suggestions" class="mt-2"></div>
+                                    </div>
+                                    <div class="col-12 mt-3">
+                                        <label for="google_place_id" class="form-label">Google Place ID</label>
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <input type="text"
+                                                   id="google_place_id"
+                                                   name="google_place_id"
+                                                   class="form-control bg-light google-place-id-selectable flex-grow-1"
+                                                   value="{{ form.google_place_id.data or '' }}"
+                                                   readonly
+                                                   placeholder="Search for a restaurant above to get a Google Place ID"
+                                                   aria-describedby="google-place-id-help">
                                             <button type="button"
-                                                    class="btn btn-outline-primary btn-sm"
+                                                    class="btn btn-outline-primary flex-shrink-0"
                                                     id="validate-restaurant-btn"
                                                     data-action="validate-restaurant"
                                                     data-restaurant-id="{{ restaurant.id if restaurant else '' }}"
                                                     title="Validate restaurant information with Google Places"
                                                     aria-label="Validate restaurant information"
-                                                    disabled>
+                                                    {% if not form.google_place_id.data %}disabled{% endif %}>
                                                 <i class="fas fa-check-circle me-1"></i> Validate
                                             </button>
-                                            <div id="validation-status" class="d-none">
-                                                <span class="badge bg-success" id="validation-status-good">
-                                                    <i class="fas fa-check-circle me-1"></i>Valid
-                                                </span>
-                                                <span class="badge bg-warning text-dark d-none" id="validation-status-warnings">
-                                                    <i class="fas fa-exclamation-triangle me-1"></i>Issues Found
-                                                </span>
-                                                <span class="badge bg-danger d-none" id="validation-status-errors">
-                                                    <i class="fas fa-exclamation-circle me-1"></i>Errors
-                                                </span>
+                                        </div>
+                                        <div class="form-text" id="google-place-id-help">Selectable for copying (read-only). Used for Google Maps integration.</div>
+                                        <div id="restaurant-coordinates-display" class="mt-2 small text-muted {% if not (form.latitude.data and form.longitude.data) %}d-none{% endif %}">
+                                            <i class="fas fa-map-pin me-1"></i>
+                                            <span id="coordinates-text">{% if form.latitude.data and form.longitude.data %}{{ "%.6f"|format(form.latitude.data) }}°, {{ "%.6f"|format(form.longitude.data) }}°{% endif %}</span>
+                                        </div>
+                                        <div id="restaurant-map-container" class="mt-2 {% if not (form.latitude.data and form.longitude.data and config.GOOGLE_MAPS_API_KEY) %}d-none{% endif %}" data-api-key="{{ config.GOOGLE_MAPS_API_KEY or '' }}">
+                                            <h6 class="text-muted mb-2 small">Map</h6>
+                                            <iframe
+                                                id="restaurant-map-iframe"
+                                                width="100%"
+                                                height="250"
+                                                style="border:0; border-radius: 4px;"
+                                                loading="lazy"
+                                                allowfullscreen
+                                                referrerpolicy="no-referrer-when-downgrade"
+                                                src="{% if form.latitude.data and form.longitude.data and config.GOOGLE_MAPS_API_KEY %}https://www.google.com/maps/embed/v1/place?key={{ config.GOOGLE_MAPS_API_KEY }}&q={% if form.google_place_id.data %}place_id:{{ form.google_place_id.data }}{% else %}{{ form.latitude.data }},{{ form.longitude.data }}{% endif %}&zoom=16{% endif %}"
+                                                title="Restaurant location">
+                                            </iframe>
+                                        </div>
+                                        <div id="google-place-id-actions"
+                                             class="mt-2 d-flex justify-content-end gap-2 {% if not form.google_place_id.data %}d-none{% endif %}">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-warning"
+                                                    data-action="clear-place-id"
+                                                    title="Clear Google Place ID">
+                                                <i class="fas fa-times me-1"></i> Clear Place ID
+                                            </button>
+                                            <a id="view-on-google-maps-link"
+                                               href="{% if form.google_place_id.data %}https://www.google.com/maps/place/?q=place_id:{{ form.google_place_id.data }}{% else %}#{% endif %}"
+                                               class="btn btn-sm btn-outline-primary"
+                                               target="_blank"
+                                               rel="noopener noreferrer">
+                                                <i class="fas fa-map-marker-alt me-1"></i> View on Google Maps
+                                            </a>
+                                        </div>
+                                        <div id="restaurant-reconciliation-panel" class="mt-3 d-none">
+                                            <div class="card border-warning">
+                                                <div class="card-header bg-warning text-dark">
+                                                    <i class="fas fa-exclamation-triangle me-2"></i>Google Places Comparison
+                                                </div>
+                                                <div class="card-body">
+                                                    <p class="card-text">
+                                                        <small>Compare your form data with Google Places. Apply individual changes or all at once:</small>
+                                                    </p>
+                                                    <div id="restaurant-reconciliation-results"></div>
+                                                    <div class="mt-3">
+                                                        <button type="button" class="btn btn-sm btn-success" id="restaurant-apply-all-btn">
+                                                            <i class="fas fa-check-double me-1"></i>Apply All
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-secondary" id="restaurant-dismiss-reconciliation-btn">
+                                                            <i class="fas fa-times me-1"></i>Dismiss
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="section-divider">
+
+                            <!-- Restaurant Information Section -->
+                            <div class="form-section">
+                                <div class="section-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-info-circle me-2 text-primary"></i>Restaurant Information
+                                    </h5>
+                                    <div class="section-validation-status d-none">
+                                        <span class="badge bg-success validation-badge-good"><i class="fas fa-check-circle me-1"></i>Valid</span>
+                                        <span class="badge bg-warning text-dark d-none validation-badge-warnings"><i class="fas fa-exclamation-triangle me-1"></i>Issues Found</span>
+                                        <span class="badge bg-danger d-none validation-badge-errors"><i class="fas fa-exclamation-circle me-1"></i>Errors</span>
                                     </div>
                                 </div>
                                 <div class="row g-3">
@@ -126,31 +182,22 @@
                                                      data_field="name") }}
                                         {% for error in form.name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
-                                    <div class="col-md-3">
+                                    <div class="col-md-6">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <label for="type" class="form-label mb-0">Type</label>
-                                            <div class="validation-indicator" id="type-validation-indicator"></div>
+                                            <div class="validation-indicator" id="type-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                            </div>
                                         </div>
-                                        {{ form.type(class_="form-select" + (" is-invalid" if form.type.errors else "") ) }}
+                                        {% from "macros/form_helpers.html" import render_restaurant_type_select %}
+                                            {{ render_restaurant_type_select(form.type, type_choices_grouped, class_="form-select") }}
                                         {% for error in form.type.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label">&nbsp;</label>
-                                        <div class="form-check form-switch">
-                                            {{ form.is_chain(class_="form-check-input" + (" is-invalid" if form.is_chain.errors else "") ) }}
-                                            <label for="is_chain" class="form-check-label">Is Chain?</label>
-                                            {% for error in form.is_chain.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                        </div>
                                     </div>
                                 </div>
                                 <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="located_within" class="form-label">Location Within</label>
-                                        {{ form.located_within(class_="form-control" + (" is-invalid" if form.located_within.errors else ""),
-                                                               placeholder="e.g., mall, airport, hotel",
-                                                               autocomplete="off") }}
-                                        {% for error in form.located_within.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                    </div>
                                     <div class="col-md-6">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <label for="cuisine" class="form-label">Cuisine</label>
@@ -195,12 +242,28 @@
                                         {% for error in form.price_level.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                     </div>
                                 </div>
-                                <div class="row g-3">
-                                    <div class="col-md-3">
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-4">
                                         <label for="rating" class="form-label">Your Rating</label>
                                         {{ form.rating(class_="form-control" + (" is-invalid" if form.rating.errors else "") ) }}
                                         {% for error in form.rating.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         <div class="validation-indicator" id="rating-validation-indicator"></div>
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-8">
+                                        <label for="located_within" class="form-label">Located Within</label>
+                                        {{ form.located_within(class_="form-control" + (" is-invalid" if form.located_within.errors else ""),
+                                                               placeholder="e.g., mall, airport, hotel",
+                                                               autocomplete="off") }}
+                                        {% for error in form.located_within.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end pb-1">
+                                        <div class="form-check form-switch w-100">
+                                            {{ form.is_chain(class_="form-check-input" + (" is-invalid" if form.is_chain.errors else "") ) }}
+                                            <label for="is_chain" class="form-check-label">Is Chain?</label>
+                                            {% for error in form.is_chain.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="row g-3">
@@ -218,10 +281,15 @@
 
                             <!-- Contact Information Section -->
                             <div class="form-section">
-                                <div class="section-header">
-                                    <h5>
+                                <div class="section-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
                                         <i class="fas fa-address-card me-2 text-primary"></i>Contact Information
                                     </h5>
+                                    <div class="section-validation-status d-none">
+                                        <span class="badge bg-success validation-badge-good"><i class="fas fa-check-circle me-1"></i>Valid</span>
+                                        <span class="badge bg-warning text-dark d-none validation-badge-warnings"><i class="fas fa-exclamation-triangle me-1"></i>Issues Found</span>
+                                        <span class="badge bg-danger d-none validation-badge-errors"><i class="fas fa-exclamation-circle me-1"></i>Errors</span>
+                                    </div>
                                 </div>
                                 <!-- Address Fields -->
                                 <div class="row g-3">
@@ -229,10 +297,10 @@
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label for="address_line_1" class="form-label">Address Line 1</label>
                                                 <div class="validation-indicator" id="address_line_1-validation-indicator">
-                                                    <small class="text-muted">
-                                                        <i class="fas fa-question-circle text-secondary"></i>
-                                                        Not validated
-                                                    </small>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
                                                 </div>
                                             </div>
                                             {{ form.address_line_1(class_="form-control" + (" is-invalid" if form.address_line_1.errors else ""),
@@ -244,58 +312,98 @@
                                             {% for error in form.address_line_1.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
                                         <div class="col-md-4">
-                                            <label for="address_line_2" class="form-label">Address Line 2</label>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label for="address_line_2" class="form-label">Address Line 2</label>
+                                                <div class="validation-indicator" id="address_line_2-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                                </div>
+                                            </div>
                                             {{ form.address_line_2(class_="form-control" + (" is-invalid" if form.address_line_2.errors else ""),
                                                                    id="address_line_2",
                                                                    placeholder="Apt, suite, unit, etc.",
-                                                                   autocomplete="address-line2") }}
+                                                                   autocomplete="address-line2",
+                                                                   data_field="address_line_2") }}
                                             {% for error in form.address_line_2.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            <div class="validation-indicator" id="address_line_2-validation-indicator"></div>
                                         </div>
                                         <div id="address-suggestions" class="mt-2"></div>
                                         <div id="address-valid-indicator" class="mt-2 small"></div>
                                         <div class="col-md-6">
-                                            <label for="city" class="form-label">City</label>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label for="city" class="form-label">City</label>
+                                                <div class="validation-indicator" id="city-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                                </div>
+                                            </div>
                                             {{ form.city(class_="form-control" + (" is-invalid" if form.city.errors else ""),
                                                          id="city",
                                                          placeholder="City",
-                                                         autocomplete="address-level2") }}
+                                                         autocomplete="address-level2",
+                                                         data_field="city") }}
                                             {% for error in form.city.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            <div class="validation-indicator" id="city-validation-indicator"></div>
                                         </div>
                                         <div class="col-md-3">
-                                            <label for="state" class="form-label">State/Province</label>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label for="state" class="form-label">State/Province</label>
+                                                <div class="validation-indicator" id="state-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                                </div>
+                                            </div>
                                             {{ form.state(class_="form-select" + (" is-invalid" if form.state.errors else ""),
-                                                          id="state") }}
+                                                          id="state",
+                                                          data_field="state") }}
                                             {% for error in form.state.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            <div class="validation-indicator" id="state-validation-indicator"></div>
                                         </div>
                                         <div class="col-md-3">
-                                            <label for="postal_code" class="form-label">Postal Code</label>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label for="postal_code" class="form-label">Postal Code</label>
+                                                <div class="validation-indicator" id="postal_code-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                                </div>
+                                            </div>
                                             {{ form.postal_code(class_="form-control" + (" is-invalid" if form.postal_code.errors else ""),
                                                                 id="postal_code",
                                                                 placeholder="Postal code",
-                                                                autocomplete="postal-code") }}
+                                                                autocomplete="postal-code",
+                                                                data_field="postal_code") }}
                                             {% for error in form.postal_code.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            <div class="validation-indicator" id="postal_code-validation-indicator"></div>
                                         </div>
                                         <div class="col-md-6">
-                                            <label for="country" class="form-label">Country</label>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <label for="country" class="form-label">Country</label>
+                                                <div class="validation-indicator" id="country-validation-indicator">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
+                                                </div>
+                                            </div>
                                             {{ form.country(class_="form-control" + (" is-invalid" if form.country.errors else ""),
                                                              id="country",
                                                              placeholder="Country",
-                                                             autocomplete="country") }}
+                                                             autocomplete="country",
+                                                             data_field="country") }}
                                             {% for error in form.country.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                                            <div class="validation-indicator" id="country-validation-indicator"></div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label for="phone" class="form-label">Phone Number</label>
                                                 <div class="validation-indicator" id="phone-validation-indicator">
-                                                    <small class="text-muted">
-                                                        <i class="fas fa-question-circle text-secondary"></i>
-                                                        Not validated
-                                                    </small>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
                                                 </div>
                                             </div>
                                             {{ form.phone(class_="form-control" + (" is-invalid" if form.phone.errors else ""),
@@ -308,10 +416,10 @@
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <label for="website" class="form-label">Website</label>
                                                 <div class="validation-indicator" id="website-validation-indicator">
-                                                    <small class="text-muted">
-                                                        <i class="fas fa-question-circle text-secondary"></i>
-                                                        Not validated
-                                                    </small>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-question-circle text-secondary"></i>
+                                                    Not validated
+                                                </small>
                                                 </div>
                                             </div>
                                             <div class="input-group">
@@ -333,51 +441,15 @@
                                             </div>
                                             {% for error in form.website.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
                                         </div>
-                                        {% if form.google_place_id.data %}
-                                            <div class="col-12 mt-3">
-                                                <label class="form-label">Google Place ID</label>
-                                                <div class="input-group">
-                                                    <input type="text"
-                                                           id="google_place_id_display"
-                                                           name="google_place_id_display"
-                                                           class="form-control bg-light"
-                                                           value="{{ form.google_place_id.data }}"
-                                                           readonly
-                                                           aria-describedby="google-place-id-help">
-                                                    <button class="btn btn-outline-secondary"
-                                                            type="button"
-                                                            data-action="copy-to-clipboard"
-                                                            data-text="{{ form.google_place_id.data }}"
-                                                            data-bs-toggle="tooltip"
-                                                            title="Copy to clipboard">
-                                                        <i class="fas fa-copy"></i>
-                                                    </button>
-                                                </div>
-                                                <div class="form-text">Used for Google Maps integration (read-only)</div>
-                                            </div>
-                                            <div class="col-12 mt-2 d-flex justify-content-end gap-2">
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-warning"
-                                                        data-action="clear-place-id"
-                                                        title="Clear Google Place ID">
-                                                    <i class="fas fa-times me-1"></i> Clear Place ID
-                                                </button>
-                                                <a href="https://www.google.com/maps/place/?q=place_id:{{ form.google_place_id.data }}"
-                                                   class="btn btn-sm btn-outline-primary">
-                                                    <i class="fas fa-map-marker-alt me-1"></i> View on Google Maps
-                                                </a>
-                                            </div>
-                                        {% endif %}
                                     </div>
-                                <!-- </div> -->
                             </div>
 
                             <hr class="section-divider">
 
-                            <!-- Additional Information Section -->
+                            <!-- Additional Information Section (no Google-sourced fields, no validation badge) -->
                             <div class="form-section">
                                 <div class="section-header">
-                                    <h5>
+                                    <h5 class="mb-0">
                                         <i class="fas fa-sticky-note me-2 text-primary"></i>Additional Information
                                     </h5>
                                 </div>
@@ -432,5 +504,5 @@
     <!-- Restaurant form module removed - using simplified autocomplete instead -->
 
     <!-- Restaurant form functionality -->
-    <script type="module" src="{{ url_for('static', filename='js/pages/restaurant-form.js') }}?v=2.0"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/restaurant-form.js') }}?v=2.4"></script>
 {% endblock scripts %}

@@ -20,6 +20,7 @@ from wtforms.validators import (
 )
 
 from app.constants.cuisines import get_cuisine_names
+from app.constants.restaurant_types import get_restaurant_type_form_choices
 
 
 def validate_service_level(form: Any, field: Any) -> None:
@@ -41,34 +42,7 @@ class RestaurantForm(FlaskForm):
     name = StringField("Restaurant Name", validators=[DataRequired(), Length(max=100)])
     type = SelectField(
         "Type",
-        choices=[
-            # Core Restaurant Types (most common)
-            ("restaurant", "Restaurant"),
-            ("cafe", "Cafe"),
-            ("bar", "Bar"),
-            ("bakery", "Bakery"),
-            ("fast_food_restaurant", "Fast Food"),
-            ("pizza_restaurant", "Pizza Restaurant"),
-            ("coffee_shop", "Coffee Shop"),
-            ("ice_cream_shop", "Ice Cream Shop"),
-            ("deli", "Deli"),
-            # Specialty Dining
-            ("steak_house", "Steak House"),
-            ("seafood_restaurant", "Seafood Restaurant"),
-            ("sushi_restaurant", "Sushi Restaurant"),
-            ("breakfast_restaurant", "Breakfast Restaurant"),
-            ("dessert_shop", "Dessert Shop"),
-            ("food_court", "Food Court"),
-            # Quick Service & Delivery
-            ("meal_takeaway", "Takeaway"),
-            ("meal_delivery", "Delivery"),
-            ("sandwich_shop", "Sandwich Shop"),
-            # Non-Restaurant Food Establishments
-            ("convenience_store", "Convenience Store"),
-            ("grocery_store", "Grocery Store"),
-            # Other (catch-all for unmapped types)
-            ("other", "Other"),
-        ],
+        choices=get_restaurant_type_form_choices(),
         validators=[DataRequired()],
     )
     located_within = StringField("Location Within", validators=[Optional(), Length(max=100)])
@@ -87,6 +61,16 @@ class RestaurantForm(FlaskForm):
 
     # Google Places Integration
     google_place_id = StringField("Google Place ID", validators=[Optional(), Length(max=255)])
+    latitude = FloatField(
+        "Latitude",
+        validators=[Optional()],
+        render_kw={"type": "hidden", "id": "latitude", "step": "any"},
+    )
+    longitude = FloatField(
+        "Longitude",
+        validators=[Optional()],
+        render_kw={"type": "hidden", "id": "longitude", "step": "any"},
+    )
 
     # Additional Information
     cuisine = SelectField(

@@ -351,19 +351,25 @@ def validate_restaurant() -> Response | tuple[Response, int]:
         if validation_error:
             return validation_error
 
-        # Get and validate restaurant
+        data = request.get_json()
+        restaurant_id = data.get("restaurant_id")
+        google_place_id = data.get("google_place_id", "").strip()
+
+        # Get restaurant and place_id (edit flow) or use place_id only (add flow)
         restaurant, place_id_to_use = _get_and_validate_restaurant()
-        if not restaurant:
+        if place_id_to_use is None:
+            # Add flow: use place_id from request directly
+            if google_place_id:
+                place_id_to_use = google_place_id
+            else:
+                return _create_api_response(message="Place ID is required", status="error", code=400)
+        elif not restaurant and restaurant_id:
             return _create_api_response(message="Restaurant not found", status="error", code=404)
 
-        # Validate with Google Places API
-        if place_id_to_use is None:
-            return _create_api_response(message="Place ID is required", status="error", code=400)
         validation_result = _validate_restaurant_with_google_api(place_id_to_use)
         if not validation_result.get("valid"):
             return _create_api_response(data=validation_result, message="Validation failed", status="error", code=400)
 
-        # Process validation results
         return _process_validation_results(restaurant, validation_result)
 
     except Exception as e:
@@ -378,8 +384,11 @@ def _validate_restaurant_input() -> tuple[Response, int] | None:
         return _create_api_response(message="JSON data required", status="error", code=400)
 
     restaurant_id = data.get("restaurant_id")
-    if not restaurant_id:
-        return _create_api_response(message="Restaurant ID is required", status="error", code=400)
+    google_place_id = data.get("google_place_id", "").strip()
+
+    # Either restaurant_id (edit) or google_place_id (add) is required
+    if not restaurant_id and not google_place_id:
+        return _create_api_response(message="Restaurant ID or Google Place ID is required", status="error", code=400)
 
     form_data = data.get("form_data")
     if not form_data:
@@ -389,22 +398,23 @@ def _validate_restaurant_input() -> tuple[Response, int] | None:
 
 
 def _get_and_validate_restaurant() -> tuple[Restaurant | None, str | None]:
-    """Get restaurant and validate user permissions."""
+    """Get restaurant and validate user permissions. Returns (restaurant, place_id)."""
     data = request.get_json()
     restaurant_id = data.get("restaurant_id")
     google_place_id = data.get("google_place_id", "").strip()
 
-    restaurant = Restaurant.query.get(restaurant_id)
+    # Add flow: no restaurant_id, use place_id from request
+    if not restaurant_id:
+        return None, google_place_id if google_place_id else None
 
+    restaurant = Restaurant.query.get(restaurant_id)
     if not restaurant:
         return None, None
 
-    # Check if user owns this restaurant
     user = _get_current_user()
     if restaurant.user_id != user.id:
         return None, None
 
-    # Use the restaurant's Google Place ID or the one provided
     place_id_to_use = google_place_id or restaurant.google_place_id
     if not place_id_to_use:
         return None, None
@@ -412,20 +422,17 @@ def _get_and_validate_restaurant() -> tuple[Restaurant | None, str | None]:
     return restaurant, place_id_to_use
 
 
-def _process_validation_results(restaurant: Any, validation_result: dict[str, Any]) -> tuple[Response, int]:
+def _process_validation_results(restaurant: Any | None, validation_result: dict[str, Any]) -> tuple[Response, int]:
     """Process validation results and return response."""
     data = request.get_json()
     form_data = data.get("form_data")
     fix_mismatches = data.get("fix_mismatches", False)
 
-    # Use form data for comparison
     current_data = form_data
-
-    # Check for mismatches
     mismatches, fixes_to_apply = _check_restaurant_mismatches_api(current_data, validation_result)
 
-    # Apply fixes if requested
-    if fix_mismatches and fixes_to_apply:
+    # Apply fixes only when we have a restaurant (edit flow)
+    if fix_mismatches and fixes_to_apply and restaurant:
         _apply_restaurant_fixes_api(restaurant, fixes_to_apply)
 
     # Prepare Google data in the same format for comparison
@@ -508,6 +515,7 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
             "primary_type": google_data.get("primary_type"),
             "google_phone": google_data.get("phone_number"),
             "google_website": google_data.get("website"),
+            "google_cuisine": google_data.get("cuisine_type"),
             "google_price_level": google_data.get("price_level"),
             "google_street_address": google_data.get("street_address"),  # Legacy field
             "google_service_level": places_service.detect_service_level_from_data(place),
@@ -540,11 +548,13 @@ def _check_restaurant_mismatches_api(
     # Check state mismatch
     _check_state_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
 
-    # Check website, phone, cuisine, type
+    # Check website, phone, cuisine, type, price level
     _check_website_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
     _check_phone_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
     _check_cuisine_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
     _check_type_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
+    _check_price_level_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
+    _check_rating_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
 
     return mismatches, fixes_to_apply
 
@@ -775,6 +785,83 @@ def _check_type_mismatch_api(
         fixes_to_apply["type"] = google_primary_type
 
 
+def _check_price_level_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
+    """Check for price level mismatches (normalize to int 0-4 for comparison)."""
+    google_price_level = validation_result.get("google_price_level")
+    if google_price_level is None:
+        return
+
+    from app.services.google_places_service import get_google_places_service
+
+    places_service = get_google_places_service()
+    google_price_level_int = places_service.convert_price_level_to_int(google_price_level)
+
+    current_raw = current_data.get("price_level")
+    current_int = None
+    if current_raw is not None and current_raw != "":
+        try:
+            current_int = int(current_raw) if isinstance(current_raw, (int, float)) else int(str(current_raw), 10)
+        except (ValueError, TypeError):
+            pass
+
+    if current_int != google_price_level_int:
+        current_display = _format_price_level_display_api(current_int)
+        google_display = _format_price_level_display_api(google_price_level_int)
+        mismatches.append(f"Price Level: '{current_display}' vs Google: '{google_display}'")
+        fixes_to_apply["price_level"] = str(google_price_level_int)
+
+
+def _check_rating_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
+    """Check for rating mismatches (user's rating vs Google's aggregate rating)."""
+    google_rating = validation_result.get("google_rating")
+    if google_rating is None:
+        return
+
+    current_raw = current_data.get("rating")
+    current_rating = None
+    if current_raw is not None and current_raw != "":
+        try:
+            current_rating = float(current_raw) if isinstance(current_raw, (int, float)) else float(str(current_raw))
+        except (ValueError, TypeError):
+            pass
+
+    try:
+        google_float = float(google_rating)
+    except (ValueError, TypeError):
+        return
+
+    if current_rating is not None and abs(current_rating - google_float) > 0.05:
+        mismatches.append(f"Rating: Your {current_rating:.1f} vs Google {google_float:.1f}")
+        fixes_to_apply["rating"] = str(google_float)
+    elif current_rating is None and google_float is not None:
+        mismatches.append(f"Rating: Not set vs Google {google_float:.1f}")
+        fixes_to_apply["rating"] = str(google_float)
+
+
+def _format_price_level_display_api(price_level: int | None) -> str:
+    """Format price level for display in mismatch messages."""
+    if price_level is None:
+        return "Not set"
+    mapping = {
+        0: "Free",
+        1: "$ (Budget)",
+        2: "$$ (Moderate)",
+        3: "$$$ (Expensive)",
+        4: "$$$$ (Very Expensive)",
+    }
+    return mapping.get(price_level, str(price_level))
+
+
 def _apply_restaurant_fixes_api(restaurant: Restaurant, fixes_to_apply: dict[str, str]) -> bool:
     """Apply fixes to restaurant data and return success status."""
     try:
@@ -806,11 +893,24 @@ def _apply_restaurant_field_fixes_api(restaurant: Restaurant, fixes_to_apply: di
         "phone": "phone",
         "cuisine": "cuisine",
         "type": "type",
+        "price_level": "price_level",
+        "rating": "rating",
     }
 
     for fix_key, restaurant_field in field_mapping.items():
         if fix_key in fixes_to_apply:
-            setattr(restaurant, restaurant_field, fixes_to_apply[fix_key])
+            value = fixes_to_apply[fix_key]
+            if restaurant_field == "rating" and value is not None:
+                try:
+                    value = float(value) if isinstance(value, (int, float)) else float(str(value))
+                except (ValueError, TypeError):
+                    value = None
+            elif restaurant_field == "price_level" and value is not None:
+                try:
+                    value = int(value, 10) if isinstance(value, str) else int(value)
+                except (ValueError, TypeError):
+                    value = None
+            setattr(restaurant, restaurant_field, value)
 
 
 # Receipt OCR endpoint

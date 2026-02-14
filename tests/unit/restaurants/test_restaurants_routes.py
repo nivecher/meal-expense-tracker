@@ -509,8 +509,8 @@ class TestRestaurantsRoutes:
             service_level, confidence = service.detect_service_level_from_data(place_data)
             assert service_level == "quick_service"
 
-    def test_analyze_restaurant_types_fast_food_primary_type_casual_dining(self, app) -> None:
-        """Test that fast_food_restaurant as primary type is classified as casual dining (simplified logic)."""
+    def test_analyze_restaurant_types_fast_food_primary_type_quick_service(self, app) -> None:
+        """Test that fast_food_restaurant as primary type is classified as quick_service."""
         place_data = {"primaryType": "fast_food_restaurant", "priceLevel": "PRICE_LEVEL_MODERATE"}
 
         with app.app_context():
@@ -518,11 +518,10 @@ class TestRestaurantsRoutes:
 
             service = GooglePlacesService(api_key="test_key")
 
-            # Test the detection logic directly
+            # Test the detection logic directly - fast_food_restaurant is always quick_service
             service_level, confidence = service.detect_service_level_from_data(place_data)
-            # Service may return unknown if data is insufficient, or casual_dining with simplified logic
-            assert service_level in ["casual_dining", "unknown"]
-            assert confidence >= 0.0  # Should have some confidence (may be lower with simplified logic)
+            assert service_level == "quick_service"
+            assert confidence >= 0.0
 
     def test_format_primary_type_for_display(self, app) -> None:
         """Test formatting primary types for display."""

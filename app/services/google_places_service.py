@@ -34,7 +34,7 @@ PLACES_API_BASE = "https://places.googleapis.com/v1/places"
 # FIELD TIERS (for cost tracking):
 # ESSENTIALS: id, formattedAddress, location, addressComponents (Place Details only), types (Place Details only), viewport (Place Details only)
 # PRO: displayName, primaryType, businessStatus, types (for Search), addressComponents (for Search), viewport (for Search), websiteUri, userRatingCount
-# ENTERPRISE: rating, nationalPhoneNumber
+# ENTERPRISE: rating, nationalPhoneNumber, priceLevel
 # NOTE: Some fields have different tiers depending on endpoint (Place Details vs Search)
 FIELD_MASKS = {
     # Basic mask - Essentials only (id, formattedAddress, location)
@@ -43,21 +43,21 @@ FIELD_MASKS = {
     # Search mask - includes Pro tier fields needed for restaurant matching
     # TIER: ESSENTIALS + PRO (places.id, formattedAddress, location, displayName, primaryType, types)
     "search": "places.id,places.formattedAddress,places.location,places.displayName,places.primaryType,places.businessStatus,places.types",
-    # Place Details: address, name, cuisine, phone, website. One request per selection (no extra calls).
-    # websiteUri = Pro (same tier as displayName). nationalPhoneNumber = Enterprise (request bills at Enterprise).
+    # Place Details: address, name, cuisine, phone, website, priceLevel. One request per selection (no extra calls).
+    # websiteUri = Pro. nationalPhoneNumber = Enterprise. priceLevel = Enterprise (same tier, no extra cost).
     "place_details": (
         "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
-        "displayName,primaryType,types,websiteUri,nationalPhoneNumber"
+        "displayName,primaryType,types,websiteUri,nationalPhoneNumber,priceLevel"
     ),
     # Legacy comprehensive - kept for CLI/validation if needed
     "comprehensive": (
         "id,formattedAddress,location,addressComponents,displayName,primaryType,businessStatus,"
         "types,rating,nationalPhoneNumber,websiteUri,userRatingCount,viewport"
     ),
-    # Same as place_details so CLI validate gets phone, website, and address lines
+    # Same as place_details so CLI validate gets phone, website, address, and price level
     "cli_validation": (
         "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
-        "displayName,primaryType,types,websiteUri,nationalPhoneNumber"
+        "displayName,primaryType,types,websiteUri,nationalPhoneNumber,priceLevel"
     ),
 }
 

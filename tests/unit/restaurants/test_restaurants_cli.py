@@ -711,7 +711,7 @@ class TestRestaurantCLI:
 
             mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
             assert len(mismatches) == 1
-            assert "Price Level: '$$ (Moderate)' vs Google: '$$$ (Expensive)'" in mismatches[0]
+            assert "Price Level: '$$ Moderate ($11-30)' vs Google: '$$$ Expensive ($31-60)'" in mismatches[0]
             assert fixes["price_level"] == 3
 
     def test_check_restaurant_mismatches_price_level_none_vs_set(self, mock_restaurant) -> None:
@@ -732,7 +732,7 @@ class TestRestaurantCLI:
 
             mismatches, fixes = _check_restaurant_mismatches(mock_restaurant, validation_result)
             assert len(mismatches) == 1
-            assert "Price Level: 'Not set' vs Google: '$$ (Moderate)'" in mismatches[0]
+            assert "Price Level: 'Not set' vs Google: '$$ Moderate ($11-30)'" in mismatches[0]
             assert fixes["price_level"] == 2
 
     def test_check_restaurant_mismatches_price_level_string_conversion(self, mock_restaurant) -> None:
@@ -761,11 +761,11 @@ class TestRestaurantCLI:
         from app.restaurants.cli import _format_price_level_display
 
         # Test various price levels
-        assert _format_price_level_display(0) == "Free"
-        assert _format_price_level_display(1) == "$ (Inexpensive)"
-        assert _format_price_level_display(2) == "$$ (Moderate)"
-        assert _format_price_level_display(3) == "$$$ (Expensive)"
-        assert _format_price_level_display(4) == "$$$$ (Very Expensive)"
+        assert _format_price_level_display(0) == "🆓 Free"
+        assert _format_price_level_display(1) == "$ Budget ($1-10)"
+        assert _format_price_level_display(2) == "$$ Moderate ($11-30)"
+        assert _format_price_level_display(3) == "$$$ Expensive ($31-60)"
+        assert _format_price_level_display(4) == "$$$$ Very Expensive ($61+)"
         assert _format_price_level_display(None) == "Not set"
         assert _format_price_level_display(99) == "99"  # Unknown level
 
@@ -1004,6 +1004,45 @@ class TestRestaurantCLI:
         assert result is False
         mock_db.session.rollback.assert_called_once()
 
+    @patch("app.restaurants.cli.click.prompt")
+    @patch("app.restaurants.cli.db")
+    def test_apply_restaurant_fixes_interactive_accepts_fix(self, mock_db, mock_prompt, mock_restaurant) -> None:
+        """Test interactive mode applies fix when user responds y."""
+        fixes = {"cuisine": "Japanese"}
+        mock_prompt.return_value = True  # User says y
+
+        result = _apply_restaurant_fixes(mock_restaurant, fixes, dry_run=False, interactive=True)
+        assert result is True
+        assert mock_restaurant.cuisine == "Japanese"
+        mock_prompt.assert_called_once()
+
+    @patch("app.restaurants.cli.click.prompt")
+    def test_apply_restaurant_fixes_interactive_rejects_all(self, mock_prompt, mock_restaurant, capsys) -> None:
+        """Test interactive mode skips all fixes when user responds n to each."""
+        fixes = {"name": "New Name", "cuisine": "Japanese"}
+        mock_prompt.return_value = False  # User says n to each
+
+        result = _apply_restaurant_fixes(mock_restaurant, fixes, dry_run=False, interactive=True)
+        assert result is False
+        assert mock_restaurant.name == "Test Restaurant"
+        assert mock_restaurant.cuisine != "Japanese"
+        captured = capsys.readouterr()
+        assert "Skipped all fixes" in captured.out
+        assert mock_prompt.call_count == 2
+
+    @patch("app.restaurants.cli.click.prompt")
+    @patch("app.restaurants.cli.db")
+    def test_apply_restaurant_fixes_interactive_partial_accept(self, mock_db, mock_prompt, mock_restaurant) -> None:
+        """Test interactive mode applies only fixes user accepts (y then n)."""
+        fixes = {"name": "New Name", "cuisine": "Japanese"}
+        mock_prompt.side_effect = [True, False]  # y for name, n for cuisine
+
+        result = _apply_restaurant_fixes(mock_restaurant, fixes, dry_run=False, interactive=True)
+        assert result is True
+        assert mock_restaurant.name == "New Name"
+        assert mock_restaurant.cuisine != "Japanese"
+        assert mock_prompt.call_count == 2
+
     def test_display_google_info(self, capsys) -> None:
         """Test displaying Google Places information."""
         validation_result = {
@@ -1025,9 +1064,19 @@ class TestRestaurantCLI:
             assert "⭐ Google Rating: 4.5/5.0" in captured.out
             assert "📞 Phone: +1-555-1234" in captured.out
             assert "🌐 Website: https://example.com" in captured.out
-            assert "💲 Price Level: $$ (Moderate)" in captured.out
+            assert "💲 Price Level: $$ Moderate ($11-30)" in captured.out
             assert "🏷️  Types: restaurant, food" in captured.out
             assert "🍽️  Service Level: Casual Dining (confidence: 0.80)" in captured.out
+
+    def test_display_google_info_price_level_string_format(self, capsys) -> None:
+        """Test displaying price level when Google returns raw string (PRICE_LEVEL_MODERATE)."""
+        validation_result = {
+            "google_price_level": "PRICE_LEVEL_MODERATE",
+        }
+
+        _display_google_info(validation_result)
+        captured = capsys.readouterr()
+        assert "💲 Price Level: $$ Moderate" in captured.out
 
     def test_display_google_info_types_list(self, capsys) -> None:
         """Test displaying Google Places information with types as list."""
@@ -1131,6 +1180,42 @@ class TestRestaurantCLI:
                     assert "Test Restaurant" in captured.out
                     assert "Has mismatches" in captured.out
                     assert "Different Name" in captured.out
+
+    @patch("app.restaurants.cli._validate_restaurant_with_google")
+    def test_process_restaurant_validation_details_before_mismatch(
+        self, mock_validate, mock_restaurant, capsys
+    ) -> None:
+        """Test that Google details are shown before valid/mismatch output (for interactive mode UX)."""
+        mock_validate.return_value = {
+            "valid": True,
+            "google_name": "Different Name",
+            "google_address": "123 Main St",
+            "google_status": "OPERATIONAL",
+            "google_service_level": None,
+            "errors": [],
+        }
+
+        with patch("app.restaurants.cli._check_restaurant_mismatches") as mock_check:
+            with patch("app.restaurants.cli._display_address_comparison"):
+                mock_check.return_value = (
+                    ["Name: 'Test Restaurant' vs Google: 'Different Name'"],
+                    {},
+                )
+
+                status, fixed = _process_restaurant_validation(mock_restaurant, False, False, quiet=False)
+                assert status == "valid"
+                captured = capsys.readouterr()
+                out = captured.out
+                # Google details (from _display_google_info) must appear before "Has mismatches"
+                details_markers = ["Google Address", "Status:", "123 Main St", "OPERATIONAL"]
+                details_pos = min(
+                    (out.find(m) for m in details_markers if m in out),
+                    default=-1,
+                )
+                mismatch_pos = out.find("Has mismatches")
+                assert details_pos >= 0, f"Expected Google details in output, got: {out[:200]}"
+                assert mismatch_pos >= 0, f"Expected mismatches in output, got: {out[:200]}"
+                assert details_pos < mismatch_pos, "Google details should appear before valid/mismatch status"
 
     def test_handle_service_level_updates_disabled(self) -> None:
         """Test handling service level updates when disabled."""

@@ -399,6 +399,26 @@ class TestDetectServiceLevelFromGooglePlaces:
         result = detect_service_level_from_google_places(place_data_bakery)
         assert result == ServiceLevel.QUICK_SERVICE
 
+    def test_detect_service_level_from_google_places_store_types_quick_service(self) -> None:
+        """Store types (grocery_store, supermarket, convenience_store) default to quick_service."""
+        for primary_type in ["grocery_store", "supermarket", "convenience_store"]:
+            place_data = {"primaryType": primary_type, "types": [primary_type, "food"]}
+            result = detect_service_level_from_google_places(place_data)
+            assert result == ServiceLevel.QUICK_SERVICE, f"Expected {primary_type} -> quick_service"
+
+    def test_detect_service_level_from_google_places_dessert_ice_cream_quick_service(self) -> None:
+        """Dessert and ice cream shop types default to quick_service."""
+        for primary_type in ["dessert_shop", "ice_cream_shop"]:
+            place_data = {"primaryType": primary_type, "types": [primary_type]}
+            result = detect_service_level_from_google_places(place_data)
+            assert result == ServiceLevel.QUICK_SERVICE, f"Expected {primary_type} -> quick_service"
+
+    def test_detect_service_level_from_google_places_barbecue_casual_dining(self) -> None:
+        """Barbecue restaurant is NOT fast_casual; falls through to casual dining (depends on counter service)."""
+        place_data = {"primaryType": "barbecue_restaurant", "types": ["barbecue_restaurant", "restaurant"]}
+        result = detect_service_level_from_google_places(place_data)
+        assert result == ServiceLevel.CASUAL_DINING
+
     def test_detect_service_level_from_google_places_primary_overrides_secondary_types(
         self,
     ) -> None:

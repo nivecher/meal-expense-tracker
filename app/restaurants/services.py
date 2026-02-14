@@ -594,13 +594,13 @@ def _process_form_data_for_update(form: Any) -> dict[str, Any]:
         Dictionary of processed form data
     """
     form_data: dict[str, Any] = {}
-    numeric_fields = {"rating"}
+    numeric_fields = {"rating", "latitude", "longitude"}
     boolean_fields = {"is_chain"}
 
     for field in form:
         if field.name in numeric_fields:
-            # Convert empty strings to None for numeric fields
-            if field.data and str(field.data).strip():
+            # Convert empty strings to None for numeric fields (rating, latitude, longitude)
+            if field.data is not None and str(field.data).strip():
                 try:
                     form_data[field.name] = float(field.data)
                 except (ValueError, TypeError):

@@ -233,10 +233,9 @@ class Restaurant(BaseModel):
             restaurant_name = quote_plus(self.name)
             return f"https://www.google.com/maps/search/?api=1&query={restaurant_name}&query_place_id={self.google_place_id}"
 
-        # Second preference: Use coordinates if available (would need to be stored or fetched)
-        # Note: Coordinates would need to be added to the model or fetched dynamically
-        # if hasattr(self, 'latitude') and hasattr(self, 'longitude') and self.latitude and self.longitude:
-        #     return f"https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}"
+        # Second preference: Use stored coordinates (from Google Places, no extra API cost)
+        if self.latitude is not None and self.longitude is not None:
+            return f"https://www.google.com/maps/search/?api=1&query={self.latitude},{self.longitude}"
 
         # Third preference: Use search-based URL with detailed address
         search_query = self._build_optimized_search_query()
@@ -421,24 +420,32 @@ class Restaurant(BaseModel):
             self.primary_type = place_data["primaryType"]
 
     def _update_coordinates(self, place_data: dict) -> None:
-        """Update coordinates from Google Places data (Places API New location format).
+        """Update coordinates from Google Places data.
+
+        Accepts both raw API format (location.latitude/longitude) and mapped format
+        (top-level latitude/longitude). No extra API calls - location is Essentials tier.
 
         Args:
-            place_data: Raw Google Places API response data
+            place_data: Google Places API response or our mapped restaurant data
         """
         if "location" in place_data and place_data["location"]:
             self._update_coordinates_from_location(place_data["location"])
+        elif place_data.get("latitude") is not None or place_data.get("longitude") is not None:
+            loc = {"latitude": place_data.get("latitude"), "longitude": place_data.get("longitude")}
+            self._update_coordinates_from_location(loc)
 
     def _update_coordinates_from_location(self, location: dict) -> None:
-        """Update coordinates from new API location format.
+        """Update coordinates from location dict (latitude/longitude keys).
 
         Args:
-            location: Location data from Google Places API
+            location: Location data with latitude and/or longitude
         """
-        if "latitude" in location:
-            self.latitude = location["latitude"]
-        if "longitude" in location:
-            self.longitude = location["longitude"]
+        lat = location.get("latitude")
+        lng = location.get("longitude")
+        if lat is not None:
+            self.latitude = float(lat)
+        if lng is not None:
+            self.longitude = float(lng)
 
     def _update_website_fallback(self, place_data: dict) -> None:
         """Update website as fallback if not already set.

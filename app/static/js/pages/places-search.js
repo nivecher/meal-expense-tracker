@@ -58,6 +58,7 @@ window.addToMyRestaurants = async function(placeId) {
       google_place_id: restaurantData.google_place_id || '',
       cuisine: restaurantData.cuisine || '',
       service_level: restaurantData.service_level || '',
+      price_level: restaurantData.price_level ?? null,
       is_chain: restaurantData.is_chain ? true : false,
       rating: restaurantData.rating || '',
       notes: restaurantData.notes || '',

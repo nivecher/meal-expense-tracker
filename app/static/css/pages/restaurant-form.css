@@ -30,21 +30,58 @@
   }
 }
 
+/* Validation reconciliation panel (like receipt validation on expense form) */
+#restaurant-reconciliation-panel .card-body {
+  padding: 1rem;
+}
+
+#restaurant-reconciliation-results {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+#restaurant-reconciliation-results .reconciliation-table {
+  margin-bottom: 0;
+  width: 100%;
+  min-width: 500px;
+}
+
+#restaurant-reconciliation-results .reconciliation-table th,
+#restaurant-reconciliation-results .reconciliation-table td {
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+}
+
+#restaurant-reconciliation-results .reconciliation-table td:nth-child(2) {
+  color: var(--bs-warning);
+}
+
+#restaurant-reconciliation-results .reconciliation-table td:nth-child(3) {
+  color: var(--bs-success);
+}
+
+/* Google Place ID field - selectable but not editable, text-select cursor */
+#google_place_id.google-place-id-selectable {
+  user-select: text;
+  cursor: text;
+}
+
 /* Form sections */
 
 .form-section {
-  margin-bottom: 3rem;
+  margin-bottom: 1.5rem;
   background: #fafbfc;
   border-radius: 8px;
-  padding: 2rem;
+  padding: 1.5rem;
   border: 1px solid #e9ecef;
 }
 
 /* Section headers with better spacing */
 
 .section-header {
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid #dee2e6;
 }
 
@@ -61,7 +98,7 @@
   border: none;
   height: 2px;
   background: linear-gradient(to right, #e9ecef, #dee2e6, #e9ecef);
-  margin: 2.5rem 0;
+  margin: 1rem 0;
   border-radius: 1px;
 }
 

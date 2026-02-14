@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/form_helpers.html" import render_field %}
+{% from "macros/form_helpers.html" import render_field, render_restaurant_type_select %}
 {% from 'macros/badge_helpers.html' import cuisine_badge %}
 {% block title %}
 {% if restaurant %}{{ restaurant.name }} -{% endif %}
@@ -104,6 +104,8 @@ Restaurant Details - Meal Expense Tracker
     <form id="restaurant-form" method="post"
         action="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">
         {{ form.hidden_tag() }}
+        {{ form.latitude() }}
+        {{ form.longitude() }}
         <!-- Main Content -->
         <div class="row g-4">
             <!-- Left Column - Restaurant Information -->
@@ -233,6 +235,15 @@ Restaurant Details - Meal Expense Tracker
                                                 %}
                                             </address>
                                         </div>
+                                        {% if restaurant.latitude is not none and restaurant.longitude is not none %}
+                                        <div class="mb-3">
+                                            <h6 class="text-muted mb-2">Location</h6>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-map-pin text-muted me-3 mt-1"></i>
+                                                <span class="small">{{ "%.6f"|format(restaurant.latitude) }}°, {{ "%.6f"|format(restaurant.longitude) }}°</span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
                                         {% set maps_url = restaurant|google_maps_url %}
                                         {% if maps_url %}
                                         <div class="mb-4">
@@ -252,6 +263,22 @@ Restaurant Details - Meal Expense Tracker
                                             </div>
                                         </div>
                                         {% endif %}
+                                    </div>
+                                    {% endif %}
+
+                                    {% if restaurant.latitude is not none and restaurant.longitude is not none and config.GOOGLE_MAPS_API_KEY %}
+                                    <div class="restaurant-map-section mb-4">
+                                        <h6 class="text-muted mb-2">Map</h6>
+                                        <iframe
+                                            width="100%"
+                                            height="250"
+                                            style="border:0; border-radius: 4px;"
+                                            loading="lazy"
+                                            allowfullscreen
+                                            referrerpolicy="no-referrer-when-downgrade"
+                                            src="https://www.google.com/maps/embed/v1/place?key={{ config.GOOGLE_MAPS_API_KEY }}&q={% if restaurant.google_place_id %}place_id:{{ restaurant.google_place_id }}{% else %}{{ restaurant.latitude }},{{ restaurant.longitude }}{% endif %}&zoom=16"
+                                            title="Restaurant location">
+                                        </iframe>
                                     </div>
                                     {% endif %}
 
@@ -467,7 +494,10 @@ Restaurant Details - Meal Expense Tracker
                                 <i class="fas fa-edit me-2"></i>Edit Restaurant Details
                             </h5>
                             <div class="mb-3">{{ render_field(form.name) }}</div>
-                            <div class="mb-3">{{ render_field(form.type) }}</div>
+                            <div class="mb-3">
+                                {{ form.type.label(class_='form-label') }}
+                                {{ render_restaurant_type_select(form.type, type_choices_grouped) }}
+                            </div>
                             <div class="mb-3">{{ render_field(form.cuisine) }}</div>
                             <div class="mb-3">{{ render_field(form.rating) }}</div>
                             <div class="mb-3">{{ render_field(form.is_chain) }}</div>
@@ -485,6 +515,30 @@ Restaurant Details - Meal Expense Tracker
                             <h5 class="text-muted mb-3 border-bottom pb-2">
                                 <i class="fas fa-map-marker-alt me-2"></i>Location
                             </h5>
+                            {% if restaurant.latitude is not none and restaurant.longitude is not none %}
+                            <div class="mb-3">
+                                <label class="form-label">Coordinates</label>
+                                <div class="form-control-plaintext small">
+                                    <i class="fas fa-map-pin text-muted me-2"></i>{{ "%.6f"|format(restaurant.latitude) }}°, {{ "%.6f"|format(restaurant.longitude) }}°
+                                </div>
+                                <div class="form-text">From Google Places (read-only)</div>
+                            </div>
+                            {% if config.GOOGLE_MAPS_API_KEY %}
+                            <div class="mb-3">
+                                <label class="form-label">Map</label>
+                                <iframe
+                                    width="100%"
+                                    height="250"
+                                    style="border:0; border-radius: 4px;"
+                                    loading="lazy"
+                                    allowfullscreen
+                                    referrerpolicy="no-referrer-when-downgrade"
+                                    src="https://www.google.com/maps/embed/v1/place?key={{ config.GOOGLE_MAPS_API_KEY }}&q={% if restaurant.google_place_id %}place_id:{{ restaurant.google_place_id }}{% else %}{{ restaurant.latitude }},{{ restaurant.longitude }}{% endif %}&zoom=16"
+                                    title="Restaurant location">
+                                </iframe>
+                            </div>
+                            {% endif %}
+                            {% endif %}
                             {% if form.address_line_1.data or form.address_line_2.data %}
                             <div class="mb-3">
                                 <label class="form-label">Address</label>

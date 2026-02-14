@@ -7,8 +7,8 @@ This document is the canonical reference for mapping Google Places API (New) fie
 ## Tier Reference
 
 - **Essentials**: id, formattedAddress, location, addressComponents, postalAddress, addressDescriptor (Place Details)
-- **Pro**: displayName, primaryType, types
-- **Enterprise**: rating, nationalPhoneNumber (we skip these for cost control)
+- **Pro**: displayName, primaryType, types, websiteUri
+- **Enterprise**: rating, nationalPhoneNumber, priceLevel (Place Details bills at Enterprise; priceLevel adds no extra cost)
 
 ## Planned Field Mapping
 
@@ -27,6 +27,7 @@ This document is the canonical reference for mapping Google Places API (New) fie
 | primaryType                 | Pro        | primary_type, type                                                | For cuisine/service detection                       |
 | types                       | Pro        | types                                                             | For cuisine/service_level                           |
 | websiteUri                  | Pro        | website                                                           | Strip query params (UTM, etc.) at extraction        |
+| priceLevel                  | Enterprise | price_level                                                       | 0–4 ($–$$$$); converted from PRICE*LEVEL*\* strings |
 
 ### Address Parsing Priority
 
@@ -57,7 +58,7 @@ This document is the canonical reference for mapping Google Places API (New) fie
 
 ## API Cost Strategy
 
-- **Place Details**: One request per place when user selects (not per search result). Mask includes `websiteUri` (Pro) and `nationalPhoneNumber` (Enterprise); request bills at Enterprise. No extra API calls—same single call, more fields.
+- **Place Details**: One request per place when user selects (not per search result). Mask includes `websiteUri` (Pro), `nationalPhoneNumber` (Enterprise), and `priceLevel` (Enterprise); request bills at Enterprise. No extra API calls—same single call, more fields.
 - **Search**: Unchanged; Place Details on select for full address, cuisine, phone, website.
 - **Billing**: Per-request at highest tier. Adding more fields in the same request does not add calls.
 

@@ -34,6 +34,7 @@ def register_commands(app: Flask) -> None:
     # Add commands to the restaurant group
     restaurant_cli.add_command(list_restaurants)
     restaurant_cli.add_command(validate_restaurants)
+    restaurant_cli.add_command(backfill_coordinates)
 
 
 def _search_google_places_by_name_and_address(name: str, address: str | None = None) -> list[dict]:
@@ -387,6 +388,8 @@ def _display_restaurant_basic_info(restaurant: Restaurant) -> None:
     """Display basic restaurant information."""
     if restaurant.cuisine:
         click.echo(f"      Cuisine: {restaurant.cuisine}")
+    if restaurant.price_level is not None:
+        click.echo(f"      💲 Price Level: {_format_price_level_display(restaurant.price_level)}")
 
 
 def _display_restaurant_address_info(restaurant: Restaurant) -> None:
@@ -957,8 +960,12 @@ def _apply_restaurant_fixes(
         for fix_key, new_value in fixes_to_apply.items():
             field_name = field_mappings.get(fix_key, fix_key)
             old_value = getattr(restaurant, field_name, None)
-            old_display = str(old_value) if old_value is not None and str(old_value) else "(not set)"
-            new_display = str(new_value) if new_value is not None and str(new_value) else "(not set)"
+            if fix_key == "price_level":
+                old_display = _format_price_level_display(old_value)
+                new_display = _format_price_level_display(new_value)
+            else:
+                old_display = str(old_value) if old_value is not None and str(old_value) else "(not set)"
+                new_display = str(new_value) if new_value is not None and str(new_value) else "(not set)"
             display_name = _get_fix_display_name(fix_key)
             if _prompt_yn_no_default(f"   Apply {display_name}: {old_display} → {new_display}? [y/n]"):
                 to_apply[fix_key] = new_value
@@ -1146,8 +1153,12 @@ def _display_google_basic_info(validation_result: dict) -> None:
     if validation_result.get("google_website"):
         click.echo(f"   🌐 Website: {validation_result['google_website']}")
     if validation_result.get("google_price_level") is not None:
-        price_level = validation_result.get("google_price_level")
-        price_level_display = _format_price_level_display(price_level)
+        from app.services.google_places_service import get_google_places_service
+
+        raw_price_level = validation_result.get("google_price_level")
+        places_service = get_google_places_service()
+        price_level_int = places_service.convert_price_level_to_int(raw_price_level)
+        price_level_display = _format_price_level_display(price_level_int)
         click.echo(f"   💲 Price Level: {price_level_display}")
     # Primary type first (clear and prominent), then full types list in Google order
     primary_type = validation_result.get("primary_type")
@@ -1193,23 +1204,23 @@ def _display_google_service_info(validation_result: dict) -> None:
 
 
 def _format_price_level_display(price_level: int | None) -> str:
-    """Format price level for display.
+    """Format price level for display with dollar signs, pretty name, and price range.
 
     Args:
         price_level: Price level integer (0-4) or None
 
     Returns:
-        Formatted price level string
+        Formatted price level string (e.g. "$$ Moderate ($11-30)", "$$$$ Very Expensive ($61+)")
     """
     if price_level is None:
         return "Not set"
 
     price_level_mapping = {
-        0: "Free",
-        1: "$ (Inexpensive)",
-        2: "$$ (Moderate)",
-        3: "$$$ (Expensive)",
-        4: "$$$$ (Very Expensive)",
+        0: "🆓 Free",
+        1: "$ Budget ($1-10)",
+        2: "$$ Moderate ($11-30)",
+        3: "$$$ Expensive ($31-60)",
+        4: "$$$$ Very Expensive ($61+)",
     }
 
     return price_level_mapping.get(price_level, str(price_level))
@@ -1621,12 +1632,66 @@ def _build_validation_sections(
     return frozenset(sections) if sections else None
 
 
+@click.command("backfill-coordinates")
+@click.option("--user-id", type=int, help="Only backfill for a specific user")
+@click.option("--restaurant-id", type=int, help="Backfill a single restaurant by ID")
+@click.option("--dry-run", is_flag=True, help="Show what would be updated without saving")
+@with_appcontext
+def backfill_coordinates(
+    user_id: int | None,
+    restaurant_id: int | None,
+    dry_run: bool,
+) -> None:
+    """Fetch latitude/longitude from Google Places for restaurants that have place_id but no coordinates."""
+    from app.services.google_places_service import get_google_places_service
+
+    places_service = get_google_places_service()
+    if not places_service.api_key:
+        click.echo("❌ Google Maps API key not configured")
+        raise SystemExit(1)
+
+    query = Restaurant.query.filter(
+        Restaurant.google_place_id.isnot(None),
+        db.or_(Restaurant.latitude.is_(None), Restaurant.longitude.is_(None)),
+    )
+    if user_id:
+        query = query.filter_by(user_id=user_id)
+    if restaurant_id:
+        query = query.filter_by(id=restaurant_id)
+
+    restaurants = query.all()
+    if not restaurants:
+        click.echo("✅ No restaurants need coordinate backfill")
+        return
+
+    click.echo(f"📍 Backfilling coordinates for {len(restaurants)} restaurant(s)...")
+    updated = 0
+    for restaurant in restaurants:
+        place_data = places_service.get_place_details(restaurant.google_place_id)
+        if not place_data:
+            click.echo(f"   ⚠️  {restaurant.name} (ID {restaurant.id}): No place data")
+            continue
+        restaurant.update_from_google_places(place_data)
+        if restaurant.latitude and restaurant.longitude:
+            updated += 1
+            if dry_run:
+                click.echo(f"   [dry-run] {restaurant.name}: {restaurant.latitude:.6f}, {restaurant.longitude:.6f}")
+            else:
+                click.echo(f"   ✓ {restaurant.name}: {restaurant.latitude:.6f}, {restaurant.longitude:.6f}")
+
+    if not dry_run and updated > 0:
+        db.session.commit()
+        click.echo(f"\n✅ Updated {updated} restaurant(s) with coordinates")
+    elif dry_run:
+        click.echo(f"\n[dry-run] Would update {updated} restaurant(s)")
+
+
 @click.command("validate")
 @click.option("--user-id", type=int, help="Specific user ID to validate restaurants for")
 @click.option("--username", type=str, help="Specific username to validate restaurants for")
 @click.option("--all-users", is_flag=True, help="Validate restaurants for all users")
 @click.option("--restaurant-id", type=int, help="Validate a specific restaurant by ID")
-@click.option("--fix-mismatches", is_flag=True, help="Fix mismatches from Google data")
+@click.option("-f", "--fix-mismatches", is_flag=True, help="Fix mismatches from Google data")
 @click.option(
     "--interactive",
     "-i",
@@ -1709,7 +1774,7 @@ def validate_restaurants(
         flask restaurant validate --address --type --cuisine --user-id 1
         flask restaurant validate --mismatches --all-users
         flask restaurant validate -m -q --all-users
-        flask restaurant validate --fix-mismatches -i --user-id 1
+        flask restaurant validate -f -i --user-id 1
     """
     validation_sections = _build_validation_sections(
         address, type_section, name_section, service_level, price_level, website, cuisine, phone

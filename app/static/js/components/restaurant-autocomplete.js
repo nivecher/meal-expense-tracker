@@ -853,6 +853,10 @@ class RestaurantAutocomplete {
       'restaurant-rating': restaurantData.rating,
       'restaurant-notes': restaurantData.notes,
 
+      // Coordinates (hidden fields, populated when selecting from Google)
+      latitude: restaurantData.latitude,
+      longitude: restaurantData.longitude,
+
       // Restaurant form field IDs (without prefix)
       name: restaurantData.name,
       type: restaurantData.type,
@@ -874,6 +878,8 @@ class RestaurantAutocomplete {
       is_chain: restaurantData.is_chain,
       rating: restaurantData.rating,
       notes: restaurantData.notes,
+      latitude: restaurantData.latitude,
+      longitude: restaurantData.longitude,
     };
 
     console.log('Field mappings:', fieldMappings);
@@ -925,10 +931,20 @@ class RestaurantAutocomplete {
 
     this.input.value = restaurantData.name || '';
 
+    // Notify form that place ID was populated (enables Validate button, shows Clear/View actions)
+    const placeIdField = document.getElementById('google_place_id');
+    if (placeIdField && restaurantData.google_place_id) {
+      placeIdField.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Update coordinates display when available
+    this.updateCoordinatesDisplay(restaurantData.latitude, restaurantData.longitude);
+
+    // Update map embed when coordinates available
+    this.updateMapEmbed(restaurantData.latitude, restaurantData.longitude, restaurantData.google_place_id);
+
     // Show success message with details
-    // Escape cuisine to prevent XSS
-    const cuisineText = restaurantData.cuisine ? `(${this.safeHtmlEscape(restaurantData.cuisine)})` : '';
-    const message = `Restaurant data loaded from Google Places! ${cuisineText}`;
+    const message = 'Restaurant data loaded from Google Places!';
     this.showSuccess(message);
   }
 
@@ -984,6 +1000,39 @@ class RestaurantAutocomplete {
     this.suggestionsContainer.appendChild(container);
     this.suggestionsContainer.style.display = 'block';
     setTimeout(() => this.hideSuggestions(), 3000);
+  }
+
+  updateCoordinatesDisplay(latitude, longitude) {
+    const displayEl = document.getElementById('restaurant-coordinates-display');
+    const textEl = document.getElementById('coordinates-text');
+    if (!displayEl || !textEl) return;
+
+    if (latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined && !Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+      textEl.textContent = `${Number(latitude).toFixed(6)}°, ${Number(longitude).toFixed(6)}°`;
+      displayEl.classList.remove('d-none');
+    } else {
+      displayEl.classList.add('d-none');
+    }
+  }
+
+  updateMapEmbed(latitude, longitude, googlePlaceId) {
+    const container = document.getElementById('restaurant-map-container');
+    const iframe = document.getElementById('restaurant-map-iframe');
+    if (!container || !iframe) return;
+
+    const apiKey = container.dataset.apiKey || window.GOOGLE_MAPS_API_KEY || '';
+    if (!apiKey) return;
+
+    const hasCoords = latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined &&
+      !Number.isNaN(latitude) && !Number.isNaN(longitude);
+
+    if (hasCoords) {
+      const q = googlePlaceId ? `place_id:${googlePlaceId}` : `${Number(latitude)},${Number(longitude)}`;
+      iframe.src = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(q)}&zoom=16`;
+      container.classList.remove('d-none');
+    } else {
+      container.classList.add('d-none');
+    }
   }
 
   showSuccess(message) {

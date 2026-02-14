@@ -46,6 +46,7 @@ FOOD_BUSINESS_TYPES = [
     "pub",
     "tea_house",
 ]
+from app.constants.restaurant_types import get_restaurant_type_form_choices_grouped
 from app.restaurants import bp, services
 from app.restaurants.exceptions import (
     DuplicateGooglePlaceIdError,
@@ -226,8 +227,8 @@ def _process_search_result_place(place: dict[str, Any], api_key: str | None) -> 
 
 
 def _enhance_place_with_details(processed_place: dict[str, Any], places_service: Any) -> dict[str, Any]:
-    """Enhance a processed place with detailed address via extract_restaurant_data (lock-step with CLI/form)."""
-    place_id = processed_place.get("place_id")
+    """Enhance a processed place with detailed address and price level via extract_restaurant_data (lock-step with CLI/form)."""
+    place_id = processed_place.get("place_id") or processed_place.get("google_place_id")
     if not place_id:
         return processed_place
 
@@ -237,6 +238,9 @@ def _enhance_place_with_details(processed_place: dict[str, Any], places_service:
             return processed_place
 
         google_data = places_service.extract_restaurant_data(detailed_place)
+        price_level = google_data.get("price_level")
+        price_level_int = _convert_price_level_to_int(price_level) if price_level is not None else None
+
         processed_place.update(
             {
                 "address_line_1": google_data.get("address_line_1", ""),
@@ -246,6 +250,7 @@ def _enhance_place_with_details(processed_place: dict[str, Any], places_service:
                 "postal_code": google_data.get("postal_code", ""),
                 "country": google_data.get("country", ""),
                 "address": google_data.get("address_line_1", ""),  # Legacy field
+                "price_level": price_level_int,
             }
         )
     except Exception as e:
@@ -818,7 +823,12 @@ def add_restaurant() -> str | Response | tuple[Response, int]:
             400,
         )
 
-    return render_template("restaurants/form.html", form=form, is_edit=False)
+    return render_template(
+        "restaurants/form.html",
+        form=form,
+        is_edit=False,
+        type_choices_grouped=get_restaurant_type_form_choices_grouped(),
+    )
 
 
 @bp.route("/<int:restaurant_id>", methods=["GET", "POST"])
@@ -870,6 +880,7 @@ def restaurant_details(restaurant_id: int) -> str | Response:
                 expenses=sorted(restaurant.expenses, key=lambda x: x.date, reverse=True),
                 form=form,
                 is_edit=True,
+                type_choices_grouped=get_restaurant_type_form_choices_grouped(),
             )
 
     # Load expenses for the restaurant
@@ -884,6 +895,7 @@ def restaurant_details(restaurant_id: int) -> str | Response:
         expenses=expenses,
         expense_stats=expense_stats,
         form=RestaurantForm(obj=restaurant),
+        type_choices_grouped=get_restaurant_type_form_choices_grouped(),
     )
 
 
@@ -927,7 +939,13 @@ def edit_restaurant(restaurant_id: int) -> str | Response:
         # Pre-populate form with existing data
         form = RestaurantForm(obj=restaurant)
 
-    return render_template("restaurants/form.html", form=form, is_edit=True, restaurant=restaurant)
+    return render_template(
+        "restaurants/form.html",
+        form=form,
+        is_edit=True,
+        restaurant=restaurant,
+        type_choices_grouped=get_restaurant_type_form_choices_grouped(),
+    )
 
 
 @bp.route("/delete/<int:restaurant_id>", methods=["POST"])
