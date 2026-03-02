@@ -35,6 +35,7 @@ This project follows a **minimalist approach** to GitHub Actions:
 **Jobs**:
 - **lint**: Python/JavaScript/YAML/JSON/TOML linting
 - **test**: Unit and integration tests with coverage
+- **migration-smoke**: Run `flask db upgrade` against disposable Postgres and assert head revision
 - **terraform**: Terraform validation and planning
 - **security**: Bandit and Safety security scans
 - **ci-success**: Aggregates all job statuses
@@ -103,7 +104,7 @@ gh workflow run tag.yml -f force=true
 **Jobs**:
 - **validate**: Resolve environment and `image_tag`; set `skip_build` when image already exists
 - **build**: Build and push Docker image (only when `skip_build` is false, e.g. manual deploy without `image_tag`)
-- **deploy**: Deploy infrastructure and Lambda; pull image from GHCR by `image_tag`
+- **deploy**: Deploy infrastructure and Lambda; pull image from GHCR by `image_tag`; run DB migrations via Lambda admin operation
 - **notify**: Deployment status
 
 **Key Features**:
@@ -111,6 +112,7 @@ gh workflow run tag.yml -f force=true
 - Multi-environment support (dev, staging, prod)
 - AWS OIDC authentication (no long-lived credentials)
 - Terraform infrastructure management
+- Automatic database migration orchestration (`run_migrations` with confirmation)
 - Automatic rollback on failure
 - Health check validation
 

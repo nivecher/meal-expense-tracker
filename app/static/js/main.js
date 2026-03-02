@@ -37,6 +37,14 @@ function safeLocalGet(key) {
   } catch {}
 }
 
+function isDebugModeEnabled() {
+  return window.location.search.includes('debug=true') || safeLocalGet('debugMode') === 'true';
+}
+
+function isLocalDevHost() {
+  return ['localhost', '127.0.0.1'].includes(window.location.hostname);
+}
+
 // Enhanced page module loading with error handling
 const pageModules = {
   '/restaurants/search': () => import('./pages/restaurant-search.js'),
@@ -63,56 +71,35 @@ function getTextColor(backgroundColor) {
   return brightness > 128 ? '#000' : '#fff';
 }
 
+function applyTagColor(badge) {
+  const color = badge?.getAttribute('data-tag-color');
+  if (!color) return;
+  badge.style.setProperty('--tag-color', color);
+  badge.style.setProperty('--tag-text-color', getTextColor(color));
+}
+
+function applyTagColorsIn(root = document) {
+  const tagBadges = root.querySelectorAll('.tag-badge[data-tag-color]:not(.tag-select-item-badge)');
+  tagBadges.forEach((badge) => applyTagColor(badge));
+}
+
 // Apply tag colors from data attributes
 function applyTagColors() {
-  // Handle tag-badge elements (exclude Tom Select internal elements)
-  const tagBadges = document.querySelectorAll('.tag-badge[data-tag-color]:not(.tag-select-item-badge)');
-  tagBadges.forEach((badge) => {
-    const color = badge.getAttribute('data-tag-color');
-    if (color) {
-      // Use CSS variables so the stylesheet controls rendering.
-      badge.style.setProperty('--tag-color', color);
-      badge.style.setProperty('--tag-text-color', getTextColor(color));
-    }
-  });
+  applyTagColorsIn();
 }
 
 // Watch for dynamically added tag badges
 function initTagColorWatcher() {
   const observer = new MutationObserver((mutations) => {
-    try {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            // Check if the added node is a tag badge (not Tom Select items - those are handled in tag-select-init.js)
-            if (
-              node.classList &&
-              node.classList.contains('tag-badge') &&
-              !node.classList.contains('tag-select-item') &&
-              node.hasAttribute('data-tag-color')
-            ) {
-              const color = node.getAttribute('data-tag-color');
-              if (color) {
-                node.style.setProperty('--tag-color', color);
-                node.style.setProperty('--tag-text-color', getTextColor(color));
-              }
-            }
-            // Check for tag badges within the added node (exclude Tom Select items)
-            const tagBadges =
-              node.querySelectorAll && node.querySelectorAll('.tag-badge[data-tag-color]:not(.tag-select-item)');
-            if (tagBadges) {
-              tagBadges.forEach((badge) => {
-                const color = badge.getAttribute('data-tag-color');
-                if (color) {
-                  badge.style.setProperty('--tag-color', color);
-                  badge.style.setProperty('--tag-text-color', getTextColor(color));
-                }
-              });
-            }
-          }
-        });
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (!(node instanceof Element)) return;
+        if (node.matches('.tag-badge[data-tag-color]:not(.tag-select-item)')) {
+          applyTagColor(node);
+        }
+        applyTagColorsIn(node);
       });
-    } catch {}
+    });
   });
 
   observer.observe(document.body, {
@@ -269,6 +256,58 @@ async function refreshTagSelectInstance() {
 // Expose for non-module scripts that refresh tag data.
 window.refreshTagSelectInstance = refreshTagSelectInstance;
 
+function refreshTagSelectIfPresent() {
+  if (window.tagSelectInstance) {
+    refreshTagSelectInstance();
+  }
+}
+
+function registerTagRefreshEvents() {
+  ['tagsUpdated', 'tagDeleted'].forEach((eventName) => {
+    document.addEventListener(eventName, refreshTagSelectIfPresent);
+  });
+}
+
+function initAutoDismissAlerts() {
+  document.querySelectorAll('.alert-dismissible').forEach((alert) => {
+    setTimeout(() => {
+      try {
+        if (alert && alert.parentNode) {
+          new bootstrap.Alert(alert).close();
+        }
+      } catch {}
+    }, 5000);
+  });
+}
+
+function initLoadingButtons() {
+  document.querySelectorAll('[data-loading]').forEach((button) => {
+    button.addEventListener('click', function(event) {
+      if (this.disabled) {
+        event.preventDefault();
+        return false;
+      }
+
+      const loadingText = this.dataset.loading || 'Processing...';
+      this.dataset.originalText = this.innerHTML;
+      this.disabled = true;
+      this.innerHTML = `
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        ${loadingText}
+      `;
+
+      setTimeout(() => {
+        if (this.disabled && this.dataset.originalText) {
+          this.disabled = false;
+          this.innerHTML = this.dataset.originalText;
+          delete this.dataset.originalText;
+          console.warn('Auto-restored button after timeout');
+        }
+      }, 30000);
+    });
+  });
+}
+
 // Initialize essential UI components directly
 function initUI() {
   // Apply tag colors
@@ -314,18 +353,7 @@ async function init() {
     }, 1500);
     runWhenIdle(() => initTagColorWatcher(), 1500);
 
-    // Listen for tag update events to refresh Tom Select
-    document.addEventListener('tagsUpdated', () => {
-      if (window.tagSelectInstance) {
-        refreshTagSelectInstance();
-      }
-    });
-
-    document.addEventListener('tagDeleted', () => {
-      if (window.tagSelectInstance) {
-        refreshTagSelectInstance();
-      }
-    });
+    registerTagRefreshEvents();
 
     // Error handling is now managed by unified-error-handler.js
 
@@ -337,46 +365,8 @@ async function init() {
     // Load page-specific modules
     await loadPageModule();
 
-    // Auto-dismiss alerts after 5 seconds with enhanced feedback
-    document.querySelectorAll('.alert-dismissible').forEach((alert) => {
-      setTimeout(() => {
-        try {
-          // Check if element still exists in DOM before trying to close
-          if (alert && alert.parentNode) {
-            new bootstrap.Alert(alert).close();
-          }
-        } catch {}
-      }, 5000);
-    });
-
-    // Enhanced loading state for buttons with better UX
-    document.querySelectorAll('[data-loading]').forEach((button) => {
-      button.addEventListener('click', function(event) {
-        // Prevent double-clicks during loading
-        if (this.disabled) {
-          event.preventDefault();
-          return false;
-        }
-
-        const loadingText = this.dataset.loading || 'Processing...';
-        this.dataset.originalText = this.innerHTML;
-        this.disabled = true;
-        this.innerHTML = `
-          <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-          ${loadingText}
-        `;
-
-        // Auto-restore button after 30 seconds as safety measure
-        setTimeout(() => {
-          if (this.disabled && this.dataset.originalText) {
-            this.disabled = false;
-            this.innerHTML = this.dataset.originalText;
-            delete this.dataset.originalText;
-            console.warn('Auto-restored button after timeout');
-          }
-        }, 30000);
-      });
-    });
+    initAutoDismissAlerts();
+    initLoadingButtons();
 
     // Error handling is now managed by the ErrorHandler class
     // The error handler is automatically initialized and will handle:
@@ -402,20 +392,20 @@ async function init() {
     }
 
     // Only show debug messages if debug mode is enabled
-    if (window.location.search.includes('debug=true') || safeLocalGet('debugMode') === 'true') {
+    if (isDebugModeEnabled()) {
       console.warn('✅ Application initialized successfully');
     }
   } catch {}
 }
 
 // Add favicon debug commands to global scope for development
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+if (isLocalDevHost()) {
   window.faviconDebug = {
     clearCache: clearFaviconCache,
   };
 
   // Only show debug messages if debug mode is enabled
-  if (window.location.search.includes('debug=true') || safeLocalGet('debugMode') === 'true') {
+  if (isDebugModeEnabled()) {
     console.warn('🔧 Favicon debug commands available: window.faviconDebug.clearCache()');
   }
 }

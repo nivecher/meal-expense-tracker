@@ -404,6 +404,46 @@ jobs:
           
           echo "✅ Lambda function updated"
 
+      - name: Run database migrations
+        id: run_migrations
+        run: |
+          FUNCTION_NAME="${{ steps.lambda_info.outputs.function_name }}"
+          RESPONSE_FILE="$(mktemp)"
+          META_FILE="$(mktemp)"
+
+          aws lambda invoke \
+            --function-name "${FUNCTION_NAME}" \
+            --invocation-type RequestResponse \
+            --cli-binary-format raw-in-base64-out \
+            --cli-read-timeout 300 \
+            --payload '{"admin_operation":"run_migrations","confirm":true}' \
+            "${RESPONSE_FILE}" > "${META_FILE}"
+
+          INVOKE_STATUS="$(jq -r '.StatusCode // 0' "${META_FILE}")"
+          if [ "${INVOKE_STATUS}" != "200" ]; then
+            echo "❌ Lambda invoke failed with StatusCode=${INVOKE_STATUS}"
+            cat "${META_FILE}"
+            exit 1
+          fi
+
+          APP_STATUS="$(jq -r '.statusCode // 0' "${RESPONSE_FILE}")"
+          if [ "${APP_STATUS}" != "200" ]; then
+            echo "❌ Migration admin operation returned statusCode=${APP_STATUS}"
+            cat "${RESPONSE_FILE}"
+            exit 1
+          fi
+
+          APP_SUCCESS="$(jq -r '.body | fromjson | .success // false' "${RESPONSE_FILE}")"
+          if [ "${APP_SUCCESS}" != "true" ]; then
+            APP_MESSAGE="$(jq -r '.body | fromjson | .message // \"Unknown migration error\"' "${RESPONSE_FILE}")"
+            echo "❌ Migration failed: ${APP_MESSAGE}"
+            cat "${RESPONSE_FILE}"
+            exit 1
+          fi
+
+          APP_MESSAGE="$(jq -r '.body | fromjson | .message // \"Migrations completed\"' "${RESPONSE_FILE}")"
+          echo "✅ ${APP_MESSAGE}"
+
       - name: Sync static files to S3
         run: |
           if [ -f scripts/sync_static_to_s3.sh ]; then
