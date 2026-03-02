@@ -28,6 +28,28 @@ repos:
         language: system
         stages: [commit-msg]
         pass_filenames: true
+      - id: commitlint-range
+        name: commitlint-range
+        entry: >
+          sh -c 'if [ -f node_modules/.bin/commitlint ]; then
+            if git rev-parse --verify origin/main >/dev/null 2>&1; then
+              BASE=$(git merge-base origin/main HEAD);
+            elif git rev-parse --verify origin/master >/dev/null 2>&1; then
+              BASE=$(git merge-base origin/master HEAD);
+            else
+              echo "No origin/main or origin/master found; skipping commitlint range check";
+              exit 0;
+            fi;
+            echo "Validating commit messages from $BASE..HEAD";
+            exec node_modules/.bin/commitlint --from "$BASE" --to HEAD --verbose;
+          else
+            echo "Commitlint deps missing. Run: npm install";
+            exit 1;
+          fi' sh
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
 
   # 3. Formatting
   - repo: https://github.com/pre-commit/pre-commit-hooks

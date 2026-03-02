@@ -300,7 +300,12 @@ lint-toml: check-env
 lint-commits: check-npm
 	@echo "\n\033[1m=== Validating Conventional Commit Messages ===\033[0m"
 	@git fetch origin main 2>/dev/null || true
-	@npx commitlint --from origin/main --to HEAD --verbose || (echo "\033[1;31m❌ Commit message validation failed\033[0m"; exit 1)
+	@BASE="$$(git merge-base origin/main HEAD 2>/dev/null || true)"; \
+	if [ -z "$$BASE" ]; then \
+		echo "\033[1;33m⚠️  Could not determine merge base with origin/main; skipping commit lint\033[0m"; \
+	else \
+		npx commitlint --from "$$BASE" --to HEAD --verbose || (echo "\033[1;31m❌ Commit message validation failed\033[0m"; exit 1); \
+	fi
 
 .PHONY: lint-terraform-fmt
 lint-terraform-fmt:
