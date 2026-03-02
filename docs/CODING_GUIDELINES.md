@@ -68,17 +68,17 @@
 
 ### Backend
 
-- Python 3.13
-- Flask 3.1.1
-- SQLAlchemy 2.0
+- Python 3.13+ (see `pyproject.toml` for exact version)
+- Flask (see `requirements.txt` for exact version)
+- SQLAlchemy (see `requirements.txt` for exact version)
 - Pytest for testing
 - Gunicorn for production WSGI server
 
 ### Frontend
 
 - **Template Engine**: Jinja2 (server-side rendering)
-- **CSS Framework**: Bootstrap 5.3.3 for responsive components
-- **JavaScript**: Modern ES6+ with jQuery 3.7.1 for DOM manipulation
+- **CSS Framework**: Bootstrap for responsive components (see CDN or `package.json` for version)
+- **JavaScript**: Modern ES6+ with jQuery for DOM manipulation
 - **Enhancement Strategy**: Progressive enhancement over server-rendered HTML
 - **Build Process**: Make-based workflow (no bundling required)
 

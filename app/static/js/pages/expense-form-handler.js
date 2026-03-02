@@ -75,9 +75,7 @@ function validateRedirectUrl(url) {
     if (urlObj.origin === window.location.origin) {
       return urlObj.pathname + urlObj.search + urlObj.hash;
     }
-  } catch {
-    // Invalid URL
-  }
+  } catch {}
 
   return null;
 }
@@ -91,21 +89,7 @@ async function getBrowserTimezone() {
     // Try to import from shared utility
     const { detectBrowserTimezone } = await import('../utils/timezone-handler.js');
     return detectBrowserTimezone();
-  } catch {
-    // Fallback to inline detection if import fails
-    try {
-      if (typeof Intl !== 'undefined' && Intl.DateTimeFormat) {
-        // eslint-disable-next-line new-cap
-        const options = Intl.DateTimeFormat().resolvedOptions();
-        if (options && options.timeZone && typeof options.timeZone === 'string') {
-          return options.timeZone;
-        }
-      }
-    } catch (error) {
-      console.warn('Timezone detection failed:', error);
-    }
-    return 'UTC';
-  }
+  } catch {}
 }
 
 /**
@@ -126,7 +110,11 @@ function showFormErrors(form, errors) {
   });
 
   // Show general errors at the top of the form
-  if (errors.errorKey || errors.message || (typeof errors === 'object' && !Array.isArray(errors) && Object.keys(errors).length > 0)) {
+  if (
+    errors.errorKey ||
+    errors.message ||
+    (typeof errors === 'object' && !Array.isArray(errors) && Object.keys(errors).length > 0)
+  ) {
     const errorContainer = form.querySelector('#formErrors') || document.createElement('div');
     if (!errorContainer.id) {
       errorContainer.id = 'formErrors';
@@ -186,7 +174,12 @@ function showFormErrors(form, errors) {
 
   // Show general error message if no field-specific errors and no errorKey/message already shown
   const errorContainer = form.querySelector('#formErrors');
-  if (errorContainer && (!errors.fields || Object.keys(errors.fields).length === 0) && !errors.errorKey && !errors.message) {
+  if (
+    errorContainer &&
+    (!errors.fields || Object.keys(errors.fields).length === 0) &&
+    !errors.errorKey &&
+    !errors.message
+  ) {
     const errorMsg = 'Please correct the errors below.';
     errorContainer.textContent = errorMsg;
     errorContainer.classList.remove('d-none');
@@ -207,14 +200,17 @@ function parseExistingTags(tagsInput) {
     try {
       const parsedTags = JSON.parse(existingTagsData);
       return parsedTags.map((tag) => tag.name);
-    } catch (error) {
-      console.warn('Failed to parse existing tags data:', error);
-    }
+    } catch {}
   }
 
   // Fallback: parse comma-separated value
   const existingValue = tagsInput.value;
-  return existingValue ? existingValue.split(',').map((tag) => tag.trim()).filter((tag) => tag) : [];
+  return existingValue
+    ? existingValue
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag)
+    : [];
 }
 
 function validateFormDataInternal(formData) {
@@ -280,7 +276,8 @@ function clearPreviousErrors(alertContainer) {
 function setLoadingState(submitButton) {
   if (submitButton) {
     submitButton.disabled = true;
-    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+    submitButton.innerHTML =
+      '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
   }
 }
 
@@ -447,9 +444,8 @@ async function processFormSubmission(formElements, formData) {
     } else {
       handleSubmissionError(form, response, result);
     }
-
   } catch (error) {
-    handleSubmissionException(form, error);
+    handleSubmissionException(formElements.form, error);
   } finally {
     restoreButtonState(submitButton, originalButtonText);
   }
@@ -619,12 +615,9 @@ async function fetchRestaurantAddressForReconciliation(restaurantId) {
         if (addressParts.length > 0) {
           return addressParts.join(', ');
         }
-
       }
     }
-  } catch (error) {
-    console.warn('Failed to fetch restaurant address for reconciliation:', error);
-  }
+  } catch {}
   return 'Not set';
 }
 
@@ -642,7 +635,8 @@ async function fetchRestaurantAddress(restaurantId) {
 
   try {
     // Show loading state
-    addressDisplay.innerHTML = '<small class="text-muted"><i class="fas fa-spinner fa-spin"></i> Loading address...</small>';
+    addressDisplay.innerHTML =
+      '<small class="text-muted"><i class="fas fa-spinner fa-spin"></i> Loading address...</small>';
     addressDisplay.style.display = 'block';
 
     // Get CSRF token
@@ -680,10 +674,7 @@ async function fetchRestaurantAddress(restaurantId) {
     } else {
       hideRestaurantAddress();
     }
-  } catch (error) {
-    console.warn('Failed to fetch restaurant address:', error);
-    hideRestaurantAddress();
-  }
+  } catch {}
 }
 
 async function fetchRestaurantDefaultCategory(restaurantId) {
@@ -715,9 +706,7 @@ async function fetchRestaurantDefaultCategory(restaurantId) {
         return result.data.category_id;
       }
     }
-  } catch (error) {
-    console.warn('Failed to fetch restaurant default category:', error);
-  }
+  } catch {}
   return null;
 }
 
@@ -795,9 +784,7 @@ function setupCategoryRestaurantHandling(form) {
 
   // Helper function to set category by ID
   function setCategoryById(categoryIdValue) {
-    const optionExists = Array.from(categorySelect.options).some(
-      (option) => option.value === String(categoryIdValue),
-    );
+    const optionExists = Array.from(categorySelect.options).some((option) => option.value === String(categoryIdValue));
     if (optionExists) {
       isProgrammaticChange = true;
       categorySelect.value = String(categoryIdValue);
@@ -870,11 +857,7 @@ function setupCategoryRestaurantHandling(form) {
         // Category name not found in options, try fallback to default category
         await trySetDefaultCategory(restaurantId);
       }
-    } catch (error) {
-      console.warn('Failed to update category based on restaurant type:', error);
-      // Fallback to default category if restaurant fetch fails
-      await trySetDefaultCategory(restaurantId);
-    }
+    } catch {}
   }
 
   // Handle restaurant change
@@ -927,10 +910,7 @@ async function initializeExpenseForm() {
     try {
       const detectedTimezone = await getBrowserTimezone();
       timezoneInput.value = detectedTimezone;
-    } catch (error) {
-      console.warn('Failed to detect timezone:', error);
-      timezoneInput.value = 'UTC';
-    }
+    } catch {}
   }
 
   // Set up form submission handler
@@ -992,8 +972,10 @@ function applyOCRSuggestion(field, value) {
     if (restaurantSelect) {
       // Search for restaurant by name (fuzzy match)
       for (const option of restaurantSelect.options) {
-        if (option.text.toLowerCase().includes(value.toLowerCase()) ||
-          value.toLowerCase().includes(option.text.toLowerCase())) {
+        if (
+          option.text.toLowerCase().includes(value.toLowerCase()) ||
+          value.toLowerCase().includes(option.text.toLowerCase())
+        ) {
           restaurantSelect.value = option.value;
           restaurantSelect.dispatchEvent(new Event('change', { bubbles: true }));
           showNotification('Restaurant updated from receipt', 'success');
@@ -1094,9 +1076,7 @@ function compareTimes(formTime, ocrTime) {
     const ocrTotalMinutes = ocrHours * 60 + ocrMinutes;
     const timeDiff = Math.abs(formTotalMinutes - ocrTotalMinutes);
     return timeDiff <= 15; // ±15 minute tolerance
-  } catch {
-    return false;
-  }
+  } catch {}
 }
 
 /**
@@ -1116,13 +1096,22 @@ function updateAddressComparisonInRow(formValueCell, row, address, ocrAddress) {
     addressFormatDiffers = comparison.formatDiffers;
   } else {
     // Fallback: Simple comparison
-    const formAddressLower = address.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
-    const ocrAddressLower = ocrAddress.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
-    addressMatch = formAddressLower && ocrAddressLower && (
-      formAddressLower === ocrAddressLower ||
-      formAddressLower.includes(ocrAddressLower) ||
-      ocrAddressLower.includes(formAddressLower)
-    );
+    const formAddressLower = address
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const ocrAddressLower = ocrAddress
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    addressMatch =
+      formAddressLower &&
+      ocrAddressLower &&
+      (formAddressLower === ocrAddressLower ||
+        formAddressLower.includes(ocrAddressLower) ||
+        ocrAddressLower.includes(formAddressLower));
   }
   const matchClass = addressMatch && !addressFormatDiffers ? 'text-success' : 'text-warning';
   formValueCell.className = matchClass;
@@ -1132,11 +1121,12 @@ function updateAddressComparisonInRow(formValueCell, row, address, ocrAddress) {
   }
   const matchIcon = row.querySelector('td:first-child i');
   if (matchIcon) {
-    matchIcon.className = addressMatch && !addressFormatDiffers
-      ? 'fas fa-check-circle'
-      : addressMatch && addressFormatDiffers
-        ? 'fas fa-check-circle text-warning'
-        : 'fas fa-exclamation-triangle';
+    matchIcon.className =
+      addressMatch && !addressFormatDiffers
+        ? 'fas fa-check-circle'
+        : addressMatch && addressFormatDiffers
+          ? 'fas fa-check-circle text-warning'
+          : 'fas fa-exclamation-triangle';
   }
   const actionCell = row.querySelector('td:last-child');
   if (actionCell) {
@@ -1299,13 +1289,7 @@ function displayReconciliationResults(ocrData) {
 
       // Also format for display (with timezone context)
       ocrDateInBrowserTz = ocrDateOnly;
-    } catch (error) {
-      // Fallback: try simple date extraction if timezone conversion fails
-      console.warn('Timezone conversion failed, using fallback:', error);
-      const [fallbackDate] = ocrData.date.split('T');
-      ocrDateOnly = fallbackDate;
-      ocrDateInBrowserTz = ocrDateOnly;
-    }
+    } catch {}
 
     // Compare dates (both should now be in YYYY-MM-DD format, browser timezone context)
     // Allow ±1 day difference for timezone edge cases
@@ -1328,21 +1312,12 @@ function displayReconciliationResults(ocrData) {
   // Time comparison
   if (ocrData.time) {
     // Extract time from form time input (type="time" format: HH:mm in 24-hour format)
-    const formTime = timeInput && timeInput.value
-      ? formatTimeTo12Hour(timeInput.value)
-      : 'Not set';
+    const formTime = timeInput && timeInput.value ? formatTimeTo12Hour(timeInput.value) : 'Not set';
 
     // Compare times with ±15 minute tolerance
     const timeMatch = compareTimes(formTime, ocrData.time);
 
-    const row = createReconciliationRow(
-      'Time',
-      formTime,
-      ocrData.time,
-      timeMatch,
-      ocrData.time,
-      'time',
-    );
+    const row = createReconciliationRow('Time', formTime, ocrData.time, timeMatch, ocrData.time, 'time');
     tbody.appendChild(row);
   }
 
@@ -1473,13 +1448,22 @@ function displayReconciliationResults(ocrData) {
         addressFormatDiffers = comparison.formatDiffers;
       } else {
         // Fallback: Simple address comparison (normalize and compare)
-        const formAddressLower = formAddress.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
-        const ocrAddressLower = ocrData.restaurant_address.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
-        addressMatch = formAddressLower && ocrAddressLower && (
-          formAddressLower === ocrAddressLower ||
-          formAddressLower.includes(ocrAddressLower) ||
-          ocrAddressLower.includes(formAddressLower)
-        );
+        const formAddressLower = formAddress
+          .toLowerCase()
+          .replace(/[^\w\s]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const ocrAddressLower = ocrData.restaurant_address
+          .toLowerCase()
+          .replace(/[^\w\s]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        addressMatch =
+          formAddressLower &&
+          ocrAddressLower &&
+          (formAddressLower === ocrAddressLower ||
+            formAddressLower.includes(ocrAddressLower) ||
+            ocrAddressLower.includes(formAddressLower));
       }
     }
 
@@ -1564,8 +1548,12 @@ function displayReconciliationResults(ocrData) {
     const phoneMatch = formPhoneNormalized && ocrPhoneNormalized && formPhoneNormalized === ocrPhoneNormalized;
     const hasBothValues = formPhoneNormalized && ocrPhoneNormalized;
 
-    const matchClass = phoneMatch ? 'text-success' : (hasBothValues ? 'text-warning' : 'text-muted');
-    const matchIconClass = phoneMatch ? 'fas fa-check-circle' : (hasBothValues ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle');
+    const matchClass = phoneMatch ? 'text-success' : hasBothValues ? 'text-warning' : 'text-muted';
+    const matchIconClass = phoneMatch
+      ? 'fas fa-check-circle'
+      : hasBothValues
+        ? 'fas fa-exclamation-triangle'
+        : 'fas fa-info-circle';
 
     const row = document.createElement('tr');
     const fieldCell = document.createElement('td');
@@ -1618,7 +1606,8 @@ function displayReconciliationResults(ocrData) {
     // Normalize URLs for comparison (remove http://, https://, www., trailing slashes)
     const normalizeWebsite = (url) => {
       if (!url || url === 'Not set' || url === 'Not found on receipt') return '';
-      return url.toLowerCase()
+      return url
+        .toLowerCase()
         .replace(/^https?:\/\//, '')
         .replace(/^www\./, '')
         .replace(/\/$/, '');
@@ -1626,11 +1615,16 @@ function displayReconciliationResults(ocrData) {
 
     const formWebsiteNormalized = normalizeWebsite(formWebsite);
     const ocrWebsiteNormalized = normalizeWebsite(ocrWebsite);
-    const websiteMatch = formWebsiteNormalized && ocrWebsiteNormalized && formWebsiteNormalized === ocrWebsiteNormalized;
+    const websiteMatch =
+      formWebsiteNormalized && ocrWebsiteNormalized && formWebsiteNormalized === ocrWebsiteNormalized;
     const hasBothValues = formWebsiteNormalized && ocrWebsiteNormalized;
 
-    const matchClass = websiteMatch ? 'text-success' : (hasBothValues ? 'text-warning' : 'text-muted');
-    const matchIconClass = websiteMatch ? 'fas fa-check-circle' : (hasBothValues ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle');
+    const matchClass = websiteMatch ? 'text-success' : hasBothValues ? 'text-warning' : 'text-muted';
+    const matchIconClass = websiteMatch
+      ? 'fas fa-check-circle'
+      : hasBothValues
+        ? 'fas fa-exclamation-triangle'
+        : 'fas fa-info-circle';
 
     const row = document.createElement('tr');
     const fieldCell = document.createElement('td');
@@ -1717,9 +1711,7 @@ function viewReceipt() {
       const blobUrl = URL.createObjectURL(file);
       window.currentReceiptBlobUrl = blobUrl;
       window.open(blobUrl, '_blank');
-    } catch (_error) {
-      showNotification('Failed to open receipt', 'error');
-    }
+    } catch (_error) {}
   } else {
     // Check for existing receipt URL
     const existingReceiptUrl = receiptInput.getAttribute('data-existing-receipt');
@@ -1799,12 +1791,7 @@ async function processReceiptOCR() {
       const urlParts = existingReceiptUrl.split('/');
       const filename = urlParts[urlParts.length - 1].split('?')[0] || 'receipt.pdf';
       file = new File([blob], filename, { type: blob.type || contentType || 'application/octet-stream' });
-    } catch (error) {
-      console.error('Error fetching existing receipt from S3:', error);
-      const errorMessage = error.message || 'Failed to load existing receipt';
-      showNotification(errorMessage, 'error');
-      return;
-    }
+    } catch {}
   }
 
   // Validate file size (5MB)
@@ -1893,7 +1880,8 @@ async function processReceiptOCR() {
         // Provide helpful message for 503 (service unavailable)
         if (response.status === 503) {
           if (errorResult.message && errorResult.message.includes('OCR service not available')) {
-            errorMessage = 'Receipt processing is not available. AWS Textract is not configured. Please contact support.';
+            errorMessage =
+              'Receipt processing is not available. AWS Textract is not configured. Please contact support.';
           } else if (errorResult.message && errorResult.message.includes('OCR is disabled')) {
             errorMessage = 'Receipt processing is currently disabled.';
           } else {
@@ -1926,10 +1914,7 @@ async function processReceiptOCR() {
     } else {
       showNotification(result.message || 'Failed to process receipt', 'error');
     }
-  } catch (error) {
-    console.error('Error processing receipt:', error);
-    showNotification(`Failed to process receipt: ${error.message || 'Unknown error'}`, 'error');
-  } finally {
+  } catch {} finally {
     // Reset processing status
     if (statusDiv && statusText) {
       statusDiv.style.display = 'none';

@@ -308,16 +308,32 @@ function compareAddressesSemantic(address1, address2) {
   const normalized2 = normalizeAddressToUSPS(address2);
 
   // Remove punctuation and extra whitespace for comparison
-  const clean1 = normalized1.replace(/[^\w\s]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
-  const clean2 = normalized2.replace(/[^\w\s]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const clean1 = normalized1
+    .replace(/[^\w\s]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  const clean2 = normalized2
+    .replace(/[^\w\s]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 
   const isMatch = clean1 === clean2;
 
   // Check if original formats differ (but normalized versions match)
-  const originalClean1 = address1.replace(/[^\w\s]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
-  const originalClean2 = address2.replace(/[^\w\s]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const originalClean1 = address1
+    .replace(/[^\w\s]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  const originalClean2 = address2
+    .replace(/[^\w\s]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  const formatDiffers = isMatch && (originalClean1 !== originalClean2);
+  const formatDiffers = isMatch && originalClean1 !== originalClean2;
 
   return { isMatch, formatDiffers };
 }

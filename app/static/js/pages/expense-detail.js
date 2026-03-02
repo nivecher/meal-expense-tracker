@@ -41,7 +41,6 @@ export function initExpenseDetail() {
       }
     });
   }
-
 }
 
 // Initialize when DOM is ready

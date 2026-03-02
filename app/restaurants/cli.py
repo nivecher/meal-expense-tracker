@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Optional
+from typing import Any, Callable, Optional, cast
 
 import click
 from flask import Flask, current_app
@@ -34,7 +34,6 @@ def register_commands(app: Flask) -> None:
     # Add commands to the restaurant group
     restaurant_cli.add_command(list_restaurants)
     restaurant_cli.add_command(validate_restaurants)
-    restaurant_cli.add_command(backfill_coordinates)
 
 
 def _search_google_places_by_name_and_address(name: str, address: str | None = None) -> list[dict]:
@@ -275,7 +274,15 @@ def _get_target_users(user_id: int | None, username: str | None, all_users: bool
     return []
 
 
-def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
+def _validation_requests_enterprise_fields(sections: frozenset[str] | None) -> bool:
+    """Return True when requested validation sections require Enterprise fields."""
+    if sections is None:
+        # "Validate all" includes phone/price checks.
+        return True
+    return "phone" in sections or "price_level" in sections
+
+
+def _validate_restaurant_with_google(restaurant: Restaurant, sections: frozenset[str] | None = None) -> dict:
     """Validate restaurant information using new Google Places API service.
 
     Args:
@@ -298,12 +305,14 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                     }
                 raise
 
-            # Use CLI validation field mask (includes all tiers for full validation)
-            from app.services.google_places_service import FIELD_MASKS
-
-            place_data = places_service.get_place_details(
-                restaurant.google_place_id, field_mask=FIELD_MASKS["cli_validation"]
+            requested_enterprise = _validation_requests_enterprise_fields(sections)
+            owner_has_advanced_features = bool(getattr(restaurant.user, "has_advanced_features", False))
+            field_mask = places_service.get_place_details_field_mask(
+                use_case="cli_validation",
+                include_enterprise=requested_enterprise,
+                user_has_advanced_features=owner_has_advanced_features,
             )
+            place_data = places_service.get_place_details(restaurant.google_place_id, field_mask=field_mask)
 
             if not place_data:
                 return {
@@ -314,8 +323,8 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
             # Extract restaurant data using the service
             google_data = places_service.extract_restaurant_data(place_data)
 
-            # PRO TIER: Extract website and price_level for validation
-            # ENTERPRISE TIER: Extract rating
+            # website is available in non-Enterprise mask.
+            # phone/price/rating are only populated when Enterprise fields are enabled.
             google_website = google_data.get("website")
             google_price_level = google_data.get("price_level")
 
@@ -338,11 +347,15 @@ def _validate_restaurant_with_google(restaurant: Restaurant) -> dict:
                 "google_state_short": google_data.get("state_short"),
                 "google_postal_code": google_data.get("postal_code"),
                 "google_country": google_data.get("country"),
+                "google_latitude": google_data.get("latitude"),
+                "google_longitude": google_data.get("longitude"),
                 "google_service_level": {
                     "level": places_service.detect_service_level_from_data(place_data)[0],
                     "confidence": places_service.detect_service_level_from_data(place_data)[1],
                 },
                 "google_cuisine": places_service.analyze_restaurant_types(place_data).get("cuisine_type"),
+                "advanced_features_enabled": owner_has_advanced_features,
+                "enterprise_fields_used": isinstance(field_mask, str) and "nationalPhoneNumber" in field_mask,
                 "errors": [],
             }
         else:
@@ -556,6 +569,34 @@ def _get_restaurants_to_validate(
         return restaurants_to_validate, counts
 
 
+def _run_section_checks(
+    restaurant: Restaurant,
+    validation_result: dict,
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+    should_check: Callable[[str], bool],
+) -> None:
+    """Run all section-specific mismatch checks."""
+    if should_check("name"):
+        _check_name_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+    if should_check("address"):
+        _check_address_mismatches(restaurant, validation_result, mismatches, fixes_to_apply)
+    if should_check("service_level"):
+        _check_service_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+    if should_check("price_level"):
+        _check_price_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+    if should_check("website"):
+        _check_website_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+    if should_check("cuisine"):
+        _check_cuisine_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+    if should_check("phone"):
+        _check_phone_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+    if should_check("type"):
+        _check_type_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+    if should_check("coordinates"):
+        _check_coordinates_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+
+
 def _check_restaurant_mismatches(
     restaurant: Restaurant,
     validation_result: dict,
@@ -571,34 +612,12 @@ def _check_restaurant_mismatches(
     mismatches: list[str] = []
     fixes_to_apply: dict[str, str] = {}
     run_all = sections is None or len(sections) == 0
+    sections_set = sections or frozenset()
 
     def _should_check(section: str) -> bool:
-        return run_all or section in (sections or frozenset())
+        return run_all or section in sections_set
 
-    if _should_check("name"):
-        _check_name_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
-
-    if _should_check("address"):
-        _check_address_mismatches(restaurant, validation_result, mismatches, fixes_to_apply)
-
-    if _should_check("service_level"):
-        _check_service_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
-
-    if _should_check("price_level"):
-        _check_price_level_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
-
-    if _should_check("website"):
-        _check_website_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
-
-    if _should_check("cuisine"):
-        _check_cuisine_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
-
-    if _should_check("phone"):
-        _check_phone_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
-
-    if _should_check("type"):
-        _check_type_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
-
+    _run_section_checks(restaurant, validation_result, mismatches, fixes_to_apply, _should_check)
     return mismatches, fixes_to_apply
 
 
@@ -618,11 +637,10 @@ def _check_name_mismatch(
         fixes_to_apply["name"] = google_name
 
 
-def _check_address_mismatches(
+def _check_address_line_mismatches(
     restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
 ) -> None:
-    """Check for address component mismatches (semantic for address lines, normalized for country)."""
-    # Address lines: semantic comparison so "South State Highway" vs "S State Hwy" do not mismatch
+    """Check address line 1 and 2 mismatches using semantic comparison."""
     for google_field, restaurant_field, display_name in [
         ("google_address_line_1", "address_line_1", "Address Line 1"),
         ("google_address_line_2", "address_line_2", "Address Line 2"),
@@ -636,14 +654,15 @@ def _check_address_mismatches(
         is_match, _ = compare_addresses_semantic(restaurant_value or "", google_value or "")
         if is_match:
             continue
-        if restaurant_value:
-            mismatches.append(f"{display_name}: '{restaurant_value}' vs Google: '{google_value}'")
-            fixes_to_apply[restaurant_field] = google_value
-        else:
-            mismatches.append(f"{display_name}: '{restaurant_value or 'N/A'}' vs Google: '{google_value}'")
-            fixes_to_apply[restaurant_field] = google_value
+        msg_val = restaurant_value if restaurant_value else "N/A"
+        mismatches.append(f"{display_name}: '{msg_val}' vs Google: '{google_value}'")
+        fixes_to_apply[restaurant_field] = google_value
 
-    # City and postal code: suggest Google value when stored is empty
+
+def _check_city_postal_mismatches(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check city and postal code mismatches."""
     for google_field, restaurant_field, display_name in [
         ("google_city", "city", "City"),
         ("google_postal_code", "postal_code", "Postal Code"),
@@ -659,7 +678,11 @@ def _check_address_mismatches(
             mismatches.append(f"{display_name}: '{restaurant_value}' vs Google: '{google_value}'")
             fixes_to_apply[restaurant_field] = google_value
 
-    # Country: normalize to ISO 2-letter (USA/United States -> US) for comparison and fix
+
+def _check_country_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check country mismatch with normalized ISO 2-letter comparison."""
     google_country = validation_result.get("google_country")
     restaurant_country = restaurant.country
     norm_google = normalize_country_to_iso2(google_country or "")
@@ -671,11 +694,15 @@ def _check_address_mismatches(
         mismatches.append(f"Country: 'N/A' vs Google: '{google_country}'")
         fixes_to_apply["country"] = norm_google
 
-    # State: specialized matching (us.states) and suggest 2-letter fix
-    current_data = {
-        "state": restaurant.state,
-        "country": restaurant.country,
-    }
+
+def _check_address_mismatches(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for address component mismatches (semantic for address lines, normalized for country)."""
+    _check_address_line_mismatches(restaurant, validation_result, mismatches, fixes_to_apply)
+    _check_city_postal_mismatches(restaurant, validation_result, mismatches, fixes_to_apply)
+    _check_country_mismatch(restaurant, validation_result, mismatches, fixes_to_apply)
+    current_data = {"state": restaurant.state, "country": restaurant.country}
     _check_state_mismatch(current_data, validation_result, mismatches, fixes_to_apply)
 
 
@@ -783,6 +810,9 @@ def _check_service_level_mismatch(
                 confidence = 0.0
         else:
             confidence = 0.0
+
+        if not isinstance(google_service_level, str):
+            return
 
         from app.restaurants.services import validate_restaurant_service_level
 
@@ -894,6 +924,31 @@ def _check_type_mismatch(
             fixes_to_apply["type"] = google_primary_type
 
 
+def _check_coordinates_mismatch(
+    restaurant: Restaurant, validation_result: dict, mismatches: list, fixes_to_apply: dict
+) -> None:
+    """Check for missing coordinates when Google has them."""
+    google_lat = validation_result.get("google_latitude")
+    google_lng = validation_result.get("google_longitude")
+
+    if google_lat is None and google_lng is None:
+        return
+
+    has_coords = restaurant.latitude is not None and restaurant.longitude is not None
+    if has_coords:
+        return
+
+    restaurant_display = f"{restaurant.latitude:.6f}, {restaurant.longitude:.6f}" if has_coords else "Not set"
+    google_display = (
+        f"{google_lat:.6f}, {google_lng:.6f}" if google_lat is not None and google_lng is not None else "N/A"
+    )
+    mismatches.append(f"Coordinates: '{restaurant_display}' vs Google: '{google_display}'")
+    if google_lat is not None:
+        fixes_to_apply["latitude"] = float(google_lat)
+    if google_lng is not None:
+        fixes_to_apply["longitude"] = float(google_lng)
+
+
 def _prompt_yn_no_default(message: str) -> bool:
     """Prompt for y/n with no default - user must explicitly respond y or n."""
 
@@ -905,7 +960,7 @@ def _prompt_yn_no_default(message: str) -> bool:
             return False
         raise click.BadParameter("Please enter y or n")
 
-    return click.prompt(message, type=_parse_yn)
+    return cast(bool, click.prompt(message, type=_parse_yn))
 
 
 def _get_fix_display_name(fix_key: str) -> str:
@@ -924,6 +979,8 @@ def _get_fix_display_name(fix_key: str) -> str:
         "cuisine": "Cuisine",
         "phone": "Phone",
         "type": "Type",
+        "latitude": "Latitude",
+        "longitude": "Longitude",
     }
     return display_names.get(fix_key, fix_key.replace("_", " ").title())
 
@@ -956,6 +1013,8 @@ def _apply_restaurant_fixes(
             "cuisine": "cuisine",
             "phone": "phone",
             "type": "type",
+            "latitude": "latitude",
+            "longitude": "longitude",
         }
         for fix_key, new_value in fixes_to_apply.items():
             field_name = field_mappings.get(fix_key, fix_key)
@@ -984,7 +1043,7 @@ def _apply_restaurant_fixes(
         return False
 
 
-def _apply_restaurant_field_fixes(restaurant: Restaurant, fixes_to_apply: dict[str, str]) -> None:
+def _apply_restaurant_field_fixes(restaurant: Restaurant, fixes_to_apply: dict) -> None:
     """Apply field fixes to restaurant object."""
     field_mappings = {
         "name": "name",
@@ -1000,6 +1059,8 @@ def _apply_restaurant_field_fixes(restaurant: Restaurant, fixes_to_apply: dict[s
         "cuisine": "cuisine",
         "phone": "phone",
         "type": "type",
+        "latitude": "latitude",
+        "longitude": "longitude",
     }
 
     for fix_key, field_name in field_mappings.items():
@@ -1012,9 +1073,8 @@ def _format_address_value(value: str | None) -> str:
     return value if value else "(not set)"
 
 
-def _address_fields_differ(restaurant: Restaurant, validation_result: dict) -> bool:
-    """Return True if any address field differs between stored and Google data."""
-    # Address lines: semantic comparison
+def _address_lines_differ(restaurant: Restaurant, validation_result: dict) -> bool:
+    """Return True if address line 1 or 2 differs (semantic comparison)."""
     for google_field, restaurant_field in [
         ("google_address_line_1", "address_line_1"),
         ("google_address_line_2", "address_line_2"),
@@ -1027,7 +1087,11 @@ def _address_fields_differ(restaurant: Restaurant, validation_result: dict) -> b
             is_match, _ = compare_addresses_semantic(stored_val or "", google_val or "")
             if not is_match:
                 return True
-    # City, postal code: simple comparison
+    return False
+
+
+def _city_postal_differ(restaurant: Restaurant, validation_result: dict) -> bool:
+    """Return True if city or postal code differs."""
     for google_field, restaurant_field in [
         ("google_city", "city"),
         ("google_postal_code", "postal_code"),
@@ -1036,14 +1100,18 @@ def _address_fields_differ(restaurant: Restaurant, validation_result: dict) -> b
         stored_val = getattr(restaurant, restaurant_field)
         if google_val and (not stored_val or stored_val.lower() != google_val.lower()):
             return True
-    # Country: normalized comparison
+    return False
+
+
+def _country_differs(restaurant: Restaurant, validation_result: dict) -> bool:
+    """Return True if country differs (normalized comparison)."""
     norm_google = normalize_country_to_iso2(validation_result.get("google_country") or "")
     norm_stored = normalize_country_to_iso2(restaurant.country or "")
-    if norm_google and norm_stored != norm_google:
-        return True
-    if norm_google and not restaurant.country:
-        return True
-    # State: show if stored differs from any Google state format
+    return bool(norm_google and (norm_stored != norm_google or not restaurant.country))
+
+
+def _state_differs(restaurant: Restaurant, validation_result: dict) -> bool:
+    """Return True if state differs from any Google state format."""
     stored_state = (restaurant.state or "").strip().lower()
     google_states = [
         validation_result.get("google_state_short"),
@@ -1051,12 +1119,69 @@ def _address_fields_differ(restaurant: Restaurant, validation_result: dict) -> b
         validation_result.get("google_state_long"),
     ]
     google_vals = [g.strip().lower() for g in google_states if g and g.strip()]
-    if google_vals and not stored_state:
+    if not google_vals:
+        return False
+    if not stored_state:
         return True
-    if stored_state and google_vals:
-        if stored_state not in google_vals:
-            return True
-    return False
+    return stored_state not in google_vals
+
+
+def _address_fields_differ(restaurant: Restaurant, validation_result: dict) -> bool:
+    """Return True if any address field differs between stored and Google data."""
+    return (
+        _address_lines_differ(restaurant, validation_result)
+        or _city_postal_differ(restaurant, validation_result)
+        or _country_differs(restaurant, validation_result)
+        or _state_differs(restaurant, validation_result)
+    )
+
+
+def _address_line_field_differs(
+    restaurant: Restaurant, validation_result: dict, restaurant_field: str, google_val: str | None
+) -> bool:
+    """Return True if address_line_1 or address_line_2 differs."""
+    stored = getattr(restaurant, restaurant_field)
+    if not google_val and not stored:
+        return False
+    if not google_val:
+        return False
+    is_match, _ = compare_addresses_semantic(stored or "", google_val or "")
+    return not is_match
+
+
+def _simple_field_differs(
+    restaurant: Restaurant, validation_result: dict, restaurant_field: str, google_val: str | None
+) -> bool:
+    """Return True if city or postal_code differs."""
+    stored = getattr(restaurant, restaurant_field)
+    if not google_val and not stored:
+        return False
+    return bool(google_val and (not stored or stored.lower() != google_val.lower()))
+
+
+def _country_field_differs(restaurant: Restaurant, google_val: str | None) -> bool:
+    """Return True if country differs."""
+    norm_google = normalize_country_to_iso2(google_val or "")
+    if not norm_google:
+        return False
+    norm_stored = normalize_country_to_iso2(restaurant.country or "")
+    return norm_stored != norm_google or not restaurant.country
+
+
+def _state_field_differs(restaurant: Restaurant, validation_result: dict) -> bool:
+    """Return True if state differs."""
+    stored_state = (restaurant.state or "").strip().lower()
+    google_states = [
+        validation_result.get("google_state_short"),
+        validation_result.get("google_state"),
+        validation_result.get("google_state_long"),
+    ]
+    google_vals = [g.strip().lower() for g in google_states if g and g.strip()]
+    if not google_vals:
+        return False
+    if not stored_state:
+        return True
+    return stored_state not in google_vals
 
 
 def _address_field_differs(
@@ -1066,39 +1191,15 @@ def _address_field_differs(
     google_field: str,
 ) -> bool:
     """Return True if the given address field differs between stored and Google data."""
-    stored = getattr(restaurant, restaurant_field)
     google_val = validation_result.get(google_field)
-
     if restaurant_field in ("address_line_1", "address_line_2"):
-        if not google_val and not stored:
-            return False
-        if not google_val:
-            return False
-        is_match, _ = compare_addresses_semantic(stored or "", google_val or "")
-        return not is_match
+        return _address_line_field_differs(restaurant, validation_result, restaurant_field, google_val)
     if restaurant_field in ("city", "postal_code"):
-        if not google_val and not stored:
-            return False
-        return bool(google_val and (not stored or stored.lower() != google_val.lower()))
+        return _simple_field_differs(restaurant, validation_result, restaurant_field, google_val)
     if restaurant_field == "country":
-        norm_google = normalize_country_to_iso2(google_val or "")
-        norm_stored = normalize_country_to_iso2(restaurant.country or "")
-        if not norm_google:
-            return False
-        return norm_stored != norm_google or not restaurant.country
+        return _country_field_differs(restaurant, google_val)
     if restaurant_field == "state":
-        stored_state = (restaurant.state or "").strip().lower()
-        google_states = [
-            validation_result.get("google_state_short"),
-            validation_result.get("google_state"),
-            validation_result.get("google_state_long"),
-        ]
-        google_vals = [g.strip().lower() for g in google_states if g and g.strip()]
-        if not google_vals:
-            return False
-        if not stored_state:
-            return True
-        return stored_state not in google_vals
+        return _state_field_differs(restaurant, validation_result)
     return False
 
 
@@ -1152,6 +1253,10 @@ def _display_google_basic_info(validation_result: dict) -> None:
         click.echo(f"   📞 Phone: {validation_result['google_phone']}")
     if validation_result.get("google_website"):
         click.echo(f"   🌐 Website: {validation_result['google_website']}")
+    google_lat = validation_result.get("google_latitude")
+    google_lng = validation_result.get("google_longitude")
+    if google_lat is not None and google_lng is not None:
+        click.echo(f"   📍 Coordinates: {float(google_lat):.6f}, {float(google_lng):.6f}")
     if validation_result.get("google_price_level") is not None:
         from app.services.google_places_service import get_google_places_service
 
@@ -1196,23 +1301,38 @@ def _display_google_service_info(validation_result: dict) -> None:
         else:
             confidence = 0.0
 
-        if service_level != "unknown":
+        if isinstance(service_level, str) and service_level != "unknown":
             from app.restaurants.services import get_service_level_display_info
 
             display_info = get_service_level_display_info(service_level)
             click.echo(f"   🍽️  Service Level: {display_info['display_name']} (confidence: {confidence:.2f})")
 
 
-def _format_price_level_display(price_level: int | None) -> str:
+def _to_price_level_int(val: Any) -> int | None:
+    """Convert a value to price level int (0-4) or None for display purposes."""
+    if val is None:
+        return None
+    if isinstance(val, int):
+        return val
+    if isinstance(val, (str, bytes, float, bool)):
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
+def _format_price_level_display(price_level: Any) -> str:
     """Format price level for display with dollar signs, pretty name, and price range.
 
     Args:
-        price_level: Price level integer (0-4) or None
+        price_level: Price level integer (0-4), None, or convertible value (e.g. str "2")
 
     Returns:
         Formatted price level string (e.g. "$$ Moderate ($11-30)", "$$$$ Very Expensive ($61+)")
     """
-    if price_level is None:
+    level = _to_price_level_int(price_level)
+    if level is None:
         return "Not set"
 
     price_level_mapping = {
@@ -1223,7 +1343,7 @@ def _format_price_level_display(price_level: int | None) -> str:
         4: "$$$$ Very Expensive ($61+)",
     }
 
-    return price_level_mapping.get(price_level, str(price_level))
+    return price_level_mapping.get(level, str(level))
 
 
 def _echo_restaurant_header(restaurant: Restaurant, quiet: bool = False) -> None:
@@ -1239,6 +1359,89 @@ def _echo_restaurant_header(restaurant: Restaurant, quiet: bool = False) -> None
         click.echo(f"   Full Address: {restaurant.full_address}")
 
 
+def _process_valid_with_mismatches(
+    restaurant: Restaurant,
+    validation_result: dict,
+    mismatches: list[str],
+    fixes_to_apply: dict,
+    fix_mismatches: bool,
+    dry_run: bool,
+    validation_sections: frozenset[str] | None,
+    quiet: bool,
+    interactive: bool,
+) -> tuple[str, bool, bool]:
+    """Handle valid result that has mismatches."""
+    _echo_restaurant_header(restaurant, quiet=quiet)
+    if not quiet:
+        _display_google_info(validation_result)
+    click.echo("   ⚠️  Has mismatches:")
+    for mismatch in mismatches:
+        click.echo(f"      - {mismatch}")
+    if validation_sections is None or "address" in (validation_sections or frozenset()):
+        _display_address_comparison(restaurant, validation_result, quiet=quiet)
+    fixed = False
+    if fix_mismatches and fixes_to_apply:
+        fixed = _apply_restaurant_fixes(restaurant, fixes_to_apply, dry_run, interactive=interactive)
+    return "valid", fixed, True
+
+
+def _process_valid_no_mismatches(
+    restaurant: Restaurant, validation_result: dict, quiet: bool, show_mismatches_only: bool
+) -> tuple[str, bool, bool]:
+    """Handle valid result with no mismatches."""
+    if not show_mismatches_only:
+        _echo_restaurant_header(restaurant, quiet=quiet)
+        if not quiet:
+            _display_google_info(validation_result)
+        click.echo("   ✅ Valid")
+    return "valid", False, False
+
+
+def _process_restaurant_validation_with_meta(
+    restaurant: Restaurant,
+    fix_mismatches: bool,
+    dry_run: bool,
+    validation_sections: frozenset[str] | None = None,
+    quiet: bool = False,
+    show_mismatches_only: bool = False,
+    interactive: bool = False,
+) -> tuple[str, bool, bool]:
+    """Process validation for a single restaurant and return status and fix success."""
+    validation_result = _validate_restaurant_with_google(restaurant, sections=validation_sections)
+    valid = validation_result["valid"]
+
+    if valid is True:
+        mismatches, fixes_to_apply = _check_restaurant_mismatches(
+            restaurant, validation_result, sections=validation_sections
+        )
+        if mismatches:
+            return _process_valid_with_mismatches(
+                restaurant,
+                validation_result,
+                mismatches,
+                fixes_to_apply,
+                fix_mismatches,
+                dry_run,
+                validation_sections,
+                quiet,
+                interactive,
+            )
+        return _process_valid_no_mismatches(restaurant, validation_result, quiet, show_mismatches_only)
+
+    if valid is False:
+        _echo_restaurant_header(restaurant, quiet=quiet)
+        click.echo("   ❌ Invalid")
+        for error in validation_result["errors"]:
+            click.echo(f"      Error: {error}")
+        return "invalid", False, False
+
+    _echo_restaurant_header(restaurant, quiet=quiet)
+    click.echo("   ⚠️  Cannot validate")
+    for error in validation_result["errors"]:
+        click.echo(f"      Warning: {error}")
+    return "error", False, False
+
+
 def _process_restaurant_validation(
     restaurant: Restaurant,
     fix_mismatches: bool,
@@ -1248,56 +1451,17 @@ def _process_restaurant_validation(
     show_mismatches_only: bool = False,
     interactive: bool = False,
 ) -> tuple[str, bool]:
-    """Process validation for a single restaurant and return status and fix success."""
-    validation_result = _validate_restaurant_with_google(restaurant)
-
-    if validation_result["valid"] is True:
-        # Check for mismatches (optionally limited to specific sections)
-        mismatches, fixes_to_apply = _check_restaurant_mismatches(
-            restaurant, validation_result, sections=validation_sections
-        )
-
-        if mismatches:
-            # Show details first so user can see Google data before interactive prompts
-            _echo_restaurant_header(restaurant, quiet=quiet)
-            if not quiet:
-                _display_google_info(validation_result)
-
-            click.echo("   ⚠️  Has mismatches:")
-            for mismatch in mismatches:
-                click.echo(f"      - {mismatch}")
-
-            # Show address comparison only when validating address section
-            if validation_sections is None or "address" in (validation_sections or frozenset()):
-                _display_address_comparison(restaurant, validation_result, quiet=quiet)
-
-            fixed = False
-            if fix_mismatches and fixes_to_apply:
-                fixed = _apply_restaurant_fixes(restaurant, fixes_to_apply, dry_run, interactive=interactive)
-            return "valid", fixed
-        else:
-            # Valid with no mismatches - skip output when showing mismatches only
-            if not show_mismatches_only:
-                _echo_restaurant_header(restaurant, quiet=quiet)
-                if not quiet:
-                    _display_google_info(validation_result)
-                click.echo("   ✅ Valid")
-            return "valid", False
-
-    elif validation_result["valid"] is False:
-        # Invalid - always show in quiet mode (it's a problem)
-        _echo_restaurant_header(restaurant, quiet=quiet)
-        click.echo("   ❌ Invalid")
-        for error in validation_result["errors"]:
-            click.echo(f"      Error: {error}")
-        return "invalid", False
-    else:
-        # Cannot validate - always show in quiet mode (it's a problem)
-        _echo_restaurant_header(restaurant, quiet=quiet)
-        click.echo("   ⚠️  Cannot validate")
-        for error in validation_result["errors"]:
-            click.echo(f"      Warning: {error}")
-        return "error", False
+    """Backward-compatible wrapper for single-restaurant validation."""
+    status, fixed, _has_mismatch = _process_restaurant_validation_with_meta(
+        restaurant,
+        fix_mismatches,
+        dry_run,
+        validation_sections=validation_sections,
+        quiet=quiet,
+        show_mismatches_only=show_mismatches_only,
+        interactive=interactive,
+    )
+    return status, fixed
 
 
 def _handle_service_level_updates(
@@ -1329,6 +1493,44 @@ def _handle_service_level_updates(
         return 0, 0
 
 
+def _run_validation_loop(
+    restaurants_to_validate: list[Restaurant],
+    fix_mismatches: bool,
+    dry_run: bool,
+    validation_sections: frozenset[str] | None,
+    quiet: bool,
+    show_mismatches_only: bool,
+    interactive: bool,
+) -> tuple[int, int, int, int, int]:
+    """Run validation loop and return (valid_count, invalid_count, error_count, fixed_count, mismatch_count)."""
+    valid_count = invalid_count = error_count = fixed_count = mismatch_count = 0
+
+    for restaurant in restaurants_to_validate:
+        status, fixed, has_mismatch = _process_restaurant_validation_with_meta(
+            restaurant,
+            fix_mismatches,
+            dry_run,
+            validation_sections=validation_sections,
+            quiet=quiet,
+            show_mismatches_only=show_mismatches_only,
+            interactive=interactive,
+        )
+
+        if status == "valid":
+            valid_count += 1
+            if has_mismatch:
+                mismatch_count += 1
+        elif status == "invalid":
+            invalid_count += 1
+        else:
+            error_count += 1
+
+        if fixed:
+            fixed_count += 1
+
+    return valid_count, invalid_count, error_count, fixed_count, mismatch_count
+
+
 def _handle_restaurant_validation(
     restaurants_to_validate: list[Restaurant],
     restaurant_counts: dict[str, int],
@@ -1347,7 +1549,6 @@ def _handle_restaurant_validation(
     """Handle restaurant validation with Google Places API."""
     if not restaurants_to_validate:
         click.echo("⚠️  No restaurants with Google Place IDs found to validate")
-        # Still show summary even when no restaurants to validate
         _display_validation_summary(
             0,
             0,
@@ -1369,48 +1570,20 @@ def _handle_restaurant_validation(
 
     if dry_run and fix_mismatches:
         click.echo("🔍 DRY RUN MODE - No changes will be made\n")
-
     if show_mismatches_only:
         click.echo("🔍 Showing only restaurants with mismatches or errors\n")
     if quiet:
         click.echo("🔇 Quiet mode: reduced output detail\n")
 
-    valid_count = 0
-    invalid_count = 0
-    error_count = 0
-    fixed_count = 0
-    mismatch_count = 0
-
-    for restaurant in restaurants_to_validate:
-        status, fixed = _process_restaurant_validation(
-            restaurant,
-            fix_mismatches,
-            dry_run,
-            validation_sections=validation_sections,
-            quiet=quiet,
-            show_mismatches_only=show_mismatches_only,
-            interactive=interactive,
-        )
-
-        if status == "valid":
-            valid_count += 1
-
-            # Check for mismatches (same sections filter for count)
-            validation_result = _validate_restaurant_with_google(restaurant)
-            if validation_result["valid"] is True:
-                mismatches, _ = _check_restaurant_mismatches(
-                    restaurant, validation_result, sections=validation_sections
-                )
-                if mismatches:
-                    mismatch_count += 1
-
-        elif status == "invalid":
-            invalid_count += 1
-        else:
-            error_count += 1
-
-        if fixed:
-            fixed_count += 1
+    valid_count, invalid_count, error_count, fixed_count, mismatch_count = _run_validation_loop(
+        restaurants_to_validate,
+        fix_mismatches,
+        dry_run,
+        validation_sections,
+        quiet,
+        show_mismatches_only,
+        interactive,
+    )
 
     _display_validation_summary(
         valid_count,
@@ -1610,9 +1783,64 @@ def _build_validation_sections(
     website: bool,
     cuisine: bool,
     phone: bool,
+    coordinates: bool = False,
+    basic: bool = False,
+    advanced: bool = False,
+    all_fields: bool = False,
 ) -> frozenset[str] | None:
-    """Build validation sections set from CLI flags. None means validate all."""
+    """Build validation sections set from CLI flags. Defaults to basic if no flags provided."""
     sections = []
+
+    # Handle --all-fields flag (includes all fields)
+    if all_fields:
+        sections.extend(
+            [
+                "address",
+                "type",
+                "name",
+                "service_level",
+                "website",
+                "cuisine",
+                "coordinates",
+                "phone",
+                "price_level",
+                "rating",
+            ]
+        )
+        return frozenset(sections)
+
+    # Default to basic fields if no specific flags provided
+    if not any(
+        [
+            address,
+            type_section,
+            name_section,
+            service_level,
+            price_level,
+            website,
+            cuisine,
+            phone,
+            coordinates,
+            basic,
+            advanced,
+            all_fields,
+        ]
+    ):
+        # Default to basic fields
+        sections.extend(["address", "type", "name", "service_level", "website", "cuisine", "coordinates"])
+        return frozenset(sections)
+
+    # Handle --basic flag (includes basic fields)
+    if basic:
+        sections.extend(["address", "type", "name", "service_level", "website", "cuisine", "coordinates"])
+        return frozenset(sections)
+
+    # Handle --advanced flag (includes advanced fields)
+    if advanced:
+        sections.extend(["phone", "price_level", "rating"])
+        return frozenset(sections)
+
+    # Handle individual field flags
     if address:
         sections.append("address")
     if type_section:
@@ -1629,61 +1857,10 @@ def _build_validation_sections(
         sections.append("cuisine")
     if phone:
         sections.append("phone")
+    if coordinates:
+        sections.append("coordinates")
+
     return frozenset(sections) if sections else None
-
-
-@click.command("backfill-coordinates")
-@click.option("--user-id", type=int, help="Only backfill for a specific user")
-@click.option("--restaurant-id", type=int, help="Backfill a single restaurant by ID")
-@click.option("--dry-run", is_flag=True, help="Show what would be updated without saving")
-@with_appcontext
-def backfill_coordinates(
-    user_id: int | None,
-    restaurant_id: int | None,
-    dry_run: bool,
-) -> None:
-    """Fetch latitude/longitude from Google Places for restaurants that have place_id but no coordinates."""
-    from app.services.google_places_service import get_google_places_service
-
-    places_service = get_google_places_service()
-    if not places_service.api_key:
-        click.echo("❌ Google Maps API key not configured")
-        raise SystemExit(1)
-
-    query = Restaurant.query.filter(
-        Restaurant.google_place_id.isnot(None),
-        db.or_(Restaurant.latitude.is_(None), Restaurant.longitude.is_(None)),
-    )
-    if user_id:
-        query = query.filter_by(user_id=user_id)
-    if restaurant_id:
-        query = query.filter_by(id=restaurant_id)
-
-    restaurants = query.all()
-    if not restaurants:
-        click.echo("✅ No restaurants need coordinate backfill")
-        return
-
-    click.echo(f"📍 Backfilling coordinates for {len(restaurants)} restaurant(s)...")
-    updated = 0
-    for restaurant in restaurants:
-        place_data = places_service.get_place_details(restaurant.google_place_id)
-        if not place_data:
-            click.echo(f"   ⚠️  {restaurant.name} (ID {restaurant.id}): No place data")
-            continue
-        restaurant.update_from_google_places(place_data)
-        if restaurant.latitude and restaurant.longitude:
-            updated += 1
-            if dry_run:
-                click.echo(f"   [dry-run] {restaurant.name}: {restaurant.latitude:.6f}, {restaurant.longitude:.6f}")
-            else:
-                click.echo(f"   ✓ {restaurant.name}: {restaurant.latitude:.6f}, {restaurant.longitude:.6f}")
-
-    if not dry_run and updated > 0:
-        db.session.commit()
-        click.echo(f"\n✅ Updated {updated} restaurant(s) with coordinates")
-    elif dry_run:
-        click.echo(f"\n[dry-run] Would update {updated} restaurant(s)")
 
 
 @click.command("validate")
@@ -1722,6 +1899,13 @@ def backfill_coordinates(
     is_flag=True,
     help="Reduce output detail (compact headers, omit Google info)",
 )
+@click.option(
+    "--basic",
+    is_flag=True,
+    help="Validate basic fields only (address, name, type, service-level, website, cuisine, coordinates)",
+)
+@click.option("--advanced", is_flag=True, help="Validate advanced fields only (phone, price-level, rating)")
+@click.option("--all-fields", is_flag=True, help="Validate all fields (basic + advanced)")
 @click.option("--address", is_flag=True, help="Only validate address fields")
 @click.option("--type", "type_section", is_flag=True, help="Only validate restaurant type")
 @click.option("--name", "name_section", is_flag=True, help="Only validate restaurant name")
@@ -1730,6 +1914,7 @@ def backfill_coordinates(
 @click.option("--website", is_flag=True, help="Only validate website")
 @click.option("--cuisine", is_flag=True, help="Only validate cuisine")
 @click.option("--phone", is_flag=True, help="Only validate phone")
+@click.option("--coordinates", is_flag=True, help="Only validate latitude/longitude")
 @with_appcontext
 def validate_restaurants(
     user_id: int | None,
@@ -1752,6 +1937,10 @@ def validate_restaurants(
     website: bool,
     cuisine: bool,
     phone: bool,
+    coordinates: bool,
+    basic: bool,
+    advanced: bool,
+    all_fields: bool,
 ) -> None:
     """Validate restaurant information using Google Places API.
 
@@ -1772,12 +1961,36 @@ def validate_restaurants(
         flask restaurant validate --address --user-id 1
         flask restaurant validate --type --restaurant-id 123
         flask restaurant validate --address --type --cuisine --user-id 1
+        flask restaurant validate --coordinates --fix-mismatches --user-id 1
         flask restaurant validate --mismatches --all-users
         flask restaurant validate -m -q --all-users
         flask restaurant validate -f -i --user-id 1
+
+        # Basic validation only (no advanced fields)
+        flask restaurant validate --username mtd37 --basic
+        flask restaurant validate --username mtd37 --address --name --type
+
+        # Advanced validation only
+        flask restaurant validate --username mtd37 --advanced
+        flask restaurant validate --username mtd37 --phone --price-level
+
+        # All fields validation (basic + advanced)
+        flask restaurant validate --username mtd37 --all-fields
+        flask restaurant validate --username mtd37 --all-fields --fix-mismatches
     """
     validation_sections = _build_validation_sections(
-        address, type_section, name_section, service_level, price_level, website, cuisine, phone
+        address,
+        type_section,
+        name_section,
+        service_level,
+        price_level,
+        website,
+        cuisine,
+        phone,
+        coordinates,
+        basic,
+        advanced,
+        all_fields,
     )
     if validation_sections:
         click.echo(f"🔍 Validating sections: {', '.join(sorted(validation_sections))}")

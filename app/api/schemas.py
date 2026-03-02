@@ -14,6 +14,7 @@ class CategorySchema(Schema):
 class RestaurantSchema(Schema):
     id = fields.Int(dump_only=True)
     name = fields.Str(required=True)
+    location_name = fields.Str()
     type = fields.Str()
     description = fields.Str()
     address = fields.Str()
@@ -40,6 +41,7 @@ class RestaurantSchema(Schema):
     google_place_id = fields.Str()
 
     # Computed/derived fields
+    display_name = fields.Str(dump_only=True)
     full_name = fields.Str(dump_only=True)
     full_address = fields.Str(dump_only=True)
     google_maps_url = fields.Method("get_google_maps_url", dump_only=True)
@@ -68,6 +70,9 @@ class UserSchema(Schema):
     id = fields.Int(dump_only=True)
     username = fields.Str(required=True)
     email = fields.Email(required=True)
+    is_admin = fields.Bool(dump_only=True)
+    advanced_features_enabled = fields.Bool(dump_only=True)
+    has_advanced_features = fields.Bool(dump_only=True)
 
 
 class PasswordChangeSchema(Schema):

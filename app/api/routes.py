@@ -20,7 +20,7 @@ from app.utils.phone_utils import normalize_phone_for_comparison
 from app.utils.url_utils import normalize_website_for_comparison
 
 from . import bp, validate_api_csrf
-from .schemas import CategorySchema, ExpenseSchema, RestaurantSchema
+from .schemas import CategorySchema, ExpenseSchema, RestaurantSchema, UserSchema
 
 # Schema instances
 expense_schema = ExpenseSchema()
@@ -29,6 +29,7 @@ restaurant_schema = RestaurantSchema()
 restaurants_schema = RestaurantSchema(many=True)
 category_schema = CategorySchema()
 categories_schema = CategorySchema(many=True)
+user_schema = UserSchema()
 
 
 def _get_current_user() -> User:
@@ -63,6 +64,14 @@ def _handle_service_error(error: Exception, operation: str) -> tuple[Response, i
     )
 
 
+def _load_dict_payload(schema: Any) -> dict[str, Any]:
+    """Load and validate a JSON object payload from the request."""
+    payload = schema.load(request.get_json())
+    if not isinstance(payload, dict):
+        raise ValidationError("Invalid request payload")
+    return payload
+
+
 # Health Check
 @bp.route("/health")
 def health_check() -> Response:
@@ -81,7 +90,7 @@ def version_info() -> tuple[Response, int]:
     try:
         from app._version import __build_timestamp__, __version__
 
-        version_data = {
+        version_data: dict[str, str | None] = {
             "version": __version__,
             "build_timestamp": __build_timestamp__,
         }
@@ -90,12 +99,23 @@ def version_info() -> tuple[Response, int]:
         current_app.logger.warning(f"Could not import version information: {e}")
         version_data = {
             "version": "unknown",
-            "build_timestamp": "Not set",
+            "build_timestamp": None,
         }
-        return _create_api_response(data=version_data, message="Version information retrieved successfully")
+        return _create_api_response(data=version_data, message="Version information unavailable")
+
+
+# Current User Information
+@bp.route("/user/current", methods=["GET"])
+@login_required
+def get_current_user() -> tuple[Response, int]:
+    """Get current authenticated user information."""
+    try:
+        user = _get_current_user()
+        user_data = user_schema.dump(user)
+        return _create_api_response(data=user_data, message="User information retrieved successfully")
     except Exception as e:
-        current_app.logger.error(f"Error retrieving version information: {e}")
-        return _handle_service_error(e, "retrieve version information")
+        current_app.logger.error(f"Error getting current user: {e}")
+        return _create_api_response(message="Failed to get user information", status="error", code=500)
 
 
 # Cuisine Data
@@ -144,7 +164,7 @@ def create_expense() -> tuple[Response, int]:
     """Create a new expense."""
     try:
         user = _get_current_user()
-        data = expense_schema.load(request.get_json())
+        data = _load_dict_payload(expense_schema)
         expense = expense_services.create_expense_for_user(user.id, data)
         return _create_api_response(data=expense_schema.dump(expense), message="Expense created successfully", code=201)
     except ValidationError as e:
@@ -178,7 +198,7 @@ def update_expense(expense_id: int) -> tuple[Response, int]:
         if not expense:
             return jsonify({"status": "error", "message": "Expense not found"}), 404
 
-        data = expense_schema.load(request.get_json())
+        data = _load_dict_payload(expense_schema)
         updated_expense = expense_services.update_expense_for_user(expense, data)
         return _create_api_response(data=expense_schema.dump(updated_expense), message="Expense updated successfully")
     except ValidationError as e:
@@ -226,7 +246,7 @@ def create_restaurant() -> Response | tuple[Response, int]:
     """Create a new restaurant."""
     try:
         user = _get_current_user()
-        data = restaurant_schema.load(request.get_json())
+        data = _load_dict_payload(restaurant_schema)
         restaurant = restaurant_services.create_restaurant_for_user(user.id, data)
         return _create_api_response(
             data=restaurant_schema.dump(restaurant),
@@ -285,7 +305,7 @@ def update_restaurant(restaurant_id: int) -> tuple[Response, int]:
         if not restaurant:
             return jsonify({"status": "error", "message": "Restaurant not found"}), 404
 
-        data = restaurant_schema.load(request.get_json())
+        data = _load_dict_payload(restaurant_schema)
         updated_restaurant = restaurant_services.update_restaurant_for_user(restaurant, data)
         return _create_api_response(
             data=restaurant_schema.dump(updated_restaurant),
@@ -354,6 +374,7 @@ def validate_restaurant() -> Response | tuple[Response, int]:
         data = request.get_json()
         restaurant_id = data.get("restaurant_id")
         google_place_id = data.get("google_place_id", "").strip()
+        include_advanced_fields = data.get("include_advanced_fields", False)
 
         # Get restaurant and place_id (edit flow) or use place_id only (add flow)
         restaurant, place_id_to_use = _get_and_validate_restaurant()
@@ -366,7 +387,8 @@ def validate_restaurant() -> Response | tuple[Response, int]:
         elif not restaurant and restaurant_id:
             return _create_api_response(message="Restaurant not found", status="error", code=404)
 
-        validation_result = _validate_restaurant_with_google_api(place_id_to_use)
+        user = _get_current_user()
+        validation_result = _validate_restaurant_with_google_api(place_id_to_use, user, include_advanced_fields)
         if not validation_result.get("valid"):
             return _create_api_response(data=validation_result, message="Validation failed", status="error", code=400)
 
@@ -457,6 +479,8 @@ def _process_validation_results(restaurant: Any | None, validation_result: dict[
         "price_level": validation_result.get("google_price_level"),
         "phone": validation_result.get("google_phone"),
         "website": validation_result.get("google_website"),
+        "latitude": validation_result.get("google_latitude"),
+        "longitude": validation_result.get("google_longitude"),
         "description": None,  # Google Places doesn't provide descriptions
     }
 
@@ -468,16 +492,23 @@ def _process_validation_results(restaurant: Any | None, validation_result: dict[
             "current_data": current_data,
             "google_data": google_data,
             "restaurant_updated": fix_mismatches and bool(fixes_to_apply),
+            "advanced_features_enabled": bool(validation_result.get("advanced_features_enabled", False)),
+            "enterprise_fields_used": bool(validation_result.get("enterprise_fields_used", False)),
+            "enterprise_fields": ["phone", "price_level", "rating"],
         },
         message="Restaurant validated successfully",
     )
 
 
-def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
+def _validate_restaurant_with_google_api(
+    google_place_id: str, user: User, include_advanced_fields: bool = False
+) -> dict:
     """Validate restaurant information using centralized Google Places service.
 
     Args:
         google_place_id: Google Place ID to validate
+        user: Current user object
+        include_advanced_fields: Whether to include advanced fields in validation
 
     Returns:
         Dictionary with validation results
@@ -486,7 +517,12 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
         from app.services.google_places_service import get_google_places_service
 
         places_service = get_google_places_service()
-        place = places_service.get_place_details(google_place_id)
+        field_mask = places_service.get_place_details_field_mask(
+            use_case="place_details",
+            include_enterprise=include_advanced_fields and bool(user.has_advanced_features),
+            user_has_advanced_features=bool(user.has_advanced_features),
+        )
+        place = places_service.get_place_details(google_place_id, field_mask)
 
         if not place:
             return {
@@ -509,16 +545,20 @@ def _validate_restaurant_with_google_api(google_place_id: str) -> dict:
             "google_state_short": google_data.get("state_short"),
             "google_postal_code": google_data.get("postal_code"),
             "google_country": google_data.get("country"),
-            "google_rating": google_data.get("rating"),
+            "google_rating": google_data.get("rating") if include_advanced_fields else None,
             "google_status": google_data.get("business_status", "OPERATIONAL"),
             "types": google_data.get("types", []),
             "primary_type": google_data.get("primary_type"),
-            "google_phone": google_data.get("phone_number"),
+            "google_phone": google_data.get("phone_number") if include_advanced_fields else None,
             "google_website": google_data.get("website"),
             "google_cuisine": google_data.get("cuisine_type"),
-            "google_price_level": google_data.get("price_level"),
+            "google_price_level": google_data.get("price_level") if include_advanced_fields else None,
             "google_street_address": google_data.get("street_address"),  # Legacy field
             "google_service_level": places_service.detect_service_level_from_data(place),
+            "google_latitude": google_data.get("latitude"),
+            "google_longitude": google_data.get("longitude"),
+            "advanced_features_enabled": bool(user.has_advanced_features),
+            "enterprise_fields_used": include_advanced_fields and bool(user.has_advanced_features),
             "errors": [],
         }
 
@@ -555,6 +595,7 @@ def _check_restaurant_mismatches_api(
     _check_type_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
     _check_price_level_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
     _check_rating_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
+    _check_coordinates_mismatch_api(current_data, validation_result, mismatches, fixes_to_apply)
 
     return mismatches, fixes_to_apply
 
@@ -600,7 +641,9 @@ def _check_state_mismatch_api(
         two_letter = validation_result.get("google_state_short") or normalize_state_to_usps(
             validation_result.get("google_state") or validation_result.get("google_state_long") or ""
         )
-        fixes_to_apply["state"] = two_letter or google_state_long or google_state or google_state_short
+        state_fix = two_letter or google_state_long or google_state or google_state_short
+        if isinstance(state_fix, str):
+            fixes_to_apply["state"] = state_fix
         return
 
     if not isinstance(current_state, str):
@@ -848,6 +891,52 @@ def _check_rating_mismatch_api(
         fixes_to_apply["rating"] = str(google_float)
 
 
+def _check_coordinates_mismatch_api(
+    current_data: dict[str, Any],
+    validation_result: dict[str, Any],
+    mismatches: list[str],
+    fixes_to_apply: dict[str, str],
+) -> None:
+    """Check for coordinates mismatches (lat/lng vs Google)."""
+    google_lat = validation_result.get("google_latitude")
+    google_lng = validation_result.get("google_longitude")
+    if google_lat is None and google_lng is None:
+        return
+
+    def _parse_float(val: Any) -> float | None:
+        if val is None or val == "":
+            return None
+        try:
+            return float(val) if isinstance(val, (int, float)) else float(str(val))
+        except (ValueError, TypeError):
+            return None
+
+    current_lat = _parse_float(current_data.get("latitude"))
+    current_lng = _parse_float(current_data.get("longitude"))
+    google_lat_f = _parse_float(google_lat)
+    google_lng_f = _parse_float(google_lng)
+
+    if google_lat_f is None or google_lng_f is None:
+        return
+
+    tolerance = 0.00001
+    current_has = current_lat is not None and current_lng is not None
+    google_has = google_lat_f is not None and google_lng_f is not None
+
+    if not current_has and google_has:
+        mismatches.append(f"Coordinates: Not set vs Google {google_lat_f:.6f}°, {google_lng_f:.6f}°")
+        fixes_to_apply["latitude"] = str(google_lat_f)
+        fixes_to_apply["longitude"] = str(google_lng_f)
+    elif current_has:
+        assert current_lat is not None and current_lng is not None
+        if abs(current_lat - google_lat_f) > tolerance or abs(current_lng - google_lng_f) > tolerance:
+            mismatches.append(
+                f"Coordinates: {current_lat:.6f}°, {current_lng:.6f}° vs Google {google_lat_f:.6f}°, {google_lng_f:.6f}°"
+            )
+            fixes_to_apply["latitude"] = str(google_lat_f)
+            fixes_to_apply["longitude"] = str(google_lng_f)
+
+
 def _format_price_level_display_api(price_level: int | None) -> str:
     """Format price level for display in mismatch messages."""
     if price_level is None:
@@ -895,11 +984,13 @@ def _apply_restaurant_field_fixes_api(restaurant: Restaurant, fixes_to_apply: di
         "type": "type",
         "price_level": "price_level",
         "rating": "rating",
+        "latitude": "latitude",
+        "longitude": "longitude",
     }
 
     for fix_key, restaurant_field in field_mapping.items():
         if fix_key in fixes_to_apply:
-            value = fixes_to_apply[fix_key]
+            value: Any = fixes_to_apply[fix_key]
             if restaurant_field == "rating" and value is not None:
                 try:
                     value = float(value) if isinstance(value, (int, float)) else float(str(value))
@@ -908,6 +999,11 @@ def _apply_restaurant_field_fixes_api(restaurant: Restaurant, fixes_to_apply: di
             elif restaurant_field == "price_level" and value is not None:
                 try:
                     value = int(value, 10) if isinstance(value, str) else int(value)
+                except (ValueError, TypeError):
+                    value = None
+            elif restaurant_field in ("latitude", "longitude") and value is not None:
+                try:
+                    value = float(value) if isinstance(value, (int, float)) else float(str(value))
                 except (ValueError, TypeError):
                     value = None
             setattr(restaurant, restaurant_field, value)
@@ -1072,13 +1168,12 @@ def process_receipt_ocr() -> tuple[Response, int]:
                         form_date = datetime.now()
 
                     # Create minimal expense object for reconciliation
-                    temp_expense = Expense(
-                        user_id=current_user.id,
-                        restaurant_id=restaurant.id,
-                        restaurant=restaurant,
-                        amount=form_amount,
-                        date=form_date,
-                    )
+                    temp_expense = Expense()
+                    temp_expense.user_id = current_user.id
+                    temp_expense.restaurant_id = restaurant.id
+                    temp_expense.restaurant = restaurant
+                    temp_expense.amount = form_amount
+                    temp_expense.date = form_date
                     reconciliation_data = reconcile_receipt_with_expense(temp_expense, receipt_dict)
             except Exception as e:
                 current_app.logger.warning(f"Failed to perform reconciliation: {e}", exc_info=True)
@@ -1120,7 +1215,7 @@ def create_category() -> tuple[Response, int]:
     """Create a new category."""
     try:
         user = _get_current_user()
-        data = category_schema.load(request.get_json())
+        data = _load_dict_payload(category_schema)
         category = category_services.create_category_for_user(user.id, data)
         return _create_api_response(
             data=category_schema.dump(category), message="Category created successfully", code=201
@@ -1156,7 +1251,7 @@ def update_category(category_id: int) -> tuple[Response, int]:
         if not category:
             return jsonify({"status": "error", "message": "Category not found"}), 404
 
-        data = category_schema.load(request.get_json())
+        data = _load_dict_payload(category_schema)
         updated_category = category_services.update_category_for_user(category, data)
         return _create_api_response(
             data=category_schema.dump(updated_category), message="Category updated successfully"

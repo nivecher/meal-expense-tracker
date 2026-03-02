@@ -47,6 +47,7 @@ FOOD_BUSINESS_TYPES = [
     "tea_house",
 ]
 from app.constants.restaurant_types import get_restaurant_type_form_choices_grouped
+from app.merchants import services as merchant_services
 from app.restaurants import bp, services
 from app.restaurants.exceptions import (
     DuplicateGooglePlaceIdError,
@@ -63,6 +64,60 @@ from app.utils.decorators import admin_required
 # Constants
 PER_PAGE = 10  # Number of restaurants per page
 SHOW_ALL = -1  # Special value to show all restaurants
+
+
+def _populate_merchant_choices(form: RestaurantForm, user_id: int) -> None:
+    """Populate merchant choices for the form dropdown.
+
+    Args:
+        form: The RestaurantForm instance
+        user_id: The current user's ID
+    """
+    if not current_user.has_advanced_features and not current_user.is_admin:
+        form.merchant_id.choices = [("", "No Merchant (Basic)")]
+        return
+
+    merchants = merchant_services.get_merchants(user_id)
+    choices: list[tuple[Any, str]] = [("", "-- Select Merchant (Optional) --")]
+    for m in merchants:
+        choices.append((str(m.id), m.name))
+    form.merchant_id.choices = choices
+
+
+def _render_restaurant_list(
+    *,
+    paginated_restaurants: list,
+    stats: dict,
+    page: int,
+    per_page: int,
+    total_pages: int,
+    total_restaurants: int,
+    filters: dict,
+    filter_options: dict,
+    active_tab: str = "restaurants",
+    places_mode: str = "my",
+) -> str:
+    """Render the restaurant list template with shared context."""
+    return render_template(
+        "restaurants/list.html",
+        restaurants=paginated_restaurants,
+        total_spent=stats.get("total_spent", 0),
+        avg_price_per_person=stats.get("avg_price_per_person", 0),
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+        total_restaurants=total_restaurants,
+        search=filters["search"],
+        cuisine=filters["cuisine"],
+        service_level=filters["service_level"],
+        city=filters["city"],
+        is_chain=filters["is_chain"],
+        rating_min=filters["rating_min"],
+        rating_max=filters["rating_max"],
+        active_tab=active_tab,
+        places_mode=places_mode,
+        **filter_options,
+    )
 
 
 def _get_page_size_from_cookie(cookie_name: str = "restaurant_page_size", default_size: int = PER_PAGE) -> int:
@@ -185,16 +240,25 @@ def _validate_search_params() -> tuple[dict[str, Any] | None, Response | None, i
     if not api_key:
         return None, jsonify({"error": "Google Maps API key not configured"}), 500
 
+    requested_max_results = request.args.get("maxResults", "20")
+    try:
+        max_results = int(requested_max_results)
+    except (TypeError, ValueError):
+        max_results = 20
+
+    max_results = max(1, min(40, max_results))
+
     return (
         {
             "query": query,
             "lat": request.args.get("lat"),
             "lng": request.args.get("lng"),
-            "radius_miles": request.args.get("radius_miles", "5"),
+            "radius_miles": request.args.get("radius_miles") or request.args.get("radiusMiles", "5"),
             "cuisine": request.args.get("cuisine", ""),
             "min_rating": request.args.get("minRating"),
             "max_price_level": request.args.get("maxPriceLevel"),
-            "max_results": int(request.args.get("maxResults", "20")),
+            "max_results": max_results,
+            "search_scope": request.args.get("searchScope", "combined"),
             "api_key": api_key,
         },
         None,
@@ -262,7 +326,11 @@ def _enhance_place_with_details(processed_place: dict[str, Any], places_service:
 def _process_search_results(
     places: list[dict[str, Any]], params: dict[str, Any], places_service: Any
 ) -> list[dict[str, Any]]:
-    """Process search results and return enhanced place data."""
+    """Process search results and return cost-optimized place data.
+
+    Important: do not call Place Details for each result here. That causes N+1
+    Enterprise billing. We fetch details only when a user selects a specific place.
+    """
     results = []
 
     for i, place in enumerate(places[: params["max_results"]]):
@@ -275,9 +343,6 @@ def _process_search_results(
         # Process place using centralized service
         processed_place = places_service.process_search_result_place(place)
         if processed_place and processed_place.get("name"):
-            # Enhance with detailed address components
-            processed_place = _enhance_place_with_details(processed_place, places_service)
-
             # Add additional processing for photos and reviews if needed
             processed_place["photos"] = places_service.build_photo_urls(place.get("photos", []))
             processed_place["reviews"] = places_service.build_reviews_summary(place.get("reviews", []))
@@ -377,30 +442,99 @@ def _calculate_search_radius(params: dict[str, Any]) -> int:
 def _perform_places_search(
     places_service: Any, params: dict[str, Any], location: tuple[float, float] | None, radius_meters: int
 ) -> list[dict[str, Any]]:
-    """Perform Google Places search with fallback logic."""
-    max_results = min(10, int(params.get("max_results", 20)))
+    """Perform Google Places search with low-cost combined strategy.
 
-    # Try text search with location bias first
-    current_app.logger.info(
-        f"Calling search_places_by_text with query='{params['query']}', location={location}, radius={radius_meters}"
-    )
-    places: list[dict[str, Any]] = cast(
-        list[dict[str, Any]],
-        places_service.search_places_by_text(params["query"], location, radius_meters, max_results),
-    )
-    current_app.logger.info(f"Places API returned: {len(places)} places")
+    Combined mode merges text and nearby results (de-duplicated) to improve recall
+    while still limiting each upstream call to 20 results.
+    """
+    max_results = max(1, min(40, int(params.get("max_results", 20))))
+    per_call_limit = min(20, max_results)
+    search_scope = str(params.get("search_scope") or "combined").lower()
 
-    if places:
-        current_app.logger.info(f"First place: {places[0]}")
+    places: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
 
-    # If no results and we have location, try nearby search
-    if not places and location:
-        places = cast(
-            list[dict[str, Any]],
-            places_service.search_places_nearby(location, radius_meters, "restaurant", max_results),
+    def _append_unique(candidates: list[dict[str, Any]]) -> None:
+        for candidate in candidates:
+            place_id = str(candidate.get("id") or "").strip()
+            if place_id and place_id in seen_ids:
+                continue
+            if place_id:
+                seen_ids.add(place_id)
+            places.append(candidate)
+
+    should_search_text = search_scope in {"combined", "google", "find", "all"}
+    should_search_nearby = bool(location) and search_scope in {"combined", "nearby", "my", "all"}
+
+    if should_search_text:
+        current_app.logger.info(
+            f"Calling search_places_by_text with query='{params['query']}', location={location}, radius={radius_meters}, limit={per_call_limit}"
         )
+        text_places = cast(
+            list[dict[str, Any]],
+            places_service.search_places_by_text(params["query"], location, radius_meters, per_call_limit),
+        )
+        _append_unique(text_places)
+
+    if should_search_nearby:
+        nearby_places = cast(
+            list[dict[str, Any]],
+            places_service.search_places_nearby(location, radius_meters, "restaurant", per_call_limit),
+        )
+        _append_unique(nearby_places)
+
+    # Fallback: if user selected text-oriented scope but got nothing, try nearby once.
+    if not places and location and not should_search_nearby:
+        fallback_places = cast(
+            list[dict[str, Any]],
+            places_service.search_places_nearby(location, radius_meters, "restaurant", per_call_limit),
+        )
+        _append_unique(fallback_places)
+
+    if len(places) > max_results:
+        places = places[:max_results]
 
     return places
+
+
+def _haversine_miles(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Calculate distance between two points in miles."""
+    import math
+
+    radius_miles = 3959.0
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return radius_miles * c
+
+
+def _filter_results_by_radius(
+    results: list[dict[str, Any]],
+    location: tuple[float, float] | None,
+    radius_miles: float | None,
+) -> list[dict[str, Any]]:
+    """Strictly enforce radius filtering around the requested center point."""
+    if not location or radius_miles is None:
+        return results
+
+    center_lat, center_lng = location
+    filtered: list[dict[str, Any]] = []
+    for result in results:
+        lat = result.get("latitude")
+        lng = result.get("longitude")
+        if lat is None or lng is None:
+            continue
+
+        try:
+            distance = _haversine_miles(center_lat, center_lng, float(lat), float(lng))
+        except (TypeError, ValueError):
+            continue
+
+        if distance <= radius_miles:
+            filtered.append(result)
+
+    return filtered
 
 
 def _format_search_response(results: list[dict[str, Any]], params: dict[str, Any]) -> Response:
@@ -417,6 +551,12 @@ def _format_search_response(results: list[dict[str, Any]], params: dict[str, Any
                     "cuisine": params["cuisine"],
                     "min_rating": float(params["min_rating"]) if params["min_rating"] else None,
                     "max_price_level": (int(params["max_price_level"]) if params["max_price_level"] else None),
+                    "max_results": int(params.get("max_results", 20)),
+                    "search_scope": params.get("search_scope", "combined"),
+                },
+                "meta": {
+                    "result_count": len(results),
+                    "has_more_hint": len(results) >= int(params.get("max_results", 20)),
                 },
             },
             "status": "OK",
@@ -439,11 +579,9 @@ def search_places() -> Response | tuple[Response, int]:
 
     try:
         # Initialize Google Places service
-        init_result = _initialize_places_service()
-        places_service = init_result[0]
-        service_error_response: tuple[Response, int] | None = init_result[1]
+        places_service, service_error_response = _initialize_places_service()
         if service_error_response is not None:
-            return service_error_response[0], service_error_response[1]
+            return service_error_response
 
         # Extract search parameters
         location = _extract_search_location(params)
@@ -454,6 +592,8 @@ def search_places() -> Response | tuple[Response, int]:
 
         # Process results
         results = _process_search_results(places, params, places_service)
+        requested_radius = float(params["radius_miles"]) if params.get("radius_miles") else None
+        results = _filter_results_by_radius(results, location, requested_radius)
 
         return _format_search_response(results, params)
 
@@ -531,6 +671,7 @@ def _map_place_to_restaurant_data(place: dict[str, Any], place_id: str, places_s
     return {
         # From extract_restaurant_data (lock-step with CLI/validate)
         "name": google_data.get("name", ""),
+        "location_name": google_data.get("location_name", ""),
         "address_line_1": google_data.get("address_line_1", ""),
         "address_line_2": google_data.get("address_line_2", ""),
         "city": google_data.get("city", ""),
@@ -579,9 +720,21 @@ def get_place_details(place_id: str) -> Response | tuple[Response, int]:
     try:
         from app.services.google_places_service import get_google_places_service
 
+        include_enterprise = str(request.args.get("include_enterprise", "false")).lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        user_has_advanced_features = bool(getattr(current_user, "has_advanced_features", False))
         # Use centralized service to get place details
         places_service = get_google_places_service()
-        place = places_service.get_place_details(place_id)
+        field_mask = places_service.get_place_details_field_mask(
+            use_case="place_details",
+            include_enterprise=include_enterprise,
+            user_has_advanced_features=user_has_advanced_features,
+        )
+        place = places_service.get_place_details(place_id, field_mask)
 
         if not place:
             current_app.logger.error(f"Failed to retrieve place details for {place_id}")
@@ -589,6 +742,9 @@ def get_place_details(place_id: str) -> Response | tuple[Response, int]:
 
         # Map place data to restaurant format
         mapped_data = _map_place_to_restaurant_data(place, place_id, places_service)
+        mapped_data["advanced_features_enabled"] = user_has_advanced_features
+        mapped_data["enterprise_fields_requested"] = include_enterprise
+        mapped_data["enterprise_fields_used"] = isinstance(field_mask, str) and "nationalPhoneNumber" in field_mask
 
         response: Response = cast(Response, jsonify(mapped_data))
         return response
@@ -653,57 +809,102 @@ def generate_notes(place: dict[str, Any]) -> str:
 
 @bp.route("/")
 @login_required
-def list_restaurants() -> str:
-    """Show a list of all restaurants with pagination."""
+def list_restaurants() -> Any:
+    """Show a list of all restaurants with pagination and tab support."""
+    # Get tab parameter (restaurants, places)
+    tab = request.args.get("tab", "restaurants")
+    if tab == "place":
+        tab = "places"
+    valid_tabs = ["restaurants", "places"]
+    if tab not in valid_tabs:
+        # Backwards-compatible merchants tab route now canonicalizes to
+        # the dedicated merchants page implementation.
+        if request.args.get("tab") == "merchants":
+            if not current_user.has_advanced_features and not current_user.is_admin:
+                flash("Merchants is an advanced feature", "warning")
+                return redirect(url_for("restaurants.list_restaurants", tab="restaurants"))
+
+            redirect_params = {}
+            q = request.args.get("q", "").strip()
+            category = request.args.get("category", "").strip()
+            if q:
+                redirect_params["q"] = q
+            if category:
+                redirect_params["category"] = category
+            return redirect(url_for("merchants.list_merchants", **redirect_params))
+
+        tab = "restaurants"
+
     # Get pagination parameters with type hints
     page = request.args.get("page", 1, type=int)
     # Check for per_page in URL params first, then cookie, then default
     per_page = request.args.get("per_page", type=int)
+    save_preference = False
     if per_page is None:
         per_page = _get_page_size_from_cookie("restaurant_page_size", PER_PAGE)
-
-    # Get all restaurants and stats
-    restaurants, stats = services.get_restaurants_with_stats(current_user.id, request.args)
-
-    # Handle pagination or show all
-    total_restaurants = len(restaurants)
-    if per_page == SHOW_ALL:
-        # Show all restaurants without pagination
-        paginated_restaurants = restaurants
-        total_pages = 1
-        page = 1
     else:
-        # Calculate pagination with bounds checking
-        total_pages = max(1, (total_restaurants + per_page - 1) // per_page) if total_restaurants else 1
-        page = max(1, min(page, total_pages))  # Ensure page is within bounds
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        paginated_restaurants = restaurants[start_idx:end_idx]
+        # Validate per_page value
+        if per_page not in [10, 25, 50, 100, SHOW_ALL]:
+            per_page = PER_PAGE
+        else:
+            save_preference = True
 
-    # Get filter options for the filter form
-    filter_options = services.get_filter_options(current_user.id)
+    # Only load restaurants data for restaurants tab
+    if tab == "restaurants":
+        # Get all restaurants and stats
+        restaurants, stats = services.get_restaurants_with_stats(current_user.id, request.args)
 
-    # Extract current filter values
-    filters = services.get_restaurant_filters(request.args)
+        # Handle pagination or show all
+        total_restaurants = len(restaurants)
+        if per_page == SHOW_ALL:
+            # Show all restaurants without pagination
+            paginated_restaurants = restaurants
+            total_pages = 1
+            page = 1
+        else:
+            # Calculate pagination with bounds checking
+            total_pages = max(1, (total_restaurants + per_page - 1) // per_page) if total_restaurants else 1
+            page = max(1, min(page, total_pages))  # Ensure page is within bounds
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            paginated_restaurants = restaurants[start_idx:end_idx]
 
-    return render_template(
-        "restaurants/list.html",
-        restaurants=paginated_restaurants,
-        total_spent=stats.get("total_spent", 0),
-        avg_price_per_person=stats.get("avg_price_per_person", 0),
-        page=page,
-        per_page=per_page,
-        total_pages=total_pages,
-        total_restaurants=total_restaurants,
-        search=filters["search"],
-        cuisine=filters["cuisine"],
-        service_level=filters["service_level"],
-        city=filters["city"],
-        is_chain=filters["is_chain"],
-        rating_min=filters["rating_min"],
-        rating_max=filters["rating_max"],
-        **filter_options,
+        # Get filter options for the filter form
+        filter_options = services.get_filter_options(current_user.id)
+
+        # Extract current filter values
+        filters = services.get_restaurant_filters(request.args)
+
+    else:
+        # For places tab, use empty data
+        paginated_restaurants = []
+        stats = {"total_spent": 0, "avg_price_per_person": 0}
+        total_restaurants = 0
+        total_pages = 1
+        filters = services.get_restaurant_filters(request.args)
+        filter_options = services.get_filter_options(current_user.id)
+
+    places_mode = request.args.get("places_mode", "find").strip().lower()
+    if places_mode not in ["my", "nearby", "find"]:
+        places_mode = "my"
+
+    response = make_response(
+        _render_restaurant_list(
+            paginated_restaurants=paginated_restaurants,
+            stats=stats,
+            page=page,
+            per_page=per_page,
+            total_pages=total_pages,
+            total_restaurants=total_restaurants,
+            filters=filters,
+            filter_options=filter_options,
+            active_tab=tab,
+            places_mode=places_mode,
+        )
     )
+    if save_preference:
+        response.set_cookie("restaurant_page_size", str(per_page), max_age=60 * 60 * 24 * 365)  # 1 year
+    return response
 
 
 def _create_ajax_success_response(restaurant: Restaurant, is_new: bool) -> tuple[Response, int]:
@@ -799,6 +1000,30 @@ def _process_restaurant_form_submission(form: RestaurantForm, is_ajax: bool) -> 
         return _handle_restaurant_creation_error(e, is_ajax)
 
 
+@bp.route("/places")
+@login_required
+def list_restaurants_places() -> Any:
+    """Redirect to places tab for backwards compatibility."""
+    return redirect(url_for("restaurants.list_restaurants", tab="places"), code=302)
+
+
+@bp.route("/merchants")
+@login_required
+def list_restaurants_merchants() -> Any:
+    """Redirect legacy merchants path to canonical merchants endpoint."""
+    if not current_user.has_advanced_features and not current_user.is_admin:
+        flash("Merchants is an advanced feature", "warning")
+        return redirect(url_for("restaurants.list_restaurants", tab="restaurants"), code=302)
+    redirect_params = {}
+    q = request.args.get("q", "").strip()
+    category = request.args.get("category", "").strip()
+    if q:
+        redirect_params["q"] = q
+    if category:
+        redirect_params["category"] = category
+    return redirect(url_for("merchants.list_merchants", **redirect_params), code=302)
+
+
 @bp.route("/add", methods=["GET", "POST"])
 @login_required
 def add_restaurant() -> str | Response | tuple[Response, int]:
@@ -809,6 +1034,7 @@ def add_restaurant() -> str | Response | tuple[Response, int]:
     Handles both regular form submissions and AJAX requests.
     """
     form = RestaurantForm()
+    _populate_merchant_choices(form, current_user.id)
     is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
     if form.validate_on_submit():
@@ -853,6 +1079,7 @@ def restaurant_details(restaurant_id: int) -> str | Response:
     # Handle form submission
     if request.method == "POST":
         form = RestaurantForm()
+        _populate_merchant_choices(form, current_user.id)
         if form.validate_on_submit():
             try:
                 # Update restaurant with form data
@@ -889,12 +1116,15 @@ def restaurant_details(restaurant_id: int) -> str | Response:
     # Calculate expense statistics
     expense_stats = calculate_expense_stats(restaurant_id, current_user.id)
 
+    detail_form = RestaurantForm(obj=restaurant)
+    _populate_merchant_choices(detail_form, current_user.id)
+
     return render_template(
         "restaurants/detail.html",
         restaurant=restaurant,
         expenses=expenses,
         expense_stats=expense_stats,
-        form=RestaurantForm(obj=restaurant),
+        form=detail_form,
         type_choices_grouped=get_restaurant_type_form_choices_grouped(),
     )
 
@@ -916,6 +1146,7 @@ def edit_restaurant(restaurant_id: int) -> str | Response:
         abort(404, "Restaurant not found")
 
     form = RestaurantForm()
+    _populate_merchant_choices(form, current_user.id)
 
     if form.validate_on_submit():
         try:
@@ -938,6 +1169,7 @@ def edit_restaurant(restaurant_id: int) -> str | Response:
     elif request.method == "GET":
         # Pre-populate form with existing data
         form = RestaurantForm(obj=restaurant)
+        _populate_merchant_choices(form, current_user.id)
 
     return render_template(
         "restaurants/form.html",
@@ -1077,6 +1309,7 @@ def export_restaurants() -> Response:
         sample_data = [
             {
                 "name": "Joe's Pizza",
+                "location_name": "Downtown",
                 "city": "New York",
                 "type": "restaurant",
                 "address": "123 Main St",
@@ -1087,6 +1320,7 @@ def export_restaurants() -> Response:
             },
             {
                 "name": "Coffee House",
+                "location_name": "Market Street",
                 "city": "San Francisco",
                 "type": "cafe",
                 "address": "456 Market St",
@@ -1105,7 +1339,7 @@ def export_restaurants() -> Response:
 
         # Default to CSV format - include required fields (name, city) first
         output = io.StringIO()
-        fieldnames = ["name", "city", "type", "address", "phone", "website", "cuisine", "notes"]
+        fieldnames = ["name", "location_name", "city", "type", "address", "phone", "website", "cuisine", "notes"]
         writer = csv.DictWriter(output, fieldnames=fieldnames, quoting=csv.QUOTE_NONNUMERIC)
         writer.writeheader()
         writer.writerows(sample_data)
@@ -1265,7 +1499,7 @@ def import_restaurants() -> str | Response:
 
 @bp.route("/find-places", methods=["GET", "POST"])
 @login_required
-def find_places() -> str:
+def find_places() -> Any:
     """Search for restaurants using Google Places API.
 
     This route renders a page where users can search for restaurants
@@ -1274,40 +1508,7 @@ def find_places() -> str:
     Returns:
         Rendered template with the Google Places search interface
     """
-    # Check if Google Maps API key is configured
-    google_maps_api_key = current_app.config.get("GOOGLE_MAPS_API_KEY")
-    google_maps_map_id = current_app.config.get("GOOGLE_MAPS_MAP_ID")
-
-    # Debug logging
-    current_app.logger.info(f"Google Maps API Key configured: {bool(google_maps_api_key)}")
-    current_app.logger.info(f"Google Maps Map ID configured: {bool(google_maps_map_id)}")
-    current_app.logger.info(f"Google Maps Map ID value: {google_maps_map_id}")
-    current_app.logger.info(f"Google Maps Map ID type: {type(google_maps_map_id)}")
-
-    if not google_maps_api_key:
-        current_app.logger.warning("Google Maps API key is not configured")
-        flash("Google Maps integration is not properly configured. Please contact support.", "warning")
-
-    if not google_maps_map_id:
-        current_app.logger.warning("Google Maps Map ID is not configured - Advanced Markers will not be available")
-        flash(
-            "Google Maps Map ID is not configured. Advanced Markers functionality will be limited.",
-            "warning",
-        )
-
-    # Ensure Map ID is a string (handle None case)
-    google_maps_map_id = str(google_maps_map_id) if google_maps_map_id is not None else ""
-
-    # Handle case where Map ID might be the string "None"
-    if google_maps_map_id == "None":
-        google_maps_map_id = ""
-
-    # Render the Google Places search template
-    return render_template(
-        "restaurants/places_search.html",
-        google_maps_api_key=google_maps_api_key or "",
-        google_maps_map_id=google_maps_map_id or "",
-    )
+    return redirect(url_for("restaurants.list_restaurants", tab="places", places_mode="find"), code=302)
 
 
 def _validate_google_places_request() -> tuple[dict[str, Any] | None, tuple[Response, int] | None]:
@@ -1405,7 +1606,10 @@ def _prepare_restaurant_form(
     current_app.logger.debug("Form created. Validating...")
 
     if not form.validate():
-        errors = {field: errors[0] for field, errors in form.errors.items()}
+        errors: dict[str, str] = {}
+        for field, field_errors in form.errors.items():
+            first_error = next(iter(field_errors), "Invalid value")
+            errors[field] = str(first_error)
         current_app.logger.warning(f"Form validation failed: {errors}")
         return None, (
             jsonify({"success": False, "message": "Validation failed", "errors": errors}),
@@ -1731,7 +1935,7 @@ def search_restaurants() -> str:
     # Check for per_page in URL params first, then cookie, then default
     per_page = request.args.get("per_page", type=int)
     if per_page is None:
-        per_page = _get_page_size_from_cookie("restaurant_page_size", 10)
+        per_page = _get_page_size_from_cookie("restaurant_page_size", PER_PAGE)
     sort = request.args.get("sort", "name")
     order = request.args.get("order", "asc")
 

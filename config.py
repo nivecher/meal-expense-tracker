@@ -115,7 +115,7 @@ class Config:
 
         instance_path = Path(__file__).parent / "instance"
         instance_path.mkdir(exist_ok=True)
-        return f'sqlite:///{instance_path}/app-{os.getenv("FLASK_ENV")}.db'
+        return f"sqlite:///{instance_path}/app-{os.getenv('FLASK_ENV')}.db"
 
     def _configure_session(self) -> None:
         """Configure session settings based on environment."""

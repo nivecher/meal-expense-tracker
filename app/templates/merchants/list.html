@@ -1,0 +1,408 @@
+{% extends "base.html" %} {% block title %}Merchants - Meal Expense Tracker{% endblock %} {% block main_container_class
+%}container-fluid{% endblock %} {% block styles %}
+<link href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" rel="stylesheet" />
+{% endblock styles %} {% block content %} {% set view_preference = request.cookies.get('merchant_view_preference',
+'card') %}
+
+<div class="px-0 pt-2">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <div class="activity-title">
+            <i class="fas fa-building text-primary"></i>
+            <span class="fw-semibold">Merchant Directory</span>
+            <span class="text-muted small ms-2"
+                >({{ stats.total_merchants }} merchants, {{ stats.total_restaurants }} restaurants)</span
+            >
+        </div>
+        <a href="{{ url_for('merchants.new_merchant') }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus me-1"></i>Add Merchant
+        </a>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form method="get" class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light"><i class="fas fa-search"></i></span>
+                        <input
+                            type="text"
+                            name="q"
+                            class="form-control"
+                            placeholder="Search merchants..."
+                            value="{{ filters.search }}" />
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <select name="category" class="form-select form-select-sm">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option
+                            value="{{ cat }}"
+                            {%
+                            if
+                            filters.category
+                            and
+                            (filters.category
+                            in
+                            [cat])
+                            %}selected{%
+                            endif
+                            %}>
+                            {{ cat|replace('_', ' ')|title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Filter</button>
+                    <a href="{{ url_for('merchants.list_merchants') }}" class="btn btn-sm btn-outline-secondary"
+                        >Clear</a
+                    >
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="btn-group btn-group-sm" role="group" aria-label="View Toggle">
+            <input
+                type="radio"
+                class="btn-check"
+                name="view-type"
+                id="card-view"
+                autocomplete="off"
+                {%
+                if
+                view_preference
+                not
+                in
+                ['table']
+                %}
+                checked{%
+                endif
+                %} />
+            <label class="btn btn-outline-primary" for="card-view"> <i class="fas fa-th-large"></i> Cards </label>
+            <input
+                type="radio"
+                class="btn-check"
+                name="view-type"
+                id="table-view"
+                autocomplete="off"
+                {%
+                if
+                view_preference
+                in
+                ['table']
+                %}
+                checked{%
+                endif
+                %} />
+            <label class="btn btn-outline-primary" for="table-view"> <i class="fas fa-table"></i> Table </label>
+        </div>
+    </div>
+
+    {% if not merchants %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        No merchants found.
+        <a href="{{ url_for('merchants.new_merchant') }}">Add your first merchant</a> to get started.
+    </div>
+    {% else %}
+    <div class="row g-3 {% if view_preference == 'table' %}d-none{% endif %}" id="card-view-container">
+        {% for merchant in merchants %} {% set merchant_stats = (merchant_data or {}).get(merchant.id, {}) %} {% set
+        restaurant_count = merchant_stats.restaurant_count or 0 %}
+        <div class="col-12">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="d-flex gap-2">
+                            <div class="restaurant-icon flex-shrink-0">
+                                {% if merchant.website %}
+                                <img
+                                    src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                    data-website="{{ merchant.website }}"
+                                    data-size="24"
+                                    alt="{{ merchant.name }} icon"
+                                    class="restaurant-favicon"
+                                    width="24"
+                                    height="24" />
+                                <i class="fas fa-building text-primary restaurant-fallback-icon d-none"></i>
+                                {% else %}
+                                <i class="fas fa-building text-primary"></i>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <h5 class="card-title mb-1">{{ merchant.name }}</h5>
+                                {% if merchant.short_name %}
+                                <div class="text-muted small">Short name: {{ merchant.short_name }}</div>
+                                {% endif %} {% if merchant.category %}
+                                <span class="badge bg-secondary">{{ merchant.category|replace('_', ' ')|title }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li
+                                    ><a
+                                        class="dropdown-item"
+                                        href="{{ url_for('merchants.view_merchant', merchant_id=merchant.id) }}"
+                                        ><i class="fas fa-eye me-2"></i>View</a
+                                    ></li
+                                >
+                                <li
+                                    ><a
+                                        class="dropdown-item"
+                                        href="{{ url_for('merchants.edit_merchant', merchant_id=merchant.id) }}"
+                                        ><i class="fas fa-edit me-2"></i>Edit</a
+                                    ></li
+                                >
+                                <li><hr class="dropdown-divider" /></li>
+                                <li
+                                    ><a
+                                        class="dropdown-item text-danger"
+                                        href="#"
+                                        data-delete-url="{{ url_for('merchants.delete_merchant', merchant_id=merchant.id) }}"
+                                        data-merchant-name="{{ merchant.name }}"
+                                        ><i class="fas fa-trash me-2"></i>Delete</a
+                                    ></li
+                                >
+                            </ul>
+                        </div>
+                    </div>
+                    <p class="card-text text-muted small mt-2">
+                        <i class="fas fa-utensils me-1"></i>
+                        {{ restaurant_count }} restaurant{{ 's' if restaurant_count != 1 else '' }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div id="table-view-container" {% if view_preference !="table" %} class="d-none" {% endif %}>
+        <div class="restaurant-table-fullwidth">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-sticky-frozen">
+                        <div class="table-scroll-inner">
+                            <div
+                                class="table-actions-toolbar d-flex align-items-center justify-content-between px-3 py-2 border-bottom bg-white">
+                                <div id="merchant-selection-status" class="text-muted small">0 selected</div>
+                                <div class="d-flex flex-wrap gap-2" role="group" aria-label="Merchant actions">
+                                    <a
+                                        id="merchant-action-view"
+                                        class="btn btn-sm btn-outline-primary disabled"
+                                        aria-disabled="true"
+                                        tabindex="-1">
+                                        <i class="fas fa-eye me-1" aria-hidden="true"></i>View
+                                    </a>
+                                    <a
+                                        id="merchant-action-edit"
+                                        class="btn btn-sm btn-outline-secondary disabled"
+                                        aria-disabled="true"
+                                        tabindex="-1"
+                                        title="Edit">
+                                        <i class="fas fa-pen me-1" aria-hidden="true"></i>Edit
+                                    </a>
+                                    <button
+                                        id="merchant-action-delete"
+                                        type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        disabled>
+                                        <i class="fas fa-trash me-1" aria-hidden="true"></i>Delete
+                                    </button>
+                                    <button
+                                        id="merchant-bulk-export"
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        data-merchant-bulk-export
+                                        data-export-url="{{ url_for('merchants.export_merchants') }}"
+                                        disabled>
+                                        <i class="fas fa-file-export me-1" aria-hidden="true"></i>Export
+                                    </button>
+                                </div>
+                            </div>
+                            <table
+                                id="merchantTable"
+                                class="table table-hover align-middle merchant-table mb-0"
+                                data-resizable-columns="true"
+                                data-column-prefs-key="merchantTable"
+                                aria-label="Merchants">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th
+                                            class="text-center select-col"
+                                            scope="col"
+                                            data-bs-toggle="tooltip"
+                                            title="Select row">
+                                            <input
+                                                id="merchant-select-all"
+                                                type="checkbox"
+                                                class="form-check-input"
+                                                aria-label="Select all merchants" />
+                                        </th>
+                                        <th
+                                            scope="col"
+                                            data-sort="true"
+                                            data-sort-type="text"
+                                            data-bs-toggle="tooltip"
+                                            title="Merchant name"
+                                            >Name</th
+                                        >
+                                        <th
+                                            scope="col"
+                                            data-sort="true"
+                                            data-sort-type="text"
+                                            data-bs-toggle="tooltip"
+                                            title="Merchant category"
+                                            >Category</th
+                                        >
+                                        <th
+                                            scope="col"
+                                            data-sort="true"
+                                            data-sort-type="number"
+                                            data-bs-toggle="tooltip"
+                                            title="Linked restaurant count"
+                                            >Restaurants</th
+                                        >
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for merchant in merchants %} {% set merchant_stats = (merchant_data or
+                                    {}).get(merchant.id, {}) %} {% set restaurant_count =
+                                    merchant_stats.restaurant_count or 0 %}
+                                    <tr
+                                        data-merchant-category="{{ merchant.category|default('Uncategorized', true) }}"
+                                        aria-selected="false">
+                                        <td class="text-center select-col">
+                                            <input
+                                                type="checkbox"
+                                                name="merchant-select"
+                                                class="form-check-input merchant-select"
+                                                value="{{ merchant.id }}"
+                                                data-merchant-id="{{ merchant.id }}"
+                                                data-merchant-name="{{ merchant.name }}"
+                                                data-view-url="{{ url_for('merchants.view_merchant', merchant_id=merchant.id) }}"
+                                                data-edit-url="{{ url_for('merchants.edit_merchant', merchant_id=merchant.id) }}"
+                                                data-delete-url="{{ url_for('merchants.delete_merchant', merchant_id=merchant.id) }}" />
+                                        </td>
+                                        <td data-sort-value="{{ merchant.name }}">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="restaurant-icon flex-shrink-0">
+                                                    {% if merchant.website %}
+                                                    <img
+                                                        src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                                                        data-website="{{ merchant.website }}"
+                                                        data-size="20"
+                                                        alt="{{ merchant.name }} icon"
+                                                        class="restaurant-favicon-table"
+                                                        width="20"
+                                                        height="20" />
+                                                    {% else %}
+                                                    <i class="fas fa-building text-primary"></i>
+                                                    {% endif %}
+                                                </div>
+                                                <div>
+                                                    <a
+                                                        href="{{ url_for('merchants.view_merchant', merchant_id=merchant.id) }}"
+                                                        >{{ merchant.name }}</a
+                                                    >
+                                                    {% if merchant.short_name %}
+                                                    <div class="text-muted small">{{ merchant.short_name }}</div>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td data-sort-value="{{ merchant.category|default('Uncategorized', true) }}">
+                                            {% if merchant.category %}
+                                            <span class="badge bg-secondary"
+                                                >{{ merchant.category|replace('_', ' ')|title }}</span
+                                            >
+                                            {% else %}
+                                            <span class="text-muted">Uncategorized</span>
+                                            {% endif %}
+                                        </td>
+                                        <td data-sort-value="{{ restaurant_count }}">{{ restaurant_count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="deleteMerchantModal" tabindex="-1" aria-labelledby="deleteMerchantModalLabel">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteMerchantModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Delete Merchant
+                </h5>
+                <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="merchantName"></strong>?</p>
+                <p class="text-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    This will unlink all restaurants from this merchant. This action cannot be undone.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i> Cancel
+                </button>
+                <form id="deleteMerchantForm" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-2"></i> Delete Merchant
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="bulkDeleteMerchantsModal" tabindex="-1" aria-labelledby="bulkDeleteMerchantsModalLabel">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="bulkDeleteMerchantsModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Delete Selected Merchants
+                </h5>
+                <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>You are about to delete <strong data-merchant-bulk-count>0</strong> merchants.</p>
+                <p class="text-danger mb-0">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    This action cannot be undone.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" data-merchant-bulk-confirm>
+                    <i class="fas fa-trash me-1"></i>Delete Selected
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %} {% block extra_js %}
+<script src="{{ url_for('static', filename='js/components/table-sorting.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/pages/merchant-list.js') }}"></script>
+{% endblock extra_js %}

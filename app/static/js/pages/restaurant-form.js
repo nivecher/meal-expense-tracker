@@ -11,6 +11,8 @@ let validationData = null;
 
 let currentValidationStatus = null;
 
+const ENTERPRISE_FIELDS = new Set(['phone', 'price_level', 'rating']);
+
 // Define all functions first
 function getCSRFToken() {
   const token = document.querySelector('meta[name="csrf-token"]');
@@ -22,11 +24,12 @@ import { toast } from '../utils/notifications.js';
 
 function updateWebsiteButton() {
   const websiteField = document.getElementById('website');
-  const websiteBtn = document.getElementById('website-btn');
+  const websiteBtn = document.getElementById('open-website-btn');
 
   if (websiteField && websiteBtn) {
     const hasWebsite = websiteField.value.trim().length > 0;
-    websiteBtn.style.display = hasWebsite ? 'inline-block' : 'none';
+    websiteBtn.disabled = !hasWebsite;
+    websiteBtn.dataset.website = websiteField.value.trim();
   }
 }
 
@@ -147,8 +150,21 @@ function hideReconciliationPanel() {
 
 function resetAllValidationIndicators() {
   const fields = [
-    'name', 'type', 'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
-    'cuisine', 'service_level', 'price_level', 'phone', 'website',
+    'name',
+    'location_name',
+    'type',
+    'address_line_1',
+    'address_line_2',
+    'city',
+    'state',
+    'postal_code',
+    'country',
+    'cuisine',
+    'service_level',
+    'price_level',
+    'phone',
+    'website',
+    'coordinates',
   ];
   fields.forEach((field) => {
     updateValidationIndicator(field, 'not-validated', 'Not validated', '', null);
@@ -157,7 +173,8 @@ function resetAllValidationIndicators() {
   // Reset validation status badges (section-level)
   document.querySelectorAll('.section-validation-status').forEach((statusEl) => {
     statusEl.classList.add('d-none');
-    statusEl.querySelectorAll('.validation-badge-good, .validation-badge-warnings, .validation-badge-errors')
+    statusEl
+      .querySelectorAll('.validation-badge-good, .validation-badge-warnings, .validation-badge-errors')
       .forEach((el) => el.classList.add('d-none'));
   });
 
@@ -169,8 +186,21 @@ function resetAllValidationIndicators() {
 function updateFieldValidationIndicators(data) {
   // Reset all field indicators to "not validated"
   const fields = [
-    'name', 'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
-    'cuisine', 'service_level', 'price_level', 'rating', 'phone', 'website', 'type',
+    'name',
+    'address_line_1',
+    'address_line_2',
+    'city',
+    'state',
+    'postal_code',
+    'country',
+    'cuisine',
+    'service_level',
+    'price_level',
+    'rating',
+    'phone',
+    'website',
+    'type',
+    'coordinates',
   ];
   fields.forEach((field) => {
     updateValidationIndicator(field, 'not-validated', 'Not validated', '', null);
@@ -197,9 +227,10 @@ function updateFieldValidationIndicators(data) {
     rating: 'rating',
     phone: 'phone',
     website: 'website',
+    coordinates: 'coordinates',
   };
 
-  // Build set of fields that have mismatches
+  // Build set of fields that have mismatches (coordinates maps to lat/lng in fixes)
   const mismatchFields = new Set();
   mismatches.forEach((mismatch) => {
     const fieldNameMatch = mismatch.match(/^([^:]+):\s/);
@@ -215,8 +246,21 @@ function updateFieldValidationIndicators(data) {
   // Determine status per field: match (green), mismatch (orange), or no-data
   const fieldStatuses = {};
   fields.forEach((field) => {
-    const googleValue = googleData[field];
-    const hasGoogleData = googleValue !== undefined && googleValue !== null && String(googleValue).trim() !== '';
+    let hasGoogleData;
+    if (field === 'coordinates') {
+      const lat = googleData.latitude;
+      const lng = googleData.longitude;
+      hasGoogleData =
+        lat !== undefined &&
+        lat !== null &&
+        lng !== undefined &&
+        lng !== null &&
+        String(lat).trim() !== '' &&
+        String(lng).trim() !== '';
+    } else {
+      const googleValue = googleData[field];
+      hasGoogleData = googleValue !== undefined && googleValue !== null && String(googleValue).trim() !== '';
+    }
 
     if (mismatchFields.has(field)) {
       fieldStatuses[field] = 'mismatch';
@@ -230,8 +274,13 @@ function updateFieldValidationIndicators(data) {
   // Update field indicators: Matches (green check) or Mismatch (orange warning)
   Object.entries(fieldStatuses).forEach(([fieldName, status]) => {
     let statusText, tooltipText, iconClass;
+    const advancedUnavailable = ENTERPRISE_FIELDS.has(fieldName) && data.advanced_features_enabled === false;
 
-    if (status === 'match') {
+    if (advancedUnavailable) {
+      statusText = 'Advanced';
+      tooltipText = 'Requires Advanced Features (Google Places Enterprise integration)';
+      iconClass = 'fas fa-bolt text-info';
+    } else if (status === 'match') {
       statusText = 'Matches';
       tooltipText = 'Matches Google data';
       iconClass = 'fas fa-check-circle text-success';
@@ -297,6 +346,9 @@ const FIELD_DISPLAY_NAMES = {
   rating: 'Your Rating',
   phone: 'Phone',
   website: 'Website',
+  latitude: 'Latitude',
+  longitude: 'Longitude',
+  coordinates: 'Coordinates',
 };
 
 function escapeForDisplay(str) {
@@ -305,14 +357,55 @@ function escapeForDisplay(str) {
   return s === '' ? '—' : s;
 }
 
+function refreshCoordinatesDisplayFromForm() {
+  const latField = document.getElementById('latitude');
+  const lngField = document.getElementById('longitude');
+  const displayEl = document.getElementById('restaurant-coordinates-display');
+  const textEl = document.getElementById('coordinates-text');
+  const mapContainer = document.getElementById('restaurant-map-container');
+  const mapIframe = document.getElementById('restaurant-map-iframe');
+
+  if (!latField || !lngField) return;
+
+  const lat = parseFloat(latField.value);
+  const lng = parseFloat(lngField.value);
+  const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
+
+  if (displayEl && textEl) {
+    if (hasCoords) {
+      textEl.textContent = `${lat.toFixed(6)}°, ${lng.toFixed(6)}°`;
+      displayEl.classList.remove('d-none');
+    } else {
+      displayEl.classList.add('d-none');
+    }
+  }
+
+  if (mapContainer && mapIframe && hasCoords) {
+    const apiKey = mapContainer.dataset.apiKey || window.GOOGLE_MAPS_API_KEY || '';
+    const placeIdField = document.getElementById('google_place_id');
+    const placeId = placeIdField ? placeIdField.value.trim() : '';
+    if (apiKey) {
+      const q = placeId ? `place_id:${placeId}` : `${lat},${lng}`;
+      mapIframe.src = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(q)}&zoom=16`;
+      mapContainer.classList.remove('d-none');
+    }
+  }
+}
+
 function applySingleFixValue(fieldName, value) {
-  const field = document.getElementById(fieldName) || document.querySelector(`[name="${fieldName}"]`) || document.querySelector(`[data-field="${fieldName}"]`) || document.querySelector(`[data_field="${fieldName}"]`);
+  const field =
+    document.getElementById(fieldName) ||
+    document.querySelector(`[name="${fieldName}"]`) ||
+    document.querySelector(`[data-field="${fieldName}"]`) ||
+    document.querySelector(`[data_field="${fieldName}"]`);
   if (!field) return false;
 
   const stringValue = String(value ?? '').trim();
   if (field.tagName === 'SELECT') {
     const option = Array.from(field.options).find(
-      (opt) => String(opt.value).trim().toLowerCase() === stringValue.toLowerCase() || opt.textContent.trim().toLowerCase() === stringValue.toLowerCase(),
+      (opt) =>
+        String(opt.value).trim().toLowerCase() === stringValue.toLowerCase() ||
+        opt.textContent.trim().toLowerCase() === stringValue.toLowerCase(),
     );
     if (option) {
       field.value = option.value;
@@ -324,6 +417,10 @@ function applySingleFixValue(fieldName, value) {
   }
 
   field.dispatchEvent(new Event('change', { bubbles: true }));
+
+  if (fieldName === 'latitude' || fieldName === 'longitude') {
+    refreshCoordinatesDisplayFromForm();
+  }
 
   // Update indicator and border immediately (ensure border re-renders after apply)
   updateValidationIndicator(fieldName, 'match', 'Matches', 'Matches Google data', 'fas fa-check-circle text-success');
@@ -338,6 +435,16 @@ function applyGoogleSuggestion(fieldName, value) {
 
   if (validationData && validationData.fixes) {
     delete validationData.fixes[fieldName];
+    const hasLatOrLng = 'latitude' in validationData.fixes || 'longitude' in validationData.fixes;
+    if ((fieldName === 'latitude' || fieldName === 'longitude') && !hasLatOrLng) {
+      updateValidationIndicator(
+        'coordinates',
+        'match',
+        'Matches',
+        'Matches Google data',
+        'fas fa-check-circle text-success',
+      );
+    }
     if (Object.keys(validationData.fixes).length === 0) {
       hideReconciliationPanel();
       updateValidationStatus('valid', 0);
@@ -387,9 +494,16 @@ function displayReconciliationPanel(data) {
     const fieldCell = document.createElement('td');
     const strong = document.createElement('strong');
     strong.textContent = displayName;
+    fieldCell.appendChild(strong);
+    if (ENTERPRISE_FIELDS.has(fieldName)) {
+      const advancedBadge = document.createElement('span');
+      advancedBadge.className = 'badge bg-info text-dark ms-2';
+      advancedBadge.textContent = 'Advanced';
+      advancedBadge.title = 'Google Places Enterprise integration';
+      fieldCell.appendChild(advancedBadge);
+    }
     const icon = document.createElement('i');
     icon.className = 'fas fa-exclamation-triangle text-warning ms-1';
-    fieldCell.appendChild(strong);
     fieldCell.appendChild(icon);
     row.appendChild(fieldCell);
 
@@ -498,7 +612,6 @@ async function applyFixes(_fixes) {
     } else {
       toast.error(`Failed to apply fixes: ${result.message || 'Unknown error'}`);
     }
-
   } catch {
     toast.error('Network error occurred while applying fixes. Please try again.');
   }
@@ -518,7 +631,7 @@ function showValidationResults(results) {
 
     if (mismatchCount > 0) {
       displayReconciliationPanel(data);
-      toast.info(`Found ${mismatchCount} mismatch(es). Use the comparison panel below to apply changes.`, 0);
+      toast.info(`Found ${mismatchCount} mismatch(es). Use comparison panel below to apply changes.`, 0);
     } else {
       hideReconciliationPanel();
       toast.success('Restaurant information validated successfully! All data matches Google Places.');
@@ -541,8 +654,7 @@ function openWebsite() {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = `https://${url}`;
     }
-    // Navigate in the same window for SPA behavior
-    window.location.href = url;
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
@@ -552,10 +664,25 @@ function collectCurrentFormData() {
 
   // Collect values from all relevant form fields
   const fields = [
-    'name', 'type', 'located_within', 'description',
-    'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
-    'phone', 'email', 'website',
-    'cuisine', 'service_level', 'rating', 'price_level',
+    'name',
+    'type',
+    'located_within',
+    'description',
+    'address_line_1',
+    'address_line_2',
+    'city',
+    'state',
+    'postal_code',
+    'country',
+    'phone',
+    'email',
+    'website',
+    'cuisine',
+    'service_level',
+    'rating',
+    'price_level',
+    'latitude',
+    'longitude',
   ];
 
   fields.forEach((fieldName) => {
@@ -567,6 +694,8 @@ function collectCurrentFormData() {
         value = parseFloat(value);
       } else if (fieldName === 'price_level' && value) {
         value = parseInt(value, 10);
+      } else if ((fieldName === 'latitude' || fieldName === 'longitude') && value) {
+        value = parseFloat(value);
       }
       // Only include non-empty values
       if (value !== '' && value !== null && value !== undefined) {
@@ -580,7 +709,9 @@ function collectCurrentFormData() {
 
 // Function to clear Google Place ID
 function clearPlaceId() {
-  if (confirm('Are you sure you want to clear the Google Place ID? This will remove the connection to Google Places.')) {
+  if (
+    confirm('Are you sure you want to clear the Google Place ID? This will remove the connection to Google Places.')
+  ) {
     const placeIdField = document.getElementById('google_place_id');
     if (placeIdField) {
       placeIdField.value = '';
@@ -609,6 +740,100 @@ function clearPlaceId() {
   }
 }
 
+// Function to prompt user for advanced fields inclusion
+async function shouldIncludeAdvancedFields() {
+  try {
+    // Check if user has advanced features
+    const response = await fetch('/api/v1/user/current', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken(),
+      },
+    });
+
+    if (!response.ok) {
+      console.warn('Could not verify user privileges, defaulting to basic validation');
+      return false;
+    }
+
+    const userData = await response.json();
+    const hasAdvancedFeatures = userData.data?.has_advanced_features || false;
+
+    if (!hasAdvancedFeatures) {
+      return false;
+    }
+
+    // Show confirmation dialog for advanced features
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'modal fade';
+      modal.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Advanced Validation</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <p>You have access to advanced features. Would you like to include advanced fields in this validation?</p>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="include-advanced-checkbox" checked>
+                <label class="form-check-label" for="include-advanced-checkbox">
+                  <strong>Include advanced fields:</strong>
+                  <ul class="mb-0 mt-2">
+                    <li>Price Level</li>
+                    <li>Rating</li>
+                    <li>Phone Number</li>
+                  </ul>
+                  <small class="text-muted">These fields use Google Places Enterprise data and may provide more comprehensive validation.</small>
+                </label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Basic Only</button>
+              <button type="button" class="btn btn-primary" id="confirm-advanced-btn">Include Advanced</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+      const bsModal = new bootstrap.Modal(modal);
+
+      const confirmBtn = modal.querySelector('#confirm-advanced-btn');
+      const checkbox = modal.querySelector('#include-advanced-checkbox');
+
+      const handleConfirm = () => {
+        const includeAdvanced = checkbox.checked;
+        bsModal.hide();
+        resolve(includeAdvanced);
+      };
+
+      confirmBtn.addEventListener('click', handleConfirm);
+
+      // Handle modal close events
+      modal.addEventListener('hidden.bs.modal', () => {
+        document.body.removeChild(modal);
+        // If modal was closed without clicking confirm, default to false
+        if (!confirmBtn.dataset.clicked) {
+          resolve(false);
+        }
+      });
+
+      // Mark button as clicked when confirmed
+      confirmBtn.addEventListener('click', () => {
+        confirmBtn.dataset.clicked = 'true';
+      });
+
+      bsModal.show();
+    });
+  } catch (error) {
+    console.error('Error checking user privileges:', error);
+    return false;
+  }
+}
+
 // Function to validate restaurant data
 async function validateRestaurantData() {
   const placeIdField = document.getElementById('google_place_id');
@@ -622,6 +847,9 @@ async function validateRestaurantData() {
     return;
   }
 
+  // Check if user has advanced features and prompt for inclusion
+  const includeAdvanced = await shouldIncludeAdvancedFields();
+
   // Reset validation indicators before starting
   resetAllValidationIndicators();
 
@@ -633,6 +861,7 @@ async function validateRestaurantData() {
       google_place_id: placeId,
       fix_mismatches: false,
       form_data: formData,
+      include_advanced_fields: includeAdvanced,
     };
     if (restaurantId) {
       payload.restaurant_id = restaurantId;
@@ -649,7 +878,6 @@ async function validateRestaurantData() {
 
     const result = await response.json();
     showValidationResults(result);
-
   } catch {
     showValidationError('Network error occurred during validation. Please try again.');
   }
@@ -657,9 +885,22 @@ async function validateRestaurantData() {
 
 // Fields that participate in Google validation (clearing when user edits)
 const VALIDATED_FIELD_NAMES = [
-  'name', 'type', 'address_line_1', 'address_line_2', 'city', 'state',
-  'postal_code', 'country', 'cuisine', 'service_level', 'price_level',
-  'rating', 'phone', 'website',
+  'name',
+  'type',
+  'address_line_1',
+  'address_line_2',
+  'city',
+  'state',
+  'postal_code',
+  'country',
+  'cuisine',
+  'service_level',
+  'price_level',
+  'rating',
+  'phone',
+  'website',
+  'latitude',
+  'longitude',
 ];
 
 function isValidatedField(element) {
@@ -694,7 +935,7 @@ function initRestaurantForm() {
   }
 
   // Set up website button
-  const websiteBtn = document.getElementById('website-btn');
+  const websiteBtn = document.getElementById('open-website-btn');
   if (websiteBtn) {
     websiteBtn.addEventListener('click', openWebsite);
   }

@@ -204,7 +204,7 @@ export class EventHandlers {
       } else {
         throw new Error('Auto-save failed');
       }
-    } catch {
+    } catch (error) {
       console.warn('Auto-save failed:', error);
       this.showAutoSaveIndicator('Save failed', 'danger');
     }
@@ -267,7 +267,7 @@ export class EventHandlers {
     try {
       await navigator.clipboard.writeText(textToCopy);
       this.showCopySuccess(button);
-    } catch {
+    } catch (error) {
       console.error('Copy failed:', error);
       this.showCopyError(button);
     }

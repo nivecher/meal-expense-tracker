@@ -57,7 +57,7 @@ def _check_existing_tables() -> bool:
     """Check if tables already exist in the database."""
     inspector = inspect(db.engine)
     existing_tables = inspector.get_table_names()
-    return existing_tables and "restaurant" in existing_tables
+    return "restaurant" in existing_tables
 
 
 def _setup_sqlite_database(db_url: str) -> bool:

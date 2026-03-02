@@ -1,13 +1,10 @@
 {% extends "base.html" %} {% from 'macros/tag_helpers.html' import tag_badge %} {% block title %}Expense Details - Meal
 Expense Tracker{% endblock title %} {% block styles %} {{ super() }}
 <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
-<link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/tags.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/tag-select.css') }}" rel="stylesheet" />
 <link href="{{ url_for('static', filename='css/pages/expense-detail.css') }}" rel="stylesheet" />
 {% endblock styles %} {% block scripts %} {{ super() }}
-<!-- Tag badge styling -->
-<script src="{{ url_for('static', filename='js/components/tag-badge-styler.js') }}"></script>
 <!-- Expense detail functionality -->
 <script type="module" src="{{ url_for('static', filename='js/pages/expense-detail.js') }}"></script>
 {% endblock scripts %} {% block content %}
@@ -30,7 +27,7 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                                 src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                 data-website="{{ expense.restaurant.website }}"
                                 data-size="32"
-                                alt="{{ expense.restaurant.name }} icon"
+                                alt="{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }} icon"
                                 class="restaurant-favicon"
                                 width="32"
                                 height="32"
@@ -46,7 +43,8 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                         </div>
                         <div class="flex-grow-1">
                             <h1 class="h4 mb-1 fw-bold"
-                                >{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}</h1
+                                >{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant'
+                                }}</h1
                             >
                             <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
                                 {% if expense.restaurant and expense.restaurant.cuisine %} {% from
@@ -101,7 +99,7 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                                     data-bs-toggle="modal"
                                     data-bs-target="#deleteExpenseModal"
                                     data-expense-id="{{ expense.id }}"
-                                    data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
+                                    data-expense-description="{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }}"
                                     data-expense-amount="{{ expense.amount|format_number(2) }}"
                                     data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}">
                                     <i class="fas fa-trash me-1"></i>Delete Expense
@@ -307,7 +305,7 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                                 src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                 data-website="{{ expense.restaurant.website }}"
                                 data-size="32"
-                                alt="{{ expense.restaurant.name }} icon"
+                                alt="{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }} icon"
                                 class="restaurant-favicon"
                                 width="32"
                                 height="32"
@@ -322,7 +320,10 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                             {% endif %}
                         </div>
                         <div class="flex-grow-1">
-                            <h6 class="mb-1 fw-bold">{{ expense.restaurant.name }}</h6>
+                            <h6 class="mb-1 fw-bold"
+                                >{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant'
+                                }}</h6
+                            >
                             {% if expense.restaurant.cuisine or expense.restaurant.service_level %}
                             <div class="d-flex justify-content-end gap-2">
                                 {% if expense.restaurant.cuisine %} {% from 'macros/badge_helpers.html' import
@@ -402,7 +403,10 @@ url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Expense Deta
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                     <i class="fas fa-times me-1"></i> Cancel
                 </button>
-                <form id="delete-expense-form" method="post" action="">
+                <form
+                    id="delete-expense-form"
+                    method="post"
+                    action="{{ url_for('expenses.delete_expense', expense_id=expense.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                     <button type="submit" class="btn btn-danger">
                         <i class="fas fa-trash me-1"></i> Delete Expense

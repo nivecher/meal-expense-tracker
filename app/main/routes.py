@@ -248,13 +248,8 @@ def index() -> str:
     ).first()
 
     # Get recent expenses (top 5 most recent)
-    # Note: Restaurant.name and Restaurant.website may be None, but SQLAlchemy handles this
     recent_expenses = db.session.execute(
-        select(
-            Expense,
-            Restaurant.name.label("restaurant_name"),
-            Restaurant.website.label("restaurant_website"),
-        )
+        select(Expense, Restaurant)
         .join(Restaurant, Expense.restaurant_id == Restaurant.id, isouter=True)
         .where(Expense.user_id == user_id)
         .order_by(Expense.date.desc(), Expense.created_at.desc())
@@ -264,16 +259,13 @@ def index() -> str:
     # Get top restaurants by expense count (top 5)
     top_restaurants = db.session.execute(
         select(
-            Restaurant.id,
-            Restaurant.name,
-            Restaurant.website,
-            Restaurant.cuisine,
+            Restaurant,
             func.count(Expense.id).label("visit_count"),
             func.coalesce(func.sum(Expense.amount), 0).label("total_spent"),
         )
         .join(Expense, Restaurant.id == Expense.restaurant_id)
         .where(Restaurant.user_id == user_id)
-        .group_by(Restaurant.id, Restaurant.name, Restaurant.website, Restaurant.cuisine)
+        .group_by(Restaurant.id)
         .order_by(func.count(Expense.id).desc())
         .limit(5)
     ).all()

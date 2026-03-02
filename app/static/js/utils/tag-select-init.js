@@ -7,11 +7,13 @@
 function getTextColor(backgroundColor) {
   const hexToRgb = (hex) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16),
-    } : null;
+    return result
+      ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+      : null;
   };
 
   const rgb = hexToRgb(backgroundColor);
@@ -158,7 +160,9 @@ function initializeTagSelector(inputElement, options = {}) {
         const tagColor = data.color || '#6c757d';
         const textColor = getTextColor(tagColor);
         const description = data.description && data.description !== data.name ? data.description : '';
-        const tooltipAttr = description ? `title="${escape(description)}" data-bs-toggle="tooltip" data-bs-placement="top"` : '';
+        const tooltipAttr = description
+          ? `title="${escape(description)}" data-bs-toggle="tooltip" data-bs-placement="top"`
+          : '';
         return `
           <div class="tag-select-item" data-color="${escape(tagColor)}" data-tag-id="${data.id || ''}" data-tag-description="${escape(description)}" style="--tag-color: ${tagColor};" ${tooltipAttr}>
             <span class="tag-select-item-badge" style="background-color: ${tagColor}; color: ${textColor};">
@@ -222,7 +226,9 @@ function initializeTagSelector(inputElement, options = {}) {
 
                 // Initialize tooltips for existing tags after they're added
                 setTimeout(() => {
-                  const tagItems = inputElement.parentElement.querySelectorAll('.tag-select-item[data-bs-toggle="tooltip"]');
+                  const tagItems = inputElement.parentElement.querySelectorAll(
+                    '.tag-select-item[data-bs-toggle="tooltip"]',
+                  );
                   tagItems.forEach((item) => {
                     const existingTooltip = bootstrap.Tooltip.getInstance(item);
                     if (existingTooltip) {
@@ -238,9 +244,7 @@ function initializeTagSelector(inputElement, options = {}) {
               // Add selected tags if available (for filter form)
               if (selectedTags.length > 0) {
                 const tagsToAdd = selectedTags.map((tagName) => {
-                  const matchingTag = allTags.find(
-                    (tag) => tag.name.toLowerCase() === tagName.toLowerCase(),
-                  );
+                  const matchingTag = allTags.find((tag) => tag.name.toLowerCase() === tagName.toLowerCase());
                   return matchingTag || { id: tagName, name: tagName, color: '#6c757d', description: tagName };
                 });
 
@@ -253,7 +257,9 @@ function initializeTagSelector(inputElement, options = {}) {
 
                 // Initialize tooltips for selected tags
                 setTimeout(() => {
-                  const tagItems = inputElement.parentElement.querySelectorAll('.tag-select-item[data-bs-toggle="tooltip"]');
+                  const tagItems = inputElement.parentElement.querySelectorAll(
+                    '.tag-select-item[data-bs-toggle="tooltip"]',
+                  );
                   tagItems.forEach((item) => {
                     const existingTooltip = bootstrap.Tooltip.getInstance(item);
                     if (existingTooltip) {
@@ -273,6 +279,14 @@ function initializeTagSelector(inputElement, options = {}) {
         });
     },
     onItemAdd: (_value) => {
+      // Clear typed characters when a tag is selected so user can immediately type next tag
+      if (tagSelect) {
+        if (typeof tagSelect.setTextboxValue === 'function') {
+          tagSelect.setTextboxValue('');
+        } else if (tagSelect.control_input) {
+          tagSelect.control_input.value = '';
+        }
+      }
       // Preserve user's case - no case normalization
       // Initialize tooltip for newly added tag item
       setTimeout(() => {
@@ -410,7 +424,8 @@ function initializeTagSelector(inputElement, options = {}) {
         controlInput.style.backgroundColor = 'transparent';
 
         // Set proper placeholder
-        const placeholderText = tagSelectConfig.placeholder || (allowCreate ? 'Type to add tags...' : 'Type to search tags...');
+        const placeholderText =
+          tagSelectConfig.placeholder || (allowCreate ? 'Type to add tags...' : 'Type to search tags...');
         controlInput.placeholder = placeholderText;
 
         // Remove any weird text that might be showing (like "Type 1")
@@ -583,7 +598,9 @@ window.initTagSelectorWidget = initTagSelectorWidget;
 document.addEventListener('DOMContentLoaded', () => {
   // Check if TomSelect is available
   if (typeof TomSelect === 'undefined') {
-    console.error('TomSelect library is not loaded. Make sure tom-select.complete.min.js is included before this script.');
+    console.error(
+      'TomSelect library is not loaded. Make sure tom-select.complete.min.js is included before this script.',
+    );
     return;
   }
 

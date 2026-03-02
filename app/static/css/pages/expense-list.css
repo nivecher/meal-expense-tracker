@@ -53,7 +53,6 @@
   border-radius: 4px;
 }
 
-
 /* Stacked meal/order layout */
 
 .meal-order-stacked {
@@ -514,9 +513,25 @@
   opacity: 0.9;
 }
 
+.calendar-scroll-shell {
+  width: 100%;
+  overflow: visible auto;
+  padding-bottom: 0.35rem;
+}
+
+.calendar-scroll-content {
+  --calendar-day-width: 132px;
+
+  min-width: calc((var(--calendar-day-width) * 7) + (0.5rem * 6));
+}
+
+.calendar-scroll-content.is-day-view {
+  min-width: 100%;
+}
+
 .calendar-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(var(--calendar-day-width), 1fr));
   gap: 0.5rem;
   font-size: 0.75rem;
   font-weight: 600;
@@ -532,14 +547,14 @@
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(var(--calendar-day-width), 1fr));
   gap: 0.5rem;
   min-height: 320px;
 }
 
 .calendar-week-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(var(--calendar-day-width), 1fr));
   gap: 0.5rem;
 }
 
@@ -750,8 +765,9 @@
 
 .calendar-day-entries {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.35rem;
+  align-items: flex-start;
 }
 
 .calendar-entry {
@@ -823,6 +839,41 @@
   background-color: var(--gray-50, #f9fafb);
   color: var(--gray-500, #6b7280);
   font-size: 0.85rem;
+}
+
+.calendar-context-menu {
+  position: fixed;
+  z-index: 1080;
+  min-width: 180px;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 0.5rem;
+  background-color: var(--white, #fff);
+  box-shadow: 0 12px 28px rgb(15 23 42 / 15%);
+  padding: 0.35rem;
+}
+
+.calendar-context-item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: 0.35rem;
+  font-size: 0.85rem;
+  text-align: left;
+  color: var(--gray-700, #374151);
+  padding: 0.4rem 0.55rem;
+}
+
+.calendar-context-item:hover,
+.calendar-context-item:focus-visible {
+  background-color: var(--gray-100, #f3f4f6);
+  color: var(--primary-color, #2563eb);
+  outline: none;
+}
+
+@media (width >= 1200px) {
+  .calendar-scroll-content {
+    --calendar-day-width: 148px;
+  }
 }
 
 .expense-search-form {

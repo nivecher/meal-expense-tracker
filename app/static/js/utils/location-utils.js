@@ -65,11 +65,14 @@ function resetLocationComponents() {
 
   // Trigger location permission reset (user will need to allow again)
   if ('permissions' in navigator) {
-    navigator.permissions.query({ name: 'geolocation' }).then((permission) => {
-      console.log('Current geolocation permission:', permission.state);
-    }).catch((error) => {
-      console.log('Cannot query geolocation permission:', error);
-    });
+    navigator.permissions
+      .query({ name: 'geolocation' })
+      .then((permission) => {
+        console.log('Current geolocation permission:', permission.state);
+      })
+      .catch((error) => {
+        console.log('Cannot query geolocation permission:', error);
+      });
   }
 }
 
@@ -172,11 +175,7 @@ function clearLocationData(options = {}) {
     }
 
     // Clear sessionStorage location data
-    const sessionKeys = [
-      'currentLocation',
-      'tempLocation',
-      'searchLocation',
-    ];
+    const sessionKeys = ['currentLocation', 'tempLocation', 'searchLocation'];
 
     sessionKeys.forEach((key) => {
       if (sessionStorage.getItem(key)) {
@@ -199,7 +198,6 @@ function clearLocationData(options = {}) {
       clearedItems,
       message: `Cleared ${clearedItems.length} location data items`,
     };
-
   } catch (error) {
     console.error('Error clearing location data:', error);
     return {
@@ -261,16 +259,15 @@ function checkLocationData() {
 
   const existingCookies = locationCookies.filter((name) => getCookie(name));
   const existingLocalStorage = locationLocalStorage.filter((key) => localStorage.getItem(key));
-  const existingSessionStorage = ['currentLocation', 'tempLocation', 'searchLocation']
-    .filter((key) => sessionStorage.getItem(key));
+  const existingSessionStorage = ['currentLocation', 'tempLocation', 'searchLocation'].filter((key) =>
+    sessionStorage.getItem(key),
+  );
 
   return {
     cookies: existingCookies,
     localStorage: existingLocalStorage,
     sessionStorage: existingSessionStorage,
-    hasLocationData: existingCookies.length > 0 ||
-                     existingLocalStorage.length > 0 ||
-                     existingSessionStorage.length > 0,
+    hasLocationData: existingCookies.length > 0 || existingLocalStorage.length > 0 || existingSessionStorage.length > 0,
   };
 }
 

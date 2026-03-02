@@ -22,9 +22,7 @@ function formatDate(isoString) {
   if (!isoString) return '';
   try {
     return new Intl.DateTimeFormat('en-US', DATE_OPTIONS).format(new Date(isoString));
-  } catch {
-    return isoString;
-  }
+  } catch {}
 }
 
 function escapeHtml(text) {

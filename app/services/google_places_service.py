@@ -19,6 +19,12 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 from flask import current_app
 import requests
 
+from app.services.simple_cache import (
+    cache_place_details as shared_cache_place_details,
+    cache_search_results as shared_cache_search_results,
+    get_place_details as shared_get_place_details,
+    get_search_results as shared_get_search_results,
+)
 from app.utils.address_utils import normalize_country_to_iso2, normalize_state_to_usps
 
 logger = logging.getLogger(__name__)
@@ -43,21 +49,31 @@ FIELD_MASKS = {
     # Search mask - includes Pro tier fields needed for restaurant matching
     # TIER: ESSENTIALS + PRO (places.id, formattedAddress, location, displayName, primaryType, types)
     "search": "places.id,places.formattedAddress,places.location,places.displayName,places.primaryType,places.businessStatus,places.types",
-    # Place Details: address, name, cuisine, phone, website, priceLevel. One request per selection (no extra calls).
-    # websiteUri = Pro. nationalPhoneNumber = Enterprise. priceLevel = Enterprise (same tier, no extra cost).
+    # Cost-optimized Place Details (default): no Enterprise fields.
+    # Includes fields needed for core add/search workflows while avoiding Enterprise billing.
     "place_details": (
         "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
-        "displayName,primaryType,types,websiteUri,nationalPhoneNumber,priceLevel"
+        "displayName,primaryType,types,websiteUri"
+    ),
+    # Full Place Details (Enterprise): opt-in for phone/price/rating enrichment.
+    "place_details_enterprise": (
+        "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
+        "displayName,primaryType,types,websiteUri,nationalPhoneNumber,priceLevel,rating"
     ),
     # Legacy comprehensive - kept for CLI/validation if needed
     "comprehensive": (
         "id,formattedAddress,location,addressComponents,displayName,primaryType,businessStatus,"
         "types,rating,nationalPhoneNumber,websiteUri,userRatingCount,viewport"
     ),
-    # Same as place_details so CLI validate gets phone, website, address, and price level
+    # CLI validation default (cost-optimized, non-Enterprise)
     "cli_validation": (
         "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
-        "displayName,primaryType,types,websiteUri,nationalPhoneNumber,priceLevel"
+        "displayName,primaryType,types,websiteUri"
+    ),
+    # CLI validation with Enterprise fields enabled
+    "cli_validation_enterprise": (
+        "id,formattedAddress,location,addressComponents,postalAddress,addressDescriptor,"
+        "displayName,primaryType,types,websiteUri,nationalPhoneNumber,priceLevel,rating"
     ),
 }
 
@@ -190,6 +206,41 @@ class GooglePlacesService:
                 logger.error(f"Response content: {e.response.text}")
             return {}
 
+    def get_place_details_field_mask(
+        self,
+        use_case: str = "place_details",
+        include_enterprise: bool = False,
+        user_has_advanced_features: bool = False,
+    ) -> str:
+        """Get appropriate field mask for place details requests.
+
+        Args:
+            use_case: Type of request ('place_details' or 'search')
+            include_enterprise: Whether to include enterprise fields
+            user_has_advanced_features: Whether user has access to advanced features
+
+        Returns:
+            Field mask string for API request
+        """
+        if use_case == "place_details":
+            if include_enterprise and user_has_advanced_features:
+                # Full enterprise mask for place details
+                return FIELD_MASKS["place_details_enterprise"]
+            else:
+                # Basic mask for place details
+                return FIELD_MASKS["place_details"]
+        elif use_case == "cli_validation":
+            if include_enterprise and user_has_advanced_features:
+                return FIELD_MASKS["cli_validation_enterprise"]
+            else:
+                return FIELD_MASKS["cli_validation"]
+        elif use_case == "search":
+            # Search always uses pro mask (no enterprise fields in search)
+            return FIELD_MASKS["search"]
+        else:
+            # Default to place_details
+            return FIELD_MASKS["place_details"]
+
     def search_places_by_text(
         self,
         query: str,
@@ -201,10 +252,16 @@ class GooglePlacesService:
         if not query or not isinstance(query, str):
             return []
 
-        # Check cache
-        cache_key = f"text_search:{query}:{location_bias}:{radius_meters}"
+        # Check per-process cache
+        cache_key = f"text_search:{query}:{location_bias}:{radius_meters}:{max_results}"
         if cache_key in self._cache:
             return cast(list[dict[str, Any]], self._cache[cache_key])
+
+        # Check shared cache across requests/processes
+        shared_cached = shared_get_search_results(cache_key, location_bias, float(radius_meters))
+        if isinstance(shared_cached, list):
+            self._cache[cache_key] = shared_cached
+            return cast(list[dict[str, Any]], shared_cached)
 
         url = f"{PLACES_API_BASE}:searchText"
         headers = self._get_headers()
@@ -236,6 +293,7 @@ class GooglePlacesService:
 
         # Cache result
         self._cache[cache_key] = places
+        shared_cache_search_results(cache_key, location_bias, float(radius_meters), places)
         return places
 
     def search_places_nearby(
@@ -246,9 +304,15 @@ class GooglePlacesService:
         max_results: int = 20,
     ) -> list[dict[str, Any]]:
         """Search for places nearby a location."""
-        cache_key = f"nearby:{location}:{radius_meters}:{included_type}"
+        cache_key = f"nearby:{location}:{radius_meters}:{included_type}:{max_results}"
         if cache_key in self._cache:
             return cast(list[dict[str, Any]], self._cache[cache_key])
+
+        # Check shared cache across requests/processes
+        shared_cached = shared_get_search_results(cache_key, location, float(radius_meters))
+        if isinstance(shared_cached, list):
+            self._cache[cache_key] = shared_cached
+            return cast(list[dict[str, Any]], shared_cached)
 
         url = f"{PLACES_API_BASE}:searchNearby"
         headers = self._get_headers()
@@ -276,6 +340,7 @@ class GooglePlacesService:
         places = cast(list[dict[str, Any]], result.get("places", []))
 
         self._cache[cache_key] = places
+        shared_cache_search_results(cache_key, location, float(radius_meters), places)
         return places
 
     def get_place_details(self, place_id: str, field_mask: str | None = None) -> dict[str, Any] | None:
@@ -300,6 +365,13 @@ class GooglePlacesService:
             logger.debug(f"Cache hit for place details: {place_id}")
             return cast(dict[str, Any] | None, self._cache[cache_key])
 
+        # Shared cache key must include field mask to avoid collisions between cost tiers
+        shared_key = f"{place_id}|{mask}"
+        shared_cached = shared_get_place_details(shared_key)
+        if isinstance(shared_cached, dict) and shared_cached:
+            self._cache[cache_key] = shared_cached
+            return cast(dict[str, Any], shared_cached)
+
         url = f"{PLACES_API_BASE}/{place_id}"
         headers = self._get_headers()
         headers["X-Goog-FieldMask"] = mask
@@ -308,6 +380,7 @@ class GooglePlacesService:
 
         if result:
             self._cache[cache_key] = result
+            shared_cache_place_details(shared_key, result)
 
         return result
 

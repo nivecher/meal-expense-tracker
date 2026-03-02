@@ -93,8 +93,9 @@ def _count_user_objects(user: User) -> dict[str, int]:
     is_flag=True,
     help="Show count of related objects (expenses, restaurants, categories)",
 )
+@click.option("--limit", type=int, default=100, help="Limit number of results")
 @with_appcontext
-def list_users(admin_only: bool, objects: bool) -> None:
+def list_users(admin_only: bool, objects: bool, limit: int) -> None:
     """List all users in the system.
 
     Args:
@@ -105,7 +106,7 @@ def list_users(admin_only: bool, objects: bool) -> None:
     if admin_only:
         query = query.where(User.is_admin == True)  # noqa: E712
 
-    users = db.session.scalars(query.order_by(User.email)).all()
+    users = db.session.scalars(query.order_by(User.email).limit(limit)).all()
 
     if not users:
         click.echo("No users found" + (" matching the criteria" if admin_only else ""))
@@ -192,8 +193,20 @@ def list_users(admin_only: bool, objects: bool) -> None:
     default=True,
     help="Set account active status (default: active)",
 )
+@click.option(
+    "--advanced/--no-advanced",
+    default=False,
+    help="Enable or disable Advanced Features",
+)
 @with_appcontext
-def create_user(username: str, email: str, password: str, admin: bool, active: bool = True) -> None:
+def create_user(
+    username: str,
+    email: str,
+    password: str,
+    admin: bool,
+    active: bool = True,
+    advanced: bool = False,
+) -> None:
     """Create a new user account.
 
     Args:
@@ -224,7 +237,13 @@ def create_user(username: str, email: str, password: str, admin: bool, active: b
             return
 
         # Create the new user
-        user = User(username=username, email=email, is_admin=admin, is_active=active)
+        user = User(
+            username=username,
+            email=email,
+            is_admin=admin,
+            advanced_features_enabled=advanced,
+            is_active=active,
+        )
         user.set_password(password)
 
         db.session.add(user)
@@ -232,6 +251,7 @@ def create_user(username: str, email: str, password: str, admin: bool, active: b
 
         click.echo(f"Successfully created user: {username} ({email})")
         click.echo(f"  - Admin: {'Yes' if admin else 'No'}")
+        click.echo(f"  - Advanced Features: {'Yes' if advanced else 'No'}")
         click.echo(f"  - Active: {'Yes' if active else 'No'}")
 
     except IntegrityError as e:
@@ -378,6 +398,15 @@ def _update_user_active_status(user: User, is_active: bool, changes: list[str]) 
     return True
 
 
+def _update_user_advanced_status(user: User, advanced: bool, changes: list[str]) -> bool:
+    """Update user's advanced feature status."""
+    if advanced != user.advanced_features_enabled:
+        user.advanced_features_enabled = advanced
+        status = "enabled" if advanced else "disabled"
+        changes.append(f"advanced features {status}")
+    return True
+
+
 def _confirm_and_apply_changes(user: User, changes: list[str]) -> bool:
     """Confirm changes with the user and apply them to the database.
 
@@ -404,7 +433,7 @@ def _confirm_and_apply_changes(user: User, changes: list[str]) -> bool:
 
     try:
         db.session.commit()
-        click.echo(f"Successfully updated user: {user.username} " f"(ID: {user.id}, Email: {user.email})")
+        click.echo(f"Successfully updated user: {user.username} (ID: {user.id}, Email: {user.email})")
         return True
     except IntegrityError as e:
         db.session.rollback()
@@ -435,6 +464,11 @@ def _confirm_and_apply_changes(user: User, changes: list[str]) -> bool:
     default=True,
     help="Activate or deactivate the account",
 )
+@click.option(
+    "--advanced/--no-advanced",
+    default=None,
+    help="Enable or disable Advanced Features",
+)
 @with_appcontext
 def update_user(
     user_identifier: str,
@@ -443,6 +477,7 @@ def update_user(
     password: bool = False,
     admin: bool | None = None,
     active: bool | None = None,
+    advanced: bool | None = None,
 ) -> None:
     """Update an existing user's account information.
 
@@ -456,10 +491,10 @@ def update_user(
         return
     changes: list[str] = []
 
-    click.echo(f"Updating user: {user.username} " f"(ID: {user.id}, Email: {user.email})")
+    click.echo(f"Updating user: {user.username} (ID: {user.id}, Email: {user.email})")
 
     # Check if any changes are requested
-    if not any([username, email, password, admin is not None, active is not None]):
+    if not any([username, email, password, admin is not None, active is not None, advanced is not None]):
         click.echo(
             "Error: No changes specified. Use --help to see available options.",
             err=True,
@@ -477,6 +512,8 @@ def update_user(
         return
     if active is not None and not _update_user_active_status(user, active, changes):
         return
+    if advanced is not None and not _update_user_advanced_status(user, advanced, changes):
+        return
 
     # Apply changes if any were made
     _confirm_and_apply_changes(user, changes)
@@ -490,6 +527,7 @@ def _display_user_info(user: User) -> None:
     """
     click.echo(f"User to delete: {user.username} (ID: {user.id}, Email: {user.email})")
     click.echo(f"  - Admin: {'Yes' if user.is_admin else 'No'}")
+    click.echo(f"  - Advanced Features: {'Yes' if user.has_advanced_features else 'No'}")
     click.echo(f"  - Active: {'Yes' if user.is_active else 'No'}")
 
 

@@ -64,8 +64,8 @@ TIGER principles (Testable, Incremental, Goal-oriented, Explicit, Responsibility
 
 ### Key Technical Decisions
 
-- **Web Framework**: Flask 3.1.1 with Blueprints for route organization
-- **Database**: SQLAlchemy ORM with PostgreSQL
+- **Web Framework**: Flask with Blueprints for route organization (see `requirements.txt` for exact version)
+- **Database**: SQLAlchemy ORM with PostgreSQL (see `requirements.txt` for exact version)
 - **API**: RESTful design with JSON:API specification
 - **Authentication**: Session-based authentication with Flask-Login
 - **Validation**: Pydantic models for request/response validation

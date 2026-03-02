@@ -5,6 +5,8 @@
  * Features Google Maps integration with restaurant markers and detailed result cards.
  */
 
+import { initializeRobustFaviconHandling } from '../utils/robust-favicon-handler.js';
+
 // Import security utilities for XSS prevention
 let escapeHtml;
 if (typeof window !== 'undefined' && window.SecurityUtils) {
@@ -44,12 +46,31 @@ export class MapRestaurantSearch {
 
     this.map = null;
     this.markers = [];
+    this.markerEntries = [];
     this.currentLocation = null;
     this.currentLocationMarker = null;
+    this.searchAreaCircle = null;
     this.searchMode = 'nearby'; // 'nearby', 'text', 'address'
     this.isSearching = false;
     this.locale = this.detectLocale();
     this.selectedRestaurant = null;
+    this.selectedResultKey = null;
+    this.activeInfoWindow = null;
+    this.myRestaurantsLoaded = false;
+    this.myRestaurantsByPlaceId = new Map();
+    this.myRestaurantsByFallbackKey = new Map();
+    this.myRestaurantsCache = [];
+    this.currentResults = null;
+    this.visibleResults = [];
+    this.resultsFilter = 'all';
+    this.discoveryScope = 'combined';
+    this.includeMine = true;
+    this.includeNew = true;
+    this.sortMode = 'distance';
+    this.requestedMaxResults = 20;
+    this.maxResultsStep = 10;
+    this.maxResultsCap = 40;
+    this.lastSearchContext = null;
 
     this.init();
   }
@@ -75,10 +96,43 @@ export class MapRestaurantSearch {
     await this.waitForGoogleMaps();
     this.render();
     this.bindEvents();
+    this.applyInitialDiscoveryMode();
     this.getCurrentLocation();
   }
 
-  async loadGoogleMaps() { // eslint-disable-line require-await
+  applyInitialDiscoveryMode() {
+    const mode = this.options.initialDiscoveryMode;
+    if (mode === 'my') {
+      this.discoveryScope = 'my';
+      this.includeMine = true;
+      this.includeNew = false;
+    } else if (mode === 'nearby') {
+      this.discoveryScope = 'combined';
+      this.includeMine = true;
+      this.includeNew = true;
+    } else {
+      this.discoveryScope = 'combined';
+      this.includeMine = true;
+      this.includeNew = true;
+    }
+
+    const scopeSelect = this.container.querySelector('#search-scope');
+    const includeMine = this.container.querySelector('#include-mine-toggle');
+    const includeNew = this.container.querySelector('#include-new-toggle');
+    if (scopeSelect) {
+      scopeSelect.value = this.discoveryScope;
+    }
+    if (includeMine instanceof HTMLInputElement) {
+      includeMine.checked = this.includeMine;
+    }
+    if (includeNew instanceof HTMLInputElement) {
+      includeNew.checked = this.includeNew;
+    }
+    this.updateResultToggleButtons();
+  }
+
+  // eslint-disable-next-line require-await -- returns Promise for script loading
+  async loadGoogleMaps() {
     if (window.google && window.google.maps) {
       return; // Already loaded
     }
@@ -93,15 +147,18 @@ export class MapRestaurantSearch {
     });
   }
 
-  async waitForGoogleMaps() { // eslint-disable-line require-await
+  // eslint-disable-next-line require-await -- returns Promise for polling
+  async waitForGoogleMaps() {
     // Wait for Google Maps API to be fully loaded including marker library
     return new Promise((resolve) => {
       const checkGoogleMaps = () => {
-        if (window.google &&
-            window.google.maps &&
-            window.google.maps.Map &&
-            window.google.maps.marker &&
-            window.google.maps.marker.AdvancedMarkerElement) {
+        if (
+          window.google &&
+          window.google.maps &&
+          window.google.maps.Map &&
+          window.google.maps.marker &&
+          window.google.maps.marker.AdvancedMarkerElement
+        ) {
           resolve();
         } else {
           setTimeout(checkGoogleMaps, 100);
@@ -112,163 +169,182 @@ export class MapRestaurantSearch {
   }
 
   render() {
-    // Add CSS for enhanced card interactions
-    if (!document.getElementById('map-restaurant-search-styles')) {
-      const style = document.createElement('style');
-      style.id = 'map-restaurant-search-styles';
-      style.textContent = `
-        .restaurant-card {
-          transition: all 0.2s ease;
-          border: 2px solid transparent;
-        }
-
-        .restaurant-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-          border-color: #dee2e6;
-        }
-
-        .restaurant-card.border-primary {
-          border-color: #0d6efd !important;
-          box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
-        }
-
-        .badge.bg-danger {
-          transition: all 0.2s ease;
-        }
-
-        .restaurant-card:hover .badge.bg-danger {
-          transform: scale(1.1);
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
     this.container.innerHTML = `
-      <div class="map-restaurant-search">
-        <div class="row g-4">
-          <!-- Left Column: Map -->
-          <div class="col-lg-8">
-            <div class="map-container">
-              <div id="restaurant-map" style="height: 500px; border-radius: 8px; border: 1px solid #dee2e6;"></div>
+      <div class="map-restaurant-search discovery-layout">
+        <div class="row g-3 align-items-start">
+          <div class="col-12 col-xl-8">
+            <div class="map-container discovery-map-panel">
+              <div class="discovery-map-toolbar">
+                <span class="map-toolbar-label"><i class="fas fa-map me-1"></i>Search area</span>
+                <button class="btn btn-outline-secondary btn-sm" id="use-location-btn" type="button">
+                  <i class="fas fa-location-arrow me-1"></i>Use My Location
+                </button>
+              </div>
+              <div id="restaurant-map" class="discovery-map-canvas"></div>
             </div>
           </div>
 
-          <!-- Right Column: Search Controls -->
-          <div class="col-lg-4">
-            <div class="search-panel bg-light p-3 rounded">
-              <h6 class="mb-3">
-                <i class="fas fa-search me-2"></i>Search & Filters
-              </h6>
+          <div class="col-12 col-xl-4">
+            <div class="search-panel discovery-control-panel p-3 rounded">
+              <h6 class="mb-3"><i class="fas fa-sliders-h me-2"></i>Search Controls</h6>
 
-              <!-- Main Search -->
               <div class="mb-3">
-                <label for="search-input" class="form-label">Find Restaurants</label>
+                <label for="search-input" class="form-label">What are you craving?</label>
                 <div class="input-group">
-                  <input type="text" class="form-control" id="search-input" placeholder="Name, cuisine, location...">
+                  <input type="text" class="form-control" id="search-input" placeholder="Try tacos, ramen, brunch..." />
                   <button class="btn btn-primary" type="button" id="search-btn">
-                    <i class="fas fa-search"></i>
+                    <i class="fas fa-search me-1"></i>Search
                   </button>
                 </div>
               </div>
 
-              <!-- Location Button -->
               <div class="mb-3">
-                <button class="btn btn-outline-secondary w-100" id="use-location-btn">
-                  <i class="fas fa-map-marker-alt me-1"></i>Use My Location
-                </button>
-              </div>
-
-              <!-- Search Radius -->
-              <div class="mb-3">
-                <label for="radius-slider" class="form-label">Search Radius</label>
-                <div class="d-flex align-items-center">
-                  <input type="range" class="form-range me-2" id="radius-slider" min="0.5" max="25" step="0.5" value="5">
+                <label for="radius-slider" class="form-label">Search radius</label>
+                <div class="d-flex align-items-center gap-2">
+                  <input type="range" class="form-range" id="radius-slider" min="0.5" max="25" step="0.5" value="5" />
                   <span id="radius-display" class="text-muted small">5.0 mi</span>
                 </div>
               </div>
 
-              <!-- Advanced Filters -->
-              <div class="mb-3">
-                <button class="btn btn-link p-0 text-decoration-none w-100 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-filters" aria-expanded="false" aria-controls="advanced-filters">
-                  <i class="fas fa-filter me-1"></i>Advanced Filters
-                  <i class="fas fa-chevron-down ms-1"></i>
-                </button>
+              <div class="discovery-filters mb-3">
+                <div class="row g-2">
+                  <div class="col-12">
+                    <label for="cuisine-filter" class="form-label">Cuisine</label>
+                    <select class="form-select form-select-sm" id="cuisine-filter">
+                      <option value="">Any cuisine</option>
+                      <option value="italian">Italian</option>
+                      <option value="chinese">Chinese</option>
+                      <option value="mexican">Mexican</option>
+                      <option value="japanese">Japanese</option>
+                      <option value="indian">Indian</option>
+                      <option value="thai">Thai</option>
+                      <option value="american">American</option>
+                      <option value="french">French</option>
+                      <option value="mediterranean">Mediterranean</option>
+                      <option value="korean">Korean</option>
+                    </select>
+                  </div>
 
-                <div class="collapse mt-2" id="advanced-filters">
-                  <div class="row g-2">
-                    <div class="col-12">
-                      <label for="cuisine-filter" class="form-label">Cuisine Type</label>
-                      <select class="form-select form-select-sm" id="cuisine-filter">
-                        <option value="">Any cuisine</option>
-                        <option value="italian">Italian</option>
-                        <option value="chinese">Chinese</option>
-                        <option value="mexican">Mexican</option>
-                        <option value="japanese">Japanese</option>
-                        <option value="indian">Indian</option>
-                        <option value="thai">Thai</option>
-                        <option value="american">American</option>
-                        <option value="french">French</option>
-                        <option value="mediterranean">Mediterranean</option>
-                        <option value="korean">Korean</option>
-                      </select>
-                    </div>
+                  <div class="col-6">
+                    <label for="min-rating" class="form-label">Min rating</label>
+                    <select class="form-select form-select-sm" id="min-rating">
+                      <option value="">Any</option>
+                      <option value="4.5">4.5+ ⭐</option>
+                      <option value="4.0">4.0+ ⭐</option>
+                      <option value="3.5">3.5+ ⭐</option>
+                      <option value="3.0">3.0+ ⭐</option>
+                    </select>
+                  </div>
 
-                    <div class="col-6">
-                      <label for="min-rating" class="form-label">Min Rating</label>
-                      <select class="form-select form-select-sm" id="min-rating">
-                        <option value="">Any</option>
-                        <option value="4.5">4.5+ ⭐</option>
-                        <option value="4.0">4.0+ ⭐</option>
-                        <option value="3.5">3.5+ ⭐</option>
-                        <option value="3.0">3.0+ ⭐</option>
-                      </select>
-                    </div>
+                  <div class="col-6">
+                    <label for="max-price" class="form-label">Max price</label>
+                    <select class="form-select form-select-sm" id="max-price">
+                      <option value="">Any</option>
+                      <option value="1">$ (Budget)</option>
+                      <option value="2">$$ (Moderate)</option>
+                      <option value="3">$$$ (Expensive)</option>
+                      <option value="4">$$$$ (Very Expensive)</option>
+                    </select>
+                  </div>
 
-                    <div class="col-6">
-                      <label for="max-price" class="form-label">Max Price</label>
-                      <select class="form-select form-select-sm" id="max-price">
-                        <option value="">Any</option>
-                        <option value="1">$ (Budget)</option>
-                        <option value="2">$$ (Moderate)</option>
-                        <option value="3">$$$ (Expensive)</option>
-                        <option value="4">$$$$ (Very Expensive)</option>
-                      </select>
-                    </div>
+                  <div class="col-6">
+                    <label for="search-scope" class="form-label">Source</label>
+                    <select class="form-select form-select-sm" id="search-scope">
+                      <option value="combined" selected>Combined</option>
+                      <option value="google">Google only</option>
+                      <option value="my">My restaurants only</option>
+                    </select>
+                  </div>
 
-
+                  <div class="col-6">
+                    <label for="sort-by" class="form-label">Sort by</label>
+                    <select class="form-select form-select-sm" id="sort-by">
+                      <option value="distance" selected>Distance</option>
+                      <option value="name">Name (A-Z)</option>
+                      <option value="rating">Rating</option>
+                    </select>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Results Section Below -->
-        <div class="mt-4">
-          <div id="results-header" class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">
-              <i class="fas fa-utensils me-2"></i>Search Results
-              <span id="location-indicator" class="badge bg-success ms-2 d-none">
-                <i class="fas fa-map-marker-alt me-1"></i>Location-based
-              </span>
-            </h5>
-            <span id="results-count" class="badge bg-primary fs-6">0 restaurants found</span>
-          </div>
+              <div class="mb-3">
+                <div class="small text-muted mb-1">Include in results</div>
+                <div class="d-flex flex-wrap gap-3">
+                  <label class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="include-mine-toggle" checked />
+                    <span class="form-check-label">My restaurants</span>
+                  </label>
+                  <label class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="include-new-toggle" checked />
+                    <span class="form-check-label">New places</span>
+                  </label>
+                </div>
+              </div>
 
-          <div id="search-results" class="row g-3">
-            <div class="col-12">
-              <div class="text-center text-muted py-5">
-                <i class="fas fa-search fa-3x mb-3"></i>
-                <h6>Find restaurants in your area</h6>
-                <p class="mb-2">Click "Search" or "Use My Location" to discover nearby dining options</p>
-                <small class="text-muted">Leave the search box empty to find all restaurants in your area</small>
+              <div class="small text-muted discovery-help-copy">
+                Balanced mode returns up to 20 results first. Use <strong>Load More</strong> to fetch 10 more.
+              </div>
+              <details class="small text-muted mt-2">
+                <summary class="cursor-pointer">How search API options work</summary>
+                <div class="mt-1">
+                  <div><strong>query</strong>: keyword or cuisine text.</div>
+                  <div><strong>radius_miles</strong>: strict radius around map center.</div>
+                  <div><strong>minRating/maxPriceLevel</strong>: optional quality filters.</div>
+                  <div><strong>searchScope</strong>: combined, google only, or my restaurants.</div>
+                  <div><strong>maxResults</strong>: balanced starts at 20, then +10 via Load More.</div>
+                </div>
+              </details>
+
+              <div class="d-grid">
+                <button class="btn btn-primary" type="button" id="search-btn-secondary">
+                  <i class="fas fa-compass me-1"></i>Search This Area
+                </button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Location Status -->
+        <div class="mt-3">
+          <div id="results-header" class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">
+              <i class="fas fa-utensils me-2"></i>Best Matches Nearby
+              <span id="location-indicator" class="badge bg-success ms-2 d-none">
+                <i class="fas fa-map-marker-alt me-1"></i>Location-based
+              </span>
+              <span id="radius-indicator" class="badge bg-info-subtle text-info-emphasis ms-2 d-none"></span>
+            </h5>
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+              <div class="btn-group btn-group-sm discovery-ownership-filter" role="group" aria-label="Filter results">
+                <button type="button" class="btn btn-outline-secondary active" data-result-filter="all">All</button>
+                <button type="button" class="btn btn-outline-secondary" data-result-filter="mine">My Restaurants</button>
+                <button type="button" class="btn btn-outline-secondary" data-result-filter="new">New To Me</button>
+              </div>
+              <span id="results-count" class="badge bg-primary fs-6">0 restaurants found</span>
+            </div>
+          </div>
+
+          <div id="search-diagnostics" class="search-diagnostics text-muted small mb-3"></div>
+
+          <div class="discovery-legend mb-2">
+            <span class="legend-item"><i class="fas fa-circle text-primary me-1"></i>My restaurants</span>
+            <span class="legend-item"><i class="fas fa-circle text-danger me-1"></i>New places</span>
+          </div>
+
+          <div id="search-results" class="discovery-results-list">
+            <div class="discovery-empty text-center text-muted py-5">
+              <i class="fas fa-search fa-3x mb-3"></i>
+              <h6>Find restaurants in your area</h6>
+              <p class="mb-2">Move the map, set your filters, then search this area</p>
+              <small class="text-muted">Leave the search box empty to discover all nearby restaurants</small>
+            </div>
+          </div>
+          <div class="d-flex justify-content-center mt-3">
+            <button class="btn btn-outline-primary d-none" type="button" id="load-more-btn">
+              <i class="fas fa-plus-circle me-1"></i>Load More (10)
+            </button>
+          </div>
+        </div>
+
         <div id="location-status" class="alert alert-info d-none mt-3">
           <i class="fas fa-info-circle me-2"></i>
           <span id="location-status-text">Getting your location...</span>
@@ -281,13 +357,6 @@ export class MapRestaurantSearch {
 
   initMap() {
     const mapElement = this.container.querySelector('#restaurant-map');
-
-    // Debug: Log map configuration
-    console.log('Map initialization options:', this.options);
-    console.log('Google Maps Map ID:', this.options.googleMapsMapId);
-    console.log('Google Maps Map ID type:', typeof this.options.googleMapsMapId);
-    console.log('Google Maps Map ID length:', this.options.googleMapsMapId ? this.options.googleMapsMapId.length : 'N/A');
-    console.log('Google Maps Map ID truthy:', !!this.options.googleMapsMapId);
 
     // Default to San Francisco if no location available
     const defaultLocation = { lat: 37.7749, lng: -122.4194 };
@@ -303,27 +372,9 @@ export class MapRestaurantSearch {
     };
 
     if (this.options.googleMapsMapId) {
-      // Validate Map ID format
       const mapId = this.options.googleMapsMapId.trim();
-      console.log('Map ID validation:', {
-        original: this.options.googleMapsMapId,
-        trimmed: mapId,
-        length: mapId.length,
-        type: typeof mapId,
-      });
-
-      if (mapId.length < 10) {
-        console.warn('Map ID appears to be too short, may not be valid:', mapId);
-      }
       mapOptions.mapId = mapId;
-      console.log('Using Map ID:', mapId);
     } else {
-      console.warn('No Map ID provided, using default styles');
-      console.log('Map ID options:', {
-        googleMapsMapId: this.options.googleMapsMapId,
-        type: typeof this.options.googleMapsMapId,
-        truthy: !!this.options.googleMapsMapId,
-      });
       // Only apply inline styles when not using a cloud-based Map ID style
       mapOptions.styles = [
         {
@@ -334,7 +385,6 @@ export class MapRestaurantSearch {
       ];
     }
 
-    console.log('Final map options:', mapOptions);
     this.map = new google.maps.Map(mapElement, mapOptions);
 
     // Add click listener to map
@@ -350,6 +400,7 @@ export class MapRestaurantSearch {
     // Search input
     const searchInput = this.container.querySelector('#search-input');
     const searchBtn = this.container.querySelector('#search-btn');
+    const searchBtnSecondary = this.container.querySelector('#search-btn-secondary');
 
     searchInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
@@ -359,6 +410,17 @@ export class MapRestaurantSearch {
 
     searchBtn.addEventListener('click', () => {
       this.performSearch();
+    });
+
+    searchBtnSecondary?.addEventListener('click', () => {
+      this.performSearch();
+    });
+
+    const loadMoreBtn = this.container.querySelector('#load-more-btn');
+    loadMoreBtn?.addEventListener('click', () => {
+      if (this.requestedMaxResults >= this.maxResultsCap) return;
+      this.requestedMaxResults = Math.min(this.maxResultsCap, this.requestedMaxResults + this.maxResultsStep);
+      this.performSearch({ preserveRequestedMax: true });
     });
 
     // Use My Location button
@@ -377,9 +439,12 @@ export class MapRestaurantSearch {
 
     // Event delegation for restaurant cards and buttons
     this.container.addEventListener('click', (e) => {
+      const targetEl = e.target instanceof Element ? e.target : null;
+      if (!targetEl) return;
+
       // Handle restaurant card clicks
-      const restaurantCard = e.target.closest('.restaurant-card');
-      if (restaurantCard) {
+      const restaurantCard = targetEl.closest('.restaurant-card');
+      if (restaurantCard && !targetEl.closest('a, button')) {
         const index = parseInt(restaurantCard.dataset.index, 10);
         if (!isNaN(index)) {
           this.selectRestaurant(index);
@@ -387,27 +452,55 @@ export class MapRestaurantSearch {
       }
 
       // Handle add restaurant button clicks
-      const addButton = e.target.closest('[data-action="add-restaurant"]');
+      const addButton = targetEl.closest('[data-action="add-restaurant"]');
       if (addButton) {
         e.stopPropagation(); // Prevent card selection
         const { placeId } = addButton.dataset;
         if (placeId && placeId !== 'null' && placeId !== 'undefined' && placeId.trim() !== '') {
           this.addToMyRestaurants(placeId);
         } else {
-          console.warn('Restaurant cannot be added: missing Google Place ID. This restaurant may need to be added manually.');
+          console.warn(
+            'Restaurant cannot be added: missing Google Place ID. This restaurant may need to be added manually.',
+          );
           // Note: User-friendly message shown via console.warn above
         }
+      }
+
+      const filterButton = targetEl.closest('[data-result-filter]');
+      if (filterButton) {
+        const { resultFilter } = filterButton.dataset;
+        this.setResultsFilter(resultFilter || 'all');
       }
     });
 
     // Add change listeners to filter controls for immediate re-search
-    const filterControls = this.container.querySelectorAll('#cuisine-filter, #min-rating, #max-price');
+    const filterControls = this.container.querySelectorAll('#cuisine-filter, #min-rating, #max-price, #search-scope');
     filterControls.forEach((control) => {
       control.addEventListener('change', () => {
-        // Re-search when filters change (works with or without search query)
+        if (control.id === 'search-scope') {
+          this.discoveryScope = control.value || 'combined';
+        }
+        this.requestedMaxResults = 20;
         this.performSearch();
       });
     });
+
+    const sortControl = this.container.querySelector('#sort-by');
+    sortControl?.addEventListener('change', () => {
+      this.sortMode = sortControl.value || 'distance';
+      this.renderVisibleResults({ fitMap: false });
+    });
+
+    const includeMineToggle = this.container.querySelector('#include-mine-toggle');
+    const includeNewToggle = this.container.querySelector('#include-new-toggle');
+    const onOwnershipToggle = () => {
+      this.includeMine = includeMineToggle instanceof HTMLInputElement ? includeMineToggle.checked : true;
+      this.includeNew = includeNewToggle instanceof HTMLInputElement ? includeNewToggle.checked : true;
+      this.updateResultToggleButtons();
+      this.renderVisibleResults({ fitMap: false });
+    };
+    includeMineToggle?.addEventListener('change', onOwnershipToggle);
+    includeNewToggle?.addEventListener('change', onOwnershipToggle);
   }
 
   updateRadiusDisplay(display, value) {
@@ -447,7 +540,8 @@ export class MapRestaurantSearch {
 
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-success');
-      statusText.innerHTML = '<i class="fas fa-check-circle me-2"></i>Location found! Searching for restaurants in your area...';
+      statusText.innerHTML =
+        '<i class="fas fa-check-circle me-2"></i>Location found! Searching for restaurants in your area...';
 
       // Perform search automatically with location-based results
       await this.performSearch();
@@ -456,39 +550,7 @@ export class MapRestaurantSearch {
       setTimeout(() => {
         statusDiv.classList.add('d-none');
       }, 3000);
-
-    } catch (error) {
-      statusDiv.classList.remove('alert-info');
-      statusDiv.classList.add('alert-warning');
-
-      // Provide more specific error messages based on error type
-      let errorMessage = '<i class="fas fa-exclamation-triangle me-2"></i>';
-
-      if (error.message.includes('Geolocation is not supported')) {
-        errorMessage += 'Location services not available. You can still search by text or drag the map to your area.';
-      } else if (error.message.includes('User denied')) {
-        errorMessage += 'Location access denied. You can still search by text or drag the map to your area.';
-      } else if (error.message.includes('timeout')) {
-        errorMessage += 'Location request timed out. Try again or search by text.';
-      } else {
-        errorMessage += 'Could not get your location. You can still search by text or drag the map to your area.';
-      }
-
-      statusText.innerHTML = errorMessage;
-
-      // Show help text about manual location setting
-      const helpText = document.createElement('div');
-      helpText.className = 'mt-2 small text-muted';
-      helpText.innerHTML = '<i class="fas fa-info-circle me-1"></i>Tip: You can drag the map to your area and search for better results.';
-      statusText.parentNode.appendChild(helpText);
-
-      // Hide status after 7 seconds for error messages
-      setTimeout(() => {
-        statusDiv.classList.add('d-none');
-        if (helpText.parentNode) {
-          helpText.parentNode.removeChild(helpText);
-        }
-      }, 7000);
+    } catch {
     } finally {
       // Reset button state
       useLocationBtn.innerHTML = originalText;
@@ -516,23 +578,14 @@ export class MapRestaurantSearch {
 
       statusDiv.classList.remove('alert-info');
       statusDiv.classList.add('alert-success');
-      statusText.innerHTML = '<i class="fas fa-check-circle me-2"></i>Location found! You can now search for nearby restaurants.';
+      statusText.innerHTML =
+        '<i class="fas fa-check-circle me-2"></i>Location found! You can now search for nearby restaurants.';
 
       // Hide status after 3 seconds
       setTimeout(() => {
         statusDiv.classList.add('d-none');
       }, 3000);
-
-    } catch (_error) {
-      statusDiv.classList.remove('alert-info');
-      statusDiv.classList.add('alert-warning');
-      statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied. You can still search by text.';
-
-      // Hide status after 5 seconds
-      setTimeout(() => {
-        statusDiv.classList.add('d-none');
-      }, 5000);
-    }
+    } catch {}
   }
 
   getCurrentPosition() {
@@ -570,16 +623,222 @@ export class MapRestaurantSearch {
     });
   }
 
-  async performSearch() {
+  async ensureMyRestaurantsLoaded(forceRefresh = false) {
+    if (this.myRestaurantsLoaded && !forceRefresh) {
+      return;
+    }
+
+    const response = await fetch('/api/v1/restaurants', {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to load your restaurants for ownership matching.');
+    }
+
+    const payload = await response.json();
+    const restaurants = payload.data || payload || [];
+    this.myRestaurantsCache = Array.isArray(restaurants) ? restaurants : [];
+
+    this.myRestaurantsByPlaceId.clear();
+    this.myRestaurantsByFallbackKey.clear();
+
+    restaurants.forEach((restaurant) => {
+      const placeId = this.normalizePlaceId(restaurant.google_place_id || restaurant.place_id);
+      if (placeId) {
+        this.myRestaurantsByPlaceId.set(placeId, restaurant);
+      }
+
+      const fallbackKey = this.buildFallbackKey(restaurant);
+      if (fallbackKey) {
+        this.myRestaurantsByFallbackKey.set(fallbackKey, restaurant);
+      }
+    });
+
+    this.myRestaurantsLoaded = true;
+  }
+
+  mapLocalRestaurantForDiscovery(restaurant) {
+    return {
+      name: restaurant.name || '',
+      formatted_address: [restaurant.address_line_1, restaurant.city, restaurant.state].filter(Boolean).join(', '),
+      address_line_1: restaurant.address_line_1 || '',
+      city: restaurant.city || '',
+      state: restaurant.state || '',
+      website: restaurant.website || '',
+      google_place_id: restaurant.google_place_id || '',
+      place_id: restaurant.google_place_id || '',
+      latitude: restaurant.latitude !== null ? Number.parseFloat(restaurant.latitude) : null,
+      longitude: restaurant.longitude !== null ? Number.parseFloat(restaurant.longitude) : null,
+      rating: Number(restaurant.rating || 0) || 0,
+      user_ratings_total: 0,
+      price_level: restaurant.price_level || null,
+      cuisine_type: restaurant.cuisine || '',
+      isMine: true,
+      matchedRestaurantId: restaurant.id || null,
+      matchedRestaurantWebsite: restaurant.website || '',
+      resultKey: this.getResultKey(restaurant),
+    };
+  }
+
+  searchMyRestaurantsOnly(searchLocation, radiusMiles, query, filters) {
+    const lowerQuery = (query || '').trim().toLowerCase();
+    const cuisineFilter = (filters.cuisine || '').trim().toLowerCase();
+
+    const mapped = this.myRestaurantsCache
+      .map((restaurant) => this.mapLocalRestaurantForDiscovery(restaurant))
+      .filter((restaurant) => restaurant.latitude !== null && restaurant.longitude !== null)
+      .filter((restaurant) => {
+        const distance = this.calculateDistance(
+          searchLocation.lat,
+          searchLocation.lng,
+          restaurant.latitude,
+          restaurant.longitude,
+        );
+        if (distance === null || distance > radiusMiles) {
+          return false;
+        }
+
+        if (lowerQuery) {
+          const haystack = [restaurant.name, restaurant.cuisine_type, restaurant.city].join(' ').toLowerCase();
+          if (!haystack.includes(lowerQuery)) {
+            return false;
+          }
+        }
+
+        if (
+          cuisineFilter &&
+          !String(restaurant.cuisine_type || '')
+            .toLowerCase()
+            .includes(cuisineFilter)
+        ) {
+          return false;
+        }
+
+        return true;
+      });
+
+    return {
+      results: mapped.slice(0, this.requestedMaxResults),
+      meta: {
+        result_count: mapped.length,
+        has_more_hint: mapped.length > this.requestedMaxResults,
+      },
+    };
+  }
+
+  normalizePlaceId(placeId) {
+    if (!placeId || typeof placeId !== 'string') {
+      return '';
+    }
+
+    return placeId.trim().toLowerCase();
+  }
+
+  normalizeText(value) {
+    if (!value) {
+      return '';
+    }
+
+    return String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  normalizeCoord(value) {
+    const parsed = Number.parseFloat(value);
+    if (Number.isNaN(parsed)) {
+      return '';
+    }
+    return parsed.toFixed(4);
+  }
+
+  buildFallbackKey(restaurant) {
+    const nameKey = this.normalizeText(restaurant.name);
+    const cityKey = this.normalizeText(restaurant.city);
+    const latKey = this.normalizeCoord(restaurant.latitude);
+    const lngKey = this.normalizeCoord(restaurant.longitude);
+
+    if (!nameKey || !latKey || !lngKey) {
+      return '';
+    }
+
+    return `${nameKey}|${cityKey}|${latKey}|${lngKey}`;
+  }
+
+  getResultKey(restaurant, index = 0) {
+    const placeId = this.normalizePlaceId(restaurant.google_place_id || restaurant.place_id || restaurant.id);
+    if (placeId) {
+      return `place:${placeId}`;
+    }
+
+    const fallbackKey = this.buildFallbackKey(restaurant);
+    if (fallbackKey) {
+      return `fallback:${fallbackKey}`;
+    }
+
+    const nameKey = this.normalizeText(restaurant.name);
+    return `idx:${nameKey || 'restaurant'}:${index}`;
+  }
+
+  enrichResultsWithOwnership(results) {
+    return results.map((restaurant, index) => {
+      const placeIdKey = this.normalizePlaceId(restaurant.google_place_id || restaurant.place_id);
+      const fallbackKey = this.buildFallbackKey(restaurant);
+      const matchedRestaurant =
+        (placeIdKey && this.myRestaurantsByPlaceId.get(placeIdKey)) ||
+        (fallbackKey && this.myRestaurantsByFallbackKey.get(fallbackKey)) ||
+        null;
+
+      return {
+        ...restaurant,
+        isMine: Boolean(matchedRestaurant),
+        matchedRestaurantId: matchedRestaurant?.id || null,
+        matchedRestaurantWebsite: matchedRestaurant?.website || '',
+        resultKey: this.getResultKey(restaurant, index),
+      };
+    });
+  }
+
+  setResultsFilter(filter) {
+    if (!['all', 'mine', 'new'].includes(filter)) {
+      return;
+    }
+
+    this.resultsFilter = filter;
+    this.updateFilterButtonStates();
+    this.renderVisibleResults({ fitMap: false });
+  }
+
+  updateFilterButtonStates() {
+    this.container.querySelectorAll('[data-result-filter]').forEach((button) => {
+      const isActive = button.getAttribute('data-result-filter') === this.resultsFilter;
+      button.classList.toggle('active', isActive);
+      button.classList.toggle('btn-outline-secondary', !isActive);
+      button.classList.toggle('btn-primary', isActive);
+    });
+  }
+
+  async performSearch(options = {}) {
+    const { preserveRequestedMax = false } = options;
     if (this.isSearching) return;
+
+    if (!preserveRequestedMax) {
+      this.requestedMaxResults = 20;
+    }
 
     this.isSearching = true;
     const searchBtn = this.container.querySelector('#search-btn');
+    const searchBtnSecondary = this.container.querySelector('#search-btn-secondary');
     const originalText = searchBtn.innerHTML;
+    const originalSecondaryText = searchBtnSecondary ? searchBtnSecondary.innerHTML : '';
 
     // Show loading state
     searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Searching...';
     searchBtn.disabled = true;
+    if (searchBtnSecondary) {
+      searchBtnSecondary.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Searching...';
+      searchBtnSecondary.disabled = true;
+    }
 
     try {
       const searchInput = this.container.querySelector('#search-input');
@@ -610,11 +869,17 @@ export class MapRestaurantSearch {
         query: searchQuery,
         lat: searchLocation.lat,
         lng: searchLocation.lng,
-        radiusMiles: radius,
+        radius_miles: radius,
         cuisine: filters.cuisine || '',
         minRating: filters.minRating || '',
         maxPriceLevel: filters.maxPriceLevel || '',
-        maxResults: filters.maxResults || 10, // Reduced for cost savings
+        maxResults: filters.maxResults || 20,
+        searchScope: this.discoveryScope || 'combined',
+      };
+
+      this.lastSearchContext = {
+        center: searchLocation,
+        radiusMiles: radius,
       };
 
       // Remove empty parameters
@@ -624,23 +889,35 @@ export class MapRestaurantSearch {
         }
       });
 
-      // Perform search
-      const results = await this.searchRestaurants(searchParams);
+      let results;
+      if (this.discoveryScope === 'my') {
+        await this.ensureMyRestaurantsLoaded();
+        results = this.searchMyRestaurantsOnly(searchLocation, radius, query, filters);
+      } else {
+        results = await this.searchRestaurants(searchParams);
+        try {
+          await this.ensureMyRestaurantsLoaded();
+        } catch (lookupError) {
+          console.warn('Failed to load ownership lookup data:', lookupError);
+        }
+      }
+
+      this.renderSearchArea(searchLocation, radius);
 
       // Display results
       this.displayResults(results);
 
       // Call callback
       this.options.onResults(results);
-
-    } catch (error) {
-      console.error('Search error:', error);
-      this.options.onError(error);
-      this.showError(error.message);
+    } catch {
     } finally {
       // Reset button state
       searchBtn.innerHTML = originalText;
       searchBtn.disabled = false;
+      if (searchBtnSecondary) {
+        searchBtnSecondary.innerHTML = originalSecondaryText;
+        searchBtnSecondary.disabled = false;
+      }
       this.isSearching = false;
     }
   }
@@ -650,7 +927,7 @@ export class MapRestaurantSearch {
       cuisine: this.container.querySelector('#cuisine-filter').value,
       minRating: parseFloat(this.container.querySelector('#min-rating').value) || undefined,
       maxPriceLevel: parseInt(this.container.querySelector('#max-price').value, 10) || undefined,
-      maxResults: 20,
+      maxResults: this.requestedMaxResults,
     };
   }
 
@@ -679,28 +956,58 @@ export class MapRestaurantSearch {
   }
 
   sortResultsByDistance(results) {
-    if (!this.currentLocation || !results || results.length === 0) {
+    if (!results || results.length === 0) {
+      return results;
+    }
+
+    const center = this.lastSearchContext?.center || this.currentLocation;
+    if (!center) {
       return results;
     }
 
     // Calculate distance for each restaurant and sort by distance
-    const resultsWithDistance = results.map((restaurant) => {
-      const distance = this.calculateDistance(
-        this.currentLocation.lat,
-        this.currentLocation.lng,
-        restaurant.latitude ?? null,
-        restaurant.longitude ?? null,
-      );
+    const resultsWithDistance = results
+      .map((restaurant) => {
+        const distance = this.calculateDistance(
+          center.lat,
+          center.lng,
+          restaurant.latitude ?? null,
+          restaurant.longitude ?? null,
+        );
 
-      return {
-        ...restaurant,
-        distance,
-        distanceText: this.formatDistance(distance),
-      };
-    }).filter((restaurant) => restaurant.distance !== null); // Filter out restaurants without valid coordinates
+        return {
+          ...restaurant,
+          distance,
+          distanceText: this.formatDistance(distance),
+        };
+      })
+      .filter((restaurant) => restaurant.distance !== null); // Filter out restaurants without valid coordinates
 
     // Sort by distance (closest first)
     return resultsWithDistance.sort((a, b) => a.distance - b.distance);
+  }
+
+  sortResults(results) {
+    if (!Array.isArray(results) || !results.length) {
+      return [];
+    }
+
+    if (this.sortMode === 'name') {
+      return [...results].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
+    if (this.sortMode === 'rating') {
+      return [...results].sort((a, b) => {
+        const aRating = Number(a.rating || 0);
+        const bRating = Number(b.rating || 0);
+        if (aRating !== bRating) {
+          return bRating - aRating;
+        }
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    }
+
+    return this.sortResultsByDistance(results);
   }
 
   calculateDistance(lat1, lng1, lat2, lng2) {
@@ -713,8 +1020,7 @@ export class MapRestaurantSearch {
 
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
@@ -731,56 +1037,56 @@ export class MapRestaurantSearch {
     if (this.locale.useMiles) {
       if (distance < 0.1) {
         return `${Math.round(distance * 5280)} ft`;
-      } else if (distance < 1) {
-        return `${(distance * 0.621371).toFixed(1)} mi`;
       }
       return `${distance.toFixed(1)} mi`;
-
     }
     if (distance < 0.1) {
       return `${Math.round(distance * 1000)} m`;
     }
     return `${(distance * 1.60934).toFixed(1)} km`;
-
   }
 
   displayResults(results) {
     const resultsContainer = this.container.querySelector('#search-results');
-    const resultsCount = this.container.querySelector('#results-count');
     const locationIndicator = this.container.querySelector('#location-indicator');
+    const radiusIndicator = this.container.querySelector('#radius-indicator');
 
-    // Sort results by distance from search location (closest first)
-    const sortedResults = this.sortResultsByDistance(results.results);
+    const withDistance = this.sortResultsByDistance(results.results || []);
+    const radiusFilteredResults = this.filterResultsByRadius(withDistance);
+    const enrichedResults = this.enrichResultsWithOwnership(radiusFilteredResults);
 
     // Store current results for selection (use sorted results for consistent ordering)
     this.currentResults = {
       ...results,
-      results: sortedResults,
+      results: enrichedResults,
     };
+    this.resultsFilter = 'all';
+    this.selectedResultKey = null;
+    this.updateFilterButtonStates();
+    this.updateResultToggleButtons();
 
     // Clear existing markers
     this.clearMarkers();
 
-    if (!results.results || results.results.length === 0) {
+    if (!enrichedResults.length) {
       resultsContainer.innerHTML = `
-        <div class="col-12">
-          <div class="text-center text-muted py-5">
-            <i class="fas fa-search fa-3x mb-3"></i>
-            <h6>No restaurants found</h6>
-            <p class="mb-0">Try adjusting your search criteria or expanding your search radius</p>
-          </div>
+        <div class="discovery-empty text-center text-muted py-5">
+          <i class="fas fa-search fa-3x mb-3"></i>
+          <h6>No restaurants found</h6>
+          <p class="mb-0">Try widening your radius or removing one of the filters.</p>
         </div>
       `;
-      resultsCount.textContent = '0 restaurants found';
+      this.updateResultsCount(0, 0);
+      this.updateDiagnostics(0, 0);
+      this.updateLoadMoreButton(0, false);
 
       // Hide location indicator if no results
       locationIndicator.classList.add('d-none');
+      if (radiusIndicator) {
+        radiusIndicator.classList.add('d-none');
+      }
       return;
     }
-
-    // Update results count
-    const count = sortedResults.length;
-    resultsCount.textContent = `${count} restaurant${count !== 1 ? 's' : ''} found`;
 
     // Show location indicator if we have location and search was location-based
     if (this.currentLocation) {
@@ -789,25 +1095,171 @@ export class MapRestaurantSearch {
       locationIndicator.classList.add('d-none');
     }
 
-    // Create markers and result cards in grid layout (using sorted results)
-    sortedResults.forEach((restaurant, index) => {
-      // Create marker for this restaurant at its sorted position
+    if (radiusIndicator && this.lastSearchContext?.radiusMiles) {
+      const radiusText = this.locale.useMiles
+        ? `${this.lastSearchContext.radiusMiles.toFixed(1)} mi radius`
+        : `${(this.lastSearchContext.radiusMiles * 1.60934).toFixed(1)} km radius`;
+      radiusIndicator.textContent = radiusText;
+      radiusIndicator.classList.remove('d-none');
+    }
+
+    this.renderVisibleResults({ fitMap: false });
+  }
+
+  getFilteredResults() {
+    const allResults = this.currentResults?.results || [];
+    const ownershipFiltered = allResults.filter((restaurant) => {
+      if (restaurant.isMine && !this.includeMine) return false;
+      if (!restaurant.isMine && !this.includeNew) return false;
+      return true;
+    });
+
+    let sliced = ownershipFiltered;
+    if (this.resultsFilter === 'mine') {
+      sliced = ownershipFiltered.filter((restaurant) => restaurant.isMine);
+    } else if (this.resultsFilter === 'new') {
+      sliced = ownershipFiltered.filter((restaurant) => !restaurant.isMine);
+    }
+
+    return this.sortResults(sliced);
+  }
+
+  filterResultsByRadius(results) {
+    const center = this.lastSearchContext?.center;
+    const radiusMiles = this.lastSearchContext?.radiusMiles;
+    if (!center || !radiusMiles || !Array.isArray(results)) {
+      return results;
+    }
+
+    return results.filter((restaurant) => {
+      const distance = this.calculateDistance(center.lat, center.lng, restaurant.latitude, restaurant.longitude);
+      if (distance === null) {
+        return false;
+      }
+      return distance <= radiusMiles;
+    });
+  }
+
+  updateResultsCount(visibleCount, totalCount) {
+    const resultsCount = this.container.querySelector('#results-count');
+    if (!resultsCount) return;
+
+    if (visibleCount === totalCount) {
+      resultsCount.textContent = `${visibleCount} restaurant${visibleCount !== 1 ? 's' : ''} found`;
+      return;
+    }
+
+    resultsCount.textContent = `Showing ${visibleCount} of ${totalCount}`;
+  }
+
+  updateDiagnostics(visibleCount, totalCount) {
+    const diagnostics = this.container.querySelector('#search-diagnostics');
+    if (!diagnostics) return;
+
+    const radius = this.lastSearchContext?.radiusMiles;
+    const radiusLabel = radius
+      ? this.locale.useMiles
+        ? `${radius.toFixed(1)} mi`
+        : `${(radius * 1.60934).toFixed(1)} km`
+      : 'n/a';
+
+    const scopeMap = {
+      combined: 'Combined',
+      google: 'Google only',
+      my: 'My restaurants only',
+    };
+
+    const chips = [
+      `Source: ${scopeMap[this.discoveryScope] || 'Combined'}`,
+      `Sort: ${this.sortMode === 'distance' ? 'Distance' : this.sortMode === 'name' ? 'Name' : 'Rating'}`,
+      `Radius: ${radiusLabel}`,
+      `Showing: ${visibleCount}/${totalCount}`,
+      `Include mine/new: ${this.includeMine ? 'yes' : 'no'}/${this.includeNew ? 'yes' : 'no'}`,
+    ];
+    diagnostics.textContent = chips.join(' | ');
+  }
+
+  updateLoadMoreButton(totalCount, hasMoreHint = false) {
+    const button = this.container.querySelector('#load-more-btn');
+    if (!(button instanceof HTMLButtonElement)) return;
+    const canLoadMore =
+      (hasMoreHint || totalCount >= this.requestedMaxResults) && this.requestedMaxResults < this.maxResultsCap;
+    button.classList.toggle('d-none', !canLoadMore);
+    button.disabled = this.isSearching;
+  }
+
+  updateResultToggleButtons() {
+    const mineToggle = this.container.querySelector('#include-mine-toggle');
+    const newToggle = this.container.querySelector('#include-new-toggle');
+    if (
+      mineToggle instanceof HTMLInputElement &&
+      !mineToggle.checked &&
+      newToggle instanceof HTMLInputElement &&
+      !newToggle.checked
+    ) {
+      newToggle.checked = true;
+      this.includeNew = true;
+    }
+  }
+
+  renderVisibleResults(options = {}) {
+    const { fitMap = false } = options;
+    const resultsContainer = this.container.querySelector('#search-results');
+    const allResults = this.currentResults?.results || [];
+    const filteredResults = this.getFilteredResults();
+
+    this.visibleResults = filteredResults;
+    this.clearMarkers();
+
+    if (!filteredResults.length) {
+      resultsContainer.innerHTML = `
+        <div class="discovery-empty text-center text-muted py-5">
+          <i class="fas fa-filter fa-3x mb-3"></i>
+          <h6>No restaurants in this filter</h6>
+          <p class="mb-0">Try switching to All, or run a wider search.</p>
+        </div>
+      `;
+      this.updateResultsCount(0, allResults.length);
+      this.updateDiagnostics(0, allResults.length);
+      const hasMoreHint = Boolean(this.currentResults?.meta?.has_more_hint);
+      this.updateLoadMoreButton(allResults.length, hasMoreHint);
+      this.selectedResultKey = null;
+      this.closeInfoWindow();
+      return;
+    }
+
+    filteredResults.forEach((restaurant, index) => {
       this.createMarker(restaurant, index);
     });
 
-    const resultsHtml = sortedResults.map((restaurant, index) => {
-      // Create result card in grid column
-      return `
-        <div class="col-lg-4 col-md-6 col-sm-12">
-          ${this.createResultCard(restaurant, index)}
-        </div>
-      `;
-    }).join('');
+    resultsContainer.innerHTML = filteredResults
+      .map((restaurant, index) => this.createResultCard(restaurant, index))
+      .join('');
+    this.initializeDiscoveryFavicons();
 
-    resultsContainer.innerHTML = resultsHtml;
+    this.updateResultsCount(filteredResults.length, allResults.length);
+    this.updateDiagnostics(filteredResults.length, allResults.length);
+    const hasMoreHint = Boolean(this.currentResults?.meta?.has_more_hint);
+    this.updateLoadMoreButton(allResults.length, hasMoreHint);
 
-    // Fit map to show all markers
-    this.fitMapToMarkers();
+    if (this.selectedResultKey) {
+      const selectedIndex = filteredResults.findIndex((restaurant) => restaurant.resultKey === this.selectedResultKey);
+      if (selectedIndex >= 0) {
+        this.selectRestaurant(selectedIndex, { centerMap: false, scrollCard: false, setZoom: false });
+      } else {
+        this.selectedResultKey = null;
+        this.closeInfoWindow();
+      }
+    }
+
+    if (fitMap) {
+      this.fitMapToMarkers();
+    }
+  }
+
+  initializeDiscoveryFavicons() {
+    initializeRobustFaviconHandling('.result-my-favicon');
+    initializeRobustFaviconHandling('.result-result-favicon');
   }
 
   createMarker(restaurant, index) {
@@ -822,30 +1274,41 @@ export class MapRestaurantSearch {
     }
 
     // Use AdvancedMarkerElement with numbered content
+    const markerType = restaurant.isMine ? 'mine' : 'new';
     const marker = new google.maps.marker.AdvancedMarkerElement({
       position,
       map: this.map,
       title: restaurant.name,
-      content: this.createNumberedMarkerContent(index + 1, 'red'),
+      content: this.createNumberedMarkerContent(index + 1, markerType, false),
     });
 
-    // Add click listener
-    marker.addListener('click', () => {
+    // Add click listener (gmp-click for AdvancedMarkerElement)
+    marker.addEventListener('gmp-click', () => {
       this.selectRestaurant(index);
     });
 
     this.markers.push(marker);
+    this.markerEntries[index] = {
+      marker,
+      markerType,
+      restaurant,
+    };
   }
 
-  createNumberedMarkerContent(number, color) {
+  createNumberedMarkerContent(number, markerType, isSelected) {
+    const backgroundColor = markerType === 'mine' ? '#0d6efd' : '#dc3545';
+    const borderColor = isSelected ? '#ffd166' : '#ffffff';
+    const scale = isSelected ? 1.14 : 1;
+    const shadow = isSelected ? '0 8px 18px rgba(15,23,42,0.42)' : '0 4px 10px rgba(15,23,42,0.24)';
+
     const markerElement = document.createElement('div');
     markerElement.style.cssText = `
       width: 36px;
       height: 36px;
-      background-color: ${color === 'red' ? '#ea4335' : '#4285f4'};
-      border: 3px solid white;
+      background-color: ${backgroundColor};
+      border: 3px solid ${borderColor};
       border-radius: 50%;
-      box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+      box-shadow: ${shadow};
       display: flex;
       align-items: center;
       justify-content: center;
@@ -854,19 +1317,20 @@ export class MapRestaurantSearch {
       color: white;
       cursor: pointer;
       transition: all 0.2s ease;
+      transform: scale(${scale});
     `;
 
     markerElement.textContent = number;
 
     // Add hover effect
     markerElement.addEventListener('mouseenter', () => {
-      markerElement.style.transform = 'scale(1.1)';
-      markerElement.style.boxShadow = '0 4px 8px rgba(0,0,0,0.5)';
+      markerElement.style.transform = `scale(${isSelected ? 1.18 : 1.08})`;
+      markerElement.style.boxShadow = '0 8px 16px rgba(15,23,42,0.32)';
     });
 
     markerElement.addEventListener('mouseleave', () => {
-      markerElement.style.transform = 'scale(1)';
-      markerElement.style.boxShadow = '0 3px 6px rgba(0,0,0,0.4)';
+      markerElement.style.transform = `scale(${scale})`;
+      markerElement.style.boxShadow = shadow;
     });
 
     return markerElement;
@@ -895,25 +1359,6 @@ export class MapRestaurantSearch {
   }
 
   createResultCard(restaurant, index) {
-    // Handle photos - use the URL if available, otherwise build it from photo_reference
-    let photoUrl = null;
-    console.log(`Restaurant ${restaurant.name} photos:`, restaurant.photos);
-
-    if (restaurant.photos && restaurant.photos.length > 0) {
-      const [firstPhoto] = restaurant.photos;
-      console.log(`First photo for ${restaurant.name}:`, firstPhoto);
-
-      if (firstPhoto.url) {
-        // New Places API format: photo has direct URL
-        photoUrl = firstPhoto.url;
-        console.log(`Using Places API photo URL for ${restaurant.name}:`, photoUrl);
-      } else {
-        console.log(`No photo URL available for ${restaurant.name}`);
-      }
-    } else {
-      console.log(`No photos found for ${restaurant.name}`);
-    }
-
     const rating = restaurant.rating || 0;
     const reviewCount = restaurant.user_ratings_total || 0;
     const priceLevel = restaurant.price_level || 0;
@@ -935,21 +1380,15 @@ export class MapRestaurantSearch {
     const escapedCityStateZip = address.cityStateZip ? escapeHtml(address.cityStateZip) : '';
     const escapedPhone = phone ? escapeHtml(phone) : '';
     const escapedOpeningStatusText = openingStatus.text ? escapeHtml(openingStatus.text) : '';
+    const ownershipClass = restaurant.isMine ? 'ownership-mine' : 'ownership-new';
+    const ownershipLabel = restaurant.isMine ? 'In My Restaurants' : 'New To Me';
+    const rankClass = restaurant.isMine ? 'result-rank-mine' : 'result-rank-new';
+    const viewUrl = restaurant.matchedRestaurantId ? `/restaurants/${restaurant.matchedRestaurantId}` : '#';
+    const matchedRestaurantWebsite = restaurant.matchedRestaurantWebsite || '';
+    const faviconWebsite = matchedRestaurantWebsite || website || '';
+    const escapedFaviconWebsite = faviconWebsite ? escapeHtml(faviconWebsite) : '';
 
     // Validate and sanitize URLs
-    let safePhotoUrl = '';
-    if (photoUrl) {
-      try {
-        const photoUrlObj = new URL(photoUrl);
-        // Only allow https URLs for photos
-        if (photoUrlObj.protocol === 'https:') {
-          safePhotoUrl = photoUrlObj.href;
-        }
-      } catch {
-        // Invalid URL, skip photo
-      }
-    }
-
     let safeWebsiteUrl = '';
     if (website) {
       try {
@@ -964,129 +1403,109 @@ export class MapRestaurantSearch {
     }
 
     return `
-      <div class="card h-100 restaurant-card" data-index="${index}" style="cursor: pointer; position: relative;">
-        <!-- Numbered badge to correlate with map markers -->
-        <div class="position-absolute top-0 start-0 m-2">
-          <span class="badge bg-danger rounded-circle" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold;">
-            ${index + 1}
-          </span>
+      <article class="restaurant-card discovery-result-card ${ownershipClass}" data-index="${index}" data-result-key="${escapeHtml(restaurant.resultKey || '')}">
+        <div class="result-rank ${rankClass}">${index + 1}</div>
+        <div class="result-media">
+          ${
+  escapedFaviconWebsite
+    ? `
+          <img
+            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+            data-website="${escapedFaviconWebsite}"
+            data-size="32"
+            alt="${escapedName} favicon"
+            class="result-result-favicon"
+            width="32"
+            height="32"
+          />`
+    : ''
+}
+          <i class="fas fa-utensils result-media-fallback restaurant-fallback-icon ${escapedFaviconWebsite ? 'd-none' : ''}"></i>
         </div>
 
-        <!-- Open/Closed status badge -->
-        ${openingStatus.badge ? `
-          <div class="position-absolute top-0 end-0 m-2">
-            <span class="badge ${openingStatus.class} small">
-              ${escapedOpeningStatusText}
-            </span>
-          </div>
-        ` : ''}
-
-        ${safePhotoUrl ? `
-          <img src="${safePhotoUrl}" class="card-img-top" alt="${escapedName}" style="height: 140px; object-fit: cover;" loading="lazy"
-               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'; console.error('Failed to load image:', this.src);"
-               onload="console.log('Image loaded successfully:', this.src);">
-        ` : `
-          <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 140px; display: none;">
-            <i class="fas fa-utensils fa-2x text-muted"></i>
-          </div>
-        `}
-
-        <div class="card-body d-flex flex-column p-3">
-          <!-- Header with name, price, and rating -->
-          <div class="d-flex justify-content-between align-items-start mb-2">
-            <div class="flex-grow-1">
-              <h6 class="card-title mb-1 d-flex align-items-center gap-2">
-                ${escapedName}
-                ${priceLevel > 0 ? `
-                  <span class="price-level text-success fw-bold small">
-                    ${'$'.repeat(priceLevel)}
-                  </span>
-                ` : ''}
-              </h6>
-              ${escapedDistanceText ? `
-                <div class="text-muted small">
-                  <i class="fas fa-map-marker-alt me-1"></i>${escapedDistanceText} away
-                </div>
-              ` : ''}
+        <div class="result-main">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+            <div>
+              <h6 class="result-title mb-0">${escapedName}</h6>
+              ${
+  escapedDistanceText
+    ? `<div class="result-distance"><i class="fas fa-location-dot me-1"></i>${escapedDistanceText} away</div>`
+    : ''
+}
             </div>
-            ${rating > 0 ? `
-              <div class="d-flex align-items-center text-end">
+            ${
+  rating > 0
+    ? `
+              <div class="d-flex align-items-center text-end small fw-semibold">
                 <i class="fas fa-star text-warning me-1"></i>
-                <span class="small fw-bold">${rating.toFixed(1)}</span>
-                <span class="text-muted small ms-1">(${reviewCount})</span>
+                <span>${rating.toFixed(1)}</span>
+                <span class="text-muted small ms-1">${reviewCount}</span>
               </div>
-            ` : ''}
+            `
+    : ''
+}
           </div>
 
-          <!-- Address -->
-          <div class="mb-2">
-            <div class="d-flex align-items-start text-muted small">
-              <i class="fas fa-map-marker-alt me-2 text-secondary mt-1" style="opacity:0.7;"></i>
-              <div class="flex-grow-1">
-                <div>${escapedStreet}</div>
-                ${escapedCityStateZip ? `<div>${escapedCityStateZip}</div>` : ''}
-              </div>
-            </div>
+          <div class="result-meta mb-2">
+            <div><i class="fas fa-map-marker-alt me-1"></i>${escapedStreet}</div>
+            ${escapedCityStateZip ? `<div>${escapedCityStateZip}</div>` : ''}
           </div>
 
-          <!-- Contact Information -->
-          ${escapedPhone || safeWebsiteUrl ? `
-            <div class="mb-3">
-              ${escapedPhone ? `
-                <div class="d-flex align-items-center text-muted small mb-1">
-                  <i class="fas fa-phone me-2 text-secondary" style="opacity:0.7;"></i>
-                  <a href="tel:${escapedPhone}" class="text-decoration-none text-muted">${escapedPhone}</a>
-                </div>
-              ` : ''}
-              ${safeWebsiteUrl ? `
-                <div class="d-flex align-items-center text-muted small">
-                  <i class="fas fa-globe me-2 text-secondary" style="opacity:0.7;"></i>
-                  <a href="${safeWebsiteUrl}" target="_blank" rel="noopener" class="text-decoration-none text-muted">
-                    Website <i class="fas fa-external-link-alt ms-1" style="font-size: 10px;"></i>
-                  </a>
-                </div>
-              ` : ''}
-            </div>
-          ` : ''}
+          <div class="result-badges mb-2">
+            <span class="badge result-ownership-badge ${restaurant.isMine ? 'text-bg-primary' : 'text-bg-danger'}">${ownershipLabel}</span>
+            ${priceLevel > 0 ? `<span class="badge text-bg-light">${'$'.repeat(priceLevel)}</span>` : ''}
+            ${openingStatus.badge ? `<span class="badge ${openingStatus.class}">${escapedOpeningStatusText}</span>` : ''}
+            ${openingStatus.hoursText ? `<span class="badge text-bg-light">${escapeHtml(openingStatus.hoursText)}</span>` : ''}
+          </div>
 
-          <!-- Current hours info -->
-          ${openingStatus.hoursText ? `
-            <div class="mb-3">
-              <div class="d-flex align-items-start text-muted small">
-                <i class="fas fa-clock me-2 text-secondary mt-1" style="opacity:0.7;"></i>
-                <div>${openingStatus.hoursText}</div>
-              </div>
+          <div class="d-flex flex-wrap gap-2 align-items-center mt-auto">
+            ${
+  escapedPhone
+    ? `
+              <a href="tel:${escapedPhone}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-phone me-1"></i>Call
+              </a>
+            `
+    : ''
+}
+            ${
+  safeWebsiteUrl
+    ? `
+              <a href="${safeWebsiteUrl}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-globe me-1"></i>Website
+              </a>
+            `
+    : ''
+}
+            <div class="ms-auto">
+              ${
+  restaurant.isMine && restaurant.matchedRestaurantId
+    ? `
+                <a href="${viewUrl}" class="btn btn-outline-primary btn-sm" data-action="view-restaurant">
+                  <i class="fas fa-arrow-up-right-from-square me-1"></i>View in My Restaurants
+                </a>
+              `
+    : (restaurant.google_place_id && restaurant.google_place_id.trim() !== '') ||
+                      (restaurant.place_id && restaurant.place_id.trim() !== '')
+      ? `
+                <button class="btn btn-primary btn-sm" data-place-id="${restaurant.google_place_id || restaurant.place_id}" data-action="add-restaurant">
+                  <i class="fas fa-plus me-1"></i>Add
+                </button>
+              `
+      : `
+                <button class="btn btn-outline-secondary btn-sm" disabled title="This restaurant is missing a Google Place ID.">
+                  <i class="fas fa-ban me-1"></i>Unavailable
+                </button>
+              `
+}
             </div>
-          ` : ''}
-
-          <!-- Add button -->
-          <div class="mt-auto">
-            ${(restaurant.google_place_id && restaurant.google_place_id.trim() !== '') || (restaurant.place_id && restaurant.place_id.trim() !== '') ? `
-              <button class="btn btn-primary btn-sm w-100" data-place-id="${restaurant.google_place_id || restaurant.place_id}" data-action="add-restaurant">
-                <i class="fas fa-plus me-1"></i>Add to My Restaurants
-              </button>
-            ` : `
-              <button class="btn btn-outline-secondary btn-sm w-100" disabled title="This restaurant cannot be added automatically. Missing Google Place ID.">
-                <i class="fas fa-exclamation-triangle me-1"></i>Cannot Add Automatically
-              </button>
-            `}
           </div>
         </div>
-      </div>
+      </article>
     `;
   }
 
   parseAddress(restaurant) {
-    console.log('Parsing address for:', restaurant.name);
-    console.log('Restaurant address data:', {
-      address_line_1: restaurant.address_line_1,
-      address_line_2: restaurant.address_line_2,
-      city: restaurant.city,
-      state: restaurant.state,
-      postal_code: restaurant.postal_code,
-      formatted_address: restaurant.formatted_address,
-    });
-
     // First, try to use structured address data if available (from details API)
     if (restaurant.address_line_1 && restaurant.city && restaurant.state) {
       const street = restaurant.address_line_1;
@@ -1094,30 +1513,16 @@ export class MapRestaurantSearch {
         ? `${restaurant.city}, ${restaurant.state} ${restaurant.postal_code}`
         : `${restaurant.city}, ${restaurant.state}`;
 
-      console.log('Using structured address:', { street, cityStateZip: cityState });
       return {
         street,
         cityStateZip: cityState,
       };
     }
 
-    // Debug: Check if we have partial structured data
-    if (restaurant.city || restaurant.state || restaurant.postal_code) {
-      console.log('Partial structured data available:', {
-        address_line_1: restaurant.address_line_1,
-        city: restaurant.city,
-        state: restaurant.state,
-        postal_code: restaurant.postal_code,
-      });
-    }
-
     // Fallback to parsing formatted_address from search results
     const formatted = restaurant.formatted_address || '';
 
-    console.log('Using formatted address fallback:', formatted);
-
     if (!formatted) {
-      console.log('No formatted address available');
       return { street: 'Address not available', cityStateZip: '' };
     }
 
@@ -1164,7 +1569,8 @@ export class MapRestaurantSearch {
       const [street, city, lastPart] = parts;
 
       // Check if last part contains state abbreviation or full state name
-      const stateRegex = /\b[A-Z]{2}\b|\b(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming)\b/i;
+      const stateRegex =
+        /\b[A-Z]{2}\b|\b(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming)\b/i;
 
       if (stateRegex.test(lastPart)) {
         // Contains state information
@@ -1178,7 +1584,6 @@ export class MapRestaurantSearch {
         street,
         cityStateZip: `${city}, ${lastPart}`,
       };
-
     } else if (parts.length === 2) {
       // Format: "Street, City State" or "Street, City"
       const [street] = parts;
@@ -1216,9 +1621,7 @@ export class MapRestaurantSearch {
       cityStateZip: '',
     };
 
-    console.log('Final parsed address result:', result);
     return result;
-
   }
 
   getOpeningStatus(openingHours) {
@@ -1259,16 +1662,77 @@ export class MapRestaurantSearch {
     return status;
   }
 
-  selectRestaurant(index) {
-    // Get restaurant data from the sorted results
-    const restaurant = this.currentResults?.results?.[index];
+  openInfoWindow(restaurant, marker) {
+    if (!this.map || !marker) return;
+
+    if (!this.activeInfoWindow) {
+      this.activeInfoWindow = new google.maps.InfoWindow();
+    }
+
+    const safeName = escapeHtml(restaurant.name || 'Restaurant');
+    const safeCity = escapeHtml(restaurant.city || '');
+    const safeCuisine = escapeHtml(restaurant.cuisine_type || restaurant.cuisine || '');
+    const ownershipText = restaurant.isMine ? 'In My Restaurants' : 'New To Me';
+    const ownershipClass = restaurant.isMine ? 'text-bg-primary' : 'text-bg-danger';
+    const viewUrl = restaurant.matchedRestaurantId ? `/restaurants/${restaurant.matchedRestaurantId}` : '#';
+    const matchedRestaurantWebsite = restaurant.matchedRestaurantWebsite || '';
+    const escapedMatchedRestaurantWebsite = matchedRestaurantWebsite ? escapeHtml(matchedRestaurantWebsite) : '';
+
+    this.activeInfoWindow.setContent(`
+      <div class="places-map-infowindow">
+        <div class="places-map-infowindow-title mb-1">
+          <span class="fw-semibold">${safeName}</span>
+          ${
+  restaurant.isMine && escapedMatchedRestaurantWebsite
+    ? `
+          <span class="places-map-infowindow-favicon-wrap" title="Saved restaurant favicon">
+            <img
+              src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+              data-website="${escapedMatchedRestaurantWebsite}"
+              data-size="16"
+              alt="${safeName} favicon"
+              class="places-map-infowindow-favicon"
+              width="16"
+              height="16"
+            />
+            <i class="fas fa-utensils restaurant-fallback-icon d-none"></i>
+          </span>
+          `
+    : ''
+}
+        </div>
+        ${safeCity ? `<div class="text-muted small mb-1">${safeCity}</div>` : ''}
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+          <span class="badge rounded-pill ${ownershipClass}">${ownershipText}</span>
+          ${safeCuisine ? `<span class="badge rounded-pill text-bg-light">${safeCuisine}</span>` : ''}
+        </div>
+        ${restaurant.isMine && restaurant.matchedRestaurantId ? `<a href="${viewUrl}" class="small text-decoration-none">View in My Restaurants</a>` : '<span class="small text-muted">Add from the list to save</span>'}
+      </div>
+    `);
+    this.activeInfoWindow.open({ map: this.map, anchor: marker });
+
+    google.maps.event.addListenerOnce(this.activeInfoWindow, 'domready', () => {
+      initializeRobustFaviconHandling('.places-map-infowindow-favicon');
+    });
+  }
+
+  closeInfoWindow() {
+    if (this.activeInfoWindow) {
+      this.activeInfoWindow.close();
+    }
+  }
+
+  selectRestaurant(index, options = {}) {
+    const { centerMap = true, scrollCard = true, setZoom = true } = options;
+
+    // Get restaurant data from visible results
+    const restaurant = this.visibleResults?.[index];
     if (!restaurant) return;
 
-    // Clear previous selection
-    this.clearSelection();
+    this.selectedResultKey = restaurant.resultKey;
 
     // Highlight selected restaurant card
-    const card = this.container.querySelector(`[data-index="${index}"]`);
+    const card = this.container.querySelector(`.restaurant-card[data-index="${index}"]`);
     if (card) {
       // Use requestAnimationFrame to batch DOM writes
       requestAnimationFrame(() => {
@@ -1277,31 +1741,47 @@ export class MapRestaurantSearch {
         card.style.transition = 'all 0.2s ease';
 
         // Scroll to selected card
-        card.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-          inline: 'nearest',
-        });
+        if (scrollCard) {
+          card.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'nearest',
+          });
+        }
       });
     }
 
-    // Highlight marker
-    if (this.markers[index]) {
-      const marker = this.markers[index];
-      marker.content = this.createNumberedMarkerContent(index + 1, 'blue');
+    this.container.querySelectorAll('.restaurant-card').forEach((otherCard) => {
+      if (otherCard !== card) {
+        otherCard.classList.remove('border-primary', 'shadow-lg');
+        otherCard.style.transform = 'scale(1)';
+      }
+    });
+
+    this.markerEntries.forEach((entry, markerIndex) => {
+      if (!entry?.marker) {
+        return;
+      }
+      const isSelected = markerIndex === index;
+      entry.marker.content = this.createNumberedMarkerContent(markerIndex + 1, entry.markerType, isSelected);
+    });
+
+    const markerEntry = this.markerEntries[index];
+    if (!markerEntry) {
+      return;
     }
 
-    // Center map on selected restaurant
-    if (
-      restaurant.latitude !== null &&
-      restaurant.longitude !== null
-    ) {
-      this.map.setCenter({
+    if (centerMap && restaurant.latitude !== null && restaurant.longitude !== null) {
+      this.map.panTo({
         lat: restaurant.latitude,
         lng: restaurant.longitude,
       });
-      this.map.setZoom(16);
+      if (setZoom) {
+        this.map.setZoom(16);
+      }
     }
+
+    this.openInfoWindow(restaurant, markerEntry.marker);
 
     this.selectedRestaurant = restaurant;
     this.options.onSelect(restaurant);
@@ -1314,22 +1794,49 @@ export class MapRestaurantSearch {
       card.style.transform = 'scale(1)';
     });
 
-    // Reset all markers to red with numbers (use sorted results for numbering)
-    this.markers.forEach((marker, index) => {
-      if (marker.content) {
-        // AdvancedMarkerElement
-        marker.content = this.createNumberedMarkerContent(index + 1, 'red');
+    // Reset all markers to their ownership colors
+    this.markerEntries.forEach((entry, index) => {
+      if (entry?.marker?.content) {
+        entry.marker.content = this.createNumberedMarkerContent(index + 1, entry.markerType, false);
       }
     });
 
     this.selectedRestaurant = null;
+    this.selectedResultKey = null;
+    this.closeInfoWindow();
   }
 
   clearMarkers() {
     this.markers.forEach((marker) => {
-      marker.setMap(null);
+      if (typeof marker.setMap === 'function') {
+        marker.setMap(null);
+      } else {
+        marker.map = null;
+      }
     });
     this.markers = [];
+    this.markerEntries = [];
+    this.closeInfoWindow();
+  }
+
+  renderSearchArea(searchLocation, radiusMiles) {
+    if (!this.map || !searchLocation || Number.isNaN(radiusMiles)) return;
+
+    if (this.searchAreaCircle) {
+      this.searchAreaCircle.setMap(null);
+    }
+
+    this.searchAreaCircle = new google.maps.Circle({
+      strokeColor: '#0d6efd',
+      strokeOpacity: 0.65,
+      strokeWeight: 1.5,
+      fillColor: '#0d6efd',
+      fillOpacity: 0.08,
+      map: this.map,
+      center: searchLocation,
+      radius: radiusMiles * 1609.34,
+      clickable: false,
+    });
   }
 
   addCurrentLocationMarker() {
@@ -1443,24 +1950,7 @@ export class MapRestaurantSearch {
           statusDiv.classList.add('d-none');
         }, 3000);
       }
-
-    } catch (error) {
-      console.warn('Could not get current location:', error);
-
-      // Show error message
-      const statusDiv = this.container.querySelector('#location-status');
-      const statusText = this.container.querySelector('#location-status-text');
-
-      if (statusDiv && statusText) {
-        statusDiv.classList.remove('d-none', 'alert-success');
-        statusDiv.classList.add('alert-warning');
-        statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Location access denied.';
-
-        setTimeout(() => {
-          statusDiv.classList.add('d-none');
-        }, 5000);
-      }
-    }
+    } catch {}
   }
 
   fitMapToMarkers() {
@@ -1481,6 +1971,13 @@ export class MapRestaurantSearch {
         bounds.extend(position);
       }
     });
+
+    if (this.searchAreaCircle) {
+      const circleBounds = this.searchAreaCircle.getBounds();
+      if (circleBounds) {
+        bounds.union(circleBounds);
+      }
+    }
 
     // Get current search radius to determine appropriate zoom
     const radiusSlider = this.container.querySelector('#radius-slider');
@@ -1518,16 +2015,66 @@ export class MapRestaurantSearch {
     `;
   }
 
-  addToMyRestaurants(placeId) {
-    // Call the global function defined in the template
-    if (window.addToMyRestaurants && typeof window.addToMyRestaurants === 'function') {
-      try {
-        window.addToMyRestaurants(placeId);
-      } catch (error) {
-        console.error('Error calling global addToMyRestaurants:', error);
+  applyOptimisticOwnership(placeId) {
+    if (!placeId || !this.currentResults?.results?.length) {
+      return;
+    }
+
+    const normalizedPlaceId = this.normalizePlaceId(placeId);
+    const matchedRestaurant = this.myRestaurantsByPlaceId.get(normalizedPlaceId) || null;
+
+    const patched = this.currentResults.results.map((result) => {
+      const resultPlaceId = this.normalizePlaceId(result.google_place_id || result.place_id);
+      if (resultPlaceId !== normalizedPlaceId) {
+        return result;
       }
-    } else {
+
+      return {
+        ...result,
+        isMine: true,
+        matchedRestaurantId: matchedRestaurant?.id || result.matchedRestaurantId || null,
+        matchedRestaurantWebsite: matchedRestaurant?.website || result.matchedRestaurantWebsite || '',
+      };
+    });
+
+    this.currentResults = {
+      ...this.currentResults,
+      results: patched,
+    };
+    this.renderVisibleResults({ fitMap: false });
+  }
+
+  async addToMyRestaurants(placeId) {
+    // Call the global function defined in the template
+    if (!window.addToMyRestaurants || typeof window.addToMyRestaurants !== 'function') {
       console.error('addToMyRestaurants function not available');
+      return;
+    }
+
+    try {
+      const addResult = await window.addToMyRestaurants(placeId);
+      const wasAdded = Boolean(addResult?.success);
+      const alreadyExists = Boolean(addResult?.exists);
+
+      if (wasAdded) {
+        this.applyOptimisticOwnership(placeId);
+      }
+
+      if (!wasAdded && !alreadyExists) {
+        return;
+      }
+
+      await this.ensureMyRestaurantsLoaded(true);
+      if (this.currentResults?.results?.length) {
+        const refreshedResults = this.enrichResultsWithOwnership(this.currentResults.results);
+        this.currentResults = {
+          ...this.currentResults,
+          results: refreshedResults,
+        };
+        this.renderVisibleResults({ fitMap: false });
+      }
+    } catch {
+      // add handler already surfaced a toast message
     }
   }
 }

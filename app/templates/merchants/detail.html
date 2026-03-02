@@ -1,0 +1,202 @@
+{% extends "base.html" %} {% block title %}{{ merchant.name }} - Merchant - Meal Expense Tracker{% endblock %} {% block
+content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0 d-flex align-items-center">
+                    <span class="me-2">
+                        {% if merchant.website %}
+                        <img
+                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                            data-website="{{ merchant.website }}"
+                            data-size="32"
+                            alt="{{ merchant.name }} icon"
+                            class="restaurant-favicon"
+                            width="32"
+                            height="32" />
+                        <i class="fas fa-building text-primary restaurant-fallback-icon d-none"></i>
+                        {% else %}
+                        <i class="fas fa-building me-2"></i>
+                        {% endif %}
+                    </span>
+                    {{ merchant.name }}
+                </h4>
+                <div>
+                    <a
+                        href="{{ url_for('merchants.edit_merchant', merchant_id=merchant.id) }}"
+                        class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-edit me-1"></i>Edit
+                    </a>
+                    <button
+                        class="btn btn-sm btn-outline-danger"
+                        data-delete-url="{{ url_for('merchants.delete_merchant', merchant_id=merchant.id) }}"
+                        data-merchant-name="{{ merchant.name }}">
+                        <i class="fas fa-trash me-1"></i>Delete
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Category</dt>
+                    <dd class="col-sm-9">
+                        {% if merchant.category %}
+                        <span class="badge bg-secondary">{{ merchant.category|replace('_', ' ')|title }}</span>
+                        {% else %}
+                        <span class="text-muted">Not specified</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Short Name</dt>
+                    <dd class="col-sm-9">
+                        {% if merchant.short_name %}
+                        <span class="fw-semibold">{{ merchant.short_name }}</span>
+                        {% else %}
+                        <span class="text-muted">Not specified</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Website</dt>
+                    <dd class="col-sm-9">
+                        {% if merchant.website %}
+                        <a href="{{ merchant.website }}" class="text-decoration-none text-break"
+                            >{{ merchant.website }}</a
+                        >
+                        {% else %}
+                        <span class="text-muted">Not specified</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Created</dt>
+                    <dd class="col-sm-9"
+                        >{{ merchant.created_at.strftime('%Y-%m-%d %H:%M') if merchant.created_at else 'N/A' }}</dd
+                    >
+
+                    <dt class="col-sm-3">Last Updated</dt>
+                    <dd class="col-sm-9"
+                        >{{ merchant.updated_at.strftime('%Y-%m-%d %H:%M') if merchant.updated_at else 'N/A' }}</dd
+                    >
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Restaurants</h5>
+            </div>
+            <div class="card-body">
+                {% if restaurants %}
+                <div class="list-group list-group-flush">
+                    {% for restaurant in restaurants %}
+                    <a
+                        href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
+                        class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-semibold">{{ restaurant.display_name }}</div>
+                                <small class="text-muted"
+                                    >{{ restaurant|restaurant_address_only|replace('\n', ', ') }}</small
+                                >
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted mb-2"> <i class="fas fa-utensils me-2"></i>No restaurants linked yet. </p>
+                {% endif %}
+                <a
+                    href="{{ url_for('restaurants.list_restaurants') }}?merchant_id={{ merchant.id }}"
+                    class="btn btn-sm btn-outline-primary mt-3">
+                    <i class="fas fa-list me-1"></i>View Restaurants
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteMerchantModal" tabindex="-1" aria-labelledby="deleteMerchantModalLabel">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteMerchantModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Delete Merchant
+                </h5>
+                <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="merchantName"></strong>?</p>
+                <p class="text-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    This will unlink all restaurants from this merchant. This action cannot be undone.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i> Cancel
+                </button>
+                <form id="deleteMerchantForm" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-2"></i> Delete Merchant
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %} {% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var deleteBtn = document.querySelector("[data-delete-url]");
+        if (deleteBtn) {
+            deleteBtn.addEventListener("click", function (e) {
+                e.preventDefault();
+                var url = this.getAttribute("data-delete-url");
+                var name = this.getAttribute("data-merchant-name");
+
+                document.getElementById("merchantName").textContent = name;
+                document.getElementById("deleteMerchantForm").action = url;
+
+                var modal = new bootstrap.Modal(document.getElementById("deleteMerchantModal"));
+                modal.show();
+            });
+
+            document.getElementById("deleteMerchantForm").addEventListener("submit", function (e) {
+                e.preventDefault();
+                var url = this.action;
+
+                fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                })
+                    .then(function (response) {
+                        return response.json();
+                    })
+                    .then(function (data) {
+                        var modal = bootstrap.Modal.getInstance(document.getElementById("deleteMerchantModal"));
+                        modal.hide();
+
+                        if (data.status === "success") {
+                            window.location.href = '{{ url_for("merchants.list_merchants") }}';
+                        } else {
+                            alert(data.message || "Failed to delete merchant");
+                        }
+                    })
+                    .catch(function (error) {
+                        alert("An error occurred. Please try again.");
+                    });
+            });
+        }
+    });
+</script>
+{% endblock extra_js %}

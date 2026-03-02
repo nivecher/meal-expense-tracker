@@ -9,7 +9,6 @@
 {% block styles %}
     <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/tags.css') }}" rel="stylesheet" />
-    <link href="{{ url_for('static', filename='css/components/tag-badges.css') }}" rel="stylesheet" />
     <!-- Tom Select CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.css">
     <!-- Custom tag styling (shared with expense form) -->
@@ -27,14 +26,13 @@
 {{ super() }}
     <!-- Tom Select JS (required for tag selector - must load before tag-select-init.js) -->
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-    <!-- Tag badge styling -->
-    <script src="{{ url_for('static', filename='js/components/tag-badge-styler.js') }}"></script>
     <!-- Table sorting functionality -->
     <script src="{{ url_for('static', filename='js/components/table-sorting.js') }}"></script>
     <!-- Tag Manager (inline on Tags tab; modal on form/profile) -->
     <script src="{{ url_for('static', filename='js/components/tag-manager.js') }}"></script>
     <!-- Tag selector initialization (depends on Tom Select being loaded) -->
     <script src="{{ url_for('static', filename='js/utils/tag-select-init.js') }}"></script>
+    <!-- Expense list module (ensures delete modal wiring) -->
     <script type="module" src="{{ url_for('static', filename='js/pages/expense-list.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/pages/expense-tags.js') }}"></script>
 {% endblock scripts %}
@@ -49,22 +47,22 @@
         <ul class="nav nav-tabs section-tabs expenses-page-tabs mt-2" id="expensesTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link{% if active_tab != 'calendar' and active_tab != 'orders' and active_tab != 'tags' %} active{% endif %}" id="expenses-tab" data-bs-toggle="tab" data-bs-target="#expenses-pane" type="button" role="tab" aria-controls="expenses-pane" aria-selected="{% if active_tab != 'calendar' and active_tab != 'orders' and active_tab != 'tags' %}true{% else %}false{% endif %}">
-                    Expenses
+                    <i class="fas fa-list me-1"></i>Expenses
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link{% if active_tab == 'calendar' %} active{% endif %}" id="calendar-tab" data-bs-toggle="tab" data-bs-target="#calendar-pane" type="button" role="tab" aria-controls="calendar-pane" aria-selected="{% if active_tab == 'calendar' %}true{% else %}false{% endif %}">
-                    Calendar
+                    <i class="fas fa-calendar me-1"></i>Calendar
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link{% if active_tab == 'orders' %} active{% endif %}" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-pane" type="button" role="tab" aria-controls="orders-pane" aria-selected="{% if active_tab == 'orders' %}true{% else %}false{% endif %}">
-                    Orders
+                    <i class="fas fa-shopping-bag me-1"></i>Orders
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link{% if active_tab == 'tags' %} active{% endif %}" id="tags-tab" data-bs-toggle="tab" data-bs-target="#tags-pane" type="button" role="tab" aria-controls="tags-pane" aria-selected="{% if active_tab == 'tags' %}true{% else %}false{% endif %}">
-                    Tags
+                    <i class="fas fa-tags me-1"></i>Tags
                 </button>
             </li>
         </ul>
@@ -194,7 +192,7 @@
                                     "date": expense.date|format_date_user_tz('%Y-%m-%d') if expense.date else "",
                                     "dateTimeIso": expense.date.isoformat() if expense.date else "",
                                     "timeLabel": expense.date|format_time_with_tz if expense.date else "",
-                                    "restaurant": expense.restaurant.name if expense.restaurant else "Unknown restaurant",
+                                    "restaurant": expense.restaurant.display_name if expense.restaurant else "Unknown restaurant",
                                     "restaurantWebsite": expense.restaurant.website if expense.restaurant else "",
                                     "mealType": expense.meal_type or "",
                                     "mealTypeIcon": expense.meal_type|meal_type_icon if expense.meal_type else "question",
@@ -329,7 +327,7 @@
                                                         src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                                         data-website="{{ expense.restaurant.website }}"
                                                         data-size="32"
-                                                        alt="{{ expense.restaurant.name }} icon"
+                                                        alt="{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }} icon"
                                                         class="restaurant-favicon"
                                                         width="32"
                                                         height="32"
@@ -345,7 +343,7 @@
                                                     <a href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
                                                        class="text-decoration-none text-dark">
                                                         {% if expense.restaurant %}
-                                                            {{ expense.restaurant.name }}
+                                                            {{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }}
                                                         {% else %}
                                                             Unknown Restaurant
                                                         {% endif %}
@@ -494,7 +492,7 @@
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#deleteExpenseModal"
                                                     data-expense-id="{{ expense.id }}"
-                                                    data-expense-description="{{ expense.restaurant.name if expense.restaurant else 'Unknown Restaurant' }}"
+                                                    data-expense-description="{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }}"
                                                     data-expense-amount="{{ expense.amount|format_number(2) }}"
                                                     data-expense-date="{{ expense.date|format_date_user_tz('%B %d, %Y') }}"
                                                     data-tooltip="true"
@@ -751,18 +749,29 @@
                                 </span>
                             </p>
                         </div>
-                        <div class="calendar-weekdays">
-                            <span>Sun</span>
-                            <span>Mon</span>
-                            <span>Tue</span>
-                            <span>Wed</span>
-                            <span>Thu</span>
-                            <span>Fri</span>
-                            <span>Sat</span>
+                        <div class="text-muted small mb-2">
+                            Click a day to open Day view. Right-click a day for quick view options.
                         </div>
-                        <div class="calendar-grid" data-expense-calendar data-calendar-initial-month="{{ calendar_month or '' }}" data-calendar-add-url="{{ url_for('expenses.add_expense') }}"></div>
-                        <div class="calendar-week-grid d-none" data-expense-calendar-week></div>
-                        <div class="calendar-day-grid d-none" data-expense-calendar-day></div>
+                        <div class="calendar-scroll-shell" data-calendar-scroll-shell>
+                            <div class="calendar-scroll-content" data-calendar-scroll-content>
+                                <div class="calendar-weekdays">
+                                    <span>Sun</span>
+                                    <span>Mon</span>
+                                    <span>Tue</span>
+                                    <span>Wed</span>
+                                    <span>Thu</span>
+                                    <span>Fri</span>
+                                    <span>Sat</span>
+                                </div>
+                                <div class="calendar-grid" data-expense-calendar data-calendar-initial-month="{{ calendar_month or '' }}" data-calendar-add-url="{{ url_for('expenses.add_expense') }}"></div>
+                                <div class="calendar-week-grid d-none" data-expense-calendar-week></div>
+                                <div class="calendar-day-grid d-none" data-expense-calendar-day></div>
+                            </div>
+                        </div>
+                        <div class="calendar-context-menu d-none" data-calendar-context-menu role="menu" aria-label="Calendar day actions">
+                            <button type="button" class="calendar-context-item" data-calendar-context-action="week" role="menuitem">Show week view</button>
+                            <button type="button" class="calendar-context-item" data-calendar-context-action="day" role="menuitem">Show day view</button>
+                        </div>
                         <div class="calendar-empty-state d-none" data-calendar-empty>
                             No expenses match this view’s filters.
                         </div>
@@ -989,7 +998,7 @@
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                             <i class="fas fa-times me-2"></i> Cancel
                         </button>
-                        <form id="delete-expense-form" method="post" action="" data-delete-url="{{ url_for('expenses.list_expenses') }}" data-skip-ajax="true">
+                        <form id="delete-expense-form" method="post" action="" data-delete-url="{{ url_for('expenses.delete_expense', expense_id=0).replace('/0/delete', '') }}" data-skip-ajax="true">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                             <button type="submit" class="btn btn-danger">
                                 <i class="fas fa-trash me-2"></i> Delete Expense

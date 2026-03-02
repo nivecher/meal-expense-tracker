@@ -11,9 +11,7 @@ function getCookieValue(name) {
   if (!match) return null;
   try {
     return decodeURIComponent(match.slice(prefix.length));
-  } catch {
-    return match.slice(prefix.length);
-  }
+  } catch {}
 }
 
 function setCookieValue(name, value, days = 365) {
@@ -27,16 +25,12 @@ function getStoredJson(storageKey, cookieKey) {
   try {
     const raw = localStorage.getItem(storageKey);
     if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   try {
     const rawCookie = getCookieValue(cookieKey);
     if (rawCookie) return JSON.parse(rawCookie);
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   return null;
 }
@@ -45,9 +39,7 @@ function persistJson(storageKey, cookieKey, value) {
   const raw = JSON.stringify(value);
   try {
     localStorage.setItem(storageKey, raw);
-  } catch {
-    // ignore
-  }
+  } catch {}
   setCookieValue(cookieKey, raw);
 }
 
@@ -58,11 +50,14 @@ function getExpenseCellValue(row, columnIndex) {
 
   const { sortValue } = cell.dataset;
   if (sortValue !== null && sortValue !== undefined) {
-    if (columnIndex === 1) { // Date column
+    if (columnIndex === 1) {
+      // Date column
       return new Date(sortValue);
-    } else if (columnIndex === 6 || columnIndex === 7) { // $/person and Amount (currency)
+    } else if (columnIndex === 6 || columnIndex === 7) {
+      // $/person and Amount (currency)
       return parseFloat(sortValue) || 0;
-    } else if (columnIndex === 5) { // Party size column
+    } else if (columnIndex === 5) {
+      // Party size column
       return parseInt(sortValue, 10) || 0;
     }
     return sortValue;
@@ -77,16 +72,42 @@ function getRestaurantCellValue(row, columnIndex) {
 
   const { sortValue } = cell.dataset;
   if (sortValue !== null && sortValue !== undefined) {
-    if (columnIndex === 2) { // Location column - handle special location sorting
+    if (columnIndex === 2) {
+      // Location column - handle special location sorting
       if (sortValue === 'No location') {
         return 'ZZZ'; // Put "No location" at the end
       }
       return sortValue.toLowerCase();
-    } else if (columnIndex === 4) { // Rating column
+    } else if (columnIndex === 4) {
+      // Rating column
       return parseFloat(sortValue) || 0;
-    } else if (columnIndex === 3) { // Price level column
+    } else if (columnIndex === 3) {
+      // Price level column
       return parseInt(sortValue, 10) || 0;
     }
+    return sortValue;
+  }
+
+  return cell.textContent.trim();
+}
+
+function getMerchantCellValue(row, columnIndex) {
+  const cell = row.cells[columnIndex];
+  if (!cell) return '';
+
+  const { sortValue } = cell.dataset;
+  if (sortValue !== null && sortValue !== undefined) {
+    if (columnIndex === 3) {
+      return parseInt(sortValue, 10) || 0;
+    }
+
+    if (columnIndex === 2) {
+      if (sortValue === 'Uncategorized') {
+        return 'zzz';
+      }
+      return sortValue.toLowerCase();
+    }
+
     return sortValue;
   }
 
@@ -108,6 +129,10 @@ function getExpenseRows(tbody) {
 }
 
 function getRestaurantRows(tbody) {
+  return Array.from(tbody.querySelectorAll('tr')).filter((row) => !isDividerRow(row));
+}
+
+function getMerchantRows(tbody) {
   return Array.from(tbody.querySelectorAll('tr')).filter((row) => !isDividerRow(row));
 }
 
@@ -193,14 +218,58 @@ function createAlphaDividerRow(alphaLabel, columnCount) {
   dividerRow.className = 'table-alpha-divider';
   dividerRow.dataset.dividerRow = 'true';
   dividerRow.dataset.alphaLabel = alphaLabel;
+  dividerRow.dataset.alphaCollapsed = 'false';
   const cell = document.createElement('td');
   cell.colSpan = columnCount;
   const content = document.createElement('div');
   content.className = 'alpha-divider-content';
+  const left = document.createElement('div');
+  left.className = 'alpha-divider-left';
+  const toggleButton = document.createElement('button');
+  toggleButton.type = 'button';
+  toggleButton.className = 'alpha-toggle';
+  toggleButton.dataset.alphaToggle = alphaLabel;
+  toggleButton.setAttribute('aria-expanded', 'true');
+  const toggleIcon = document.createElement('i');
+  toggleIcon.className = 'fas fa-chevron-down';
+  toggleIcon.setAttribute('aria-hidden', 'true');
+  toggleButton.appendChild(toggleIcon);
   const label = document.createElement('span');
   label.className = 'alpha-divider-label text-muted text-uppercase';
   label.textContent = alphaLabel;
-  content.appendChild(label);
+  left.append(toggleButton, label);
+  content.appendChild(left);
+  cell.appendChild(content);
+  dividerRow.appendChild(cell);
+  return dividerRow;
+}
+
+function createMerchantCategoryDividerRow(categoryLabel, columnCount) {
+  const dividerRow = document.createElement('tr');
+  dividerRow.className = 'table-city-divider';
+  dividerRow.dataset.dividerRow = 'true';
+  dividerRow.dataset.merchantCategoryLabel = categoryLabel;
+  dividerRow.dataset.merchantCategoryCollapsed = 'false';
+  const cell = document.createElement('td');
+  cell.colSpan = columnCount;
+  const content = document.createElement('div');
+  content.className = 'city-divider-content';
+  const left = document.createElement('div');
+  left.className = 'city-divider-left';
+  const toggleButton = document.createElement('button');
+  toggleButton.type = 'button';
+  toggleButton.className = 'city-toggle';
+  toggleButton.dataset.merchantCategoryToggle = categoryLabel;
+  toggleButton.setAttribute('aria-expanded', 'true');
+  const toggleIcon = document.createElement('i');
+  toggleIcon.className = 'fas fa-chevron-down';
+  toggleIcon.setAttribute('aria-hidden', 'true');
+  toggleButton.appendChild(toggleIcon);
+  const label = document.createElement('span');
+  label.className = 'city-divider-label text-muted text-uppercase';
+  label.textContent = categoryLabel;
+  left.append(toggleButton, label);
+  content.appendChild(left);
   cell.appendChild(content);
   dividerRow.appendChild(cell);
   return dividerRow;
@@ -217,10 +286,22 @@ function getRestaurantLocationGroup(row) {
   return row.dataset.restaurantCity || 'No location';
 }
 
+function getMerchantCategoryGroup(row) {
+  const rawCategory = row.dataset.merchantCategory || '';
+  if (!rawCategory) return 'Uncategorized';
+  if (rawCategory === 'Uncategorized') return rawCategory;
+  return rawCategory.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function rebuildRestaurantTableBody(tbody, rows, columnCount, groupBy) {
   tbody.textContent = '';
   if (!groupBy) {
-    rows.forEach((row) => tbody.appendChild(row));
+    rows.forEach((row) => {
+      delete row.dataset.restaurantGroupType;
+      delete row.dataset.restaurantGroupLabel;
+      delete row.dataset.restaurantAlphaGroup;
+      tbody.appendChild(row);
+    });
     return;
   }
 
@@ -237,11 +318,64 @@ function rebuildRestaurantTableBody(tbody, rows, columnCount, groupBy) {
 
     if (groupLabel && groupLabel !== currentGroup) {
       currentGroup = groupLabel;
-      const dividerRow = groupBy === 'location'
-        ? createCityDividerRow(groupLabel, columnCount)
-        : createAlphaDividerRow(groupLabel, columnCount);
+      const dividerRow =
+        groupBy === 'location'
+          ? createCityDividerRow(groupLabel, columnCount)
+          : createAlphaDividerRow(groupLabel, columnCount);
       tbody.appendChild(dividerRow);
     }
+
+    row.dataset.restaurantGroupType = groupBy;
+    row.dataset.restaurantGroupLabel = groupLabel;
+    if (groupBy === 'location') {
+      row.dataset.restaurantCityGroup = groupLabel;
+      delete row.dataset.restaurantAlphaGroup;
+    } else if (groupBy === 'alpha') {
+      row.dataset.restaurantAlphaGroup = groupLabel;
+    }
+    tbody.appendChild(row);
+  });
+}
+
+function rebuildMerchantTableBody(tbody, rows, columnCount, groupBy) {
+  tbody.textContent = '';
+  if (!groupBy) {
+    rows.forEach((row) => {
+      delete row.dataset.merchantAlphaGroup;
+      delete row.dataset.merchantCategoryGroup;
+      tbody.appendChild(row);
+    });
+    return;
+  }
+
+  let currentGroup = '';
+  rows.forEach((row) => {
+    let groupLabel = '';
+    if (groupBy === 'alpha') {
+      const [, nameCell] = row.cells;
+      const nameValue = nameCell?.dataset.sortValue || nameCell?.textContent || '';
+      groupLabel = getRestaurantAlphaGroup(nameValue);
+    } else if (groupBy === 'category') {
+      groupLabel = getMerchantCategoryGroup(row);
+    }
+
+    if (groupLabel && groupLabel !== currentGroup) {
+      currentGroup = groupLabel;
+      const dividerRow =
+        groupBy === 'category'
+          ? createMerchantCategoryDividerRow(groupLabel, columnCount)
+          : createAlphaDividerRow(groupLabel, columnCount);
+      tbody.appendChild(dividerRow);
+    }
+
+    if (groupBy === 'alpha') {
+      row.dataset.merchantAlphaGroup = groupLabel;
+      delete row.dataset.merchantCategoryGroup;
+    } else if (groupBy === 'category') {
+      row.dataset.merchantCategoryGroup = groupLabel;
+      delete row.dataset.merchantAlphaGroup;
+    }
+
     tbody.appendChild(row);
   });
 }
@@ -287,7 +421,8 @@ function sortExpenseTable(columnIndex, ascending) {
     const bValue = getExpenseCellValue(b, columnIndex);
 
     // Multi-level sort for restaurant column
-    if (columnIndex === 2) { // Restaurant column
+    if (columnIndex === 2) {
+      // Restaurant column
       const aRestaurant = (aValue || '').toString().toLowerCase();
       const bRestaurant = (bValue || '').toString().toLowerCase();
       if (aRestaurant !== bRestaurant) {
@@ -320,7 +455,8 @@ function sortRestaurantTable(columnIndex, ascending) {
     const bValue = getRestaurantCellValue(b, columnIndex);
 
     // Multi-level sort for name column
-    if (columnIndex === 1) { // Name column
+    if (columnIndex === 1) {
+      // Name column
       const aName = (aValue || '').toString().toLowerCase();
       const bName = (bValue || '').toString().toLowerCase();
       if (aName !== bName) {
@@ -344,6 +480,41 @@ function sortRestaurantTable(columnIndex, ascending) {
     groupBy = 'location';
   }
   rebuildRestaurantTableBody(tbody, rows, columnCount, groupBy);
+}
+
+function sortMerchantTable(columnIndex, ascending) {
+  const table = document.getElementById('merchantTable');
+  if (!table) return;
+  const tbody = table.querySelector('tbody');
+  if (!tbody) return;
+  const rows = getMerchantRows(tbody);
+
+  rows.sort((a, b) => {
+    const aValue = getMerchantCellValue(a, columnIndex);
+    const bValue = getMerchantCellValue(b, columnIndex);
+
+    if (columnIndex === 1) {
+      const aName = (aValue || '').toString().toLowerCase();
+      const bName = (bValue || '').toString().toLowerCase();
+      if (aName !== bName) {
+        return ascending ? compareValues(aName, bName) : compareValues(bName, aName);
+      }
+      const aCount = getMerchantCellValue(a, 3);
+      const bCount = getMerchantCellValue(b, 3);
+      return ascending ? compareValues(aCount, bCount) : compareValues(bCount, aCount);
+    }
+
+    return ascending ? compareValues(aValue, bValue) : compareValues(bValue, aValue);
+  });
+
+  const columnCount = table.querySelectorAll('thead th').length;
+  let groupBy = null;
+  if (columnIndex === 1) {
+    groupBy = 'alpha';
+  } else if (columnIndex === 2) {
+    groupBy = 'category';
+  }
+  rebuildMerchantTableBody(tbody, rows, columnCount, groupBy);
 }
 
 function initTableSorting(tableId) {
@@ -378,6 +549,8 @@ function initTableSorting(tableId) {
         sortExpenseTable(columnIndex, newAscending);
       } else if (tableId === 'restaurantTable') {
         sortRestaurantTable(columnIndex, newAscending);
+      } else if (tableId === 'merchantTable') {
+        sortMerchantTable(columnIndex, newAscending);
       }
     });
   });
@@ -391,16 +564,22 @@ function initTableSorting(tableId) {
         sortExpenseTable(saved.columnIndex, saved.direction === 'asc');
       } else if (tableId === 'restaurantTable') {
         sortRestaurantTable(saved.columnIndex, saved.direction === 'asc');
+      } else if (tableId === 'merchantTable') {
+        sortMerchantTable(saved.columnIndex, saved.direction === 'asc');
       }
     }
     return;
   }
 
-  if (tableId === 'restaurantTable') {
+  if (tableId === 'restaurantTable' || tableId === 'merchantTable') {
     const nameHeader = getHeaderByCellIndex(headers, 1);
     if (nameHeader) {
       nameHeader.classList.add('sort-asc');
-      sortRestaurantTable(1, true);
+      if (tableId === 'restaurantTable') {
+        sortRestaurantTable(1, true);
+      } else {
+        sortMerchantTable(1, true);
+      }
     }
   }
 }
@@ -409,6 +588,7 @@ function initExpenseTableSorting() {
   // Initialize table sorting for both expense and restaurant tables
   initTableSorting('expenseTable');
   initTableSorting('restaurantTable');
+  initTableSorting('merchantTable');
 
   // Initialize other expense-specific functionality
   if (typeof initExpenseList === 'function') {

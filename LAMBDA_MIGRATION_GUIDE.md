@@ -57,16 +57,16 @@ The migration manager automatically:
 
 ```bash
 # Check migration status
-python scripts/remote_admin.py run-migrations --dry-run
+python scripts/remote_admin.py db run-migrations --dry-run
 
 # Run migrations normally
-python scripts/remote_admin.py --confirm run-migrations
+python scripts/remote_admin.py --confirm db run-migrations
 
 # Fix migration history for existing tables
-python scripts/remote_admin.py --confirm run-migrations --fix-history
+python scripts/remote_admin.py --confirm db run-migrations --fix-history
 
 # Run to specific revision
-python scripts/remote_admin.py --confirm run-migrations --target-revision abc123
+python scripts/remote_admin.py --confirm db run-migrations --target-revision abc123
 ```
 
 ### Direct Lambda Invocation
@@ -96,7 +96,7 @@ If you encounter "already exists" errors:
 python scripts/fix_rds_migration.py
 
 # Or use remote admin
-python scripts/remote_admin.py --confirm run-migrations --fix-history
+python scripts/remote_admin.py --confirm db run-migrations --fix-history
 ```
 
 ### Manual Database Fix
@@ -149,7 +149,7 @@ INSERT INTO alembic_version (version_num) VALUES ('your_latest_revision');
 
 ```bash
 # Use fix-history option
-python scripts/remote_admin.py --confirm run-migrations --fix-history
+python scripts/remote_admin.py --confirm db run-migrations --fix-history
 
 # Or run fix script
 python scripts/fix_rds_migration.py
@@ -258,7 +258,7 @@ flask db upgrade
 ### 2. **Use Dry-Run Before Production**
 
 ```bash
-python scripts/remote_admin.py run-migrations --dry-run
+python scripts/remote_admin.py db run-migrations --dry-run
 ```
 
 ### 3. **Backup Before Major Changes**
@@ -317,7 +317,7 @@ FLASK_ENV=production
 4. **Verify staging**
 
    ```bash
-   python scripts/remote_admin.py run-migrations --dry-run
+   python scripts/remote_admin.py db run-migrations --dry-run
    ```
 
 5. **Deploy to production**
@@ -330,7 +330,7 @@ FLASK_ENV=production
 6. **Monitor and verify**
    ```bash
    # Check migration status
-   python scripts/remote_admin.py run-migrations --dry-run
+   python scripts/remote_admin.py db run-migrations --dry-run
    ```
 
 This approach ensures safe, automated migrations while preserving all data and providing manual control when needed.

@@ -40,6 +40,7 @@ def validate_service_level(form: Any, field: Any) -> None:
 class RestaurantForm(FlaskForm):
     # Basic Information
     name = StringField("Restaurant Name", validators=[DataRequired(), Length(max=100)])
+    location_name = StringField("Location Name", validators=[Optional(), Length(max=100)])
     type = SelectField(
         "Type",
         choices=get_restaurant_type_form_choices(),
@@ -122,6 +123,12 @@ class RestaurantForm(FlaskForm):
         },
     )
     is_chain = BooleanField("Part of a chain", false_values=(False, "false", 0, "0"), default=False)
+    merchant_id = SelectField(
+        "Merchant",
+        choices=[],
+        validators=[Optional()],
+        coerce=lambda x: int(x) if x and x != "" else None,
+    )
     notes = TextAreaField("Notes", validators=[Optional()])
 
     # Form submission

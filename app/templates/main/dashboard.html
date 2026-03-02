@@ -74,7 +74,9 @@ block head_extra %}
                         </a>
                     </div>
                     <div class="col-6 col-md-2">
-                        <a href="{{ url_for('restaurants.find_places') }}" class="quick-action-btn">
+                        <a
+                            href="{{ url_for('restaurants.list_restaurants', tab='places', places_mode='find') }}"
+                            class="quick-action-btn">
                             <i class="fas fa-search-location mb-1"></i>
                             <div>Find Places</div>
                         </a>
@@ -155,8 +157,8 @@ block head_extra %}
                 <div class="card-body">
                     {% if recent_expenses %}
                     <div class="recent-expenses-list">
-                        {% for expense_row in recent_expenses %} {% set expense = expense_row[0] %} {% set
-                        restaurant_name = expense_row[1] %} {% set restaurant_website = expense_row[2] %}
+                        {% for expense_row in recent_expenses %} {% set expense = expense_row[0] %} {% set restaurant =
+                        expense_row[1] %}
                         <a
                             href="{{ url_for('expenses.expense_details', expense_id=expense.id) }}"
                             class="expense-item-link">
@@ -164,12 +166,12 @@ block head_extra %}
                                 <div class="expense-info">
                                     <div class="expense-restaurant d-flex align-items-center">
                                         <div class="restaurant-icon me-2 flex-shrink-0">
-                                            {% if restaurant_website %}
+                                            {% if restaurant and restaurant.website %}
                                             <img
                                                 src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-                                                data-website="{{ restaurant_website }}"
+                                                data-website="{{ restaurant.website }}"
                                                 data-size="28"
-                                                alt="{{ restaurant_name }} icon"
+                                                alt="{{ restaurant.display_name if restaurant else 'Unknown Restaurant' }} icon"
                                                 class="restaurant-favicon"
                                                 width="28"
                                                 height="28"
@@ -183,7 +185,7 @@ block head_extra %}
                                                 style="font-size: 24px"></i>
                                             {% endif %}
                                         </div>
-                                        {{ restaurant_name or 'Unknown Restaurant' }}
+                                        {{ restaurant.display_name if restaurant else 'Unknown Restaurant' }}
                                     </div>
                                     <div class="expense-details">
                                         <span class="expense-date text-muted">
@@ -225,20 +227,21 @@ block head_extra %}
                 <div class="card-body">
                     {% if top_restaurants %}
                     <div class="top-restaurants-list">
-                        {% for restaurant in top_restaurants %}
+                        {% for restaurant_row in top_restaurants %} {% set restaurant = restaurant_row[0] %} {% set
+                        visit_count = restaurant_row[1] %} {% set total_spent = restaurant_row[2] %}
                         <a
-                            href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant[0]) }}"
+                            href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
                             class="restaurant-item-link">
                             <div class="restaurant-item">
                                 <div class="restaurant-info">
                                     <div class="restaurant-name d-flex align-items-center">
                                         <div class="restaurant-icon me-2 flex-shrink-0">
-                                            {% if restaurant[2] %}
+                                            {% if restaurant.website %}
                                             <img
                                                 src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-                                                data-website="{{ restaurant[2] }}"
+                                                data-website="{{ restaurant.website }}"
                                                 data-size="28"
-                                                alt="{{ restaurant[1] }} icon"
+                                                alt="{{ restaurant.display_name }} icon"
                                                 class="restaurant-favicon"
                                                 width="28"
                                                 height="28"
@@ -252,14 +255,15 @@ block head_extra %}
                                                 style="font-size: 24px"></i>
                                             {% endif %}
                                         </div>
-                                        {{ restaurant[1] }}
+                                        {{ restaurant.display_name }}
                                     </div>
                                     <div class="restaurant-stats d-flex align-items-center gap-2">
-                                        <span class="visit-count">{{ restaurant[4] }} visits</span>
-                                        {% if restaurant[3] %} {{ cuisine_badge(restaurant[3], size='sm') }} {% endif %}
+                                        <span class="visit-count">{{ visit_count }} visits</span>
+                                        {% if restaurant.cuisine %} {{ cuisine_badge(restaurant.cuisine, size='sm') }}
+                                        {% endif %}
                                     </div>
                                 </div>
-                                <div class="restaurant-total"> {{ restaurant[5]|format_currency_usd }} </div>
+                                <div class="restaurant-total"> {{ total_spent|format_currency_usd }} </div>
                             </div>
                         </a>
                         {% endfor %}

@@ -42,58 +42,45 @@ make requirements-dev
 
 ## Python Development Tools
 
-### Core Tools (Pinned Versions)
+### Core Tools
 
-| Tool       | Version | Purpose                                      | Configuration    |
-| ---------- | ------- | -------------------------------------------- | ---------------- |
-| **black**  | 24.10.0 | Code formatting                              | `pyproject.toml` |
-| **ruff**   | 0.8.0+  | Linting, import sorting, unused code removal | `pyproject.toml` |
-| **mypy**   | 1.13.0  | Type checking                                | `pyproject.toml` |
-| **bandit** | 1.8.6   | Security linting                             | `.bandit`        |
-| **safety** | 3.7.0   | Dependency security                          | Auto-updated     |
+| Tool       | Purpose                                      | Configuration    |
+| ---------- | -------------------------------------------- | ---------------- |
+| **black**  | Code formatting                              | `pyproject.toml` |
+| **ruff**   | Linting, import sorting, unused code removal | `pyproject.toml` |
+| **mypy**   | Type checking                                | `pyproject.toml` |
+| **bandit** | Security linting                             | `.bandit`        |
+| **safety** | Dependency security                          | Auto-updated     |
 
-**Note**: Ruff replaces Flake8 (linting), isort (import sorting), and autoflake (unused code removal). It provides the same functionality with 10-100x better performance.
+**Note**: See `requirements.txt` and `requirements-dev.txt` for exact pinned versions. Ruff replaces Flake8 (linting), isort (import sorting), and autoflake (unused code removal). It provides the same functionality with 10-100x better performance.
 
-### Testing Tools (Pinned Versions)
+### Testing Tools
 
-| Tool             | Version | Purpose              | Configuration    |
-| ---------------- | ------- | -------------------- | ---------------- |
-| **pytest**       | 8.4.2   | Test framework       | `pyproject.toml` |
-| **pytest-cov**   | 4.0.0   | Coverage reporting   | `pyproject.toml` |
-| **pytest-xdist** | 3.8.0   | Parallel testing     | CLI flags        |
-| **coverage**     | 7.6.9   | Coverage measurement | `pyproject.toml` |
-| **factory-boy**  | 3.3.3   | Test fixtures        | N/A              |
-| **Faker**        | 25.9.2  | Test data generation | N/A              |
+| Tool             | Purpose              | Configuration    |
+| ---------------- | -------------------- | ---------------- |
+| **pytest**       | Test framework       | `pyproject.toml` |
+| **pytest-cov**   | Coverage reporting   | `pyproject.toml` |
+| **pytest-xdist** | Parallel testing     | CLI flags        |
+| **coverage**     | Coverage measurement | `pyproject.toml` |
+| **factory-boy**  | Test fixtures        | N/A              |
+| **Faker**        | Test data generation | N/A              |
 
-### Documentation Tools (Pinned Versions)
+**Note**: See `requirements-dev.txt` for exact pinned versions.
 
-| Tool                 | Version | Purpose                  | Configuration  |
-| -------------------- | ------- | ------------------------ | -------------- |
-| **sphinx**           | 7.4.7   | Documentation generation | `docs/conf.py` |
-| **sphinx-rtd-theme** | 2.0.0   | Documentation theme      | `docs/conf.py` |
+### Documentation Tools
+
+| Tool                 | Purpose                  | Configuration  |
+| -------------------- | ------------------------ | -------------- |
+| **sphinx**           | Documentation generation | `docs/conf.py` |
+| **sphinx-rtd-theme** | Documentation theme      | `docs/conf.py` |
+
+**Note**: See `requirements-dev.txt` for exact pinned versions.
 
 ## Node.js Development Tools
 
 ### Package Management
 
-Most Node.js dependencies are pinned in `package.json` without version ranges, with security exceptions:
-
-```json
-{
-  "devDependencies": {
-    "eslint-formatter-compact": "8.40.0",
-    "prettier": "3.3.3",
-    "stylelint": "16.24.0",
-    "stylelint-config-standard": "39.0.0"
-  },
-  "dependencies": {
-    "@playwright/test": "^1.56.1",
-    "eslint": "9.34.0"
-  }
-}
-```
-
-**Security Exception**: Playwright uses a caret range (`^1.56.1`) to allow automatic security updates while maintaining compatibility within the same major version.
+All Node.js dependencies are pinned in `package.json`. See `package.json` and `package-lock.json` for exact versions.
 
 ### Tool Purposes
 

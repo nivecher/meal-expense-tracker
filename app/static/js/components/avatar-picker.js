@@ -23,13 +23,7 @@ class AvatarPicker {
       'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&h=150&fit=crop&crop=faces',
     ];
 
-    this.dicebearStyles = [
-      'avataaars',
-      'bottts',
-      'identicon',
-      'personas',
-      'pixel-art',
-    ];
+    this.dicebearStyles = ['avataaars', 'bottts', 'identicon', 'personas', 'pixel-art'];
 
     this.init();
   }
@@ -230,7 +224,7 @@ class AvatarPicker {
   selectAvatar(option) {
     // Update selected state
     // For initials, set to empty string explicitly
-    this.selectedAvatarUrl = option.type === 'initials' ? '' : (option.url || '');
+    this.selectedAvatarUrl = option.type === 'initials' ? '' : option.url || '';
 
     // Update hidden input
     if (this.avatarInput) {
@@ -245,9 +239,7 @@ class AvatarPicker {
       el.classList.remove('selected');
     });
 
-    const selectedElement = this.container.querySelector(
-      `[data-avatar-id="${option.id}"]`,
-    );
+    const selectedElement = this.container.querySelector(`[data-avatar-id="${option.id}"]`);
     if (selectedElement) {
       selectedElement.classList.add('selected');
     }
@@ -350,9 +342,7 @@ class AvatarPicker {
 
     // If no match found and URL is empty, select initials
     if (!avatarUrl || avatarUrl.trim() === '') {
-      const initialsOption = this.container?.querySelector(
-        '[data-avatar-id="initials"]',
-      );
+      const initialsOption = this.container?.querySelector('[data-avatar-id="initials"]');
       if (initialsOption) {
         initialsOption.classList.add('selected');
       }

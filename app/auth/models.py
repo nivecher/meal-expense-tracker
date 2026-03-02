@@ -18,7 +18,9 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
 
     from app.expenses.models import Category, Expense, Tag
+    from app.receipts.models import Receipt
     from app.restaurants.models import Restaurant
+    from app.visits.models import Visit
 
 
 class User(BaseModel, UserMixin):
@@ -66,6 +68,12 @@ class User(BaseModel, UserMixin):
         default=False,
         nullable=False,
         comment="Whether the user has admin privileges",
+    )
+    advanced_features_enabled: Mapped[bool] = mapped_column(
+        db.Boolean,
+        default=False,
+        nullable=False,
+        comment="Whether the user has advanced features enabled",
     )
 
     # Profile fields
@@ -130,6 +138,20 @@ class User(BaseModel, UserMixin):
     )
     tags: Mapped[list[Tag]] = relationship(
         "Tag",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    visits: Mapped[list[Visit]] = relationship(
+        "Visit",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    receipts: Mapped[list[Receipt]] = relationship(
+        "Receipt",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="dynamic",
@@ -218,6 +240,14 @@ class User(BaseModel, UserMixin):
 
         return self.username[:2].upper()
 
+    @property
+    def has_advanced_features(self) -> bool:
+        """Return whether user can access advanced features.
+
+        Admin users always have advanced features regardless of account setting.
+        """
+        return bool(self.is_admin or self.advanced_features_enabled)
+
     def to_dict(self) -> dict[str, Any]:
         """Return a dictionary representation of the user.
 
@@ -237,6 +267,8 @@ class User(BaseModel, UserMixin):
             "timezone": self.timezone,
             "is_active": self.is_active,
             "is_admin": self.is_admin,
+            "advanced_features_enabled": self.advanced_features_enabled,
+            "has_advanced_features": self.has_advanced_features,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

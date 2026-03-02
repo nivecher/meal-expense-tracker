@@ -28,30 +28,32 @@ This document defines the linting and formatting standards for the Meal Expense 
 
 ## Tool Versions
 
+See `requirements.txt`, `requirements-dev.txt`, `package.json`, and `pyproject.toml` for exact versions. The key tools used are:
+
 ### Python Tools
 
-- **Black**: 24.10.0 (code formatting)
-- **Ruff**: 0.8.0+ (linting, import sorting, unused code removal - replaces Flake8, isort, autoflake)
-- **Bandit**: 1.8.6 (security linting)
-- **Mypy**: 1.13.0 (type checking - enabled in pre-commit and Makefile)
+- **Black**: Code formatting (see `requirements-dev.txt`)
+- **Ruff**: Linting, import sorting, unused code removal - replaces Flake8, isort, autoflake (see `requirements-dev.txt`)
+- **Bandit**: Security linting (see `requirements-dev.txt`)
+- **Mypy**: Type checking - enabled in pre-commit and Makefile (see `requirements-dev.txt`)
 
 ### JavaScript/Web Tools
 
-- **ESLint**: 9.34.0
-- **Prettier**: 3.3.3
-- **Stylelint**: 16.24.0
-- **markdownlint-cli**: v0.38.0
+- **ESLint**: JavaScript linting with flat config (see `package.json`)
+- **Prettier**: HTML template formatting (see `package.json`)
+- **Stylelint**: CSS linting (see `package.json`)
+- **markdownlint-cli**: Markdown linting
 
 ### Infrastructure Tools
 
-- **Terraform**: 1.13.5
-- **pre-commit-hooks**: v6.0.0
+- **Terraform**: Infrastructure as code (see `.github/workflows/` for version used)
+- **pre-commit-hooks**: Git hooks for code quality
 
 ## Detailed Tool Configuration
 
 ### Python Linting
 
-#### Black (24.10.0)
+#### Black
 
 **Purpose**: Code formatting
 
@@ -78,7 +80,7 @@ include = "\\.pyi?$"
 
 **Notes**: All environments rely on `pyproject.toml` configuration. No explicit arguments needed.
 
-#### Ruff (0.8.0+)
+#### Ruff
 
 **Purpose**: Fast Python linter and formatter that replaces Flake8, isort, and autoflake
 
@@ -136,7 +138,7 @@ force-sort-within-sections = true
 - Ruff is 10-100x faster than the tools it replaces
 - Black is still used for code formatting in Phase 1; Ruff formatter will be evaluated in Phase 2
 
-#### Bandit (1.8.6)
+#### Bandit
 
 **Purpose**: Security vulnerability scanning
 
@@ -162,7 +164,7 @@ skips:
 
 **Notes**: All environments use `.bandit` configuration file.
 
-#### Mypy (1.13.0)
+#### Mypy
 
 **Purpose**: Static type checking
 
@@ -197,7 +199,7 @@ warn_unreachable = true
 
 ### JavaScript Linting
 
-#### ESLint (9.34.0)
+#### ESLint
 
 **Purpose**: JavaScript linting
 
@@ -214,7 +216,7 @@ warn_unreachable = true
 
 **Notes**: All environments use the same npm script for consistency.
 
-#### Prettier for JavaScript (3.3.3)
+#### Prettier for JavaScript
 
 **Purpose**: JavaScript formatting
 
@@ -233,7 +235,7 @@ warn_unreachable = true
 
 ### HTML Linting
 
-#### Prettier (3.3.3)
+#### Prettier
 
 **Purpose**: HTML template formatting
 
@@ -271,7 +273,7 @@ warn_unreachable = true
 
 ### CSS Linting
 
-#### Stylelint (16.24.0)
+#### Stylelint
 
 **Purpose**: CSS linting
 
@@ -307,7 +309,7 @@ warn_unreachable = true
 
 **Notes**: All environments use the same configuration file.
 
-#### Prettier for Markdown (3.3.3)
+#### Prettier for Markdown
 
 **Purpose**: Markdown formatting
 
@@ -383,7 +385,7 @@ warn_unreachable = true
 - **Pre-commit**: `check-toml`
 - **GitHub Actions**: `check-toml`
 
-#### Prettier for YAML/JSON (3.3.3)
+#### Prettier for YAML/JSON
 
 **Purpose**: YAML/JSON formatting
 
@@ -411,7 +413,7 @@ warn_unreachable = true
 
 ### Terraform Linting
 
-#### terraform fmt (1.13.5)
+#### terraform fmt
 
 **Purpose**: Terraform code formatting
 
@@ -426,7 +428,7 @@ warn_unreachable = true
 
 **Notes**: All environments use the same command.
 
-#### terraform validate (1.13.5)
+#### terraform validate
 
 **Purpose**: Terraform configuration validation
 

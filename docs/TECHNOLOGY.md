@@ -16,29 +16,29 @@ This document outlines the technology choices and architecture decisions for the
 
 ### Backend
 
-- **Language**: [Python 3.13](https://www.python.org/)
+- **Language**: Python 3.13+ (see `pyproject.toml` for exact version)
   - Type hints and modern Python features
   - Strict typing with Mypy for better code quality
 
-- **Web Framework**: [Flask 3.1.1](https://flask.palletsprojects.com/)
+- **Web Framework**: Flask (see `requirements.txt` for exact version)
   - Blueprints for modular application structure
   - AWS Lambda WSGI adapter for serverless deployment
 
-- **Database**: [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
+- **Database**: SQLAlchemy 2.0 (see `requirements.txt` for exact version)
   - Modern SQLAlchemy with improved type hints
   - PostgreSQL for production, SQLite for development
   - Flask-Migrate for schema management
 
 - **Data & Validation**:
-  - [Marshmallow](https://marshmallow.readthedocs.io/) for API serialization/validation
-  - [msgspec](https://jcristharif.com/msgspec/) for high-performance JSON serialization
-  - [WTForms](https://wtforms.readthedocs.io/) for form validation
+  - Marshmallow for API serialization/validation
+  - msgspec for high-performance JSON serialization
+  - WTForms for form validation
 
 - **Authentication & Security**:
   - Flask-Login for session-based authentication
   - Signed cookie sessions for all environments (no external storage required)
   - Flask-Limiter for rate limiting
-  - CSRF protection (disabled in Lambda, enabled in development)
+  - CSRF protection enabled (with conditional handling for API routes)
 
 - **Testing**: Pytest with comprehensive test fixtures
 - **Code Quality**: Black, Ruff (replaces Flake8/isort/autoflake), Mypy, pre-commit hooks
@@ -46,9 +46,9 @@ This document outlines the technology choices and architecture decisions for the
 ### Frontend
 
 - **Framework Strategy**: Server-side rendered templates with progressive enhancement
-  - [Jinja2](https://jinja.palletsprojects.com/) templates for server-side rendering
-  - [Bootstrap 5.3.3](https://getbootstrap.com/) for responsive UI components
-  - [jQuery 3.7.1](https://jquery.com/) for DOM manipulation and AJAX
+  - Jinja2 templates for server-side rendering
+  - Bootstrap (see `requirements.txt` or CDN for exact version)
+  - jQuery for DOM manipulation and AJAX
   - Vanilla JavaScript ES6+ for modern features and custom components
 
 - **UI Components & Styling**:
@@ -101,9 +101,9 @@ This document outlines the technology choices and architecture decisions for the
 
 ### Local Development
 
-- LocalStack for AWS service emulation
 - Docker Compose for local services
 - SQLite for local development database
+- LocalStack (optional) for AWS service emulation
 
 ## CI/CD Pipeline
 
@@ -173,25 +173,24 @@ This document outlines the technology choices and architecture decisions for the
   - [Bandit](https://bandit.readthedocs.io/) - Security vulnerability scanning
 
 - **Frontend**:
-  - [ESLint 9.34.0](https://eslint.org/) - JavaScript linting with flat config
-  - [Prettier 3.2.4](https://prettier.io/) - HTML template formatting
+  - ESLint - JavaScript linting with flat config (see `package.json` for exact version)
+  - Prettier - HTML template formatting (see `package.json` for exact version)
   - Environment-specific rules (development vs production)
 
 - **Infrastructure**:
-  - [TFLint](https://github.com/terraform-linters/tflint) - Terraform linting
-  - [ShellCheck](https://www.shellcheck.net/) - Shell script analysis
-  - [yamllint](https://yamllint.readthedocs.io/) - YAML file validation
+  - TFLint - Terraform linting
+  - ShellCheck - Shell script analysis
+  - yamllint - YAML file validation
 
 - **Security Scanning**:
-  - [Trivy](https://trivy.dev/) - Dependency and container vulnerability scanning
-  - [GitLeaks](https://github.com/gitleaks/gitleaks) - Secret detection
+  - Trivy - Dependency and container vulnerability scanning
+  - GitLeaks - Secret detection
   - Pre-commit hooks for automated quality checks
 
 ### AWS Development
 
 - **AWS SAM CLI** for local Lambda testing
 - **AWS CLI** for service interaction
-- **AWS Vault** for credential management
 - **LocalStack** for offline development
 
 ### Testing
@@ -205,11 +204,6 @@ This document outlines the technology choices and architecture decisions for the
   - Minimum coverage requirements
 
 ### Documentation
-
-- **API**:
-- Swagger/OpenAPI
-- Interactive API documentation
-- Request/response examples
 
 - **Architecture**:
   - C4 Model
@@ -333,15 +327,10 @@ This document outlines the technology choices and architecture decisions for the
 
 ### Alerting
 
-- **Critical Alerts**
-- PagerDuty integration
-- 24/7 on-call rotation
-- Escalation policies
-
-- **Non-critical Alerts**
+- **Notification Channels**:
   - Email notifications
-  - Slack channels
-  - Daily digest
+  - Slack channels (configure via environment variables)
+  - CloudWatch Alarms for threshold-based alerting
 
 - **Alert Thresholds**
   - Warning levels

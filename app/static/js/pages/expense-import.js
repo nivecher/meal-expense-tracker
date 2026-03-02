@@ -14,11 +14,7 @@ function setProgressUiVisible(isVisible) {
   container.classList.toggle('d-none', !isVisible);
 }
 
-function setProgressUiState({
-  percent,
-  statusText,
-  isAnimated,
-}) {
+function setProgressUiState({ percent, statusText, isAnimated }) {
   const bar = document.getElementById('import-upload-bar');
   const percentEl = document.getElementById('import-upload-percent');
   const statusEl = document.getElementById('import-upload-status');
@@ -75,9 +71,7 @@ function shouldNavigateToResponseUrl(requestUrl, responseUrl) {
     const samePath = response.pathname === request.pathname;
 
     return !samePath;
-  } catch {
-    return false;
-  }
+  } catch {}
 }
 
 function replaceDocumentWithHtml(html) {
@@ -86,10 +80,7 @@ function replaceDocumentWithHtml(html) {
   window.location.assign(url);
 }
 
-function uploadImportForm({
-  form,
-  fileInput,
-}) {
+function uploadImportForm({ form, fileInput }) {
   const requestUrl = form.getAttribute('action') || window.location.href;
   const formData = new FormData(form);
 

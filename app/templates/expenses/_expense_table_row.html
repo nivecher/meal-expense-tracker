@@ -63,7 +63,7 @@
                     {% endif %}
                 </div>
             </td>
-    <td data-sort-value="{{ expense.restaurant.name|lower if expense.restaurant else '' }}">
+    <td data-sort-value="{{ expense.restaurant.display_name|lower if expense.restaurant else '' }}">
         {% if expense.restaurant %}
             <div class="restaurant-cuisine-combined">
                 <div class="d-flex align-items-center mb-1">
@@ -74,7 +74,7 @@
                                 src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                 data-website="{{ expense.restaurant.website }}"
                                 data-size="20"
-                                alt="{{ expense.restaurant.name }} icon"
+                                alt="{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }} icon"
                                 class="restaurant-favicon-table"
                                 width="20"
                                 height="20"
@@ -86,7 +86,7 @@
 
                     <!-- Restaurant Name -->
                     <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=expense.restaurant.id) }}"
-                       class="text-decoration-none fw-medium">{{ expense.restaurant.name }}</a>
+                        class="text-decoration-none fw-medium">{{ expense.restaurant.display_name if expense.restaurant else 'Unknown Restaurant' }}</a>
                 </div>
                 <!-- Cuisine and Service Level (side by side) -->
                 <div class="d-flex gap-2 flex-wrap align-items-center">

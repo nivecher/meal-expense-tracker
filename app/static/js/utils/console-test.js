@@ -45,7 +45,7 @@ class ConsoleTest {
         status: 'PASS',
         message: 'All console methods working correctly',
       });
-    } catch {
+    } catch (error) {
       this.testResults.push({
         test: 'Console Methods',
         status: 'FAIL',
@@ -86,7 +86,7 @@ class ConsoleTest {
           message: 'Error stats not available (error handler disabled)',
         });
       }
-    } catch {
+    } catch (error) {
       this.testResults.push({
         test: 'Error Handling',
         status: 'FAIL',
@@ -119,7 +119,7 @@ class ConsoleTest {
           message: 'Performance API not available',
         });
       }
-    } catch {
+    } catch (error) {
       this.testResults.push({
         test: 'Performance',
         status: 'FAIL',
@@ -145,7 +145,7 @@ class ConsoleTest {
           message: 'Console filtering not available (error handler disabled)',
         });
       }
-    } catch {
+    } catch (error) {
       this.testResults.push({
         test: 'Console Filtering',
         status: 'FAIL',
@@ -168,8 +168,7 @@ class ConsoleTest {
 
     console.log('\n📋 Detailed Results:');
     this.testResults.forEach((result, index) => {
-      const icon = result.status === 'PASS' ? '✅' :
-        result.status === 'SKIP' ? '⏭️' : '❌';
+      const icon = result.status === 'PASS' ? '✅' : result.status === 'SKIP' ? '⏭️' : '❌';
       console.log(`${index + 1}. ${icon} ${result.test}: ${result.message}`);
     });
 
@@ -188,8 +187,10 @@ class ConsoleTest {
 }
 
 // Auto-run tests only in development mode and only when explicitly enabled
-if ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
-    window.location.search.includes('debug=console')) {
+if (
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+  window.location.search.includes('debug=console')
+) {
   new ConsoleTest(); // eslint-disable-line no-new
 }
 

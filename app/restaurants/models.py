@@ -12,6 +12,8 @@ from app.models.base import BaseModel
 if TYPE_CHECKING:
     from app.auth.models import User
     from app.expenses.models import Expense
+    from app.merchants.models import Merchant
+    from app.visits.models import Visit
 
 
 class Restaurant(BaseModel):
@@ -57,6 +59,10 @@ class Restaurant(BaseModel):
 
     # Basic Information
     name: Mapped[str] = mapped_column(db.String(100), nullable=False, comment="Name of the restaurant")
+    location_name: Mapped[str | None] = mapped_column(
+        db.String(100),
+        comment="Optional location/branch name used for display when available",
+    )
     type: Mapped[str | None] = mapped_column(db.String(50), comment="Type of cuisine or restaurant style")
     located_within: Mapped[str | None] = mapped_column(
         db.String(100), comment="Location within (e.g., mall, airport, hotel)"
@@ -115,15 +121,40 @@ class Restaurant(BaseModel):
         index=True,
         comment="Reference to the user who added this restaurant",
     )
+    merchant_id: Mapped[int | None] = mapped_column(
+        db.Integer,
+        ForeignKey("merchant.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Optional reference to the merchant/brand",
+    )
 
     # Relationships
     user: Mapped[User] = relationship("User", back_populates="restaurants", lazy="select")
+    merchant: Mapped[Merchant | None] = relationship("Merchant", back_populates="restaurants", lazy="select")
+    visits: Mapped[list[Visit]] = relationship(
+        "Visit",
+        back_populates="restaurant",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="dynamic",
+    )
     expenses: Mapped[list[Expense]] = relationship(
         "Expense",
         back_populates="restaurant",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    @property
+    def display_name(self) -> str:
+        """Return display-friendly name with merchant short name when available."""
+        merchant = self.merchant
+        short_name = merchant.short_name if merchant else None
+        base_name = (self.location_name or "").strip() or self.name
+        if short_name and short_name.strip():
+            return f"{short_name.strip()} {base_name}".strip()
+        return base_name
 
     @property
     def full_name(self) -> str:
@@ -134,10 +165,10 @@ class Restaurant(BaseModel):
         """
         city = self.city
         if city is None:
-            return self.name
+            return self.display_name
         if not city.strip():
-            return self.name
-        return f"{self.name} - {city}"
+            return self.display_name
+        return f"{self.display_name} - {city}"
 
     @property
     def address(self) -> str | None:
@@ -487,7 +518,9 @@ class Restaurant(BaseModel):
 
             # Use centralized service for restaurant type analysis
             places_service = get_google_places_service()
-            cuisine, service_level = places_service.analyze_restaurant_types(place_data)
+            analysis_result = places_service.analyze_restaurant_types(place_data)
+            cuisine = analysis_result.get("cuisine_type")
+            service_level = analysis_result.get("service_level")
 
             # Update the restaurant fields if we detected values
             if cuisine:
@@ -511,6 +544,8 @@ class Restaurant(BaseModel):
         return {
             "id": self.id,
             "name": self.name,
+            "location_name": self.location_name,
+            "display_name": self.display_name,
             "type": self.type,
             "located_within": self.located_within,
             "description": self.description,
@@ -528,6 +563,7 @@ class Restaurant(BaseModel):
             "is_chain": self.is_chain,
             "rating": self.rating,
             "price_level": self.price_level,
+            "merchant_id": self.merchant_id,
             "notes": self.notes,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),

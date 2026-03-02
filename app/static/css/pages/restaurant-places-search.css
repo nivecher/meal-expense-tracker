@@ -74,3 +74,455 @@
 .results-container::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+
+/* Places tab map (embedded in restaurant list) */
+
+.restaurants-tab-content-wrapper {
+  min-height: 300px;
+  overflow-x: hidden;
+}
+
+#places-pane.places-pane-active,
+#places-pane.tab-pane.show,
+#places-pane.tab-pane.active {
+  display: block !important;
+  visibility: visible !important;
+}
+
+.places-pane-inner {
+  min-height: 450px;
+}
+
+.places-pane-standalone {
+  display: block;
+  min-height: 450px;
+  padding-top: 0.5rem;
+}
+
+.places-map-wrapper {
+  min-height: 450px;
+  width: 100%;
+}
+
+.places-map-wrapper .map-container {
+  border: 1px solid #dbe4ee;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgb(15 23 42 / 10%);
+}
+
+.places-map-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.places-map-header .btn-group {
+  flex-shrink: 0;
+}
+
+.places-map-header .btn-group .btn,
+.places-map-header .btn-group label {
+  white-space: nowrap;
+}
+
+.places-map-header .ms-auto {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.places-map-element {
+  min-height: 450px;
+  height: 500px;
+  width: 100%;
+  border: 1px solid #dbe4ee;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #eef5ff 0%, #f7fbff 100%);
+}
+
+.places-map-sidebar {
+  min-height: 450px;
+  background: linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
+  border: 1px solid #dbe4ee;
+  box-shadow: 0 8px 28px rgb(15 23 42 / 8%);
+}
+
+.places-map-sidebar .results-container {
+  max-height: 500px;
+}
+
+.places-my-toolbar .input-group-text,
+.places-my-toolbar .form-control,
+.places-my-toolbar .btn {
+  border-color: #cfdceb;
+}
+
+.places-my-toolbar .form-control:focus {
+  border-color: #8fb4df;
+  box-shadow: 0 0 0 0.2rem rgb(13 110 253 / 12%);
+}
+
+.places-my-results {
+  border-color: #d4dfeb;
+  background: #fff;
+}
+
+.places-restaurant-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.75rem;
+  margin-bottom: 0.55rem;
+  border: 1px solid #d7e1ec;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.places-restaurant-item:hover {
+  transform: translateY(-1px);
+  border-color: #a5c0dd;
+  box-shadow: 0 7px 18px rgb(15 23 42 / 11%);
+}
+
+.places-restaurant-item.is-active {
+  border-color: #198754;
+  box-shadow: 0 0 0 0.2rem rgb(25 135 84 / 16%);
+  background: #f5fff8;
+}
+
+.places-restaurant-badge {
+  width: 1.8rem;
+  min-width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d6efd;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.places-restaurant-item.is-active .places-restaurant-badge {
+  background: #198754;
+}
+
+.places-restaurant-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.places-map-infowindow {
+  max-width: 220px;
+  line-height: 1.35;
+}
+
+.places-map-infowindow-favicon-wrap {
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 0.3rem;
+  border: 1px solid #ccd8e5;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.places-map-infowindow-favicon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.places-nearby-favicon-wrap {
+  width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid #c9d8e9;
+  border-radius: 0.32rem;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.places-nearby-favicon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.places-nearby-favicon-wrap .restaurant-fallback-icon {
+  font-size: 0.95rem;
+  color: #4b6f94;
+}
+
+.discovery-layout {
+  --discovery-surface: linear-gradient(180deg, #f6f9fc 0%, #edf3fb 100%);
+  --discovery-border: #d7e2ef;
+  --discovery-ink: #10253f;
+  --discovery-accent: #0d6efd;
+}
+
+.discovery-hero {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--discovery-border);
+  border-radius: 12px;
+  background: var(--discovery-surface);
+}
+
+.discovery-steps {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.step-chip {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid #ccd9e8;
+  border-radius: 999px;
+  background: #fff;
+  color: #22466d;
+  font-size: 0.78rem;
+}
+
+.discovery-map-panel {
+  border: 1px solid var(--discovery-border);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.discovery-map-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid #dde7f2;
+  background: linear-gradient(180deg, #fdfefe 0%, #f6f9fc 100%);
+}
+
+.map-toolbar-label {
+  color: var(--discovery-ink);
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.discovery-map-canvas {
+  height: 510px;
+  width: 100%;
+  border: 0;
+}
+
+.discovery-control-panel {
+  border: 1px solid var(--discovery-border);
+  background: var(--discovery-surface);
+  box-shadow: 0 10px 30px rgb(16 37 63 / 8%);
+  padding: 0.75rem !important;
+}
+
+.discovery-results-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.discovery-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  color: #5d738c;
+  font-size: 0.8rem;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.discovery-ownership-filter .btn {
+  border-color: #c9d8e8;
+}
+
+.discovery-ownership-filter .btn.active,
+.discovery-ownership-filter .btn:active {
+  border-color: #0d6efd;
+}
+
+.discovery-result-card {
+  display: grid;
+  grid-template-columns: auto 56px minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: stretch;
+  border: 1px solid #d7e2ef;
+  border-radius: 12px;
+  padding: 0.62rem;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.discovery-result-card:hover {
+  transform: translateY(-1px);
+  border-color: #b5c9df;
+  box-shadow: 0 8px 22px rgb(16 37 63 / 10%);
+}
+
+.discovery-result-card.border-primary {
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 0.2rem rgb(13 110 253 / 16%);
+}
+
+.discovery-result-card.ownership-mine {
+  border-left: 4px solid #0d6efd;
+}
+
+.discovery-result-card.ownership-new {
+  border-left: 4px solid #dc3545;
+}
+
+.result-rank {
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-top: 0.15rem;
+}
+
+.result-rank-mine {
+  background: #0d6efd;
+}
+
+.result-rank-new {
+  background: #dc3545;
+}
+
+.result-media {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.38rem;
+  border: 1px solid #d7e2ef;
+  background: #f4f8fc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-top: 0.1rem;
+}
+
+.result-result-favicon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.result-media-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #87a2be;
+  font-size: 1rem;
+}
+
+.search-diagnostics {
+  border: 1px dashed #cad8e8;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 0.45rem 0.6rem;
+}
+
+.discovery-help-copy {
+  line-height: 1.4;
+}
+
+.result-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.result-title {
+  color: #12283f;
+}
+
+.result-distance,
+.result-meta {
+  font-size: 0.82rem;
+  color: #60758e;
+}
+
+.result-meta {
+  margin-bottom: 0.35rem !important;
+}
+
+.result-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.result-ownership-badge {
+  font-weight: 600;
+}
+
+.discovery-empty {
+  border: 1px dashed #cad8e8;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fcfeff 0%, #f7fbff 100%);
+}
+
+@media (width <= 991.98px) {
+  .places-map-element {
+    height: 350px !important;
+    min-height: 350px;
+  }
+
+  .discovery-map-canvas {
+    height: 380px;
+  }
+
+  .discovery-result-card {
+    grid-template-columns: auto 48px minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .result-media {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+
+  .places-map-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .places-map-header .ms-auto {
+    margin-left: 0;
+  }
+}

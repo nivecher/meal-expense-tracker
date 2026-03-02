@@ -4,15 +4,21 @@ This document describes how version is determined across different contexts to e
 
 ## Version Determination Rules
 
-### On Main Branch
+### On Main Branch at Exact Tag
 
-**Rule**: When on the `main` branch, use the **latest git tag version** directly (no post-release versions).
+**Rule**: When on the `main` branch **and HEAD is exactly at a git tag**, use the tag version directly (no post-release versions).
 
 This ensures:
 
 - `make version` shows the tag version
 - CI/deploy workflows use the tag version
-- Deployments from main use the tag version (not post versions)
+- Deployments from tagged main use the tag version (not post versions)
+
+### On Main Branch Without Exact Tag
+
+**Rule**: When on `main` but not exactly at a tag, compute a PEP 440 dev preview version.
+
+This allows development on main to show they're ahead of the last tag.
 
 ### On Other Branches
 
@@ -31,19 +37,24 @@ This allows:
 
 **Behavior**:
 
-- On `main`: Returns latest tag version (e.g., `0.6.1`)
+- On `main` at exact tag: Returns tag version (e.g., `0.6.1`)
+- On `main` without exact tag: Returns PEP 440 dev preview version
 - On other branches: Uses setuptools-scm (may show post versions)
 
 **Example**:
 
 ```bash
-# On main branch with tag v0.6.1
+# On main branch at exact tag v0.6.1
 $ make version
 0.6.1
 
+# On main branch with commits after tag
+$ make version
+0.6.1.dev3+gabc123.d20260214
+
 # On feature branch with commits after tag
 $ make version
-0.6.1.post1.dev3+gabc123.d20251207
+0.6.1.dev3+gabc123.branch.feature-name
 ```
 
 ### 2. CI/Deploy Workflows
@@ -98,13 +109,16 @@ fi
 
 ### ✅ Aligned Behaviors
 
-1. **Main Branch**:
+1. **Main Branch at Exact Tag**:
    - `make version` → Tag version
    - Deploy workflow → Tag version
    - Docker build → Tag version
    - Version file → Tag version
 
-2. **Other Branches**:
+2. **Main Branch Without Exact Tag**:
+   - `make version` → PEP 440 dev preview version
+
+3. **Other Branches**:
    - `make version` → setuptools-scm (may show post versions)
    - Development builds → setuptools-scm (may show post versions)
 
@@ -145,7 +159,9 @@ cat app/_version.py | grep __version__
 
 ## Summary
 
-**On main branch**: All version sources use the **tag version** directly (no post-release versions).
+**On main at exact tag**: All version sources use the **tag version** directly (no post-release versions).
+
+**On main without exact tag**: Uses a PEP 440 dev preview version showing commits ahead of last tag.
 
 **On other branches**: Version sources use **setuptools-scm** (may show post-release versions for development).
 

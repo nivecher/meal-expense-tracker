@@ -12,7 +12,9 @@ from app.models.base import BaseModel
 
 if TYPE_CHECKING:
     from app.auth.models import User
+    from app.receipts.models import Receipt
     from app.restaurants.models import Restaurant
+    from app.visits.models import Visit
 
 
 class Tag(BaseModel):
@@ -311,13 +313,22 @@ class Expense(BaseModel):
         db.Integer,
         ForeignKey("category.id", ondelete="SET NULL"),
         index=True,
-        comment="Reference to the expense category",
+        comment="Reference to expense category",
+    )
+    visit_id: Mapped[int | None] = mapped_column(
+        db.Integer,
+        ForeignKey("visit.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Optional reference to a visit",
     )
 
     # Relationships with explicit join conditions and loading strategies
     user: Mapped[User] = relationship("User", back_populates="expenses", lazy="select")
     restaurant: Mapped[Restaurant | None] = relationship("Restaurant", back_populates="expenses", lazy="select")
     category: Mapped[Category | None] = relationship("Category", back_populates="expenses", lazy="select")
+    visit: Mapped[Visit | None] = relationship("Visit", back_populates="expenses", lazy="select")
+    receipt: Mapped[Receipt | None] = relationship("Receipt", back_populates="expense", lazy="select")
 
     # Tags relationship
     expense_tags: Mapped[list[ExpenseTag]] = relationship(
@@ -393,6 +404,7 @@ class Expense(BaseModel):
             "user_id": self.user_id,
             "restaurant_id": self.restaurant_id,
             "category_id": self.category_id,
+            "visit_id": self.visit_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

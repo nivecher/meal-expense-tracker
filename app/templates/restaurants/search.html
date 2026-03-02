@@ -83,7 +83,7 @@
                                         <a
                                             href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
                                             class="text-decoration-none"
-                                            >{{ restaurant.name }}</a
+                                            >{{ restaurant.display_name or restaurant.name }}</a
                                         >
                                     </td>
                                     <td>
@@ -154,7 +154,4 @@
         </div>
     </div>
 </div>
-{% endblock content %} {% block scripts %} {{ super() }}
-<!-- Restaurant search functionality -->
-<script src="{{ url_for('static', filename='js/pages/restaurant-search.js') }}"></script>
-{% endblock scripts %}
+{% endblock content %} {% block scripts %} {{ super() }} {% endblock scripts %}

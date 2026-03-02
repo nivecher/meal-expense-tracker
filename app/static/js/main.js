@@ -8,10 +8,7 @@
 
 import { toast } from './utils/notifications.js';
 import { EventHandlers } from './components/event-handlers.js';
-import {
-  clearFaviconCache,
-  initializeRobustFaviconHandling,
-} from './utils/robust-favicon-handler.js';
+import { clearFaviconCache, initializeRobustFaviconHandling } from './utils/robust-favicon-handler.js';
 
 function runWhenIdle(callback, timeoutMs = 1200) {
   if (typeof callback !== 'function') return;
@@ -25,25 +22,19 @@ function runWhenIdle(callback, timeoutMs = 1200) {
 function safeSessionGet(key) {
   try {
     return sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
+  } catch {}
 }
 
 function safeSessionSet(key, value) {
   try {
     sessionStorage.setItem(key, value);
-  } catch {
-    // ignore (tracking prevention / blocked storage)
-  }
+  } catch {}
 }
 
 function safeLocalGet(key) {
   try {
     return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
+  } catch {}
 }
 
 // Enhanced page module loading with error handling
@@ -53,6 +44,25 @@ const pageModules = {
   '/restaurants': () => import('./pages/restaurant-list.js'),
 };
 
+// Helper function to calculate text color based on background brightness
+function getTextColor(backgroundColor) {
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+      : null;
+  };
+
+  const rgb = hexToRgb(backgroundColor);
+  if (!rgb) return '#000';
+  const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+  return brightness > 128 ? '#000' : '#fff';
+}
+
 // Apply tag colors from data attributes
 function applyTagColors() {
   // Handle tag-badge elements (exclude Tom Select internal elements)
@@ -60,9 +70,9 @@ function applyTagColors() {
   tagBadges.forEach((badge) => {
     const color = badge.getAttribute('data-tag-color');
     if (color) {
-      // Only set CSS variable - CSS handles the rest
+      // Use CSS variables so the stylesheet controls rendering.
       badge.style.setProperty('--tag-color', color);
-      badge.style.setProperty('background-color', color);
+      badge.style.setProperty('--tag-text-color', getTextColor(color));
     }
   });
 }
@@ -75,56 +85,40 @@ function initTagColorWatcher() {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
             // Check if the added node is a tag badge (not Tom Select items - those are handled in tag-select-init.js)
-            if (node.classList && node.classList.contains('tag-badge') && !node.classList.contains('tag-select-item') && node.hasAttribute('data-tag-color')) {
+            if (
+              node.classList &&
+              node.classList.contains('tag-badge') &&
+              !node.classList.contains('tag-select-item') &&
+              node.hasAttribute('data-tag-color')
+            ) {
               const color = node.getAttribute('data-tag-color');
               if (color) {
-                // Only set CSS variable for tag badges - CSS handles the rest
                 node.style.setProperty('--tag-color', color);
-                node.style.setProperty('background-color', color);
+                node.style.setProperty('--tag-text-color', getTextColor(color));
               }
             }
             // Check for tag badges within the added node (exclude Tom Select items)
-            const tagBadges = node.querySelectorAll && node.querySelectorAll('.tag-badge[data-tag-color]:not(.tag-select-item)');
+            const tagBadges =
+              node.querySelectorAll && node.querySelectorAll('.tag-badge[data-tag-color]:not(.tag-select-item)');
             if (tagBadges) {
               tagBadges.forEach((badge) => {
                 const color = badge.getAttribute('data-tag-color');
                 if (color) {
-                  // Only set CSS variable - CSS handles the rest
                   badge.style.setProperty('--tag-color', color);
-                  badge.style.setProperty('background-color', color);
+                  badge.style.setProperty('--tag-text-color', getTextColor(color));
                 }
               });
             }
           }
         });
       });
-    } catch {
-      // Silently handle any errors from browser extensions
-      // console.debug('MutationObserver error (likely from browser extension)');
-    }
+    } catch {}
   });
 
   observer.observe(document.body, {
     childList: true,
     subtree: true,
   });
-}
-
-// Helper function to calculate text color based on background brightness
-function getTextColor(backgroundColor) {
-  const hexToRgb = (hex) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16),
-    } : null;
-  };
-
-  const rgb = hexToRgb(backgroundColor);
-  if (!rgb) return '#000';
-  const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-  return brightness > 128 ? '#000' : '#fff';
 }
 
 // Refresh Tom Select instance with updated tags
@@ -269,10 +263,11 @@ async function refreshTagSelectInstance() {
     } else {
       console.warn('Invalid response format when refreshing tags:', data);
     }
-  } catch (error) {
-    console.error('Error refreshing Tom Select instance:', error);
-  }
+  } catch {}
 }
+
+// Expose for non-module scripts that refresh tag data.
+window.refreshTagSelectInstance = refreshTagSelectInstance;
 
 // Initialize essential UI components directly
 function initUI() {
@@ -302,9 +297,7 @@ async function loadPageModule() {
   try {
     const module = await moduleLoader();
     module.init?.();
-  } catch (error) {
-    console.error('Failed to load page module:', error);
-  }
+  } catch {}
 }
 
 // Enhanced app initialization with toast notifications
@@ -352,13 +345,7 @@ async function init() {
           if (alert && alert.parentNode) {
             new bootstrap.Alert(alert).close();
           }
-        } catch {
-          console.warn('Error closing alert:', error);
-          // Safe fallback removal
-          if (alert && alert.parentNode) {
-            alert.remove();
-          }
-        }
+        } catch {}
       }, 5000);
     });
 
@@ -400,9 +387,11 @@ async function init() {
     // - Console message filtering
 
     // Dispatch initialization complete event
-    document.dispatchEvent(new CustomEvent('app:initialized', {
-      detail: { timestamp: Date.now() },
-    }));
+    document.dispatchEvent(
+      new CustomEvent('app:initialized', {
+        detail: { timestamp: Date.now() },
+      }),
+    );
 
     // Show welcome message if this is a fresh page load
     if (!safeSessionGet('app-initialized')) {
@@ -416,13 +405,7 @@ async function init() {
     if (window.location.search.includes('debug=true') || safeLocalGet('debugMode') === 'true') {
       console.warn('✅ Application initialized successfully');
     }
-
-  } catch (error) {
-    console.error('❌ Failed to initialize application:', error);
-
-    // Show error feedback
-    toast.error('Failed to initialize application. Please refresh the page.');
-  }
+  } catch {}
 }
 
 // Add favicon debug commands to global scope for development

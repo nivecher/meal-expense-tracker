@@ -430,22 +430,26 @@
                                     </ul>
                                     <div class="alert alert-warning mt-3">
                                         <h6 class="alert-heading mb-2">
-                                            <i class="fas fa-info-circle me-2"></i>Google Places API Essentials Tier
+                                            <i class="fas fa-info-circle me-2"></i>Advanced Features
                                         </h6>
                                         <p class="mb-1 small">
-                                            This application uses Google Places API Essentials tier to control costs.
-                                            Some advanced features are not available:
+                                            Advanced Features include Google Places Enterprise integration for richer
+                                            metadata.
                                         </p>
                                         <ul class="mb-0 small">
                                             <li><strong>No restaurant photos</strong> - Photo display is disabled</li>
                                             <li><strong>No detailed reviews</strong> - Only basic ratings are shown</li>
                                             <li
+                                                ><strong>Advanced fields:</strong> Phone, price level, and Google rating
+                                                are available when Advanced Features are enabled</li
+                                            >
+                                            <li
                                                 ><strong>Limited amenities</strong> - Only basic service options
                                                 (takeout, delivery, etc.)</li
                                             >
                                             <li
-                                                ><strong>No advanced features</strong> - Payment options, parking info,
-                                                and other Pro+ features are not available</li
+                                                ><strong>Admin override:</strong> Admin users always have Advanced
+                                                Features enabled</li
                                             >
                                         </ul>
                                         <p class="mb-0 mt-2 small">
@@ -473,6 +477,30 @@
                                         >
                                     </ul>
 
+                                    <h6><i class="fas fa-map-marked-alt me-2"></i>Places Tab Map View</h6>
+                                    <p class="small mb-2">
+                                        The <strong>Places</strong> tab on the Restaurants page shows your restaurants
+                                        on a map with three modes:
+                                    </p>
+                                    <ul class="list-unstyled small">
+                                        <li class="mb-1"
+                                            ><strong>My Restaurants:</strong> View all your restaurants with coordinates
+                                            on the map. Click a marker or sidebar card to center the map.</li
+                                        >
+                                        <li class="mb-1"
+                                            ><strong>Nearby:</strong> Use your location or pan the map, then search for
+                                            your restaurants within a radius. Results show distance from the center.</li
+                                        >
+                                        <li class="mb-1"
+                                            ><strong>Find New:</strong> Search Google Places for new restaurants and add
+                                            them to your list. Same experience as the Find Places page.</li
+                                        >
+                                    </ul>
+                                    <p class="small text-muted mb-0">
+                                        Restaurants without coordinates are not shown on the map. Use Google Places
+                                        validation on the Edit form to add coordinates.
+                                    </p>
+
                                     <h6><i class="fas fa-check-circle me-2"></i>Google Places Validation</h6>
                                     <div class="alert alert-info">
                                         <strong>Data Validation:</strong> Compare your restaurant information with
@@ -487,8 +515,14 @@
                                                 etc.)</li
                                             >
                                             <li><strong>Cuisine:</strong> Confirm cuisine classification</li>
-                                            <li><strong>Phone & Website:</strong> Keep contact information current</li>
-                                            <li><strong>Price Level:</strong> Validate pricing tier information</li>
+                                            <li
+                                                ><strong>Phone (Advanced) & Website:</strong> Keep contact information
+                                                current</li
+                                            >
+                                            <li
+                                                ><strong>Price Level (Advanced):</strong> Validate pricing tier
+                                                information</li
+                                            >
                                         </ul>
                                     </div>
                                 </div>

@@ -1050,6 +1050,8 @@ class TestRestaurantCLI:
             "google_rating": 4.5,
             "google_phone": "+1-555-1234",
             "google_website": "https://example.com",
+            "google_latitude": 37.7749,
+            "google_longitude": -122.4194,
             "google_price_level": 2,
             "types": ["restaurant", "food"],
             "google_service_level": ("casual_dining", 0.8),
@@ -1064,6 +1066,7 @@ class TestRestaurantCLI:
             assert "⭐ Google Rating: 4.5/5.0" in captured.out
             assert "📞 Phone: +1-555-1234" in captured.out
             assert "🌐 Website: https://example.com" in captured.out
+            assert "📍 Coordinates: 37.774900, -122.419400" in captured.out
             assert "💲 Price Level: $$ Moderate ($11-30)" in captured.out
             assert "🏷️  Types: restaurant, food" in captured.out
             assert "🍽️  Service Level: Casual Dining (confidence: 0.80)" in captured.out

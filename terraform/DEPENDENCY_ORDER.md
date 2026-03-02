@@ -45,7 +45,6 @@ This document explains the dependency relationships between Terraform modules an
 **The Solution:**
 
 1. **Domain Name**: Computed independently in `locals.tf` using the same logic as API Gateway module
-
    - Lambda uses: `local.api_gateway_domain_name = "${local.api_domain_prefix}.${local.domain_name}"`
    - API Gateway computes: `"${var.api_domain_prefix}.${var.domain_name}"`
    - Both use the same inputs, so they match without creating a dependency
@@ -82,25 +81,21 @@ module "api_gateway" {
 ## Resource Creation Order
 
 1. **Foundation Resources** (no dependencies)
-
    - KMS Key
    - Route53 Zone (data source)
    - ACM Certificate (data source)
 
 2. **Supporting Resources**
-
    - S3 Buckets (depends on KMS)
    - IAM Roles and Policies (depends on KMS)
    - SNS Topics (depends on KMS)
 
 3. **Lambda Function**
-
    - Depends on: IAM roles, S3, SNS
    - Provides: `invoke_arn`, `function_name`
    - Uses: `local.api_gateway_domain_name` (computed, not from API Gateway module)
 
 4. **API Gateway**
-
    - Depends on: Lambda (for `invoke_arn`)
    - Provides: `api_execution_arn`, `domain_name` (not used by Lambda)
    - Creates: Custom domain, routes, integrations

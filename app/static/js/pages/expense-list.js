@@ -14,6 +14,42 @@ import {
 } from './expense-list-filters.js';
 import { initExpenseCalendar, updateCalendarFilterSummary } from './expense-list-calendar.js';
 
+function buildExpenseDeleteUrl(baseUrl, expenseId) {
+  if (!expenseId) return '';
+  let normalizedBase = baseUrl || '';
+  if (!normalizedBase) return '';
+  try {
+    const url = new URL(normalizedBase, window.location.origin);
+    let path = url.pathname;
+    if (path.endsWith('/')) path = path.slice(0, -1);
+    if (path.endsWith('/delete')) path = path.slice(0, -'/delete'.length);
+    return `${url.origin}${path}/${expenseId}/delete`;
+  } catch {
+    if (normalizedBase.endsWith('/')) normalizedBase = normalizedBase.slice(0, -1);
+    if (normalizedBase.endsWith('/delete')) normalizedBase = normalizedBase.slice(0, -'/delete'.length);
+    return `${normalizedBase}/${expenseId}/delete`;
+  }
+}
+
+function getExpenseDeleteBase(deleteForm) {
+  if (!deleteForm) return '';
+  return deleteForm.getAttribute('data-delete-url') || deleteForm.action || '';
+}
+
+function syncDeleteModalFromTrigger(deleteForm, triggerButton) {
+  if (!deleteForm || !triggerButton) return;
+  const expenseId = triggerButton.getAttribute('data-expense-id');
+  const expenseName = triggerButton.getAttribute('data-expense-description') || 'Expense';
+  const deleteUrl = buildExpenseDeleteUrl(getExpenseDeleteBase(deleteForm), expenseId);
+  if (deleteUrl) {
+    deleteForm.action = deleteUrl;
+  }
+  const modalTitle = document.getElementById('deleteExpenseModalLabel');
+  if (modalTitle) {
+    modalTitle.textContent = `Delete Expense: ${expenseName}`;
+  }
+}
+
 // --- Delete expense (single) ---
 function initDeleteExpense() {
   const deleteForm = document.getElementById('delete-expense-form');
@@ -25,20 +61,19 @@ function initDeleteExpense() {
   document.addEventListener('click', (event) => {
     const button = event.target.closest('[data-bs-target="#deleteExpenseModal"][data-expense-id]');
     if (!button) return;
-
-    const expenseId = button.getAttribute('data-expense-id');
-    const expenseName = button.getAttribute('data-expense-description') || 'Expense';
-
-    const deleteUrlBase = deleteForm.getAttribute('data-delete-url') || '';
-    if (expenseId && deleteUrlBase) {
-      deleteForm.action = `${deleteUrlBase}${expenseId}/delete`;
-    }
-
-    const modalTitle = document.getElementById('deleteExpenseModalLabel');
-    if (modalTitle) {
-      modalTitle.textContent = `Delete Expense: ${expenseName}`;
-    }
+    syncDeleteModalFromTrigger(deleteForm, button);
   });
+
+  const modalElement = document.getElementById('deleteExpenseModal');
+  if (modalElement && modalElement.dataset.listenerAttached !== 'true') {
+    modalElement.dataset.listenerAttached = 'true';
+    modalElement.addEventListener('show.bs.modal', (event) => {
+      const triggerButton = event.relatedTarget;
+      if (triggerButton instanceof HTMLElement) {
+        syncDeleteModalFromTrigger(deleteForm, triggerButton);
+      }
+    });
+  }
 
   deleteForm.addEventListener('submit', () => {
     const submitButton = deleteForm.querySelector('button[type="submit"]');
@@ -230,7 +265,9 @@ function getSelectedExpenseInputs() {
 }
 
 function getSelectedExpenseIds() {
-  return getSelectedExpenseInputs().map((input) => input.value).filter(Boolean);
+  return getSelectedExpenseInputs()
+    .map((input) => input.value)
+    .filter(Boolean);
 }
 
 function updateExpenseRowSelectionHighlight() {
@@ -351,11 +388,12 @@ function openBulkDeleteModal(selectedIds) {
 
 async function performBulkExpenseDelete(expenseIds) {
   const csrfToken = getCsrfToken();
-  const deleteUrlBase = document.getElementById('delete-expense-form')?.dataset.deleteUrl || '';
+  const deleteForm = document.getElementById('delete-expense-form');
+  const deleteUrlBase = getExpenseDeleteBase(deleteForm);
   if (!deleteUrlBase || !expenseIds.length) return;
   try {
     const requests = expenseIds.map((expenseId) =>
-      fetch(`${deleteUrlBase}${expenseId}/delete`, {
+      fetch(buildExpenseDeleteUrl(deleteUrlBase, expenseId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -409,9 +447,9 @@ function openExpenseDeleteModal(expenseId, expenseName) {
   const deleteForm = document.getElementById('delete-expense-form');
   if (!deleteForm) return;
 
-  const deleteUrlBase = deleteForm.getAttribute('data-delete-url') || '';
-  if (deleteUrlBase) {
-    deleteForm.action = `${deleteUrlBase}${expenseId}/delete`;
+  const deleteUrl = buildExpenseDeleteUrl(getExpenseDeleteBase(deleteForm), expenseId);
+  if (deleteUrl) {
+    deleteForm.action = deleteUrl;
   }
 
   const modalTitle = document.getElementById('deleteExpenseModalLabel');
@@ -486,6 +524,27 @@ function initExpenseSelectionActions() {
 
   document.addEventListener('change', handleExpenseSelectionChange);
   document.addEventListener('input', handleExpenseSelectionChange);
+}
+
+function initExpenseRowClickSelection() {
+  if (document.body.dataset.expenseRowClickListener === 'true') return;
+  document.body.dataset.expenseRowClickListener = 'true';
+
+  document.addEventListener('click', (event) => {
+    const { target } = event;
+    if (!(target instanceof Element)) return;
+
+    if (target.closest('input, a, button, label, select, textarea')) return;
+
+    const row = target.closest('#expenseTable tbody tr');
+    if (!row || row.dataset.dividerRow === 'true') return;
+
+    const checkbox = row.querySelector('input[name="expense-select"]');
+    if (!(checkbox instanceof HTMLInputElement)) return;
+
+    checkbox.checked = !checkbox.checked;
+    applyExpenseSelectionState();
+  });
 }
 
 // --- Month toggles (table) ---
@@ -574,6 +633,7 @@ function init() {
   initFilterTagSelector();
   initTagManagerModal();
   initExpenseSelectionActions();
+  initExpenseRowClickSelection();
   initExpenseBulkActions();
   initExpenseDeleteSelected();
   initExpenseFilterClear();

@@ -55,7 +55,7 @@ The application provides several useful CLI commands for administration and main
 Reset the password for an admin user:
 
 ```bash
-flask reset-admin-password --email admin@example.com
+flask user reset-password --email admin@example.com
 
 ```
 
@@ -71,7 +71,7 @@ Example:
 
 ```bash
 
-flask reset-admin-password --email admin@example.com
+flask user reset-password --email admin@example.com
 ## You'll be prompted to enter and confirm the new password
 
 ```

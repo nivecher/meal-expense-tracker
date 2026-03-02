@@ -210,6 +210,7 @@ _POPULAR_TYPE_ORDER = [
     "fast_food_restaurant",
     "pizza_restaurant",
     "coffee_shop",
+    "dessert_shop",
     "mexican_restaurant",
     "chinese_restaurant",
     "italian_restaurant",

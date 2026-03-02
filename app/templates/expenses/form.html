@@ -1,13 +1,13 @@
 {% extends "base.html" %} {% from "expenses/macros.html" import expense_form, expense_scripts %} {% block title %} {% if
-is_edit %} Edit Expense {% else %} Add Expense {% if restaurant %}for {{ restaurant.name }}{% endif %} {% endif %} {%
-endblock title %} {% block content %}
+is_edit %} Edit Expense {% else %} Add Expense {% if restaurant %}for {{ restaurant.display_name or restaurant.name }}{%
+endif %} {% endif %} {% endblock title %} {% block content %}
 <!-- Breadcrumb Navigation -->
 {% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'} ] %} {% if restaurant and not is_edit
 %} {% set _ = breadcrumb_items.extend([ {'url': url_for('restaurants.list_restaurants'), 'title': 'Restaurants'},
-{'url': url_for('restaurants.restaurant_details', restaurant_id=restaurant.id), 'title': restaurant.name}, {'title':
-'Add Expense'} ]) %} {% else %} {% set _ = breadcrumb_items.extend([ {'url': url_for('expenses.list_expenses'), 'title':
-'Expenses'}, {'title': 'Edit Expense' if is_edit else 'Add Expense'} ]) %} {% endif %} {% include
-'includes/breadcrumb.html' %}
+{'url': url_for('restaurants.restaurant_details', restaurant_id=restaurant.id), 'title': restaurant.display_name or
+restaurant.name}, {'title': 'Add Expense'} ]) %} {% else %} {% set _ = breadcrumb_items.extend([ {'url':
+url_for('expenses.list_expenses'), 'title': 'Expenses'}, {'title': 'Edit Expense' if is_edit else 'Add Expense'} ]) %}
+{% endif %} {% include 'includes/breadcrumb.html' %}
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-8">
@@ -18,7 +18,7 @@ endblock title %} {% block content %}
                         <a
                             href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
                             class="btn btn-outline-secondary btn-sm me-3"
-                            title="Back to {{ restaurant.name }}">
+                            title="Back to {{ restaurant.display_name or restaurant.name }}">
                             <i class="fas fa-arrow-left"></i>
                         </a>
                         {% else %}

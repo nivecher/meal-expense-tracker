@@ -1,0 +1,43 @@
+{% extends "base.html" %} {% block title %}Places - Restaurants - Meal Expense Tracker{% endblock %} {% block
+main_container_class %}container-fluid{% endblock %} {% block styles %}
+<link href="{{ url_for('static', filename='css/pages/restaurant-places-search.css') }}" rel="stylesheet" />
+{% endblock %} {% block content %} {% set breadcrumb_items = [ {'url': url_for('main.index'), 'title': 'Dashboard'},
+{'url': url_for('restaurants.list_restaurants'), 'title': 'Restaurants'}, {'title': 'Places'} ] %} {% include
+'includes/breadcrumb.html' %}
+
+<div class="mt-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0"> <i class="fas fa-map-marked-alt text-primary me-2"></i>Restaurant Map </h1>
+    </div>
+
+    <div id="places-map-container" class="places-map-wrapper">
+        <input type="hidden" name="places-mode" value="find" />
+        <div class="row g-4 mx-0">
+            <div class="col-12 col-lg-8">
+                <div class="map-container">
+                    <div id="places-map" class="places-map-element"></div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="places-map-sidebar search-panel p-3 rounded">
+                    <div id="places-sidebar-content">
+                        <p class="text-muted mb-0"><i class="fas fa-spinner fa-spin me-1"></i>Loading map...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="places-map-config">
+    {
+        "googleMapsApiKey": {{ config.get('GOOGLE_MAPS_API_KEY', '')|tojson }},
+        "googleMapsMapId": {{ config.get('GOOGLE_MAPS_MAP_ID', '')|tojson }},
+        "csrfToken": {{ csrf_token()|tojson }},
+        "addRestaurantUrl": {{ url_for('restaurants.add_from_google_places')|tojson }},
+        "findPlacesUrl": {{ url_for('restaurants.list_restaurants', tab='places', places_mode='find')|tojson }}
+    }
+</script>
+{% endblock %} {% block extra_js %}
+<script type="module" src="{{ url_for('static', filename='js/pages/places-map.js') }}"></script>
+{% endblock %}

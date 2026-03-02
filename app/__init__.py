@@ -255,6 +255,9 @@ def _configure_logging(app: Flask) -> None:
 
 def _initialize_components(app: Flask) -> None:
     """Initialize core application components."""
+    # Import all models to ensure they're registered with SQLAlchemy
+    from . import merchants, receipts, visits
+
     # Initialize all extensions
     from .database import init_database
     from .extensions import init_app as init_extensions
@@ -301,6 +304,11 @@ def _initialize_admin_and_cli(app: Flask) -> None:
     # Enable -h as alias for --help on all CLI commands
     app.cli.context_settings["help_option_names"] = ["-h", "--help"]
 
+    # Add flask remote command (flask remote user list) - proxies to Lambda
+    from app.cli.remote_commands import register_remote_commands
+
+    register_remote_commands(app)
+
     # Initialize admin module if available
     try:
         from . import admin
@@ -317,6 +325,9 @@ def _initialize_admin_and_cli(app: Flask) -> None:
     register_auth_commands(app)
     register_expenses_commands(app)
     register_restaurant_commands(app)
+    from app.cli.db_commands import register_commands as register_db_commands
+
+    register_db_commands(app)
     logger.debug("Initialized CLI commands")
 
 
@@ -344,6 +355,14 @@ def _register_blueprints(app: Flask) -> None:
         ("reports", "/reports"),
         ("health", "/health"),
     ]
+
+    # Register merchants blueprint (has built-in URL prefix)
+    try:
+        from app.merchants import bp as merchants_bp
+
+        app.register_blueprint(merchants_bp)
+    except ImportError as e:
+        logger.warning(f"Could not import merchants blueprint: {e}")
 
     for module_name, url_prefix in blueprint_configs:
         try:

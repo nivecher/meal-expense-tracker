@@ -11,9 +11,7 @@ import { toast } from './utils/notifications.js';
 // Side-effect modules that register handlers / polyfills.
 import './utils/timezone-handler.js';
 import './utils/date-formatter.js';
-import './utils/error-handler.js';
 import './utils/logger.js';
-import './utils/module-loader.js';
 import './utils/select2-init.js';
 import './utils/lazy-loading-optimizer.js';
 import './utils/robust-favicon-handler.js';
@@ -38,25 +36,31 @@ function maybeDisableServiceWorkerForDev() {
 
   // If a service worker was registered previously, it can serve stale cached CSS/JS
   // and make UI changes appear "stuck" even after refresh.
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    registrations.forEach((registration) => {
-      registration.unregister();
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((registrations) => {
+      registrations.forEach((registration) => {
+        registration.unregister();
+      });
+    })
+    .catch((error) => {
+      console.warn('Failed to unregister service workers in development:', error);
     });
-  }).catch((error) => {
-    console.warn('Failed to unregister service workers in development:', error);
-  });
 
   if (!('caches' in window)) return;
 
-  caches.keys().then((cacheNames) => {
-    cacheNames
-      .filter((name) => name.startsWith('meal-tracker-'))
-      .forEach((name) => {
-        caches.delete(name);
-      });
-  }).catch((error) => {
-    console.warn('Failed to clear caches in development:', error);
-  });
+  caches
+    .keys()
+    .then((cacheNames) => {
+      cacheNames
+        .filter((name) => name.startsWith('meal-tracker-'))
+        .forEach((name) => {
+          caches.delete(name);
+        });
+    })
+    .catch((error) => {
+      console.warn('Failed to clear caches in development:', error);
+    });
 }
 
 function initBootstrapEnhancements() {
