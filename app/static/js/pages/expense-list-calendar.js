@@ -17,9 +17,7 @@ function getCalendarData() {
   if (!calendarScript) return [];
   try {
     return JSON.parse(calendarScript.textContent || '[]');
-  } catch {
-    return [];
-  }
+  } catch {}
 }
 
 function groupExpensesByDate(expenses) {
@@ -37,9 +35,7 @@ function groupExpensesByDate(expenses) {
 }
 
 function formatMonthLabel(year, month) {
-  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(
-    new Date(year, month, 1),
-  );
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(year, month, 1));
 }
 
 function formatDateKey(date) {
@@ -329,13 +325,7 @@ function buildCalendarDayHeader(dayDate, entries, formatter) {
 }
 
 function createCalendarEntry(entry, formatter) {
-  const {
-    detailsUrl,
-    mealType,
-    mealTypeIcon,
-    amount,
-    restaurantWebsite,
-  } = entry || {};
+  const { detailsUrl, mealType, mealTypeIcon, amount, restaurantWebsite } = entry || {};
   const mealTypeLabel = formatMealTypeLabel(mealType);
   const amountText = formatAmount(amount, formatter);
   const tooltipText = buildEntryTooltip(entry, amountText, mealTypeLabel);
@@ -377,7 +367,7 @@ function buildCalendarEntries(entries, formatter) {
   if (!entries.length) return null;
   const entriesWrap = document.createElement('div');
   entriesWrap.className = 'calendar-day-entries';
-  entries.forEach((entry) => {
+  sortEntriesByDateTime(entries).forEach((entry) => {
     entriesWrap.appendChild(createCalendarEntry(entry, formatter));
   });
   return entriesWrap;
@@ -553,9 +543,7 @@ function renderDayView(container, calendarData, referenceDate) {
   if (!dayContainer) return;
   dayContainer.innerHTML = '';
   const formatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
-  const entries = sortEntriesByDateTime(
-    calendarData.filter((entry) => isSameDate(entry?.date, referenceDate)),
-  );
+  const entries = sortEntriesByDateTime(calendarData.filter((entry) => isSameDate(entry?.date, referenceDate)));
   const dayHeader = document.createElement('div');
   dayHeader.className = 'calendar-day-selected';
   const dayLabel = document.createElement('span');
@@ -585,10 +573,18 @@ function setCalendarView(view) {
   const monthContainer = document.querySelector('[data-expense-calendar]');
   const weekContainer = document.querySelector('[data-expense-calendar-week]');
   const dayContainer = document.querySelector('[data-expense-calendar-day]');
+  const weekdays = document.querySelector('.calendar-weekdays');
+  const scrollContent = document.querySelector('[data-calendar-scroll-content]');
   if (!monthContainer || !weekContainer || !dayContainer) return;
   monthContainer.classList.toggle('d-none', view !== CALENDAR_VIEWS.month);
   weekContainer.classList.toggle('d-none', view !== CALENDAR_VIEWS.week);
   dayContainer.classList.toggle('d-none', view !== CALENDAR_VIEWS.day);
+  if (weekdays) {
+    weekdays.classList.toggle('d-none', view === CALENDAR_VIEWS.day);
+  }
+  if (scrollContent) {
+    scrollContent.classList.toggle('is-day-view', view === CALENDAR_VIEWS.day);
+  }
   monthContainer.dataset.calendarView = view;
 }
 
@@ -674,7 +670,7 @@ function scrollToSelectedView(view) {
     target = document.querySelector('.calendar-day.is-selected');
   }
   if (!target) return;
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
 }
 
 function buildCalendarFilterSummary() {
@@ -794,6 +790,28 @@ export function initExpenseCalendar() {
     setCalendarCurrentDate(container, currentDate);
   };
 
+  const contextMenu = document.querySelector('[data-calendar-context-menu]');
+
+  function hideContextMenu() {
+    if (!contextMenu) return;
+    contextMenu.classList.add('d-none');
+    delete contextMenu.dataset.dateKey;
+  }
+
+  function showContextMenu(clientX, clientY, dateKey) {
+    if (!contextMenu) return;
+    contextMenu.dataset.dateKey = dateKey;
+    contextMenu.classList.remove('d-none');
+    contextMenu.style.left = '0px';
+    contextMenu.style.top = '0px';
+
+    const rect = contextMenu.getBoundingClientRect();
+    const clampedX = Math.max(8, Math.min(clientX, window.innerWidth - rect.width - 8));
+    const clampedY = Math.max(8, Math.min(clientY, window.innerHeight - rect.height - 8));
+    contextMenu.style.left = `${clampedX}px`;
+    contextMenu.style.top = `${clampedY}px`;
+  }
+
   function selectDate(dateKey, shouldUpdateMonth) {
     const selectedDate = parseDateKey(dateKey);
     if (!selectedDate) return;
@@ -807,16 +825,42 @@ export function initExpenseCalendar() {
   function attachMonthSelectionHandlers() {
     if (container.dataset.monthSelectionAttached === 'true') return;
     container.dataset.monthSelectionAttached = 'true';
-    container.addEventListener('click', (event) => {
+    container.addEventListener(
+      'click',
+      (event) => {
+        hideContextMenu();
+        const view = getCalendarView(container);
+        if (view !== 'month') return;
+        const { target } = event;
+        if (!(target instanceof Element)) return;
+        if (target.closest('.calendar-entry')) return;
+        const cell = target.closest('.calendar-day');
+        if (!cell || !container.contains(cell)) return;
+        const { dateKey } = cell.dataset;
+        if (!dateKey) return;
+        const shouldUpdateMonth = cell.classList.contains('is-outside');
+        selectDate(dateKey, shouldUpdateMonth);
+        setCalendarView(CALENDAR_VIEWS.day);
+        updateCalendarViewInUrl(CALENDAR_VIEWS.day);
+        renderCalendar();
+      },
+      true,
+    );
+
+    container.addEventListener('contextmenu', (event) => {
       const view = getCalendarView(container);
       if (view !== 'month') return;
-      const cell = event.target.closest('.calendar-day');
+      const { target } = event;
+      if (!(target instanceof Element)) return;
+      const cell = target.closest('.calendar-day');
       if (!cell || !container.contains(cell)) return;
+      event.preventDefault();
       const { dateKey } = cell.dataset;
       if (!dateKey) return;
       const shouldUpdateMonth = cell.classList.contains('is-outside');
       selectDate(dateKey, shouldUpdateMonth);
-    }, true);
+      showContextMenu(event.clientX, event.clientY, dateKey);
+    });
   }
 
   function attachWeekSelectionHandlers() {
@@ -825,7 +869,9 @@ export function initExpenseCalendar() {
     if (weekContainer.dataset.weekSelectionAttached === 'true') return;
     weekContainer.dataset.weekSelectionAttached = 'true';
     weekContainer.addEventListener('click', (event) => {
-      const cell = event.target.closest('.calendar-week-day');
+      const { target } = event;
+      if (!(target instanceof Element)) return;
+      const cell = target.closest('.calendar-week-day');
       if (!cell || !weekContainer.contains(cell)) return;
       const { dateKey } = cell.dataset;
       if (!dateKey) return;
@@ -837,6 +883,7 @@ export function initExpenseCalendar() {
     if (button.dataset.listenerAttached === 'true') return;
     button.dataset.listenerAttached = 'true';
     button.addEventListener('click', () => {
+      hideContextMenu();
       const view = button.dataset.calendarView || 'month';
       setCalendarView(view);
       updateCalendarViewInUrl(view);
@@ -847,6 +894,7 @@ export function initExpenseCalendar() {
   const prevButton = document.querySelector('[data-calendar-prev]');
   if (prevButton) {
     prevButton.addEventListener('click', () => {
+      hideContextMenu();
       const view = getCalendarView(container);
       if (view === 'day') {
         currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() - 1);
@@ -864,6 +912,7 @@ export function initExpenseCalendar() {
   const nextButton = document.querySelector('[data-calendar-next]');
   if (nextButton) {
     nextButton.addEventListener('click', () => {
+      hideContextMenu();
       const view = getCalendarView(container);
       if (view === 'day') {
         currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + 1);
@@ -881,6 +930,7 @@ export function initExpenseCalendar() {
   const todayButton = document.querySelector('[data-calendar-today]');
   if (todayButton) {
     todayButton.addEventListener('click', () => {
+      hideContextMenu();
       currentDate = new Date();
       setSelectedDateKey(container, formatDateKey(currentDate));
       renderCalendar();
@@ -890,6 +940,7 @@ export function initExpenseCalendar() {
   const prevExpenseButton = document.querySelector('[data-calendar-prev-expense]');
   if (prevExpenseButton) {
     prevExpenseButton.addEventListener('click', () => {
+      hideContextMenu();
       const prevKey = findNeighborExpenseDate(getCalendarData(), currentDate, 'prev');
       const targetDate = parseDateKey(prevKey);
       if (!targetDate) return;
@@ -903,6 +954,7 @@ export function initExpenseCalendar() {
   const nextExpenseButton = document.querySelector('[data-calendar-next-expense]');
   if (nextExpenseButton) {
     nextExpenseButton.addEventListener('click', () => {
+      hideContextMenu();
       const nextKey = findNeighborExpenseDate(getCalendarData(), currentDate, 'next');
       const targetDate = parseDateKey(nextKey);
       if (!targetDate) return;
@@ -916,12 +968,51 @@ export function initExpenseCalendar() {
   const calendarTab = document.getElementById('calendar-tab');
   if (calendarTab) {
     calendarTab.addEventListener('shown.bs.tab', () => {
+      hideContextMenu();
       renderCalendar();
       const pane = document.getElementById('calendar-pane');
       if (pane) {
         pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     });
+  }
+
+  if (contextMenu && contextMenu.dataset.listenerAttached !== 'true') {
+    contextMenu.dataset.listenerAttached = 'true';
+    contextMenu.addEventListener('click', (event) => {
+      const { target } = event;
+      if (!(target instanceof Element)) return;
+      const actionButton = target.closest('[data-calendar-context-action]');
+      if (!actionButton) return;
+      const action = actionButton.getAttribute('data-calendar-context-action');
+      const dateKey = contextMenu.dataset.dateKey || '';
+      if (!dateKey || !action) {
+        hideContextMenu();
+        return;
+      }
+      selectDate(dateKey, true);
+      const nextView = action === CALENDAR_VIEWS.week ? CALENDAR_VIEWS.week : CALENDAR_VIEWS.day;
+      setCalendarView(nextView);
+      updateCalendarViewInUrl(nextView);
+      hideContextMenu();
+      renderCalendar();
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!contextMenu || contextMenu.classList.contains('d-none')) return;
+      const { target } = event;
+      if (target instanceof Element && contextMenu.contains(target)) return;
+      hideContextMenu();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        hideContextMenu();
+      }
+    });
+
+    window.addEventListener('resize', hideContextMenu);
+    document.addEventListener('scroll', hideContextMenu, true);
   }
 
   renderCalendar();

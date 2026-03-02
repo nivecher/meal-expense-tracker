@@ -9,7 +9,7 @@
                     src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                     data-website="{{ restaurant.website }}"
                     data-size="20"
-                    alt="{{ restaurant.name }} icon"
+                    alt="{{ restaurant.display_name or restaurant.name }} icon"
                     class="restaurant-favicon-table"
                     width="20"
                     height="20"
@@ -24,7 +24,7 @@
             <div>
                 <div class="d-flex align-items-center gap-2">
                     <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                        >{{ restaurant.name }}</a
+                        >{{ restaurant.display_name or restaurant.name }}</a
                     >
                     {% if restaurant.price_level is not none %}
                     <span class="text-muted">•</span>
@@ -119,10 +119,9 @@
         <button
             type="button"
             class="btn btn-sm btn-outline-danger"
-            data-bs-toggle="modal"
-            data-bs-target="#deleteRestaurantModal"
+            data-action="delete-restaurant"
             data-restaurant-id="{{ restaurant.id }}"
-            data-restaurant-name="{{ restaurant.name }}"
+            data-restaurant-name="{{ restaurant.display_name or restaurant.name }}"
             data-tooltip="true"
             title="Delete">
             <i class="fas fa-trash"></i>

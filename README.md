@@ -55,7 +55,7 @@ The application provides several useful CLI commands for administration and main
 Reset the password for an admin user:
 
 ```bash
-flask reset-admin-password --email admin@example.com
+flask user reset-password --email admin@example.com
 
 ```
 
@@ -71,7 +71,7 @@ Example:
 
 ```bash
 
-flask reset-admin-password --email admin@example.com
+flask user reset-password --email admin@example.com
 ## You'll be prompted to enter and confirm the new password
 
 ```
@@ -254,12 +254,15 @@ Pre-commit hooks automatically run on `git commit`:
 # Install hooks (one-time setup)
 pre-commit install
 pre-commit install --hook-type commit-msg   # Enforce conventional commits
+pre-commit install --hook-type pre-push     # Validate commit range before push
 
 # Run hooks manually
 pre-commit run --all-files
 ```
 
-The **commit-msg** hook uses [commitlint](https://commitlint.js.org/) to validate conventional commit format. Merge commits are allowed. See [docs/BRANCH_NAMING.md](docs/BRANCH_NAMING.md).
+The **commit-msg** hook uses [commitlint](https://commitlint.js.org/) to validate each commit message format.  
+The **pre-push** hook uses commitlint across the branch commit range to catch older invalid commits before CI.  
+Merge commits are allowed. See [docs/BRANCH_NAMING.md](docs/BRANCH_NAMING.md).
 
 ### Supported Languages
 

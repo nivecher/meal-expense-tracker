@@ -12,12 +12,7 @@ const OFFLINE_URL = '/static/offline.html';
 const IS_DEV_HOST = ['localhost', '127.0.0.1'].includes(self.location.hostname);
 
 // Essential files to cache
-const STATIC_FILES = [
-  '/',
-  '/static/css/main.css',
-  '/static/js/app.js',
-  OFFLINE_URL,
-];
+const STATIC_FILES = ['/', '/static/css/main.css', '/static/js/app.js', OFFLINE_URL];
 
 // ===== INSTALL EVENT =====
 
@@ -27,29 +22,34 @@ const STATIC_FILES = [
  * Check if request is for a static asset
  */
 function isStaticAsset(url) {
-  return url.pathname.startsWith('/static/') ||
-         url.pathname.endsWith('.css') ||
-         url.pathname.endsWith('.js') ||
-         url.pathname.endsWith('.png') ||
-         url.pathname.endsWith('.jpg') ||
-         url.pathname.endsWith('.ico');
+  return (
+    url.pathname.startsWith('/static/') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.jpg') ||
+    url.pathname.endsWith('.ico')
+  );
 }
 
 /**
  * Check if request is a navigation request
  */
 function isNavigationRequest(request) {
-  return request.mode === 'navigate' ||
-         (request.method === 'GET' && request.headers.get('accept').includes('text/html'));
+  return (
+    request.mode === 'navigate' || (request.method === 'GET' && request.headers.get('accept').includes('text/html'))
+  );
 }
 
 /**
  * Check if request is for API
  */
 function isAPIRequest(url) {
-  return url.pathname.startsWith('/api/') ||
-         url.pathname.startsWith('/restaurants/') ||
-         url.pathname.startsWith('/expenses/');
+  return (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/restaurants/') ||
+    url.pathname.startsWith('/expenses/')
+  );
 }
 
 /**
@@ -157,7 +157,8 @@ self.addEventListener('install', (event) => {
   console.warn('Service Worker installing...');
 
   event.waitUntil(
-    caches.open(CACHE_NAME)
+    caches
+      .open(CACHE_NAME)
       .then((cache) => {
         console.warn('Caching essential files...');
         return cache.addAll(STATIC_FILES);
@@ -179,7 +180,8 @@ self.addEventListener('activate', (event) => {
   console.warn('Service Worker activating...');
 
   event.waitUntil(
-    caches.keys()
+    caches
+      .keys()
       .then((cacheNames) => {
         return Promise.all(
           cacheNames

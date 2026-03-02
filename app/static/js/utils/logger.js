@@ -3,8 +3,7 @@
  */
 
 // Check if we're in development
-const isDev = ['localhost', '127.0.0.1', ''].includes(window.location.hostname) ||
-              window.location.port === '5000';
+const isDev = ['localhost', '127.0.0.1', ''].includes(window.location.hostname) || window.location.port === '5000';
 
 // Simple logging function
 function log(level, ...args) {

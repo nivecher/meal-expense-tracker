@@ -9,9 +9,7 @@ const DEFAULT_LOCALE = 'en-US';
 const browserTimeZone = (() => {
   try {
     return new Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return 'UTC';
-  }
+  } catch {}
 })();
 
 const intlFormatterCache = new Map();
@@ -33,8 +31,18 @@ function getIntlFormatter(options) {
  */
 function formatCustomDate(date, format) {
   const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -92,10 +100,7 @@ function formatDateTime(isoString, options = {}) {
 
     const formatOptions = { ...defaultOptions, ...options };
     return getIntlFormatter(formatOptions).format(date);
-  } catch (error) {
-    console.warn('Date formatting failed:', error);
-    return 'Invalid date';
-  }
+  } catch {}
 }
 
 /**
@@ -129,10 +134,7 @@ function formatDate(isoString, format = 'medium') {
 
     const options = formatMap[format] || formatMap.medium;
     return getIntlFormatter({ ...options, timeZone: browserTimeZone }).format(date);
-  } catch (error) {
-    console.warn('Date formatting failed:', error);
-    return 'Invalid date';
-  }
+  } catch {}
 }
 
 /**
@@ -176,10 +178,7 @@ function formatTimeAgo(isoString) {
       return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
     }
     return 'Just now';
-  } catch (error) {
-    console.warn('Time ago formatting failed:', error);
-    return 'Unknown time';
-  }
+  } catch {}
 }
 
 function formatAmericanFullDateTimeParts(date) {

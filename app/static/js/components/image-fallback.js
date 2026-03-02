@@ -23,52 +23,68 @@ export function initImageFallback() {
   }
 
   // Handle favicon fallbacks with optimized DOM updates
-  document.addEventListener('error', (event) => {
-    if (event.target.tagName === 'IMG' &&
-            (event.target.classList.contains('restaurant-favicon') ||
-             event.target.classList.contains('restaurant-favicon-table'))) {
+  document.addEventListener(
+    'error',
+    (event) => {
+      if (
+        event.target.tagName === 'IMG' &&
+        (event.target.classList.contains('restaurant-favicon') ||
+          event.target.classList.contains('restaurant-favicon-table'))
+      ) {
+        batchUpdate(event.target, { display: 'none' });
 
-      batchUpdate(event.target, { display: 'none' });
+        const fallback = event.target.nextElementSibling;
+        if (
+          fallback &&
+          (fallback.classList.contains('restaurant-fallback-icon') ||
+            fallback.classList.contains('restaurant-fallback-icon-table') ||
+            fallback.classList.contains('restaurant-fallback-icon-large'))
+        ) {
+          batchUpdate(fallback, {
+            display: 'inline-block',
+          });
+        }
 
-      const fallback = event.target.nextElementSibling;
-      if (fallback &&
-                (fallback.classList.contains('restaurant-fallback-icon') ||
-                 fallback.classList.contains('restaurant-fallback-icon-table') ||
-                 fallback.classList.contains('restaurant-fallback-icon-large'))) {
-        batchUpdate(fallback, {
-          display: 'inline-block',
-        });
+        // Flush updates on next tick to batch DOM changes
+        requestAnimationFrame(flushUpdates);
       }
-
-      // Flush updates on next tick to batch DOM changes
-      requestAnimationFrame(flushUpdates);
-    }
-  }, true);
+    },
+    true,
+  );
 
   // Handle successful image loads with opacity transition
-  document.addEventListener('load', (event) => {
-    if (event.target.tagName === 'IMG' &&
-            (event.target.classList.contains('restaurant-favicon') ||
-             event.target.classList.contains('restaurant-favicon-table'))) {
-
-      batchUpdate(event.target, { opacity: '1' });
-      requestAnimationFrame(flushUpdates);
-    }
-  }, true);
+  document.addEventListener(
+    'load',
+    (event) => {
+      if (
+        event.target.tagName === 'IMG' &&
+        (event.target.classList.contains('restaurant-favicon') ||
+          event.target.classList.contains('restaurant-favicon-table'))
+      ) {
+        batchUpdate(event.target, { opacity: '1' });
+        requestAnimationFrame(flushUpdates);
+      }
+    },
+    true,
+  );
 
   // Handle avatar fallbacks
-  document.addEventListener('error', (event) => {
-    if (event.target.tagName === 'IMG' && event.target.classList.contains('avatar-img')) {
-      batchUpdate(event.target, { display: 'none' });
+  document.addEventListener(
+    'error',
+    (event) => {
+      if (event.target.tagName === 'IMG' && event.target.classList.contains('avatar-img')) {
+        batchUpdate(event.target, { display: 'none' });
 
-      const fallback = event.target.nextElementSibling;
-      if (fallback && fallback.classList.contains('avatar-fallback')) {
-        batchUpdate(fallback, { display: 'flex' });
+        const fallback = event.target.nextElementSibling;
+        if (fallback && fallback.classList.contains('avatar-fallback')) {
+          batchUpdate(fallback, { display: 'flex' });
+        }
+
+        requestAnimationFrame(flushUpdates);
       }
-
-      requestAnimationFrame(flushUpdates);
-    }
-  }, true);
+    },
+    true,
+  );
 }
 
 // Auto-initialize when module loads

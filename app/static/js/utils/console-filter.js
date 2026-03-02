@@ -9,8 +9,7 @@
   'use strict';
 
   // Enable debug mode via URL parameter or localStorage
-  const DEBUG_MODE = window.location.search.includes('debug=true') ||
-                     localStorage.getItem('debug-mode') === 'true';
+  const DEBUG_MODE = window.location.search.includes('debug=true') || localStorage.getItem('debug-mode') === 'true';
 
   // If debug mode is on, don't filter anything
   if (DEBUG_MODE) {
@@ -55,8 +54,7 @@
   ];
 
   function shouldFilter(message) {
-    return typeof message === 'string' &&
-           FILTERED_PATTERNS.some((pattern) => pattern.test(message));
+    return typeof message === 'string' && FILTERED_PATTERNS.some((pattern) => pattern.test(message));
   }
 
   // Filter console.log (most common noise source)
@@ -89,5 +87,4 @@
     localStorage.setItem('debug-mode', newMode.toString());
     console.log('🔄 Debug mode toggled. Refresh page to apply changes.');
   };
-
 })();

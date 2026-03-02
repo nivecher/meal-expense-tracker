@@ -83,6 +83,13 @@ ignore:
         reason: Static assets bucket doesn't require versioning as files are immutable and managed via deployment process.
         expires: "2025-12-31T23:59:59.000Z"
 
+  # ajv ReDoS (CVE-2025-69873) - No fixed version available
+  # Only exploitable when $data option is enabled; our deps (commitlint, eslint, table) use static schemas
+  SNYK-JS-AJV-15274295:
+    - "*":
+        reason: No remediation for ajv ReDoS. Vuln requires $data:true; transitive deps use static schema validation.
+        expires: "2026-06-30T23:59:59.000Z"
+
 # Patch vulnerabilities (add specific ones if needed)
 patch: {}
 # Ignore false positives

@@ -326,6 +326,29 @@ def toggle_user_active(user_id: int) -> Response:
         return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
 
 
+@bp.route("/users/<int:user_id>/toggle-advanced", methods=["POST"])
+@login_required
+@admin_required
+@db_transaction(success_message="User advanced features updated", error_message="Failed to update advanced features")
+def toggle_user_advanced_features(user_id: int) -> Response:
+    """Toggle advanced feature access for a user."""
+    try:
+        user = User.query.get_or_404(user_id)
+
+        user.advanced_features_enabled = not user.advanced_features_enabled
+        db.session.add(user)
+
+        status = "enabled" if user.advanced_features_enabled else "disabled"
+        flash(f"Advanced features {status} for {user.get_display_name()}", "success")
+
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
+
+    except Exception as e:
+        current_app.logger.error(f"Error toggling advanced features for user {user_id}: {e}")
+        flash("Error updating advanced features", "danger")
+        return cast(Response, redirect(url_for("admin.view_user", user_id=user_id)))
+
+
 @bp.route("/users/<int:user_id>/delete", methods=["POST"])
 @login_required
 @admin_required
@@ -384,6 +407,7 @@ def _extract_user_form_data() -> dict[str, Any]:
         "first_name": request.form.get("first_name", "").strip(),
         "last_name": request.form.get("last_name", "").strip(),
         "is_admin": request.form.get("is_admin") == "on",
+        "advanced_features_enabled": request.form.get("advanced_features_enabled") == "on",
         "is_active": request.form.get("is_active") == "on",
         "send_password_notification": request.form.get("send_password_notification") == "on",
     }
@@ -427,6 +451,7 @@ def _create_user_from_form_data(form_data: dict[str, Any], password: str) -> Use
         first_name=form_data["first_name"] or None,
         last_name=form_data["last_name"] or None,
         is_admin=form_data["is_admin"],
+        advanced_features_enabled=form_data.get("advanced_features_enabled", False),
         is_active=form_data["is_active"],
     )
     user.set_password(password)
@@ -520,6 +545,8 @@ def get_user_stats(user_id: int) -> tuple[Response, int]:
             "username": user.username,
             "email": user.email,
             "is_admin": user.is_admin,
+            "advanced_features_enabled": user.advanced_features_enabled,
+            "has_advanced_features": user.has_advanced_features,
             "is_active": user.is_active,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "updated_at": user.updated_at.isoformat() if user.updated_at else None,

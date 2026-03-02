@@ -44,6 +44,7 @@ docs/formatting-rules.md
 *.temp
 
 # Complex Jinja2 templates that Prettier can't parse
+app/templates/macros/form_helpers.html
 app/templates/expenses/_expense_table_row.html
 app/templates/expenses/macros.html
 app/templates/restaurants/detail.html

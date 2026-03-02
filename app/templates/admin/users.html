@@ -117,6 +117,7 @@
                                 <th>Email</th>
                                 <th>Status</th>
                                 <th>Role</th>
+                                <th>Features</th>
                                 <th>Joined</th>
                                 <th>Last Updated</th>
                                 <th>Actions</th>
@@ -151,6 +152,13 @@
                                     <span class="badge bg-warning user-status-badge">Admin</span>
                                     {% else %}
                                     <span class="badge bg-secondary user-status-badge">User</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.has_advanced_features %}
+                                    <span class="badge bg-info text-dark user-status-badge">Advanced</span>
+                                    {% else %}
+                                    <span class="badge bg-light text-dark user-status-badge">Standard</span>
                                     {% endif %}
                                 </td>
                                 <td>

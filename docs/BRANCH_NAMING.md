@@ -93,8 +93,9 @@ Commit messages must follow [Conventional Commits](https://www.conventionalcommi
 Enforcement:
 
 1. **Pre-commit (commit-msg hook)**: Run `pre-commit install --hook-type commit-msg`. Uses commitlint to validate each commit at `git commit`.
-2. **CI**: Validates all commits in PRs and pushes to `main` / `develop` via `npx commitlint --from <base> --to <head>`.
-3. **Local**: `make lint-commits` runs `npx commitlint --from origin/main --to HEAD`.
+2. **Pre-push hook**: Run `pre-commit install --hook-type pre-push`. Uses commitlint over the branch commit range before push.
+3. **CI**: Validates all commits in PRs and pushes to `main` / `develop` via `npx commitlint --from <base> --to <head>`.
+4. **Local**: `make lint-commits` runs `npx commitlint --from origin/main --to HEAD`.
 
 Only **feat** and **fix** trigger version bumps (via [Python semantic-release](https://python-semantic-release.readthedocs.io/) in CI).
 

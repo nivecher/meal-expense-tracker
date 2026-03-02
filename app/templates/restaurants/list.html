@@ -8,6 +8,7 @@
 {% block styles %}
     <link href="{{ url_for('static', filename='css/components/category-badges.css') }}" rel="stylesheet" />
     <link href="{{ url_for('static', filename='css/pages/restaurant-list.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/pages/restaurant-places-search.css') }}" rel="stylesheet" />
 {% endblock styles %}
 
 {% block section_header %}
@@ -15,32 +16,35 @@
         <i class="fas fa-utensils text-primary"></i>
         <h1>Restaurants</h1>
     </div>
-    <ul class="nav nav-tabs section-tabs" id="restaurantsTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="restaurants-tab" data-bs-toggle="tab" data-bs-target="#restaurants-pane" type="button" role="tab" aria-controls="restaurants-pane" aria-selected="true">
-                Restaurants
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="places-tab" data-bs-toggle="tab" data-bs-target="#places-pane" type="button" role="tab" aria-controls="places-pane" aria-selected="false">
-                Places
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="rewards-tab" data-bs-toggle="tab" data-bs-target="#rewards-pane" type="button" role="tab" aria-controls="rewards-pane" aria-selected="false">
-                Rewards
-            </button>
-        </li>
-    </ul>
 {% endblock %}
 
 {% block content %}
 {% set view_preference = request.cookies.get('restaurant_view_preference', 'card') %}
 {% set active_filters_count = (1 if cuisine else 0) + (1 if service_level else 0) + (1 if city else 0) + (1 if is_chain else 0) + (1 if rating_min else 0) + (1 if rating_max else 0) %}
 
+<!-- Tab Navigation -->
+<ul class="nav nav-tabs mb-3" id="restaurantTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <a class="nav-link {% if active_tab == 'restaurants' %}active{% endif %}" href="{{ url_for('restaurants.list_restaurants', tab='restaurants') }}">
+            <i class="fas fa-list me-1"></i>List
+        </a>
+    </li>
+    <li class="nav-item" role="presentation">
+        <a class="nav-link {% if active_tab == 'places' %}active{% endif %}" href="{{ url_for('restaurants.list_restaurants', tab='places', places_mode='find') }}">
+            <i class="fas fa-map me-1"></i>Find
+        </a>
+    </li>
+    {% if current_user.has_advanced_features or current_user.is_admin %}
+    <li class="nav-item" role="presentation">
+        <a class="nav-link" href="{{ url_for('merchants.list_merchants') }}">
+            <i class="fas fa-building me-1"></i>Merchants
+        </a>
+    </li>
+    {% endif %}
+</ul>
+
+{% if active_tab == 'restaurants' %}
 <div class="px-0">
-<div class="tab-content pt-2">
-    <div class="tab-pane fade show active" id="restaurants-pane" role="tabpanel" aria-labelledby="restaurants-tab">
         <div class="card mb-4 activity-panel">
             <div class="card-header bg-white">
                 <div class="activity-header activity-header-stacked">
@@ -139,7 +143,7 @@
                                     </li>
                                 </ul>
                             </div>
-                            <a href="{{ url_for('restaurants.find_places') }}" class="btn btn-sm btn-outline-secondary btn-icon-only" data-bs-toggle="tooltip" title="Find places (Google Places)">
+                            <a href="{{ url_for('restaurants.list_restaurants', tab='places', places_mode='find') }}" class="btn btn-sm btn-outline-secondary btn-icon-only" data-bs-toggle="tooltip" title="Find places (Google Places)">
                                 <i class="fas fa-search-location"></i>
                             </a>
                             <a href="{{ url_for('restaurants.add_restaurant') }}" class="btn btn-sm btn-primary btn-icon-only" data-bs-toggle="tooltip" title="New restaurant">
@@ -243,6 +247,7 @@
             </div>
         </div>
     {% endif %}
+
 </div>
 
 <!-- Restaurant List -->
@@ -264,7 +269,7 @@
                                                 src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                                 data-website="{{ restaurant.website }}"
                                                 data-size="32"
-                                                alt="{{ restaurant.name }} icon"
+                                                alt="{{ restaurant.display_name or restaurant.name }} icon"
                                                 class="restaurant-favicon"
                                                 width="32"
                                                 height="32"
@@ -278,7 +283,7 @@
                                             class="text-decoration-none text-dark restaurant-name-link"
                                             data-bs-toggle="tooltip"
                                             title="View Restaurant details"
-                                            >{{ restaurant.name }}</a
+                                            >{{ restaurant.display_name or restaurant.name }}</a
                                         >
                                     </h5>
                                 </div>
@@ -394,12 +399,9 @@
                                         type="button"
                                         class="btn btn-sm btn-outline-danger"
                                         data-action="delete-restaurant"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#deleteRestaurantModal"
                                         data-restaurant-id="{{ restaurant.id }}"
-                                        data-restaurant-name="{{ restaurant.name }}"
-                                        data-tooltip="true"
-                                        title="Delete restaurant">
+                                        data-restaurant-name="{{ restaurant.display_name or restaurant.name }}"
+                                        aria-label="Delete restaurant">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
@@ -449,7 +451,6 @@
                                 id="restaurant-action-delete"
                                 type="button"
                                 class="btn btn-sm btn-outline-danger"
-                                data-action="delete-restaurant"
                                 disabled>
                                 <i class="fas fa-trash me-1" aria-hidden="true"></i>Delete
                             </button>
@@ -533,12 +534,12 @@
                                         class="form-check-input restaurant-select"
                                         value="{{ restaurant.id }}"
                                         data-restaurant-id="{{ restaurant.id }}"
-                                        data-restaurant-name="{{ restaurant.name }}"
+                                        data-restaurant-name="{{ restaurant.display_name or restaurant.name }}"
                                         data-view-url="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
                                         data-edit-url="{{ url_for('restaurants.edit_restaurant', restaurant_id=restaurant.id) }}"
                                         data-add-expense-url="{{ url_for('expenses.add_expense', restaurant_id=restaurant.id) }}" />
                                 </td>
-                                <td data-sort-value="{{ restaurant.name }}">
+                                    <td data-sort-value="{{ restaurant.display_name or restaurant.name }}">
                                     <div class="d-flex align-items-start">
                                         <!-- Restaurant Icon (small for table view) -->
                                         <div class="restaurant-icon-table me-2 flex-shrink-0 d-flex align-items-center">
@@ -547,7 +548,7 @@
                                                     src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                                     data-website="{{ restaurant.website }}"
                                                     data-size="20"
-                                                    alt="{{ restaurant.name }} icon"
+                                                    alt="{{ restaurant.display_name or restaurant.name }} icon"
                                                     class="restaurant-favicon-table"
                                                     width="20"
                                                     height="20"
@@ -561,7 +562,7 @@
                                         <div>
                                             <div>
                                                 <a href="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}"
-                                                    >{{ restaurant.name }}</a
+                                                    >{{ restaurant.display_name or restaurant.name }}</a
                                                 >
                                             </div>
 
@@ -744,118 +745,104 @@
         </div>
     {% endif %}
 
-        <!-- Restaurant Filters Modal -->
-        <div class="modal fade" id="restaurantFilterModal" tabindex="-1" aria-labelledby="restaurantFilterModalLabel">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="restaurantFilterModalLabel">Filter Restaurants</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form
-                            id="restaurant-filter-form"
-                            method="get"
-                            class="row g-3"
-                            novalidate
-                            hx-get="{{ url_for('restaurants.list_restaurants') }}"
-                            hx-params="not csrf_token"
-                            hx-target="#restaurant-list-results"
-                            hx-select="#restaurant-list-results"
-                            hx-swap="outerHTML"
-                            hx-push-url="true"
-                            hx-include="#per_page, #restaurant-search-form"
-                            hx-vals='{"page":"1"}'
-                            hx-trigger="submit, change delay:250ms">
-                            <div class="col-md-4">
-                                <label for="cuisine" class="form-label">Cuisine</label>
-                                <select class="form-control" id="cuisine" name="cuisine">
-                                    <option value="">All Cuisines</option>
-                                    {% for cuisine_name in cuisine_names %}
-                                    <option value="{{ cuisine_name }}" {% if cuisine == cuisine_name %}selected{% endif %}>{{ cuisine_name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="service_level" class="form-label">Service Level</label>
-                                <select class="form-control" id="service_level" name="service_level">
-                                    <option value="">All Service Levels</option>
-                                    {% for level in service_levels %}
-                                    <option value="{{ level }}" {% if service_level == level %}selected{% endif %}>{{ level.replace('_', ' ').title() }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="city" class="form-label">City</label>
-                                <select class="form-control" id="city" name="city">
-                                    <option value="">All Cities</option>
-                                    {% for city_name in cities %}
-                                    <option value="{{ city_name }}" {% if city == city_name %}selected{% endif %}>{{ city_name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
+</div>
 
-                            <div class="col-md-4">
-                                <label for="is_chain" class="form-label">Chain</label>
-                                <select class="form-control" id="is_chain" name="is_chain">
-                                    <option value="">All</option>
-                                    <option value="true" {% if is_chain == 'true' %}selected{% endif %}>Chain</option>
-                                    <option value="false" {% if is_chain == 'false' %}selected{% endif %}>Independent</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="rating_min" class="form-label">Min Rating</label>
-                                <input
-                                    type="number"
-                                    class="form-control"
-                                    id="rating_min"
-                                    name="rating_min"
-                                    min="1"
-                                    max="5"
-                                    step="0.1"
-                                    value="{{ rating_min }}"
-                                    placeholder="1.0" />
-                            </div>
-                            <div class="col-md-4">
-                                <label for="rating_max" class="form-label">Max Rating</label>
-                                <input
-                                    type="number"
-                                    class="form-control"
-                                    id="rating_max"
-                                    name="rating_max"
-                                    min="1"
-                                    max="5"
-                                    step="0.1"
-                                    value="{{ rating_max }}"
-                                    placeholder="5.0" />
-                            </div>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" id="restaurant-filter-clear">
-                            <i class="fas fa-undo me-2" aria-hidden="true"></i>Clear All
-                        </button>
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
-                            <i class="fas fa-check me-2" aria-hidden="true"></i>Apply
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-    </div>
+
+<!-- Restaurant Filters Modal -->
+<div class="modal fade" id="restaurantFilterModal" tabindex="-1" aria-labelledby="restaurantFilterModalLabel">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="restaurantFilterModalLabel">Filter Restaurants</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-    <div class="tab-pane fade" id="places-pane" role="tabpanel" aria-labelledby="places-tab">
-        <div class="card mb-4">
-            <div class="card-body text-muted">
-                Places view is coming soon. For now, use <a href="{{ url_for('restaurants.find_places') }}">Find Places</a> to search Google Places.
+            <div class="modal-body">
+                <form
+                    id="restaurant-filter-form"
+                    method="get"
+                    class="row g-3"
+                    novalidate
+                    hx-get="{{ url_for('restaurants.list_restaurants') }}"
+                    hx-params="not csrf_token"
+                    hx-target="#restaurant-list-results"
+                    hx-select="#restaurant-list-results"
+                    hx-swap="outerHTML"
+                    hx-push-url="true"
+                    hx-include="#per_page, #restaurant-search-form"
+                    hx-vals='{"page":"1"}'
+                    hx-trigger="submit, change delay:250ms">
+                    <div class="col-md-4">
+                        <label for="cuisine" class="form-label">Cuisine</label>
+                        <select class="form-control" id="cuisine" name="cuisine">
+                            <option value="">All Cuisines</option>
+                            {% for cuisine_name in cuisine_names %}
+                            <option value="{{ cuisine_name }}" {% if cuisine == cuisine_name %}selected{% endif %}>{{ cuisine_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="service_level" class="form-label">Service Level</label>
+                        <select class="form-control" id="service_level" name="service_level">
+                            <option value="">All Service Levels</option>
+                            {% for level in service_levels %}
+                            <option value="{{ level }}" {% if service_level == level %}selected{% endif %}>{{ level.replace('_', ' ').title() }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="city" class="form-label">City</label>
+                        <select class="form-control" id="city" name="city">
+                            <option value="">All Cities</option>
+                            {% for city_name in cities %}
+                            <option value="{{ city_name }}" {% if city == city_name %}selected{% endif %}>{{ city_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label for="is_chain" class="form-label">Chain</label>
+                        <select class="form-control" id="is_chain" name="is_chain">
+                            <option value="">All</option>
+                            <option value="true" {% if is_chain == 'true' %}selected{% endif %}>Chain</option>
+                            <option value="false" {% if is_chain == 'false' %}selected{% endif %}>Independent</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="rating_min" class="form-label">Min Rating</label>
+                        <input
+                            type="number"
+                            class="form-control"
+                            id="rating_min"
+                            name="rating_min"
+                            min="1"
+                            max="5"
+                            step="0.1"
+                            value="{{ rating_min }}"
+                            placeholder="1.0" />
+                    </div>
+                    <div class="col-md-4">
+                        <label for="rating_max" class="form-label">Max Rating</label>
+                        <input
+                            type="number"
+                            class="form-control"
+                            id="rating_max"
+                            name="rating_max"
+                            min="1"
+                            max="5"
+                            step="0.1"
+                            value="{{ rating_max }}"
+                            placeholder="5.0" />
+                    </div>
+                </form>
             </div>
-        </div>
-    </div>
-    <div class="tab-pane fade" id="rewards-pane" role="tabpanel" aria-labelledby="rewards-tab">
-        <div class="card mb-4">
-            <div class="card-body text-muted">
-                Rewards program management is planned for a future release.
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="restaurant-filter-clear">
+                    <i class="fas fa-undo me-2" aria-hidden="true"></i>Clear All
+                </button>
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                    <i class="fas fa-check me-2" aria-hidden="true"></i>Apply
+                </button>
             </div>
         </div>
     </div>
@@ -890,47 +877,90 @@
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteRestaurantModal" tabindex="-1" aria-labelledby="deleteRestaurantModalLabel">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="deleteRestaurantModalLabel">
-                    <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
-                </h5>
-                <button
-                    type="button"
-                    class="btn-close btn-close-white"
-                    data-bs-dismiss="modal"
-                    aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p> Are you sure you want to delete <strong id="restaurantName"></strong>? </p>
-                <p class="text-danger">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    This action cannot be undone. All associated expenses will also be deleted.
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-2"></i> Cancel
-                </button>
-                <form id="deleteRestaurantForm" method="post" action="" data-delete-url="{{ url_for('restaurants.delete_restaurant', restaurant_id=0).replace('/0', '') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash me-2"></i> Delete Restaurant
+<!-- Delete Confirmation Modal Template (instantiated on click) -->
+<template id="deleteRestaurantModalTemplate">
+    <div class="modal fade" id="deleteRestaurantModal" tabindex="-1" aria-labelledby="deleteRestaurantModalLabel">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteRestaurantModalLabel">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
+                    </h5>
+                    <button
+                        type="button"
+                        class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p> Are you sure you want to delete <strong id="restaurantName"></strong>? </p>
+                    <p class="text-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        This action cannot be undone. All associated expenses will also be deleted.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i> Cancel
                     </button>
-                </form>
+                    <form id="deleteRestaurantForm" method="post" action="" data-delete-url="{{ url_for('restaurants.delete_restaurant', restaurant_id=0).replace('/0', '') }}" data-skip-ajax="true">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-2"></i> Delete Restaurant
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
+</template>
+
+{% elif active_tab == 'places' %}
+<div class="px-0">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <h1 class="h4 mb-0">
+            <i class="fas fa-map-marked-alt text-primary me-2"></i>Restaurant Map
+        </h1>
+    </div>
+
+    <div id="places-map-container" class="places-map-wrapper">
+        <input type="hidden" name="places-mode" value="{{ places_mode }}" />
+        <div class="row g-4 mx-0">
+            <div class="col-12 col-lg-8">
+                <div class="map-container">
+                    <div id="places-map" class="places-map-element"></div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="places-map-sidebar search-panel p-3 rounded">
+                    <div id="places-sidebar-content">
+                        <p class="text-muted mb-0"><i class="fas fa-spinner fa-spin me-1"></i>Loading map...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="application/json" id="places-map-config">
+        {
+            "googleMapsApiKey": {{ config.get('GOOGLE_MAPS_API_KEY', '')|tojson }},
+            "googleMapsMapId": {{ config.get('GOOGLE_MAPS_MAP_ID', '')|tojson }},
+            "csrfToken": {{ csrf_token()|tojson }},
+            "addRestaurantUrl": {{ url_for('restaurants.add_from_google_places')|tojson }},
+            "findPlacesUrl": {{ url_for('restaurants.list_restaurants', tab='places', places_mode='find')|tojson }}
+        }
+    </script>
 </div>
-</div>
+
+{% endif %}
 
 {% endblock content %}
 
 {% block extra_js %}
-<!-- Table sorting functionality -->
+{% if active_tab == 'restaurants' %}
 <script src="{{ url_for('static', filename='js/components/table-sorting.js') }}"></script>
+{% endif %}
+{% if active_tab == 'restaurants' or active_tab == 'places' %}
 <script type="module" src="{{ url_for('static', filename='js/pages/restaurant-list.js') }}"></script>
+{% endif %}
 {% endblock extra_js %}

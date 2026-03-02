@@ -1,3 +1,25 @@
+{# Restaurant type select with optgroup separator (Popular | All Types A-Z) #}
+{% macro render_restaurant_type_select(field, type_choices_grouped, class_='form-select') -%}
+<select
+    name="{{ field.name }}"
+    id="{{ field.id or field.name }}"
+    class="{{ class_ }}{{ ' is-invalid' if field.errors else '' }}"
+    data-field="{{ field.name }}"
+    {% if field.flags.required %}required{% endif %}
+>
+    {% for group_label, group_choices in type_choices_grouped %}
+    <optgroup label="{{ group_label }}">
+        {% for value, label in group_choices %}
+        <option value="{{ value }}" {{ 'selected' if field.data|string == value|string else '' }}>{{ label }}</option>
+        {% endfor %}
+    </optgroup>
+    {% endfor %}
+</select>
+{% if field.errors %}
+    {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+{% endif %}
+{%- endmacro %}
+
 {# Form field rendering macro #} {% macro render_field(field, label_visible=true, class_='', placeholder='') -%}
 <div class="form-group{% if field.errors %} has-error{% endif %}">
     {% if field.type != 'HiddenField' and label_visible %}{{ field.label(class_='form-label') }}{% endif %} {{

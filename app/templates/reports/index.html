@@ -105,7 +105,7 @@ reports_content %}
                     <tbody>
                         {% for restaurant in dashboard_stats.top_restaurants %}
                         <tr>
-                            <td>{{ restaurant.name }}</td>
+                            <td>{{ restaurant.display_name or restaurant.name }}</td>
                             <td class="text-end">{{ restaurant.count }}</td>
                         </tr>
                         {% endfor %}

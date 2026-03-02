@@ -68,8 +68,8 @@ pip install -r requirements-dev.txt
 
 ```bash
 
-## Start PostgreSQL container
-docker-compose -f docker-compose.yml up -d postgres
+## Start database container
+docker-compose -f docker-compose.yml up -d db
 
 ## Run migrations
 alembic upgrade head

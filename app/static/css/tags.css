@@ -35,25 +35,37 @@
   flex: 1;
 }
 
-/* Individual Tag Badge - Base styling only */
+/* Individual Tag Badge - Base styling */
 
 .tag-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
+  padding: 4px 12px;
+  font-size: 0.8rem;
   font-weight: 500;
-  border-radius: 0.25rem;
-  color: #fff;
+  border-radius: 20px;
+  color: var(--tag-text-color, #fff);
+  background-color: var(--tag-color, #6c757d);
   border: none;
   cursor: pointer;
-  transition: all 0.15s ease-in-out;
+  transition: all 0.2s ease;
   user-select: none;
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  line-height: 1.2;
+}
+
+/* Compact version for table rows */
+
+.tag-badge.compact {
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  margin: 1px;
+  border-radius: 15px;
 }
 
 /* Default background color only when no custom color class is present */
@@ -62,10 +74,19 @@
   background-color: #6c757d;
 }
 
+/* Apply colors from data-tag-color attribute - JS sets CSS variables */
+
+.tag-badge[data-tag-color] {
+  background-color: var(--tag-color, #6c757d) !important;
+  color: var(--tag-text-color, #fff) !important;
+  border: none !important;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 10%) !important;
+}
+
 .tag-badge:hover {
-  opacity: 0.8;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+  opacity: 0.9;
+  transform: scale(1.05);
+  text-decoration: none;
 }
 
 .tag-badge .tag-remove {

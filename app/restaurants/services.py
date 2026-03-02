@@ -209,6 +209,7 @@ def get_restaurants_with_stats(user_id: int, args: dict[str, Any]) -> tuple[list
         restaurant.pop("_sa_instance_state", None)
         # Add the computed address property and individual address lines
         restaurant["address"] = restaurant_obj.address
+        restaurant["display_name"] = restaurant_obj.display_name
         restaurant["address_line_1"] = restaurant_obj.address_line_1
         restaurant["address_line_2"] = restaurant_obj.address_line_2
         # Add the aggregated fields
@@ -594,13 +595,13 @@ def _process_form_data_for_update(form: Any) -> dict[str, Any]:
         Dictionary of processed form data
     """
     form_data: dict[str, Any] = {}
-    numeric_fields = {"rating"}
+    numeric_fields = {"rating", "latitude", "longitude"}
     boolean_fields = {"is_chain"}
 
     for field in form:
         if field.name in numeric_fields:
-            # Convert empty strings to None for numeric fields
-            if field.data and str(field.data).strip():
+            # Convert empty strings to None for numeric fields (rating, latitude, longitude)
+            if field.data is not None and str(field.data).strip():
                 try:
                     form_data[field.name] = float(field.data)
                 except (ValueError, TypeError):
@@ -848,6 +849,7 @@ def _process_restaurant_row(row: dict, user_id: int) -> tuple[bool, str, Restaur
         restaurant = Restaurant(
             user_id=user_id,
             name=name,
+            location_name=row.get("location_name", "").strip() or None,
             city=city,
             address_line_1=address,
             state=row.get("state", "").strip() or None,
@@ -1160,6 +1162,7 @@ def export_restaurants_for_user(
     return [
         {
             "name": r.name or "",
+            "location_name": r.location_name or "",
             "address": r.address or "",
             "city": r.city or "",
             "state": r.state or "",
@@ -1216,6 +1219,7 @@ def create_restaurant_for_user(user_id: int, data: dict[str, Any]) -> Restaurant
     restaurant = Restaurant(
         user_id=user_id,
         name=data.get("name"),
+        location_name=data.get("location_name"),
         type=data.get("type"),
         description=data.get("description"),
         located_within=data.get("located_within"),
@@ -1260,6 +1264,7 @@ def update_restaurant_for_user(restaurant: Restaurant, data: dict[str, Any]) -> 
     # Update restaurant fields using a loop to reduce complexity
     updateable_fields = [
         "name",
+        "location_name",
         "type",
         "description",
         "located_within",

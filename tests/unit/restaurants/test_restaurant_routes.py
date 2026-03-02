@@ -188,7 +188,7 @@ def test_export_restaurants(client, test_restaurant, test_user) -> None:
     print(f"CSV data first line: {response_text.splitlines()[0] if response_text else 'Empty response'}")
 
     # Check for CSV header (actual headers from the export)
-    assert '"name","address","city","state","postal_code"' in response_text
+    assert '"name","location_name","address","city","state","postal_code"' in response_text
 
     # Check for test restaurant data
     assert test_restaurant.name in response_text
@@ -290,9 +290,9 @@ def test_find_places_page(client, auth, test_user) -> None:
     auth.login("testuser_1", "testpass")
 
     # Test GET request to Find Places search page
-    response = client.get(url_for("restaurants.find_places"))
-    assert response.status_code == 200
-    assert b"Find Restaurants" in response.data
+    response = client.get(url_for("restaurants.find_places"), follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["Location"] == url_for("restaurants.list_restaurants", tab="places", places_mode="find")
 
 
 def test_get_place_details_invalid_id(client, auth, test_user, app) -> None:

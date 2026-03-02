@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% from "macros/form_helpers.html" import render_field %}
+{% from "macros/form_helpers.html" import render_field, render_restaurant_type_select %}
 {% from 'macros/badge_helpers.html' import cuisine_badge %}
 {% block title %}
-{% if restaurant %}{{ restaurant.name }} -{% endif %}
+{% if restaurant %}{{ restaurant.display_name or restaurant.name }} -{% endif %}
 Restaurant Details - Meal Expense Tracker
 {% endblock title %}
 {% block extra_css %}
@@ -16,7 +16,7 @@ Restaurant Details - Meal Expense Tracker
 {% set breadcrumb_items = [
 {'url': url_for('main.index'), 'title': 'Dashboard'},
 {'url': url_for('restaurants.list_restaurants'), 'title': 'Restaurants'},
-{'title': restaurant.name}
+{'title': restaurant.display_name or restaurant.name}
 ] %}
 {% include 'includes/breadcrumb.html' %}
 <div class="container py-4">
@@ -32,7 +32,7 @@ Restaurant Details - Meal Expense Tracker
                                 {% if restaurant.website %}
                                 <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                                     data-website="{{ restaurant.website }}" data-size="32"
-                                    alt="{{ restaurant.name }} icon" class="restaurant-favicon" width="32" height="32"
+                                    alt="{{ restaurant.display_name or restaurant.name }} icon" class="restaurant-favicon" width="32" height="32"
                                     style="opacity: 0; transition: opacity 0.2s;" />
                                 <i class="fas fa-utensils text-primary restaurant-fallback-icon restaurant-fallback-icon-large"
                                     style="display: none; font-size: 32px;"></i>
@@ -41,7 +41,7 @@ Restaurant Details - Meal Expense Tracker
                                     style="font-size: 32px;"></i>
                                 {% endif %}
                             </div>
-                            {{ restaurant.name }}
+                            {{ restaurant.display_name or restaurant.name }}
                         </h1>
                         <div class="d-flex align-items-center flex-wrap gap-2">
                             {% if restaurant.type %}<span class="badge bg-light text-dark border">{{
@@ -83,8 +83,13 @@ Restaurant Details - Meal Expense Tracker
                             class="btn btn-outline-primary" id="edit-btn" data-restaurant-id="{{ restaurant.id }}">
                             <i class="fas fa-edit me-1"></i>Edit
                         </a>
-                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
-                            data-bs-target="#deleteRestaurantModal" id="delete-btn">
+                        <button
+                            type="button"
+                            class="btn btn-outline-danger"
+                            data-action="delete-restaurant"
+                            data-restaurant-id="{{ restaurant.id }}"
+                            data-restaurant-name="{{ restaurant.display_name or restaurant.name }}"
+                            id="delete-btn">
                             <i class="fas fa-trash me-1"></i>Delete
                         </button>
                         {% else %}
@@ -104,6 +109,8 @@ Restaurant Details - Meal Expense Tracker
     <form id="restaurant-form" method="post"
         action="{{ url_for('restaurants.restaurant_details', restaurant_id=restaurant.id) }}">
         {{ form.hidden_tag() }}
+        {{ form.latitude() }}
+        {{ form.longitude() }}
         <!-- Main Content -->
         <div class="row g-4">
             <!-- Left Column - Restaurant Information -->
@@ -233,6 +240,15 @@ Restaurant Details - Meal Expense Tracker
                                                 %}
                                             </address>
                                         </div>
+                                        {% if restaurant.latitude is not none and restaurant.longitude is not none %}
+                                        <div class="mb-3">
+                                            <h6 class="text-muted mb-2">Location</h6>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-map-pin text-muted me-3 mt-1"></i>
+                                                <span class="small">{{ "%.6f"|format(restaurant.latitude) }}°, {{ "%.6f"|format(restaurant.longitude) }}°</span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
                                         {% set maps_url = restaurant|google_maps_url %}
                                         {% if maps_url %}
                                         <div class="mb-4">
@@ -252,6 +268,22 @@ Restaurant Details - Meal Expense Tracker
                                             </div>
                                         </div>
                                         {% endif %}
+                                    </div>
+                                    {% endif %}
+
+                                    {% if restaurant.latitude is not none and restaurant.longitude is not none and config.GOOGLE_MAPS_API_KEY %}
+                                    <div class="restaurant-map-section mb-4">
+                                        <h6 class="text-muted mb-2">Map</h6>
+                                        <iframe
+                                            width="100%"
+                                            height="250"
+                                            style="border:0; border-radius: 4px;"
+                                            loading="lazy"
+                                            allowfullscreen
+                                            referrerpolicy="no-referrer-when-downgrade"
+                                            src="https://www.google.com/maps/embed/v1/place?key={{ config.GOOGLE_MAPS_API_KEY }}&q={% if restaurant.google_place_id %}place_id:{{ restaurant.google_place_id }}{% else %}{{ restaurant.latitude }},{{ restaurant.longitude }}{% endif %}&zoom=16"
+                                            title="Restaurant location">
+                                        </iframe>
                                     </div>
                                     {% endif %}
 
@@ -467,7 +499,10 @@ Restaurant Details - Meal Expense Tracker
                                 <i class="fas fa-edit me-2"></i>Edit Restaurant Details
                             </h5>
                             <div class="mb-3">{{ render_field(form.name) }}</div>
-                            <div class="mb-3">{{ render_field(form.type) }}</div>
+                            <div class="mb-3">
+                                {{ form.type.label(class_='form-label') }}
+                                {{ render_restaurant_type_select(form.type, type_choices_grouped) }}
+                            </div>
                             <div class="mb-3">{{ render_field(form.cuisine) }}</div>
                             <div class="mb-3">{{ render_field(form.rating) }}</div>
                             <div class="mb-3">{{ render_field(form.is_chain) }}</div>
@@ -485,6 +520,30 @@ Restaurant Details - Meal Expense Tracker
                             <h5 class="text-muted mb-3 border-bottom pb-2">
                                 <i class="fas fa-map-marker-alt me-2"></i>Location
                             </h5>
+                            {% if restaurant.latitude is not none and restaurant.longitude is not none %}
+                            <div class="mb-3">
+                                <label class="form-label">Coordinates</label>
+                                <div class="form-control-plaintext small">
+                                    <i class="fas fa-map-pin text-muted me-2"></i>{{ "%.6f"|format(restaurant.latitude) }}°, {{ "%.6f"|format(restaurant.longitude) }}°
+                                </div>
+                                <div class="form-text">From Google Places (read-only)</div>
+                            </div>
+                            {% if config.GOOGLE_MAPS_API_KEY %}
+                            <div class="mb-3">
+                                <label class="form-label">Map</label>
+                                <iframe
+                                    width="100%"
+                                    height="250"
+                                    style="border:0; border-radius: 4px;"
+                                    loading="lazy"
+                                    allowfullscreen
+                                    referrerpolicy="no-referrer-when-downgrade"
+                                    src="https://www.google.com/maps/embed/v1/place?key={{ config.GOOGLE_MAPS_API_KEY }}&q={% if restaurant.google_place_id %}place_id:{{ restaurant.google_place_id }}{% else %}{{ restaurant.latitude }},{{ restaurant.longitude }}{% endif %}&zoom=16"
+                                    title="Restaurant location">
+                                </iframe>
+                            </div>
+                            {% endif %}
+                            {% endif %}
                             {% if form.address_line_1.data or form.address_line_2.data %}
                             <div class="mb-3">
                                 <label class="form-label">Address</label>
@@ -797,7 +856,7 @@ Restaurant Details - Meal Expense Tracker
                     <i class="fas fa-exclamation-triangle me-2"></i>
                     <strong>Warning:</strong> This action will remove the Google Place ID association.
                 </div>
-                <p>Are you sure you want to clear the Google Place ID for <strong>{{ restaurant.name }}</strong>?</p>
+                <p>Are you sure you want to clear the Google Place ID for <strong>{{ restaurant.display_name or restaurant.name }}</strong>?</p>
                 <p class="text-muted small">
                     <strong>Current Place ID:</strong> {{ restaurant.google_place_id }}<br>
                     This will remove the ability to view this restaurant on Google Maps and may affect location
@@ -820,44 +879,50 @@ Restaurant Details - Meal Expense Tracker
     </div>
 </div>
 
-<!-- Delete Restaurant Modal -->
-<div class="modal fade" id="deleteRestaurantModal" tabindex="-1" aria-labelledby="deleteRestaurantModalLabel">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="deleteRestaurantModalLabel">Confirm Delete Restaurant</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>Warning:</strong> This action cannot be undone.
+<!-- Delete Restaurant Modal Template (instantiated on click) -->
+<template id="deleteRestaurantModalTemplate">
+    <div class="modal fade" id="deleteRestaurantModal" tabindex="-1" aria-labelledby="deleteRestaurantModalLabel">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteRestaurantModalLabel">Confirm Delete Restaurant</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <p>Are you sure you want to delete <strong>{{ restaurant.name }}</strong>?</p>
-                {% if expenses %}
-                <p class="text-danger">
-                    <strong>Note:</strong> This restaurant has {{ expenses|length }} expense{{ 's' if expenses|length !=
-                    1 else '' }}
-                    totaling {{ (expenses|sum(attribute='amount'))|format_currency_usd }}.
-                    All associated expenses will also be deleted.
-                </p>
-                {% endif %}
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i>Cancel
-                </button>
-                <form action="{{ url_for('restaurants.delete_restaurant', restaurant_id=restaurant.id) }}" method="post"
-                    class="d-inline">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash me-1"></i>Delete Restaurant
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> This action cannot be undone.
+                    </div>
+                    <p>Are you sure you want to delete <strong id="restaurantName"></strong>?</p>
+                    {% if expenses %}
+                    <p class="text-danger">
+                        <strong>Note:</strong> This restaurant has {{ expenses|length }} expense{{ 's' if expenses|length !=
+                        1 else '' }}
+                        totaling {{ (expenses|sum(attribute='amount'))|format_currency_usd }}.
+                        All associated expenses will also be deleted.
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Cancel
                     </button>
-                </form>
+                    <form
+                        id="deleteRestaurantForm"
+                        method="post"
+                        action=""
+                        data-delete-url="{{ url_for('restaurants.delete_restaurant', restaurant_id=0).replace('/0', '') }}"
+                        class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash me-1"></i>Delete Restaurant
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
+</template>
 
 {% else %}
 <div class="alert alert-info" role="alert">

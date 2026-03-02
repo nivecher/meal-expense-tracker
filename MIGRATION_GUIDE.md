@@ -48,12 +48,12 @@ If you get errors like `relation "user" already exists`, it means your database 
 1. **Check what would be migrated:**
 
    ```bash
-   python scripts/remote_admin.py run-migrations --dry-run
+   python scripts/remote_admin.py db run-migrations --dry-run
    ```
 
 2. **Run migrations:**
    ```bash
-   python scripts/remote_admin.py --confirm run-migrations
+   python scripts/remote_admin.py --confirm db run-migrations
    ```
 
 ### Handling Remote "Already Exists" Errors
@@ -61,7 +61,7 @@ If you get errors like `relation "user" already exists`, it means your database 
 If you get `relation "user" already exists` errors remotely, use the fix-history option:
 
 ```bash
-python scripts/remote_admin.py --confirm run-migrations --fix-history
+python scripts/remote_admin.py --confirm db run-migrations --fix-history
 ```
 
 This will:
@@ -72,24 +72,22 @@ This will:
 
 ### Migration Commands Reference
 
-| Command                                   | Description                                 |
-| ----------------------------------------- | ------------------------------------------- |
-| `run-migrations --dry-run`                | Show what would be migrated without running |
-| `run-migrations`                          | Run all pending migrations                  |
-| `run-migrations --fix-history`            | Fix migration history for existing tables   |
-| `run-migrations --target-revision abc123` | Run to specific revision                    |
+| Command                                      | Description                                 |
+| -------------------------------------------- | ------------------------------------------- |
+| `db run-migrations --dry-run`                | Show what would be migrated without running |
+| `db run-migrations`                          | Run all pending migrations                  |
+| `db run-migrations --fix-history`            | Fix migration history for existing tables   |
+| `db run-migrations --target-revision abc123` | Run to specific revision                    |
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **"Table already exists" error**
-
    - **Cause**: Database has tables but no migration history
    - **Solution**: Use `--fix-history` option or run `fix_migration_history.py` locally
 
 2. **"No migration history found"**
-
    - **Cause**: No migration files exist
    - **Solution**: Create initial migration with `flask db init` and `flask db migrate`
 
@@ -108,11 +106,10 @@ This will:
 2. **Use dry-run before remote migrations**
 
    ```bash
-   python scripts/remote_admin.py run-migrations --dry-run
+   python scripts/remote_admin.py db run-migrations --dry-run
    ```
 
 3. **Backup before major migrations**
-
    - For RDS: Use AWS RDS snapshots
    - For local: Copy database file
 
@@ -120,7 +117,7 @@ This will:
 
    ```bash
    flask db current
-   python scripts/remote_admin.py run-migrations --dry-run
+   python scripts/remote_admin.py db run-migrations --dry-run
    ```
 
 5. **Enable RLS for new public tables**

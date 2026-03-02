@@ -1208,6 +1208,41 @@ footer {
   min-width: 200px;
 }
 
+table[data-resizable-columns="true"] thead th {
+  position: relative;
+  padding-right: 1rem;
+}
+
+table[data-resizable-columns="true"] .col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  z-index: 2;
+}
+
+table[data-resizable-columns="true"] .col-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  right: 4px;
+  width: 2px;
+  border-radius: 2px;
+  background: rgb(148 163 184 / 42%);
+  transition: background-color 0.14s ease;
+}
+
+table[data-resizable-columns="true"] thead th:hover .col-resize-handle::after,
+table[data-resizable-columns="true"] .col-resize-handle:hover::after,
+table[data-resizable-columns="true"] .col-resize-handle:active::after {
+  background: rgb(59 130 246 / 72%);
+}
+
 /* Row styling */
 
 .table-row-subtle {

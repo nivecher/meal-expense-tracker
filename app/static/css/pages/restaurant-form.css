@@ -30,38 +30,100 @@
   }
 }
 
+/* Validation reconciliation panel (like receipt validation on expense form) */
+#restaurant-reconciliation-panel .card-body {
+  padding: 1rem;
+}
+
+#restaurant-reconciliation-results {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+#restaurant-reconciliation-results .reconciliation-table {
+  margin-bottom: 0;
+  width: 100%;
+  min-width: 500px;
+}
+
+#restaurant-reconciliation-results .reconciliation-table th,
+#restaurant-reconciliation-results .reconciliation-table td {
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+}
+
+#restaurant-reconciliation-results .reconciliation-table td:nth-child(2) {
+  color: var(--bs-warning);
+}
+
+#restaurant-reconciliation-results .reconciliation-table td:nth-child(3) {
+  color: var(--bs-success);
+}
+
+/* Google Place ID field - selectable but not editable, text-select cursor */
+#google_place_id.google-place-id-selectable {
+  user-select: text;
+  cursor: text;
+}
+
 /* Form sections */
 
 .form-section {
-  margin-bottom: 3rem;
-  background: #fafbfc;
-  border-radius: 8px;
-  padding: 2rem;
+  margin-bottom: 1.25rem;
+  background: #fbfcfe;
+  border-radius: 10px;
+  padding: 1.5rem;
   border: 1px solid #e9ecef;
 }
 
 /* Section headers with better spacing */
 
 .section-header {
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.65rem;
   border-bottom: 1px solid #dee2e6;
 }
 
 .section-header h5 {
   margin-bottom: 0;
-  color: #495057;
+  color: #334155;
   display: flex; /* Ensure icon and text are aligned */
   align-items: center; /* Vertically center content */
+  gap: 0.5rem;
+}
+
+.form-step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.5rem;
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #075985;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+}
+
+.section-intro {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 /* Horizontal rule styling */
 
 .section-divider {
   border: none;
-  height: 2px;
-  background: linear-gradient(to right, #e9ecef, #dee2e6, #e9ecef);
-  margin: 2.5rem 0;
+  height: 1px;
+  background: linear-gradient(to right, rgb(226 232 240 / 0%), rgb(203 213 225 / 95%), rgb(226 232 240 / 0%));
+  margin: 1.15rem 0;
   border-radius: 1px;
 }
 
@@ -70,8 +132,9 @@
 .form-actions {
   background: transparent;
   border: none;
-  padding: 0;
+  padding: 0.25rem 0 0;
   margin-bottom: 0;
+  align-items: center;
 }
 
 /* Loading indicator */
@@ -256,7 +319,8 @@
 }
 
 /* Form field validation states */
-.form-control, .form-select {
+.form-control,
+.form-select {
   position: relative; /* For validation indicator positioning */
 }
 
@@ -513,5 +577,41 @@
 
   .field-actions .btn {
     flex: 1;
+  }
+
+  .form-section {
+    padding: 1rem;
+    border-radius: 8px;
+  }
+
+  .section-header {
+    margin-bottom: 0.65rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .section-header h5 {
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
+    font-size: 1rem;
+  }
+
+  .form-step-badge {
+    min-width: 3.1rem;
+    height: 1.35rem;
+    font-size: 0.67rem;
+  }
+
+  .section-intro {
+    font-size: 0.84rem;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .form-actions .btn {
+    width: 100%;
   }
 }

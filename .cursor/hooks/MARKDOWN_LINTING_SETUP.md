@@ -47,7 +47,6 @@ The script automatically:
 ## How It Works
 
 1. **Markdownlint** (`--fix` flag) automatically fixes:
-
    - Heading styles
    - List formatting
    - Line length issues

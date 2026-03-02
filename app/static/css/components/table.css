@@ -365,9 +365,10 @@
 
 .restaurant-table th:nth-child(1),
 .restaurant-table td:nth-child(1) {
-  width: 4%;
-  min-width: 44px;
-  text-align: center;
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  text-align: left;
   white-space: nowrap;
 }
 
@@ -416,19 +417,67 @@
   min-width: 5.5rem; /* Prevent total amount wrapping (e.g. $1,221.37) */
 }
 
-/* Table checkboxes: standard checkbox look, hand cursor on hover */
-.expense-table .form-check-input,
-.restaurant-table .form-check-input {
-  cursor: pointer;
+/* Merchant table: match restaurant table density without fixed column widths */
+.merchant-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 560px;
 }
 
+.merchant-table thead th {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+.merchant-table tbody td {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+/* Table checkboxes: standard checkbox look, hand cursor on hover */
+.table .form-check-input,
+.expense-table .form-check-input,
+.restaurant-table .form-check-input,
+.merchant-table .form-check-input {
+  width: 14px;
+  height: 14px;
+  border-radius: 0;
+  padding: 0;
+  margin: 0 auto;
+  box-shadow: none;
+  cursor: pointer;
+  accent-color: var(--accent-color);
+}
+
+/* Fallback checkmark for browsers that don't show accent-color */
+.table .form-check-input:checked,
 .expense-table .form-check-input:checked,
-.restaurant-table .form-check-input:checked {
-  background-image: var(--bs-form-check-bg-image);
+.restaurant-table .form-check-input:checked,
+.merchant-table .form-check-input:checked {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='white' d='M12.97 4.97a.75.75 0 0 1 0 1.06l-5 5a.75.75 0 0 1-1.06 0l-2.5-2.5a.75.75 0 1 1 1.06-1.06L7.5 9.44l4.47-4.47a.75.75 0 0 1 1.06 0Z'/%3E%3C/svg%3E");
   background-size: 0.65rem 0.65rem;
   background-position: center;
   background-repeat: no-repeat;
 }
+
+/* Compact, left-justified select column */
+.table .select-col {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  text-align: left !important;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.table .select-col .form-check-input {
+  margin: 0;
+}
+
 
 /* No actions column for restaurant table (actions live in toolbar) */
 

@@ -14,9 +14,7 @@ function getCookieValue(name) {
   if (!match) return null;
   try {
     return decodeURIComponent(match.slice(prefix.length));
-  } catch {
-    return match.slice(prefix.length);
-  }
+  } catch {}
 }
 
 function setCookieValue(name, value, days = 365) {
@@ -30,16 +28,12 @@ function getStoredJson(storageKey, cookieKey) {
   try {
     const raw = localStorage.getItem(storageKey);
     if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   try {
     const rawCookie = getCookieValue(cookieKey);
     if (rawCookie) return JSON.parse(rawCookie);
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   return null;
 }
@@ -48,9 +42,7 @@ function persistJson(storageKey, cookieKey, value) {
   const raw = JSON.stringify(value);
   try {
     localStorage.setItem(storageKey, raw);
-  } catch {
-    // ignore
-  }
+  } catch {}
   setCookieValue(cookieKey, raw);
 }
 
@@ -123,9 +115,8 @@ function initResizableTable(table) {
   const cols = Array.from(colgroup.querySelectorAll('col'));
 
   headers.forEach((th, index) => {
-    const isNonResizable = th.classList.contains('actions')
-      || th.classList.contains('select-col')
-      || th.hasAttribute('data-col-fill');
+    const isNonResizable =
+      th.classList.contains('actions') || th.classList.contains('select-col') || th.hasAttribute('data-col-fill');
     if (isNonResizable) {
       if (th.hasAttribute('data-col-fill')) {
         const col = cols[index];

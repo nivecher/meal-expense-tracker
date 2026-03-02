@@ -80,8 +80,8 @@ class TagManager {
   }
 
   /**
-     * Setup event listeners for the tag manager
-     */
+   * Setup event listeners for the tag manager
+   */
   setupEventListeners() {
     // Prevent duplicate event listeners
     if (this.listenersSetup) {
@@ -236,8 +236,8 @@ class TagManager {
   }
 
   /**
-     * Update the tag preview with rounded edges (matching expense details)
-     */
+   * Update the tag preview with rounded edges (matching expense details)
+   */
   updateTagPreview() {
     const tagName = document.getElementById('tagName')?.value || 'Tag Preview';
     const tagColor = document.getElementById('tagColor')?.value || '#6c757d';
@@ -295,11 +295,13 @@ class TagManager {
 
     // Store current form state if editing a tag
     const currentTagId = document.getElementById('tagId')?.value;
-    const currentFormData = currentTagId ? {
-      name: document.getElementById('tagName')?.value || '',
-      color: document.getElementById('tagColor')?.value || '',
-      description: document.getElementById('tagDescription')?.value || '',
-    } : null;
+    const currentFormData = currentTagId
+      ? {
+        name: document.getElementById('tagName')?.value || '',
+        color: document.getElementById('tagColor')?.value || '',
+        description: document.getElementById('tagDescription')?.value || '',
+      }
+      : null;
 
     try {
       const loadingDiv = document.createElement('div');
@@ -340,7 +342,7 @@ class TagManager {
           if (userIds.length > 1) {
             console.error(
               `SECURITY WARNING: Received tags from multiple users: ${userIds.join(', ')}. ` +
-              'This indicates a backend security issue. Filtering to first user ID.',
+                'This indicates a backend security issue. Filtering to first user ID.',
             );
             // Filter to the first user_id (should be current user)
             const [currentUserId] = userIds;
@@ -352,14 +354,15 @@ class TagManager {
         if (tags.length !== originalCount) {
           console.warn(
             `Tag list filtered: ${originalCount} -> ${tags.length} tags. ` +
-            'Some tags were removed due to user_id mismatch.',
+              'Some tags were removed due to user_id mismatch.',
           );
         }
 
         if (tags.length === 0) {
           const noTagsDiv = document.createElement('div');
           noTagsDiv.className = 'text-muted text-center py-4';
-          noTagsDiv.innerHTML = '<i class="fas fa-tags fa-2x mb-2 d-block"></i><div>No tags created yet. Create your first tag above!</div>';
+          noTagsDiv.innerHTML =
+            '<i class="fas fa-tags fa-2x mb-2 d-block"></i><div>No tags created yet. Create your first tag above!</div>';
           container.replaceChildren(noTagsDiv);
           document.dispatchEvent(new CustomEvent('tagsLoaded', { detail: { tags: [] } }));
           return;
@@ -590,8 +593,8 @@ class TagManager {
   }
 
   /**
-     * Edit a tag
-     */
+   * Edit a tag
+   */
   editTag(tagId, tagName, tagColor, tagDescription = '') {
     console.log('Editing tag:', { tagId, tagName, tagColor, tagDescription });
 
@@ -621,8 +624,8 @@ class TagManager {
   }
 
   /**
-     * Save the tag
-     */
+   * Save the tag
+   */
   async saveTag() {
     const tagId = document.getElementById('tagId')?.value;
     const tagName = document.getElementById('tagName')?.value?.trim();
@@ -693,9 +696,11 @@ class TagManager {
         // The form will be reset when the modal is closed
 
         // Trigger custom event for other components to listen to
-        document.dispatchEvent(new CustomEvent('tagsUpdated', {
-          detail: { tagId, tag: result.tag },
-        }));
+        document.dispatchEvent(
+          new CustomEvent('tagsUpdated', {
+            detail: { tagId, tag: result.tag },
+          }),
+        );
 
         // Update Tom Select instance if it exists
         if (window.tagSelectInstance && typeof refreshTagSelectInstance === 'function') {
@@ -711,8 +716,8 @@ class TagManager {
   }
 
   /**
-     * Delete the tag
-     */
+   * Delete the tag
+   */
   async deleteTag() {
     const tagIdInput = document.getElementById('tagId');
     const tagId = tagIdInput?.value;
@@ -798,7 +803,8 @@ class TagManager {
 
     // Get CSRF token - try multiple sources
     const csrfInput = document.querySelector('input[name="csrf_token"]');
-    const csrfToken = csrfInput?.value || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const csrfToken =
+      csrfInput?.value || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     if (!csrfToken) {
       console.error('Tag delete: CSRF token not found');
@@ -850,9 +856,11 @@ class TagManager {
         this.resetForm();
 
         // Trigger custom event for other components to listen to
-        document.dispatchEvent(new CustomEvent('tagDeleted', {
-          detail: { tagId: tagIdNum },
-        }));
+        document.dispatchEvent(
+          new CustomEvent('tagDeleted', {
+            detail: { tagId: tagIdNum },
+          }),
+        );
 
         // Update Tom Select instance if it exists
         if (window.tagSelectInstance && typeof refreshTagSelectInstance === 'function') {
@@ -899,8 +907,8 @@ class TagManager {
   }
 
   /**
-     * Reset the form
-     */
+   * Reset the form
+   */
   resetForm() {
     if (this.form) {
       this.form.reset();
@@ -937,11 +945,13 @@ class TagManager {
    */
   hexToRgb(hex) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16),
-    } : null;
+    return result
+      ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+      : null;
   }
 
   /**
@@ -961,11 +971,13 @@ class TagManager {
       const expenseText = expenseCount === 1 ? 'expense' : 'expenses';
       title = '⚠️ Warning: Tag is in Use';
       alertClass = 'alert-warning';
-      message = `<p>The tag <strong>"${tagNameEscaped}"</strong> is currently associated with <strong>${expenseCount} ${expenseText}</strong>.</p>` +
+      message =
+        `<p>The tag <strong>"${tagNameEscaped}"</strong> is currently associated with <strong>${expenseCount} ${expenseText}</strong>.</p>` +
         '<p>Deleting this tag will remove it from all associated expenses. This action cannot be undone.</p>';
     } else {
       title = 'Delete Tag';
-      message = `<p>Are you sure you want to delete the tag <strong>"${tagNameEscaped}"</strong>?</p>` +
+      message =
+        `<p>Are you sure you want to delete the tag <strong>"${tagNameEscaped}"</strong>?</p>` +
         '<p>This action cannot be undone.</p>';
     }
 

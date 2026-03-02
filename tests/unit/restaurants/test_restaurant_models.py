@@ -3,6 +3,7 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from app.merchants.models import Merchant
 from app.restaurants.models import Restaurant
 
 
@@ -112,6 +113,21 @@ def test_restaurant_properties(test_restaurant) -> None:
     # Test with whitespace city
     test_restaurant.city = "  "
     assert test_restaurant.full_name == test_restaurant.name
+
+
+def test_display_name_prefers_location_name_when_present() -> None:
+    """Display name should use location name before restaurant name."""
+    restaurant = Restaurant(name="Chipotle", location_name="Downtown")
+    assert restaurant.display_name == "Downtown"
+
+
+def test_display_name_uses_merchant_short_name_with_location_name() -> None:
+    """Display name should combine merchant short name and location name."""
+    merchant = Merchant(name="Chipotle Mexican Grill", short_name="Chipotle")
+    restaurant = Restaurant(name="Chipotle", location_name="Downtown")
+    restaurant.merchant = merchant
+
+    assert restaurant.display_name == "Chipotle Downtown"
 
 
 def test_restaurant_string_representation(test_restaurant) -> None:

@@ -137,10 +137,7 @@ function restoreDraft(form) {
 
     showDraftIndicator('Draft restored', 'info');
     return true;
-  } catch (error) {
-    console.warn('Failed to restore draft:', error);
-    return false;
-  }
+  } catch {}
 }
 
 /**
@@ -196,9 +193,7 @@ function saveDraft(form) {
     const storageKey = getDraftKey(form);
     localStorage.setItem(storageKey, JSON.stringify(draftData));
     showDraftIndicator('Draft saved', 'success');
-  } catch (error) {
-    console.warn('Failed to save draft:', error);
-  }
+  } catch {}
 }
 
 /**
@@ -210,9 +205,7 @@ function clearDraft(form) {
     const storageKey = getDraftKey(form);
     localStorage.removeItem(storageKey);
     hideDraftIndicator();
-  } catch (error) {
-    console.warn('Failed to clear draft:', error);
-  }
+  } catch {}
 }
 
 /**
@@ -224,9 +217,7 @@ function hasDraft(form) {
   try {
     const storageKey = getDraftKey(form);
     return localStorage.getItem(storageKey) !== null;
-  } catch {
-    return false;
-  }
+  } catch {}
 }
 
 /**
@@ -271,12 +262,4 @@ function initAutoSave(form) {
 }
 
 // Export functions
-export {
-  initAutoSave,
-  saveDraft,
-  restoreDraft,
-  clearDraft,
-  hasDraft,
-  showDraftIndicator,
-  hideDraftIndicator,
-};
+export { initAutoSave, saveDraft, restoreDraft, clearDraft, hasDraft, showDraftIndicator, hideDraftIndicator };

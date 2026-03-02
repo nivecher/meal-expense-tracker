@@ -15,7 +15,7 @@ class ModernAvatarManager {
       ['#fa709a', '#fee140'], // Orange gradient
       ['#a8edea', '#fed6e3'], // Teal gradient
       ['#ffecd2', '#fcb69f'], // Peach gradient
-      ['#ff9a9e', '#fecfef'],  // Rose gradient
+      ['#ff9a9e', '#fecfef'], // Rose gradient
     ];
 
     this.init();
@@ -281,7 +281,6 @@ class ModernAvatarManager {
     }
     // Fallback to first letter or 'U'
     return (parts[0] || 'U')[0].toUpperCase();
-
   }
 
   getColorForUser(identifier) {

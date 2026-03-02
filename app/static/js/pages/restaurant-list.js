@@ -5,6 +5,104 @@
 
 import { initializeRobustFaviconHandling } from '../utils/robust-favicon-handler.js';
 import { toast } from '../utils/notifications.js';
+import { PlacesMapView } from '../components/places-map-view.js';
+
+function ensureAddToMyRestaurantsHandler() {
+  if (typeof window.addToMyRestaurants === 'function') {
+    return;
+  }
+
+  window.addToMyRestaurants = async function addToMyRestaurants(placeId) {
+    try {
+      if (!placeId || placeId === 'null' || placeId === 'undefined') {
+        throw new Error(`Invalid place ID: ${placeId}`);
+      }
+
+      const configElement = document.getElementById('places-map-config');
+      const mapConfig = configElement ? JSON.parse(configElement.textContent) : {};
+      const csrfToken = mapConfig.csrfToken || '';
+      const addRestaurantUrl = mapConfig.addRestaurantUrl || '';
+
+      if (!csrfToken || !addRestaurantUrl) {
+        throw new Error('Missing configuration for restaurant addition');
+      }
+
+      toast.info('Adding restaurant to your list...');
+
+      const detailsResponse = await fetch(`/restaurants/api/places/details/${placeId}?include_enterprise=false`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!detailsResponse.ok) {
+        throw new Error(`Failed to get restaurant details: ${detailsResponse.status}`);
+      }
+
+      const restaurantData = await detailsResponse.json();
+
+      const requestData = {
+        name: restaurantData.name || '',
+        type: restaurantData.type || 'restaurant',
+        description: restaurantData.description || '',
+        address_line_1: restaurantData.address_line_1 || '',
+        address_line_2: restaurantData.address_line_2 || '',
+        city: restaurantData.city || '',
+        state: restaurantData.state || '',
+        postal_code: restaurantData.postal_code || '',
+        country: restaurantData.country || '',
+        phone: restaurantData.phone || '',
+        website: restaurantData.website || '',
+        email: restaurantData.email || '',
+        google_place_id: restaurantData.google_place_id || '',
+        cuisine: restaurantData.cuisine || '',
+        service_level: restaurantData.service_level || '',
+        price_level: restaurantData.price_level ?? null,
+        is_chain: restaurantData.is_chain ? true : false,
+        rating: restaurantData.rating || '',
+        notes: restaurantData.notes || '',
+        latitude: restaurantData.latitude ?? null,
+        longitude: restaurantData.longitude ?? null,
+      };
+
+      const addResponse = await fetch(addRestaurantUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      const responseData = await addResponse.json();
+
+      if (addResponse.status === 200 || addResponse.status === 201) {
+        toast.success('Restaurant added to your list!');
+        return {
+          success: true,
+          exists: false,
+          restaurantId: responseData?.restaurant_id || null,
+        };
+      }
+
+      if (addResponse.status === 409) {
+        toast.warning(responseData.message || 'Restaurant already exists in your list.');
+        return {
+          success: false,
+          exists: true,
+          restaurantId: responseData?.restaurant_id || null,
+        };
+      }
+
+      throw new Error(responseData.message || 'Failed to add restaurant');
+    } catch (error) {
+      toast.error(error?.message || 'Failed to add restaurant');
+      throw error;
+    }
+  };
+}
 
 function getActiveRestaurantFilterCount() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -131,9 +229,7 @@ function getCookieValue(name) {
   if (!match) return null;
   try {
     return decodeURIComponent(match.slice(prefix.length));
-  } catch {
-    return match.slice(prefix.length);
-  }
+  } catch {}
 }
 
 function setCookieValue(name, value, days = 365) {
@@ -147,9 +243,7 @@ function getStoredPreference(storageKey, cookieKey) {
   try {
     const localValue = localStorage.getItem(storageKey);
     if (localValue) return localValue;
-  } catch {
-    // localStorage may be unavailable (privacy mode / locked down browsers)
-  }
+  } catch {}
 
   return getCookieValue(cookieKey);
 }
@@ -157,9 +251,7 @@ function getStoredPreference(storageKey, cookieKey) {
 function persistPreference(storageKey, cookieKey, value) {
   try {
     localStorage.setItem(storageKey, value);
-  } catch {
-    // localStorage may be unavailable (privacy mode / locked down browsers)
-  }
+  } catch {}
 
   setCookieValue(cookieKey, value);
 }
@@ -176,7 +268,9 @@ function getSelectedRestaurantInputs() {
 }
 
 function getSelectedRestaurantIds() {
-  return getSelectedRestaurantInputs().map((input) => input.value).filter(Boolean);
+  return getSelectedRestaurantInputs()
+    .map((input) => input.value)
+    .filter(Boolean);
 }
 
 let stickyOffsetUpdateScheduled = false;
@@ -346,10 +440,33 @@ function initRestaurantSelectionActions() {
   document.addEventListener('input', handleRestaurantSelectionChange);
 }
 
+function initRestaurantRowClickSelection() {
+  if (document.body.dataset.restaurantRowClickListener === 'true') return;
+  document.body.dataset.restaurantRowClickListener = 'true';
+
+  document.addEventListener('click', (event) => {
+    const { target } = event;
+    if (!(target instanceof Element)) return;
+
+    if (target.closest('input, a, button, label, select, textarea')) return;
+
+    const row = target.closest('#restaurantTable tbody tr');
+    if (!row || row.dataset.dividerRow === 'true') return;
+
+    const checkbox = row.querySelector('input[name="restaurant-select"]');
+    if (!(checkbox instanceof HTMLInputElement)) return;
+
+    checkbox.checked = !checkbox.checked;
+    applyRestaurantSelectionState();
+  });
+}
+
 function getCityRows(cityLabel) {
-  return Array.from(
-    document.querySelectorAll(`tr[data-restaurant-city-group="${CSS.escape(cityLabel)}"]`),
-  );
+  return Array.from(document.querySelectorAll(`tr[data-restaurant-city-group="${CSS.escape(cityLabel)}"]`));
+}
+
+function getAlphaRows(alphaLabel) {
+  return Array.from(document.querySelectorAll(`tr[data-restaurant-alpha-group="${CSS.escape(alphaLabel)}"]`));
 }
 
 function setCityCollapsedState(dividerRow, cityLabel, isCollapsed) {
@@ -372,30 +489,60 @@ function setCityCollapsedState(dividerRow, cityLabel, isCollapsed) {
   }
 }
 
+function setAlphaCollapsedState(dividerRow, alphaLabel, isCollapsed) {
+  const rows = getAlphaRows(alphaLabel);
+  rows.forEach((row) => {
+    row.classList.toggle('alpha-hidden', isCollapsed);
+  });
+  if (!dividerRow) return;
+
+  dividerRow.dataset.alphaCollapsed = isCollapsed ? 'true' : 'false';
+  dividerRow.classList.toggle('alpha-collapsed', isCollapsed);
+  const toggleButton = dividerRow.querySelector('[data-alpha-toggle]');
+  if (toggleButton) {
+    toggleButton.setAttribute('aria-expanded', String(!isCollapsed));
+    const icon = toggleButton.querySelector('i');
+    if (icon) {
+      icon.classList.toggle('fa-chevron-right', isCollapsed);
+      icon.classList.toggle('fa-chevron-down', !isCollapsed);
+    }
+  }
+}
+
 function initRestaurantCityToggles() {
   if (document.body.dataset.restaurantCityToggleListener === 'true') return;
   document.body.dataset.restaurantCityToggleListener = 'true';
 
   document.addEventListener('click', (event) => {
-    const toggleButton = event.target.closest('[data-city-toggle]');
-    if (!toggleButton) return;
-    const cityLabel = toggleButton.dataset.cityToggle || '';
-    if (!cityLabel) return;
-    const dividerRow = toggleButton.closest('tr');
-    const currentlyCollapsed = dividerRow?.dataset.cityCollapsed === 'true';
-    setCityCollapsedState(dividerRow, cityLabel, !currentlyCollapsed);
+    const { target } = event;
+    if (!(target instanceof Element)) return;
+
+    const cityToggleButton = target.closest('[data-city-toggle]');
+    if (cityToggleButton) {
+      const cityLabel = cityToggleButton.dataset.cityToggle || '';
+      if (!cityLabel) return;
+      const dividerRow = cityToggleButton.closest('tr');
+      const currentlyCollapsed = dividerRow?.dataset.cityCollapsed === 'true';
+      setCityCollapsedState(dividerRow, cityLabel, !currentlyCollapsed);
+      return;
+    }
+
+    const alphaToggleButton = target.closest('[data-alpha-toggle]');
+    if (!alphaToggleButton) return;
+    const alphaLabel = alphaToggleButton.dataset.alphaToggle || '';
+    if (!alphaLabel) return;
+    const dividerRow = alphaToggleButton.closest('tr');
+    const currentlyCollapsed = dividerRow?.dataset.alphaCollapsed === 'true';
+    setAlphaCollapsedState(dividerRow, alphaLabel, !currentlyCollapsed);
   });
 }
 
 // Helper function to clean up modal backdrop
-function cleanupModalBackdrop() {
-  const backdrops = document.querySelectorAll('.modal-backdrop');
-  backdrops.forEach((backdrop) => {
-    backdrop.remove();
-  });
-  document.body.classList.remove('modal-open');
-  document.body.style.overflow = '';
-  document.body.style.paddingRight = '';
+function buildRestaurantDeleteUrl(baseUrl, restaurantId) {
+  if (!baseUrl || !restaurantId) return '';
+  let normalizedBase = baseUrl;
+  if (normalizedBase.endsWith('/')) normalizedBase = normalizedBase.slice(0, -1);
+  return `${normalizedBase}/${restaurantId}`;
 }
 
 function openRestaurantBulkDeleteModal(selectedIds) {
@@ -410,12 +557,46 @@ function openRestaurantBulkDeleteModal(selectedIds) {
   }
 }
 
+function ensureDeleteRestaurantModal() {
+  const existing = document.getElementById('deleteRestaurantModal');
+  if (existing) return existing;
+
+  const template = document.getElementById('deleteRestaurantModalTemplate');
+  if (!(template instanceof HTMLTemplateElement)) return null;
+
+  const modalNode = template.content.firstElementChild?.cloneNode(true);
+  if (!(modalNode instanceof HTMLElement)) return null;
+
+  document.body.appendChild(modalNode);
+
+  const deleteForm = modalNode.querySelector('#deleteRestaurantForm');
+  if (deleteForm instanceof HTMLFormElement && deleteForm.dataset.listenerAttached !== 'true') {
+    deleteForm.dataset.listenerAttached = 'true';
+    deleteForm.addEventListener('submit', () => {
+      const submitButton = deleteForm.querySelector('button[type="submit"]');
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Deleting...';
+      }
+    });
+  }
+
+  modalNode.addEventListener('hidden.bs.modal', () => {
+    modalNode.remove();
+  });
+
+  return modalNode;
+}
+
 function openRestaurantDeleteModal(restaurantId, restaurantName) {
   if (!restaurantId) return;
 
-  const modalTitle = document.getElementById('deleteRestaurantModalLabel');
-  const restaurantNameElement = document.getElementById('restaurantName');
-  const deleteForm = document.getElementById('deleteRestaurantForm');
+  const modalElement = ensureDeleteRestaurantModal();
+  if (!modalElement) return;
+
+  const modalTitle = modalElement.querySelector('#deleteRestaurantModalLabel');
+  const restaurantNameElement = modalElement.querySelector('#restaurantName');
+  const deleteForm = modalElement.querySelector('#deleteRestaurantForm');
 
   if (modalTitle) {
     modalTitle.textContent = `Delete Restaurant: ${restaurantName || ''}`;
@@ -426,64 +607,15 @@ function openRestaurantDeleteModal(restaurantId, restaurantName) {
   }
 
   if (deleteForm) {
-    const deleteUrl = deleteForm.getAttribute('data-delete-url');
-    deleteForm.action = `${deleteUrl}/${restaurantId}`;
-    deleteForm.onsubmit = (e) => {
-      e.preventDefault();
-
-      fetch(`/restaurants/delete/${restaurantId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({
-          csrf_token: document.querySelector('input[name="csrf_token"]')?.value || '',
-        }),
-      })
-        .then((response) => {
-          if (response.ok) {
-            toast.success('Restaurant deleted successfully.');
-            const elementsWithId = document.querySelectorAll(`[data-restaurant-id="${restaurantId}"]`);
-            elementsWithId.forEach((element) => {
-              const cardContainer = element.closest('.col');
-              if (cardContainer) {
-                cardContainer.remove();
-              }
-              const tableRow = element.closest('tr');
-              if (tableRow) {
-                tableRow.remove();
-              }
-            });
-            const modalElement = document.getElementById('deleteRestaurantModal');
-            const modalInstance = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
-            modalInstance.hide();
-            if (modalElement) {
-              modalElement.addEventListener('hidden.bs.modal', cleanupModalBackdrop, { once: true });
-            }
-            return;
-          }
-          return response.json().then((data) => {
-            if (data.error) {
-              toast.error(data.error);
-            } else {
-              window.location.reload();
-            }
-          });
-        })
-        .catch((error) => {
-          console.error('Error:', error);
-          toast.error('An error occurred while deleting the restaurant.');
-          cleanupModalBackdrop();
-        });
-    };
+    const deleteUrlBase = deleteForm.getAttribute('data-delete-url') || '';
+    const deleteUrl = buildRestaurantDeleteUrl(deleteUrlBase, restaurantId);
+    if (deleteUrl) {
+      deleteForm.action = deleteUrl;
+    }
   }
 
-  const modalElement = document.getElementById('deleteRestaurantModal');
-  if (modalElement) {
-    const modalInstance = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
-    modalInstance.show();
-  }
+  const modalInstance = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+  modalInstance.show();
 }
 
 async function performBulkRestaurantDelete(restaurantIds) {
@@ -509,10 +641,7 @@ async function performBulkRestaurantDelete(restaurantIds) {
     }
     toast.success('Selected restaurants deleted.');
     window.location.reload();
-  } catch (error) {
-    console.warn('Bulk delete failed', error);
-    toast.error('Unable to delete selected restaurants.');
-  }
+  } catch {}
 }
 
 function initRestaurantBulkActions() {
@@ -627,93 +756,24 @@ function initViewToggle() {
 
 // Delete restaurant functionality - optimized with event delegation
 function initDeleteRestaurant() {
-  // Use event delegation for better performance
+  const template = document.getElementById('deleteRestaurantModalTemplate');
+  if (!template) return;
+  if (template.dataset.listenerAttached === 'true') return;
+  template.dataset.listenerAttached = 'true';
+
   document.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-action="delete-restaurant"]');
+    const { target } = event;
+    if (!(target instanceof Element)) return;
+
+    const button = target.closest('[data-action="delete-restaurant"][data-restaurant-id]');
     if (!button) return;
 
     event.preventDefault();
-
-    const restaurantId = button.getAttribute('data-restaurant-id');
-    const restaurantName = button.getAttribute('data-restaurant-name');
-    const modalTitle = document.getElementById('deleteRestaurantModalLabel');
-    const restaurantNameElement = document.getElementById('restaurantName');
-    const deleteForm = document.getElementById('deleteRestaurantForm');
-
-    if (modalTitle) {
-      modalTitle.textContent = `Delete Restaurant: ${restaurantName}`;
-    }
-
-    if (restaurantNameElement) {
-      restaurantNameElement.textContent = restaurantName;
-    }
-
-    if (deleteForm) {
-      const deleteUrl = deleteForm.getAttribute('data-delete-url');
-      deleteForm.action = `${deleteUrl}/${restaurantId}`;
-    }
-
-    // Show the modal
-    const modalElement = document.getElementById('deleteRestaurantModal');
-    const modal = new bootstrap.Modal(modalElement);
-    modal.show();
-
-    // Handle form submission
-    if (deleteForm) {
-      deleteForm.onsubmit = (e) => {
-        e.preventDefault();
-
-        fetch(`/restaurants/delete/${restaurantId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-          body: JSON.stringify({
-            csrf_token: document.querySelector('input[name="csrf_token"]').value,
-          }),
-        })
-          .then((response) => {
-            if (response.ok) {
-              toast.success('Restaurant deleted successfully.');
-              // Remove restaurant from both card view and table view
-              const elementsWithId = document.querySelectorAll(`[data-restaurant-id="${restaurantId}"]`);
-              elementsWithId.forEach((element) => {
-                // For card view: find the parent .col div and remove it
-                const cardContainer = element.closest('.col');
-                if (cardContainer) {
-                  cardContainer.remove();
-                }
-                // For table view: find the parent tr and remove it
-                const tableRow = element.closest('tr');
-                if (tableRow) {
-                  tableRow.remove();
-                }
-              });
-              // Close the modal and clean up backdrop
-              modal.hide();
-              // Wait for modal to fully close, then remove any leftover backdrop
-              if (modalElement) {
-                modalElement.addEventListener('hidden.bs.modal', cleanupModalBackdrop, { once: true });
-              }
-            } else {
-              return response.json().then((data) => {
-                if (data.error) {
-                  toast.error(data.error);
-                } else {
-                  window.location.reload();
-                }
-              });
-            }
-          })
-          .catch((error) => {
-            console.error('Error:', error);
-            toast.error('An error occurred while deleting the restaurant.');
-            // Clean up backdrop on error as well
-            cleanupModalBackdrop();
-          });
-      };
-    }
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    const restaurantId = button.getAttribute('data-restaurant-id') || '';
+    const restaurantName = button.getAttribute('data-restaurant-name') || '';
+    openRestaurantDeleteModal(restaurantId, restaurantName);
   });
 }
 
@@ -768,16 +828,52 @@ function initHtmxIntegration() {
   document.addEventListener('htmx:afterSettle', maybeReapply);
 }
 
+let placesMapViewInstance = null;
+
+function initPlacesMapView() {
+  if (placesMapViewInstance) return;
+
+  const container = document.getElementById('places-map-container');
+  if (!container) {
+    toast.error('Places map container not found.');
+    return;
+  }
+
+  try {
+    ensureAddToMyRestaurantsHandler();
+
+    placesMapViewInstance = new PlacesMapView(container, {
+      onError: (err) => toast.error(err?.message || 'Map error'),
+    });
+  } catch (err) {
+    toast.error(err?.message || 'Failed to load Places map.');
+    const sidebar = document.getElementById('places-sidebar-content');
+    if (sidebar) {
+      sidebar.innerHTML =
+        '<div class="alert alert-danger mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Failed to load map. Check the console for details.</div>';
+    }
+  }
+}
+
+function initPlacesTabLazyLoad() {
+  // Init when Places map container exists (/restaurants/places or Places tab)
+  if (document.getElementById('places-map-container')) {
+    initPlacesMapView();
+  }
+}
+
 // Main initialization function - optimized for performance
 function init() {
   // Critical functionality that must run immediately
   initViewToggle();
   initDeleteRestaurant();
   initRestaurantSelectionActions();
+  initRestaurantRowClickSelection();
   initRestaurantBulkActions();
   initRestaurantDeleteSelected();
   initRestaurantFilterClear();
   initHtmxIntegration();
+  initPlacesTabLazyLoad();
   applyRestaurantSelectionState();
   initRestaurantCityToggles();
   updateRestaurantFilterIndicators();
@@ -793,5 +889,9 @@ function init() {
   initFaviconLoading();
 }
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', init);
+// Initialize when DOM is ready (or immediately if already loaded, e.g. after HTMX swap)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

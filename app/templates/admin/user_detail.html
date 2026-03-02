@@ -94,6 +94,14 @@
                         <span class="badge bg-secondary">User</span>
                         {% endif %}
                     </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Advanced:</span>
+                        {% if user.has_advanced_features %}
+                        <span class="badge bg-info text-dark">Advanced</span>
+                        {% else %}
+                        <span class="badge bg-light text-dark">Standard</span>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <!-- Action Buttons -->
@@ -141,6 +149,20 @@
                         </button>
                     </form>
 
+                    <form
+                        method="POST"
+                        action="{{ url_for('admin.toggle_user_advanced_features', user_id=user.id) }}"
+                        class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <button
+                            type="submit"
+                            class="btn btn-{{ 'outline-secondary' if user.advanced_features_enabled else 'outline-info' }} w-100 mb-2"
+                            data-confirm="Are you sure you want to {{ 'disable' if user.advanced_features_enabled else 'enable' }} Advanced Features for {{ user.get_display_name() }}?">
+                            <i class="fas fa-bolt me-1"></i>
+                            {{ 'Disable' if user.advanced_features_enabled else 'Enable' }} Advanced Features
+                        </button>
+                    </form>
+
                     <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}" class="d-inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                         <button
@@ -183,6 +205,16 @@
                     <div class="fw-bold">
                         {{ user.updated_at|format_datetime_user_tz('%Y-%m-%d %H:%M') if user.updated_at else 'Unknown'
                         }}
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Advanced Features:</small>
+                    <div class="fw-bold">
+                        {% if user.has_advanced_features %} Enabled{% if user.is_admin %} (Admin override){% endif %} {%
+                        else %} Disabled {% endif %}
+                    </div>
+                    <div class="text-muted small">
+                        Includes Google Places Enterprise integration (phone, price level, rating).
                     </div>
                 </div>
                 {% if user.timezone %}

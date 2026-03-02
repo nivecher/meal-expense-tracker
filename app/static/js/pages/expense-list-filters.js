@@ -161,9 +161,7 @@ function getCookieValue(name) {
   if (!match) return null;
   try {
     return decodeURIComponent(match.slice(prefix.length));
-  } catch {
-    return match.slice(prefix.length);
-  }
+  } catch {}
 }
 
 function setCookieValue(name, value, days = 365) {
@@ -177,9 +175,7 @@ function getStoredPreference(storageKey, cookieKey) {
   try {
     const localValue = localStorage.getItem(storageKey);
     if (localValue) return localValue;
-  } catch {
-    // localStorage may be unavailable (privacy mode / locked down browsers)
-  }
+  } catch {}
 
   return getCookieValue(cookieKey);
 }
@@ -187,9 +183,7 @@ function getStoredPreference(storageKey, cookieKey) {
 function persistPreference(storageKey, cookieKey, value) {
   try {
     localStorage.setItem(storageKey, value);
-  } catch {
-    // localStorage may be unavailable (privacy mode / locked down browsers)
-  }
+  } catch {}
 
   setCookieValue(cookieKey, value);
 }
@@ -205,7 +199,14 @@ export function applyExpenseViewPreference() {
   }
 
   const storedView = getStoredPreference('expenseViewPreference', 'expense_view_preference');
-  const view = storedView === 'compact' ? 'table' : (storedView === 'table' || storedView === 'card' ? storedView : (tableView.checked ? 'table' : 'card'));
+  const view =
+    storedView === 'compact'
+      ? 'table'
+      : storedView === 'table' || storedView === 'card'
+        ? storedView
+        : tableView.checked
+          ? 'table'
+          : 'card';
   persistPreference('expenseViewPreference', 'expense_view_preference', view);
 
   if (view === 'table') {

@@ -254,6 +254,36 @@ setup_node_environment() {
   log_info "Node.js environment setup complete"
 }
 
+setup_pre_commit_hooks() {
+  log_section "Setting up git hooks"
+
+  cd "$PROJECT_ROOT"
+
+  if ! command -v pre-commit >/dev/null 2>&1; then
+    log_warn "pre-commit not found, skipping hook installation"
+    return 0
+  fi
+
+  if [[ ! -f ".pre-commit-config.yaml" ]]; then
+    log_warn ".pre-commit-config.yaml not found, skipping hook installation"
+    return 0
+  fi
+
+  log_info "Installing pre-commit hook..."
+  pre-commit install
+
+  if command -v node >/dev/null 2>&1 && [[ -d "node_modules" ]]; then
+    log_info "Installing commit-msg hook..."
+    pre-commit install --hook-type commit-msg
+    log_info "Installing pre-push hook..."
+    pre-commit install --hook-type pre-push
+  else
+    log_warn "Node.js or node_modules missing; skipping commit-msg/pre-push hook installation"
+  fi
+
+  log_info "Git hooks setup complete"
+}
+
 install_docker() {
   log_section "Installing Docker"
 
@@ -648,6 +678,7 @@ run_full_mode() {
 
   setup_python_environment
   setup_node_environment
+  setup_pre_commit_hooks
   setup_database
 
   log_info "✅ Full development setup complete"
@@ -662,6 +693,7 @@ run_minimal_mode() {
   }
 
   setup_python_environment
+  setup_pre_commit_hooks
 
   log_info "✅ Minimal setup complete"
 }

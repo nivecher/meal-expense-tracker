@@ -101,6 +101,37 @@ user_avatar_dropdown %}
                     <span>Restaurants</span>
                 </a>
                 <ul class="dropdown-menu" aria-labelledby="restaurantsDropdownDesktop" role="menu">
+                    <!-- Tab Views -->
+                    <li role="none">
+                        <div role="group" aria-label="View Tabs">
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'restaurants.list_restaurants' and request.args.get('tab', 'restaurants') == 'restaurants' %}active{% endif %}"
+                                href="{{ url_for('restaurants.list_restaurants', tab='restaurants') }}"
+                                role="menuitem">
+                                <i class="fas fa-list" aria-hidden="true"></i>
+                                <span>List</span>
+                            </a>
+                            <a
+                                class="dropdown-item {% if request.endpoint == 'restaurants.list_restaurants' and request.args.get('tab') == 'places' %}active{% endif %}"
+                                href="{{ url_for('restaurants.list_restaurants', tab='places', places_mode='find') }}"
+                                role="menuitem">
+                                <i class="fas fa-map" aria-hidden="true"></i>
+                                <span>Find</span>
+                            </a>
+                            {% if current_user.has_advanced_features or current_user.is_admin %}
+                            <a
+                                class="dropdown-item {% if request.endpoint and request.endpoint.startswith('merchants.') %}active{% endif %}"
+                                href="{{ url_for('merchants.list_merchants') }}"
+                                role="menuitem">
+                                <i class="fas fa-building" aria-hidden="true"></i>
+                                <span>Merchants</span>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </li>
+                    <li role="none">
+                        <hr class="dropdown-divider" role="separator" />
+                    </li>
                     <!-- Primary Actions -->
                     <li role="none">
                         <div role="group" aria-label="Primary Actions">
@@ -111,16 +142,12 @@ user_avatar_dropdown %}
                                 <i class="fas fa-plus-circle" aria-hidden="true"></i>
                                 <span>Add Restaurant</span>
                             </a>
-                            <a class="dropdown-item" href="{{ url_for('restaurants.find_places') }}" role="menuitem">
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('restaurants.list_restaurants', tab='places', places_mode='find') }}"
+                                role="menuitem">
                                 <i class="fas fa-search-location" aria-hidden="true"></i>
                                 <span>Find Restaurants</span>
-                            </a>
-                            <a
-                                class="dropdown-item {% if request.endpoint == 'restaurants.list_restaurants' %}active{% endif %}"
-                                href="{{ url_for('restaurants.list_restaurants') }}"
-                                role="menuitem">
-                                <i class="fas fa-list" aria-hidden="true"></i>
-                                <span>View All</span>
                             </a>
                         </div>
                     </li>
@@ -310,7 +337,10 @@ user_avatar_dropdown %}
                                 <i class="fas fa-plus-circle" aria-hidden="true"></i>
                                 <span>Add Restaurant</span>
                             </a>
-                            <a class="dropdown-item" href="{{ url_for('restaurants.find_places') }}" role="menuitem">
+                            <a
+                                class="dropdown-item"
+                                href="{{ url_for('restaurants.list_restaurants', tab='places', places_mode='find') }}"
+                                role="menuitem">
                                 <i class="fas fa-search-location" aria-hidden="true"></i>
                                 <span>Find Places</span>
                             </a>

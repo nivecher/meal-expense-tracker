@@ -35,9 +35,7 @@ function setMobileSidebarOpen(isOpen) {
 function loadSidebarState() {
   try {
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
-  } catch {
-    return false;
-  }
+  } catch {}
 }
 
 function getInitialCollapsedState() {
@@ -48,9 +46,7 @@ function getInitialCollapsedState() {
 function saveSidebarState(isCollapsed) {
   try {
     localStorage.setItem(SIDEBAR_STORAGE_KEY, String(isCollapsed));
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 function initSidebarToggle() {

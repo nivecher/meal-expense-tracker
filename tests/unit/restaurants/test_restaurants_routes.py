@@ -332,6 +332,62 @@ class TestRestaurantsRoutes:
             assert result["postal_code"] == "75201"
             assert result["country"] == "United States"
 
+    def test_extract_restaurant_data_prefers_address_components_for_line_split(self, app) -> None:
+        """Address line 1/2 should come from addressComponents when available (proper street vs unit split)."""
+        with app.app_context():
+            from app.services.google_places_service import GooglePlacesService
+
+            service = GooglePlacesService(api_key="test_key")
+            place_data = {
+                "formattedAddress": "499 S State Hwy #200, Dallas, TX 75201",
+                "addressComponents": [
+                    {"types": ["street_number"], "longText": "499", "shortText": "499"},
+                    {"types": ["route"], "longText": "S State Hwy", "shortText": "S State Hwy"},
+                    {"types": ["subpremise"], "longText": "#200", "shortText": "#200"},
+                    {"types": ["locality"], "longText": "Dallas", "shortText": "Dallas"},
+                    {"types": ["administrative_area_level_1"], "longText": "Texas", "shortText": "TX"},
+                    {"types": ["postal_code"], "longText": "75201", "shortText": "75201"},
+                    {"types": ["country"], "longText": "United States", "shortText": "US"},
+                ],
+                "postalAddress": {
+                    "addressLines": ["499 S State Hwy #200"],
+                    "locality": "Dallas",
+                    "administrativeArea": "Texas",
+                    "postalCode": "75201",
+                    "regionCode": "US",
+                },
+                "displayName": {"text": "Test Restaurant"},
+                "location": {"latitude": 32.7, "longitude": -96.8},
+            }
+            result = service.extract_restaurant_data(place_data)
+            assert result["address_line_1"] == "499 S State Hwy"
+            assert result["address_line_2"] == "#200"
+            assert result["city"] == "Dallas"
+            assert result["state"] == "TX"
+
+    def test_extract_restaurant_data_splits_postal_address_combined_line(self, app) -> None:
+        """When only postalAddress has addressLines, split combined line (e.g. '499 S State Hwy #200')."""
+        with app.app_context():
+            from app.services.google_places_service import GooglePlacesService
+
+            service = GooglePlacesService(api_key="test_key")
+            place_data = {
+                "formattedAddress": "499 S State Hwy #200, Dallas, TX 75201",
+                "addressComponents": [],
+                "postalAddress": {
+                    "addressLines": ["499 S State Hwy #200"],
+                    "locality": "Dallas",
+                    "administrativeArea": "Texas",
+                    "postalCode": "75201",
+                    "regionCode": "US",
+                },
+                "displayName": {"text": "Test Restaurant"},
+                "location": {"latitude": 32.7, "longitude": -96.8},
+            }
+            result = service.extract_restaurant_data(place_data)
+            assert result["address_line_1"] == "499 S State Hwy"
+            assert result["address_line_2"] == "#200"
+
     def test_get_cuisine_choices(self) -> None:
         """Test getting cuisine choices."""
         choices = get_cuisine_choices()
@@ -440,8 +496,8 @@ class TestRestaurantsRoutes:
             assert service_level in ["quick_service", "casual_dining", "unknown"]
             assert confidence >= 0.0  # Should have some confidence
 
-    def test_analyze_restaurant_types_expensive_dessert_shop_casual_dining(self, app) -> None:
-        """Test that expensive dessert shops are classified (may return unknown if data insufficient)."""
+    def test_analyze_restaurant_types_expensive_dessert_shop_quick_service(self, app) -> None:
+        """Test that dessert shops are classified as quick_service (type-based; price does not override)."""
         place_data = {"primaryType": "dessert_shop", "priceLevel": "PRICE_LEVEL_EXPENSIVE"}
 
         with app.app_context():
@@ -449,13 +505,12 @@ class TestRestaurantsRoutes:
 
             service = GooglePlacesService(api_key="test_key")
 
-            # Test the detection logic directly
+            # Test the detection logic directly - dessert_shop is quick_service regardless of price
             service_level, confidence = service.detect_service_level_from_data(place_data)
-            # Service may return unknown if data is insufficient, or casual_dining with sufficient data
-            assert service_level in ["casual_dining", "unknown"]
+            assert service_level == "quick_service"
 
-    def test_analyze_restaurant_types_fast_food_primary_type_casual_dining(self, app) -> None:
-        """Test that fast_food_restaurant as primary type is classified as casual dining (simplified logic)."""
+    def test_analyze_restaurant_types_fast_food_primary_type_quick_service(self, app) -> None:
+        """Test that fast_food_restaurant as primary type is classified as quick_service."""
         place_data = {"primaryType": "fast_food_restaurant", "priceLevel": "PRICE_LEVEL_MODERATE"}
 
         with app.app_context():
@@ -463,11 +518,10 @@ class TestRestaurantsRoutes:
 
             service = GooglePlacesService(api_key="test_key")
 
-            # Test the detection logic directly
+            # Test the detection logic directly - fast_food_restaurant is always quick_service
             service_level, confidence = service.detect_service_level_from_data(place_data)
-            # Service may return unknown if data is insufficient, or casual_dining with simplified logic
-            assert service_level in ["casual_dining", "unknown"]
-            assert confidence >= 0.0  # Should have some confidence (may be lower with simplified logic)
+            assert service_level == "quick_service"
+            assert confidence >= 0.0
 
     def test_format_primary_type_for_display(self, app) -> None:
         """Test formatting primary types for display."""

@@ -19,10 +19,10 @@ class StickyTable {
     this.container = container;
     this.table = container.querySelector('table');
     this.headers = container.querySelectorAll('thead th');
-    this.isSticky = container.classList.contains('table-sticky-header') ||
-                       container.classList.contains('table-sticky-frozen');
-    this.isFrozen = container.classList.contains('table-frozen-columns') ||
-                       container.classList.contains('table-sticky-frozen');
+    this.isSticky =
+      container.classList.contains('table-sticky-header') || container.classList.contains('table-sticky-frozen');
+    this.isFrozen =
+      container.classList.contains('table-frozen-columns') || container.classList.contains('table-sticky-frozen');
 
     this.init();
   }
@@ -82,13 +82,17 @@ class StickyTable {
 
     let scrollTimeout;
 
-    this.container.addEventListener('scroll', () => {
-      // Debounce scroll events for better performance
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        this.handleScroll();
-      }, 16); // ~60fps
-    }, { passive: true });
+    this.container.addEventListener(
+      'scroll',
+      () => {
+        // Debounce scroll events for better performance
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          this.handleScroll();
+        }, 16); // ~60fps
+      },
+      { passive: true },
+    );
   }
 
   handleScroll() {
@@ -204,7 +208,12 @@ class StickyTable {
     }
 
     // Remove existing sticky classes
-    tableContainer.classList.remove('table-responsive', 'table-sticky-header', 'table-frozen-columns', 'table-sticky-frozen');
+    tableContainer.classList.remove(
+      'table-responsive',
+      'table-sticky-header',
+      'table-frozen-columns',
+      'table-sticky-frozen',
+    );
 
     // Add appropriate class
     switch (type) {

@@ -4,7 +4,7 @@
         <img
             src="{{ restaurant.photo_url }}"
             class="card-img-top"
-            alt="Photo of {{ restaurant.name }}"
+            alt="Photo of {{ restaurant.display_name or restaurant.name }}"
             width="300"
             height="160"
             loading="lazy" />
@@ -15,7 +15,7 @@
         {% endif %}
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-start">
-                <h5 class="card-title mb-1">{{ restaurant.name }}</h5>
+                <h5 class="card-title mb-1">{{ restaurant.display_name or restaurant.name }}</h5>
                 <div class="d-flex flex-column align-items-end gap-1">
                     {% if restaurant.price_level is not none %} {% from 'macros/badge_helpers.html' import
                     price_level_badge %} {{ price_level_badge(restaurant.price_level, size='sm') }} {% endif %} {% if

@@ -91,6 +91,10 @@ def _validate_list_users(**kwargs: Any) -> dict[str, Any]:
     if not isinstance(admin_only, bool):
         errors.append("admin_only must be a boolean")
 
+    objects = kwargs.get("objects", False)
+    if not isinstance(objects, bool):
+        errors.append("objects must be a boolean")
+
     limit = kwargs.get("limit", 100)
     if not isinstance(limit, int) or limit < 1 or limit > 1000:
         errors.append("limit must be an integer between 1 and 1000")
@@ -98,10 +102,20 @@ def _validate_list_users(**kwargs: Any) -> dict[str, Any]:
     return {"valid": len(errors) == 0, "errors": errors}
 
 
+def _count_user_objects(user: User) -> dict[str, int]:
+    """Count related objects for a user."""
+    return {
+        "expenses": user.expenses.count(),  # type: ignore[call-arg]
+        "restaurants": user.restaurants.count(),  # type: ignore[call-arg]
+        "categories": user.categories.count(),  # type: ignore[call-arg]
+    }
+
+
 def _execute_list_users(**kwargs: Any) -> dict[str, Any]:
     """Execute list users operation."""
     try:
         admin_only = kwargs.get("admin_only", False)
+        objects = kwargs.get("objects", False)
         limit = kwargs.get("limit", 100)
 
         query = User.query
@@ -112,17 +126,23 @@ def _execute_list_users(**kwargs: Any) -> dict[str, Any]:
 
         user_data = []
         for user in users:
-            user_data.append(
-                {
-                    "id": user.id,
-                    "username": user.username,
-                    "email": user.email,
-                    "is_admin": getattr(user, "is_admin", False),
-                    "is_active": getattr(user, "is_active", True),
-                    "created_at": getattr(user, "created_at", None),
-                    "last_login": getattr(user, "last_login", None),
-                }
-            )
+            row: dict[str, Any] = {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "is_admin": getattr(user, "is_admin", False),
+                "advanced_features_enabled": getattr(user, "advanced_features_enabled", False),
+                "has_advanced_features": getattr(user, "has_advanced_features", False),
+                "is_active": getattr(user, "is_active", True),
+                "created_at": getattr(user, "created_at", None),
+                "last_login": getattr(user, "last_login", None),
+            }
+            if objects:
+                counts = _count_user_objects(user)
+                row["expenses"] = counts["expenses"]
+                row["restaurants"] = counts["restaurants"]
+                row["categories"] = counts["categories"]
+            user_data.append(row)
 
         return {
             "success": True,
@@ -130,7 +150,7 @@ def _execute_list_users(**kwargs: Any) -> dict[str, Any]:
             "data": {
                 "users": user_data,
                 "total_count": len(user_data),
-                "filtered": {"admin_only": admin_only},
+                "filtered": {"admin_only": admin_only, "objects": objects},
                 "limit_applied": limit,
             },
         }
@@ -159,6 +179,10 @@ def _validate_create_user(**kwargs: Any) -> dict[str, Any]:
     admin = kwargs.get("admin", False)
     if not isinstance(admin, bool):
         errors.append("admin must be a boolean")
+
+    advanced = kwargs.get("advanced", False)
+    if not isinstance(advanced, bool):
+        errors.append("advanced must be a boolean")
 
     active = kwargs.get("active", True)
     if not isinstance(active, bool):
@@ -210,7 +234,11 @@ def _validate_update_user(**kwargs: Any) -> dict[str, Any]:
     if active is not None and not isinstance(active, bool):
         errors.append("active must be a boolean")
 
-    if not any([new_email, new_username, password, admin is not None, active is not None]):
+    advanced = kwargs.get("advanced")
+    if advanced is not None and not isinstance(advanced, bool):
+        errors.append("advanced must be a boolean")
+
+    if not any([new_email, new_username, password, admin is not None, active is not None, advanced is not None]):
         errors.append("No updates specified (provide at least one field to change)")
 
     return {"valid": len(errors) == 0, "errors": errors}
@@ -242,6 +270,7 @@ def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
         email = kwargs.get("email", "").strip()
         password = kwargs.get("password", "")
         admin = kwargs.get("admin", False)
+        advanced = kwargs.get("advanced", False)
         active = kwargs.get("active", True)
 
         # Check if user already exists
@@ -253,7 +282,13 @@ def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
             }
 
         # Create new user
-        user = User(username=username, email=email, is_admin=bool(admin), is_active=bool(active))
+        user = User(
+            username=username,
+            email=email,
+            is_admin=bool(admin),
+            advanced_features_enabled=bool(advanced),
+            is_active=bool(active),
+        )
         user.set_password(password)
 
         db.session.add(user)
@@ -267,6 +302,8 @@ def _execute_create_user(**kwargs: Any) -> dict[str, Any]:
                 "username": user.username,
                 "email": user.email,
                 "is_admin": user.is_admin,
+                "advanced_features_enabled": user.advanced_features_enabled,
+                "has_advanced_features": user.has_advanced_features,
                 "is_active": user.is_active,
             },
         }
@@ -331,6 +368,7 @@ def _execute_update_user(**kwargs: Any) -> dict[str, Any]:
         password = kwargs.get("password")
         admin = kwargs.get("admin")
         active = kwargs.get("active")
+        advanced = kwargs.get("advanced")
 
         user = _find_user_for_update(user_id, email, username)
         if user is None:
@@ -366,6 +404,10 @@ def _execute_update_user(**kwargs: Any) -> dict[str, Any]:
             user.is_active = active
             changes.append("is_active")
 
+        if isinstance(advanced, bool) and advanced != user.advanced_features_enabled:
+            user.advanced_features_enabled = advanced
+            changes.append("advanced_features_enabled")
+
         if not changes:
             return {
                 "success": True,
@@ -375,6 +417,8 @@ def _execute_update_user(**kwargs: Any) -> dict[str, Any]:
                     "username": user.username,
                     "email": user.email,
                     "is_admin": user.is_admin,
+                    "advanced_features_enabled": user.advanced_features_enabled,
+                    "has_advanced_features": user.has_advanced_features,
                     "is_active": user.is_active,
                     "changed_fields": [],
                 },
@@ -390,6 +434,8 @@ def _execute_update_user(**kwargs: Any) -> dict[str, Any]:
                 "username": user.username,
                 "email": user.email,
                 "is_admin": user.is_admin,
+                "advanced_features_enabled": user.advanced_features_enabled,
+                "has_advanced_features": user.has_advanced_features,
                 "is_active": user.is_active,
                 "changed_fields": changes,
             },

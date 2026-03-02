@@ -65,7 +65,6 @@ deployment.
 - Set up automated tests for critical infrastructure paths (e.g., network connectivity, IAM policies).
 
   Key Conventions
-
   1. Always lock provider versions to avoid breaking changes.
   2. Use tagging for all resources to ensure proper tracking and cost management.
   3. Ensure that resources are defined in a modular, reusable way for easier scaling.

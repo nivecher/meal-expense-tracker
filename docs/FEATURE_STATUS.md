@@ -7,6 +7,7 @@ This document serves as the single source of truth for the implementation status
 **Related Documents:**
 
 - [Feature Roadmap](./FEATURE_ROADMAP.md) - Planned features and future enhancements
+- [Google Places Field Mapping](./GOOGLE_PLACES_FIELD_MAPPING.md) - Google Places API to Restaurant model field mapping
 
 ## Status Legend
 
@@ -97,18 +98,19 @@ This document serves as the single source of truth for the implementation status
 
 ### 6. Google Maps Integration
 
-| Feature                   | Status | Implementation | Code Location                                       | Completion |
-| ------------------------- | ------ | -------------- | --------------------------------------------------- | ---------- |
-| Google Places API         | ✅     | Complete       | `app/static/js/utils/google-maps.js`                | 100%       |
-| Address Autocomplete      | ✅     | Complete       | `app/api/routes.py:90`                              | 100%       |
-| Place Details             | ✅     | Complete       | `app/api/routes.py:123`                             | 100%       |
-| Restaurant Search         | ✅     | Complete       | `app/restaurants/routes.py:40`                      | 100%       |
-| Google Places Integration | ✅     | Complete       | `app/restaurants/routes.py:693`                     | 100%       |
-| Map-Based Search          | ✅     | Complete       | `app/static/js/components/map-restaurant-search.js` | 100%       |
-| Map Display               | ✅     | Complete       | `app/templates/restaurants/places_search.html`      | 100%       |
-| API Key Management        | ✅     | Complete       | `app/main/routes.py:222`                            | 100%       |
-| Fallback Handling         | ✅     | Complete       | `app/static/js/utils/error-recovery.js`             | 100%       |
-| Modern API Detection      | ✅     | Complete       | `app/static/js/utils/google-maps.js`                | 100%       |
+| Feature                   | Status | Implementation | Code Location                                                                                               | Completion |
+| ------------------------- | ------ | -------------- | ----------------------------------------------------------------------------------------------------------- | ---------- |
+| Google Places API         | ✅     | Complete       | `app/static/js/utils/google-maps.js`                                                                        | 100%       |
+| Address Autocomplete      | ✅     | Complete       | `app/api/routes.py:90`                                                                                      | 100%       |
+| Place Details             | ✅     | Complete       | `app/api/routes.py:123`                                                                                     | 100%       |
+| Restaurant Search         | ✅     | Complete       | `app/restaurants/routes.py:40`                                                                              | 100%       |
+| Google Places Integration | ✅     | Complete       | `app/restaurants/routes.py:693`, [GOOGLE_PLACES_FIELD_MAPPING.md](./GOOGLE_PLACES_FIELD_MAPPING.md)         | 100%       |
+| Map-Based Search          | ✅     | Complete       | `app/static/js/components/map-restaurant-search.js`                                                         | 100%       |
+| Map Display               | ✅     | Complete       | `app/templates/restaurants/list.html` (`tab=places`), `app/static/js/components/places-map-view.js`         | 100%       |
+| Places Tab Map View       | ✅     | Complete       | `/restaurants/places`, `app/templates/restaurants/list.html`, `app/static/js/components/places-map-view.js` | 100%       |
+| API Key Management        | ✅     | Complete       | `app/main/routes.py:222`                                                                                    | 100%       |
+| Fallback Handling         | ✅     | Complete       | `app/static/js/utils/error-recovery.js`                                                                     | 100%       |
+| Modern API Detection      | ✅     | Complete       | `app/static/js/utils/google-maps.js`                                                                        | 100%       |
 
 ### 7. Reporting & Analytics
 
@@ -185,17 +187,17 @@ This document serves as the single source of truth for the implementation status
 
 ### 13. Development & Deployment
 
-| Feature                   | Status | Implementation                                      | Code Location                                                                     | Completion |
-| ------------------------- | ------ | --------------------------------------------------- | --------------------------------------------------------------------------------- | ---------- |
-| Make Commands             | ✅     | Complete                                            | `Makefile`                                                                        | 100%       |
-| Docker Support            | ✅     | Complete                                            | `Dockerfile`                                                                      | 100%       |
-| Terraform Infrastructure  | ✅     | Complete                                            | `terraform/`                                                                      | 100%       |
-| AWS Lambda Deployment     | ✅     | Complete                                            | `scripts/redeploy-lambda.sh`                                                      | 100%       |
-| Remote Admin (Lambda CLI) | ✅     | create-user/update-user; admin, active, credentials | `scripts/remote_admin.py`, `app/admin/operations.py`, `app/admin/lambda_admin.py` | 100%       |
-| Environment Configuration | ✅     | Complete                                            | `config.py`                                                                       | 100%       |
-| Logging                   | ✅     | Complete                                            | `app/__init__.py`                                                                 | 100%       |
-| Testing Framework         | ✅     | Complete                                            | `tests/`                                                                          | 100%       |
-| Code Quality Tools        | ✅     | Complete                                            | `Makefile`                                                                        | 100%       |
+| Feature                   | Status | Implementation                                                        | Code Location                                                                     | Completion |
+| ------------------------- | ------ | --------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ---------- |
+| Make Commands             | ✅     | Complete                                                              | `Makefile`                                                                        | 100%       |
+| Docker Support            | ✅     | Complete                                                              | `Dockerfile`                                                                      | 100%       |
+| Terraform Infrastructure  | ✅     | Complete                                                              | `terraform/`                                                                      | 100%       |
+| AWS Lambda Deployment     | ✅     | Complete                                                              | `scripts/redeploy-lambda.sh`                                                      | 100%       |
+| Remote Admin (Lambda CLI) | ✅     | Same CLI as Flask (user, category, restaurant, db); proxies to Lambda | `scripts/remote_admin.py`, `app/admin/operations.py`, `app/admin/lambda_admin.py` | 100%       |
+| Environment Configuration | ✅     | Complete                                                              | `config.py`                                                                       | 100%       |
+| Logging                   | ✅     | Complete                                                              | `app/__init__.py`                                                                 | 100%       |
+| Testing Framework         | ✅     | Complete                                                              | `tests/`                                                                          | 100%       |
+| Code Quality Tools        | ✅     | Complete                                                              | `Makefile`                                                                        | 100%       |
 
 ---
 

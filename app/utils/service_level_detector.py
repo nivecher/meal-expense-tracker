@@ -68,15 +68,19 @@ class ServiceLevelDetector:
         ServiceLevel.FAST_CASUAL: [
             "fast_casual_restaurant",
             "cafe",
-            "coffee_shop",
-            "bakery",
-            "sandwich_shop",
             "salad_shop",
         ],
         ServiceLevel.QUICK_SERVICE: [
             "meal_takeaway",
             "fast_food_restaurant",
             "convenience_store",
+            "grocery_store",
+            "supermarket",
+            "coffee_shop",
+            "sandwich_shop",
+            "bakery",
+            "dessert_shop",
+            "ice_cream_shop",
             "gas_station",
             "food_court",
             "food_truck",
@@ -84,7 +88,7 @@ class ServiceLevelDetector:
             "cart",
             "stand",
             "kiosk",
-            "fast_food",  # Add this for better detection
+            "fast_food",
         ],
     }
 
@@ -430,53 +434,67 @@ def detect_service_level_from_google_places(place_data: dict) -> ServiceLevel:
     if not place_data:
         return ServiceLevel.UNKNOWN
 
-    types = place_data.get("types", [])
+    types = list(place_data.get("types", []))
+    primary_type = place_data.get("primaryType", "")
+    primary_type_lower = primary_type.lower() if primary_type else ""
+    if primary_type and primary_type not in types:
+        types.append(primary_type)
     if not types:
         return ServiceLevel.UNKNOWN
 
     types_lower = [t.lower() for t in types]
+    # When primaryType is missing, use first type as effective primary (API may omit primary)
+    effective_primary = primary_type_lower or (types_lower[0] if types_lower else "")
 
-    # Quick Service (Fast Food) - Google's primary indicators
-    if any(
-        indicator in types_lower
-        for indicator in [
-            "fast_food_restaurant",  # Google's primary fast food type
-            "fast_food",  # Alternative fast food type
-            "meal_takeaway",  # Takeaway food
-            "food_court",  # Food court vendors
-            "convenience_store",  # Convenience stores with food
-        ]
-    ):
+    # Strong indicators: fast_food_restaurant/fast_food in types always means quick_service
+    if "fast_food_restaurant" in types_lower or "fast_food" in types_lower:
         return ServiceLevel.QUICK_SERVICE
 
-    # Fast Casual - Counter service but higher quality
-    elif any(
-        indicator in types_lower
-        for indicator in [
-            "fast_casual_restaurant",  # Google's fast casual type
-            "fast_casual",  # Alternative fast casual type
-        ]
-    ):
+    # Other types are nuanced - only match when PRIMARY type indicates it.
+    # Secondary types like meal_takeaway (takeout) can apply to any restaurant.
+    quick_service_primary = [
+        "meal_takeaway",
+        "food_court",
+        "convenience_store",
+        "grocery_store",
+        "supermarket",
+        "dessert_shop",
+        "ice_cream_shop",
+        "coffee_shop",
+        "sandwich_shop",
+        "bakery",
+    ]
+    if effective_primary and effective_primary in quick_service_primary:
+        return ServiceLevel.QUICK_SERVICE
+
+    fast_casual_primary = [
+        "fast_casual_restaurant",
+        "fast_casual",
+        "cafe",
+        "salad_shop",
+        "burrito_restaurant",
+        "deli",
+    ]
+    if effective_primary and effective_primary in fast_casual_primary:
         return ServiceLevel.FAST_CASUAL
 
-    # Fine Dining - Upscale establishments
-    elif any(
-        indicator in types_lower
-        for indicator in [
-            "fine_dining_restaurant",  # Google's fine dining type
-            "fine_dining",  # Alternative fine dining type
-            "upscale_restaurant",  # Upscale restaurants
-        ]
-    ):
+    fine_dining_primary = [
+        "fine_dining_restaurant",
+        "fine_dining",
+        "upscale_restaurant",
+    ]
+    if effective_primary and effective_primary in fine_dining_primary:
         return ServiceLevel.FINE_DINING
 
-    # Casual Dining - Regular sit-down restaurants
-    elif "restaurant" in types_lower:
+    # Casual Dining - restaurant as primary or any type (e.g. italian_restaurant, mexican_restaurant)
+    if effective_primary == "restaurant":
+        return ServiceLevel.CASUAL_DINING
+    if "restaurant" in types_lower:
+        return ServiceLevel.CASUAL_DINING
+    if any("restaurant" in t for t in types_lower):
         return ServiceLevel.CASUAL_DINING
 
-    # Unknown - no clear restaurant indicators
-    else:
-        return ServiceLevel.UNKNOWN
+    return ServiceLevel.UNKNOWN
 
 
 def _calculate_price_score(price_level: int | None, score_type: str) -> float:

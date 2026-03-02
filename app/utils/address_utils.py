@@ -218,6 +218,72 @@ USPS_ABBREVIATIONS: dict[str, str] = {
     "UPPR": "UPPER",
 }
 
+# Country variants -> ISO 3166-1 alpha-2 (for USPS/address consistency)
+_COUNTRY_TO_ISO2: dict[str, str] = {
+    # US
+    "usa": "US",
+    "united states": "US",
+    "u.s.": "US",
+    "u.s.a.": "US",
+    "united states of america": "US",
+    # Canada
+    "canada": "CA",
+    "ca": "CA",
+    # UK
+    "united kingdom": "GB",
+    "uk": "GB",
+    "gb": "GB",
+    "great britain": "GB",
+    "england": "GB",
+}
+
+
+def normalize_state_to_usps(state: str) -> str:
+    """Normalize state name to USPS 2-letter abbreviation.
+
+    Uses us.states.lookup so "Texas" -> "TX", "TX" -> "TX". Returns original
+    string if not a US state (e.g. international or unknown).
+
+    Args:
+        state: State name or abbreviation (e.g. "Texas", "TX")
+
+    Returns:
+        Two-letter abbreviation if US state, else original string trimmed.
+    """
+    if not state or not isinstance(state, str):
+        return ""
+    raw = state.strip()
+    if not raw:
+        return ""
+    try:
+        import us  # type: ignore[import-untyped]
+
+        obj = us.states.lookup(raw)
+        return obj.abbr if obj else raw
+    except Exception:
+        return raw
+
+
+def normalize_country_to_iso2(country: str) -> str:
+    """Normalize country to ISO 3166-1 alpha-2 (e.g. USA -> US).
+
+    US variants (USA, United States, U.S., U.S.A.) map to "US".
+    Other values are trimmed and returned as-is.
+
+    Args:
+        country: Country name or code
+
+    Returns:
+        Two-letter code for US variants, else trimmed input.
+    """
+    if not country or not isinstance(country, str):
+        return ""
+    raw = country.strip()
+    if not raw:
+        return ""
+    key = raw.lower()
+    return _COUNTRY_TO_ISO2.get(key, raw)
+
 
 def normalize_address_to_usps(address: str) -> str:
     """Normalize an address to USPS standard format by expanding abbreviations.

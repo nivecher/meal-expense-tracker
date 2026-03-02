@@ -29,7 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
     ],
   };
 
-  new Chart(ctx, { // eslint-disable-line no-new
+  // eslint-disable-next-line no-new -- Chart.js constructor used for side effects
+  new Chart(ctx, {
     type: 'line',
     data: chartData,
     options: {
