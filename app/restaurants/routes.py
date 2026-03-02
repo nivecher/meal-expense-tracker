@@ -78,7 +78,7 @@ def _populate_merchant_choices(form: RestaurantForm, user_id: int) -> None:
         return
 
     merchants = merchant_services.get_merchants(user_id)
-    choices: list[tuple[Any, str]] = [("", "-- Select Merchant (Optional) --")]
+    choices: list[tuple[Any, str] | tuple[Any, str, dict[str, Any]]] = [("", "-- Select Merchant (Optional) --")]
     for m in merchants:
         choices.append((str(m.id), m.name))
     form.merchant_id.choices = choices
