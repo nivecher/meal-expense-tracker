@@ -14,6 +14,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import List, Optional
 
 # Configure logging
@@ -42,7 +43,22 @@ def _parse_lambda_response(response_text: str) -> bool:
     # Handle API Gateway response format
     if "statusCode" in response:
         if response["statusCode"] == 200:
-            logger.info("✅ Database migrations completed successfully")
+            body_raw = response.get("body")
+            if body_raw:
+                try:
+                    body = json.loads(body_raw) if isinstance(body_raw, str) else body_raw
+                    if isinstance(body, dict):
+                        if body.get("success") is True:
+                            logger.info("✅ Database migrations completed successfully")
+                            return True
+                        logger.error(
+                            "❌ Migration operation returned success=false: %s",
+                            body.get("message", "No message provided"),
+                        )
+                        return False
+                except json.JSONDecodeError:
+                    logger.warning("Could not parse Lambda response body as JSON")
+            logger.info("✅ Lambda returned HTTP 200")
             return True
         logger.error("❌ Migration failed with status code: %s", response["statusCode"])
         return False
@@ -130,7 +146,12 @@ def _find_aws_cli() -> str:
     return aws_path
 
 
-def build_aws_cli_command(function_name: str, region: str | None = None, profile: str | None = None) -> list[str]:
+def build_aws_cli_command(
+    function_name: str,
+    region: str | None = None,
+    profile: str | None = None,
+    output_file: str | None = None,
+) -> list[str]:
     """Build the AWS CLI command for invoking the Lambda function.
 
     Args:
@@ -166,7 +187,7 @@ def build_aws_cli_command(function_name: str, region: str | None = None, profile
         "--log-type",
         "Tail",
         "--payload",
-        base64.b64encode(json.dumps({"admin_operation": "run_migrations"}).encode()).decode(),
+        base64.b64encode(json.dumps({"admin_operation": "run_migrations", "confirm": True}).encode()).decode(),
     ]
 
     # Add optional parameters
@@ -177,7 +198,7 @@ def build_aws_cli_command(function_name: str, region: str | None = None, profile
 
     # Add output file
     null_device = "nul" if os.name == "nt" else "/dev/null"
-    cmd_parts.append(null_device)
+    cmd_parts.append(output_file or null_device)
 
     return cmd_parts
 
@@ -198,8 +219,11 @@ def invoke_lambda_migrations(function_name: str, region: str | None = None, prof
         subprocess.SubprocessError: If the subprocess call fails
     """
     try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as response_file:
+            response_path = response_file.name
+
         # Build and validate the command
-        cmd = build_aws_cli_command(function_name, region, profile)
+        cmd = build_aws_cli_command(function_name, region, profile, output_file=response_path)
         logger.debug("Running command: %s", " ".join(shlex.quote(arg) for arg in cmd))
 
         # Execute the command with a timeout
@@ -218,11 +242,23 @@ def invoke_lambda_migrations(function_name: str, region: str | None = None, prof
             logger.error("❌ Failed to invoke Lambda: %s", result.stderr or "Unknown error")
             return False
 
+        if os.path.exists(response_path):
+            with open(response_path, encoding="utf-8") as f:
+                payload = f.read().strip()
+            if payload:
+                return _parse_lambda_response(payload)
+
         return process_lambda_response(result)
 
     except Exception as e:
         logger.error("❌ Error: %s", str(e))
         return False
+    finally:
+        if "response_path" in locals():
+            try:
+                os.remove(response_path)
+            except OSError:
+                pass
 
 
 def main() -> None:

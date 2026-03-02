@@ -51,6 +51,20 @@
             </a>
         </div>
 
+        {% if current_user.is_authenticated and (current_user.has_advanced_features or current_user.is_admin) %}
+        <div class="sidebar-section">
+            <a
+                class="sidebar-link {% if request.endpoint and request.endpoint.startswith('merchants.') %}active{% endif %}"
+                href="{{ url_for('merchants.list_merchants') }}"
+                data-bs-toggle="tooltip"
+                data-bs-placement="right"
+                title="Merchants">
+                <i class="fas fa-building" aria-hidden="true"></i>
+                <span class="nav-text">Merchants</span>
+            </a>
+        </div>
+        {% endif %}
+
         <div class="sidebar-section">
             <a
                 class="sidebar-link {% if request.endpoint and 'reports' in request.endpoint %}active{% endif %}"
