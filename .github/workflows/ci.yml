@@ -316,8 +316,8 @@ jobs:
       - name: Assert database is at migration head
         run: |
           source venv/bin/activate
-          CURRENT_REV=$(flask db current 2>/dev/null | grep -oE '^[a-f0-9]+' | head -1 || true)
-          HEAD_REV=$(flask db heads 2>/dev/null | grep -oE '^[a-f0-9]+' | head -1 || true)
+          CURRENT_REV=$(flask db current 2>/dev/null | awk 'NR==1 {print $1}' || true)
+          HEAD_REV=$(flask db heads 2>/dev/null | awk 'NR==1 {print $1}' || true)
           echo "Current revision: ${CURRENT_REV}"
           echo "Head revision: ${HEAD_REV}"
           if [ -z "${CURRENT_REV}" ] || [ -z "${HEAD_REV}" ] || [ "${CURRENT_REV}" != "${HEAD_REV}" ]; then
